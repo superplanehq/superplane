@@ -21,6 +21,8 @@ export interface FieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
   readOnly?: boolean;
+  /** Keep the standard edit layout and disable controls instead of switching to readonly presentation. */
+  preserveEditLayout?: boolean;
   excludedSuggestions?: string[];
   valuePreviewLabel?: string;
   expressionPreviewContext?: Record<string, unknown> | null;

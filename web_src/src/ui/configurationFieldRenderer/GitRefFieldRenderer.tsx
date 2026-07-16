@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildGitRef, gitRefPlaceholder, parseGitRef, type GitRefKind } from "@/lib/gitRef";
 import type { FieldRendererProps } from "./types";
 
-export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const effective = (value as string) ?? (field.defaultValue as string) ?? "";
   const initial = React.useMemo(() => parseGitRef(effective), [effective]);
 
@@ -18,6 +18,10 @@ export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
   }, [initial.kind, initial.name]);
 
   const update = (nextKind: GitRefKind, nextName: string) => {
+    if (readOnly) {
+      return;
+    }
+
     setKind(nextKind);
     setName(nextName);
     const ref = buildGitRef(nextKind, nextName);
@@ -27,7 +31,7 @@ export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
   return (
     <div className="flex gap-2">
       <div className="w-40 min-w-32">
-        <Select value={kind} onValueChange={(v) => update((v as GitRefKind) || "branch", name)}>
+        <Select value={kind} onValueChange={(v) => update((v as GitRefKind) || "branch", name)} disabled={readOnly}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Reference type" />
           </SelectTrigger>
@@ -45,6 +49,7 @@ export const GitRefFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
           onChange={(e) => update(kind, e.target.value)}
           placeholder={field.placeholder || gitRefPlaceholder(kind)}
           className=""
+          disabled={readOnly}
         />
       </div>
     </div>

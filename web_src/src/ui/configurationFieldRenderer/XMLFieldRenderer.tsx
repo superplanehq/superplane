@@ -9,7 +9,13 @@ import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
+export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  readOnly = false,
+}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [validationError, setValidationError] = React.useState<string | null>(null);
@@ -53,6 +59,10 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
   };
 
   const handleEditorChange = (newValue: string | undefined) => {
+    if (readOnly) {
+      return;
+    }
+
     const valueToUse = newValue || "";
     validateXML(valueToUse);
     onChange(valueToUse || undefined);
@@ -85,6 +95,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
       comments: false,
     },
     wordBasedSuggestions: "off" as const,
+    readOnly,
   };
 
   return (
@@ -97,11 +108,13 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
               </button>
             </SimpleTooltip>
-            <SimpleTooltip content="Expand">
-              <button onClick={() => setIsModalOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
-                {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
-              </button>
-            </SimpleTooltip>
+            {!readOnly ? (
+              <SimpleTooltip content="Expand">
+                <button onClick={() => setIsModalOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
+                  {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                </button>
+              </SimpleTooltip>
+            ) : null}
           </div>
           <Editor
             height="100%"
@@ -117,45 +130,47 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
       </div>
 
       {/* Expanded Editor Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between">
-            <DialogTitle>{field.label || field.name}</DialogTitle>
-            <DialogDescription className="sr-only">
-              Expanded XML editor for {field.label || field.name}.
-            </DialogDescription>
-            <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard();
+      {!readOnly ? (
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <DialogTitle>{field.label || field.name}</DialogTitle>
+              <DialogDescription className="sr-only">
+                Expanded XML editor for {field.label || field.name}.
+              </DialogDescription>
+              <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard();
+                  }}
+                >
+                  {React.createElement(resolveIcon("copy"), { size: 14 })}
+                  Copy
+                </Button>
+              </SimpleTooltip>
+            </div>
+            <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-md">
+              <Editor
+                height="600px"
+                defaultLanguage="xml"
+                value={editorValue}
+                onChange={handleEditorChange}
+                onMount={handleEditorMount}
+                theme={monacoTheme}
+                options={{
+                  ...editorOptions,
+                  automaticLayout: true,
                 }}
-              >
-                {React.createElement(resolveIcon("copy"), { size: 14 })}
-                Copy
-              </Button>
-            </SimpleTooltip>
-          </div>
-          <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-md">
-            <Editor
-              height="600px"
-              defaultLanguage="xml"
-              value={editorValue}
-              onChange={handleEditorChange}
-              onMount={handleEditorMount}
-              theme={monacoTheme}
-              options={{
-                ...editorOptions,
-                automaticLayout: true,
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </>
   );
 };
