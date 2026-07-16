@@ -1060,15 +1060,13 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 
 ```json
 {
-  "data": [
-    {
-      "exit_code": 0,
-      "result": {
-        "example": "value"
-      },
-      "status": "succeeded"
-    }
-  ],
+  "data": {
+    "exit_code": 0,
+    "result": {
+      "example": "value"
+    },
+    "status": "succeeded"
+  },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runner.finished"
 }
@@ -1122,15 +1120,13 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 
 ```json
 {
-  "data": [
-    {
-      "exit_code": 0,
-      "result": {
-        "example": "value"
-      },
-      "status": "succeeded"
-    }
-  ],
+  "data": {
+    "exit_code": 0,
+    "result": {
+      "example": "value"
+    },
+    "status": "succeeded"
+  },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerBash.finished"
 }
@@ -1176,15 +1172,13 @@ function main() {
 
 ```json
 {
-  "data": [
-    {
-      "exit_code": 0,
-      "result": {
-        "example": "value"
-      },
-      "status": "succeeded"
-    }
-  ],
+  "data": {
+    "exit_code": 0,
+    "result": {
+      "example": "value"
+    },
+    "status": "succeeded"
+  },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerJS.finished"
 }
@@ -1229,15 +1223,13 @@ def main(payload):
 
 ```json
 {
-  "data": [
-    {
-      "exit_code": 0,
-      "result": {
-        "example": "value"
-      },
-      "status": "succeeded"
-    }
-  ],
+  "data": {
+    "exit_code": 0,
+    "result": {
+      "example": "value"
+    },
+    "status": "succeeded"
+  },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerPython.finished"
 }
