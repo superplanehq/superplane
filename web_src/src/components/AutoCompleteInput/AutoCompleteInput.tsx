@@ -35,6 +35,25 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   fullHeight?: boolean;
   /** Adapter that powers evaluation and previews. Defaults to expr-lang. */
   expressionAdapter?: ExpressionAdapter;
+  /**
+   * Suggest top-level `exampleObj` keys (e.g. `payload`, `status`) as plain-name
+   * completions. Enable for dialects like widget CEL where the row context is
+   * addressed directly rather than through the `$` selector.
+   */
+  includeTopLevelGlobals?: boolean;
+  /**
+   * Include the built-in expr-lang function list (`root()`, `previous()`,
+   * `upper()`, …) in suggestions. Disable for dialects with a different
+   * function set (e.g. widget CEL).
+   */
+  includeFunctions?: boolean;
+  /**
+   * In wrapped mode, also fire suggestions when the cursor sits outside a
+   * `{{ … }}` block by treating the whole input as a plain-path expression.
+   * Enable for fields that accept either a plain path or a wrapped expression
+   * (e.g. widget CEL `pathOrRaw` profile).
+   */
+  pathModeOutsideWrapper?: boolean;
 }
 
 const suggestionSortPriority = {
@@ -130,6 +149,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       minHeight,
       fullHeight = false,
       expressionAdapter = exprLangAdapter,
+      includeTopLevelGlobals = false,
+      includeFunctions = true,
+      pathModeOutsideWrapper = false,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -153,13 +175,31 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
 
     const isRawExpression = expressionMode === "raw";
+    const hasTemplateSegments = /\{\{[\s\S]*?\}\}/.test(inputValue);
+    // Preview the whole input as a single value when either:
+    //  - raw mode (the whole input IS the expression), or
+    //  - `pathOrRaw` mode without `{{ … }}` AND the adapter knows how to
+    //    resolve bare input as a literal path (mirroring runtime semantics).
+    const canEvaluatePathLiteral =
+      pathModeOutsideWrapper && !hasTemplateSegments && typeof expressionAdapter.evaluatePathLiteral === "function";
+    const evaluateWholeInputAsExpression = isRawExpression || canEvaluatePathLiteral;
 
-    // Check if all expressions are valid
+    const evaluateWholeInput = useCallback(
+      (input: string, globals: Record<string, unknown>) => {
+        if (canEvaluatePathLiteral && expressionAdapter.evaluatePathLiteral) {
+          const outcome = expressionAdapter.evaluatePathLiteral(input, globals);
+          if (outcome) return outcome;
+        }
+        return expressionAdapter.evaluate(input, globals);
+      },
+      [canEvaluatePathLiteral, expressionAdapter],
+    );
+
     const allExpressionsValid = useMemo(() => {
       if (!exampleObj) return true;
-      if (isRawExpression) {
+      if (evaluateWholeInputAsExpression) {
         if (inputValue.trim().length === 0) return true;
-        return expressionAdapter.evaluate(inputValue, exampleObj).ok;
+        return evaluateWholeInput(inputValue, exampleObj).ok;
       }
       const regex = /\{\{(.*?)\}\}/g;
       let match;
@@ -169,7 +209,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         }
       }
       return true;
-    }, [inputValue, exampleObj, isRawExpression, expressionAdapter]);
+    }, [inputValue, exampleObj, evaluateWholeInputAsExpression, evaluateWholeInput, expressionAdapter]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -386,7 +426,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return tokens;
     };
 
-    // Evaluate an expression against the exampleObj using the configured adapter
+    // Evaluate a `{{ … }}` inner segment against the exampleObj.
     const evaluateExpression = useCallback(
       (expr: string): { value: string; error?: string } => {
         if (!exampleObj) return { value: "?", error: "No context available" };
@@ -399,14 +439,29 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       [exampleObj, expressionAdapter],
     );
 
+    // Evaluate the whole input (raw mode / `pathOrRaw` plain input).
+    const evaluateWholeInputPreview = useCallback(
+      (input: string): { value: string; error?: string } => {
+        if (!exampleObj) return { value: "?", error: "No context available" };
+        const outcome = evaluateWholeInput(input, exampleObj);
+        if (!outcome.ok) {
+          return { value: "error", error: outcome.error ?? "Evaluation failed" };
+        }
+        return { value: outcome.formattedValue ?? expressionAdapter.formatResult(outcome.value) };
+      },
+      [exampleObj, evaluateWholeInput, expressionAdapter],
+    );
+
     // Render content with highlighted expressions
     const renderHighlightedContent = (text: string) => {
-      if (isRawExpression) {
+      // Raw mode + `pathOrRaw` fields with no `{{ … }}` share the same preview
+      // treatment: the whole input is one expression to evaluate.
+      if (evaluateWholeInputAsExpression) {
         if (!text) {
           return [<span key={0}>{"\u200B"}</span>];
         }
         if (previewMode) {
-          const result = evaluateExpression(text);
+          const result = evaluateWholeInputPreview(text);
           if (result.error) {
             return [
               <span key={0} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
@@ -506,17 +561,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
         const openIndex = text.lastIndexOf(props.startWord, position);
         if (openIndex === -1) {
-          return false;
+          return pathModeOutsideWrapper;
         }
 
         const closeIndex = text.indexOf(props.suffix, openIndex + 2);
         if (closeIndex !== -1 && position - 1 > closeIndex) {
-          return false;
+          return pathModeOutsideWrapper;
         }
 
         return true;
       },
-      [isRawExpression, props.startWord, props.suffix],
+      [isRawExpression, props.startWord, props.suffix, pathModeOutsideWrapper],
     );
 
     const getExpressionContext = useCallback(
@@ -531,13 +586,19 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         }
 
         const openIndex = text.lastIndexOf(startWord, cursor);
-        if (openIndex === -1) {
-          return null;
-        }
+        const closeIndex = openIndex === -1 ? -1 : text.indexOf(suffix, openIndex + startWord.length);
+        const insideWrapper = openIndex !== -1 && (closeIndex === -1 || cursor - 1 <= closeIndex);
 
-        const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-        if (closeIndex !== -1 && cursor - 1 > closeIndex) {
-          return null;
+        if (!insideWrapper) {
+          // Path-mode fallback: treat the whole input as a plain-path
+          // expression when the field opts in (e.g. widget CEL `pathOrRaw`).
+          if (!pathModeOutsideWrapper) return null;
+          return {
+            expressionText: text,
+            expressionCursor: cursor,
+            startOffset: 0,
+            endOffset: text.length,
+          };
         }
 
         const startOffset = openIndex + startWord.length;
@@ -549,7 +610,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           endOffset,
         };
       },
-      [isRawExpression, startWord, suffix],
+      [isRawExpression, startWord, suffix, pathModeOutsideWrapper],
     );
 
     const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
@@ -596,6 +657,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       (expressionText: string, expressionCursor: number) =>
         getSuggestions(expressionText, expressionCursor, exampleObj ?? {}, {
           limit: 150,
+          includeTopLevelGlobals,
+          includeFunctions,
         })
           .filter((s) => !excludedSuggestions?.includes(s.label))
           .sort((a, b) => {
@@ -613,7 +676,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             }
             return a.label.localeCompare(b.label);
           }),
-      [exampleObj, excludedSuggestions],
+      [exampleObj, excludedSuggestions, includeTopLevelGlobals, includeFunctions],
     );
 
     const getReplacementRange = (left: string, insertText: string) => {

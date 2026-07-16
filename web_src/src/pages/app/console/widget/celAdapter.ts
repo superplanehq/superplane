@@ -10,6 +10,7 @@ import {
   evalExprDetailed,
   evalTemplateDetailed,
 } from "./celExpr";
+import { getValueAtPath } from "./fieldPath";
 
 const FULL_TEMPLATE_RE = /^\s*\{\{[\s\S]*\}\}\s*$/;
 const ANY_TEMPLATE_RE = /\{\{[\s\S]*?\}\}/;
@@ -37,6 +38,8 @@ export function evaluateCel(
   const row = withRunNodesShim(globals as Record<string, unknown>);
   const env = buildEnv();
 
+  // Wrapped mode calls this per `{{ … }}` segment with the raw inner text, so
+  // any input without wrappers is a CEL expression (not a literal path).
   if (ANY_TEMPLATE_RE.test(trimmed) && !FULL_TEMPLATE_RE.test(trimmed)) {
     const outcome = evalTemplateDetailed(compileTemplate(trimmed), row, env, stringifyCelValue);
     if (!outcome.ok) return { ok: false, error: outcome.error };
@@ -63,9 +66,24 @@ export function resolveCelSuggestionValue(
   });
 }
 
+// Mirrors `compileMaybeExpr` / `evalRowField`: widget runtime treats
+// non-`{{ … }}` field values as literal dot/bracket paths, so plain-path
+// previews must resolve through the same walker to stay accurate.
+export function evaluateCelPathLiteral(
+  path: string,
+  globals: Record<string, unknown> | null | undefined,
+): ExpressionEvaluationOutcome {
+  if (!globals) return { ok: false, error: "No context available" };
+  const trimmed = path.trim();
+  if (!trimmed) return { ok: true, value: "", formattedValue: "" };
+  const value = getValueAtPath(globals, trimmed);
+  return { ok: true, value, formattedValue: stringifyCelValue(value) };
+}
+
 export const widgetCelAdapter: ExpressionAdapter = {
   id: "cel",
   evaluate: evaluateCel,
   resolveSuggestionValue: resolveCelSuggestionValue,
   formatResult: stringifyCelValue,
+  evaluatePathLiteral: evaluateCelPathLiteral,
 };

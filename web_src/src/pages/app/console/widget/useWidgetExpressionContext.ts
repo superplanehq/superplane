@@ -49,14 +49,16 @@ export function useWidgetExpressionContext(args: {
     const liveRow = rows.find((r): r is Record<string, unknown> => typeof r === "object" && r !== null);
     if (liveRow) return { row: liveRow, origin: "live", isLoading: false, fields, error };
 
-    if (isLoading || memoryCatalog.isLoading) {
-      return { row: EMPTY_ROW, origin: "empty", isLoading: true, fields, error };
+    // While fetches are in flight, fall back to the catalog sample row so the
+    // editor keeps its autocomplete and previews instead of blanking out.
+    const isFetching = isLoading || memoryCatalog.isLoading;
+    if (fields.length === 0) {
+      return { row: EMPTY_ROW, origin: "empty", isLoading: isFetching, fields, error };
     }
-
     return {
       row: sampleRowFromFields(fields),
-      origin: fields.length > 0 ? "catalog" : "empty",
-      isLoading: false,
+      origin: "catalog",
+      isLoading: isFetching,
       fields,
       error,
     };

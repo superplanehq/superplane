@@ -336,7 +336,7 @@ export function FilterRow({
         <div className="col-span-8">
           <ExpressionEditor
             dialect="cel"
-            syntaxProfile="pathOrRaw"
+            syntaxProfile="wrapped"
             exampleObj={sampleRow}
             value={filter.value ?? ""}
             onChange={(next) => onChange({ value: next })}
@@ -399,7 +399,7 @@ export function RowStyleRow({
         <div className="col-span-5">
           <ExpressionEditor
             dialect="cel"
-            syntaxProfile="pathOrRaw"
+            syntaxProfile="wrapped"
             exampleObj={sampleRow}
             value={rule.value ?? ""}
             onChange={(next) => onChange({ value: next })}

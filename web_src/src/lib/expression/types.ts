@@ -20,4 +20,11 @@ export interface ExpressionAdapter {
   // `undefined` when the tail path isn't statically resolvable.
   resolveSuggestionValue(expression: string, globals: Record<string, unknown> | null | undefined): unknown;
   formatResult(value: unknown): string;
+  // Optional preview for bare, non-templated input in `pathOrRaw` fields where
+  // the runtime treats the string as a literal dot/bracket path rather than
+  // an expression. Return `undefined` to opt out (preview stays hidden).
+  evaluatePathLiteral?(
+    path: string,
+    globals: Record<string, unknown> | null | undefined,
+  ): ExpressionEvaluationOutcome | undefined;
 }

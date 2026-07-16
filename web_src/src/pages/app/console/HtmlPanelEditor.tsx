@@ -16,6 +16,8 @@ import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import type { MarkdownVariable } from "./panelTypes";
 
+const MONACO_CEL_EXCLUDED_SUGGESTIONS = ["memory"];
+
 /**
  * Imperative handle exposed by the body code editor to its parent. We don't
  * expose the raw Monaco editor; instead the panel card gets the two narrow
@@ -297,6 +299,12 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
   const { handleEditorMount: attachExpressionAutocomplete } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj: autocompleteExampleObj ?? null,
     languageId: "html",
+    // HTML bodies use widget CEL templates (`{{ … }}`), not expr-lang, so hide
+    // the expr-lang function catalog + `memory` namespace and surface the
+    // caller-declared variables as top-level suggestions inside braces.
+    includeTopLevelGlobals: true,
+    includeFunctions: false,
+    excludedSuggestions: MONACO_CEL_EXCLUDED_SUGGESTIONS,
   });
 
   useImperativeHandle(

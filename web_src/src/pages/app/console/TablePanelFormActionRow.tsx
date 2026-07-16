@@ -243,7 +243,10 @@ function ActionConditions({
     <div className="grid grid-cols-2 items-start gap-2">
       <ExpressionEditor
         dialect="cel"
-        syntaxProfile="pathOrRaw"
+        // Runtime for the row-action "show" field routes bare input through
+        // the legacy `evaluateShow` parser (not CEL), so keep preview scoped
+        // to `{{ … }}` expressions where semantics match.
+        syntaxProfile="wrapped"
         exampleObj={sampleRow}
         value={action.show ?? ""}
         onChange={(next) => onChange({ show: next || undefined })}

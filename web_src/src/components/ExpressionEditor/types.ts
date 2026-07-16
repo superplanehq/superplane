@@ -34,6 +34,12 @@ export interface ExpressionEditorProps extends Omit<ComponentPropsWithoutRef<"te
   quickTip?: string;
   excludedSuggestions?: string[];
   noExampleObjectText?: string;
+  // Explicit override for suggesting top-level `exampleObj` keys as plain names.
+  // Defaults to `true` for the `cel` dialect + `pathOrRaw` profile.
+  includeTopLevelGlobals?: boolean;
+  // Explicit override for suggesting the built-in expr-lang function list.
+  // Defaults to `false` for the `cel` dialect, `true` otherwise.
+  includeFunctions?: boolean;
 }
 
 export interface ExpressionEditorDialogChildProps {

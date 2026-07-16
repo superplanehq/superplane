@@ -201,11 +201,10 @@ describe("TablePanelForm column field input", () => {
     render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
     const input = screen.getByTestId("table-column-field") as HTMLTextAreaElement;
     fireEvent.focus(input);
-    // Typing `{{ ` opens the wrapped-expression mode so the editor lists field
-    // names from the sample row context (which mirrors the datalist entries).
     fireEvent.change(input, { target: { value: "{{ ", selectionStart: 3 } });
+    const dropdown = await screen.findByTestId("autocomplete-suggestions");
     for (const expected of ["status", "payload", "nodeName"]) {
-      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(dropdown.textContent ?? "").toContain(expected);
     }
   });
 
@@ -275,8 +274,9 @@ describe("TablePanelForm column href input", () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "{{ ", selectionStart: 3 } });
 
+    const dropdown = await screen.findByTestId("autocomplete-suggestions");
     for (const expected of ["status", "payload", "nodeName"]) {
-      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(dropdown.textContent ?? "").toContain(expected);
     }
   });
 });
