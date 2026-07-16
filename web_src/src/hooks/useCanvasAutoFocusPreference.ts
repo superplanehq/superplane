@@ -7,13 +7,9 @@ const DEFAULT_ENABLED = true;
 /**
  * Read the persisted auto-focus preference from `localStorage`. The default
  * is `true` so existing users keep the current framing behavior when the
- * value is missing, invalid, or unavailable (SSR, private mode, quota).
+ * value is missing, invalid, or unavailable (private mode, quota).
  */
 export function readStoredCanvasAutoFocusEnabled(): boolean {
-  if (typeof window === "undefined") {
-    return DEFAULT_ENABLED;
-  }
-
   try {
     const stored = window.localStorage.getItem(CANVAS_AUTO_FOCUS_STORAGE_KEY);
     if (stored === null) {
@@ -28,10 +24,6 @@ export function readStoredCanvasAutoFocusEnabled(): boolean {
 }
 
 function persistCanvasAutoFocusEnabled(value: boolean): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
   try {
     window.localStorage.setItem(CANVAS_AUTO_FOCUS_STORAGE_KEY, JSON.stringify(value));
   } catch {
