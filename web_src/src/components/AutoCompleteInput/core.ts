@@ -23,6 +23,8 @@
  *   (object/array), we append a trailing '.' so the user can keep typing members.
  */
 
+import { extractTailPathExpression } from "@/lib/expression/pathWalker";
+
 export type SuggestionKind = "function" | "variable" | "field" | "keyword";
 
 export interface Suggestion {
@@ -51,6 +53,12 @@ export interface GetSuggestionsOptions {
   includeTopLevelGlobals?: boolean;
   limit?: number;
   allowInStrings?: boolean;
+  /**
+   * Key in `globals` that backs the `$` / `$["…"]` selector. Defaults to the
+   * globals root (expr-lang behaviour). Widget CEL points this at
+   * `__runNodes__` so `$` completes run-node names instead of row fields.
+   */
+  envKeySource?: string;
 }
 
 type ExprFunction = {
@@ -590,16 +598,21 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     includeTopLevelGlobals = false,
     limit = 30,
     allowInStrings = false,
+    envKeySource,
   } = options;
+  const envRecord = resolveEnvRecord(globals, envKeySource);
   const left = text.slice(0, cursor);
   // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
-    const keys = listGlobalKeys(globals);
+    const triggerRecord = envTrigger.baseExpr
+      ? resolveNestedDollarRecord(envTrigger.baseExpr, globals, envKeySource)
+      : envRecord;
+    const keys = listGlobalKeys(triggerRecord);
     return keys.slice(0, limit).map((k) => {
-      const v = (globals as Record<string, unknown>)[k];
+      const v = triggerRecord[k];
       const tailDot = isExpandableValue(v) ? "." : "";
-      const metadata = getNodeMetadata(globals, k, v);
+      const metadata = getNodeMetadata(triggerRecord, k, v);
       const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
       return {
         label: `["${k}"]`,
@@ -619,13 +632,16 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   const bracketCtx = detectBracketKeyContext(left);
   if (bracketCtx) {
     const prefix = (bracketCtx.partialKey ?? "").toLowerCase();
-    const keys = listGlobalKeys(globals);
+    const bracketRecord = bracketCtx.baseExpr
+      ? resolveNestedDollarRecord(bracketCtx.baseExpr, globals, envKeySource)
+      : envRecord;
+    const keys = listGlobalKeys(bracketRecord);
     return keys
       .filter((k) => k.toLowerCase().startsWith(prefix))
       .slice(0, limit)
       .map((k) => {
-        const v = (globals as Record<string, unknown>)[k];
-        const metadata = getNodeMetadata(globals, k, v);
+        const v = bracketRecord[k];
+        const metadata = getNodeMetadata(bracketRecord, k, v);
         const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
         return {
           label: `["${k}"]`,
@@ -684,7 +700,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     }
 
     const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
-    const target = resolveExprToValue(resolvableBase, globals);
+    const target = resolveExprToValue(resolvableBase, globals, envKeySource);
 
     const keys = listKeys(target);
 
@@ -724,12 +740,12 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 
   if (includeGlobals) {
     if (!prefix || "$".startsWith(prefix)) {
-      const nodeCount = listGlobalKeys(globals).length;
+      const nodeCount = listGlobalKeys(envRecord).length;
       out.push({
         label: "$",
         kind: "variable",
         insertText: "$",
-        detail: getValueTypeLabel(globals),
+        detail: getValueTypeLabel(envRecord),
         description:
           'Access event data emitted by connected components in a run, keyed by component name (e.g. $["Component Name"]).',
         nodeCount,
@@ -885,12 +901,20 @@ function getFunctionReturnMethods(funcName: string): MethodInfo[] {
   return FUNCTION_RETURN_METHODS[funcName.toLowerCase()] ?? [];
 }
 
-type EnvKeyTrigger = { quote: "'" | '"' };
+type EnvKeyTrigger = { quote: "'" | '"'; baseExpr?: string };
 
 function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
+  const nested = left.match(/(.+)\.\$\s*(?:\[\s*)?$/);
+  if (nested?.[1]) return { quote: '"', baseExpr: nested[1] };
   if (/\$\s*$/.test(left)) return { quote: '"' };
   if (/\$\s*\[\s*$/.test(left)) return { quote: '"' };
   return null;
+}
+
+function resolveEnvRecord(globals: Record<string, unknown>, envKeySource: string | undefined): Record<string, unknown> {
+  if (!envKeySource) return globals;
+  const nested = globals[envKeySource];
+  return isRecord(nested) ? (nested as Record<string, unknown>) : {};
 }
 
 function listGlobalKeys(globals: Record<string, unknown>): string[] {
@@ -1048,7 +1072,7 @@ function detectDotContext(left: string): DotContext | null {
     return null;
   }
 
-  const tail = extractTailExpressionWithParens(left);
+  const tail = extractTailPathExpression(left);
   const expr = tail.trim();
   if (!expr) return null;
 
@@ -1071,7 +1095,7 @@ function detectDotContext(left: string): DotContext | null {
   // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
   const funcMatch = expr.match(/((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (funcMatch) {
-    let funcName = extractTailExpressionWithParens(funcMatch[1]);
+    let funcName = extractTailPathExpression(funcMatch[1]);
     funcName = extractSpecialFunctionCall(funcName);
     const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
     const memberPrefix = (funcMatch[3] ?? "").trim();
@@ -1087,9 +1111,18 @@ function detectDotContext(left: string): DotContext | null {
   return null;
 }
 
-type BracketKeyContext = { quote: "'" | '"'; partialKey: string };
+type BracketKeyContext = { quote: "'" | '"'; partialKey: string; baseExpr?: string };
 
 function detectBracketKeyContext(left: string): BracketKeyContext | null {
+  const nested = left.match(/(.+)\.\$\s*\[\s*(['"])([^'"]*)$/);
+  if (nested?.[1]) {
+    return {
+      quote: nested[2] === "'" ? "'" : '"',
+      partialKey: nested[3] ?? "",
+      baseExpr: nested[1],
+    };
+  }
+
   const m = left.match(/(?:\$\s*|\]\s*)\[\s*(['"])([^'"]*)$/);
   if (!m) return null;
 
@@ -1098,67 +1131,15 @@ function detectBracketKeyContext(left: string): BracketKeyContext | null {
   return { quote, partialKey };
 }
 
-function extractTailPathExpression(expr: string | undefined | null): string {
-  if (!expr) return "";
-  const s = expr.trim();
-  let i = s.length - 1;
-
-  let bracketDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
-
-  const isEscaped = (idx: number): boolean => {
-    let bs = 0;
-    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-    return bs % 2 === 1;
-  };
-
-  const isStopChar = (ch: string): boolean =>
-    ch === "(" ||
-    ch === ")" ||
-    ch === "," ||
-    ch === ";" ||
-    ch === ":" ||
-    ch === "?" ||
-    ch === "+" ||
-    ch === "-" ||
-    ch === "*" ||
-    ch === "/" ||
-    ch === "%" ||
-    ch === "|" ||
-    ch === "&" ||
-    ch === "!" ||
-    ch === "=" ||
-    ch === "<" ||
-    ch === ">" ||
-    ch === "\n" ||
-    ch === "\r" ||
-    ch === "\t" ||
-    ch === " ";
-
-  for (; i >= 0; i--) {
-    const ch = s[i];
-
-    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-    if (inSingle || inDouble) continue;
-
-    if (ch === "]") {
-      bracketDepth++;
-      continue;
-    }
-    if (ch === "[") {
-      bracketDepth = Math.max(0, bracketDepth - 1);
-      continue;
-    }
-
-    if (bracketDepth === 0 && isStopChar(ch)) {
-      return s.slice(i + 1).trim();
-    }
-  }
-
-  return s;
+function resolveNestedDollarRecord<TGlobals extends Record<string, unknown>>(
+  baseExpr: string,
+  globals: TGlobals,
+  envKeySource?: string,
+): Record<string, unknown> {
+  const owner = resolveExprToValue(extractTailPathExpression(baseExpr), globals, envKeySource);
+  if (!isRecord(owner)) return {};
+  if (isRecord(owner.__runNodes__)) return owner.__runNodes__;
+  return isRecord(owner.$) ? owner.$ : {};
 }
 
 function findTailDotContext(input: string): DotContext | null {
@@ -1213,7 +1194,7 @@ function findTailDotContext(input: string): DotContext | null {
       const operator = ch === "?" ? "?." : ".";
       const opStart = ch === "?" ? i : i;
       let baseExpr = s.slice(0, opStart).trim();
-      baseExpr = extractTailExpressionWithParens(baseExpr);
+      baseExpr = extractTailPathExpression(baseExpr);
       baseExpr = extractSpecialFunctionCall(baseExpr);
       const memberPrefix = s.slice(opStart + operator.length).trim();
       if (!baseExpr) return null;
@@ -1227,81 +1208,6 @@ function findTailDotContext(input: string): DotContext | null {
 }
 
 type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
-
-function extractTailExpressionWithParens(expr: string): string {
-  const s = expr.trim();
-  let i = s.length - 1;
-  let bracketDepth = 0;
-  let parenDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
-
-  const isEscaped = (idx: number): boolean => {
-    let bs = 0;
-    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-    return bs % 2 === 1;
-  };
-
-  const isStopChar = (ch: string): boolean =>
-    ch === "(" ||
-    ch === ")" ||
-    ch === "," ||
-    ch === ";" ||
-    ch === ":" ||
-    ch === "?" ||
-    ch === "+" ||
-    ch === "-" ||
-    ch === "*" ||
-    ch === "/" ||
-    ch === "%" ||
-    ch === "|" ||
-    ch === "&" ||
-    ch === "!" ||
-    ch === "=" ||
-    ch === "<" ||
-    ch === ">" ||
-    ch === "\n" ||
-    ch === "\r" ||
-    ch === "\t" ||
-    ch === " ";
-
-  for (; i >= 0; i--) {
-    const ch = s[i];
-
-    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-    if (inSingle || inDouble) continue;
-
-    if (ch === "]") {
-      bracketDepth++;
-      continue;
-    }
-    if (ch === "[") {
-      bracketDepth = Math.max(0, bracketDepth - 1);
-      continue;
-    }
-    if (ch === ")") {
-      parenDepth++;
-      continue;
-    }
-    if (ch === "(") {
-      if (parenDepth === 0) {
-        return s.slice(i + 1).trim();
-      }
-      parenDepth = Math.max(0, parenDepth - 1);
-      continue;
-    }
-
-    if (bracketDepth > 0 || parenDepth > 0) continue;
-
-    if (isStopChar(ch)) {
-      return s.slice(i + 1).trim();
-    }
-  }
-
-  return s;
-}
 
 function extractSpecialFunctionCall(expr: string): string {
   const matches = [...expr.matchAll(/(root\(\)|previous\([^)]*\))/g)];
@@ -1323,7 +1229,11 @@ function extractSpecialFunctionCall(expr: string): string {
   return matchValue;
 }
 
-function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
+function resolveExprToValue<TGlobals extends Record<string, unknown>>(
+  baseExpr: string,
+  globals: TGlobals,
+  envKeySource?: string,
+): unknown {
   const stripWhitespaceOutsideStrings = (input: string) => {
     let out = "";
     let inSingle = false;
@@ -1349,7 +1259,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   };
 
   let expr = stripWhitespaceOutsideStrings(baseExpr.trim());
-  expr = extractTailExpressionWithParens(expr);
+  expr = extractTailPathExpression(expr);
   const normalized = normalizeSpecialFunctionExpr(expr);
   if (normalized === null) {
     return undefined;
@@ -1405,7 +1315,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   const first = (tokens[pos] as { t: "ident"; v: string }).v;
   pos++;
 
-  if (first === "$") cur = globals;
+  if (first === "$") cur = resolveEnvRecord(globals as Record<string, unknown>, envKeySource);
   else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
 
   while (pos < tokens.length) {

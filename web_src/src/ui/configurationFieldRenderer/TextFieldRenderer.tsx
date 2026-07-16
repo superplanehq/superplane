@@ -3,10 +3,8 @@ import Editor from "@monaco-editor/react";
 import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { coerceMonacoValue } from "@/lib/monaco";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { ExpressionEditor, ExpressionEditorDialog } from "@/components/ExpressionEditor";
 import { toTestId } from "@/lib/testID";
 import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
@@ -86,19 +84,15 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
   const label = field.label || field.name || "value";
 
   const inlineEditor = allowExpressions ? (
-    <AutoCompleteInput
+    <ExpressionEditor
       exampleObj={autocompleteExampleObj ?? null}
       value={currentValue}
       onChange={emit}
       placeholder={field.placeholder || ""}
-      startWord="{{"
-      prefix="{{ "
-      suffix=" }}"
       inputSize="md"
       minHeight={PLAIN_TEXT_MIN_HEIGHT_PX}
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
-      quickTip="Tip: type `{{` to start an expression."
       excludedSuggestions={excludedSuggestions}
       data-testid={toTestId(testId)}
     />
@@ -120,7 +114,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
         label={`Expand ${label} editor`}
         testId={toTestId(`${testId}-expand`)}
       />
-      <ExpandableEditorDialog
+      <ExpressionEditorDialog
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         title={label}
@@ -130,18 +124,14 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       >
         {({ value: draftValue, onChange: setDraftValue }) =>
           allowExpressions ? (
-            <AutoCompleteInput
+            <ExpressionEditor
               exampleObj={autocompleteExampleObj ?? null}
               value={draftValue}
               onChange={setDraftValue}
               placeholder={field.placeholder || ""}
-              startWord="{{"
-              prefix="{{ "
-              suffix=" }}"
               inputSize="md"
               showValuePreview
               valuePreviewLabel={valuePreviewLabel}
-              quickTip="Tip: type `{{` to start an expression."
               excludedSuggestions={excludedSuggestions}
               fullHeight
               data-testid={toTestId(`${testId}-modal-input`)}
@@ -157,7 +147,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
             />
           )
         }
-      </ExpandableEditorDialog>
+      </ExpressionEditorDialog>
     </div>
   );
 };
@@ -236,7 +226,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
         </div>
       </div>
 
-      <ExpandableEditorDialog
+      <ExpressionEditorDialog
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         title={label}
@@ -273,107 +263,8 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             }}
           />
         )}
-      </ExpandableEditorDialog>
+      </ExpressionEditorDialog>
     </>
-  );
-};
-
-interface ExpandableEditorDialogChildProps {
-  value: string;
-  onChange: (next: string) => void;
-}
-
-interface ExpandableEditorDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  initialValue: string;
-  onSave: (next: string) => void;
-  testId?: string;
-  children: (props: ExpandableEditorDialogChildProps) => React.ReactNode;
-  headerActions?: (props: { draft: string }) => React.ReactNode;
-}
-
-const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({ open, onOpenChange, ...sessionProps }) => (
-  <Dialog open={open} onOpenChange={onOpenChange}>
-    {open ? <ExpandableEditorDialogSession onOpenChange={onOpenChange} {...sessionProps} /> : null}
-  </Dialog>
-);
-
-type ExpandableEditorDialogSessionProps = Omit<ExpandableEditorDialogProps, "open">;
-
-const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps> = ({
-  onOpenChange,
-  title,
-  initialValue,
-  onSave,
-  testId,
-  children,
-  headerActions,
-}) => {
-  const [draft, setDraft] = React.useState(initialValue);
-
-  const handleSave = () => {
-    onSave(draft);
-    onOpenChange(false);
-  };
-
-  const handleCancel = () => {
-    onOpenChange(false);
-  };
-
-  // Autocomplete suggestions render in a portal on `document.body`, which Radix Dialog treats
-  // as an outside interaction (and would otherwise dismiss the dialog while the user is picking
-  // a suggestion). Prevent the default close when the interaction originates in that portal.
-  const handleInteractOutside = (event: Event) => {
-    const target = event.target as Element | null;
-    if (target?.closest?.("[data-autocomplete-suggestions]")) {
-      event.preventDefault();
-    }
-  };
-
-  const handleEscapeKeyDown = (event: KeyboardEvent) => {
-    const target = event.target as Element | null;
-    const autocompleteSuggestionsAreOpen = target?.closest(
-      "[data-autocomplete-input][data-autocomplete-suggestions-open]",
-    );
-    const monacoEditor = target?.closest(".monaco-editor");
-    const monacoSuggestionsAreOpen = monacoEditor?.querySelector(".suggest-widget.visible");
-    if (autocompleteSuggestionsAreOpen || monacoSuggestionsAreOpen) {
-      event.preventDefault();
-    }
-  };
-
-  return (
-    <DialogContent
-      size="90vw"
-      className="flex flex-col gap-0 overflow-hidden p-0"
-      onClick={(e) => e.stopPropagation()}
-      onEscapeKeyDown={handleEscapeKeyDown}
-      onPointerDownOutside={handleInteractOutside}
-      onFocusOutside={handleInteractOutside}
-      onInteractOutside={handleInteractOutside}
-      data-testid={testId}
-    >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">
-        <DialogTitle className="truncate">{title}</DialogTitle>
-        <DialogDescription className="sr-only">
-          Expanded editor for {title}. Save to apply your changes or cancel to discard them.
-        </DialogDescription>
-        {headerActions ? <div className="flex items-center gap-2">{headerActions({ draft })}</div> : null}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
-        {children({ value: draft, onChange: setDraft })}
-      </div>
-      <DialogFooter className="shrink-0 border-t border-gray-200 px-4 py-3 dark:border-gray-600">
-        <Button type="button" variant="outline" onClick={handleCancel} data-testid="expandable-editor-cancel">
-          Cancel
-        </Button>
-        <Button type="button" onClick={handleSave} data-testid="expandable-editor-save">
-          Save
-        </Button>
-      </DialogFooter>
-    </DialogContent>
   );
 };
 

@@ -8,7 +8,7 @@ import { ChartTopControls } from "./ChartTopControls";
 import { DataSourceForm } from "./DataSourceForm";
 import { useConsoleContext } from "./ConsoleContext";
 import type { ChartPanelContent } from "./panelTypes";
-import { useMemoryCatalog } from "./widget/useMemoryCatalog";
+import { useWidgetExpressionContext } from "./widget/useWidgetExpressionContext";
 
 export function ChartPanelForm({
   value,
@@ -20,12 +20,17 @@ export function ChartPanelForm({
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId;
   const memoryNamespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : undefined;
-  const { fields } = useMemoryCatalog(canvasId, memoryNamespace);
-  const fieldListId = memoryNamespace ? `chart-fields-${memoryNamespace}` : undefined;
-  const hasFieldSuggestions = fields.length > 0 && Boolean(fieldListId);
+  const { row: sampleRow, fields } = useWidgetExpressionContext({
+    canvasId: canvasId ?? "",
+    dataSource: value.dataSource,
+    render: value.render,
+  });
   const hasSeriesFieldPivot = Boolean(value.render.seriesField?.trim());
   const stackedBarNeedsMoreSeries =
     value.render.type === "stacked-bar" && !hasSeriesFieldPivot && value.render.series.length < 2;
+  const fieldOptions = fields.map((f) => f.field);
+  const seriesFieldListId = memoryNamespace ? `chart-fields-${memoryNamespace}` : undefined;
+  const hasSeriesFieldSuggestions = fields.length > 0 && Boolean(seriesFieldListId);
 
   return (
     <div className="space-y-3">
@@ -38,16 +43,21 @@ export function ChartPanelForm({
         />
       </div>
       <DataSourceForm value={value.dataSource} onChange={(ds) => onChange({ ...value, dataSource: ds })} />
-      <ChartTopControls value={value} onChange={onChange} fieldListId={hasFieldSuggestions ? fieldListId : undefined} />
+      <ChartTopControls
+        value={value}
+        onChange={onChange}
+        sampleRow={sampleRow}
+        seriesFieldListId={hasSeriesFieldSuggestions ? seriesFieldListId : undefined}
+      />
       {stackedBarNeedsMoreSeries ? <StackedBarHint /> : null}
-      {hasFieldSuggestions ? (
-        <datalist id={fieldListId}>
-          {fields.map((f) => (
-            <option key={f.field} value={f.field} />
+      {hasSeriesFieldSuggestions ? (
+        <datalist id={seriesFieldListId}>
+          {fieldOptions.map((f) => (
+            <option key={f} value={f} />
           ))}
         </datalist>
       ) : null}
-      <ChartSeriesList value={value} onChange={onChange} fieldListId={hasFieldSuggestions ? fieldListId : undefined} />
+      <ChartSeriesList value={value} onChange={onChange} sampleRow={sampleRow} />
     </div>
   );
 }
