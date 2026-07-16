@@ -66,5 +66,12 @@ func writeLiveLogRecord(live io.Writer, rec any) {
 	if err != nil {
 		return
 	}
-	_, _ = live.Write(append(b, '\n'))
+	// Leading newline keeps control JSON on its own CloudWatch event when the
+	// previous stdout chunk omitted a trailing newline (otherwise cmd_end sticks
+	// to that chunk and live-log UI never sees the command finish).
+	payload := make([]byte, 0, 1+len(b)+1)
+	payload = append(payload, '\n')
+	payload = append(payload, b...)
+	payload = append(payload, '\n')
+	_, _ = live.Write(payload)
 }
