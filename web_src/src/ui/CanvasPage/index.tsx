@@ -1287,10 +1287,10 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.headerMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   useEffect(() => {
-    if (props.isRunInspectionMode && props.isEditing && state.componentSidebar.isOpen) {
+    if (props.isRunInspectionMode && state.componentSidebar.isOpen) {
       handleSidebarClose();
     }
-  }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
+  }, [props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =

@@ -3758,6 +3758,7 @@ export function AppPage() {
       const workflowNode = canvasNodesById.get(nodeId);
       const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
       if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
+        actions.openConfigurationSidebar();
         return;
       }
 
@@ -3775,6 +3776,7 @@ export function AppPage() {
 
           const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
           if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
+            actions.openConfigurationSidebar();
             return;
           }
 

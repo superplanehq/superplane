@@ -788,14 +788,18 @@ export function SettingsTab({
             })}
           </div>
         )}
-
-        {/* Custom field section */}
-        {customField && shouldShowConfiguration && (
-          <div className={configurationFields && configurationFields.length > 0 ? "" : SETTINGS_TAB_DIVIDER_CLASS}>
-            {customField(nodeConfiguration)}
-          </div>
-        )}
       </div>
+
+      {customField && shouldShowConfiguration && (
+        <div
+          className={cn(
+            configurationFields && configurationFields.length > 0 ? "mt-6" : SETTINGS_TAB_DIVIDER_CLASS,
+            "space-y-6",
+          )}
+        >
+          {customField(nodeConfiguration)}
+        </div>
+      )}
     </div>
   );
 }

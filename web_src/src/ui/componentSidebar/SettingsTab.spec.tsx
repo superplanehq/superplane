@@ -48,4 +48,27 @@ describe("SettingsTab", () => {
     expect(screen.getByTestId("settings-tab-form")).not.toHaveClass("opacity-70");
     expect(screen.getByTestId("settings-tab-form").querySelector("[inert]")).toBeInTheDocument();
   });
+
+  it("keeps customField interactive when formDisabled", () => {
+    render(
+      <SettingsTab
+        mode="edit"
+        nodeName="Webhook node"
+        configuration={{}}
+        configurationFields={[{ name: "path", label: "Path", type: "string" }]}
+        onSave={vi.fn()}
+        formDisabled
+        customField={() => (
+          <button type="button" data-testid="custom-field-action">
+            Copy URL
+          </button>
+        )}
+      />,
+    );
+
+    const inertContainer = screen.getByTestId("settings-tab-form").querySelector("[inert]");
+    expect(inertContainer).toBeInTheDocument();
+    expect(inertContainer?.querySelector('[data-testid="custom-field-action"]')).toBeNull();
+    expect(screen.getByTestId("custom-field-action")).toBeEnabled();
+  });
 });
