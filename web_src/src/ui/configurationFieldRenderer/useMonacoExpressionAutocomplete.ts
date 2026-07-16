@@ -18,6 +18,9 @@ type UseMonacoExpressionAutocompleteProps = {
   suffix?: string;
   allowOutsideExpression?: boolean;
   includeTopLevelGlobals?: boolean;
+  includeFunctions?: boolean;
+  excludedSuggestions?: string[];
+  envKeySource?: string;
 };
 
 type MonacoKeyEvent = {
@@ -184,6 +187,9 @@ export const useMonacoExpressionAutocomplete = ({
   suffix = " }}",
   allowOutsideExpression = false,
   includeTopLevelGlobals = false,
+  includeFunctions = true,
+  excludedSuggestions,
+  envKeySource,
 }: UseMonacoExpressionAutocompleteProps) => {
   const modelsRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
   const previousValueRef = useRef<WeakMap<MonacoEditor.ITextModel, string>>(new WeakMap());
@@ -243,12 +249,22 @@ export const useMonacoExpressionAutocomplete = ({
               wordAtPosition.endColumn,
             );
 
-            const suggestions = getSuggestions(
+            const rawSuggestions = getSuggestions(
               expressionContext.expressionText,
               expressionContext.expressionCursor,
               context.exampleObj ?? {},
-              { allowInStrings: allowOutsideExpression, limit: 100, includeTopLevelGlobals },
-            ).sort((a, b) => {
+              {
+                allowInStrings: allowOutsideExpression,
+                limit: 100,
+                includeTopLevelGlobals,
+                includeFunctions,
+                envKeySource,
+              },
+            );
+            const filteredSuggestions = excludedSuggestions
+              ? rawSuggestions.filter((s) => !excludedSuggestions.includes(s.label))
+              : rawSuggestions;
+            const suggestions = filteredSuggestions.sort((a, b) => {
               const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
               const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
 
@@ -440,7 +456,18 @@ export const useMonacoExpressionAutocomplete = ({
         modelsRef.current.delete(model);
       });
     },
-    [allowOutsideExpression, autocompleteExampleObj, includeTopLevelGlobals, languageId, prefix, startWord, suffix],
+    [
+      allowOutsideExpression,
+      autocompleteExampleObj,
+      envKeySource,
+      excludedSuggestions,
+      includeFunctions,
+      includeTopLevelGlobals,
+      languageId,
+      prefix,
+      startWord,
+      suffix,
+    ],
   );
 
   return { handleEditorMount };

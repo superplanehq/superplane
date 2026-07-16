@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuperplaneComponentsNode } from "@/api-client";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import { MemoryDiscoveryPanel } from "../MemoryDiscoveryPanel";
 import type { TablePanelContent } from "../panelTypes";
@@ -56,11 +57,13 @@ export function TablePanelColumnsSection({
   value,
   fields,
   fieldOptions,
+  sampleRow,
   actions,
 }: {
   value: TablePanelContent;
   fields: Array<{ field: string; sample?: string }>;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
   return (
@@ -91,6 +94,7 @@ export function TablePanelColumnsSection({
             key={idx}
             col={col}
             fieldOptions={fieldOptions}
+            sampleRow={sampleRow}
             onChange={(patch) => actions.updateColumn(idx, patch)}
             onRemove={() => actions.removeColumn(idx)}
           />
@@ -141,10 +145,12 @@ function TablePanelFieldQuickAddButtons({
 export function TablePanelFiltersSection({
   value,
   fieldOptions,
+  sampleRow,
   actions,
 }: {
   value: TablePanelContent;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
   return (
@@ -161,6 +167,7 @@ export function TablePanelFiltersSection({
             key={idx}
             filter={filter}
             fieldOptions={fieldOptions}
+            sampleRow={sampleRow}
             onChange={(patch) => actions.updateFilter(idx, patch)}
             onRemove={() => actions.removeFilter(idx)}
           />
@@ -173,10 +180,12 @@ export function TablePanelFiltersSection({
 export function TablePanelRowStylesSection({
   value,
   fieldOptions,
+  sampleRow,
   actions,
 }: {
   value: TablePanelContent;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
   const rules = value.render.rowStyles ?? [];
@@ -204,6 +213,7 @@ export function TablePanelRowStylesSection({
             key={idx}
             rule={rule}
             fieldOptions={fieldOptions}
+            sampleRow={sampleRow}
             onChange={(patch) => actions.updateRowStyle(idx, patch)}
             onRemove={() => actions.removeRowStyle(idx)}
           />
@@ -215,33 +225,36 @@ export function TablePanelRowStylesSection({
 
 export function TablePanelSortSection({
   value,
-  fieldOptions,
+  sampleRow,
   actions,
 }: {
   value: TablePanelContent;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
   const sort = value.render.sort;
   const sortField = sort?.field ?? "";
   const sortOrder: WidgetSortOrder = sort?.order ?? "asc";
   const hasSortField = sortField.trim() !== "";
-  const datalistId = fieldOptions.length > 0 ? "table-sort-field-options" : undefined;
 
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
-      <div className="grid grid-cols-3 gap-2">
-        <Input
-          className="col-span-2 h-8"
-          list={datalistId}
-          value={sortField}
-          onChange={(e) =>
-            actions.setSort(e.target.value.trim() ? { field: e.target.value, order: sort?.order } : undefined)
-          }
-          placeholder="e.g. createdAt or {{ expr }} (blank = unsorted)"
-          data-testid="table-sort-field"
-        />
+      <div className="grid grid-cols-3 items-start gap-2">
+        <div className="col-span-2">
+          <ExpressionEditor
+            dialect="cel"
+            syntaxProfile="pathOrRaw"
+            exampleObj={sampleRow}
+            value={sortField}
+            onChange={(next) => actions.setSort(next.trim() ? { field: next, order: sort?.order } : undefined)}
+            placeholder="e.g. createdAt or {{ expr }} (blank = unsorted)"
+            inputSize="md"
+            showValuePreview
+            data-testid="table-sort-field"
+          />
+        </div>
         <Select
           value={sortOrder}
           onValueChange={(v) => actions.setSort({ field: sortField, order: v as WidgetSortOrder })}
@@ -259,13 +272,6 @@ export function TablePanelSortSection({
           </SelectContent>
         </Select>
       </div>
-      {datalistId ? (
-        <datalist id={datalistId}>
-          {fieldOptions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
-      ) : null}
     </div>
   );
 }
