@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,8 +15,60 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"github.com/superplanehq/superplane/test/support/logger"
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
+
+func Test__GitHub__handleWebhook__MissingSecret(t *testing.T) {
+	g := &GitHub{}
+
+	newRequestContext := func(integration core.IntegrationContext) (core.HTTPRequestContext, *httptest.ResponseRecorder) {
+		recorder := httptest.NewRecorder()
+		return core.HTTPRequestContext{
+			Logger:      logger.DiscardLogger(),
+			Request:     httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/webhook", strings.NewReader("{}")),
+			Response:    recorder,
+			Integration: integration,
+		}, recorder
+	}
+
+	//
+	// Regression test for issue #5850: an integration whose setup never
+	// completed has no webhook secret stored. This must be reported as a 4xx
+	// setup problem, not a 500 that pages us via Sentry.
+	//
+	t.Run("non-legacy setup without appWebhookSecret returns 404", func(t *testing.T) {
+		ctx, recorder := newRequestContext(mocks.IntegrationContextForNewSetupFlow())
+
+		g.handleWebhook(ctx)
+
+		assert.Equal(t, http.StatusNotFound, recorder.Code)
+	})
+
+	t.Run("legacy setup without webhookSecret returns 404", func(t *testing.T) {
+		ctx, recorder := newRequestContext(mocks.IntegrationContextForLegacySetupFlow(githubPrivateKeyPEM(t)))
+
+		g.handleWebhook(ctx)
+
+		assert.Equal(t, http.StatusNotFound, recorder.Code)
+	})
+
+	//
+	// When the secret is present, the handler proceeds to signature validation.
+	// A payload with no valid signature is rejected as a bad request (400),
+	// confirming the secret-present path is unaffected by the 404 change.
+	//
+	t.Run("secret present with invalid signature returns 400", func(t *testing.T) {
+		integration := mocks.IntegrationContextForNewSetupFlow()
+		require.NoError(t, integration.SetSecret(common.SecretAppWebhookSecret, []byte("webhook-secret")))
+
+		ctx, recorder := newRequestContext(integration)
+
+		g.handleWebhook(ctx)
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+}
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &GitHubWebhookHandler{}
