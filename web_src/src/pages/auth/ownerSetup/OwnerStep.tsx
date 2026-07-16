@@ -54,7 +54,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label className="mb-2 block text-left">
-            First Name <span className="text-gray-800 dark:text-gray-300">*</span>
+            First Name <span className="text-gray-800 dark:text-gray-100">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -71,7 +71,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         </div>
         <div>
           <Label className="mb-2 block text-left">
-            Last Name <span className="text-gray-800 dark:text-gray-300">*</span>
+            Last Name <span className="text-gray-800 dark:text-gray-100">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -89,7 +89,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Email <span className="text-gray-800 dark:text-gray-300">*</span>
+          Email <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -104,7 +104,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Password <span className="text-gray-800 dark:text-gray-300">*</span>
+          Password <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -125,7 +125,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Confirm Password <span className="text-gray-800 dark:text-gray-300">*</span>
+          Confirm Password <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
