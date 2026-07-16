@@ -191,94 +191,77 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: metadata is required")
 	}
 
-	return ctx.Apps.Invoke(nodeMetadata.App.ID, nodeMetadata.Node.ID, config.Parameters)
+	run, err := ctx.Runs.Create(core.RunCreationParams{
+		App:   nodeMetadata.App.ID,
+		Node:  nodeMetadata.Node.ID,
+		Input: config.Parameters,
+		Callbacks: []core.RunCallbackDefinition{
+			{
+				Kind: core.RunCallbackKindInit,
+				Ref:  core.RunCallbackRefTarget,
+				Hook: "onMessage",
+			},
+			{
+				Kind: core.RunCallbackKindFinished,
+				Ref:  core.RunCallbackRefParent,
+				Hook: "onRunFinished",
+			},
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("invoke app: create run: %w", err)
+	}
+
+	return ctx.Metadata.Set(InvokeAppExecutionMetadata{
+		RunID: run.ID.String(),
+	})
 }
 
 func (c *InvokeApp) Hooks() []core.Hook {
 	return []core.Hook{
-		{Name: "invocationStarted", Type: core.HookTypeInternal},
-		{Name: "invocationPassed", Type: core.HookTypeInternal},
-		{Name: "invocationFailed", Type: core.HookTypeInternal},
+		{Name: "onRunFinished", Type: core.HookTypeInternal},
 	}
 }
 
 func (c *InvokeApp) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
-	case "invocationStarted":
-		return c.handleInvocationStarted(ctx)
-	case "invocationPassed":
-		return c.handleInvocationPassed(ctx)
-	case "invocationFailed":
-		return c.handleInvocationFailed(ctx)
+	case "onRunFinished":
+		return c.handleRunFinished(ctx)
 	default:
 		return fmt.Errorf("invoke app: unknown hook %s", ctx.Name)
 	}
 }
 
-func (c *InvokeApp) handleInvocationStarted(ctx core.ActionHookContext) error {
+func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 	metadata := InvokeAppExecutionMetadata{}
 	err := mapstructure.Decode(ctx.Metadata, &metadata)
 	if err != nil {
 		return fmt.Errorf("invoke app: decode metadata: %w", err)
 	}
 
-	runId, ok := ctx.Parameters["run_id"].(string)
+	result, ok := ctx.Parameters["result"].(string)
 	if !ok {
-		return fmt.Errorf("invoke app: run_id is required")
+		return fmt.Errorf("invoke app: result is required")
 	}
 
-	return ctx.Metadata.Set(InvokeAppExecutionMetadata{RunID: runId})
-}
-
-func (c *InvokeApp) handleInvocationPassed(ctx core.ActionHookContext) error {
-	metadata := InvokeAppExecutionMetadata{}
-	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-	if err != nil {
-		return fmt.Errorf("invoke app: decode metadata: %w", err)
-	}
-
-	result := models.CanvasRunResultPassed
-	err = ctx.Metadata.Set(InvokeAppExecutionMetadata{
-		RunID:  metadata.RunID,
-		Result: &result,
-	})
-
-	if err != nil {
-		return fmt.Errorf("invoke app: set metadata: %w", err)
-	}
-
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "app.invocation.passed", []any{
-		map[string]any{
-			"run": map[string]any{
-				"id":     metadata.RunID,
-				"result": result,
+	if result == core.RunResultPassed {
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "app.invocation.passed", []any{
+			map[string]any{
+				"run": map[string]any{
+					"id":     metadata.RunID,
+					"result": result,
+				},
 			},
-		},
-	})
-}
-
-func (c *InvokeApp) handleInvocationFailed(ctx core.ActionHookContext) error {
-	metadata := InvokeAppExecutionMetadata{}
-	err := mapstructure.Decode(ctx.Metadata, &metadata)
-	if err != nil {
-		return fmt.Errorf("invoke app: decode metadata: %w", err)
+		})
 	}
 
-	message, _ := ctx.Parameters["message"].(string)
-	result := models.CanvasRunResultFailed
-	err = ctx.Metadata.Set(InvokeAppExecutionMetadata{
-		RunID:  metadata.RunID,
-		Result: &result,
-		Error:  &message,
-	})
-
-	if err != nil {
-		return fmt.Errorf("invoke app: set metadata: %w", err)
+	errMessage, ok := ctx.Parameters["error"].(string)
+	if !ok {
+		errMessage = ""
 	}
 
-	ctx.Logger.Infof("Invocation failed: run_id=%s, message=%s", metadata.RunID, message)
-
-	return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, message)
+	return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, errMessage)
 }
 
 func (c *InvokeApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

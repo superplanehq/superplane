@@ -1254,7 +1254,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
+		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),
 		Integration:   integrationCtx,
 	})
 }
@@ -1289,7 +1289,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node, onNewEvents),
+		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),
 		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)

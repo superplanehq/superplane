@@ -47,11 +47,11 @@ type ExecutionContext struct {
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
+	Runs           RunExecutionContext
 }
 
 type AppExecutionContext interface {
 	Broadcast(payload any) error
-	Invoke(app string, node string, payload any) error
 }
 
 type ExpressionContext interface {

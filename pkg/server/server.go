@@ -141,7 +141,7 @@ func startWorkers(
 	if os.Getenv("START_RUN_FINALIZER") == "yes" {
 		log.Println("Starting Run Finalizer")
 
-		w := workers.NewRunFinalizer(rabbitMQURL)
+		w := workers.NewRunFinalizer(rabbitMQURL, registry)
 		go w.Start(context.Background())
 	}
 
@@ -168,9 +168,9 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_APP_INVOCATION_WORKER") == "yes" {
-		log.Println("Starting App Invocation Worker")
-		w := workers.NewAppInvocationWorker(registry)
+	if os.Getenv("START_RUN_INITIALIZER") == "yes" {
+		log.Println("Starting Run Initializer")
+		w := workers.NewRunInitializer(registry)
 		go w.Start(context.Background())
 	}
 

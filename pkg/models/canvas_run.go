@@ -5,12 +5,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const (
+	CanvasRunStatePending  = "pending"
 	CanvasRunStateStarted  = "started"
 	CanvasRunStateFinished = "finished"
 
@@ -24,9 +27,30 @@ const (
 )
 
 type CanvasRun struct {
-	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	ID uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+
+	//
+	// The target node of the run
+	//
 	WorkflowID uuid.UUID
+	NodeID     string
 	VersionID  uuid.UUID
+
+	//
+	// The information for the parent of the run.
+	// Parent runs can be in a different workflow.
+	//
+	ParentRunID       *uuid.UUID
+	ParentWorkflowID  *uuid.UUID
+	ParentExecutionID *uuid.UUID
+
+	//
+	// Callback definitions for the run.
+	// Allows controlling specific behavior to run throughout the run lifecycle.
+	//
+	Callbacks datatypes.JSONSlice[core.RunCallbackDefinition]
+
+	Input      JSONValue
 	State      string
 	Result     string
 	CreatedAt  *time.Time
@@ -323,4 +347,30 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 	}
 
 	return CanvasRunResultPassed, nil
+}
+
+func ListPendingRuns(tx *gorm.DB) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := tx.
+		Where("state = ?", CanvasRunStatePending).
+		Order("created_at ASC").
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return runs, nil
+}
+
+func (r *CanvasRun) FindTargetNode(tx *gorm.DB) (*CanvasNode, error) {
+	node, err := FindCanvasNode(tx, r.WorkflowID, r.NodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+func (r *CanvasRun) Start(db *gorm.DB) error {
+	return db.Model(r).Update("state", CanvasRunStateStarted).Error
 }

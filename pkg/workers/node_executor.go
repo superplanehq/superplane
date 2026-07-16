@@ -357,6 +357,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
+		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution),
 	}
 
 	if node.AppInstallationID != nil {

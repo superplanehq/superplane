@@ -199,7 +199,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, re
 		Logger:        logging.WithNode(logger, *node),
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
-		Events:        contexts.NewEventContext(tx, node, onNewEvents),
+		Events:        contexts.NewEventContext(tx, node, nil, onNewEvents),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
 

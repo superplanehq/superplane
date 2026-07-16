@@ -2,19 +2,22 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
@@ -33,12 +36,14 @@ const (
 
 type RunFinalizer struct {
 	logger      *log.Entry
+	registry    *registry.Registry
 	rabbitMQURL string
 }
 
-func NewRunFinalizer(rabbitMQURL string) *RunFinalizer {
+func NewRunFinalizer(rabbitMQURL string, registry *registry.Registry) *RunFinalizer {
 	return &RunFinalizer{
 		logger:      log.WithFields(log.Fields{"worker": "RunFinalizer"}),
+		registry:    registry,
 		rabbitMQURL: rabbitMQURL,
 	}
 }
@@ -365,55 +370,90 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
-	if err := w.completeAppInvocation(tx, run.ID); err != nil {
+	if err := w.executeRunCallback(tx, run); err != nil {
 		return false, "", err
 	}
 
 	return true, "", nil
 }
 
-func (w *RunFinalizer) completeAppInvocation(tx *gorm.DB, runID uuid.UUID) error {
-	invocation, err := models.FindInvocationForRun(tx, runID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		w.logger.Infof("No invocation found for run %s", runID)
+func (w *RunFinalizer) executeRunCallback(tx *gorm.DB, run *models.CanvasRun) error {
+	callbackIndex := slices.IndexFunc(run.Callbacks, func(callback core.RunCallbackDefinition) bool {
+		return callback.Kind == core.RunCallbackKindFinished
+	})
+
+	//
+	// If no callback exists, nothing extra to execute here.
+	//
+	if callbackIndex == -1 {
 		return nil
 	}
 
+	return w.executeCallback(tx, run, run.Callbacks[callbackIndex])
+}
+
+func (w *RunFinalizer) executeCallback(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition) error {
+	//
+	// TODO: handle target callbacks too
+	//
+	switch callback.Ref {
+	case core.RunCallbackRefParent:
+		return w.executeCallbackOnParent(tx, run, callback)
+	default:
+		return fmt.Errorf("invalid callback reference: %s", callback.Ref)
+	}
+}
+
+func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition) error {
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	if run.ParentExecutionID == nil || run.ParentWorkflowID == nil {
+		return fmt.Errorf("no parent information")
+	}
+
+	execution, err := models.FindNodeExecutionInTransaction(tx, *run.ParentWorkflowID, *run.ParentExecutionID)
 	if err != nil {
-		w.logger.WithError(err).Errorf("Error finding invocation for run %s", runID)
-		return err
+		return fmt.Errorf("find parent execution: %w", err)
 	}
 
-	if invocation.State == models.AppInvocationStateCompleted {
-		w.logger.Infof("Invocation %s already completed for run %s", invocation.ID, runID)
-		return nil
-	}
-
-	if invocation.CallerExecutionID == nil {
-		w.logger.Infof("Invocation %s missing caller execution id for run %s", invocation.ID, runID)
-		return fmt.Errorf("invocation %s missing caller execution id", invocation.ID)
-	}
-
-	execution, err := models.FindNodeExecutionInTransaction(tx, invocation.CallerAppID, *invocation.CallerExecutionID)
+	node, err := models.FindCanvasNode(tx, *run.ParentWorkflowID, execution.NodeID)
 	if err != nil {
-		w.logger.WithError(err).Errorf("Error finding caller execution for invocation %s", invocation.ID)
-		return fmt.Errorf("find caller execution: %w", err)
+		return fmt.Errorf("find parent node: %w", err)
 	}
 
 	//
-	// TODO: weird to have this hard coded here.
+	// TODO: handle triggers too
 	//
-	w.logger.Infof("Creating invocation callback request for execution %s", execution.ID)
-	now := time.Now()
-	err = execution.CreateRequest(tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
-		InvokeAction: &models.InvokeAction{
-			ActionName: "invocationPassed",
+
+	ref := node.Ref.Data()
+	action, err := w.registry.GetAction(ref.Component.Name)
+	if err != nil {
+		return fmt.Errorf("get action: %w", err)
+	}
+
+	err = action.HandleHook(core.ActionHookContext{
+		Name:           callback.Hook,
+		Logger:         logging.ForNode(*node),
+		Configuration:  node.Configuration.Data(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Parameters: map[string]any{
+			"result": run.Result,
 		},
-	}, &now)
+	})
 
 	if err != nil {
-		return fmt.Errorf("schedule invocation callback: %w", err)
+		return fmt.Errorf("handle hook: %w", err)
 	}
 
-	return invocation.Delete(tx)
+	//
+	// TODO: we have to send RabbitMQ message about this execution
+	//
+
+	return tx.Save(&execution).Error
 }

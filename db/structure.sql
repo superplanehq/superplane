@@ -219,24 +219,6 @@ CREATE TABLE public.app_installations (
 
 
 --
--- Name: app_invocations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.app_invocations (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    caller_app_id uuid NOT NULL,
-    caller_execution_id uuid NOT NULL,
-    target_canvas_id uuid NOT NULL,
-    target_node_id character varying(128) NOT NULL,
-    run_id uuid,
-    state character varying(64) DEFAULT 'pending'::character varying NOT NULL,
-    payload jsonb NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: app_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -688,7 +670,13 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    parent_run_id uuid,
+    parent_workflow_id uuid,
+    parent_execution_id uuid,
+    callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    input jsonb DEFAULT '{}'::jsonb NOT NULL,
+    node_id character varying(255)
 );
 
 
@@ -871,14 +859,6 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 ALTER TABLE ONLY public.app_installations
     ADD CONSTRAINT app_installations_pkey PRIMARY KEY (id);
-
-
---
--- Name: app_invocations app_invocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.app_invocations
-    ADD CONSTRAINT app_invocations_pkey PRIMARY KEY (id);
 
 
 --
@@ -1351,13 +1331,6 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 
 
 --
--- Name: idx_app_invocations_run_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_app_invocations_run_id ON public.app_invocations USING btree (run_id);
-
-
---
 -- Name: idx_app_messages_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1788,38 +1761,6 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: app_invocations app_invocations_caller_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.app_invocations
-    ADD CONSTRAINT app_invocations_caller_app_id_fkey FOREIGN KEY (caller_app_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
--- Name: app_invocations app_invocations_caller_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.app_invocations
-    ADD CONSTRAINT app_invocations_caller_execution_id_fkey FOREIGN KEY (caller_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
-
-
---
--- Name: app_invocations app_invocations_target_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.app_invocations
-    ADD CONSTRAINT app_invocations_target_canvas_id_fkey FOREIGN KEY (target_canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
--- Name: app_invocations app_invocations_target_canvas_id_target_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.app_invocations
-    ADD CONSTRAINT app_invocations_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
-
-
---
 -- Name: app_messages app_messages_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2164,6 +2105,30 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.workflow_runs(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_workflow_id_fkey FOREIGN KEY (parent_workflow_id) REFERENCES public.workflows(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2275,7 +2240,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260715144612	f
+20260715232202	f
 \.
 
 

@@ -1,0 +1,60 @@
+package contexts
+
+import (
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
+)
+
+type RunExecutionContext struct {
+	tx        *gorm.DB
+	canvas    *models.Canvas
+	node      *models.CanvasNode
+	execution *models.CanvasNodeExecution
+}
+
+func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, execution *models.CanvasNodeExecution) *RunExecutionContext {
+	return &RunExecutionContext{tx: tx, canvas: canvas, node: node, execution: execution}
+}
+
+func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
+	appContext := NewAppContext(c.tx, c.canvas, c.node)
+
+	app, err := appContext.Get(params.App)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := models.FindLiveCanvasVersionInTransaction(c.tx, uuid.MustParse(app.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := appContext.GetNode(params.App, params.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	run := &models.CanvasRun{
+		ID:                uuid.New(),
+		WorkflowID:        uuid.MustParse(app.ID),
+		NodeID:            node.ID,
+		VersionID:         version.ID,
+		ParentRunID:       &c.execution.RunID,
+		ParentWorkflowID:  &c.canvas.ID,
+		ParentExecutionID: &c.execution.ID,
+		Callbacks:         params.Callbacks,
+		Input:             models.NewJSONValue(params.Input),
+		State:             models.CanvasRunStatePending,
+	}
+
+	err = c.tx.Create(run).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.Run{
+		ID: run.ID,
+	}, nil
+}

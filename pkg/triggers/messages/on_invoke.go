@@ -160,38 +160,40 @@ func (c *OnInvoke) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (c *OnInvoke) OnAppMessage(ctx core.AppMessageContext) error {
-	config := OnInvokeConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return fmt.Errorf("on invoke: decode configuration: %w", err)
-	}
-
-	message, ok := ctx.Message.(map[string]any)
-	if !ok {
-		return fmt.Errorf("on invoke: message is not a map[string]any")
-	}
-
-	payload, ok := message["payload"].(map[string]any)
-	if !ok {
-		return fmt.Errorf("on invoke: payload is not present")
-	}
-
-	if len(config.Parameters) > 0 {
-		err = configuration.ValidateConfiguration(config.Parameters, payload)
-		if err != nil {
-			return fmt.Errorf("on invoke: validate configuration: %w", err)
-		}
-	}
-
-	return ctx.Events.Emit("app.invocation", ctx.Message)
-}
-
 func (c *OnInvoke) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{
+		{Name: "onMessage", Type: core.HookTypeInternal},
+	}
 }
 
 func (c *OnInvoke) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	switch ctx.Name {
+	case "onMessage":
+		return c.handleMessage(ctx)
+	default:
+		return nil, fmt.Errorf("on invoke: unknown hook %s", ctx.Name)
+	}
+}
+
+func (c *OnInvoke) handleMessage(ctx core.TriggerHookContext) (map[string]any, error) {
+	config := OnInvokeConfiguration{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return nil, fmt.Errorf("on invoke: decode configuration: %w", err)
+	}
+
+	if len(config.Parameters) > 0 {
+		err = configuration.ValidateConfiguration(config.Parameters, ctx.Parameters)
+		if err != nil {
+			return nil, fmt.Errorf("on invoke: validate configuration: %w", err)
+		}
+	}
+
+	err = ctx.Events.Emit("app.invocation", ctx.Parameters)
+	if err != nil {
+		return nil, fmt.Errorf("on invoke: emit event: %w", err)
+	}
+
 	return nil, nil
 }
 
