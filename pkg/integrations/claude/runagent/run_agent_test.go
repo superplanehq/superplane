@@ -19,9 +19,9 @@ func Test__RunAgent__Setup(t *testing.T) {
 	integrationCtx := &contexts.IntegrationContext{}
 	ctx := core.SetupContext{
 		Configuration: map[string]any{
-			"agent":       "agent_01",
-			"environment": "env_01",
-			"prompt":      "Do the thing",
+			"agent":         "agent_01",
+			"environmentId": "env_01",
+			"prompt":        "Do the thing",
 		},
 		Integration: integrationCtx,
 	}
@@ -33,8 +33,8 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 	integrationCtx := &contexts.IntegrationContext{}
 	ctx := core.SetupContext{
 		Configuration: map[string]any{
-			"environment": "env_01",
-			"prompt":      "x",
+			"environmentId": "env_01",
+			"prompt":        "x",
 		},
 		Integration: integrationCtx,
 	}
@@ -118,7 +118,7 @@ func Test__decodeSpec__legacyConfig(t *testing.T) {
 		"prompt":        "do it",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "env_1", spec.Environment, "legacy environmentId must map to environment")
+	assert.Equal(t, "env_1", spec.Environment)
 	assert.Equal(t, "2", spec.Version, "numeric version must become the resource string")
 	require.NoError(t, validateSpec(spec))
 
@@ -128,18 +128,16 @@ func Test__decodeSpec__legacyConfig(t *testing.T) {
 	assert.Equal(t, 2, *v)
 }
 
-// The new keys win when both are present, and a version already stored as a
-// string passes through untouched.
-func Test__decodeSpec__prefersNewKeys(t *testing.T) {
+// A config saved by the current version (string version) decodes unchanged.
+func Test__decodeSpec__newConfig(t *testing.T) {
 	spec, err := decodeSpec(map[string]any{
 		"agent":         "agent_1",
-		"environment":   "env_new",
-		"environmentId": "env_old",
+		"environmentId": "env_1",
 		"version":       "3",
 		"prompt":        "do it",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "env_new", spec.Environment)
+	assert.Equal(t, "env_1", spec.Environment)
 	assert.Equal(t, "3", spec.Version)
 }
 
@@ -165,7 +163,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 
 	execCtx := core.ExecutionContext{
 		ID:             uuid.New(),
-		Configuration:  map[string]any{"agent": "ag_1", "environment": "ev_1", "prompt": "Hello"},
+		Configuration:  map[string]any{"agent": "ag_1", "environmentId": "ev_1", "prompt": "Hello"},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
 		Metadata:       metadataCtx,
@@ -222,7 +220,7 @@ func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
 
 	execCtx := core.ExecutionContext{
 		ID:             uuid.New(),
-		Configuration:  map[string]any{"agent": "a", "environment": "e", "prompt": "p"},
+		Configuration:  map[string]any{"agent": "a", "environmentId": "e", "prompt": "p"},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
 		Metadata:       metadataCtx,
@@ -299,7 +297,7 @@ func Test__RunAgent__poll__persistSessionKeepsSession(t *testing.T) {
 		Parameters: map[string]any{"attempt": float64(1), "errors": float64(0)},
 		Configuration: map[string]any{
 			"agent":          "agent_1",
-			"environment":    "env_1",
+			"environmentId":  "env_1",
 			"prompt":         "do it",
 			"persistSession": true,
 		},

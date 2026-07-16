@@ -38,8 +38,10 @@ type Spec struct {
 	Agent string `json:"agent" mapstructure:"agent"`
 	// Version pins the agent version. It holds the raw resource value (a version
 	// number as a string); empty runs the agent's latest version.
-	Version     string          `json:"version" mapstructure:"version"`
-	Environment string          `json:"environment" mapstructure:"environment"`
+	Version string `json:"version" mapstructure:"version"`
+	// Environment is stored under the legacy "environmentId" key so existing
+	// nodes keep working; it is presented as the Environment resource field.
+	Environment string          `json:"environmentId" mapstructure:"environmentId"`
 	Prompt      string          `json:"prompt" mapstructure:"prompt"`
 	VaultIDs    []string        `json:"vaultIds" mapstructure:"vaultIds"`
 	Files       []string        `json:"files" mapstructure:"files"`

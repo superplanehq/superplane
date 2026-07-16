@@ -94,7 +94,12 @@ func (a *RunAgent) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "environment",
+			// The stored key stays "environmentId" for backward compatibility:
+			// existing nodes saved it under that name, and neither the backend nor
+			// the editor migrates unknown keys, so renaming it would drop the value
+			// on the next save. The field is still shown and selected as an
+			// Environment resource.
+			Name:        "environmentId",
 			Label:       "Environment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -550,11 +555,8 @@ func decodeSpec(config any) (Spec, error) {
 
 // normalizeLegacyConfig migrates configuration written by earlier versions of
 // this component so already-saved nodes keep working without being re-saved:
-//
-//   - the environment id lived under "environmentId" before it became the
-//     "environment" resource field;
-//   - the agent version was a number before it became a resource value string,
-//     which mapstructure would otherwise refuse to decode into Spec.Version.
+// the agent version was stored as a number before it became the resource-value
+// string, which mapstructure would otherwise refuse to decode into Spec.Version.
 //
 // The input map is never mutated: a shallow copy is made only when a migration
 // actually applies, and non-map inputs pass through untouched.
@@ -578,14 +580,8 @@ func normalizeLegacyConfig(config any) any {
 		out[key] = value
 	}
 
-	// Legacy "environmentId" -> "environment" (only when the new key is unset).
-	if isBlank(raw["environment"]) {
-		if legacy, ok := raw["environmentId"]; ok && !isBlank(legacy) {
-			set("environment", legacy)
-		}
-	}
-
-	// A numeric version was stored before the resource-value string.
+	// The version was stored as a number before it became the resource-value
+	// string, which mapstructure would otherwise refuse to decode into a string.
 	if v, ok := raw["version"]; ok {
 		if _, isStr := v.(string); !isStr {
 			if s := legacyVersionToString(v); s != "" {
@@ -595,11 +591,6 @@ func normalizeLegacyConfig(config any) any {
 	}
 
 	return out
-}
-
-func isBlank(v any) bool {
-	s, ok := v.(string)
-	return v == nil || (ok && strings.TrimSpace(s) == "")
 }
 
 // legacyVersionToString renders a version stored as a JSON number as the string
