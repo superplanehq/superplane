@@ -69,6 +69,27 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 	}
 }
 
+func Test__RunCodeAgent__Setup__structuredOutputInvalidSchema(t *testing.T) {
+	a := &RunCodeAgent{}
+	cfg := repoConfig()
+	cfg["outputSchema"] = `{"type":"object"}` // missing "properties"
+	err := a.Setup(core.SetupContext{Configuration: cfg, Integration: &contexts.IntegrationContext{}, Metadata: &contexts.MetadataContext{}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "properties")
+}
+
+func Test__RunCodeAgent__Setup__structuredOutputMetadata(t *testing.T) {
+	a := &RunCodeAgent{}
+	cfg := repoConfig()
+	cfg["outputSchema"] = `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`
+	metadataCtx := &contexts.MetadataContext{}
+	require.NoError(t, a.Setup(core.SetupContext{Configuration: cfg, Integration: &contexts.IntegrationContext{}, Metadata: metadataCtx}))
+
+	md := NodeMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
+	assert.True(t, md.StructuredOutput)
+}
+
 func Test__RunCodeAgent__validateRepository(t *testing.T) {
 	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "{{ event.repo }}"}
 	for _, v := range valid {
@@ -125,7 +146,7 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug", BaseBranch: "main"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{})
+	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
 	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git checkout -b claude/agent-abc")
 	assert.Contains(t, got, "fix the bug")
@@ -139,7 +160,7 @@ func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
 	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr)
+	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr, nil)
 	assert.Contains(t, got, `git config user.name "Octo Cat"`)
 	assert.Contains(t, got, `git config user.email "1+octocat@users.noreply.github.com"`)
 	assert.Contains(t, got, "Co-Authored-By")
@@ -147,11 +168,27 @@ func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
-	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", false, commitAttribution{})
+	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", false, commitAttribution{}, nil)
 	assert.Contains(t, got, "git switch feature-x")
 	assert.Contains(t, got, "do NOT open a new pull request")
 	assert.Contains(t, got, "address review")
 	assert.Contains(t, got, "https://github.com/owner/repo/pull/9")
+}
+
+func Test__RunCodeAgent__buildPrompt__structuredOutput(t *testing.T) {
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"summary": map[string]any{"type": "string"}},
+		"required":   []any{"summary"},
+	}
+	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
+	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, schema)
+
+	assert.Contains(t, got, "fenced json code block")
+	assert.Contains(t, got, `"summary"`)
+	// The structured-output instructions must precede the FINAL line marker,
+	// so the marker instruction is still the last thing the agent is told.
+	assert.Less(t, strings.Index(got, "fenced json code block"), strings.Index(got, "output on the FINAL line"))
 }
 
 func Test__RunCodeAgent__actAsBot(t *testing.T) {
@@ -214,6 +251,53 @@ func Test__RunCodeAgent__Execute__repositoryMode_schedulesPoll(t *testing.T) {
 	body, _ := io.ReadAll(sendReq.Body)
 	assert.Contains(t, string(body), "git clone")
 	assert.Contains(t, string(body), "do the thing")
+}
+
+func Test__RunCodeAgent__Execute__structuredOutputInPrompt(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"agent_1"}`),                   // create agent
+		resp(`{"id":"env_1"}`),                     // create environment
+		resp(`{"id":"vault_1"}`),                   // create vault
+		resp(`{}`),                                 // add GITHUB_TOKEN credential
+		resp(`{"id":"sess_1","status":"running"}`), // create session
+		resp(`{}`),                                 // send message
+		resp(`{"id":"sess_1","status":"running"}`), // get session (fast-path check)
+	}}
+	metadataCtx := &contexts.MetadataContext{}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+	cfg := repoConfig()
+	cfg["outputSchema"] = `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  cfg,
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{"gh/token": []byte("ghp_123")}},
+		Metadata:       metadataCtx,
+		ExecutionState: execState,
+		Requests:       requestsCtx,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.Execute(execCtx))
+	assert.False(t, execState.Finished)
+
+	var sendReq *http.Request
+	for _, r := range httpCtx.Requests {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/events") {
+			sendReq = r
+		}
+	}
+	require.NotNil(t, sendReq)
+	body, _ := io.ReadAll(sendReq.Body)
+	// Structured-output instructions and the PR_URL marker must both be present,
+	// and in the order that keeps the marker the true final line.
+	assert.Contains(t, string(body), "fenced json code block")
+	assert.Contains(t, string(body), `\"summary\"`)
+	assert.Contains(t, string(body), "PR_URL=")
+	assert.Less(t, strings.Index(string(body), "fenced json code block"), strings.Index(string(body), "PR_URL="))
 }
 
 func Test__RunCodeAgent__Execute__cleansUpOnSessionFailure(t *testing.T) {
@@ -355,6 +439,45 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "migration-notes.md", out.Artifacts[0].Filename)
 	assert.Equal(t, "text", out.Artifacts[0].Encoding)
 	assert.Equal(t, "# Migration notes\n", out.Artifacts[0].Content)
+}
+
+func Test__RunCodeAgent__poll__structuredOutput(t *testing.T) {
+	a := &RunCodeAgent{}
+	agentMessage := "Done.\n\n```json\n{\"summary\": \"fixed the bug\"}\n```\n\nPR_URL=https://github.com/o/r/pull/7"
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"idle"}`),
+		resp(fmt.Sprintf(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":%q}]}]}`, agentMessage)),
+		resp(`{"data":[]}`),                            // session artifacts (empty)
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:       "poll",
+		Parameters: map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Configuration: map[string]any{
+			"sourceMode":   "repository",
+			"repository":   "o/r",
+			"task":         "do it",
+			"githubToken":  map[string]any{"secret": "gh", "key": "token"},
+			"outputSchema": `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`,
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.Equal(t, "https://github.com/o/r/pull/7", out.PrURL)
+
+	parsed, ok := out.Parsed.(map[string]any)
+	require.True(t, ok, "expected Parsed to be an object, got %T", out.Parsed)
+	assert.Equal(t, "fixed the bug", parsed["summary"])
 }
 
 func Test__RunCodeAgent__poll__persistSessionKeepsSessionAndEnvironment(t *testing.T) {
