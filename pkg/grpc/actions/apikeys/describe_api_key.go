@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 )
 
-func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountRequest) (*pb.DescribeServiceAccountResponse, error) {
+func DescribeAPIKey(ctx context.Context, req *pb.DescribeAPIKeyRequest) (*pb.DescribeAPIKeyResponse, error) {
 	_, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -27,20 +27,20 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
-	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+	if !user.IsAPIKey() {
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	db := database.DB(ctx)
-	creator, err := creatorUserForServiceAccount(db, orgID, user)
+	creator, err := creatorUserForAPIKey(db, orgID, user)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to describe service account")
+		return nil, grpcerrors.Internal(err, "failed to describe API key")
 	}
 
-	return &pb.DescribeServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user, creator),
+	return &pb.DescribeAPIKeyResponse{
+		ApiKey: serializeAPIKey(user, creator),
 	}, nil
 }
