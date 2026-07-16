@@ -68,7 +68,7 @@ const SmtpConfigFields: React.FC<SmtpConfigFieldsProps> = ({
   <>
     <div>
       <Label className="mb-2 block text-left">
-        SMTP Host <span className="text-gray-800">*</span>
+        SMTP Host <span className="text-gray-800 dark:text-gray-300">*</span>
       </Label>
       <InputGroup>
         <Input
@@ -84,7 +84,7 @@ const SmtpConfigFields: React.FC<SmtpConfigFieldsProps> = ({
 
     <div>
       <Label className="mb-2 block text-left">
-        SMTP Port <span className="text-gray-800">*</span>
+        SMTP Port <span className="text-gray-800 dark:text-gray-300">*</span>
       </Label>
       <InputGroup>
         <Input
@@ -140,7 +140,7 @@ const SmtpConfigFields: React.FC<SmtpConfigFieldsProps> = ({
 
     <div>
       <Label className="mb-2 block text-left">
-        From Email <span className="text-gray-800">*</span>
+        From Email <span className="text-gray-800 dark:text-gray-300">*</span>
       </Label>
       <InputGroup>
         <Input
