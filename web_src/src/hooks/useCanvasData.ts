@@ -196,16 +196,30 @@ function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
 }
 
 export function invalidateStagedCanvasCaches(queryClient: QueryClient, canvasId: string): void {
-  queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-  queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey;
-      return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
-    },
-  });
+  // Callers (WebSocket staging_updated handler, mutation onSuccess) fire this
+  // helper without awaiting it. Two guards keep the detached promises from
+  // leaking unhandled rejections (see #5945):
+  //   1. cancelRefetch: false — do not cancel an in-flight staged read when a
+  //      staging_updated event arrives mid-fetch. Cancelling makes the retryer
+  //      throw a CancelledError that escapes the unawaited promise. The query
+  //      is still marked stale, so the next read refetches.
+  //   2. Promise.allSettled — absorb any other rejection here instead of
+  //      letting it surface via window.onunhandledrejection.
+  void Promise.allSettled([
+    queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries(
+      {
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
+        },
+      },
+      { cancelRefetch: false }
+    ),
+  ]);
 }
 
 function isVersionScopedRepositoryQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
