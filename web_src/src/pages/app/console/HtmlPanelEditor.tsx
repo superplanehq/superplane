@@ -305,6 +305,7 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
     includeTopLevelGlobals: true,
     includeFunctions: false,
     excludedSuggestions: MONACO_CEL_EXCLUDED_SUGGESTIONS,
+    envKeySource: "__runNodes__",
   });
 
   useImperativeHandle(

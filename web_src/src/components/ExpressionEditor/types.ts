@@ -42,6 +42,9 @@ export interface ExpressionEditorProps extends Omit<ComponentPropsWithoutRef<"te
   includeFunctions?: boolean;
 }
 
+// Note: `envKeySource` is derived from `dialect` and not user-configurable to
+// keep the two in sync; widget CEL always maps `$` to `__runNodes__`.
+
 export interface ExpressionEditorDialogChildProps {
   value: string;
   onChange: (next: string) => void;

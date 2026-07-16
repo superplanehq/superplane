@@ -54,6 +54,12 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
    * (e.g. widget CEL `pathOrRaw` profile).
    */
   pathModeOutsideWrapper?: boolean;
+  /**
+   * Key in `exampleObj` that backs the `$` / `$["…"]` selector. Defaults to the
+   * globals root (expr-lang). Widget CEL points this at `__runNodes__` so `$`
+   * completes run-node names instead of row fields.
+   */
+  envKeySource?: string;
 }
 
 const suggestionSortPriority = {
@@ -152,6 +158,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       includeTopLevelGlobals = false,
       includeFunctions = true,
       pathModeOutsideWrapper = false,
+      envKeySource,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -659,6 +666,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           limit: 150,
           includeTopLevelGlobals,
           includeFunctions,
+          envKeySource,
         })
           .filter((s) => !excludedSuggestions?.includes(s.label))
           .sort((a, b) => {
@@ -676,7 +684,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             }
             return a.label.localeCompare(b.label);
           }),
-      [exampleObj, excludedSuggestions, includeTopLevelGlobals, includeFunctions],
+      [exampleObj, excludedSuggestions, includeTopLevelGlobals, includeFunctions, envKeySource],
     );
 
     const getReplacementRange = (left: string, insertText: string) => {

@@ -20,6 +20,7 @@ type UseMonacoExpressionAutocompleteProps = {
   includeTopLevelGlobals?: boolean;
   includeFunctions?: boolean;
   excludedSuggestions?: string[];
+  envKeySource?: string;
 };
 
 type MonacoKeyEvent = {
@@ -188,6 +189,7 @@ export const useMonacoExpressionAutocomplete = ({
   includeTopLevelGlobals = false,
   includeFunctions = true,
   excludedSuggestions,
+  envKeySource,
 }: UseMonacoExpressionAutocompleteProps) => {
   const modelsRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
   const previousValueRef = useRef<WeakMap<MonacoEditor.ITextModel, string>>(new WeakMap());
@@ -256,6 +258,7 @@ export const useMonacoExpressionAutocomplete = ({
                 limit: 100,
                 includeTopLevelGlobals,
                 includeFunctions,
+                envKeySource,
               },
             );
             const filteredSuggestions = excludedSuggestions
@@ -456,6 +459,7 @@ export const useMonacoExpressionAutocomplete = ({
     [
       allowOutsideExpression,
       autocompleteExampleObj,
+      envKeySource,
       excludedSuggestions,
       includeFunctions,
       includeTopLevelGlobals,

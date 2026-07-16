@@ -64,6 +64,10 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     // specific — hide them from CEL fields so authors don't insert identifiers
     // the CEL runtime doesn't understand.
     const resolvedIncludeFunctions = includeFunctions ?? dialect !== "cel";
+    // Widget CEL's `$` selector maps to the internal `__runNodes__` map, so
+    // route env-key completion (`$` / `$["…"]`) to node names instead of the
+    // row's top-level fields.
+    const envKeySource = dialect === "cel" ? "__runNodes__" : undefined;
     const resolvedExcludedSuggestions = useMemo(() => {
       if (dialect !== "cel") return excludedSuggestions;
       const base = excludedSuggestions ?? [];
@@ -82,6 +86,7 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
         includeTopLevelGlobals={resolvedIncludeTopLevelGlobals}
         includeFunctions={resolvedIncludeFunctions}
         pathModeOutsideWrapper={pathModeOutsideWrapper}
+        envKeySource={envKeySource}
         excludedSuggestions={resolvedExcludedSuggestions}
         {...rest}
       />
