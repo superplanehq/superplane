@@ -1,11 +1,12 @@
-import { useId } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useId, useMemo } from "react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
+import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
 export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
@@ -87,45 +88,73 @@ function PayloadEntry({
   const reactId = useId();
   const datalistId = fieldOptions.length > 0 ? `payload-fields-${reactId}` : undefined;
   return (
-    <div className="grid grid-cols-12 items-start gap-1">
-      <Input
-        value={entry.path}
-        onChange={(e) => onChange({ path: e.target.value })}
-        placeholder="data.issue.number"
-        className="col-span-5 h-7 text-xs"
-        list={datalistId}
-      />
-      <div className="col-span-6">
-        <ExpressionEditor
-          dialect="cel"
-          exampleObj={sampleRow}
-          value={entry.template}
-          onChange={(next) => onChange({ template: next })}
-          placeholder="{{ pr_number }} or int(value) / 2"
-          inputSize="xs"
-          showValuePreview
-          valuePreviewLabel="Preview"
-          data-testid="payload-template-input"
+    <div className="space-y-1">
+      <div className="grid grid-cols-12 items-start gap-1">
+        <Input
+          value={entry.path}
+          onChange={(e) => onChange({ path: e.target.value })}
+          placeholder="data.issue.number"
+          className="col-span-5 h-7 text-xs"
+          list={datalistId}
         />
+        <div className="col-span-6">
+          <ExpressionEditor
+            dialect="cel"
+            exampleObj={sampleRow}
+            value={entry.template}
+            onChange={(next) => onChange({ template: next })}
+            placeholder="{{ pr_number }} or int(value) / 2"
+            inputSize="xs"
+            showValuePreview
+            valuePreviewLabel="Preview"
+            data-testid="payload-template-input"
+          />
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="col-span-1 h-7 w-7"
+          onClick={onRemove}
+          disabled={isBlankTrailingRow}
+          title={isBlankTrailingRow ? "Empty row — type to add" : "Remove field"}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+        {datalistId ? (
+          <datalist id={datalistId}>
+            {fieldOptions.map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
+        ) : null}
       </div>
-      <Button
-        type="button"
-        size="icon"
-        variant="ghost"
-        className="col-span-1 h-7 w-7"
-        onClick={onRemove}
-        disabled={isBlankTrailingRow}
-        title={isBlankTrailingRow ? "Empty row — type to add" : "Remove field"}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
-      {datalistId ? (
-        <datalist id={datalistId}>
-          {fieldOptions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
-      ) : null}
+      <PayloadTemplateError template={entry.template} sampleRow={sampleRow} />
     </div>
+  );
+}
+
+/**
+ * Always-visible CEL compile/eval error line for the payload template. The
+ * ExpressionEditor's preview toggle already covers success previews, but
+ * authors expect immediate feedback on invalid templates without having to
+ * flip preview mode.
+ */
+function PayloadTemplateError({ template, sampleRow }: { template: string; sampleRow: Record<string, unknown> }) {
+  const preview = useMemo(() => {
+    if (!template || !template.includes("{{")) return null;
+    const env = buildEnv();
+    const stringify = (v: unknown) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v));
+    return evalTemplateDetailed(compileTemplate(template), sampleRow, env, stringify);
+  }, [template, sampleRow]);
+
+  if (!preview || preview.ok) return null;
+  return (
+    <p className="flex items-start gap-1 text-[10px] text-red-600">
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+      <span>
+        <span className="font-medium">CEL error:</span> {preview.error}
+      </span>
+    </p>
   );
 }
