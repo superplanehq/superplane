@@ -77,10 +77,12 @@ export function evaluateCelPathLiteral(
   globals: Record<string, unknown> | null | undefined,
 ): ExpressionEvaluationOutcome {
   if (!globals) return { ok: false, error: "No context available" };
-  const trimmed = path.trim();
-  if (!trimmed) return { ok: true, value: "", formattedValue: "" };
+  if (path.length === 0) return { ok: true, value: "", formattedValue: "" };
+  // Pass the raw string through — runtime `evalRowField` does not trim, so
+  // stray leading/trailing whitespace should surface as a resolution miss
+  // here instead of a green preview that fails at render time.
   try {
-    const value = getValueAtPath(globals, trimmed);
+    const value = getValueAtPath(globals, path);
     return { ok: true, value, formattedValue: stringifyCelValue(value) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
