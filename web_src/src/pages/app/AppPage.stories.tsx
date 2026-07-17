@@ -27,7 +27,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Live canvas view: the ReactFlow graph plus the runs history sidebar. */
+/** Live canvas view: ReactFlow graph plus runs sidebar; Console tab uses the Software Factory dashboard. */
 export const LiveCanvas: Story = {
   render: () => <AppPageHarness />,
 };

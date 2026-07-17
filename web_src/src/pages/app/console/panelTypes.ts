@@ -35,6 +35,8 @@ import {
   validateRunTriggersArray,
 } from "./runDataSourceFilterSchema";
 import { validateScorecardContent } from "./scorecardRenderValidation";
+import { validateSpotlightContent, DEFAULT_SPOTLIGHT_CONTENT } from "./spotlightContent";
+import type { SpotlightPanelContent } from "./spotlightContent";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
@@ -53,7 +55,17 @@ export {
 export { asObject };
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"] as const;
+export const PANEL_TYPES = [
+  "markdown",
+  "html",
+  "node",
+  "nodes",
+  "table",
+  "chart",
+  "number",
+  "scorecard",
+  "spotlight",
+] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 /**
@@ -116,6 +128,11 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "scorecard",
     label: "Scorecard",
     description: "A KPI with target, change vs the previous value, and a status-colored sparkline.",
+  },
+  spotlight: {
+    type: "spotlight",
+    label: "Spotlight",
+    description: "Hero banner for the top data-source row — who, what, when, and a check strip.",
   },
 };
 
@@ -342,6 +359,11 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
         dataSource: { kind: "memory", namespace: "" },
         render: DEFAULT_SCORECARD_RENDER,
       } satisfies ScorecardPanelContent;
+    case "spotlight":
+      return {
+        ...DEFAULT_SPOTLIGHT_CONTENT,
+        title: defaultTitle ?? "",
+      } satisfies SpotlightPanelContent;
   }
 }
 
@@ -373,6 +395,15 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateNumberContent(content);
     case "scorecard":
       return validateScorecardContent(content);
+    case "spotlight": {
+      const obj = asObject(content);
+      if (!obj) return "content must be an object.";
+      return validateSpotlightContent({
+        ...DEFAULT_SPOTLIGHT_CONTENT,
+        ...(obj as SpotlightPanelContent),
+        dataSource: (obj.dataSource as SpotlightPanelContent["dataSource"]) ?? DEFAULT_SPOTLIGHT_CONTENT.dataSource,
+      });
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import docsReviewerFixture from "./console/docsReviewer.json";
 import prRiskReviewFixture from "./console/prRiskReview.json";
+import softwareFactoryFixture from "./console/softwareFactory.json";
 import superplaneReleaseFixture from "./console/superplaneRelease.json";
 import superplaneSaasFixture from "./console/superplaneSaas.json";
 import superplaneSaasReadme from "./repository/superplaneSaas.README.md?raw";
@@ -18,4 +19,5 @@ export const consoleFixtures = {
   prRiskReview: prRiskReviewFixture as CanvasAppFixture,
   docsReviewer: docsReviewerFixture as CanvasAppFixture,
   superplaneRelease: superplaneReleaseFixture as CanvasAppFixture,
+  softwareFactory: softwareFactoryFixture as CanvasAppFixture,
 } as const;

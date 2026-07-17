@@ -1,6 +1,5 @@
-import { materializeConsoleSpec } from "../lib/workflow-spec-files";
-
 import defaultRaw from "./canvasAppResponses.json";
+import softwareFactoryFixture from "./console/softwareFactory.json";
 import cleanCodeAssessmentReadme from "./repository/cleanCodeAssessment.README.md?raw";
 
 // Shape of a captured fixture. Endpoint bodies are stored verbatim as the
@@ -54,32 +53,21 @@ const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml
 
 const capturedFixture = defaultRaw as CanvasAppFixture;
 
+const softwareFactory = softwareFactoryFixture as CanvasAppFixture;
+
 // Live Canvas stories need a real console.yaml: `useCanvasConsole` treats an
-// empty/missing file as `undefined`, which TanStack Query rejects. Seed one
-// markdown panel that reuses the README showcase so Console and Files stay in
-// sync while we prototype markdown rendering.
+// empty/missing file as `undefined`, which TanStack Query rejects. Reuse the
+// Software Factory console (spotlight + scorecards + tables) so the default
+// AppPage story showcases the factory dashboard; rewrite metadata canvasId to
+// match this capture so repository/console reads stay consistent.
 const defaultConsoleYaml =
   capturedFixture.consoleYaml ??
-  materializeConsoleSpec({
-    canvasId: capturedFixture.canvasId,
-    canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Clean Code Assessment",
-    panels: [
-      {
-        id: "markdown-showcase",
-        type: "markdown",
-        content: {
-          title: "Markdown showcase",
-          body: cleanCodeAssessmentReadme,
-          variables: [],
-        },
-      },
-    ],
-    layout: [{ i: "markdown-showcase", x: 0, y: 0, w: 12, h: 20, minW: 4, minH: 4 }],
-  });
+  (softwareFactory.consoleYaml ?? "").replaceAll(softwareFactory.canvasId, capturedFixture.canvasId);
 
 const defaultFixture = {
   ...capturedFixture,
   consoleYaml: defaultConsoleYaml,
+  memory: capturedFixture.memory ?? softwareFactory.memory,
   repositoryFileContents: {
     "README.md": cleanCodeAssessmentReadme,
     ...capturedFixture.repositoryFileContents,

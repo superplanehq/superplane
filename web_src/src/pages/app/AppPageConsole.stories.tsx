@@ -37,7 +37,7 @@ type Story = StoryObj<typeof meta>;
 
 const consoleQuery = "view=console";
 
-const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease } = consoleFixtures;
+const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease, softwareFactory } = consoleFixtures;
 
 /**
  * SuperPlane SaaS — production deployment pipeline console.
@@ -83,4 +83,15 @@ export const DocsReviewer: Story = {
 export const SuperPlaneRelease: Story = {
   name: "SuperPlane Release",
   render: () => <AppPageHarness query={consoleQuery} fixture={superplaneRelease} />,
+};
+
+/**
+ * Software Factory — engineering throughput with an AI vs human center of
+ * gravity. Top row pairs the latest-merge spotlight with an AI-assisted share
+ * area chart; scorecards (sparklines) cover authorship / spend / time-to-merge;
+ * tables cover merges, per-engineer spend vs PRs, and weekly PR health.
+ */
+export const SoftwareFactory: Story = {
+  name: "Software Factory",
+  render: () => <AppPageHarness query={consoleQuery} fixture={softwareFactory} />,
 };

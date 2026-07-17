@@ -9,6 +9,7 @@ import {
   Loader2,
   Network,
   Plus,
+  Rocket,
   Table2,
   Workflow,
 } from "lucide-react";
@@ -274,6 +275,7 @@ const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   chart: LineChart,
   number: Hash,
   scorecard: Gauge,
+  spotlight: Rocket,
 };
 
 /**

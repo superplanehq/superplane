@@ -23,6 +23,7 @@ const (
 	ConsolePanelTypeChart     = "chart"
 	ConsolePanelTypeNumber    = "number"
 	ConsolePanelTypeScorecard = "scorecard"
+	ConsolePanelTypeSpotlight = "spotlight"
 
 	MaxConsolePanels       = 50
 	MaxConsolePayloadBytes = 1024 * 1024
@@ -40,6 +41,7 @@ var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeChart,
 	ConsolePanelTypeNumber,
 	ConsolePanelTypeScorecard,
+	ConsolePanelTypeSpotlight,
 }
 
 type Console struct {
@@ -276,6 +278,8 @@ func validatePanelContent(panel ConsolePanel) error {
 		return validateNumberPanelContent(panel)
 	case ConsolePanelTypeScorecard:
 		return validateScorecardPanelContent(panel)
+	case ConsolePanelTypeSpotlight:
+		return validateSpotlightPanelContent(panel)
 	}
 	return nil
 }
@@ -1249,6 +1253,36 @@ func validateScorecardPanelContent(panel ConsolePanel) error {
 		if !isString || !slices.Contains(allowedScorecardShowChange, s) {
 			return fmt.Errorf("panel %q render.showChange must be one of %s", panel.ID, strings.Join(allowedScorecardShowChange, "/"))
 		}
+	}
+	return nil
+}
+
+// validateSpotlightPanelContent enforces a `spotlight` panel: a data source
+// plus optional slot field paths (flat on content, matching the FE model).
+// At least titleField or actorNameField must be present so the banner has a
+// headline — same rule as web_src/.../spotlightContent.ts.
+func validateSpotlightPanelContent(panel ConsolePanel) error {
+	if panel.Content == nil {
+		return fmt.Errorf("panel %q content is required", panel.ID)
+	}
+	if err := validateDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
+		return err
+	}
+	optionalStringKeys := []string{
+		"title", "kicker", "statusField", "statusLabelField",
+		"actorNameField", "actorAvatarField", "titleField", "hrefField", "subtitleField",
+		"timestampField", "durationField", "approverNameField", "approverAvatarField",
+		"approverLabel", "checksField", "checkNameField", "checkStatusField",
+	}
+	for _, key := range optionalStringKeys {
+		if err := validateOptionalString(panel.ID, "content."+key, panel.Content[key]); err != nil {
+			return err
+		}
+	}
+	titleField, _ := panel.Content["titleField"].(string)
+	actorNameField, _ := panel.Content["actorNameField"].(string)
+	if strings.TrimSpace(titleField) == "" && strings.TrimSpace(actorNameField) == "" {
+		return fmt.Errorf("panel %q must set content.titleField or content.actorNameField", panel.ID)
 	}
 	return nil
 }

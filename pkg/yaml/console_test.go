@@ -1829,6 +1829,46 @@ func TestValidateConsoleContent_AcceptsScorecardPanel(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateConsoleContent_AcceptsSpotlightPanel(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "latest-merge",
+			Type: ConsolePanelTypeSpotlight,
+			Content: map[string]any{
+				"title":            "Latest merge",
+				"dataSource":       map[string]any{"kind": "memory", "namespace": "recentMerges"},
+				"kicker":           "Just landed",
+				"titleField":       "title",
+				"actorNameField":   "authorName",
+				"actorAvatarField": "authorAvatar",
+				"statusField":      "status",
+				"checksField":      "checks",
+				"checkNameField":   "name",
+				"checkStatusField": "status",
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_RejectsSpotlightWithoutHeadline(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "blank",
+			Type: ConsolePanelTypeSpotlight,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "runs"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "titleField or content.actorNameField")
+}
+
 func TestValidateConsoleContent_AcceptsCountScorecardWithoutField(t *testing.T) {
 	panels := []ConsolePanel{
 		{
