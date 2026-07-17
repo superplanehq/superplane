@@ -86,7 +86,7 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 }
 
 func (w *RunFinalizer) sweepStartedRuns() error {
-	runs, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateStarted, startedRunsSweepLimit)
+	runs, err := models.ListStartedCanvasRuns(database.Conn(), startedRunsSweepLimit)
 	if err != nil {
 		w.logger.Errorf("Error listing started runs: %v", err)
 		return err
@@ -105,7 +105,7 @@ func (w *RunFinalizer) sweepStartedRuns() error {
 }
 
 func (w *RunFinalizer) sweepCancellingRuns() error {
-	cancellingRuns, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateCancelling, startedRunsSweepLimit)
+	cancellingRuns, err := models.ListCancellingCanvasRuns(database.Conn(), startedRunsSweepLimit)
 	if err != nil {
 		w.logger.Errorf("Error listing cancelling runs: %v", err)
 		return err
@@ -131,7 +131,7 @@ func (w *RunFinalizer) sweepCancellingRuns() error {
 		}
 
 		if cancellationResult != nil {
-			w.publishRunCancellationDrainMessages(run.WorkflowID, cancellationResult)
+			messages.PublishRunCancellationDrain(run.WorkflowID, cancellationResult)
 		}
 
 		if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
@@ -140,26 +140,6 @@ func (w *RunFinalizer) sweepCancellingRuns() error {
 	}
 
 	return nil
-}
-
-func (w *RunFinalizer) publishRunCancellationDrainMessages(workflowID uuid.UUID, result *models.RunCancellationDrainResult) {
-	for _, executionID := range result.RequestedExecutionIDs {
-		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
-			log.Errorf("failed to publish execution cancelling RabbitMQ message: %v", err)
-		}
-	}
-
-	for _, queueItem := range result.DeletedQueueItems {
-		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
-			log.Errorf("failed to publish queue item deleted RabbitMQ message: %v", err)
-		}
-	}
-
-	for _, event := range result.SupersededEvents {
-		if err := messages.PublishEventTerminal(event.WorkflowID, event.RunID, event.ID); err != nil {
-			log.Errorf("failed to publish event terminal RabbitMQ message: %v", err)
-		}
-	}
 }
 
 func (w *RunFinalizer) startQueueItemDeletedConsumer(ctx context.Context) {

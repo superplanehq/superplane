@@ -70,7 +70,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 		}
 	}
 
-	publishRunCancellationDrain(workflowID, drainResult)
+	messages.PublishRunCancellationDrain(workflowID, drainResult)
 
 	run, err = models.FindCanvasRunInTransaction(database.DB(ctx), workflowID, runID)
 	if err != nil {
@@ -96,28 +96,4 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 	return &pb.CancelRunResponse{
 		Run: serializedRun,
 	}, nil
-}
-
-func publishRunCancellationDrain(workflowID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
-	if drainResult == nil {
-		return
-	}
-
-	for _, executionID := range drainResult.RequestedExecutionIDs {
-		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
-			log.Errorf("failed to publish execution cancelling RabbitMQ message: %v", err)
-		}
-	}
-
-	for _, queueItem := range drainResult.DeletedQueueItems {
-		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
-			log.Errorf("failed to publish queue item deleted RabbitMQ message: %v", err)
-		}
-	}
-
-	for _, event := range drainResult.SupersededEvents {
-		if err := messages.PublishEventTerminal(event.WorkflowID, event.RunID, event.ID); err != nil {
-			log.Errorf("failed to publish event terminal RabbitMQ message: %v", err)
-		}
-	}
 }

@@ -123,11 +123,26 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	return run, nil
 }
 
-func ListCanvasRunsInState(db *gorm.DB, state string, limit int) ([]CanvasRun, error) {
+func ListStartedCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 	err := db.
-		Where("state = ?", state).
+		Where("state = ?", CanvasRunStateStarted).
 		Order("updated_at ASC").
+		Limit(limit).
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := db.
+		Where("state = ?", CanvasRunStateCancelling).
+		Order("cancelled_at DESC").
 		Limit(limit).
 		Find(&runs).
 		Error

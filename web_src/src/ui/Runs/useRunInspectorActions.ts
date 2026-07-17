@@ -157,7 +157,7 @@ function useStopMutation({
   return useMutation({
     mutationFn: async () => {
       if (!runId) {
-        return false;
+        return;
       }
 
       await canvasesCancelRun(
@@ -168,13 +168,9 @@ function useStopMutation({
           },
         }),
       );
-      return true;
     },
-    onSuccess: async (stoppedWork) => {
+    onSuccess: async () => {
       await refreshRunQueries();
-      if (stoppedWork) {
-        showSuccessToast("Run stopped");
-      }
     },
     onError: (error) => {
       console.error("Failed to stop run", error);

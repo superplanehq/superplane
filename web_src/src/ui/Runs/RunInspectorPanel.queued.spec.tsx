@@ -2,7 +2,6 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
-import { showSuccessToast } from "@/lib/toast";
 import { executions, renderInspector, runningExecutions, runningRun } from "./RunInspectorPanel.spec.fixtures";
 
 let mockedExecutions = executions;
@@ -215,8 +214,6 @@ describe("RunInspectorPanel queued steps", () => {
     await waitFor(() => {
       expect(cancelRunMock).toHaveBeenCalled();
     });
-
-    expect(showSuccessToast).toHaveBeenCalledWith("Run stopped");
   });
 
   it("requests run cancellation when cached running execution refs remain on the run", async () => {
@@ -241,8 +238,6 @@ describe("RunInspectorPanel queued steps", () => {
     await waitFor(() => {
       expect(cancelRunMock).toHaveBeenCalled();
     });
-
-    expect(showSuccessToast).toHaveBeenCalledWith("Run stopped");
   });
 
   it("renders queued items as non-expandable queued rows", () => {
