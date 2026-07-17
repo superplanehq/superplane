@@ -13,6 +13,7 @@ type RunExecutionContext struct {
 	node                  *models.CanvasNode
 	execution             *models.CanvasNodeExecution
 	maxCrossWorkflowDepth int
+	onPendingRunCreated   func(workflowID, runID uuid.UUID)
 }
 
 func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, execution *models.CanvasNodeExecution) *RunExecutionContext {
@@ -23,6 +24,11 @@ func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.Can
 		execution:             execution,
 		maxCrossWorkflowDepth: 8,
 	}
+}
+
+func (c *RunExecutionContext) WithPendingRunCreated(fn func(workflowID, runID uuid.UUID)) *RunExecutionContext {
+	c.onPendingRunCreated = fn
+	return c
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -71,6 +77,10 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 	err = c.tx.Create(run).Error
 	if err != nil {
 		return nil, err
+	}
+
+	if c.onPendingRunCreated != nil {
+		c.onPendingRunCreated(run.WorkflowID, run.ID)
 	}
 
 	return &core.Run{

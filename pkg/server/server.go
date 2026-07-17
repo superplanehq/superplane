@@ -177,7 +177,7 @@ func startWorkers(
 
 	if os.Getenv("START_RUN_INITIALIZER") == "yes" {
 		log.Println("Starting Run Initializer")
-		w := workers.NewRunInitializer(registry)
+		w := workers.NewRunInitializer(rabbitMQURL, registry)
 		go w.Start(context.Background())
 	}
 
