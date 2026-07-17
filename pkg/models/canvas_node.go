@@ -596,7 +596,7 @@ func cancelNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid
 		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
 		Where("workflow_id = ?", workflowID).
 		Where("id IN ?", executionIDs).
-		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
 		Updates(map[string]any{
 			"state":        CanvasNodeExecutionStateFinished,
 			"result":       CanvasNodeExecutionResultCancelled,
