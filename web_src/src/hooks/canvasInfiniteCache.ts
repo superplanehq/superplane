@@ -51,7 +51,8 @@ const EXECUTION_STATE_ORDER: Record<string, number> = {
   STATE_UNKNOWN: 0,
   STATE_PENDING: 1,
   STATE_STARTED: 2,
-  STATE_FINISHED: 3,
+  STATE_CANCELLING: 3,
+  STATE_FINISHED: 4,
 };
 
 export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): CanvasRunsFilters {
