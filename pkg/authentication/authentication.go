@@ -248,7 +248,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String(), gothUser.Provider); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -336,7 +336,7 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String(), models.ProviderPassword); err != nil {
 		log.Errorf("Failed to generate token for password login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -423,7 +423,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String(), models.ProviderPassword); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -704,7 +704,7 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
-	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String(), models.ProviderMagicCode); err != nil {
 		log.Errorf("Failed to generate token for magic code login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

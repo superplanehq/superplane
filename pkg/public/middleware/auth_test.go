@@ -24,7 +24,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -70,6 +70,52 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)
 
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+}
+
+func TestOrganizationAuthMiddleware_AllowedProviders(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	// The default organization allows only the "github" provider.
+	require.Equal(t, []string{models.ProviderGitHub}, []string(r.Organization.AllowedProviders))
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := func(provider string) *httptest.ResponseRecorder {
+		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), provider, time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		return res
+	}
+
+	t.Run("allowed OAuth provider reaches next handler", func(t *testing.T) {
+		res := request(models.ProviderGitHub)
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("disallowed OAuth provider is forbidden", func(t *testing.T) {
+		res := request(models.ProviderGoogle)
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), ProviderNotAllowedError)
+	})
+
+	t.Run("password login is not gated by allowed_providers", func(t *testing.T) {
+		res := request(models.ProviderPassword)
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("legacy token without provider claim is not gated", func(t *testing.T) {
+		res := request("")
 		assert.Equal(t, http.StatusNoContent, res.Code)
 	})
 }
@@ -205,7 +251,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 	})
 
 	t.Run("cookie issued before password change is rejected", func(t *testing.T) {
-		oldToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		oldToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		// Bump password_changed_at so the cookie's iat is now stale.
@@ -225,7 +271,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		// cookie's iat is newer than it.
 		require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now().Add(-time.Hour)))
 
-		freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
