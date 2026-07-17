@@ -168,7 +168,27 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		}
 	}
 
+	if _, ok := value.(string); ok && !fieldAllowsExpressionResolution(field) {
+		return value, nil
+	}
+
 	return b.resolveValue(value)
+}
+
+// fieldAllowsExpressionResolution reports whether {{ }} placeholders in this
+// field should be evaluated. Text fields can opt out via
+// TypeOptions.Text.AllowExpressions=false; placeholders are then left as
+// literal text (e.g. runner scripts).
+func fieldAllowsExpressionResolution(field configuration.Field) bool {
+	if field.Type != configuration.FieldTypeText || field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return true
+	}
+
+	if field.TypeOptions.Text.AllowExpressions == nil {
+		return true
+	}
+
+	return *field.TypeOptions.Text.AllowExpressions
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {

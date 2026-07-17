@@ -266,7 +266,9 @@ export const ConfigurationFieldRenderer = ({
   }
 
   const fieldAllowsExpressions =
-    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+    allowExpressions &&
+    !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false) &&
+    !(field.type === "text" && field.typeOptions?.text?.allowExpressions === false);
   const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
   // `field.label` arrives as an empty string (not undefined) when a component omits it,
   // so fall back to the field name whenever the label is blank.
