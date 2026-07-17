@@ -196,6 +196,29 @@ func Test__OnPush__HandleWebhook__BranchMismatch(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
+func Test__OnPush__HandleWebhook__BranchCreationIgnored(t *testing.T) {
+	trigger := &OnPush{}
+	events := &contexts.EventContext{}
+
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers: gitlabHeaders("Push Hook", "token"),
+		Body:    []byte(`{"ref":"refs/heads/feature/x","before":"0000000000000000000000000000000000000000","after":"bbb"}`),
+		Configuration: map[string]any{
+			"project": "123",
+			"branches": []configuration.Predicate{
+				{Type: configuration.PredicateTypeMatches, Value: ".*"},
+			},
+		},
+		Webhook: &contexts.NodeWebhookContext{Secret: "token"},
+		Events:  events,
+		Logger:  log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
 func Test__OnPush__HandleWebhook__BranchDeletionIgnored(t *testing.T) {
 	trigger := &OnPush{}
 	events := &contexts.EventContext{}

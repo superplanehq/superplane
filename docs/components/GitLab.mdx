@@ -625,7 +625,7 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
 
 **Trigger key:** `gitlab.onPush`
 
-The On Push trigger starts a workflow execution when code is pushed to a branch in a GitLab project.
+The On Push trigger starts a workflow execution when code is pushed to an existing branch in a GitLab project. New-branch creation is handled by the dedicated On Branch Created trigger, and branch deletions are ignored.
 
 ### Use Cases
 

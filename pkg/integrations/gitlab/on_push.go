@@ -32,7 +32,7 @@ func (p *OnPush) Description() string {
 }
 
 func (p *OnPush) Documentation() string {
-	return `The On Push trigger starts a workflow execution when code is pushed to a branch in a GitLab project.
+	return `The On Push trigger starts a workflow execution when code is pushed to an existing branch in a GitLab project. New-branch creation is handled by the dedicated On Branch Created trigger, and branch deletions are ignored.
 
 ## Use Cases
 
@@ -150,10 +150,16 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	}
 
 	//
-	// Branch deletions arrive as push events with an all-zero "after" SHA.
-	// They carry no commits, so ignore them here and leave deletions to
-	// dedicated triggers.
+	// Branch creation (all-zero "before") and deletion (all-zero "after") are
+	// ref-lifecycle events, not content pushes. Creation is handled by the
+	// dedicated On Branch Created trigger, and deletion carries no commits, so
+	// On Push ignores both and only fires on pushes to existing branches.
 	//
+	if isBranchCreation(data) {
+		ctx.Logger.Info("Ignoring event - branch creation (handled by On Branch Created)")
+		return http.StatusOK, nil, nil
+	}
+
 	if isBranchDeletion(data) {
 		ctx.Logger.Info("Ignoring event - branch deletion")
 		return http.StatusOK, nil, nil

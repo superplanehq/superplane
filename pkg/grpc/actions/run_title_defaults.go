@@ -70,7 +70,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"gitlab.onMergeRequest":  "!{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onMilestone":     "{{ root().data.object_attributes.title }}",
 	"gitlab.onPipeline":      "{{ root().data.object_attributes.ref }}",
-	"gitlab.onPush":          "{{ root().data.commits[0].message }} - {{ root().data.commits[0].id[:7] }}",
+	"gitlab.onPush":          "{{ root().data.commits[-1].message }} - {{ root().data.commits[-1].id[:7] }}",
 	"gitlab.onRelease":       "{{ root().data.name }}",
 	"gitlab.onTag":           "{{ root().data.ref }}",
 	"gitlab.onVulnerability": "{{ root().data.object_attributes.title }}",
