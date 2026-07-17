@@ -237,10 +237,10 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 	return result, tx.Delete(&webhook).Error
 }
 
-func (n *CanvasNode) HardDelete(tx *gorm.DB) error {
+func (c *CanvasNode) HardDelete(tx *gorm.DB) error {
 	return tx.Unscoped().
-		Where("workflow_id = ? AND node_id = ?", n.WorkflowID, n.NodeID).
-		Delete(n).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Delete(c).
 		Error
 }
 
