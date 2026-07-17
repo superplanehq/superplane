@@ -665,7 +665,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions)
+	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions, nil)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
@@ -688,7 +688,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
 	err := tx.
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Delete(&deletedQueueItems).
@@ -700,7 +700,7 @@ func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (
 	return deletedQueueItems, nil
 }
 
-func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid.UUID, error) {
+func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution, cancelledBy *uuid.UUID) ([]uuid.UUID, error) {
 	requestedCancellationIDs := make([]uuid.UUID, 0, len(executions))
 
 	for i := range executions {
@@ -709,7 +709,7 @@ func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid
 			continue
 		}
 
-		if err := execution.RequestCancellation(tx, nil); err != nil {
+		if err := execution.RequestCancellation(tx, cancelledBy); err != nil {
 			return nil, err
 		}
 
