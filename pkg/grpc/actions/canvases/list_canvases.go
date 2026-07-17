@@ -104,20 +104,12 @@ func serializeCanvasSummaries(
 		liveSpec := liveSpecs[canvas.ID]
 		preference := preferencesByCanvasID[canvas.ID]
 
-		var createdAt, updatedAt *timestamppb.Timestamp
-		if canvas.CreatedAt != nil {
-			createdAt = timestamppb.New(*canvas.CreatedAt)
-		}
-		if canvas.UpdatedAt != nil {
-			updatedAt = timestamppb.New(*canvas.UpdatedAt)
-		}
-
 		protoCanvases[i] = &pb.CanvasSummary{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
-			CreatedAt:   createdAt,
-			UpdatedAt:   updatedAt,
+			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
 			Edges:       actions.EdgesToProto(liveSpec.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
 			Starred:     preference.StarredAt != nil,

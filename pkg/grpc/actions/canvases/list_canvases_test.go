@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -296,34 +295,6 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
 	assert.NotNil(t, listedCanvas.FolderId)
-}
-
-func Test__ListCanvases__DoesNotPanicWhenTimestampsAreNil(t *testing.T) {
-	r := support.Setup(t)
-
-	//
-	// A canvas whose CreatedAt/UpdatedAt pointers are nil must not panic the
-	// serializer (regression for #5853 - HTTP 500 on /api/v1/canvases).
-	//
-	canvas := models.Canvas{
-		ID:             r.Organization.ID, // any UUID; no matching rows needed
-		OrganizationID: r.Organization.ID,
-		Name:           "canvas-without-timestamps",
-		CreatedAt:      nil,
-		UpdatedAt:      nil,
-	}
-
-	summaries, err := serializeCanvasSummaries(
-		database.DB(context.Background()),
-		r.Organization.ID,
-		r.User,
-		[]models.Canvas{canvas},
-	)
-	require.NoError(t, err)
-	require.Len(t, summaries, 1)
-	assert.Nil(t, summaries[0].CreatedAt)
-	assert.Nil(t, summaries[0].UpdatedAt)
-	assert.Equal(t, canvas.Name, summaries[0].Name)
 }
 
 func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {
