@@ -7,9 +7,11 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const PassedOutputChannel = "passed"
+const FailedOutputChannel = "failed"
 
 type InvokeApp struct{}
 
@@ -21,6 +23,16 @@ type InvokeAppConfiguration struct {
 	App        string         `json:"app" mapstructure:"app"`
 	Node       string         `json:"node" mapstructure:"node"`
 	Parameters map[string]any `json:"parameters" mapstructure:"parameters"`
+}
+
+type invokeAppExecutionMetadata struct {
+	Run *RunMetadata `json:"run" mapstructure:"run"`
+}
+
+type RunMetadata struct {
+	ID     string  `json:"id" mapstructure:"id"`
+	Result string  `json:"result" mapstructure:"result"`
+	Error  *string `json:"error" mapstructure:"error"`
 }
 
 type InvokeAppMetadata struct {
@@ -72,7 +84,10 @@ func (c *InvokeApp) ExampleOutput() map[string]any {
 }
 
 func (c *InvokeApp) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: PassedOutputChannel, Label: "Passed"},
+		{Name: FailedOutputChannel, Label: "Failed"},
+	}
 }
 
 func (c *InvokeApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -185,7 +200,7 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: metadata is required")
 	}
 
-	_, err = ctx.Runs.Create(core.RunCreationParams{
+	run, err := ctx.Runs.Create(core.RunCreationParams{
 		App:   nodeMetadata.App.ID,
 		Node:  nodeMetadata.Node.ID,
 		Input: config.Parameters,
@@ -207,7 +222,11 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: create run: %w", err)
 	}
 
-	return nil
+	return ctx.Metadata.Set(invokeAppExecutionMetadata{
+		Run: &RunMetadata{
+			ID: run.ID.String(),
+		},
+	})
 }
 
 func (c *InvokeApp) Hooks() []core.Hook {
@@ -231,8 +250,25 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 		return fmt.Errorf("invoke app: decode run finished callback: %w", err)
 	}
 
+	executionMetadata := invokeAppExecutionMetadata{}
+	err = mapstructure.Decode(ctx.Metadata.Get(), &executionMetadata)
+	if err != nil {
+		return fmt.Errorf("invoke app: decode execution metadata: %w", err)
+	}
+
 	if callback.Run.Result == core.RunResultPassed {
-		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "app.invocation.passed", []any{
+		err = ctx.Metadata.Set(invokeAppExecutionMetadata{
+			Run: &RunMetadata{
+				ID:     callback.Run.ID.String(),
+				Result: callback.Run.Result,
+			},
+		})
+
+		if err != nil {
+			return fmt.Errorf("invoke app: set execution metadata: %w", err)
+		}
+
+		return ctx.ExecutionState.Emit(PassedOutputChannel, "app.invocation.passed", []any{
 			map[string]any{
 				"run": map[string]any{
 					"id":     callback.Run.ID.String(),
@@ -247,7 +283,27 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 		errMessage = *callback.Run.Error
 	}
 
-	return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, errMessage)
+	err = ctx.Metadata.Set(invokeAppExecutionMetadata{
+		Run: &RunMetadata{
+			ID:     callback.Run.ID.String(),
+			Result: callback.Run.Result,
+			Error:  &errMessage,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("invoke app: set execution metadata: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(FailedOutputChannel, "app.invocation.failed", []any{
+		map[string]any{
+			"run": map[string]any{
+				"id":     callback.Run.ID.String(),
+				"result": callback.Run.Result,
+				"error":  errMessage,
+			},
+		},
+	})
 }
 
 func (c *InvokeApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

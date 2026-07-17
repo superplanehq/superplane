@@ -1,5 +1,5 @@
 import type { CanvasesCanvasRunRef } from "@/api-client";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { appRunPath } from "@/lib/appPaths";
@@ -31,14 +31,14 @@ type AppMetadata = {
   name?: string;
 };
 
-export const INVOKE_APP_STATE_MAP: EventStateMap = {
-  ...DEFAULT_EVENT_STATE_MAP,
-  waiting: {
-    icon: "clock",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
-    badgeColor: "bg-yellow-600",
-  },
+type InvokeAppExecutionMetadata = {
+  run?: RunMetadata;
+};
+
+type RunMetadata = {
+  id?: string;
+  result?: string;
+  error?: string;
 };
 
 export const invokeAppStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
@@ -57,18 +57,20 @@ export const invokeAppStateFunction: StateFunction = (execution: ExecutionInfo):
   }
 
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    return "waiting";
+    return "running";
   }
 
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    return "success";
+  const metadata = execution.metadata as InvokeAppExecutionMetadata;
+  const runResult = metadata?.run?.result;
+  if (runResult === "failed") {
+    return "failed";
   }
 
-  return "failed";
+  return "success";
 };
 
 export const INVOKE_APP_STATE_REGISTRY: EventStateRegistry = {
-  stateMap: INVOKE_APP_STATE_MAP,
+  stateMap: DEFAULT_EVENT_STATE_MAP,
   getState: invokeAppStateFunction,
 };
 
