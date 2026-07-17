@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -168,6 +169,42 @@ func Test__CreateMergeRequest__Execute(t *testing.T) {
 		assert.Equal(t, "main", mergeRequest.TargetBranch)
 		require.Len(t, mergeRequest.Reviewers, 1)
 		assert.Equal(t, 30, mergeRequest.Reviewers[0].ID)
+	})
+
+	t.Run("normalizes refs/heads branch references", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 1,
+					"iid": 42,
+					"project_id": 123,
+					"source_branch": "feature/login-page",
+					"target_branch": "main",
+					"web_url": "https://gitlab.com/my-group/my-project/-/merge_requests/42"
+				}`),
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":      "123",
+				"sourceBranch": "refs/heads/feature/login-page",
+				"targetBranch": "refs/heads/main",
+				"title":        "feat: add login page",
+			},
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		var sent CreateMergeRequestRequest
+		require.NoError(t, json.Unmarshal(body, &sent))
+		assert.Equal(t, "feature/login-page", sent.SourceBranch)
+		assert.Equal(t, "main", sent.TargetBranch)
 	})
 
 	t.Run("failure", func(t *testing.T) {

@@ -274,8 +274,8 @@ func (c *CreateMergeRequest) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := &CreateMergeRequestRequest{
-		SourceBranch: config.SourceBranch,
-		TargetBranch: config.TargetBranch,
+		SourceBranch: normalizePipelineRef(config.SourceBranch),
+		TargetBranch: normalizePipelineRef(config.TargetBranch),
 		Title:        config.Title,
 		Description:  config.Description,
 		AssigneeIDs:  parseUserIDs(config.Assignees),
