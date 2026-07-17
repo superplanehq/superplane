@@ -73,8 +73,6 @@ spec:
               value: "yes"
             - name: START_CANVAS_CLEANUP_WORKER
               value: "yes"
-            - name: START_CANVAS_NODE_CLEANUP_WORKER
-              value: "yes"
             - name: START_REPOSITORY_PROVISIONER
               value: "yes"
             - name: RBAC_MODEL_PATH
