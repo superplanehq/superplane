@@ -7,8 +7,11 @@ import (
 )
 
 const (
-	payloadType             = "claude.runAgent.finished"
-	defaultChannel          = "default"
+	payloadType    = "claude.runAgent.finished"
+	defaultChannel = "default"
+	// latestVersionValue is the sentinel the Version resource field uses for the
+	// explicit "Latest" option; it is treated the same as an unset version.
+	latestVersionValue      = "latest"
 	sessionStatusIdle       = "idle"
 	sessionStatusTerminated = "terminated"
 	initialPoll             = 15 * time.Second
@@ -16,7 +19,6 @@ const (
 	maxPollAttempts         = 200
 	maxPollErrors           = 5
 	finalMessageReads       = 15
-	finalMessageDelay       = 2 * time.Second
 	// Session outputs can take a few seconds to be indexed by the Files API
 	// after the session goes idle (~1-3s documented), so when the session is
 	// expected to have written outputs, a listing without them is retried
@@ -29,16 +31,24 @@ const (
 	maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 )
 
+// finalMessageDelay is the pause between event-stream reads while waiting for
+// the terminal event to be written. A var so tests can shrink it.
+var finalMessageDelay = 2 * time.Second
+
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
-	// Agent is the managed agent id (use latest if Version is nil, else pin to Version).
-	Agent         string          `json:"agent" mapstructure:"agent"`
-	Version       *int            `json:"version" mapstructure:"version"`
-	EnvironmentID string          `json:"environmentId" mapstructure:"environmentId"`
-	Prompt        string          `json:"prompt" mapstructure:"prompt"`
-	VaultIDs      []string        `json:"vaultIds" mapstructure:"vaultIds"`
-	Files         []string        `json:"files" mapstructure:"files"`
-	Secrets       []SecretBinding `json:"secrets" mapstructure:"secrets"`
+	// Agent is the managed agent id.
+	Agent string `json:"agent" mapstructure:"agent"`
+	// Version pins the agent version. It holds the raw resource value (a version
+	// number as a string); empty runs the agent's latest version.
+	Version string `json:"version" mapstructure:"version"`
+	// Environment is stored under the legacy "environmentId" key so existing
+	// nodes keep working; it is presented as the Environment resource field.
+	Environment string          `json:"environmentId" mapstructure:"environmentId"`
+	Prompt      string          `json:"prompt" mapstructure:"prompt"`
+	VaultIDs    []string        `json:"vaultIds" mapstructure:"vaultIds"`
+	Files       []string        `json:"files" mapstructure:"files"`
+	Secrets     []SecretBinding `json:"secrets" mapstructure:"secrets"`
 	// PersistSession keeps the Managed Agents session after the run finishes so
 	// its transcript stays readable in the Anthropic Console.
 	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`

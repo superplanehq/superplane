@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	CanvasNodeExecutionStatePending  = "pending"
-	CanvasNodeExecutionStateStarted  = "started"
-	CanvasNodeExecutionStateFinished = "finished"
+	CanvasNodeExecutionStatePending    = "pending"
+	CanvasNodeExecutionStateStarted    = "started"
+	CanvasNodeExecutionStateCancelling = "cancelling"
+	CanvasNodeExecutionStateFinished   = "finished"
 
 	CanvasNodeExecutionResultPassed    = "passed"
 	CanvasNodeExecutionResultFailed    = "failed"
@@ -25,6 +26,12 @@ const (
 	CanvasNodeExecutionResultReasonError         = "error"
 	CanvasNodeExecutionResultReasonErrorResolved = "error_resolved"
 )
+
+var CanvasNodeExecutionActiveStates = []string{
+	CanvasNodeExecutionStatePending,
+	CanvasNodeExecutionStateStarted,
+	CanvasNodeExecutionStateCancelling,
+}
 
 type CanvasNodeExecution struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
@@ -64,6 +71,7 @@ type CanvasNodeExecution struct {
 	ResultReason  string
 	ResultMessage string
 	CancelledBy   *uuid.UUID
+	CancelledAt   *time.Time
 
 	//
 	// Components can store metadata about each execution here.
@@ -114,6 +122,49 @@ func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
 	}
 
 	return executions, nil
+}
+
+func ListCancellingNodeExecutions(db *gorm.DB) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	query := db.
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStateCancelling).
+		Where("workflow_node_executions.cancelled_at IS NOT NULL").
+		Order("workflow_node_executions.cancelled_at ASC")
+
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func LockCancellingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+
+	query := tx.
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Clauses(clause.Locking{
+			Strength: lockingForUpdateNoKey,
+			Table:    clause.Table{Name: "workflow_node_executions"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_node_executions.id = ?", id).
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStateCancelling)
+
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
 }
 
 func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
@@ -173,7 +224,7 @@ func ListActiveNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) 
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
-		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
 		Find(&executions).
 		Error
 	if err != nil {
@@ -230,7 +281,7 @@ func CountActiveNodeExecutionsForRootEventInTransaction(tx *gorm.DB, rootEventID
 	err := tx.
 		Model(&CanvasNodeExecution{}).
 		Where("root_event_id = ?", rootEventID).
-		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
 		Count(&count).
 		Error
 	if err != nil {
@@ -398,12 +449,12 @@ func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, err
 }
 
 func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
-	finished, err := e.IsFinished(tx)
+	state, err := e.findState(tx)
 	if err != nil {
 		return nil, err
 	}
 
-	if finished {
+	if state == CanvasNodeExecutionStateFinished || state == CanvasNodeExecutionStateCancelling {
 		return []CanvasEvent{}, nil
 	}
 
@@ -538,12 +589,12 @@ func (e *CanvasNodeExecution) Fail(reason, message string) error {
 }
 
 func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) (bool, error) {
-	finished, err := e.IsFinished(tx)
+	state, err := e.findState(tx)
 	if err != nil {
 		return false, err
 	}
 
-	if finished {
+	if state == CanvasNodeExecutionStateFinished || state == CanvasNodeExecutionStateCancelling {
 		return false, nil
 	}
 
@@ -586,6 +637,29 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	return true, CompletePendingRequestsForExecution(tx, e.ID)
 }
 
+func (e *CanvasNodeExecution) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) error {
+	now := time.Now()
+
+	e.State = CanvasNodeExecutionStateCancelling
+	e.CancelledBy = cancelledBy
+	e.CancelledAt = &now
+	e.UpdatedAt = &now
+
+	err := tx.Model(e).
+		Updates(map[string]any{
+			"state":        CanvasNodeExecutionStateCancelling,
+			"cancelled_by": cancelledBy,
+			"cancelled_at": &now,
+			"updated_at":   &now,
+		}).Error
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (e *CanvasNodeExecution) Cancel(cancelledBy *uuid.UUID) error {
 	return e.CancelInTransaction(database.Conn(), cancelledBy)
 }
@@ -604,16 +678,22 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 
 	e.State = CanvasNodeExecutionStateFinished
 	e.Result = CanvasNodeExecutionResultCancelled
-	e.CancelledBy = cancelledBy
+	if cancelledBy != nil {
+		e.CancelledBy = cancelledBy
+	}
 	e.UpdatedAt = &now
 
+	updates := map[string]any{
+		"state":      CanvasNodeExecutionStateFinished,
+		"result":     CanvasNodeExecutionResultCancelled,
+		"updated_at": &now,
+	}
+	if cancelledBy != nil {
+		updates["cancelled_by"] = cancelledBy
+	}
+
 	err = tx.Model(e).
-		Updates(map[string]interface{}{
-			"state":        CanvasNodeExecutionStateFinished,
-			"result":       CanvasNodeExecutionResultCancelled,
-			"cancelled_by": cancelledBy,
-			"updated_at":   &now,
-		}).Error
+		Updates(updates).Error
 
 	if err != nil {
 		return err
@@ -672,6 +752,15 @@ func (e *CanvasNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]CanvasEven
 }
 
 func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
+	state, err := e.findState(tx)
+	if err != nil {
+		return false, err
+	}
+
+	return state == CanvasNodeExecutionStateFinished, nil
+}
+
+func (e *CanvasNodeExecution) findState(tx *gorm.DB) (string, error) {
 	var execution CanvasNodeExecution
 	err := tx.
 		Select("state").
@@ -679,10 +768,10 @@ func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
 		First(&execution).
 		Error
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	return execution.State == CanvasNodeExecutionStateFinished, nil
+	return execution.State, nil
 }
 
 func ListCanvasEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid.UUID) ([]CanvasEvent, error) {
