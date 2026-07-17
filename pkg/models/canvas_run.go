@@ -409,7 +409,7 @@ func (r *CanvasRun) ListExecutionsInStates(tx *gorm.DB, states []string) ([]Canv
 func (r *CanvasRun) DeleteQueueItems(tx *gorm.DB) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
 	err := tx.
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
 		Where("workflow_id = ?", r.WorkflowID).
 		Where("run_id = ?", r.ID).
 		Delete(&deletedQueueItems).

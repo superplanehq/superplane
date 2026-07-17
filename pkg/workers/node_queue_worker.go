@@ -262,14 +262,13 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		)
 	}()
 
-	var executionIDs []*uuid.UUID
-	var queueItem *models.CanvasNodeQueueItem
-
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
 	}
 
+	var executionIDs []*uuid.UUID
+	var queueItem *models.CanvasNodeQueueItem
 	var run *models.CanvasRun
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -281,7 +280,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
-		queueItem, err := node.FirstQueueItem(tx)
+		item, err := node.FirstQueueItem(tx)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
@@ -290,13 +289,14 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return err
 		}
 
-		r, err := models.FindCanvasRunInTransaction(tx, queueItem.WorkflowID, queueItem.RunID)
+		r, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
 		if err != nil {
 			return err
 		}
 
 		run = r
-		executionIDs, err = w.processNodeQueueItem(tx, logger, n, queueItem, run, onNewEvents)
+		queueItem = item
+		executionIDs, err = w.processNodeQueueItem(tx, logger, n, item, run, onNewEvents)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
