@@ -44,7 +44,8 @@ export function reuseCachedInfiniteRunsPage(
 const RUN_STATE_ORDER: Record<CanvasesCanvasRunState, number> = {
   STATE_UNKNOWN: 0,
   STATE_STARTED: 1,
-  STATE_FINISHED: 2,
+  STATE_CANCELLING: 2,
+  STATE_FINISHED: 3,
 };
 
 const EXECUTION_STATE_ORDER: Record<string, number> = {
