@@ -48,16 +48,27 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 			return nil
 		}
 
-		if run.State != models.CanvasRunStateCancelling {
-			if err := run.MarkAsCancelling(tx, &user.ID); err != nil {
-				return err
-			}
-
-			publishCancelled = true
+		drainResult, err = run.DrainForCancellation(tx, &user.ID)
+		if err != nil {
+			return err
 		}
 
-		drainResult, err = run.DrainForCancellation(tx, &user.ID)
-		return err
+		if run.State == models.CanvasRunStateCancelling {
+			return nil
+		}
+
+		publishCancelled = true
+
+		//
+		// If drain results are expected, we mark the run as cancelling,
+		// and let RunFinalizer do its job, moving it to cancelled state when everything is done.
+		// Otherwise, we can mark it as cancelled immediately.
+		//
+		if !drainResult.Empty() {
+			return run.MarkAsCancelling(tx, &user.ID)
+		} else {
+			return run.MarkAsCancelled(tx, &user.ID)
+		}
 	})
 
 	if err != nil {

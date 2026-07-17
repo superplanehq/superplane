@@ -386,7 +386,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	}
 
 	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		if trigger == runFinalizerTriggerSweep {
+		if trigger == runFinalizerTriggerSweep && run.State != models.CanvasRunStateCancelling {
 			// The started-run sweep loads candidates with ORDER BY updated_at ASC
 			// LIMIT N. Bump updated_at here so a run that is still open is pushed to
 			// the back of the queue instead of being retried on every tick.

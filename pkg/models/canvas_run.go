@@ -350,6 +350,10 @@ type RunCancellationDrainResult struct {
 	SupersededEvents      []CanvasEvent
 }
 
+func (r *RunCancellationDrainResult) Empty() bool {
+	return len(r.RequestedExecutionIDs) == 0 && len(r.DeletedQueueItems) == 0 && len(r.SupersededEvents) == 0
+}
+
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
 	executions, err := r.ListExecutionsInStates(tx, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
 	if err != nil {
@@ -448,6 +452,27 @@ func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error 
 			"state":        CanvasRunStateCancelling,
 			"cancelled_at": &now,
 			"cancelled_by": cancelledBy,
+			"updated_at":   &now,
+		}).
+		Error
+}
+
+func (r *CanvasRun) MarkAsCancelled(tx *gorm.DB, cancelledBy *uuid.UUID) error {
+	now := time.Now()
+	r.State = CanvasRunStateFinished
+	r.Result = CanvasRunResultCancelled
+	r.CancelledAt = &now
+	r.CancelledBy = cancelledBy
+	r.FinishedAt = &now
+	r.UpdatedAt = &now
+
+	return tx.Model(r).
+		Updates(map[string]any{
+			"state":        CanvasRunStateFinished,
+			"result":       CanvasRunResultCancelled,
+			"cancelled_at": &now,
+			"cancelled_by": cancelledBy,
+			"finished_at":  &now,
 			"updated_at":   &now,
 		}).
 		Error

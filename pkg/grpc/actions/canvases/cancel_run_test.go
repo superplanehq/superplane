@@ -99,6 +99,63 @@ func Test__CancelRun__RequestsCancellationAndDrainsWork(t *testing.T) {
 	assert.Zero(t, queueItemCount)
 }
 
+func Test__CancelRun__CancelsImmediatelyWhenNothingToDrain(t *testing.T) {
+	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	runConsumer := testconsumer.New(amqpURL, messages.CanvasRunRoutingKey)
+	runConsumer.Start()
+	defer runConsumer.Stop()
+
+	executionCancellingConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionCancellingRoutingKey)
+	executionCancellingConsumer.Start()
+	defer executionCancellingConsumer.Stop()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+	require.NoError(t, rootEvent.Routed())
+	require.Equal(t, models.CanvasRunStateStarted, run.State)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	response, err := CancelRun(ctx, r.Organization.ID.String(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Run)
+	assert.Equal(t, pb.CanvasRun_STATE_FINISHED, response.Run.State)
+	assert.Equal(t, pb.CanvasRun_RESULT_CANCELLED, response.Run.Result)
+	assert.True(t, runConsumer.HasReceivedMessage())
+	assert.False(t, executionCancellingConsumer.HasReceivedMessage())
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+	assert.NotNil(t, updatedRun.CancelledAt)
+	assert.NotNil(t, updatedRun.FinishedAt)
+	assert.NotNil(t, updatedRun.CancelledBy)
+	assert.Equal(t, r.User, *updatedRun.CancelledBy)
+	assert.NotNil(t, response.Run.FinishedAt)
+}
+
 func Test__CancelRun__IsIdempotentForCancellingRun(t *testing.T) {
 	r := support.Setup(t)
 
