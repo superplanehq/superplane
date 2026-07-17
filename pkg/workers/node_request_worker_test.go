@@ -647,16 +647,23 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T
 	err := worker.LockAndProcessRequest(request)
 	require.NoError(t, err)
 
-	var updatedRequest models.CanvasNodeRequest
-	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
-	require.NoError(t, err)
-	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
-
 	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+	require.NoError(t, terminator.LockAndCancelExecution(updatedExecution))
+
 	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
 func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvokingHook(t *testing.T) {
@@ -865,18 +872,27 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFa
 	err := worker.LockAndProcessRequest(request)
 	require.NoError(t, err)
 
-	assert.True(t, cancelCalled, "component Cancel should be invoked")
+	assert.False(t, cancelCalled, "NodeRequestWorker should not invoke component Cancel directly")
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+	require.NoError(t, terminator.LockAndCancelExecution(updatedExecution))
+
+	assert.True(t, cancelCalled, "component Cancel should be invoked by ExecutionTerminator")
+
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
 
 	var updatedRequest models.CanvasNodeRequest
 	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
-
-	var updatedExecution models.CanvasNodeExecution
-	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
 }
 
 func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
