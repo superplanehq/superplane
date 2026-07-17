@@ -5,9 +5,9 @@ import { toTestId } from "@/lib/testID";
 import { ConfigurationFieldRenderer } from "./index";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
-import { normalizeInvocationParameterDefinitions } from "./invocationParameters";
+import { normalizeRunParameterDefinitions } from "./runParameters";
 
-interface InvocationParametersFieldRendererProps extends FieldRendererProps {
+interface RunParametersFieldRendererProps extends FieldRendererProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   organizationId?: string;
@@ -45,7 +45,7 @@ function findTargetNode(
   return nodes.find((node) => node.id === nodeId);
 }
 
-export function InvocationParametersFieldRenderer({
+export function RunParametersFieldRenderer({
   field,
   value,
   onChange,
@@ -58,7 +58,7 @@ export function InvocationParametersFieldRenderer({
   readOnly = false,
   validationErrors,
   fieldPath,
-}: InvocationParametersFieldRendererProps) {
+}: RunParametersFieldRendererProps) {
   const appId = useMemo(() => resolveTargetAppId(allValues), [allValues]);
   const nodeId = useMemo(() => resolveTargetNodeId(allValues), [allValues]);
 
@@ -72,7 +72,7 @@ export function InvocationParametersFieldRenderer({
 
   const parameterDefinitions = useMemo(() => {
     const targetNode = findTargetNode(canvas?.spec?.nodes, nodeId);
-    return normalizeInvocationParameterDefinitions(targetNode?.configuration?.parameters);
+    return normalizeRunParameterDefinitions(targetNode?.configuration?.parameters);
   }, [canvas?.spec?.nodes, nodeId]);
 
   const parameterValues = useMemo(() => {
@@ -98,17 +98,15 @@ export function InvocationParametersFieldRenderer({
 
   if (!organizationId) {
     return (
-      <div className="text-sm text-red-500 dark:text-red-400">
-        Invocation parameters field requires organization context.
-      </div>
+      <div className="text-sm text-red-500 dark:text-red-400">Run parameters field requires organization context.</div>
     );
   }
 
   if (!appId || !nodeId) {
     return (
-      <div data-testid={toTestId(`invocation-parameters-field-${field.name}`)} className="space-y-2">
+      <div data-testid={toTestId(`run-parameters-field-${field.name}`)} className="space-y-2">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Choose the target app and node before configuring invocation parameters.
+          Choose the target app and node before configuring run parameters.
         </p>
       </div>
     );
@@ -117,22 +115,22 @@ export function InvocationParametersFieldRenderer({
   if (error) {
     return (
       <div className="text-sm text-red-500 dark:text-red-400">
-        Failed to load invocation parameters: {error instanceof Error ? error.message : "Unknown error"}
+        Failed to load run parameters: {error instanceof Error ? error.message : "Unknown error"}
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div data-testid={toTestId(`invocation-parameters-field-${field.name}`)}>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Loading invocation parameters...</p>
+      <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
+        <p className="text-xs text-gray-500 dark:text-gray-400">Loading run parameters...</p>
       </div>
     );
   }
 
   if (parameterDefinitions.length === 0) {
     return (
-      <div data-testid={toTestId(`invocation-parameters-field-${field.name}`)}>
+      <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
         <ObjectFieldRenderer
           field={fallbackObjectField}
           value={value}
@@ -151,7 +149,7 @@ export function InvocationParametersFieldRenderer({
 
   return (
     <div
-      data-testid={toTestId(`invocation-parameters-field-${field.name}`)}
+      data-testid={toTestId(`run-parameters-field-${field.name}`)}
       className="space-y-4 rounded-md border border-gray-200 dark:border-gray-700 p-3"
     >
       {parameterDefinitions.map((parameterField) => {

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeInvocationParameterDefinitions } from "./invocationParameters";
+import { normalizeRunParameterDefinitions } from "./runParameters";
 
-describe("normalizeInvocationParameterDefinitions", () => {
+describe("normalizeRunParameterDefinitions", () => {
   it("returns an empty list for missing or invalid input", () => {
-    expect(normalizeInvocationParameterDefinitions(undefined)).toEqual([]);
-    expect(normalizeInvocationParameterDefinitions(null)).toEqual([]);
-    expect(normalizeInvocationParameterDefinitions({})).toEqual([]);
-    expect(normalizeInvocationParameterDefinitions([])).toEqual([]);
+    expect(normalizeRunParameterDefinitions(undefined)).toEqual([]);
+    expect(normalizeRunParameterDefinitions(null)).toEqual([]);
+    expect(normalizeRunParameterDefinitions({})).toEqual([]);
+    expect(normalizeRunParameterDefinitions([])).toEqual([]);
   });
 
-  it("maps onInvoke parameter definitions to configuration fields", () => {
+  it("maps onRun parameter definitions to configuration fields", () => {
     expect(
-      normalizeInvocationParameterDefinitions([
+      normalizeRunParameterDefinitions([
         {
           type: "string",
           name: "message",
@@ -51,7 +51,7 @@ describe("normalizeInvocationParameterDefinitions", () => {
 
   it("prefers label over name for display", () => {
     expect(
-      normalizeInvocationParameterDefinitions([
+      normalizeRunParameterDefinitions([
         {
           type: "boolean",
           name: "is_active",
@@ -73,7 +73,7 @@ describe("normalizeInvocationParameterDefinitions", () => {
 
   it("skips entries without a name", () => {
     expect(
-      normalizeInvocationParameterDefinitions([
+      normalizeRunParameterDefinitions([
         { type: "string", name: "valid" },
         { type: "string", name: "  " },
         { type: "string" },

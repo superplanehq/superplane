@@ -608,14 +608,14 @@ export const rendererExamples: RendererExample[] = [
       "Use `app-canvas-node` when a field must reference a node in another app, optionally filtered by node type and component.",
     field: baseField({
       name: "node",
-      label: "Invoke node",
+      label: "Run node",
       type: "app-canvas-node",
-      description: "Select the On Invoke trigger in the target app.",
+      description: "Select the On Run trigger in the target app.",
       required: true,
       typeOptions: {
         appCanvasNode: {
           nodeTypes: ["trigger"],
-          componentTypes: ["onInvoke"],
+          componentTypes: ["onRun"],
           parameters: [{ name: "app", valueFrom: { field: "app" } }],
         },
       },
@@ -796,7 +796,7 @@ const mockTargetAppCanvas = {
   organizationId: STORY_ORGANIZATION_ID,
   spec: {
     nodes: [
-      { id: "on-invoke", name: "On Invoke", type: "TYPE_TRIGGER", component: "onInvoke" },
+      { id: "on-run", name: "On Run", type: "TYPE_TRIGGER", component: "onRun" },
       { id: "on-broadcast", name: "On Broadcast", type: "TYPE_TRIGGER", component: "onBroadcast" },
       { id: "send-email", name: "Send Email", type: "TYPE_ACTION", component: "sendEmail" },
     ],

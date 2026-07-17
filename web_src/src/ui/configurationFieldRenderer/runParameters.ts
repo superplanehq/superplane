@@ -1,6 +1,6 @@
 import type { ConfigurationField } from "@/api-client";
 
-export function normalizeInvocationParameterDefinitions(raw: unknown): ConfigurationField[] {
+export function normalizeRunParameterDefinitions(raw: unknown): ConfigurationField[] {
   if (!Array.isArray(raw) || raw.length === 0) {
     return [];
   }

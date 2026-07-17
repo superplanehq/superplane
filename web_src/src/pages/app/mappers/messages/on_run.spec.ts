@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { invokeTitle, onInvokeTriggerRenderer } from "./on_invoke";
+import { onRunTitle, onRunTriggerRenderer } from "./on_run";
 
-describe("onInvokeTriggerRenderer", () => {
+describe("onRunTriggerRenderer", () => {
   it("builds a title from the calling app name", () => {
-    expect(invokeTitle({ app: { name: "Billing" } })).toBe("Invoked from Billing");
-    expect(invokeTitle(undefined)).toBe("App invoked");
+    expect(onRunTitle({ app: { name: "Billing" } })).toBe("Run from Billing");
+    expect(onRunTitle(undefined)).toBe("App run");
   });
 
   it("maps root event values from app and payload", () => {
     expect(
-      onInvokeTriggerRenderer.getRootEventValues({
+      onRunTriggerRenderer.getRootEventValues({
         event: {
           id: "event-1",
           createdAt: "2026-07-15T12:00:00.000Z",
-          nodeId: "on-invoke",
+          nodeId: "on-run",
           type: "app.invocation",
           data: {
             app: { name: "Billing" },
@@ -34,19 +34,19 @@ describe("onInvokeTriggerRenderer", () => {
   });
 
   it("shows parameter count on the trigger node", () => {
-    const props = onInvokeTriggerRenderer.getTriggerProps({
+    const props = onRunTriggerRenderer.getTriggerProps({
       node: {
-        id: "on-invoke",
-        name: "Handle invoke",
-        componentName: "onInvoke",
+        id: "on-run",
+        name: "Handle run",
+        componentName: "onRun",
         isCollapsed: false,
         configuration: {
           parameters: [{ name: "message" }, { name: "count" }],
         },
       },
       definition: {
-        name: "onInvoke",
-        label: "On Invoke",
+        name: "onRun",
+        label: "On Run",
         description: "",
         icon: "play",
         color: "gray",

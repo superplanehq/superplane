@@ -13,29 +13,29 @@ import (
 const PassedOutputChannel = "passed"
 const FailedOutputChannel = "failed"
 
-type InvokeApp struct{}
+type RunApp struct{}
 
 func init() {
-	registry.RegisterAction("invokeApp", &InvokeApp{})
+	registry.RegisterAction("runApp", &RunApp{})
 }
 
-type InvokeAppConfiguration struct {
+type RunAppConfiguration struct {
 	App        string         `json:"app" mapstructure:"app"`
 	Node       string         `json:"node" mapstructure:"node"`
 	Parameters map[string]any `json:"parameters" mapstructure:"parameters"`
 }
 
-type invokeAppExecutionMetadata struct {
+type runAppExecutionMetadata struct {
 	Run *RunMetadata `json:"run" mapstructure:"run"`
 }
 
 type RunMetadata struct {
 	ID     string  `json:"id" mapstructure:"id"`
 	Result string  `json:"result" mapstructure:"result"`
-	Error  *string `json:"error" mapstructure:"error"`
+	Error  *string `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
-type InvokeAppMetadata struct {
+type RunAppMetadata struct {
 	App  *AppMetadata        `json:"app" mapstructure:"app"`
 	Node *CanvasNodeMetadata `json:"node" mapstructure:"node"`
 }
@@ -50,31 +50,31 @@ type CanvasNodeMetadata struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
-func (c *InvokeApp) Name() string {
-	return "invokeApp"
+func (c *RunApp) Name() string {
+	return "runApp"
 }
 
-func (c *InvokeApp) Label() string {
-	return "Invoke App"
+func (c *RunApp) Label() string {
+	return "Run App"
 }
 
-func (c *InvokeApp) Color() string {
+func (c *RunApp) Color() string {
 	return "gray"
 }
 
-func (c *InvokeApp) Icon() string {
+func (c *RunApp) Icon() string {
 	return "play"
 }
 
-func (c *InvokeApp) Documentation() string {
-	return "Invoke another SuperPlane app and wait for its run to finish"
+func (c *RunApp) Documentation() string {
+	return "Run another SuperPlane app and wait for its run to finish"
 }
 
-func (c *InvokeApp) Description() string {
-	return "Invoke another SuperPlane app and wait for its run to finish"
+func (c *RunApp) Description() string {
+	return "Run another SuperPlane app and wait for its run to finish"
 }
 
-func (c *InvokeApp) ExampleOutput() map[string]any {
+func (c *RunApp) ExampleOutput() map[string]any {
 	return map[string]any{
 		"run": map[string]any{
 			"id":     "123",
@@ -83,23 +83,23 @@ func (c *InvokeApp) ExampleOutput() map[string]any {
 	}
 }
 
-func (c *InvokeApp) OutputChannels(configuration any) []core.OutputChannel {
+func (c *RunApp) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: PassedOutputChannel, Label: "Passed"},
 		{Name: FailedOutputChannel, Label: "Failed"},
 	}
 }
 
-func (c *InvokeApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *RunApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *InvokeApp) Configuration() []configuration.Field {
+func (c *RunApp) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "app",
 			Label:       "App",
-			Description: "The SuperPlane app to invoke",
+			Description: "The SuperPlane app to run",
 			Type:        configuration.FieldTypeApp,
 			Required:    true,
 			TypeOptions: &configuration.TypeOptions{
@@ -111,13 +111,13 @@ func (c *InvokeApp) Configuration() []configuration.Field {
 		{
 			Name:        "node",
 			Label:       "Node",
-			Description: "The node to invoke",
+			Description: "The On Run trigger in the target app",
 			Type:        configuration.FieldTypeAppCanvasNode,
 			Required:    true,
 			TypeOptions: &configuration.TypeOptions{
 				AppCanvasNode: &configuration.AppCanvasNodeTypeOptions{
 					NodeTypes:      []string{"trigger"},
-					ComponentTypes: []string{"onInvoke"},
+					ComponentTypes: []string{"onRun"},
 					Parameters: []configuration.ParameterRef{
 						{
 							Name: "app",
@@ -132,15 +132,15 @@ func (c *InvokeApp) Configuration() []configuration.Field {
 		{
 			Name:        "parameters",
 			Label:       "Parameters",
-			Description: "The invocation parameters to use",
-			Type:        configuration.FieldTypeInvocationParameters,
+			Description: "The run parameters to pass to the target app",
+			Type:        configuration.FieldTypeRunParameters,
 			Required:    true,
 		},
 	}
 }
 
-func (c *InvokeApp) Setup(ctx core.SetupContext) error {
-	config := InvokeAppConfiguration{}
+func (c *RunApp) Setup(ctx core.SetupContext) error {
+	config := RunAppConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -164,7 +164,7 @@ func (c *InvokeApp) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to get app node: %w", err)
 	}
 
-	metadata := InvokeAppMetadata{
+	metadata := RunAppMetadata{
 		App: &AppMetadata{
 			ID:   app.ID,
 			Name: app.Name,
@@ -177,27 +177,27 @@ func (c *InvokeApp) Setup(ctx core.SetupContext) error {
 
 	err = ctx.Metadata.Set(metadata)
 	if err != nil {
-		return fmt.Errorf("invoke app: set metadata: %w", err)
+		return fmt.Errorf("run app: set metadata: %w", err)
 	}
 
 	return nil
 }
 
-func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
-	config := InvokeAppConfiguration{}
+func (c *RunApp) Execute(ctx core.ExecutionContext) error {
+	config := RunAppConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return fmt.Errorf("invoke app: decode configuration: %w", err)
+		return fmt.Errorf("run app: decode configuration: %w", err)
 	}
 
-	nodeMetadata := InvokeAppMetadata{}
+	nodeMetadata := RunAppMetadata{}
 	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata)
 	if err != nil {
-		return fmt.Errorf("invoke app: decode configuration: %w", err)
+		return fmt.Errorf("run app: decode configuration: %w", err)
 	}
 
 	if nodeMetadata.App == nil || nodeMetadata.Node == nil {
-		return fmt.Errorf("invoke app: metadata is required")
+		return fmt.Errorf("run app: metadata is required")
 	}
 
 	run, err := ctx.Runs.Create(core.RunCreationParams{
@@ -219,45 +219,45 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("invoke app: create run: %w", err)
+		return fmt.Errorf("run app: create run: %w", err)
 	}
 
-	return ctx.Metadata.Set(invokeAppExecutionMetadata{
+	return ctx.Metadata.Set(runAppExecutionMetadata{
 		Run: &RunMetadata{
 			ID: run.ID.String(),
 		},
 	})
 }
 
-func (c *InvokeApp) Hooks() []core.Hook {
+func (c *RunApp) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "onRunFinished", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *InvokeApp) HandleHook(ctx core.ActionHookContext) error {
+func (c *RunApp) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "onRunFinished":
 		return c.handleRunFinished(ctx)
 	default:
-		return fmt.Errorf("invoke app: unknown hook %s", ctx.Name)
+		return fmt.Errorf("run app: unknown hook %s", ctx.Name)
 	}
 }
 
-func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
+func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 	callback, err := core.DecodeRunFinishedCallback(ctx.Parameters)
 	if err != nil {
-		return fmt.Errorf("invoke app: decode run finished callback: %w", err)
+		return fmt.Errorf("run app: decode run finished callback: %w", err)
 	}
 
-	executionMetadata := invokeAppExecutionMetadata{}
+	executionMetadata := runAppExecutionMetadata{}
 	err = mapstructure.Decode(ctx.Metadata.Get(), &executionMetadata)
 	if err != nil {
-		return fmt.Errorf("invoke app: decode execution metadata: %w", err)
+		return fmt.Errorf("run app: decode execution metadata: %w", err)
 	}
 
 	if callback.Run.Result == core.RunResultPassed {
-		err = ctx.Metadata.Set(invokeAppExecutionMetadata{
+		err = ctx.Metadata.Set(runAppExecutionMetadata{
 			Run: &RunMetadata{
 				ID:     callback.Run.ID.String(),
 				Result: callback.Run.Result,
@@ -265,7 +265,7 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("invoke app: set execution metadata: %w", err)
+			return fmt.Errorf("run app: set execution metadata: %w", err)
 		}
 
 		return ctx.ExecutionState.Emit(PassedOutputChannel, "app.invocation.passed", []any{
@@ -283,7 +283,7 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 		errMessage = *callback.Run.Error
 	}
 
-	err = ctx.Metadata.Set(invokeAppExecutionMetadata{
+	err = ctx.Metadata.Set(runAppExecutionMetadata{
 		Run: &RunMetadata{
 			ID:     callback.Run.ID.String(),
 			Result: callback.Run.Result,
@@ -292,7 +292,7 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("invoke app: set execution metadata: %w", err)
+		return fmt.Errorf("run app: set execution metadata: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(FailedOutputChannel, "app.invocation.failed", []any{
@@ -306,14 +306,14 @@ func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
 	})
 }
 
-func (c *InvokeApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *RunApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 0, nil, nil
 }
 
-func (c *InvokeApp) Cancel(ctx core.ExecutionContext) error {
+func (c *RunApp) Cancel(ctx core.ExecutionContext) error {
 	return ctx.Runs.Cancel()
 }
 
-func (c *InvokeApp) Cleanup(ctx core.SetupContext) error {
+func (c *RunApp) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

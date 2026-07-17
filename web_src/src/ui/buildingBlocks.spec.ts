@@ -6,12 +6,12 @@ describe("buildBuildingBlockCategories", () => {
     const categories = buildBuildingBlockCategories(
       [
         { name: "onBroadcast", label: "On Broadcast" },
-        { name: "onInvoke", label: "On Invoke" },
+        { name: "onRun", label: "On Run" },
       ],
       [
         { name: "deploy", label: "Deploy" },
         { name: "broadcastMessage", label: "Broadcast Message" },
-        { name: "invokeApp", label: "Invoke App" },
+        { name: "runApp", label: "Run App" },
         { name: "runnerJS", label: "Run JavaScript" },
         { name: "runnerBash", label: "Run Bash" },
         { name: "runnerPython", label: "Run Python" },
@@ -31,9 +31,9 @@ describe("buildBuildingBlockCategories", () => {
     ]);
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
-      "onInvoke",
+      "onRun",
       "broadcastMessage",
-      "invokeApp",
+      "runApp",
     ]);
     expect(categories.find((category) => category.name === "Runners")?.blocks.map((block) => block.name)).toEqual([
       "runner",

@@ -16,7 +16,7 @@ import type {
   SubtitleContext,
 } from "./types";
 
-type InvokeAppMetadata = {
+type RunAppMetadata = {
   app?: AppMetadata;
   node?: NodeMetadata;
 };
@@ -31,7 +31,7 @@ type AppMetadata = {
   name?: string;
 };
 
-type InvokeAppExecutionMetadata = {
+type RunAppExecutionMetadata = {
   run?: RunMetadata;
 };
 
@@ -41,7 +41,7 @@ type RunMetadata = {
   error?: string;
 };
 
-export const invokeAppStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+export const runAppStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -60,7 +60,7 @@ export const invokeAppStateFunction: StateFunction = (execution: ExecutionInfo):
     return "running";
   }
 
-  const metadata = execution.metadata as InvokeAppExecutionMetadata;
+  const metadata = execution.metadata as RunAppExecutionMetadata;
   const runResult = metadata?.run?.result;
   if (runResult === "failed") {
     return "failed";
@@ -69,14 +69,14 @@ export const invokeAppStateFunction: StateFunction = (execution: ExecutionInfo):
   return "success";
 };
 
-export const INVOKE_APP_STATE_REGISTRY: EventStateRegistry = {
+export const RUN_APP_STATE_REGISTRY: EventStateRegistry = {
   stateMap: DEFAULT_EVENT_STATE_MAP,
-  getState: invokeAppStateFunction,
+  getState: runAppStateFunction,
 };
 
-export const invokeAppMapper: ComponentBaseMapper = {
+export const runAppMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const componentName = context.componentDefinition.name || "invokeApp";
+    const componentName = context.componentDefinition.name || "runApp";
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
@@ -84,16 +84,16 @@ export const invokeAppMapper: ComponentBaseMapper = {
       iconColor: "text-gray-800",
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Invoke App",
-      metadata: invokeAppMetadataList(context.node),
-      eventSections: lastExecution ? invokeAppEventSections(context.nodes, lastExecution, componentName) : undefined,
+      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Run App",
+      metadata: runAppMetadataList(context.node),
+      eventSections: lastExecution ? runAppEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const nodeMetadata = context.node.metadata as InvokeAppMetadata | undefined;
+    const nodeMetadata = context.node.metadata as RunAppMetadata | undefined;
     const appName = nodeMetadata?.app?.name;
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
 
@@ -106,7 +106,7 @@ export const invokeAppMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const nodeMetadata = context.node.metadata as InvokeAppMetadata | undefined;
+    const nodeMetadata = context.node.metadata as RunAppMetadata | undefined;
     const childRun = resolveChildRun(context.execution.runs, nodeMetadata?.app?.id);
     const app = nodeMetadata?.app;
 
@@ -149,9 +149,9 @@ function resolveChildRun(
   return runs[0];
 }
 
-function invokeAppMetadataList(node: NodeInfo): MetadataItem[] {
+function runAppMetadataList(node: NodeInfo): MetadataItem[] {
   const metadataList: MetadataItem[] = [];
-  const metadata = node.metadata as InvokeAppMetadata | undefined;
+  const metadata = node.metadata as RunAppMetadata | undefined;
   if (metadata?.app) {
     metadataList.push({ icon: "layout-grid", label: metadata.app.name });
   }
@@ -163,7 +163,7 @@ function invokeAppMetadataList(node: NodeInfo): MetadataItem[] {
   return metadataList;
 }
 
-function invokeAppEventSections(
+function runAppEventSections(
   nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,

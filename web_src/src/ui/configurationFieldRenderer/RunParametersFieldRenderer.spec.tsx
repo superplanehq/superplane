@@ -7,7 +7,7 @@ import type { ConfigurationField } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { useCanvas } from "@/hooks/useCanvasData";
 
-import { InvocationParametersFieldRenderer } from "./InvocationParametersFieldRenderer";
+import { RunParametersFieldRenderer } from "./RunParametersFieldRenderer";
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: vi.fn(),
@@ -23,7 +23,7 @@ function parametersField(): ConfigurationField {
   return {
     name: "parameters",
     label: "Parameters",
-    type: "invocation-parameters",
+    type: "run-parameters",
     required: true,
   };
 }
@@ -39,7 +39,7 @@ function ControlledRenderer({
   return (
     <>
       <span data-testid="current-value">{JSON.stringify(value ?? null)}</span>
-      <InvocationParametersFieldRenderer
+      <RunParametersFieldRenderer
         field={parametersField()}
         value={value}
         onChange={setValue}
@@ -57,10 +57,10 @@ beforeEach(() => {
       spec: {
         nodes: [
           {
-            id: "on-invoke",
-            name: "On Invoke",
+            id: "on-run",
+            name: "On Run",
             type: "TYPE_TRIGGER",
-            component: "onInvoke",
+            component: "onRun",
             configuration: {
               parameters: [
                 {
@@ -81,19 +81,16 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useCanvas>);
 });
 
-describe("InvocationParametersFieldRenderer", () => {
+describe("RunParametersFieldRenderer", () => {
   it("prompts for app and node before loading parameters", () => {
     renderWithTheme(<ControlledRenderer allValues={{ app: "canvas_target" }} />);
 
-    expect(screen.getByText("Choose the target app and node before configuring invocation parameters.")).toBeTruthy();
+    expect(screen.getByText("Choose the target app and node before configuring run parameters.")).toBeTruthy();
   });
 
   it("renders typed fields when the target node defines parameters", async () => {
     renderWithTheme(
-      <ControlledRenderer
-        initialValue={{ message: "hello" }}
-        allValues={{ app: "canvas_target", node: "on-invoke" }}
-      />,
+      <ControlledRenderer initialValue={{ message: "hello" }} allValues={{ app: "canvas_target", node: "on-run" }} />,
     );
 
     await waitFor(() => {
@@ -107,7 +104,7 @@ describe("InvocationParametersFieldRenderer", () => {
   it("updates the parameters object when a typed field changes", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ControlledRenderer initialValue={{}} allValues={{ app: "canvas_target", node: "on-invoke" }} />);
+    renderWithTheme(<ControlledRenderer initialValue={{}} allValues={{ app: "canvas_target", node: "on-run" }} />);
 
     const input = await screen.findByTestId("string-field-message");
     await user.type(input, "updated");
@@ -124,10 +121,10 @@ describe("InvocationParametersFieldRenderer", () => {
         spec: {
           nodes: [
             {
-              id: "on-invoke",
-              name: "On Invoke",
+              id: "on-run-empty",
+              name: "Run",
               type: "TYPE_TRIGGER",
-              component: "onInvoke",
+              component: "onRun",
               configuration: {
                 parameters: [],
               },
@@ -140,11 +137,11 @@ describe("InvocationParametersFieldRenderer", () => {
     } as unknown as ReturnType<typeof useCanvas>);
 
     renderWithTheme(
-      <ControlledRenderer initialValue={{ custom: true }} allValues={{ app: "canvas_target", node: "on-invoke" }} />,
+      <ControlledRenderer initialValue={{ custom: true }} allValues={{ app: "canvas_target", node: "on-run-empty" }} />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("invocation-parameters-field-parameters")).toBeTruthy();
+      expect(screen.getByTestId("run-parameters-field-parameters")).toBeTruthy();
       expect(screen.queryByTestId("string-field-message")).toBeNull();
     });
   });

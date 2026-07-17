@@ -264,12 +264,12 @@ import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
-import { invokeAppMapper, INVOKE_APP_STATE_REGISTRY } from "./invokeApp";
+import { runAppMapper, RUN_APP_STATE_REGISTRY } from "./runApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
-import { onInvokeTriggerRenderer } from "./messages/on_invoke";
+import { onRunTriggerRenderer } from "./messages/on_run";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
@@ -282,7 +282,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   webhook: webhookTriggerRenderer,
   start: startTriggerRenderer,
   onBroadcast: onBroadcastTriggerRenderer,
-  onInvoke: onInvokeTriggerRenderer,
+  onRun: onRunTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -308,7 +308,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
-  invokeApp: invokeAppMapper,
+  runApp: runAppMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -471,7 +471,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
-  invokeApp: INVOKE_APP_STATE_REGISTRY,
+  runApp: RUN_APP_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

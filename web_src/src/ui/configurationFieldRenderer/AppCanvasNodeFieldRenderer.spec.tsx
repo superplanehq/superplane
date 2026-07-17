@@ -22,7 +22,7 @@ function nodeField(): ConfigurationField {
     typeOptions: {
       appCanvasNode: {
         nodeTypes: ["trigger"],
-        componentTypes: ["onInvoke"],
+        componentTypes: ["onRun"],
         parameters: [{ name: "app", valueFrom: { field: "app" } }],
       },
     },
@@ -57,7 +57,7 @@ beforeEach(() => {
       id: "canvas_target",
       spec: {
         nodes: [
-          { id: "on-invoke", name: "On Invoke", type: "TYPE_TRIGGER", component: "onInvoke" },
+          { id: "onRun-trigger", name: "On Run", type: "TYPE_TRIGGER", component: "onRun" },
           { id: "on-broadcast", name: "On Broadcast", type: "TYPE_TRIGGER", component: "onBroadcast" },
           { id: "send-email", name: "Send Email", type: "TYPE_ACTION", component: "sendEmail" },
         ],
@@ -80,15 +80,15 @@ describe("AppCanvasNodeFieldRenderer helpers", () => {
   it("filters nodes by type and component", () => {
     const nodes = filterAppCanvasNodes(
       [
-        { id: "on-invoke", name: "On Invoke", type: "TYPE_TRIGGER", component: "onInvoke" },
+        { id: "onRun-trigger", name: "On Run", type: "TYPE_TRIGGER", component: "onRun" },
         { id: "on-broadcast", name: "On Broadcast", type: "TYPE_TRIGGER", component: "onBroadcast" },
         { id: "send-email", name: "Send Email", type: "TYPE_ACTION", component: "sendEmail" },
       ],
       ["trigger"],
-      ["onInvoke"],
+      ["onRun"],
     );
 
-    expect(nodes.map((node) => node.id)).toEqual(["on-invoke"]);
+    expect(nodes.map((node) => node.id)).toEqual(["onRun-trigger"]);
   });
 });
 
@@ -104,7 +104,7 @@ describe("AppCanvasNodeFieldRenderer", () => {
     render(<ControlledRenderer allValues={{ app: "canvas_target" }} />);
 
     await userEvent.click(screen.getByRole("combobox"));
-    expect(screen.getByText("On Invoke")).toBeInTheDocument();
+    expect(screen.getByText("On Run")).toBeInTheDocument();
     expect(screen.queryByText("On Broadcast")).not.toBeInTheDocument();
     expect(screen.queryByText("Send Email")).not.toBeInTheDocument();
   });
@@ -113,26 +113,28 @@ describe("AppCanvasNodeFieldRenderer", () => {
     render(<ControlledRenderer allValues={{ app: "canvas_target" }} />);
 
     await userEvent.click(screen.getByRole("combobox"));
-    await userEvent.click(screen.getByText("On Invoke"));
+    await userEvent.click(screen.getByText("On Run"));
 
-    expect(screen.getByTestId("current-value")).toHaveTextContent("on-invoke");
+    expect(screen.getByTestId("current-value")).toHaveTextContent("onRun-trigger");
   });
 
   it("clears stale node values when the app changes", async () => {
-    const { rerender } = render(<ControlledRenderer initialValue="on-invoke" allValues={{ app: "canvas_target" }} />);
+    const { rerender } = render(
+      <ControlledRenderer initialValue="onRun-trigger" allValues={{ app: "canvas_target" }} />,
+    );
 
     mockUseCanvas.mockReturnValue({
       data: {
         id: "canvas_other",
         spec: {
-          nodes: [{ id: "other-trigger", name: "Other Trigger", type: "TYPE_TRIGGER", component: "onInvoke" }],
+          nodes: [{ id: "other-trigger", name: "Other Trigger", type: "TYPE_TRIGGER", component: "onRun" }],
         },
       },
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof useCanvas>);
 
-    rerender(<ControlledRenderer initialValue="on-invoke" allValues={{ app: "canvas_other" }} />);
+    rerender(<ControlledRenderer initialValue="onRun-trigger" allValues={{ app: "canvas_other" }} />);
 
     await waitFor(() => {
       expect(screen.getByTestId("current-value")).toHaveTextContent("");

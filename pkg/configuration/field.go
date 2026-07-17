@@ -24,19 +24,19 @@ const (
 	/*
 	 * Special field types
 	 */
-	FieldTypeDayInYear            = "day-in-year"
-	FieldTypeCron                 = "cron"
-	FieldTypeUser                 = "user"
-	FieldTypeRole                 = "role"
-	FieldTypeGroup                = "group"
-	FieldTypeIntegrationResource  = "integration-resource"
-	FieldTypeRepositoryFile       = "repository-file"
-	FieldTypeAnyPredicateList     = "any-predicate-list"
-	FieldTypeGitRef               = "git-ref"
-	FieldTypeSecretKey            = "secret-key"
-	FieldTypeApp                  = "app"
-	FieldTypeAppCanvasNode        = "app-canvas-node"
-	FieldTypeInvocationParameters = "invocation-parameters"
+	FieldTypeDayInYear           = "day-in-year"
+	FieldTypeCron                = "cron"
+	FieldTypeUser                = "user"
+	FieldTypeRole                = "role"
+	FieldTypeGroup               = "group"
+	FieldTypeIntegrationResource = "integration-resource"
+	FieldTypeRepositoryFile      = "repository-file"
+	FieldTypeAnyPredicateList    = "any-predicate-list"
+	FieldTypeGitRef              = "git-ref"
+	FieldTypeSecretKey           = "secret-key"
+	FieldTypeApp                 = "app"
+	FieldTypeAppCanvasNode       = "app-canvas-node"
+	FieldTypeRunParameters       = "run-parameters"
 )
 
 type Field struct {

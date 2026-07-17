@@ -9,50 +9,49 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-// TODO: call this just 'run'?
-type OnInvoke struct{}
+type OnRun struct{}
 
-type OnInvokeConfiguration struct {
+type OnRunConfiguration struct {
 	Parameters []configuration.Field `json:"parameters"`
 }
 
 func init() {
-	registry.RegisterTrigger("onInvoke", &OnInvoke{})
+	registry.RegisterTrigger("onRun", &OnRun{})
 }
 
-func (c *OnInvoke) Name() string {
-	return "onInvoke"
+func (c *OnRun) Name() string {
+	return "onRun"
 }
 
-func (c *OnInvoke) Label() string {
-	return "On Invoke"
+func (c *OnRun) Label() string {
+	return "On Run"
 }
 
-func (c *OnInvoke) Description() string {
-	return "Handle invocations"
+func (c *OnRun) Description() string {
+	return "Handle runs started from another app"
 }
 
-func (c *OnInvoke) Color() string {
+func (c *OnRun) Color() string {
 	return "gray"
 }
 
-func (c *OnInvoke) Icon() string {
+func (c *OnRun) Icon() string {
 	return "play"
 }
 
-func (c *OnInvoke) Documentation() string {
+func (c *OnRun) Documentation() string {
 	return ""
 }
 
-func (c *OnInvoke) ExampleData() map[string]any {
+func (c *OnRun) ExampleData() map[string]any {
 	return map[string]any{
 		"app": map[string]any{
 			"id":   "123",
 			"name": "Caller App",
 		},
 		"node": map[string]any{
-			"id":   "invoke",
-			"name": "Invoke App",
+			"id":   "runApp",
+			"name": "Run App",
 		},
 		"payload": map[string]any{
 			"message": "Hello, World!",
@@ -60,12 +59,12 @@ func (c *OnInvoke) ExampleData() map[string]any {
 	}
 }
 
-func (c *OnInvoke) Configuration() []configuration.Field {
+func (c *OnRun) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "parameters",
 			Label:       "Parameters",
-			Description: "Parameters to receive as part of the invocation",
+			Description: "Parameters to receive when another app runs this app",
 			Type:        configuration.FieldTypeList,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -154,52 +153,52 @@ func (c *OnInvoke) Configuration() []configuration.Field {
 	}
 }
 
-func (c *OnInvoke) Setup(ctx core.TriggerContext) error {
+func (c *OnRun) Setup(ctx core.TriggerContext) error {
 	// TODO: validate configuration for parameters is correct
 	return nil
 }
 
-func (c *OnInvoke) Hooks() []core.Hook {
+func (c *OnRun) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "onMessage", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *OnInvoke) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+func (c *OnRun) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "onMessage":
 		return c.handleMessage(ctx)
 	default:
-		return nil, fmt.Errorf("on invoke: unknown hook %s", ctx.Name)
+		return nil, fmt.Errorf("on run: unknown hook %s", ctx.Name)
 	}
 }
 
-func (c *OnInvoke) handleMessage(ctx core.TriggerHookContext) (map[string]any, error) {
-	config := OnInvokeConfiguration{}
+func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, error) {
+	config := OnRunConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return nil, fmt.Errorf("on invoke: decode configuration: %w", err)
+		return nil, fmt.Errorf("on run: decode configuration: %w", err)
 	}
 
 	if len(config.Parameters) > 0 {
 		err = configuration.ValidateConfiguration(config.Parameters, ctx.Parameters)
 		if err != nil {
-			return nil, fmt.Errorf("on invoke: validate configuration: %w", err)
+			return nil, fmt.Errorf("on run: validate configuration: %w", err)
 		}
 	}
 
 	err = ctx.Events.Emit("app.invocation", ctx.Parameters)
 	if err != nil {
-		return nil, fmt.Errorf("on invoke: emit event: %w", err)
+		return nil, fmt.Errorf("on run: emit event: %w", err)
 	}
 
 	return nil, nil
 }
 
-func (c *OnInvoke) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *OnRun) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 0, nil, nil
 }
 
-func (c *OnInvoke) Cleanup(ctx core.TriggerContext) error {
+func (c *OnRun) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }

@@ -13,7 +13,7 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
 import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
-import { InvocationParametersFieldRenderer } from "./InvocationParametersFieldRenderer";
+import { RunParametersFieldRenderer } from "./RunParametersFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -109,9 +109,9 @@ export function ConfigurationFieldInput({
     );
   }
 
-  if (field.type === "invocation-parameters") {
+  if (field.type === "run-parameters") {
     return (
-      <InvocationParametersFieldRenderer
+      <RunParametersFieldRenderer
         {...commonProps}
         domainId={domainId}
         domainType={domainType}

@@ -3,16 +3,16 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 
-interface OnInvokeParameterDefinition {
+interface OnRunParameterDefinition {
   name?: string;
   label?: string;
 }
 
-interface OnInvokeConfiguration {
-  parameters?: OnInvokeParameterDefinition[];
+interface OnRunConfiguration {
+  parameters?: OnRunParameterDefinition[];
 }
 
-interface OnInvokeEventData {
+interface OnRunEventData {
   app?: {
     id?: string;
     name?: string;
@@ -20,18 +20,18 @@ interface OnInvokeEventData {
   payload?: Record<string, unknown>;
 }
 
-export const onInvokeTriggerRenderer: TriggerRenderer = {
+export const onRunTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as OnInvokeEventData | undefined;
+    const eventData = context.event?.data as OnRunEventData | undefined;
 
     return {
-      title: invokeTitle(eventData),
+      title: onRunTitle(eventData),
       subtitle: "",
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnInvokeEventData | undefined;
+    const eventData = context.event?.data as OnRunEventData | undefined;
     const values: Record<string, string> = {};
 
     if (eventData?.app?.name) {
@@ -58,11 +58,11 @@ export const onInvokeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as OnInvokeConfiguration | undefined;
+    const configuration = node.configuration as OnRunConfiguration | undefined;
     const parameterCount = configuration?.parameters?.length ?? 0;
 
     const props: TriggerProps = {
-      title: node.name || definition.label || "On Invoke",
+      title: node.name || definition.label || "On Run",
       iconSlug: definition.icon || "play",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
@@ -73,10 +73,10 @@ export const onInvokeTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnInvokeEventData | undefined;
+      const eventData = lastEvent.data as OnRunEventData | undefined;
 
       props.lastEventData = {
-        title: invokeTitle(eventData),
+        title: onRunTitle(eventData),
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -88,13 +88,13 @@ export const onInvokeTriggerRenderer: TriggerRenderer = {
   },
 };
 
-export function invokeTitle(eventData: OnInvokeEventData | undefined): string {
+export function onRunTitle(eventData: OnRunEventData | undefined): string {
   const appName = eventData?.app?.name?.trim();
   if (appName) {
-    return `Invoked from ${appName}`;
+    return `Run from ${appName}`;
   }
 
-  return "App invoked";
+  return "App run";
 }
 
 function formatEventValue(value: unknown): string {

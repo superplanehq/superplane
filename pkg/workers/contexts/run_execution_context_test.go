@@ -21,27 +21,27 @@ func Test__RunExecutionContext__Create__RejectsEntrypointCycle(t *testing.T) {
 
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User,
 		[]models.CanvasNode{
-			{NodeID: "onInvoke1", Name: "On Invoke 1", Type: models.NodeTypeTrigger},
-			{NodeID: "onInvoke2", Name: "On Invoke 2", Type: models.NodeTypeTrigger},
+			{NodeID: "run1", Name: "Run 1", Type: models.NodeTypeTrigger},
+			{NodeID: "run2", Name: "Run 2", Type: models.NodeTypeTrigger},
 			{
-				NodeID: "invokeApp",
-				Name:   "Invoke App",
+				NodeID: "runApp",
+				Name:   "Run App",
 				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "invokeApp"}}),
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runApp"}}),
 			},
 		},
 		nil,
 	)
 
-	rootRun := createRunRecord(t, canvas.ID, "onInvoke1", nil)
-	runOnInvoke2 := createRunRecord(t, canvas.ID, "onInvoke2", &rootRun.ID)
-	parentRun := createRunRecord(t, canvas.ID, "onInvoke1", &runOnInvoke2.ID)
+	rootRun := createRunRecord(t, canvas.ID, "run1", nil)
+	run2 := createRunRecord(t, canvas.ID, "run2", &rootRun.ID)
+	parentRun := createRunRecord(t, canvas.ID, "run1", &run2.ID)
 	execution := createRunExecution(t, canvas.ID, parentRun.ID, nodes[2].NodeID)
 
 	ctx := NewRunExecutionContext(database.Conn(), canvas, &nodes[2], execution)
 	_, err := ctx.Create(core.RunCreationParams{
 		App:  canvas.ID.String(),
-		Node: "onInvoke2",
+		Node: "run2",
 	})
 
 	require.Error(t, err)
@@ -55,19 +55,19 @@ func Test__RunExecutionContext__Create__AllowsSiblingSubRuns(t *testing.T) {
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User,
 		[]models.CanvasNode{
 			{NodeID: "forEach", Name: "For Each", Type: models.NodeTypeComponent},
-			{NodeID: "onInvoke", Name: "On Invoke", Type: models.NodeTypeTrigger},
+			{NodeID: "onRun", Name: "On Run", Type: models.NodeTypeTrigger},
 		},
 		nil,
 	)
 
 	parentRun := createRunRecord(t, canvas.ID, "forEach", nil)
-	createRunRecord(t, canvas.ID, "onInvoke", &parentRun.ID)
+	createRunRecord(t, canvas.ID, "onRun", &parentRun.ID)
 	execution := createRunExecution(t, canvas.ID, parentRun.ID, nodes[0].NodeID)
 
 	ctx := NewRunExecutionContext(database.Conn(), canvas, &nodes[0], execution)
 	run, err := ctx.Create(core.RunCreationParams{
 		App:  canvas.ID.String(),
-		Node: "onInvoke",
+		Node: "onRun",
 	})
 
 	require.NoError(t, err)
@@ -82,17 +82,17 @@ func Test__RunExecutionContext__Cancel__CancelsChildRuns(t *testing.T) {
 		[]models.CanvasNode{
 			{NodeID: "trigger", Type: models.NodeTypeTrigger},
 			{
-				NodeID: "invokeApp",
-				Name:   "Invoke App",
+				NodeID: "runApp",
+				Name:   "Run App",
 				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "invokeApp"}}),
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runApp"}}),
 			},
 		},
 		nil,
 	)
 
 	childCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "onInvoke", Type: models.NodeTypeTrigger}},
+		[]models.CanvasNode{{NodeID: "onRun", Type: models.NodeTypeTrigger}},
 		nil,
 	)
 
@@ -103,7 +103,7 @@ func Test__RunExecutionContext__Cancel__CancelsChildRuns(t *testing.T) {
 	execution, err := models.FindNodeExecution(parentCanvas.ID, execution.ID)
 	require.NoError(t, err)
 
-	childRun := createChildRunRecord(t, childCanvas.ID, "onInvoke", parentRun.ID, parentCanvas.ID, execution.ID, models.CanvasRunStatePending)
+	childRun := createChildRunRecord(t, childCanvas.ID, "onRun", parentRun.ID, parentCanvas.ID, execution.ID, models.CanvasRunStatePending)
 
 	ctx := NewRunExecutionContext(database.Conn(), parentCanvas, &parentNodes[1], execution)
 	require.NoError(t, ctx.Cancel())

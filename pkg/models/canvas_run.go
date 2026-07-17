@@ -384,7 +384,7 @@ const maxRunAncestorHops = 256 // safety cap for corrupted parent_run_id cycles 
 
 var (
 	// Returned when the same app entrypoint is invoked twice in one chain, e.g.
-	// A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1.
+	// A/run1 -> A/run2 -> A/run1.
 	ErrSubRunEntrypointCycle = errors.New("sub-run entrypoint cycle detected")
 
 	// Returned when invoke chains cross back into an app they already visited, e.g.
@@ -403,7 +403,7 @@ var (
 // those create sibling sub-runs and do not deepen the cross-app chain.
 //
 // Checks (in order):
-//  1. Entrypoint cycle — A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1
+//  1. Entrypoint cycle — A/run1 -> A/run2 -> A/run1
 //  2. Workflow cycle   — A -> B -> C -> A
 //  3. Cross-app depth  — A -> B -> C -> D -> ... -> Z (too many app hops)
 func ValidateSubRunCreationInTransaction(
@@ -422,10 +422,10 @@ func ValidateSubRunCreationInTransaction(
 		return err
 	}
 
-	// Entrypoint cycle: same app AND same onInvoke (or other entry) node already
+	// Entrypoint cycle: same app AND same run (or other entry) node already
 	// appears in the chain.
 	//
-	// Catches ping-pong inside one app, e.g. A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1.
+	// Catches ping-pong inside one app, e.g. A/run1 -> A/run2 -> A/run1.
 	// Does not count forEach/loop siblings: they share a parent run, so earlier
 	// siblings are not ancestors of the next create.
 	if targetNodeID != "" && entrypointInRuns(ancestors, targetWorkflowID, targetNodeID) {
@@ -438,7 +438,7 @@ func ValidateSubRunCreationInTransaction(
 	//
 	// Catches A -> B -> C -> A. Skipped when the parent run is already in the
 	// target app (same-workflow sub-runs), e.g. forEach in A creating another
-	// A/onInvoke item.
+	// A/run item.
 	if workflowCycleInAncestors(ancestors, targetWorkflowID) {
 		return fmt.Errorf("%w: workflow %s already appears in the run chain",
 			ErrSubRunWorkflowCycle, targetWorkflowID)
@@ -494,7 +494,7 @@ func collectRunAncestorsInTransaction(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun
 }
 
 // entrypointInRuns reports whether (workflow, node) already appears in the chain.
-// Example match: prior sub-run was A/onInvoke1 and the new target is A/onInvoke1.
+// Example match: prior sub-run was A/run1 and the new target is A/run1.
 func entrypointInRuns(runs []CanvasRun, workflowID uuid.UUID, nodeID string) bool {
 	for _, run := range runs {
 		if run.WorkflowID == workflowID && run.NodeID == nodeID {

@@ -223,7 +223,7 @@ func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
 		r.User,
 		[]models.CanvasNode{
 			{NodeID: "trigger", Type: models.NodeTypeTrigger},
-			{NodeID: "invokeApp", Type: models.NodeTypeComponent},
+			{NodeID: "runApp", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -231,25 +231,25 @@ func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.CanvasNode{{NodeID: "onInvoke", Type: models.NodeTypeTrigger}},
+		[]models.CanvasNode{{NodeID: "onRun", Type: models.NodeTypeTrigger}},
 		[]models.Edge{},
 	)
 
 	parentRootEvent := support.EmitCanvasEventForNode(t, parentCanvas.ID, "trigger", "default", nil)
 	parentRun := createStartedRun(t, parentRootEvent)
-	parentExecution := createRunExecution(t, parentRun, parentRootEvent.ID, "invokeApp", models.CanvasNodeExecutionResultPassed)
+	parentExecution := createRunExecution(t, parentRun, parentRootEvent.ID, "runApp", models.CanvasNodeExecutionResultPassed)
 
 	childRun := createSubRunRecord(
 		t,
 		childCanvas.ID,
-		"onInvoke",
+		"onRun",
 		&parentRun.ID,
 		&parentCanvas.ID,
 		&parentExecution.ID,
 		models.CanvasRunStateStarted,
 		models.CanvasRunResultPassed,
 	)
-	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onInvoke", "default", nil)
+	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onRun", "default", nil)
 	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
 
 	parentResponse, err := ListRuns(context.Background(), r.Registry, parentCanvas.ID, 0, nil, nil, nil)

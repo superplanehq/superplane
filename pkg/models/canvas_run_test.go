@@ -254,12 +254,12 @@ func Test__ValidateSubRunCreationInTransaction__SameWorkflowDoesNotIncreaseCross
 		nil,
 	)
 
-	parentRun := createSubRun(t, canvas.ID, "onInvoke1", nil, nil, nil)
+	parentRun := createSubRun(t, canvas.ID, "run1", nil, nil, nil)
 	err := models.ValidateSubRunCreationInTransaction(
 		database.Conn(),
 		parentRun.ID,
 		canvas.ID,
-		"onInvoke2",
+		"run2",
 		8,
 	)
 	require.NoError(t, err)
@@ -282,15 +282,15 @@ func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *
 		nil,
 	)
 
-	runA := createSubRun(t, canvasA.ID, "onInvokeA", nil, nil, nil)
-	runB := createSubRun(t, canvasB.ID, "onInvokeB", &runA.ID, &canvasA.ID, nil)
-	runC := createSubRun(t, canvasC.ID, "onInvokeC", &runB.ID, &canvasB.ID, nil)
+	runA := createSubRun(t, canvasA.ID, "runA", nil, nil, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
 
 	err := models.ValidateSubRunCreationInTransaction(
 		database.Conn(),
 		runC.ID,
 		uuid.New(),
-		"onInvokeD",
+		"runD",
 		8,
 	)
 	require.NoError(t, err)
@@ -299,7 +299,7 @@ func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *
 		database.Conn(),
 		runC.ID,
 		uuid.New(),
-		"onInvokeD",
+		"runD",
 		2,
 	)
 	require.ErrorIs(t, err, models.ErrSubRunCrossWorkflowDepthExceeded)
@@ -323,14 +323,14 @@ func Test__ValidateSubRunCreationInTransaction__WorkflowCycleAcrossApps(t *testi
 	)
 
 	runA := createSubRun(t, canvasA.ID, "", nil, nil, nil)
-	runB := createSubRun(t, canvasB.ID, "onInvokeB", &runA.ID, &canvasA.ID, nil)
-	runC := createSubRun(t, canvasC.ID, "onInvokeC", &runB.ID, &canvasB.ID, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
 
 	err := models.ValidateSubRunCreationInTransaction(
 		database.Conn(),
 		runC.ID,
 		canvasA.ID,
-		"onInvokeA",
+		"runA",
 		8,
 	)
 	require.ErrorIs(t, err, models.ErrSubRunWorkflowCycle)
@@ -346,14 +346,14 @@ func Test__ValidateSubRunCreationInTransaction__EntrypointCycleWithinWorkflow(t 
 	)
 
 	rootRun := createSubRun(t, canvas.ID, "", nil, nil, nil)
-	runOnInvoke2 := createSubRun(t, canvas.ID, "onInvoke2", &rootRun.ID, &canvas.ID, nil)
-	parentRun := createSubRun(t, canvas.ID, "onInvoke1", &runOnInvoke2.ID, &canvas.ID, nil)
+	run2InChain := createSubRun(t, canvas.ID, "run2", &rootRun.ID, &canvas.ID, nil)
+	parentRun := createSubRun(t, canvas.ID, "run1", &run2InChain.ID, &canvas.ID, nil)
 
 	err := models.ValidateSubRunCreationInTransaction(
 		database.Conn(),
 		parentRun.ID,
 		canvas.ID,
-		"onInvoke2",
+		"run2",
 		8,
 	)
 	require.ErrorIs(t, err, models.ErrSubRunEntrypointCycle)
