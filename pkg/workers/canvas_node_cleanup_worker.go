@@ -37,37 +37,43 @@ func (w *CanvasNodeCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			tickStart := time.Now()
-			nodes, err := models.ListDeletedCanvasNodes(database.Conn())
-			if err != nil {
-				w.logger.Errorf("Error finding deleted canvas nodes: %v", err)
-				continue
-			}
-
-			for _, node := range nodes {
-				if !node.DeletedAt.Valid || deletedResourceWithinGracePeriod(node.DeletedAt.Time, tickStart) {
-					continue
-				}
-
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-					w.logger.Errorf("Error acquiring semaphore: %v", err)
-					continue
-				}
-
-				go func(node models.CanvasNode) {
-					defer w.semaphore.Release(1)
-
-					if err := w.LockAndProcessNode(node); err != nil {
-						w.logger.Errorf("Error processing canvas node %s/%s: %v", node.WorkflowID, node.NodeID, err)
-					}
-				}(node)
-			}
-
-			w.logger.WithFields(log.Fields{
-				"nodes":       len(nodes),
-				"duration_ms": time.Since(tickStart).Milliseconds(),
-			}).Debug("Canvas node cleanup tick completed")
+			w.tick()
 		}
+	}
+}
+
+func (w *CanvasNodeCleanupWorker) tick() {
+	tickStart := time.Now()
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn())
+	if err != nil {
+		w.logger.Errorf("Error finding deleted canvas nodes: %v", err)
+		return
+	}
+
+	for _, node := range nodes {
+		if !node.DeletedAt.Valid || deletedResourceWithinGracePeriod(node.DeletedAt.Time, tickStart) {
+			continue
+		}
+
+		if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+			w.logger.Errorf("Error acquiring semaphore: %v", err)
+			continue
+		}
+
+		go w.processDeletedNode(node)
+	}
+
+	w.logger.WithFields(log.Fields{
+		"nodes":       len(nodes),
+		"duration_ms": time.Since(tickStart).Milliseconds(),
+	}).Debug("Canvas node cleanup tick completed")
+}
+
+func (w *CanvasNodeCleanupWorker) processDeletedNode(node models.CanvasNode) {
+	defer w.semaphore.Release(1)
+
+	if err := w.LockAndProcessNode(node); err != nil {
+		w.logger.Errorf("Error processing canvas node %s/%s: %v", node.WorkflowID, node.NodeID, err)
 	}
 }
 
