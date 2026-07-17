@@ -117,11 +117,15 @@ function getExecutionStatusLabel(execution: CanvasesCanvasNodeExecutionRef) {
 export function getExecutionStatus(execution: CanvasesCanvasNodeExecutionRef) {
   const statusLabel = getExecutionStatusLabel(execution);
 
-  if (
-    execution.state === "STATE_STARTED" ||
-    execution.state === "STATE_PENDING" ||
-    execution.state === "STATE_CANCELLING"
-  ) {
+  if (execution.state === "STATE_CANCELLING") {
+    return {
+      label: statusLabel,
+      className: "bg-amber-50 text-amber-800 ring-amber-200",
+      dotClassName: "bg-amber-500 animate-pulse",
+    };
+  }
+
+  if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
     return {
       label: statusLabel,
       className: "bg-blue-50 text-blue-700 ring-blue-200",

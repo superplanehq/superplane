@@ -110,13 +110,7 @@ func publishRunCancellationDrain(workflowID uuid.UUID, drainResult *models.RunCa
 	}
 
 	for _, queueItem := range drainResult.DeletedQueueItems {
-		message := messages.NewCanvasQueueItemDeletedMessage(
-			workflowID.String(),
-			queueItem.ID.String(),
-			queueItem.NodeID,
-			queueItem.RunID.String(),
-		)
-		if err := message.PublishDeleted(); err != nil {
+		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
 			log.Errorf("failed to publish queue item deleted RabbitMQ message: %v", err)
 		}
 	}

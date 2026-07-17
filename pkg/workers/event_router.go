@@ -199,11 +199,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
-			messages.NewCanvasQueueItemMessage(
-				event.WorkflowID.String(),
-				queueItem.ID.String(),
-				queueItem.NodeID,
-			).Publish(false)
+			messages.NewCanvasQueueItemMessage(queueItem).PublishCreated()
 		}
 	}
 
