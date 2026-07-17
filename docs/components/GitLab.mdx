@@ -25,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Accept Merge Request" href="#accept-merge-request" description="Merge an open GitLab merge request" />
+  <LinkCard title="Add Merge Request Reviewers" href="#add-merge-request-reviewers" description="Add reviewers to a GitLab merge request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add an award emoji reaction to a GitLab merge request or comment" />
   <LinkCard title="Approve Merge Request" href="#approve-merge-request" description="Approve a GitLab merge request" />
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a deployment for a GitLab environment" />
@@ -32,10 +33,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitLab issue" />
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
+  <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
+  <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
 </CardGrid>
@@ -56,6 +59,7 @@ To connect with a **Personal Access Token**:
 **Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
 
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
+- **Create Merge Request**, **Add Merge Request Reviewers**, and **Remove Merge Request Reviewers** require at least the **Developer** role on the project. These use the `api` scope, which is already included in the scopes above.
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
 - **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
 - **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
@@ -1073,6 +1077,99 @@ Returns the merged merge request object, including state, merge commit SHA, sour
 }
 ```
 
+<a id="add-merge-request-reviewers"></a>
+
+## Add Merge Request Reviewers
+
+**Component key:** `gitlab.addMergeRequestReviewers`
+
+The Add Merge Request Reviewers component requests reviews from additional users on an existing GitLab merge request. Existing reviewers are kept.
+
+### Use Cases
+
+- **Automated review assignment**: Add reviewers after a merge request is opened as part of a workflow
+- **Escalation**: Add a senior reviewer when checks fail or a change touches sensitive areas
+- **Round-robin**: Assign reviewers from a rotation once a merge request is ready
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to request a review from. These are added to any existing reviewers.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its full reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      },
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/ghi789",
+        "id": 31,
+        "name": "Sam Chen",
+        "state": "active",
+        "username": "schen",
+        "web_url": "https://gitlab.example.com/schen"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:30:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:30:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
 <a id="add-reaction"></a>
 
 ## Add Reaction
@@ -1547,6 +1644,112 @@ Returns the created note object, including:
 }
 ```
 
+<a id="create-merge-request"></a>
+
+## Create Merge Request
+
+**Component key:** `gitlab.createMergeRequest`
+
+The Create Merge Request component opens a new merge request in a specified GitLab project.
+
+### Use Cases
+
+- **Automated fixes**: An agent commits a fix on a branch and opens a merge request for review
+- **Dependency updates**: Open a merge request when a dependency or changelog bump is generated
+- **Release automation**: Open a merge request to promote a branch into a release branch
+
+### Configuration
+
+- **Project** (required): The GitLab project where the merge request will be created
+- **Source Branch** (required): The branch containing the changes (supports expressions)
+- **Target Branch** (required): The branch you want the changes merged into (e.g. main)
+- **Title** (required): The title of the new merge request
+- **Description** (optional): The description/body of the merge request
+- **Assignees** (optional): Users to assign the merge request to
+- **Reviewers** (optional): Users to request a review from
+- **Labels** (optional): Labels to apply to the merge request
+- **Milestone** (optional): Milestone to associate with the merge request
+- **Remove Source Branch** (optional): Remove the source branch when the merge request is merged
+- **Squash** (optional): Squash commits into a single commit when merging
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to create a merge request.
+
+### Output
+
+The component outputs the created merge request object, including:
+- **iid**: The project-relative ID of the merge request
+- **web_url**: The URL to view the merge request in GitLab
+- **source_branch** and **target_branch**: The branches involved
+- **state**: The current state of the merge request (opened)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 22,
+        "name": "Jamie Rivera",
+        "state": "active",
+        "username": "jrivera",
+        "web_url": "https://gitlab.example.com/jrivera"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T08:46:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T08:46:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -1797,6 +2000,91 @@ The Get Test Report Summary component fetches the test report summary for a GitL
   },
   "timestamp": "2026-02-13T19:26:01.000Z",
   "type": "gitlab.testReportSummary"
+}
+```
+
+<a id="remove-merge-request-reviewers"></a>
+
+## Remove Merge Request Reviewers
+
+**Component key:** `gitlab.removeMergeRequestReviewers`
+
+The Remove Merge Request Reviewers component removes reviewers from an existing GitLab merge request. Reviewers that are not listed are kept.
+
+### Use Cases
+
+- **Automated cleanup**: Remove a reviewer once their review is no longer needed
+- **Reassignment**: Remove a reviewer before adding a different one as part of a workflow
+- **Rotation**: Drop an out-of-office reviewer from an open merge request
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to remove from the merge request's reviewers. Reviewers not listed are kept.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its remaining reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:45:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:45:00.000Z",
+  "type": "gitlab.mergeRequest"
 }
 ```
 
