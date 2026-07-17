@@ -35,13 +35,19 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		return nil, grpcerrors.InvalidArgument(nil, "content or an image is required")
 	}
 
-	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, images, agentModeFromProto(req.Mode))
+	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, images, agentservice.SendMessageRequestOptions{
+		Mode:                      agentModeFromProto(req.Mode),
+		AutoLayoutOnUpdateEnabled: req.AutoLayoutOnUpdateEnabled,
+	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "agent chat not found")
 		}
 		if errors.Is(err, agentservice.ErrSessionBusy) {
 			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the previous turn")
+		}
+		if errors.Is(err, agentservice.ErrInvalidRequest) {
+			return nil, grpcerrors.InvalidArgument(err, "invalid agent chat message")
 		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
 		return nil, grpcerrors.Internal(err, "failed to send agent chat message")

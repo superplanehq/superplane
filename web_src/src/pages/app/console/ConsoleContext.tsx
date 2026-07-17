@@ -28,6 +28,8 @@ export interface ConsoleContextValue {
   organizationId: string;
   /** All canvas nodes available for chip resolution. */
   nodes: SuperplaneComponentsNode[];
+  /** True while the canvas node catalog is still being fetched. */
+  nodesLoading?: boolean;
   /** Optional latest-status map keyed by node id. */
   nodeStatuses?: Record<string, ConsoleNodeStatus | undefined>;
   /**
@@ -74,6 +76,26 @@ export function resolveConsoleNode(
   const byId = ctx.nodes.find((n) => n.id === trimmed);
   if (byId) return { node: byId, label: byId.name || byId.id || trimmed };
   const byName = ctx.nodes.find((n) => n.name === trimmed);
+  if (byName) return { node: byName, label: byName.name || byName.id || trimmed };
+  return undefined;
+}
+
+/**
+ * Resolve a trigger-filter reference (id or name) to a `TYPE_TRIGGER` node.
+ * Unlike {@link resolveConsoleNode}, this ignores actions and other node
+ * types so a shared name cannot silently bind a run filter to the wrong id.
+ */
+export function resolveConsoleTrigger(
+  ctx: Pick<ConsoleContextValue, "nodes"> | undefined,
+  reference: string,
+): { node: SuperplaneComponentsNode; label: string } | undefined {
+  if (!ctx) return undefined;
+  const trimmed = reference.trim();
+  if (!trimmed) return undefined;
+  const triggers = ctx.nodes.filter((n) => n.type === "TYPE_TRIGGER");
+  const byId = triggers.find((n) => n.id === trimmed);
+  if (byId) return { node: byId, label: byId.name || byId.id || trimmed };
+  const byName = triggers.find((n) => n.name === trimmed);
   if (byName) return { node: byName, label: byName.name || byName.id || trimmed };
   return undefined;
 }

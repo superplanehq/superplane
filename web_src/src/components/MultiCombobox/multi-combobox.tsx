@@ -5,12 +5,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../Icon";
-
-interface DropdownPosition {
-  top: number;
-  left: number;
-  width: number;
-}
+import { computeDropdownPosition, type DropdownPosition } from "./dropdownPosition";
 
 export function MultiCombobox<T extends { id: string }>({
   options,
@@ -55,7 +50,12 @@ export function MultiCombobox<T extends { id: string }>({
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [justAddedTag, setJustAddedTag] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({
+    top: 0,
+    left: 0,
+    width: 0,
+    maxHeight: 240,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const optionsPortalRef = useRef<HTMLDivElement>(null);
@@ -66,11 +66,7 @@ export function MultiCombobox<T extends { id: string }>({
     }
 
     const rect = containerRef.current.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-    });
+    setDropdownPosition(computeDropdownPosition(rect, window.innerHeight));
   }, []);
 
   useEffect(() => {
@@ -315,17 +311,19 @@ export function MultiCombobox<T extends { id: string }>({
               ref={optionsPortalRef}
               className="fixed z-[9999]"
               style={{
-                top: `${dropdownPosition.top}px`,
+                ...(dropdownPosition.top !== undefined ? { top: `${dropdownPosition.top}px` } : {}),
+                ...(dropdownPosition.bottom !== undefined ? { bottom: `${dropdownPosition.bottom}px` } : {}),
                 left: `${dropdownPosition.left}px`,
                 width: `${dropdownPosition.width}px`,
               }}
             >
               <Headless.ComboboxOptions
                 static
+                style={{ maxHeight: `${dropdownPosition.maxHeight}px` }}
                 className={clsx(
                   "scroll-py-1 rounded-xl p-1 select-none empty:invisible w-full",
                   "outline outline-transparent focus:outline-hidden",
-                  "max-h-60 overflow-y-auto overscroll-contain",
+                  "overflow-y-auto overscroll-contain",
                   "bg-white dark:bg-gray-800",
                   "shadow-lg ring-1 ring-gray-950/10 dark:ring-white/10",
                   "transition-opacity duration-100 ease-in",

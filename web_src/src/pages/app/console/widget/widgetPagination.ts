@@ -139,11 +139,74 @@ export function computeWidgetHasMore({
 }
 
 /**
+ * Module-level set of `flightKey`s that currently have a `fetchNextPage`
+ * call in flight. React Query dedupes network requests per query key, but
+ * it flips `isFetchingNextPage` asynchronously — so N consumers that pass
+ * their "should fetch" check in the same commit will each call
+ * `fetchNextPage()` before the flag reaches them, producing duplicate
+ * `before=` requests for the same cursor (live capture on the SaaS console
+ * showed 4× duplicates on the first pagination steps).
+ *
+ * This set gives us a synchronous single-flight guarantee across all
+ * console consumers of the shared runs infinite-query cache (widgets and
+ * markdown/html run variables). It is intentionally module-scoped (per
+ * browser tab) — pagination is a global concern of the shared cache, not a
+ * per-widget one.
+ */
+const inFlightEagerPagination = new Set<string>();
+
+/**
+ * Test-only escape hatch: clears the module-level in-flight set. Guarded
+ * so it stays a no-op in production bundles.
+ */
+export function __resetEagerPaginationInFlight(): void {
+  inFlightEagerPagination.clear();
+}
+
+/**
+ * Synchronously claim the eager-pagination single-flight lock for
+ * `flightKey`, invoke `fetchNextPage`, and release the lock when the
+ * promise settles. Returns `false` when another consumer already holds
+ * the lock for this key (caller should no-op).
+ *
+ * Shared by widget fill-to-target pagination and markdown/html filtered
+ * run-variable pagination so both join the same mutex on a shared cache
+ * entry (especially the unfiltered `latest` bucket).
+ */
+export function claimEagerPaginationFetch(flightKey: string, fetchNextPage: () => Promise<unknown> | unknown): boolean {
+  if (inFlightEagerPagination.has(flightKey)) return false;
+  inFlightEagerPagination.add(flightKey);
+  const clear = () => {
+    inFlightEagerPagination.delete(flightKey);
+  };
+  let result: Promise<unknown> | unknown;
+  try {
+    result = fetchNextPage();
+  } catch {
+    clear();
+    return true;
+  }
+  if (result && typeof (result as Promise<unknown>).then === "function") {
+    (result as Promise<unknown>).then(clear, clear);
+    return true;
+  }
+  clear();
+  return true;
+}
+
+/**
  * Drives widget-owned eager pagination of an infinite query: fetches pages
  * until the current `fillTarget` is reached, the source runs out of pages,
  * or `WIDGET_MAX_EAGER_PAGES` is hit. Re-runs after each page arrives so
  * `loadMore` (bumping `fillTarget`) flows through the same mechanism with
  * no special-case fetch path.
+ *
+ * `flightKey` is a stable string identifying the shared infinite-query
+ * cache entry (typically `JSON.stringify(queryKey)`). Widget effects on the
+ * same key coordinate through {@link claimEagerPaginationFetch} so only
+ * one `fetchNextPage()` call is dispatched per cursor advance even when
+ * multiple widgets satisfy `shouldFetchNextWidgetPage` in the same React
+ * commit.
  */
 export function useEagerInfinitePagination({
   enabled,
@@ -153,7 +216,10 @@ export function useEagerInfinitePagination({
   hasNextPage,
   isFetchingNextPage,
   isFetching,
+  isError = false,
+  isFetchNextPageError = false,
   fetchNextPage,
+  flightKey,
 }: {
   enabled: boolean;
   fillTarget: number;
@@ -162,7 +228,10 @@ export function useEagerInfinitePagination({
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
-  fetchNextPage: () => unknown;
+  isError?: boolean;
+  isFetchNextPageError?: boolean;
+  fetchNextPage: () => Promise<unknown> | unknown;
+  flightKey: string;
 }) {
   useEffect(() => {
     if (
@@ -174,12 +243,26 @@ export function useEagerInfinitePagination({
         hasNextPage,
         isFetchingNextPage,
         isFetching,
+        isError,
+        isFetchNextPageError,
       })
     ) {
       return;
     }
-    void fetchNextPage();
-  }, [enabled, fillTarget, loadedRowCount, pageCount, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
+    claimEagerPaginationFetch(flightKey, fetchNextPage);
+  }, [
+    enabled,
+    fillTarget,
+    loadedRowCount,
+    pageCount,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    isError,
+    isFetchNextPageError,
+    fetchNextPage,
+    flightKey,
+  ]);
 }
 
 export function shouldFetchNextWidgetPage({
@@ -190,6 +273,8 @@ export function shouldFetchNextWidgetPage({
   hasNextPage,
   isFetchingNextPage,
   isFetching,
+  isError = false,
+  isFetchNextPageError = false,
 }: {
   enabled: boolean;
   fillTarget: number;
@@ -198,8 +283,11 @@ export function shouldFetchNextWidgetPage({
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
+  isError?: boolean;
+  isFetchNextPageError?: boolean;
 }): boolean {
   if (!enabled || !hasNextPage) return false;
+  if (isError || isFetchNextPageError) return false;
   if (isFetchingNextPage || isFetching) return false;
   if (loadedRowCount >= fillTarget) return false;
   return pageCount < WIDGET_MAX_EAGER_PAGES;
@@ -232,4 +320,49 @@ export function isWidgetQueryLoading({
     pageCount < WIDGET_MAX_EAGER_PAGES &&
     (isFetchingNextPage || isFetching)
   );
+}
+
+/**
+ * Loading flag for runs-backed widgets. Includes the usual initial-fill
+ * wait plus a filtered-search wait for count KPIs still hunting matches
+ * across pages. Query failures clear the filtered wait so panels settle
+ * instead of spinning forever after a failed `fetchNextPage`.
+ */
+export function computeRunsDataSourceLoading(args: {
+  query: {
+    isLoading: boolean;
+    hasNextPage: boolean | undefined;
+    isFetchingNextPage: boolean;
+    isFetching: boolean;
+    isError?: boolean;
+    isFetchNextPageError?: boolean;
+  };
+  enabled: boolean;
+  fillRowCount: number;
+  initialFillTarget: number;
+  pageCount: number;
+  filtersActive: boolean;
+  triggersMatchable: boolean;
+  progressive: boolean;
+  runExecutionsLoading: boolean;
+}): boolean {
+  const queryFailed = args.query.isError === true || args.query.isFetchNextPageError === true;
+  const initialFillLoading = isWidgetQueryLoading({
+    queryIsLoading: args.query.isLoading,
+    enabled: args.enabled,
+    hasNextPage: args.query.hasNextPage,
+    loadedRowCount: args.fillRowCount,
+    fillTarget: args.initialFillTarget,
+    pageCount: args.pageCount,
+    isFetchingNextPage: args.query.isFetchingNextPage,
+    isFetching: args.query.isFetching,
+  });
+  const awaitingFilteredFill =
+    !queryFailed &&
+    args.filtersActive &&
+    args.triggersMatchable &&
+    args.fillRowCount < args.initialFillTarget &&
+    args.query.hasNextPage === true &&
+    args.pageCount < WIDGET_MAX_EAGER_PAGES;
+  return initialFillLoading || awaitingFilteredFill || (!args.progressive && args.runExecutionsLoading);
 }

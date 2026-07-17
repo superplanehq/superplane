@@ -100,6 +100,7 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     onAgentStagingReady: undefined,
     onAgentStagingCommit: undefined,
     isEditing: false,
+    isAutoLayoutOnUpdateEnabled: false,
     readOnly: false,
     isToolSidebarOpen: true,
     showToolSidebarToggle: true,
@@ -234,6 +235,7 @@ describe("CanvasToolSidebar", () => {
       content: "retry",
       mode: "operator",
       images: [],
+      autoLayoutOnUpdateEnabled: false,
     });
   });
 

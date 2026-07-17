@@ -20,12 +20,12 @@ type OwnerStepProps = {
   onLastNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
-  onNext: (event: React.FormEvent) => void;
+  onSubmit: (event: React.FormEvent) => void;
 };
 
 const OwnerStepHeader = (
   <div className="mb-8 text-center">
-    <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
+    <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8 dark:brightness-0 dark:invert" />
     <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Set up owner account</h4>
     <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
   </div>
@@ -45,16 +45,16 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   onLastNameChange,
   onPasswordChange,
   onConfirmPasswordChange,
-  onNext,
+  onSubmit,
 }) => (
   <>
     {OwnerStepHeader}
-    <form onSubmit={onNext} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label className="mb-2 block text-left">
-            First Name <span className="text-gray-800">*</span>
+            First Name <span className="text-gray-800 dark:text-gray-100">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -71,7 +71,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         </div>
         <div>
           <Label className="mb-2 block text-left">
-            Last Name <span className="text-gray-800">*</span>
+            Last Name <span className="text-gray-800 dark:text-gray-100">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -89,7 +89,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Email <span className="text-gray-800">*</span>
+          Email <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -104,7 +104,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Password <span className="text-gray-800">*</span>
+          Password <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -125,7 +125,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div>
         <Label className="mb-2 block text-left">
-          Confirm Password <span className="text-gray-800">*</span>
+          Confirm Password <span className="text-gray-800 dark:text-gray-100">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -142,7 +142,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div className="flex justify-end">
         <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : "Next"}
+          {loading ? "Saving..." : "Finish setup"}
         </Button>
       </div>
     </form>

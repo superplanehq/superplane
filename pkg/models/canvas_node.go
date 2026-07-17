@@ -102,6 +102,11 @@ type CanvasNode struct {
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
+type DeleteCanvasNodeResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	DeletedQueueItems     []CanvasNodeQueueItem
+}
+
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
 }
@@ -180,18 +185,33 @@ func randomNodeSuffix(length int) string {
 }
 
 func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
-	err := tx.Delete(&node).Error
+	_, err := DeleteCanvasNodeWithResult(tx, node)
+	return err
+}
+
+func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeResult, error) {
+	result, err := cancelActiveExecutionsForDeletedNode(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	err = tx.Delete(&node).Error
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	err = DeleteIntegrationSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	err = DeleteCanvasSubscriptionsForNode(tx, node.WorkflowID, node.NodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	if node.WebhookID == nil {
-		return nil
+		return result, nil
 	}
 
 	//
@@ -200,21 +220,21 @@ func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
 	//
 	webhook, err := FindWebhookInTransaction(tx, *node.WebhookID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	nodes, err := FindWebhookNodesInTransaction(tx, *node.WebhookID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	if len(nodes) > 0 {
 		log.Printf("Webhook %s has %d other nodes associated with it", webhook.ID.String(), len(nodes))
-		return nil
+		return result, nil
 	}
 
 	log.Printf("Deleting webhook %s", webhook.ID.String())
-	return tx.Delete(&webhook).Error
+	return result, tx.Delete(&webhook).Error
 }
 
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
@@ -248,9 +268,14 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 }
 
 func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]CanvasNode, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
 	var nodes []CanvasNode
 	err := tx.
-		Where("workflow_id = ? AND node_id IN ?", canvasID, nodeIDs).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Where("workflow_nodes.workflow_id = ? AND workflow_nodes.node_id IN ?", canvasID, nodeIDs).
 		Find(&nodes).
 		Error
 
@@ -506,4 +531,79 @@ func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNode
 	}
 
 	return &queueItem, nil
+}
+
+func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (DeleteCanvasNodeResult, error) {
+	executions, err := ListActiveNodeExecutions(tx, workflowID, nodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	deletedQueueItems, err := deleteQueueItemsForNode(tx, workflowID, nodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	if err := completePendingRequestsForNodeExecutions(tx, workflowID, nodeID); err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	return DeleteCanvasNodeResult{
+		CancelledExecutionIDs: cancelledExecutionIDs,
+		DeletedQueueItems:     deletedQueueItems,
+	}, nil
+}
+
+func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeQueueItem, error) {
+	var deletedQueueItems []CanvasNodeQueueItem
+	err := tx.
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Delete(&deletedQueueItems).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return deletedQueueItems, nil
+}
+
+func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid.UUID, error) {
+	requestedCancellationIDs := make([]uuid.UUID, 0, len(executions))
+
+	for i := range executions {
+		execution := executions[i]
+		if execution.State == CanvasNodeExecutionStateFinished || execution.State == CanvasNodeExecutionStateCancelling {
+			continue
+		}
+
+		if err := execution.RequestCancellation(tx, nil); err != nil {
+			return nil, err
+		}
+
+		requestedCancellationIDs = append(requestedCancellationIDs, execution.ID)
+	}
+
+	return requestedCancellationIDs, nil
+}
+
+func completePendingRequestsForNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	now := time.Now()
+	return tx.
+		Model(&CanvasNodeRequest{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("execution_id IS NOT NULL").
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": now,
+		}).
+		Error
 }

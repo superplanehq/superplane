@@ -21,9 +21,10 @@ type ExecutionStateWebsocketEvent struct {
 }
 
 const (
-	ExecutionCreatedEvent  = "execution_created"
-	ExecutionFinishedEvent = "execution_finished"
-	ExecutionStartedEvent  = "execution_started"
+	ExecutionCreatedEvent    = "execution_created"
+	ExecutionFinishedEvent   = "execution_finished"
+	ExecutionStartedEvent    = "execution_started"
+	ExecutionCancellingEvent = "execution_cancelling"
 )
 
 func HandleCanvasExecution(messageBody []byte, wsHub *ws.Hub) error {
@@ -45,6 +46,8 @@ func workflowExecutionStateToWsEvent(workflowState string) string {
 		return ExecutionFinishedEvent
 	case models.CanvasNodeExecutionStateStarted:
 		return ExecutionStartedEvent
+	case models.CanvasNodeExecutionStateCancelling:
+		return ExecutionCancellingEvent
 	default:
 		return ""
 	}

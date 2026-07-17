@@ -472,6 +472,7 @@ function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
     field.type === "user" ||
     field.type === "role" ||
     field.type === "group" ||
+    field.type === "app" ||
     (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
   );
 }

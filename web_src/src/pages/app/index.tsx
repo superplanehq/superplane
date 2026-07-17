@@ -130,6 +130,7 @@ import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
+import { useCanvasAutoFocusPreference } from "@/hooks/useCanvasAutoFocusPreference";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   applyRunInspectionNavigationSearchParams,
@@ -206,6 +207,22 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
+function useAutoLayoutOnUpdatePreference() {
+  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
+    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
+  );
+
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    const newValue = !isAutoLayoutOnUpdateEnabled;
+    setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
+    }
+  }, [isAutoLayoutOnUpdateEnabled]);
+
+  return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
+}
+
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
@@ -242,7 +259,6 @@ export function AppPage() {
     runDetailNodeId,
     setRunDetailNodeId,
     clearDismissedRunDetail,
-    maybeOpenRunDetailForRun,
     detailDismissedForRunId,
     handleBackToRunList,
   } = useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, preserveRunDetailNodeOnNextRunChangeRef, {
@@ -591,9 +607,8 @@ export function AppPage() {
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
-    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
-  );
+  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
+  const { handleToggleAutoFocus, isAutoFocusEnabled } = useCanvasAutoFocusPreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -1148,14 +1163,6 @@ export function AppPage() {
       hasQueuedFollowUp: false,
     });
   }, []);
-
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    const newValue = !isAutoLayoutOnUpdateEnabled;
-    setIsAutoLayoutOnUpdateEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-  }, [isAutoLayoutOnUpdateEnabled]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
@@ -3495,7 +3502,7 @@ export function AppPage() {
   const handleSelectRun = useCallback(
     (runId: string) => {
       exitEditableVersionForRunInspection();
-      maybeOpenRunDetailForRun(runId);
+      clearDismissedRunDetail({ persistAutoOpen: true });
       setRunDetailNodeId(null);
       setFocusRequest(null);
       requestRunFitRef.current(runId);
@@ -3503,7 +3510,7 @@ export function AppPage() {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
-    [exitEditableVersionForRunInspection, maybeOpenRunDetailForRun, setRunDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
@@ -4100,6 +4107,7 @@ export function AppPage() {
             canvasName: canvas?.metadata?.name || undefined,
             organizationId: organizationId || undefined,
             canvasNodes,
+            canvasNodesLoading: canvasLoading,
             nodeStatuses: consoleNodeStatuses,
             onTriggerNode: handleConsoleTriggerNode,
             visualDiff: {
@@ -4261,6 +4269,8 @@ export function AppPage() {
           discardStaleStagingPending={resetStagingPending}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
+          isAutoFocusEnabled={isAutoFocusEnabled}
+          onToggleAutoFocus={handleToggleAutoFocus}
           onCancelQueueItem={onCancelQueueItem}
           onCancelExecution={showLiveActivity ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}

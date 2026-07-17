@@ -104,13 +104,14 @@ func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error
 	}
 
 	layoutEdges := resolveLayoutEdges(edges, layoutNodeSet)
+	layoutEdgesForPositioning := resolveForwardLayoutEdges(layoutNodes, layoutEdges)
 	components := resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges)
 	if len(components) == 0 {
 		return nodes, nil
 	}
 
 	sortedComponents := sortComponentsByCurrentPosition(components)
-	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdges)
+	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdgesForPositioning)
 	if len(layoutedPositions.byNodeID) == 0 {
 		return nodes, nil
 	}
@@ -195,6 +196,55 @@ func resolveLayoutEdges(edges []E, nodeSet map[string]struct{}) []E {
 		layoutEdges = append(layoutEdges, edge)
 	}
 	return layoutEdges
+}
+
+func resolveForwardLayoutEdges(layoutNodes []N, layoutEdges []E) []E {
+	nodeSet := make(map[string]struct{}, len(layoutNodes))
+	for _, node := range layoutNodes {
+		nodeSet[node.ID] = struct{}{}
+	}
+
+	forwardEdges := make([]E, 0, len(layoutEdges))
+	for _, edge := range layoutEdges {
+		if _, ok := nodeSet[edge.SourceID]; !ok {
+			continue
+		}
+		if _, ok := nodeSet[edge.TargetID]; !ok {
+			continue
+		}
+
+		if hasLayoutPath(forwardEdges, edge.TargetID, edge.SourceID) {
+			continue
+		}
+
+		forwardEdges = append(forwardEdges, edge)
+	}
+
+	return forwardEdges
+}
+
+func hasLayoutPath(edges []E, startNodeID, targetNodeID string) bool {
+	adjacencyByNodeID := map[string][]string{}
+	for _, edge := range edges {
+		adjacencyByNodeID[edge.SourceID] = append(adjacencyByNodeID[edge.SourceID], edge.TargetID)
+	}
+
+	visited := map[string]struct{}{}
+	queue := []string{startNodeID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current == targetNodeID {
+			return true
+		}
+		if _, ok := visited[current]; ok {
+			continue
+		}
+		visited[current] = struct{}{}
+		queue = append(queue, adjacencyByNodeID[current]...)
+	}
+
+	return false
 }
 
 func resolveDisconnectedLayoutComponents(layoutNodes []N, layoutEdges []E) [][]N {

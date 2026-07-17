@@ -24,7 +24,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
 import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -248,6 +248,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onToggleAutoFocus?: () => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
@@ -467,13 +469,13 @@ function CanvasModeFloatingBar({
 }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3">
-      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-slate-600">
-        <span className="min-w-0 truncate text-[13px] font-medium text-white">{label}</span>
+      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-gray-800">
+        <span className="min-w-0 truncate text-[13px] font-medium text-white dark:text-gray-400">{label}</span>
         <Button
           type="button"
           variant="outline"
           size="xs"
-          className="h-7 shrink-0 rounded-full border-0 bg-white px-3 text-[13px] font-medium text-slate-800 shadow-none hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-500 dark:hover:bg-slate-700 dark:hover:text-white"
+          className="shrink-0 border-0 shadow-none dark:border dark:border-gray-600/70 dark:shadow-xs"
           onClick={onAction}
         >
           {actionLabel}
@@ -845,6 +847,7 @@ function CanvasPage(props: CanvasPageProps) {
     liveCanvasVersionId: props.liveCanvasVersionId,
     headerMode: props.headerMode,
     isRunInspectionMode: props.isRunInspectionMode,
+    isAutoLayoutOnUpdateEnabled: props.isAutoLayoutOnUpdateEnabled ?? false,
     onAgentStagingReady: props.onAgentStagingReady,
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
@@ -1553,6 +1556,8 @@ function CanvasPage(props: CanvasPageProps) {
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
                   autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                  isAutoFocusEnabled={props.isAutoFocusEnabled}
+                  onToggleAutoFocus={props.onToggleAutoFocus}
                   readOnly={props.readOnly}
                   logEntries={props.logEntries}
                   focusRequest={props.focusRequest}
@@ -2165,6 +2170,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  isAutoFocusEnabled = true,
+  onToggleAutoFocus,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -2219,6 +2226,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onToggleAutoFocus?: () => void;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -2511,19 +2520,6 @@ function CanvasContent({
     [reportZoom, viewportRef],
   );
 
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
-      return;
-    }
-    onToggleAutoLayoutOnUpdate();
-  }, [isReadOnly, onToggleAutoLayoutOnUpdate, autoLayoutOnUpdateDisabled]);
-
-  const isAutoLayoutToggleDisabled = isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled;
-  const autoLayoutTooltipMessage =
-    autoLayoutOnUpdateDisabledTooltip ||
-    (isAutoLayoutOnUpdateEnabled
-      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
-      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
   const handledFocusRequestKeyRef = useRef<string | null>(null);
@@ -2558,6 +2554,12 @@ function CanvasContent({
         selected: node.id === focusRequest.nodeId,
       })),
     );
+    // Auto-focus toggle: when disabled, still record the focus request as handled
+    // (so re-enabling later does not replay a stale request) and let the sidebar/
+    // selection update above stand, but keep the viewport where the user left it.
+    if (!isAutoFocusEnabled) {
+      return;
+    }
     void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
       () => {
         const nextViewport = getViewport();
@@ -2572,6 +2574,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasReactFlowInitialized,
+    isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
     runCanvasNodeIdsKey,
@@ -2769,7 +2772,10 @@ function CanvasContent({
     const last = lastFitAllRequestRef.current;
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
+    // Consume the nonce so re-enabling auto-focus later does not retroactively
+    // replay this run's participant fit. The viewport stays where the user is.
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
+    if (!isAutoFocusEnabled) return;
     let timeoutId: number | null = null;
     const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
@@ -2811,6 +2817,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasFitToViewRef,
+    isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
     viewportRef,
@@ -3202,41 +3209,6 @@ function CanvasContent({
   const handleOpenCommandPalette = useCallback(() => {
     openGlobalCommandPalette();
   }, []);
-  const autoLayoutToggleControl = useMemo(() => {
-    if (!isEditMode) {
-      return null;
-    }
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
-              onClick={handleToggleAutoLayoutOnUpdate}
-              disabled={isAutoLayoutToggleDisabled}
-              aria-pressed={isAutoLayoutOnUpdateEnabled}
-            >
-              {isAutoLayoutOnUpdateEnabled ? (
-                <LayoutGrid className="h-3 w-3" />
-              ) : (
-                <LayoutDashboard className="h-3 w-3" />
-              )}
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-      </Tooltip>
-    );
-  }, [
-    autoLayoutTooltipMessage,
-    handleToggleAutoLayoutOnUpdate,
-    isAutoLayoutOnUpdateEnabled,
-    isAutoLayoutToggleDisabled,
-    isEditMode,
-  ]);
   const commandPaletteSearchControl = useMemo(
     () => (
       <Tooltip>
@@ -3256,15 +3228,7 @@ function CanvasContent({
     ),
     [handleOpenCommandPalette],
   );
-  const zoomSliderContent = useMemo(
-    () => (
-      <>
-        {autoLayoutToggleControl}
-        {commandPaletteSearchControl}
-      </>
-    ),
-    [autoLayoutToggleControl, commandPaletteSearchControl],
-  );
+  const zoomSliderContent = useMemo(() => <>{commandPaletteSearchControl}</>, [commandPaletteSearchControl]);
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
@@ -3344,6 +3308,14 @@ function CanvasContent({
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
+                  isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
+                  onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
+                  autoLayoutOnUpdateDisabledTooltip={
+                    isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
+                  }
+                  isAutoFocusEnabled={isAutoFocusEnabled}
+                  onAutoFocusToggle={onToggleAutoFocus}
                 >
                   {zoomSliderContent}
                 </ZoomSlider>
