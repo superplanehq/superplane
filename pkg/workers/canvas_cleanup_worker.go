@@ -195,31 +195,28 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 			break
 		}
 
-		resourcesDeleted, allResourcesDeleted, err := models.DeleteCanvasNodeResourcesBatched(
-			tx,
-			canvas.ID,
-			node.NodeID,
-			w.maxResourcesPerTick-totalResourcesDeleted,
-			models.CanvasNodeEventCleanupDeleteAll,
-		)
+		result, err := models.NewNodeResourceCleaner(tx, &node).
+			ForAll().
+			WithLimit(w.maxResourcesPerTick - totalResourcesDeleted).
+			Run()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
 		}
 
-		totalResourcesDeleted += resourcesDeleted
+		totalResourcesDeleted += result.ResourcesDeleted
 
-		if !allResourcesDeleted {
-			w.logger.Infof("Partially cleaned node %s from canvas %s (deleted %d resources, more remain)", node.NodeID, canvas.ID, resourcesDeleted)
+		if !result.AllDeleted {
+			w.logger.Infof("Partially cleaned node %s from canvas %s (deleted %d resources, more remain)", node.NodeID, canvas.ID, result.ResourcesDeleted)
 			nodesProcessed++
 
 			continue
 		}
 
-		if err := models.HardDeleteCanvasNode(tx, canvas.ID, node.NodeID); err != nil {
+		if err := node.HardDelete(tx); err != nil {
 			return nil, nil, fmt.Errorf("failed to delete canvas node %s: %w", node.NodeID, err)
 		}
 
-		w.logger.Infof("Deleted node %s from canvas %s (deleted %d resources)", node.NodeID, canvas.ID, resourcesDeleted)
+		w.logger.Infof("Deleted node %s from canvas %s (deleted %d resources)", node.NodeID, canvas.ID, result.ResourcesDeleted)
 		nodesProcessed++
 	}
 
