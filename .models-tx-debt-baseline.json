@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 168,
-  "maxAllowedDatabaseConnCalls": 192,
+  "maxAllowedInTransactionDefinitions": 165,
+  "maxAllowedDatabaseConnCalls": 191,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -88,13 +88,10 @@
     "pkg/models/canvas_run.go:FindCanvasRunByRootEventInTransaction",
     "pkg/models/canvas_run.go:FindOrCreateCanvasRunForRootEventInTransaction",
     "pkg/models/canvas_run.go:CreateCanvasRunInTransaction",
-    "pkg/models/canvas_run.go:ListStartedCanvasRunsInTransaction",
     "pkg/models/canvas_run.go:ListCanvasRunsInTransaction",
     "pkg/models/canvas_run.go:CountCanvasRunsInTransaction",
     "pkg/models/canvas_run.go:ListExecutionsForRunsInTransaction",
     "pkg/models/canvas_run.go:LockCanvasRunInTransaction",
-    "pkg/models/canvas_run.go:FindOpenCanvasRunWorkInTransaction",
-    "pkg/models/canvas_run.go:CalculateCanvasRunResultInTransaction",
     "pkg/models/canvas_version.go:FindCanvasVersionInTransaction",
     "pkg/models/canvas_version.go:FindVersionByCommitSHAInTransaction",
     "pkg/models/canvas_version.go:FindCanvasVersionsByIDsInTransaction",
@@ -265,7 +262,6 @@
     "pkg/models/canvas_node_execution.go:Cancel:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:GetOutputs:database.Conn()#1",
     "pkg/models/canvas_node_request.go:ListNodeRequests:database.Conn()#1",
-    "pkg/models/canvas_run.go:ListStartedCanvasRuns:database.Conn()#1",
     "pkg/models/canvas_run.go:ListCanvasRuns:database.Conn()#1",
     "pkg/models/canvas_run.go:CountCanvasRuns:database.Conn()#1",
     "pkg/models/canvas_version.go:FindCanvasVersion:database.Conn()#1",
@@ -365,5 +361,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-06T20:09:19Z"
+  "updatedAt": "2026-07-17T03:07:38Z"
 }

@@ -201,6 +201,10 @@ func serializeCanvasRunWithQueueItemInputs(
 		serialized.FinishedAt = timestamppb.New(*run.FinishedAt)
 	}
 
+	if run.CancelledAt != nil {
+		serialized.CancelledAt = timestamppb.New(*run.CancelledAt)
+	}
+
 	return serialized, nil
 }
 
@@ -222,6 +226,8 @@ func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
 	switch state {
 	case pb.CanvasRun_STATE_STARTED:
 		return models.CanvasRunStateStarted, nil
+	case pb.CanvasRun_STATE_CANCELLING:
+		return models.CanvasRunStateCancelling, nil
 	case pb.CanvasRun_STATE_FINISHED:
 		return models.CanvasRunStateFinished, nil
 	default:
@@ -246,6 +252,8 @@ func RunStateToProto(state string) pb.CanvasRun_State {
 	switch state {
 	case models.CanvasRunStateStarted:
 		return pb.CanvasRun_STATE_STARTED
+	case models.CanvasRunStateCancelling:
+		return pb.CanvasRun_STATE_CANCELLING
 	case models.CanvasRunStateFinished:
 		return pb.CanvasRun_STATE_FINISHED
 	default:

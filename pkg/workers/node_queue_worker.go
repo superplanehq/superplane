@@ -262,13 +262,14 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		)
 	}()
 
-	var executionIDs []*uuid.UUID
-	var queueItem *models.CanvasNodeQueueItem
-
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
 	}
+
+	var executionIDs []*uuid.UUID
+	var queueItem *models.CanvasNodeQueueItem
+	var run *models.CanvasRun
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
@@ -279,7 +280,23 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
-		executionIDs, queueItem, err = w.processNode(tx, logger, n, onNewEvents)
+		item, err := node.FirstQueueItem(tx)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+
+			return err
+		}
+
+		r, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
+		if err != nil {
+			return err
+		}
+
+		run = r
+		queueItem = item
+		executionIDs, err = w.processNodeQueueItem(tx, logger, n, item, run, onNewEvents)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
@@ -289,43 +306,66 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		return nil
 	})
 
-	if err == nil {
-		if len(executionIDs) > 0 {
-			for _, executionID := range executionIDs {
-				if executionID == nil {
-					continue
-				}
+	if err != nil {
+		return err
+	}
 
-				if err := messages.PublishCanvasExecutionByID(node.WorkflowID, *executionID); err != nil {
-					logger.Errorf("Error publishing execution state: %v", err)
-				}
+	//
+	// Send RabbitMQ messages about what changed inside of the transaction
+	//
+	if len(executionIDs) > 0 {
+		for _, executionID := range executionIDs {
+			if executionID == nil {
+				continue
 			}
-		}
 
-		if queueItem != nil {
-			messages.NewCanvasQueueItemMessage(
-				queueItem.WorkflowID.String(),
-				queueItem.ID.String(),
-				queueItem.NodeID,
-			).Publish(true)
-		}
-
-		for _, event := range newEvents {
-			messages.PublishCanvasEventCreatedMessage(&event)
+			if err := messages.PublishCanvasExecutionByID(node.WorkflowID, *executionID); err != nil {
+				logger.Errorf("Error publishing execution state: %v", err)
+			}
 		}
 	}
 
-	return err
+	for _, event := range newEvents {
+		messages.PublishCanvasEventCreatedMessage(&event)
+	}
+
+	if queueItem == nil {
+		return nil
+	}
+
+	//
+	// Queue item consumed messages are used by the NodeExecutor
+	//
+	if run.State != models.CanvasRunStateCancelling {
+		err := messages.NewCanvasQueueItemMessage(*queueItem).PublishConsumed()
+		if err != nil {
+			logger.Errorf("Error publishing queue item consumed message: %v", err)
+		}
+	} else {
+		err := messages.NewCanvasQueueItemMessage(*queueItem).PublishDeleted()
+		if err != nil {
+			logger.Errorf("Error publishing queue item deleted message: %v", err)
+		}
+	}
+
+	return nil
 }
 
-func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
-	queueItem, err := node.FirstQueueItem(tx)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
+func (w *NodeQueueWorker) processNodeQueueItem(
+	tx *gorm.DB,
+	logger *log.Entry,
+	node *models.CanvasNode,
+	queueItem *models.CanvasNodeQueueItem,
+	run *models.CanvasRun,
+	onNewEvents func([]models.CanvasEvent),
+) ([]*uuid.UUID, error) {
+	if run.State == models.CanvasRunStateCancelling {
+		if err := tx.Delete(queueItem).Error; err != nil {
+			return nil, err
 		}
 
-		return nil, nil, err
+		logger.Infof("Skipping queue item for cancelling run %s", queueItem.RunID)
+		return nil, nil
 	}
 
 	logger = logging.WithQueueItem(logger, *queueItem)
@@ -333,7 +373,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 
 	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
@@ -347,7 +387,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		//
 		var configErr *contexts.ConfigurationBuildError
 		if !errors.As(err, &configErr) {
-			return nil, nil, err
+			return nil, err
 		}
 
 		//
@@ -361,10 +401,10 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
 		executions, err := w.handleNodeConfigurationError(tx, configErr, onNewEvents)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		return executions, queueItem, nil
+		return executions, nil
 	}
 
 	var executionID *uuid.UUID
@@ -376,15 +416,15 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 */
 		executionID, err = w.processComponentNode(ctx, node)
 	default:
-		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
+		return nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 
 	if errors.Is(err, core.ErrQueueItemDeferred) {
 		logger.Info("Queue item deferred")
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	return []*uuid.UUID{executionID}, queueItem, err
+	return []*uuid.UUID{executionID}, err
 }
 
 func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {
