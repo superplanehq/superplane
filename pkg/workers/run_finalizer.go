@@ -14,6 +14,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -27,6 +28,8 @@ const (
 
 	runFinalizerReasonAlreadyFinished = "already_finished"
 	runFinalizerReasonOpenWork        = "open_work"
+
+	loopComponentName = "loop"
 )
 
 type RunFinalizer struct {
@@ -332,6 +335,20 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
+	if openWork.HasActiveExecutions && !openWork.HasQueueItems && !openWork.HasPendingEvents {
+		failed, err := w.failStalledLoopExecutions(tx, runID)
+		if err != nil {
+			return false, "", err
+		}
+
+		if failed {
+			openWork, err = models.FindOpenCanvasRunWorkInTransaction(tx, runID)
+			if err != nil {
+				return false, "", err
+			}
+		}
+	}
+
 	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
 		if trigger == runFinalizerTriggerSweep {
 			// The started-run sweep loads candidates with ORDER BY updated_at ASC
@@ -364,4 +381,94 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	}
 
 	return true, "", nil
+}
+
+func (w *RunFinalizer) failStalledLoopExecutions(tx *gorm.DB, runID uuid.UUID) (bool, error) {
+	activeExecutions, err := findActiveRunExecutions(tx, runID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(activeExecutions) == 0 {
+		return false, nil
+	}
+
+	loopExecutions := make([]models.CanvasNodeExecution, 0, len(activeExecutions))
+	for _, execution := range activeExecutions {
+		isLoop, err := isLoopExecution(tx, &execution)
+		if err != nil {
+			return false, err
+		}
+
+		if !isLoop {
+			return false, nil
+		}
+
+		if loopExecutionIsWaitingBetweenIterations(execution) {
+			return false, nil
+		}
+
+		loopExecutions = append(loopExecutions, execution)
+	}
+
+	for i := range loopExecutions {
+		if err := failStalledLoopExecution(tx, &loopExecutions[i]); err != nil {
+			return false, err
+		}
+	}
+
+	return len(loopExecutions) > 0, nil
+}
+
+func findActiveRunExecutions(tx *gorm.DB, runID uuid.UUID) ([]models.CanvasNodeExecution, error) {
+	var executions []models.CanvasNodeExecution
+	err := tx.
+		Where("run_id = ?", runID).
+		Where("state IN ?", []string{
+			models.CanvasNodeExecutionStatePending,
+			models.CanvasNodeExecutionStateStarted,
+		}).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func isLoopExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) (bool, error) {
+	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+	if err != nil {
+		return false, err
+	}
+
+	ref := node.Ref.Data()
+	return ref.Component != nil && ref.Component.Name == loopComponentName, nil
+}
+
+func loopExecutionIsWaitingBetweenIterations(execution models.CanvasNodeExecution) bool {
+	waiting, _ := execution.Metadata.Data()["waitingBetweenIterations"].(bool)
+	return waiting
+}
+
+func failStalledLoopExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+	metadata := execution.Metadata.Data()
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+
+	metadata["active"] = false
+	metadata["waitingBetweenIterations"] = false
+	execution.Metadata = datatypes.NewJSONType(metadata)
+	if err := tx.Model(execution).Update("metadata", execution.Metadata).Error; err != nil {
+		return err
+	}
+
+	_, err := execution.FailInTransaction(
+		tx,
+		models.CanvasNodeExecutionResultReasonError,
+		"loop cannot reach the loop conclusion because all downstream work has reached a terminal state",
+	)
+	return err
 }
