@@ -292,7 +292,7 @@ func withoutActiveRootEventExecutions(tx *gorm.DB) *gorm.DB {
 			WHERE workflow_node_executions.root_event_id = workflow_events.id
 			AND workflow_node_executions.state IN ?
 		)
-	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
+	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted, CanvasNodeExecutionStateCancelling})
 }
 
 func withoutPendingRootEventRequests(tx *gorm.DB) *gorm.DB {

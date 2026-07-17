@@ -192,6 +192,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
 			RunId:               uuidStringOrEmpty(execution.RunID),
+			CancelledAt:         optionalTimestamp(execution.CancelledAt),
 		})
 	}
 
@@ -238,6 +239,8 @@ func ProtoToNodeExecutionState(state pb.CanvasNodeExecution_State) (string, erro
 		return models.CanvasNodeExecutionStatePending, nil
 	case pb.CanvasNodeExecution_STATE_STARTED:
 		return models.CanvasNodeExecutionStateStarted, nil
+	case pb.CanvasNodeExecution_STATE_CANCELLING:
+		return models.CanvasNodeExecutionStateCancelling, nil
 	case pb.CanvasNodeExecution_STATE_FINISHED:
 		return models.CanvasNodeExecutionStateFinished, nil
 	default:
@@ -262,6 +265,8 @@ func NodeExecutionStateToProto(state string) pb.CanvasNodeExecution_State {
 		return pb.CanvasNodeExecution_STATE_PENDING
 	case models.CanvasNodeExecutionStateStarted:
 		return pb.CanvasNodeExecution_STATE_STARTED
+	case models.CanvasNodeExecutionStateCancelling:
+		return pb.CanvasNodeExecution_STATE_CANCELLING
 	case models.CanvasNodeExecutionStateFinished:
 		return pb.CanvasNodeExecution_STATE_FINISHED
 	default:
@@ -439,4 +444,12 @@ func getOutputsForExecution(execution models.CanvasNodeExecution, events map[str
 	}
 
 	return data, nil
+}
+
+func optionalTimestamp(value *time.Time) *timestamppb.Timestamp {
+	if value == nil {
+		return nil
+	}
+
+	return timestamppb.New(*value)
 }
