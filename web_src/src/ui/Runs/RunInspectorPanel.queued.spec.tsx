@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showSuccessToast } from "@/lib/toast";
 import { executions, renderInspector, runningExecutions, runningRun } from "./RunInspectorPanel.spec.fixtures";
 
 let mockedExecutions = executions;
@@ -19,6 +19,7 @@ vi.mock("@uiw/react-json-view", () => ({
 
 const reemitTriggerEventMock = vi.fn();
 const cancelExecutionMock = vi.fn();
+const cancelRunMock = vi.fn();
 const invokeExecutionHookMock = vi.fn();
 const describeRunMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/api-client", async (importOriginal) => {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: (...args: unknown[]) => cancelExecutionMock(...args),
+    canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
     canvasesInvokeNodeExecutionHook: (...args: unknown[]) => invokeExecutionHookMock(...args),
     canvasesDescribeRun: (...args: unknown[]) => describeRunMock(...args),
     canvasesListNodeQueueItems: (...args: unknown[]) => listNodeQueueItemsMock(...args),
@@ -83,6 +85,7 @@ beforeEach(() => {
   mockedMe = null;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
+  cancelRunMock.mockResolvedValue({});
   invokeExecutionHookMock.mockResolvedValue({});
   describeRunMock.mockResolvedValue({ data: { run: { queueItems: [] } } });
   listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
@@ -132,30 +135,8 @@ describe("RunInspectorPanel queued steps", () => {
     expect(screen.getByRole("button", { name: /Output/i })).toBeInTheDocument();
   });
 
-  it("stops running executions and queued items for the inspected run", async () => {
+  it("requests run cancellation from the stop action", async () => {
     mockedExecutions = runningExecutions;
-    describeRunMock.mockResolvedValueOnce({
-      data: {
-        run: {
-          executions: [
-            {
-              id: "execution-running",
-              nodeId: "action-2",
-              state: "STATE_STARTED",
-            },
-          ],
-          queueItems: [
-            {
-              id: "queue-1",
-              nodeId: "action-2",
-              rootEvent: { id: "event-running" },
-              input: { approval: "pending" },
-              createdAt: "2026-05-01T12:00:04Z",
-            },
-          ],
-        },
-      },
-    });
 
     renderInspector({
       run: {
@@ -175,74 +156,44 @@ describe("RunInspectorPanel queued steps", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
     await waitFor(() => {
-      expect(cancelExecutionMock).toHaveBeenCalledWith(
+      expect(cancelRunMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: {
             canvasId: "canvas-1",
-            executionId: "execution-running",
-          },
-        }),
-      );
-      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: {
-            canvasId: "canvas-1",
-            nodeId: "action-2",
-            itemId: "queue-1",
+            runId: "run-running",
           },
         }),
       );
     });
 
-    expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
+    expect(cancelRunMock).toHaveBeenCalledTimes(1);
+    expect(cancelExecutionMock).not.toHaveBeenCalled();
+    expect(deleteNodeQueueItemMock).not.toHaveBeenCalled();
   });
 
-  it("stops queued items that are fresher than the inspected run cache", async () => {
+  it("requests run cancellation even when cached queue items are stale", async () => {
     mockedExecutions = executions;
-    describeRunMock.mockResolvedValueOnce({
-      data: {
-        run: {
-          queueItems: [
-            {
-              id: "fresh-queue-1",
-              nodeId: "action-2",
-              rootEvent: { id: "event-running" },
-              input: { approval: "pending" },
-            },
-          ],
-        },
-      },
-    });
 
     renderInspector({ run: { ...runningRun, queueItems: [] } });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
     await waitFor(() => {
-      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
+      expect(cancelRunMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: {
             canvasId: "canvas-1",
-            nodeId: "action-2",
-            itemId: "fresh-queue-1",
+            runId: "run-running",
           },
         }),
       );
     });
 
-    expect(describeRunMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: {
-          canvasId: "canvas-1",
-          runId: "run-running",
-        },
-      }),
-    );
-    expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
-    expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
+    expect(describeRunMock).not.toHaveBeenCalled();
+    expect(cancelRunMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not stop stale cached queued items when the fresh run has none", async () => {
+  it("requests run cancellation when cached queue items remain on the run", async () => {
     mockedExecutions = [];
 
     renderInspector({
@@ -262,16 +213,13 @@ describe("RunInspectorPanel queued steps", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
     await waitFor(() => {
-      expect(describeRunMock).toHaveBeenCalled();
+      expect(cancelRunMock).toHaveBeenCalled();
     });
 
-    expect(deleteNodeQueueItemMock).not.toHaveBeenCalled();
-    expect(cancelExecutionMock).not.toHaveBeenCalled();
-    expect(showErrorToast).not.toHaveBeenCalledWith("Failed to stop run");
-    expect(showSuccessToast).not.toHaveBeenCalledWith("Run stopped");
+    expect(showSuccessToast).toHaveBeenCalledWith("Run stopped");
   });
 
-  it("does not stop stale cached running execution refs when the fresh run has none", async () => {
+  it("requests run cancellation when cached running execution refs remain on the run", async () => {
     mockedExecutions = [];
 
     renderInspector({
@@ -291,13 +239,10 @@ describe("RunInspectorPanel queued steps", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
     await waitFor(() => {
-      expect(describeRunMock).toHaveBeenCalled();
+      expect(cancelRunMock).toHaveBeenCalled();
     });
 
-    expect(cancelExecutionMock).not.toHaveBeenCalled();
-    expect(deleteNodeQueueItemMock).not.toHaveBeenCalled();
-    expect(showErrorToast).not.toHaveBeenCalledWith("Failed to stop run");
-    expect(showSuccessToast).not.toHaveBeenCalledWith("Run stopped");
+    expect(showSuccessToast).toHaveBeenCalledWith("Run stopped");
   });
 
   it("renders queued items as non-expandable queued rows", () => {
