@@ -709,6 +709,126 @@ func (c *Client) AcceptMergeRequest(ctx context.Context, projectID, mergeRequest
 	return &mergeRequest, nil
 }
 
+type CreateMergeRequestRequest struct {
+	SourceBranch       string `json:"source_branch"`
+	TargetBranch       string `json:"target_branch"`
+	Title              string `json:"title"`
+	Description        string `json:"description,omitempty"`
+	AssigneeIDs        []int  `json:"assignee_ids,omitempty"`
+	ReviewerIDs        []int  `json:"reviewer_ids,omitempty"`
+	Labels             string `json:"labels,omitempty"`
+	MilestoneID        *int   `json:"milestone_id,omitempty"`
+	RemoveSourceBranch *bool  `json:"remove_source_branch,omitempty"`
+	Squash             *bool  `json:"squash,omitempty"`
+}
+
+// CreateMergeRequest opens a new merge request in a project.
+// See https://docs.gitlab.com/api/merge_requests/#create-mr
+func (c *Client) CreateMergeRequest(ctx context.Context, projectID string, req *CreateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// GetMergeRequest fetches a single merge request, including its current reviewers.
+func (c *Client) GetMergeRequest(ctx context.Context, projectID, mergeRequestIID string) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestReviewersRequest sets the full reviewer list of a merge
+// request. GitLab replaces the existing reviewers with the given IDs, so an
+// empty (but non-nil) slice clears all reviewers.
+type UpdateMergeRequestReviewersRequest struct {
+	ReviewerIDs []int `json:"reviewer_ids"`
+}
+
+// UpdateMergeRequestReviewers replaces the reviewers of a merge request with the
+// given set of user IDs.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequestReviewers(ctx context.Context, projectID, mergeRequestIID string, reviewerIDs []int) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	if reviewerIDs == nil {
+		reviewerIDs = []int{}
+	}
+
+	body, err := json.Marshal(&UpdateMergeRequestReviewersRequest{ReviewerIDs: reviewerIDs})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request reviewers: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
 type MergeRequestApprover struct {
 	User       User   `json:"user"`
 	ApprovedAt string `json:"approved_at"`

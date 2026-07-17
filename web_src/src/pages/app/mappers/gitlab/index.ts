@@ -1,8 +1,11 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { acceptMergeRequestMapper } from "./accept_merge_request";
+import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";
 import { addReactionMapper } from "./add_reaction";
 import { approveMergeRequestMapper } from "./approve_merge_request";
+import { createMergeRequestMapper } from "./create_merge_request";
+import { removeMergeRequestReviewersMapper } from "./remove_merge_request_reviewers";
 import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
 import { createIssueMapper } from "./create_issue";
@@ -31,6 +34,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getTestReportSummary: buildActionStateRegistry("retrieved"),
   createMergeComment: buildActionStateRegistry("created"),
   addReaction: buildActionStateRegistry("added"),
+  createMergeRequest: buildActionStateRegistry("created"),
+  addMergeRequestReviewers: buildActionStateRegistry("updated"),
+  removeMergeRequestReviewers: buildActionStateRegistry("updated"),
   acceptMergeRequest: buildActionStateRegistry("merged"),
   approveMergeRequest: buildActionStateRegistry("approved"),
   createDeployment: buildActionStateRegistry("created"),
@@ -48,6 +54,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getTestReportSummary: testReportSummaryMapper,
   createMergeComment: createMergeCommentMapper,
   addReaction: addReactionMapper,
+  createMergeRequest: createMergeRequestMapper,
+  addMergeRequestReviewers: addMergeRequestReviewersMapper,
+  removeMergeRequestReviewers: removeMergeRequestReviewersMapper,
   acceptMergeRequest: acceptMergeRequestMapper,
   approveMergeRequest: approveMergeRequestMapper,
   createDeployment: createDeploymentMapper,
