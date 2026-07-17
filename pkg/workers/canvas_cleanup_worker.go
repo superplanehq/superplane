@@ -195,12 +195,12 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 			break
 		}
 
-		resourcesDeleted, allResourcesDeleted, err := deleteCanvasNodeResourcesBatched(
+		resourcesDeleted, allResourcesDeleted, err := models.DeleteCanvasNodeResourcesBatched(
 			tx,
 			canvas.ID,
 			node.NodeID,
 			w.maxResourcesPerTick-totalResourcesDeleted,
-			canvasNodeEventCleanupDeleteAll,
+			models.CanvasNodeEventCleanupDeleteAll,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
@@ -215,7 +215,7 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 			continue
 		}
 
-		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvas.ID, node.NodeID).Delete(&models.CanvasNode{}).Error; err != nil {
+		if err := models.HardDeleteCanvasNode(tx, canvas.ID, node.NodeID); err != nil {
 			return nil, nil, fmt.Errorf("failed to delete canvas node %s: %w", node.NodeID, err)
 		}
 
