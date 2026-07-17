@@ -145,6 +145,7 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 	// Past the poll budget the events may still be unavailable (sm == nil);
 	// emit what we have and only look for artifacts when events were read.
 	if sm != nil {
+		applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
 		out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	}
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
