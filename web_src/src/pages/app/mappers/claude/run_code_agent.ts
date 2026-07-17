@@ -20,6 +20,7 @@ type RunCodeAgentNodeMetadata = {
   prUrl?: string;
   model?: string;
   sourceMode?: string;
+  structuredOutput?: boolean;
 };
 
 type RunCodeAgentConfiguration = {
@@ -28,6 +29,7 @@ type RunCodeAgentConfiguration = {
   baseBranch?: string;
   prUrl?: string;
   model?: string;
+  outputSchema?: string;
 };
 
 type RunCodeAgentArtifact = {
@@ -42,6 +44,7 @@ type RunCodeAgentPayloadData = {
   branch?: string;
   lastMessage?: string;
   artifacts?: RunCodeAgentArtifact[];
+  parsed?: unknown;
 };
 
 function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
@@ -58,6 +61,24 @@ function formatArtifacts(artifacts?: RunCodeAgentArtifact[]): string | undefined
     .map((artifact) => artifact.filename || artifact.fileId)
     .filter((name): name is string => Boolean(name));
   return names.length > 0 ? names.join(", ") : undefined;
+}
+
+// formatParsed renders the structured-output JSON extracted from the agent's
+// final message. Best-effort: the backend only sets this when a schema is
+// configured and the session finished normally, so it's absent otherwise.
+function formatParsed(parsed?: unknown): string | undefined {
+  if (parsed === undefined || parsed === null) {
+    return undefined;
+  }
+  try {
+    return JSON.stringify(parsed);
+  } catch {
+    return undefined;
+  }
+}
+
+function hasSchema(schema: unknown): boolean {
+  return typeof schema === "string" && schema.trim().length > 0;
 }
 
 export const runCodeAgentMapper: ComponentBaseMapper = {
@@ -96,6 +117,7 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
       ["Status", data.status],
       ["Pull Request", data.prUrl],
       ["Branch", data.branch],
+      ["Parsed Output", formatParsed(data.parsed)],
       ["Artifacts", formatArtifacts(data.artifacts)],
     ];
     for (const [key, value] of entries) {
@@ -138,6 +160,14 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const model = meta.model || config.model;
   if (model) {
     items.push({ icon: "bot", label: model });
+  }
+
+  // Unlike repository/model above, this prefers the live configuration when
+  // it exists at all (even if the schema was just cleared) — autosave
+  // updates configuration only, so node.metadata can lag behind.
+  const structured = node.configuration !== undefined ? hasSchema(config.outputSchema) : Boolean(meta.structuredOutput);
+  if (structured) {
+    items.push({ icon: "braces", label: "Structured output" });
   }
 
   return items;

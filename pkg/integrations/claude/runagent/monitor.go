@@ -93,6 +93,7 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 	}
 
 	out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
+	applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
 	if sm != nil {
 		out.Artifacts = CollectSessionArtifacts(client, metadata.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	}
