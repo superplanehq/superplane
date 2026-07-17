@@ -9,6 +9,7 @@ import {
   renderInteractiveInspector,
   runningExecutions,
   runningRun,
+  cancellingRun,
 } from "./RunInspectorPanel.spec.fixtures";
 let mockedExecutions = executions;
 let mockedExecutionsLoading = false;
@@ -517,6 +518,16 @@ describe("RunInspectorPanel", () => {
     expect(screen.getByRole("button", { name: /Await Approval/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+  });
+
+  it("shows a disabled cancelling action while the run is stopping", () => {
+    mockedExecutions = runningExecutions;
+
+    renderInspector({ run: cancellingRun });
+
+    expect(screen.getByLabelText("Cancelling")).toBeInTheDocument();
+    const headerAction = screen.getByRole("button", { name: "Cancelling" });
+    expect(headerAction).toBeDisabled();
   });
 
   it("keeps the stop action disabled while executions are loading", () => {

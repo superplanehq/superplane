@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -25,9 +25,10 @@ func DeleteNodeQueueItem(ctx context.Context, registry *registry.Registry, workf
 		return nil, grpcerrors.InvalidArgument(err, "invalid item id")
 	}
 
+	var item models.CanvasNodeQueueItem
+
 	var runID uuid.UUID
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		var item models.CanvasNodeQueueItem
 		err := tx.
 			Where("id = ? AND workflow_id = ? AND node_id = ?", qID, wfID, nodeID).
 			First(&item).
@@ -52,8 +53,7 @@ func DeleteNodeQueueItem(ctx context.Context, registry *registry.Registry, workf
 	}
 
 	if runID != uuid.Nil {
-		message := messages.NewCanvasQueueItemDeletedMessage(wfID.String(), qID.String(), nodeID, runID.String())
-		if err := message.PublishDeleted(); err != nil {
+		if err := messages.NewCanvasQueueItemMessage(item).PublishDeleted(); err != nil {
 			log.Errorf("failed to publish queue item deleted RabbitMQ message: %v", err)
 		}
 	}

@@ -10,12 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 )
@@ -626,4 +629,74 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
+}
+
+func Test__NodeQueueWorker_DeferredQueueItemDoesNotPublishConsumed(t *testing.T) {
+	componentName := "defer_queue_item_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		ProcessQueueFunc: func(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+			if err := ctx.DeferQueueItem(); err != nil {
+				return nil, err
+			}
+			return nil, core.ErrQueueItemDeferred
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	queueItem := support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
+	require.NoError(t, err)
+
+	storedQueueItem, err := models.FindNodeQueueItem(canvas.ID, queueItem.ID)
+	require.NoError(t, err)
+	assert.Equal(t, queueItem.ID, storedQueueItem.ID)
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
 }
