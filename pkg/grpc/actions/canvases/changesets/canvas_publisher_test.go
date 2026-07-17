@@ -227,8 +227,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		var updatedExecution models.CanvasNodeExecution
 		err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
 		require.NoError(t, err)
-		require.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
-		require.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+		require.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
 
 		queueItems, err := models.ListNodeQueueItems(canvas.ID, "approval-node", 10, nil)
 		require.NoError(t, err)

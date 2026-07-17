@@ -19,7 +19,6 @@ const (
 	maxPollAttempts         = 200
 	maxPollErrors           = 5
 	finalMessageReads       = 15
-	finalMessageDelay       = 2 * time.Second
 	// Session outputs can take a few seconds to be indexed by the Files API
 	// after the session goes idle (~1-3s documented), so when the session is
 	// expected to have written outputs, a listing without them is retried
@@ -31,6 +30,10 @@ const (
 	// their metadata and download link only.
 	maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 )
+
+// finalMessageDelay is the pause between event-stream reads while waiting for
+// the terminal event to be written. A var so tests can shrink it.
+var finalMessageDelay = 2 * time.Second
 
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {

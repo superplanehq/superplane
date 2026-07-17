@@ -386,6 +386,17 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
 
+// stopAndReclaim ends a run whose session may still be working: a timeout or a
+// dead poll means we stopped watching, not that the agent stopped. The interrupt
+// is what makes the delete possible — the API rejects deleting a live session —
+// and it stops the agent even when the session is kept for debugging.
+func stopAndReclaim(client *Client, sessionID string, persist bool, logger *log.Entry) {
+	if err := client.SendManagedSessionInterrupt(sessionID); err != nil {
+		logger.Warnf("Failed to interrupt managed session %s: %v", sessionID, err)
+	}
+	reclaimSession(client, sessionID, persist, logger)
+}
+
 // reclaimSession deletes the session unless the step is configured to keep it,
 // in which case the transcript stays readable in the Anthropic Console.
 func reclaimSession(client *Client, sessionID string, persist bool, logger *log.Entry) {

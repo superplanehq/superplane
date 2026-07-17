@@ -152,6 +152,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_EXECUTION_TERMINATOR") == "yes" {
+		log.Println("Starting Execution Terminator")
+
+		w := workers.NewExecutionTerminator(rabbitMQURL, authService, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 

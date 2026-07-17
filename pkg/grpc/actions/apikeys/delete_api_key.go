@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 )
 
-func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountRequest, authService authorization.Authorization) (*pb.DeleteServiceAccountResponse, error) {
+func DeleteAPIKey(ctx context.Context, req *pb.DeleteAPIKeyRequest, authService authorization.Authorization) (*pb.DeleteAPIKeyResponse, error) {
 	_, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -28,30 +28,30 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
-	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+	if !user.IsAPIKey() {
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	// Remove all RBAC roles before deleting
 	roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determining roles for service account %s: %v", user.ID, err)
+		log.Errorf("Error determining roles for API key %s: %v", user.ID, err)
 	} else {
 		for _, role := range roles {
 			err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 			if err != nil {
-				log.Errorf("Error removing role %s for service account %s: %v", role.Name, user.ID, err)
+				log.Errorf("Error removing role %s for API key %s: %v", role.Name, user.ID, err)
 			}
 		}
 	}
 
 	err = user.Delete()
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to delete service account")
+		return nil, grpcerrors.Internal(err, "failed to delete API key")
 	}
 
-	return &pb.DeleteServiceAccountResponse{}, nil
+	return &pb.DeleteAPIKeyResponse{}, nil
 }
