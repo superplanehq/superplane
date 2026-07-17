@@ -3,19 +3,22 @@ package runcodeagent
 import (
 	"fmt"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 )
 
 // buildPrompt wraps the user's task in a deterministic operating procedure that
 // makes the agent clone, work, push, and open (or update) a pull request, then
-// report the PR URL in a machine-readable form.
-func buildPrompt(spec Spec, pr *pullRequestInfo, branch string, hasFiles bool, attr commitAttribution) string {
+// report the PR URL in a machine-readable form. schema, when non-nil, adds
+// instructions asking the agent to also include a JSON block matching it.
+func buildPrompt(spec Spec, pr *pullRequestInfo, branch string, hasFiles bool, attr commitAttribution, schema map[string]any) string {
 	if pr != nil {
-		return buildPRPrompt(spec, pr, hasFiles, attr)
+		return buildPRPrompt(spec, pr, hasFiles, attr, schema)
 	}
-	return buildRepositoryPrompt(spec, branch, hasFiles, attr)
+	return buildRepositoryPrompt(spec, branch, hasFiles, attr, schema)
 }
 
-func buildRepositoryPrompt(spec Spec, branch string, hasFiles bool, attr commitAttribution) string {
+func buildRepositoryPrompt(spec Spec, branch string, hasFiles bool, attr commitAttribution, schema map[string]any) string {
 	var b strings.Builder
 	writeIntro(&b, hasFiles)
 
@@ -35,11 +38,11 @@ func buildRepositoryPrompt(spec Spec, branch string, hasFiles bool, attr commitA
 		}
 		fmt.Fprintf(&b, "5. Open a pull request from %s into %s (use the GitHub API with $GITHUB_TOKEN, or the gh CLI).\n", branch, target)
 	}
-	writeFinalMarker(&b, prEnabled(spec))
+	writeFinalMarker(&b, prEnabled(spec), schema)
 	return b.String()
 }
 
-func buildPRPrompt(spec Spec, pr *pullRequestInfo, hasFiles bool, attr commitAttribution) string {
+func buildPRPrompt(spec Spec, pr *pullRequestInfo, hasFiles bool, attr commitAttribution, schema map[string]any) string {
 	var b strings.Builder
 	writeIntro(&b, hasFiles)
 	fmt.Fprintf(&b, "You are updating the existing pull request %s.\n\n", pr.HTMLURL)
@@ -50,7 +53,7 @@ func buildPRPrompt(spec Spec, pr *pullRequestInfo, hasFiles bool, attr commitAtt
 	writeIdentity(&b, attr)
 	fmt.Fprintf(&b, "2. Complete this task:\n%s\n", indent(spec.Task))
 	fmt.Fprintf(&b, "3. %s and push to the SAME branch (%s) — do NOT open a new pull request; pushing updates the existing one: git push origin %s\n", commitInstruction(attr), pr.HeadRef, pr.HeadRef)
-	writeFinalMarker(&b, true)
+	writeFinalMarker(&b, true, schema)
 	fmt.Fprintf(&b, "\nThe pull request URL is %s.\n", pr.HTMLURL)
 	return b.String()
 }
@@ -80,7 +83,13 @@ func writeIntro(b *strings.Builder, hasFiles bool) {
 	b.WriteString("\nFollow these steps:\n")
 }
 
-func writeFinalMarker(b *strings.Builder, prExpected bool) {
+// writeFinalMarker writes the machine-readable PR_URL/NO_PR marker the agent
+// must end its message with. When schema is set, the structured-output
+// instructions are written first so the marker line stays truly last.
+func writeFinalMarker(b *strings.Builder, prExpected bool, schema map[string]any) {
+	if schema != nil {
+		b.WriteString(structuredoutput.PromptSuffix(structuredoutput.Prepare(schema, false)))
+	}
 	b.WriteString("\nWhen finished, output on the FINAL line of your last message exactly one of:\n")
 	if prExpected {
 		b.WriteString("     PR_URL=<the pull request url>\n")

@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+const structuredOutputSchema = `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`
 
 func Test__RunAgent__Setup(t *testing.T) {
 	a := &RunAgent{}
@@ -42,6 +45,56 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 	err := a.Setup(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "agent")
+}
+
+func Test__RunAgent__Setup__structuredOutputInvalidSchema(t *testing.T) {
+	a := &RunAgent{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"agent":         "agent_01",
+			"environmentId": "env_01",
+			"prompt":        "Do the thing",
+			"outputSchema":  `{"type":"object"}`, // missing "properties"
+		},
+		Integration: &contexts.IntegrationContext{},
+	}
+	err := a.Setup(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "properties")
+}
+
+func Test__RunAgent__Setup__structuredOutputUnresolvedExpressionSkipsValidation(t *testing.T) {
+	a := &RunAgent{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"agent":         "agent_01",
+			"environmentId": "env_01",
+			"prompt":        "Do the thing",
+			"outputSchema":  "{{ event.schema }}",
+		},
+		Integration: &contexts.IntegrationContext{},
+	}
+	require.NoError(t, a.Setup(ctx))
+}
+
+func Test__RunAgent__Setup__structuredOutputMetadata(t *testing.T) {
+	a := &RunAgent{}
+	metadataCtx := &contexts.MetadataContext{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"agent":         "agent_01",
+			"environmentId": "env_01",
+			"prompt":        "Do the thing",
+			"outputSchema":  structuredOutputSchema,
+		},
+		Integration: &contexts.IntegrationContext{},
+		Metadata:    metadataCtx,
+	}
+	require.NoError(t, a.Setup(ctx))
+
+	meta, ok := metadataCtx.Metadata.(RunAgentNodeMetadata)
+	require.True(t, ok, "expected RunAgentNodeMetadata, got %T", metadataCtx.Metadata)
+	assert.True(t, meta.StructuredOutput)
 }
 
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
@@ -105,6 +158,98 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, sessionEventsPageLimit, httpContext.Requests[3].URL.Query().Get("limit"))
 	assert.Contains(t, httpContext.Requests[4].URL.Path, "/files")
 	assert.Equal(t, "sess_1", httpContext.Requests[4].URL.Query().Get("scope_id"))
+}
+
+func Test__RunAgent__Execute__structuredOutput(t *testing.T) {
+	a := &RunAgent{}
+	agentMessage := "Here is the result.\n\n```json\n{\"summary\": \"looks good\"}\n```\n"
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(fmt.Sprintf(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":%q}]}]}`, agentMessage)))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	metadataCtx := &contexts.MetadataContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"agent":         "ag_1",
+			"environmentId": "ev_1",
+			"prompt":        "Summarize this",
+			"outputSchema":  structuredOutputSchema,
+		},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       requestsCtx,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.Execute(execCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+
+	out := executionState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+
+	parsed, ok := out.Parsed.(map[string]any)
+	require.True(t, ok, "expected Parsed to be an object, got %T", out.Parsed)
+	assert.Equal(t, "looks good", parsed["summary"])
+
+	// The sent user message must include the schema instructions.
+	sendBody, err := io.ReadAll(httpContext.Requests[1].Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(sendBody), "fenced json code block")
+	assert.Contains(t, string(sendBody), `\"summary\"`)
+}
+
+func Test__RunAgent__Execute__structuredOutputRefusalStaysUnparsed(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"terminated"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_terminated"},{"type":"agent.message","content":[{"type":"text","text":"I can't finish this task."}]}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"agent":         "ag_1",
+			"environmentId": "ev_1",
+			"prompt":        "Summarize this",
+			"outputSchema":  structuredOutputSchema,
+		},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: executionState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.Execute(execCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+
+	out := executionState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "terminated", out.Status)
+	assert.Nil(t, out.Parsed, "a terminated session must never be trusted for structured output")
 }
 
 func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
@@ -179,6 +324,50 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
 	assert.Equal(t, "text", out.Artifacts[0].Encoding)
 	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
+}
+
+func Test__RunAgent__poll__structuredOutput(t *testing.T) {
+	a := &RunAgent{}
+	agentMessage := "```json\n{\"summary\": \"async result\"}\n```"
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(fmt.Sprintf(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":%q}]}]}`, agentMessage)))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{
+			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
+		},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:       "poll",
+		Parameters: map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Configuration: map[string]any{
+			"agent":         "agent_1",
+			"environmentId": "env_1",
+			"prompt":        "do it",
+			"outputSchema":  structuredOutputSchema,
+		},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	err := a.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	parsed, ok := out.Parsed.(map[string]any)
+	require.True(t, ok, "expected Parsed to be an object, got %T", out.Parsed)
+	assert.Equal(t, "async result", parsed["summary"])
 }
 
 func Test__RunAgent__poll__persistSessionKeepsSession(t *testing.T) {
@@ -349,6 +538,40 @@ func Test__RunAgent__poll__terminalWithIncompleteEventsReportsRealStatus(t *test
 	interrupted, deleted := sessionCalls(httpContext)
 	assert.False(t, interrupted, "a session that already finished must not be interrupted")
 	assert.True(t, deleted, "a finished session is still reclaimed by default")
+}
+
+// Past the poll budget with incomplete events, LastMessage may not be the
+// agent's real final message — structured output must not be trusted then,
+// even though the session is reported as genuinely finished (idle).
+func Test__RunAgent__poll__terminalWithIncompleteEventsSkipsStructuredOutput(t *testing.T) {
+	a := &RunAgent{}
+	restore := finalMessageDelay
+	finalMessageDelay = time.Millisecond
+	t.Cleanup(func() { finalMessageDelay = restore })
+
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))}, // get session: finished
+	}}
+	// Events never include session.status_idle, so Complete never becomes true,
+	// even though the message looks like valid structured-output JSON.
+	for range finalMessageReads {
+		httpContext.Responses = append(httpContext.Responses,
+			&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"data":[{"type":"agent.message","content":[{"type":"text","text":"{\"summary\":\"partial\"}"}]}]}`))})
+	}
+	httpContext.Responses = append(httpContext.Responses,
+		&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}) // delete session
+
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it", "outputSchema": structuredOutputSchema,
+	})))
+
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.NotEmpty(t, out.LastMessage, "the partial message we did collect must still be emitted")
+	assert.Nil(t, out.Parsed, "incomplete events must never be trusted for structured output")
 }
 
 // Repeated poll failures mean we lost sight of the session, not that it ended.

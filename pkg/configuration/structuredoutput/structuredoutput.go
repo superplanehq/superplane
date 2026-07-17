@@ -9,11 +9,18 @@
 //     "required" to list all of its properties; optional fields are expressed by
 //     making their type nullable in the schema itself.
 //   - Anthropic (strict=false) leaves "required" as the user wrote it.
+//
+// Agent components (Claude Managed Agents sessions) have no equivalent to the
+// Messages API's output_config.format — there is no server-side grammar
+// constraint for a Sessions-based run. For those, PromptSuffix and ExtractJSON
+// emulate structured output by asking the model to comply and best-effort
+// parsing its final message
 package structuredoutput
 
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -107,6 +114,70 @@ func validateRoot(schema map[string]any) error {
 // to send. It does not mutate the input.
 func Prepare(schema map[string]any, strict bool) map[string]any {
 	return normalizeMap(schema, strict)
+}
+
+// ValidateAtSetup validates a raw structured-output config value at Setup
+// time. An empty value is fine (structured output is optional). A value that
+// still contains an unresolved "{{" expression is skipped, mirroring how the
+// prompt field itself is only resolved at Execute.
+func ValidateAtSetup(raw string) error {
+	if strings.TrimSpace(raw) == "" || strings.Contains(raw, "{{") {
+		return nil
+	}
+	_, err := Parse(raw)
+	return err
+}
+
+// PromptSuffix renders schema-following instructions to append to an agent's
+// task prompt. There is no output_config.format equivalent for Managed Agents
+// sessions, so this is the only lever: ask the model to emit matching JSON,
+// then extract it with ExtractJSON. Returns "" if schema is nil.
+func PromptSuffix(schema map[string]any) string {
+	if schema == nil {
+		return ""
+	}
+	encoded, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("\n\nBefore you finish, include a fenced json code block in your message with data matching this JSON Schema exactly:\n\n```json\n%s\n```\n", encoded)
+}
+
+// jsonFencePattern matches a fenced code block, with or without a "json"
+// language tag.
+var jsonFencePattern = regexp.MustCompile("(?s)```(?:json)?\\s*\\n?(.*?)\\n?```")
+
+// ExtractJSON pulls a JSON object out of free-form text, as produced by an
+// agent asked (via PromptSuffix) to emit structured output in its final
+// message. It tries each fenced code block, last to first, then falls back to
+// parsing the whole trimmed text, and reports false if none of those parse as
+// a JSON object. There is no schema validation here: for agent components
+// there is no server-side grammar constraint to trust, so this is inherently
+// best-effort — callers decide whether to trust it (e.g. only on a normal
+// completion).
+func ExtractJSON(text string) (any, bool) {
+	matches := jsonFencePattern.FindAllStringSubmatch(text, -1)
+	for i := len(matches) - 1; i >= 0; i-- {
+		if parsed, ok := unmarshalJSONObject(matches[i][1]); ok {
+			return parsed, true
+		}
+	}
+	return unmarshalJSONObject(text)
+}
+
+func unmarshalJSONObject(s string) (any, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, false
+	}
+	var parsed any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return nil, false
+	}
+	if _, ok := parsed.(map[string]any); !ok {
+		return nil, false
+	}
+	return parsed, true
 }
 
 func normalizeMap(node map[string]any, strict bool) map[string]any {
