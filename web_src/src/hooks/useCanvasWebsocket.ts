@@ -235,6 +235,7 @@ export function useCanvasWebsocket(
           }
           break;
         case "run_started":
+        case "run_cancelling":
         case "run_finished": {
           const run = payload as CanvasesCanvasRun;
           if (!run.canvasId || run.canvasId !== canvasId) {
