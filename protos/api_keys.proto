@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package Superplane.ApiKeys;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/api_keys";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "SuperPlane API Keys API";
+    version: "1.0";
+    description: "API for SuperPlane API keys";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service ApiKeys {
+  rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/api-keys"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create an API key";
+      description: "Creates a new API key in the organization";
+      tags: "ApiKeys";
+    };
+  }
+
+  rpc ListAPIKeys(ListAPIKeysRequest) returns (ListAPIKeysResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/api-keys"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List API keys";
+      description: "Returns all API keys in the organization";
+      tags: "ApiKeys";
+    };
+  }
+
+  rpc DescribeAPIKey(DescribeAPIKeyRequest) returns (DescribeAPIKeyResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/api-keys/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an API key";
+      description: "Returns details of a specific API key";
+      tags: "ApiKeys";
+    };
+  }
+
+  rpc UpdateAPIKey(UpdateAPIKeyRequest) returns (UpdateAPIKeyResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/api-keys/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update an API key";
+      description: "Updates the name, description, expiration, or app scope of an API key";
+      tags: "ApiKeys";
+    };
+  }
+
+  rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/api-keys/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete an API key";
+      description: "Deletes an API key and removes its RBAC policies";
+      tags: "ApiKeys";
+    };
+  }
+
+  rpc RegenerateAPIKeyToken(RegenerateAPIKeyTokenRequest) returns (RegenerateAPIKeyTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/api-keys/{id}/token"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Regenerate API key token";
+      description: "Regenerates the token for an API key";
+      tags: "ApiKeys";
+    };
+  }
+}
+
+message APIKey {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string organization_id = 4;
+  string created_by = 5;
+  bool has_token = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  string created_by_name = 9;
+  string created_by_email = 10;
+  google.protobuf.Timestamp expires_at = 11;
+  repeated string canvas_ids = 12;
+}
+
+message CreateAPIKeyRequest {
+  string name = 1;
+  string description = 2;
+  string role = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  repeated string canvas_ids = 5;
+}
+
+message CreateAPIKeyResponse {
+  APIKey api_key = 1;
+  string token = 2;
+}
+
+message ListAPIKeysRequest {}
+
+message ListAPIKeysResponse {
+  repeated APIKey api_keys = 1;
+}
+
+message DescribeAPIKeyRequest {
+  string id = 1;
+}
+
+message DescribeAPIKeyResponse {
+  APIKey api_key = 1;
+}
+
+message UpdateAPIKeyRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  repeated string canvas_ids = 5;
+  bool clear_expires_at = 6;
+}
+
+message UpdateAPIKeyResponse {
+  APIKey api_key = 1;
+}
+
+message DeleteAPIKeyRequest {
+  string id = 1;
+}
+
+message DeleteAPIKeyResponse {}
+
+message RegenerateAPIKeyTokenRequest {
+  string id = 1;
+}
+
+message RegenerateAPIKeyTokenResponse {
+  string token = 1;
+}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,119 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 	err := a.Setup(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "agent")
+}
+
+func Test__parseAgentVersion(t *testing.T) {
+	// Empty means "latest": nil pointer, no error.
+	v, err := parseAgentVersion("")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// Whitespace is treated as empty too.
+	v, err = parseAgentVersion("  ")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// The explicit "Latest" sentinel also means latest, so the field can be
+	// returned to its unset state after a version was pinned.
+	v, err = parseAgentVersion("latest")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// A numeric resource value pins that version.
+	v, err = parseAgentVersion("3")
+	require.NoError(t, err)
+	require.NotNil(t, v)
+	assert.Equal(t, 3, *v)
+
+	// A non-numeric, non-sentinel value is rejected.
+	_, err = parseAgentVersion("bogus")
+	require.Error(t, err)
+}
+
+func Test__resolveAgentVersion(t *testing.T) {
+	logger := logrus.NewEntry(logrus.New())
+	three := 3
+
+	// An unset version stays unset without calling the API.
+	assert.Nil(t, resolveAgentVersion(&Client{}, "agent_1", nil, logger))
+
+	// A pinned version that exists for the agent is kept.
+	okClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":3},{"version":2}]}`))},
+	}}}
+	got := resolveAgentVersion(okClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
+
+	// A pinned version the agent no longer has falls back to latest (nil).
+	staleClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":1}]}`))},
+	}}}
+	assert.Nil(t, resolveAgentVersion(staleClient, "agent_1", &three, logger))
+
+	// If versions can't be listed, the configured pin is kept (best-effort).
+	errClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"boom"}}`))},
+	}}}
+	got = resolveAgentVersion(errClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
+}
+
+func Test__validateSpec__rejectsBadVersion(t *testing.T) {
+	err := validateSpec(Spec{Agent: "a", Environment: "e", Prompt: "p", Version: "not-a-number"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version")
+}
+
+func Test__ListAgentVersionNumbers(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":1},{"version":3},{"version":2}]}`))},
+	}}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+
+	versions, err := client.ListAgentVersionNumbers("agent_1")
+	require.NoError(t, err)
+	assert.Equal(t, []int{3, 2, 1}, versions, "versions must be returned newest first")
+	assert.Contains(t, httpCtx.Requests[0].URL.Path, "/agents/agent_1/versions")
+
+	_, err = client.ListAgentVersionNumbers("")
+	require.Error(t, err)
+}
+
+// Nodes saved before this component used resource fields stored the environment
+// under "environmentId" and the version as a number. They must keep decoding
+// and validating without being re-saved.
+func Test__decodeSpec__legacyConfig(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environmentId": "env_1",
+		"version":       float64(2), // JSON numbers decode to float64
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env_1", spec.Environment)
+	assert.Equal(t, "2", spec.Version, "numeric version must become the resource string")
+	require.NoError(t, validateSpec(spec))
+
+	v, err := parseAgentVersion(spec.Version)
+	require.NoError(t, err)
+	require.NotNil(t, v)
+	assert.Equal(t, 2, *v)
+}
+
+// A config saved by the current version (string version) decodes unchanged.
+func Test__decodeSpec__newConfig(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environmentId": "env_1",
+		"version":       "3",
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env_1", spec.Environment)
+	assert.Equal(t, "3", spec.Version)
 }
 
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
@@ -221,29 +335,156 @@ func Test__RunAgent__poll__persistSessionKeepsSession(t *testing.T) {
 	}
 }
 
-func Test__RunAgent__poll__timeout(t *testing.T) {
+// A client that never builds must terminate the run rather than poll forever:
+// the timeout check sits below the status read and would never be reached.
+func Test__RunAgent__poll__clientErrorReportsError(t *testing.T) {
 	a := &RunAgent{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: ExecutionMetadata{
-			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
-		},
-	}
 	hookCtx := core.ActionHookContext{
 		Name: "poll",
 		Parameters: map[string]any{
-			"attempt": float64(maxPollAttempts + 1),
-			"errors":  float64(0),
+			"attempt": float64(2),
+			"errors":  float64(maxPollErrors - 1),
 		},
-		Metadata:       metadataCtx,
+		Integration:    &contexts.IntegrationContext{}, // no apiKey -> client creation fails
+		Metadata:       &contexts.MetadataContext{Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}}},
 		ExecutionState: executionState,
+		Requests:       &contexts.RequestContext{},
 		Logger:         logrus.NewEntry(logrus.New()),
 	}
 
-	err := a.HandleHook(hookCtx)
-	require.NoError(t, err)
+	require.NoError(t, a.HandleHook(hookCtx))
 	require.True(t, executionState.Finished)
-	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "error", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+}
+
+// sessionCalls reports whether the session was interrupted and whether it was
+// deleted, so the reclaim paths can be asserted precisely.
+func sessionCalls(httpContext *contexts.HTTPContext) (interrupted, deleted bool) {
+	for _, r := range httpContext.Requests {
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/sessions/sess_1/events"):
+			interrupted = true
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1"):
+			deleted = true
+		}
+	}
+	return interrupted, deleted
+}
+
+func timeoutHookCtx(httpContext *contexts.HTTPContext, execState *contexts.ExecutionStateContext, config map[string]any) core.ActionHookContext {
+	return core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		Configuration:  config,
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       &contexts.MetadataContext{Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}}},
+		ExecutionState: execState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+}
+
+// A timeout means we stopped watching, not that the agent stopped: the session
+// must be interrupted and reclaimed rather than left running in Anthropic.
+func Test__RunAgent__poll__timeoutReclaimsSession(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // delete session
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it",
+	})))
+	require.True(t, execState.Finished)
+	assert.Equal(t, "timeout", execState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	interrupted, deleted := sessionCalls(httpContext)
+	assert.True(t, interrupted, "a timed-out session must be interrupted, not left running")
+	assert.True(t, deleted, "a timed-out session must be deleted by default")
+}
+
+// Keeping the transcript must still stop the agent.
+func Test__RunAgent__poll__timeoutPersistSessionInterruptsButKeeps(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it", "persistSession": true,
+	})))
+	require.True(t, execState.Finished)
+
+	interrupted, deleted := sessionCalls(httpContext)
+	assert.True(t, interrupted, "a kept session must still be interrupted so the agent stops")
+	assert.False(t, deleted, "session must be kept when persistSession is enabled")
+}
+
+// The event stream can lag the status endpoint: the session reports idle while
+// the terminal event has not been written, so sm.Complete stays false. Once the
+// retry budget is spent we must still report the real outcome — never "timeout",
+// and never destroy the transcript of a run that finished.
+func Test__RunAgent__poll__terminalWithIncompleteEventsReportsRealStatus(t *testing.T) {
+	a := &RunAgent{}
+	restore := finalMessageDelay
+	finalMessageDelay = time.Millisecond
+	t.Cleanup(func() { finalMessageDelay = restore })
+
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))}, // get session: finished
+	}}
+	// Events never include session.status_idle, so Complete never becomes true.
+	for range finalMessageReads {
+		httpContext.Responses = append(httpContext.Responses,
+			&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Partial work"}]}]}`))})
+	}
+	httpContext.Responses = append(httpContext.Responses,
+		&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}) // delete session
+
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it",
+	})))
+
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status, "a finished session must report its real status, not timeout")
+	assert.Equal(t, "Partial work", out.LastMessage, "the messages we did collect must still be emitted")
+
+	interrupted, deleted := sessionCalls(httpContext)
+	assert.False(t, interrupted, "a session that already finished must not be interrupted")
+	assert.True(t, deleted, "a finished session is still reclaimed by default")
+}
+
+// Repeated poll failures mean we lost sight of the session, not that it ended.
+func Test__RunAgent__poll__repeatedErrorsReclaimSession(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"boom"}}`))}, // get session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                            // interrupt
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                            // delete session
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it",
+	})
+	hookCtx.Parameters = map[string]any{"attempt": float64(2), "errors": float64(maxPollErrors - 1)}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	assert.Equal(t, "error", execState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	interrupted, deleted := sessionCalls(httpContext)
+	assert.True(t, interrupted, "an unreachable session must be interrupted")
+	assert.True(t, deleted, "an unreachable session must be reclaimed")
 }
 
 func Test__RunAgent__scheduleNextPoll(t *testing.T) {

@@ -3,6 +3,7 @@ package runagent
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,24 +18,24 @@ type RunAgent struct{}
 
 func (a *RunAgent) Name() string { return "claude.runAgent" }
 
-func (a *RunAgent) Label() string { return "Run Claude Agent" }
+func (a *RunAgent) Label() string { return "Run Managed Agent" }
 
 func (a *RunAgent) Description() string {
 	return "Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated."
 }
 
 func (a *RunAgent) Documentation() string {
-	return `The **Run Claude Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
+	return `The **Run Managed Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
 
 ## Prerequisites
 
 - A **Claude API key** on the integration.
-- An **agent** and **environment** already created in the Anthropic API (or Console). This step references them by ID.
+- An **agent** and **environment** already created in the Anthropic API (or Console). This step lists them for selection.
 
 ## Configuration
 
-- **Agent ID** and optional **Version**: the Managed Agent to run (latest, or a pinned version if **Version** is set).
-- **Environment ID**: The environment the session runs in.
+- **Agent** and optional **Version**: the Managed Agent to run. Pick an agent, then optionally pin a **Version** (the latest is used when left unset).
+- **Environment**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
 - **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
@@ -62,24 +63,53 @@ func (a *RunAgent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "agent",
-			Label:       "Agent ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Agent",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "ID of a Claude Managed Agent. Uses the latest version unless **Version** is set.",
+			Placeholder: "Select an agent",
+			Description: "The Claude Managed Agent to run. Uses the latest version unless **Version** is set.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "agent",
+				},
+			},
 		},
 		{
 			Name:        "version",
-			Label:       "Agent version",
-			Type:        configuration.FieldTypeNumber,
+			Label:       "Version",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "When set, pins the session to this agent version (otherwise latest is used).",
+			Placeholder: "Latest",
+			Description: "Pins the session to a specific agent version. Choose **Latest** (or leave unset) to always use the agent's newest version.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "agentVersion",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "agent",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "agent"},
+						},
+					},
+				},
+			},
 		},
 		{
+			// The stored key stays "environmentId" for backward compatibility:
+			// existing nodes saved it under that name, and neither the backend nor
+			// the editor migrates unknown keys, so renaming it would drop the value
+			// on the next save. The field is still shown and selected as an
+			// Environment resource.
 			Name:        "environmentId",
-			Label:       "Environment ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Environment",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "ID of the Managed Agent environment (container) for this session",
+			Placeholder: "Select an environment",
+			Description: "The Managed Agent environment (container) the session runs in.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "environment",
+				},
+			},
 		},
 		{
 			Name:        "prompt",
@@ -278,11 +308,19 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		vaultIDs = append(vaultIDs, vaultID)
 	}
 
+	version, err := parseAgentVersion(spec.Version)
+	if err != nil {
+		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		return err
+	}
+
 	aid := strings.TrimSpace(spec.Agent)
+	version = resolveAgentVersion(client, aid, version, ctx.Logger)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
-		AgentVersion:  spec.Version,
-		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
+		AgentVersion:  version,
+		EnvironmentID: strings.TrimSpace(spec.Environment),
 		VaultIDs:      vaultIDs,
 		Resources:     resources,
 	}
@@ -347,6 +385,17 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
+
+// stopAndReclaim ends a run whose session may still be working: a timeout or a
+// dead poll means we stopped watching, not that the agent stopped. The interrupt
+// is what makes the delete possible — the API rejects deleting a live session —
+// and it stops the agent even when the session is kept for debugging.
+func stopAndReclaim(client *Client, sessionID string, persist bool, logger *log.Entry) {
+	if err := client.SendManagedSessionInterrupt(sessionID); err != nil {
+		logger.Warnf("Failed to interrupt managed session %s: %v", sessionID, err)
+	}
+	reclaimSession(client, sessionID, persist, logger)
+}
 
 // reclaimSession deletes the session unless the step is configured to keep it,
 // in which case the transcript stays readable in the Anthropic Console.
@@ -498,6 +547,8 @@ func truncateID(id string, maxLen int) string {
 }
 
 func decodeSpec(config any) (Spec, error) {
+	config = normalizeLegacyConfig(config)
+
 	var spec Spec
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return spec, fmt.Errorf("failed to decode configuration: %w", err)
@@ -511,6 +562,65 @@ func decodeSpec(config any) (Spec, error) {
 		}
 	}
 	return spec, nil
+}
+
+// normalizeLegacyConfig migrates configuration written by earlier versions of
+// this component so already-saved nodes keep working without being re-saved:
+// the agent version was stored as a number before it became the resource-value
+// string, which mapstructure would otherwise refuse to decode into Spec.Version.
+//
+// The input map is never mutated: a shallow copy is made only when a migration
+// actually applies, and non-map inputs pass through untouched.
+func normalizeLegacyConfig(config any) any {
+	raw, ok := config.(map[string]any)
+	if !ok {
+		return config
+	}
+
+	out := raw
+	copied := false
+	set := func(key string, value any) {
+		if !copied {
+			dup := make(map[string]any, len(raw)+1)
+			for k, v := range raw {
+				dup[k] = v
+			}
+			out = dup
+			copied = true
+		}
+		out[key] = value
+	}
+
+	// The version was stored as a number before it became the resource-value
+	// string, which mapstructure would otherwise refuse to decode into a string.
+	if v, ok := raw["version"]; ok {
+		if _, isStr := v.(string); !isStr {
+			if s := legacyVersionToString(v); s != "" {
+				set("version", s)
+			}
+		}
+	}
+
+	return out
+}
+
+// legacyVersionToString renders a version stored as a JSON number as the string
+// the resource field now uses. Returns "" for values it cannot interpret.
+func legacyVersionToString(v any) string {
+	switch n := v.(type) {
+	case float64:
+		return strconv.Itoa(int(n))
+	case float32:
+		return strconv.Itoa(int(n))
+	case int:
+		return strconv.Itoa(n)
+	case int64:
+		return strconv.FormatInt(n, 10)
+	case json.Number:
+		return n.String()
+	default:
+		return ""
+	}
 }
 
 func decodeStringList(v any) []string {
@@ -536,11 +646,53 @@ func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Agent) == "" {
 		return fmt.Errorf("agent is required")
 	}
-	if strings.TrimSpace(spec.EnvironmentID) == "" {
-		return fmt.Errorf("environmentId is required")
+	if strings.TrimSpace(spec.Environment) == "" {
+		return fmt.Errorf("environment is required")
 	}
 	if strings.TrimSpace(spec.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
 	}
+	if _, err := parseAgentVersion(spec.Version); err != nil {
+		return err
+	}
+	return nil
+}
+
+// parseAgentVersion converts the raw version resource value into an agent
+// version number. An empty value or the explicit "latest" sentinel both mean
+// "use the latest version" and yield a nil pointer, so the field can always be
+// returned to its unset state by picking the Latest option.
+func parseAgentVersion(raw string) (*int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.EqualFold(raw, latestVersionValue) {
+		return nil, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid agent version %q: must be a number", raw)
+	}
+	return &v, nil
+}
+
+// resolveAgentVersion drops a pinned version that the agent no longer has, so a
+// stale pin — e.g. one left in the config after switching to an agent without
+// that version — falls back to the latest version instead of running or failing
+// with the wrong one. Validation is best-effort: if the versions cannot be
+// listed, the configured pin is kept.
+func resolveAgentVersion(client *Client, agentID string, version *int, logger *log.Entry) *int {
+	if version == nil {
+		return nil
+	}
+	versions, err := client.ListAgentVersionNumbers(agentID)
+	if err != nil {
+		logger.Warnf("Could not verify versions for agent %s (%v); using version %d as configured", agentID, err, *version)
+		return version
+	}
+	for _, v := range versions {
+		if v == *version {
+			return version
+		}
+	}
+	logger.Warnf("Agent %s has no version %d (stale pin, likely after switching agents); using the latest version instead", agentID, *version)
 	return nil
 }

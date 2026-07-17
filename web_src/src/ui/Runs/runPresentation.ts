@@ -97,32 +97,48 @@ export function getRunStatus(run: CanvasesCanvasRun): RunStatusKey {
   return "unknown";
 }
 
+function getExecutionStatusLabel(execution: CanvasesCanvasNodeExecutionRef) {
+  if (execution.state === "STATE_PENDING") return "Pending";
+  if (execution.state === "STATE_CANCELLING") return "Cancelling";
+  if (execution.state === "STATE_STARTED") return "Running";
+  if (execution.result === "RESULT_FAILED") return "Failed";
+  if (execution.result === "RESULT_CANCELLED") return "Cancelled";
+  if (execution.result === "RESULT_PASSED") return "Passed";
+  return "Unknown";
+}
+
 export function getExecutionStatus(execution: CanvasesCanvasNodeExecutionRef) {
-  if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
+  const statusLabel = getExecutionStatusLabel(execution);
+
+  if (
+    execution.state === "STATE_STARTED" ||
+    execution.state === "STATE_PENDING" ||
+    execution.state === "STATE_CANCELLING"
+  ) {
     return {
-      label: execution.state === "STATE_PENDING" ? "Pending" : "Running",
+      label: statusLabel,
       className: "bg-blue-50 text-blue-700 ring-blue-200",
       dotClassName: "bg-blue-500",
     };
   }
 
   if (execution.result === "RESULT_FAILED") {
-    return { label: "Failed", className: "bg-red-50 text-red-700 ring-red-200", dotClassName: "bg-red-500" };
+    return { label: statusLabel, className: "bg-red-50 text-red-700 ring-red-200", dotClassName: "bg-red-500" };
   }
 
   if (execution.result === "RESULT_CANCELLED") {
-    return { label: "Cancelled", className: "bg-gray-100 text-gray-700 ring-gray-200", dotClassName: "bg-gray-400" };
+    return { label: statusLabel, className: "bg-gray-100 text-gray-700 ring-gray-200", dotClassName: "bg-gray-400" };
   }
 
   if (execution.result === "RESULT_PASSED" || execution.state === "STATE_FINISHED") {
     return {
-      label: "Passed",
+      label: statusLabel,
       className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
       dotClassName: "bg-emerald-500",
     };
   }
 
-  return { label: "Unknown", className: "bg-slate-100 text-slate-600 ring-slate-200", dotClassName: "bg-slate-300" };
+  return { label: statusLabel, className: "bg-slate-100 text-slate-600 ring-slate-200", dotClassName: "bg-slate-300" };
 }
 
 export function buildNodeMap(workflowNodes: SuperplaneComponentsNode[]) {
