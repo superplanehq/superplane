@@ -199,11 +199,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
-			messages.NewCanvasQueueItemMessage(
-				event.WorkflowID.String(),
-				queueItem.ID.String(),
-				queueItem.NodeID,
-			).Publish(false)
+			messages.NewCanvasQueueItemMessage(queueItem).PublishCreated()
 		}
 	}
 
@@ -291,6 +287,14 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, err
 	}
 
+	if run.State == models.CanvasRunStateCancelling {
+		if err := event.RoutedInTransaction(tx); err != nil {
+			return nil, uuid.Nil, err
+		}
+
+		return nil, run.ID, nil
+	}
+
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
@@ -334,8 +338,20 @@ func (w *EventRouter) processExecutionEvent(
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
 ) ([]models.CanvasNodeQueueItem, error) {
-	now := time.Now()
+	run, err := models.FindCanvasRunInTransaction(tx, execution.WorkflowID, execution.RunID)
+	if err != nil {
+		return nil, err
+	}
 
+	if run.State == models.CanvasRunStateCancelling {
+		if err := event.RoutedInTransaction(tx); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	now := time.Now()
 	logger = logging.WithExecution(logger, execution)
 	w.logger.Infof("Processing event")
 

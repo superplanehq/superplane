@@ -11,6 +11,7 @@ import (
 
 func Test__RunStateToWsEvent(t *testing.T) {
 	assert.Equal(t, RunStartedEvent, runStateToWsEvent(models.CanvasRunStateStarted))
+	assert.Equal(t, RunCancellingEvent, runStateToWsEvent(models.CanvasRunStateCancelling))
 	assert.Equal(t, RunFinishedEvent, runStateToWsEvent(models.CanvasRunStateFinished))
 	assert.Empty(t, runStateToWsEvent("unknown"))
 }

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,26 +68,78 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			runs, err := models.ListStartedCanvasRuns(startedRunsSweepLimit)
-			if err != nil {
-				w.logger.Errorf("Error listing started runs: %v", err)
-				continue
-			}
-
-			telemetry.RecordRunFinalizerRunsCount(context.Background(), len(runs))
-
-			for _, run := range runs {
-				if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
-					w.logger.WithFields(log.Fields{
-						"workflow_id": run.WorkflowID,
-						"run_id":      run.ID,
-					}).Errorf("Error finalizing run from sweep: %v", err)
-				}
-			}
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				w.sweepStartedRuns()
+			}()
+			go func() {
+				defer wg.Done()
+				w.sweepCancellingRuns()
+			}()
+			wg.Wait()
 
 			telemetry.RecordRunFinalizerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
+}
+
+func (w *RunFinalizer) sweepStartedRuns() error {
+	runs, err := models.ListStartedCanvasRuns(database.Conn(), startedRunsSweepLimit)
+	if err != nil {
+		w.logger.Errorf("Error listing started runs: %v", err)
+		return err
+	}
+
+	telemetry.RecordRunFinalizerRunsCount(context.Background(), len(runs))
+
+	for _, run := range runs {
+		if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
+			logger := logging.WithRun(w.logger, run)
+			logger.WithError(err).Errorf("Error finalizing run from sweep: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (w *RunFinalizer) sweepCancellingRuns() error {
+	cancellingRuns, err := models.ListCancellingCanvasRuns(database.Conn(), startedRunsSweepLimit)
+	if err != nil {
+		w.logger.Errorf("Error listing cancelling runs: %v", err)
+		return err
+	}
+
+	for _, run := range cancellingRuns {
+		logger := logging.WithRun(w.logger, run)
+
+		var cancellationResult *models.RunCancellationDrainResult
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			result, err := run.DrainForCancellation(tx, run.CancelledBy)
+			if err != nil {
+				return err
+			}
+
+			cancellationResult = result
+			return nil
+		})
+
+		if err != nil {
+			logger.WithError(err).Errorf("Error draining cancelling run from sweep: %v", err)
+			continue
+		}
+
+		if cancellationResult != nil {
+			messages.PublishRunCancellationDrain(run.WorkflowID, cancellationResult)
+		}
+
+		if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
+			logger.WithError(err).Errorf("Error finalizing cancelling run from sweep: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (w *RunFinalizer) startQueueItemDeletedConsumer(ctx context.Context) {
@@ -327,7 +380,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, runFinalizerReasonAlreadyFinished, nil
 	}
 
-	openWork, err := models.FindOpenCanvasRunWorkInTransaction(tx, runID)
+	openWork, err := run.FindOpenWork(tx)
 	if err != nil {
 		return false, "", err
 	}
@@ -344,7 +397,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, runFinalizerReasonOpenWork, nil
 	}
 
-	result, err := models.CalculateCanvasRunResultInTransaction(tx, runID)
+	result, err := run.CalculateResult(tx)
 	if err != nil {
 		return false, "", err
 	}
