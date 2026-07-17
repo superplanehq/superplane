@@ -201,6 +201,15 @@ describe("runCodeAgentMapper.props", () => {
     );
     expect(props.metadata).not.toContainEqual({ icon: "braces", label: "Structured output" });
   });
+
+  it("falls back to node metadata for structured output when configuration is null", () => {
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: null as unknown as undefined, metadata: { structuredOutput: true } }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "braces", label: "Structured output" });
+  });
 });
 
 describe("eventStateRegistry.runCodeAgent", () => {

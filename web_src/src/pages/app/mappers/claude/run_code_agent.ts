@@ -165,7 +165,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   // Unlike repository/model above, this prefers the live configuration when
   // it exists at all (even if the schema was just cleared) — autosave
   // updates configuration only, so node.metadata can lag behind.
-  const structured = node.configuration !== undefined ? hasSchema(config.outputSchema) : Boolean(meta.structuredOutput);
+  const structured = node.configuration != null ? hasSchema(config.outputSchema) : Boolean(meta.structuredOutput);
   if (structured) {
     items.push({ icon: "braces", label: "Structured output" });
   }
