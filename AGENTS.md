@@ -104,39 +104,6 @@ Order declarations in each model file as follows:
 
 Place private helpers after the public API in the file.
 
-### Models API shape (`pkg/models`)
-
-Choose one style per concern and stick to it. Prefer object style when you already have a model handle; do not invent free functions that re-take IDs you already hold.
-
-| Situation | Prefer | Example |
-| --- | --- | --- |
-| Operation on a loaded model | Method on the struct | `node.HardDelete(tx)` |
-| Multi-step / configurable DB work for a model | Package constructor + collaborator/builder | `NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(n).Run()` |
-| Lookup / list when you do **not** have a handle | Package function with `tx` first | `ListDeletedCanvasNodes(tx, …)`, `FindCanvas(tx, …)` |
-
-Rules:
-
-- **Do not** add `models.HardDeleteCanvasNode(tx, orgID, nodeID)` (or similar) when the caller already has `*CanvasNode` — that forces an extra find and mixes procedural style with OO for the same concern.
-- **Do not** hang multi-step cleanup/publish logic as a thick method chain on the aggregate when a dedicated collaborator is clearer (`NodeResourceCleaner`, canvas publisher patterns).
-- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions **orchestrate** (lock → clean → hard-delete); they do not own batched delete queries.
-- Receivers on model methods should use a short name consistent with the type (`c` for `*CanvasNode`, etc.), matching nearby code in the file.
-
-```go
-// Good: handle already loaded
-if err := node.HardDelete(tx); err != nil {
-    return err
-}
-
-// Good: multi-step cleanup as a collaborator
-n, err := NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(batchSize).Run()
-
-// Good: no handle yet — package function
-nodes, err := ListDeletedCanvasNodes(tx, before, limit)
-
-// Avoid: free function that re-keys a node you already have
-_ = HardDeleteCanvasNode(tx, node.OrganizationID, node.ID)
-```
-
 ## Cursor Cloud specific instructions
 
 ### Environment overview
