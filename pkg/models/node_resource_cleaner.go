@@ -60,12 +60,15 @@ func (c *NodeResourceCleaner) Run() (NodeResourceCleanupResult, error) {
 		return NodeResourceCleanupResult{}, fmt.Errorf("limit must be positive")
 	}
 
+	// Events before executions in unreferenced mode: workflow_events.execution_id
+	// is ON DELETE CASCADE from executions, so deleting an execution would remove
+	// its output events even when downstream nodes still reference them.
 	resourceTypes := []any{
 		&CanvasNodeRequest{},
 		&CanvasNodeExecutionKV{},
-		&CanvasNodeExecution{},
 		&CanvasNodeQueueItem{},
 		&CanvasEvent{},
+		&CanvasNodeExecution{},
 	}
 
 	totalDeleted := 0
@@ -76,14 +79,7 @@ func (c *NodeResourceCleaner) Run() (NodeResourceCleanupResult, error) {
 		}
 
 		remaining := c.limit - totalDeleted
-		var deleted int
-		var err error
-
-		if _, isEvent := model.(*CanvasEvent); isEvent {
-			deleted, err = c.deleteEventsBatch(remaining)
-		} else {
-			deleted, err = c.deleteResourceBatch(model, remaining)
-		}
+		deleted, err := c.deleteBatch(model, remaining)
 		if err != nil {
 			return NodeResourceCleanupResult{}, fmt.Errorf("failed to delete resources: %w", err)
 		}
@@ -102,15 +98,28 @@ func (c *NodeResourceCleaner) Run() (NodeResourceCleanupResult, error) {
 		}
 	}
 
-	hasEvents, err := c.hasRemaining(&CanvasEvent{})
-	if err != nil {
-		return NodeResourceCleanupResult{}, err
-	}
-	if hasEvents {
-		return NodeResourceCleanupResult{ResourcesDeleted: totalDeleted, AllDeleted: false}, nil
+	for _, model := range resourceTypes {
+		hasMore, err := c.hasRemaining(model)
+		if err != nil {
+			return NodeResourceCleanupResult{}, err
+		}
+		if hasMore {
+			return NodeResourceCleanupResult{ResourcesDeleted: totalDeleted, AllDeleted: false}, nil
+		}
 	}
 
 	return NodeResourceCleanupResult{ResourcesDeleted: totalDeleted, AllDeleted: true}, nil
+}
+
+func (c *NodeResourceCleaner) deleteBatch(model any, limit int) (int, error) {
+	switch model.(type) {
+	case *CanvasEvent:
+		return c.deleteEventsBatch(limit)
+	case *CanvasNodeExecution:
+		return c.deleteExecutionsBatch(limit)
+	default:
+		return c.deleteResourceBatch(model, limit)
+	}
 }
 
 func (c *NodeResourceCleaner) hasRemaining(model any) (bool, error) {
@@ -155,6 +164,45 @@ func (c *NodeResourceCleaner) deleteEventsBatch(limit int) (int, error) {
 
 	ids := c.unreferencedEventsQuery().Limit(limit)
 	result := c.tx.Where("id IN (?)", ids).Delete(&CanvasEvent{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return int(result.RowsAffected), nil
+}
+
+func (c *NodeResourceCleaner) deleteExecutionsBatch(limit int) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	if c.eventMode == nodeResourceEventModeAll {
+		return c.deleteResourceBatch(&CanvasNodeExecution{}, limit)
+	}
+
+	// Skip executions whose cascaded event deletes would remove events still
+	// referenced by other executions or queue items.
+	ids := c.tx.Model(&CanvasNodeExecution{}).
+		Select("id").
+		Where("workflow_id = ? AND node_id = ?", c.node.WorkflowID, c.node.NodeID).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM workflow_events e
+			WHERE e.execution_id = workflow_node_executions.id
+			AND (
+				EXISTS (
+					SELECT 1 FROM workflow_node_executions x
+					WHERE (x.root_event_id = e.id OR x.event_id = e.id)
+					AND x.id <> workflow_node_executions.id
+				)
+				OR EXISTS (
+					SELECT 1 FROM workflow_node_queue_items q
+					WHERE q.root_event_id = e.id OR q.event_id = e.id
+				)
+			)
+		)`).
+		Limit(limit)
+
+	result := c.tx.Where("id IN (?)", ids).Delete(&CanvasNodeExecution{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
