@@ -240,7 +240,7 @@ func Test__CanvasNodeCleanupWorker_RotatesBlockedNodesSoOthersProgress(t *testin
 		Where("workflow_id = ? AND node_id = ?", canvas.ID, "ready-node").
 		Update("updated_at", newer).Error)
 
-	candidates, err := models.ListDeletedCanvasNodes(database.Conn(), 1)
+	candidates, err := models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 1)
 	require.NoError(t, err)
 	require.Len(t, candidates, 1)
 	assert.Equal(t, "blocked-node", candidates[0].NodeID)
@@ -248,7 +248,7 @@ func Test__CanvasNodeCleanupWorker_RotatesBlockedNodesSoOthersProgress(t *testin
 	require.NoError(t, worker.LockAndProcessNode(blocked))
 	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "blocked-node"))
 
-	candidates, err = models.ListDeletedCanvasNodes(database.Conn(), 1)
+	candidates, err = models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 1)
 	require.NoError(t, err)
 	require.Len(t, candidates, 1)
 	assert.Equal(t, "ready-node", candidates[0].NodeID)
@@ -508,7 +508,7 @@ func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedCanvas(t *testing.T) {
 		Where("id = ?", canvas.ID).
 		Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
 
-	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), 100)
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 100)
 	require.NoError(t, err)
 	for _, node := range nodes {
 		assert.NotEqual(t, canvas.ID, node.WorkflowID)
@@ -547,7 +547,7 @@ func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedOrganization(t *testing.
 	deletedNode := softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), 100)
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 100)
 	require.NoError(t, err)
 	for _, node := range nodes {
 		assert.NotEqual(t, canvas.ID, node.WorkflowID)
@@ -565,6 +565,52 @@ func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedOrganization(t *testing.
 	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "node-1"))
 	assert.Equal(t, int64(1), countNodeEvents(t, canvas.ID, "node-1"))
 	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "node-1"))
+}
+
+func Test__ListDeletedCanvasNodes_ExcludesNodesWithinGracePeriod(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "in-grace",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "past-grace",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	_ = softDeleteCanvasNode(t, canvas.ID, "in-grace", time.Now().AddDate(0, 0, -10))
+	_ = softDeleteCanvasNode(t, canvas.ID, "past-grace", time.Now().AddDate(0, 0, -40))
+
+	eligibleBefore := time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays)
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), eligibleBefore, 100)
+	require.NoError(t, err)
+
+	foundPastGrace := false
+	for _, node := range nodes {
+		if node.WorkflowID != canvas.ID {
+			continue
+		}
+		assert.NotEqual(t, "in-grace", node.NodeID)
+		if node.NodeID == "past-grace" {
+			foundPastGrace = true
+		}
+	}
+	require.True(t, foundPastGrace)
 }
 
 func Test__ListDeletedCanvasNodes_AndLock(t *testing.T) {
@@ -595,7 +641,7 @@ func Test__ListDeletedCanvasNodes_AndLock(t *testing.T) {
 
 	_ = softDeleteCanvasNode(t, canvas.ID, "deleted-node", time.Now().AddDate(0, 0, -31))
 
-	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), 100)
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 100)
 	require.NoError(t, err)
 
 	found := false
@@ -609,7 +655,7 @@ func Test__ListDeletedCanvasNodes_AndLock(t *testing.T) {
 	}
 	require.True(t, found)
 
-	limited, err := models.ListDeletedCanvasNodes(database.Conn(), 1)
+	limited, err := models.ListDeletedCanvasNodes(database.Conn(), time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays), 1)
 	require.NoError(t, err)
 	assert.Len(t, limited, 1)
 
