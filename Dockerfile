@@ -21,7 +21,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
-ENV GOPROXY="https://proxy.golang.org,direct"
+ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN apt-get update && \

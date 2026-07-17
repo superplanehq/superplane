@@ -11,6 +11,28 @@ import { calculateRunDuration } from "./runNodeDetailModel";
 import { getRunStatus } from "./runPresentation";
 import { RunStatusBadge } from "./RunStatusBadge";
 
+function getActionTooltip(status: string) {
+  switch (status) {
+    case "running":
+      return "Stop all running steps and cancel queued ones";
+    case "cancelling":
+      return "Cancelling all running steps and cancelling queued ones";
+    default:
+      return "Restart this whole run from trigger event";
+  }
+}
+
+function getActionLabel(status: string) {
+  switch (status) {
+    case "running":
+      return "Stop";
+    case "cancelling":
+      return "Cancelling";
+    default:
+      return "Rerun";
+  }
+}
+
 export function RunInspectorHeader({
   run,
   title,
@@ -38,11 +60,9 @@ export function RunInspectorHeader({
   const status = getRunStatus(run);
   const duration = calculateRunDuration(run);
   const durationText = duration !== null ? formatMinutesSecondsDuration(duration) : "";
-  const actionLabel = status === "running" ? "Stop" : "Rerun";
-  const actionTooltip =
-    status === "running"
-      ? "Stop all running steps and cancel queued ones"
-      : "Restart this whole run from trigger event";
+  const actionLabel = getActionLabel(status);
+  const actionTooltip = getActionTooltip(status);
+  const isStopAction = status === "running";
 
   return (
     <div className="sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950">
@@ -90,7 +110,7 @@ export function RunInspectorHeader({
                   disabled={actionDisabled || actionPending}
                   onClick={onAction}
                   className={cn(
-                    status === "running" &&
+                    isStopAction &&
                       "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
                   )}
                 >

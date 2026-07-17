@@ -311,6 +311,18 @@ service Canvases {
     };
   }
 
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/runs/{run_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a run";
+      description: "Requests cancellation of a run and its active work";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -397,8 +409,7 @@ message UpdateCanvasResponse {
 
 message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
-  optional bool pinned = 2;
-  optional bool starred = 3;
+  optional bool starred = 2;
 }
 
 message UpdateCanvasPreferenceResponse {
@@ -417,7 +428,7 @@ message CreateCanvasResponse {
 message CanvasRepository {
   message Metadata {
     string canvas_id = 1;
-    google.protobuf.Timestamp updated_at = 7;
+    google.protobuf.Timestamp updated_at = 2;
   }
 
   enum State {
@@ -549,24 +560,20 @@ message CanvasSummary {
   string id = 1;
   string name = 2;
   string description = 3;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  UserRef created_by = 7;
-  string folder_id = 8;
-  repeated Node nodes = 9;
-  repeated Components.Edge edges = 10;
-  bool pinned = 11;
-  bool starred = 12;
-  google.protobuf.Timestamp pinned_at = 13;
-  google.protobuf.Timestamp starred_at = 14;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  UserRef created_by = 6;
+  string folder_id = 7;
+  repeated Node nodes = 8;
+  repeated Components.Edge edges = 9;
+  bool starred = 10;
+  google.protobuf.Timestamp starred_at = 11;
 }
 
 message CanvasPreference {
   string canvas_id = 1;
-  bool pinned = 2;
-  bool starred = 3;
-  google.protobuf.Timestamp pinned_at = 4;
-  google.protobuf.Timestamp starred_at = 5;
+  bool starred = 2;
+  google.protobuf.Timestamp starred_at = 3;
 }
 
 message Canvas {
@@ -699,6 +706,7 @@ message CanvasNodeExecution {
     STATE_PENDING = 1;
     STATE_STARTED = 2;
     STATE_FINISHED = 3;
+    STATE_CANCELLING = 4;
   }
 
   enum Result {
@@ -730,6 +738,7 @@ message CanvasNodeExecution {
   CanvasEvent root_event = 14;
   UserRef cancelled_by = 15;
   string run_id = 16;
+  google.protobuf.Timestamp cancelled_at = 17;
 }
 
 message CanvasNodeQueueItem {
@@ -782,6 +791,15 @@ message DescribeRunRequest {
 }
 
 message DescribeRunResponse {
+  CanvasRun run = 1;
+}
+
+message CancelRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message CancelRunResponse {
   CanvasRun run = 1;
 }
 
@@ -855,7 +873,8 @@ message CanvasRun {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_STARTED = 2;
-    STATE_FINISHED = 3;
+    STATE_CANCELLING = 4;
+    STATE_FINISHED = 5;
   }
 
   enum Result {
@@ -876,7 +895,8 @@ message CanvasRun {
   google.protobuf.Timestamp finished_at = 9;
   string version_id = 10;
   repeated CanvasNodeQueueItem queue_items = 11;
-  CanvasRunRef parent = 12;
+  google.protobuf.Timestamp cancelled_at = 12;
+  CanvasRunRef parent = 13;
 }
 
 message CanvasRunRef {

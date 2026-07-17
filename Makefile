@@ -115,7 +115,7 @@ dev.setup.npm:
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
 
 dev.setup.go:
-	@$(COMPOSE) exec app go mod download
+	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
 
 dev.setup.no.cache:
@@ -166,6 +166,9 @@ dev.pr.clean.checkout:
 
 check.example.payloads:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
+
+check.proto.field.numbers:
+	bash ./scripts/check_proto_field_numbers.sh
 
 check.configuration.fields:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
@@ -312,8 +315,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents,usage
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models

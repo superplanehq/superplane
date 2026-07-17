@@ -15,7 +15,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
@@ -149,6 +151,30 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
+	t.Run("expired API key api token is rejected", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		expiredAt := time.Now().Add(-time.Minute)
+		apiKey := &models.User{
+			ID:              uuid.New(),
+			OrganizationID:  r.Organization.ID,
+			Name:            "expired-bot",
+			Type:            models.UserTypeAPIKey,
+			TokenHash:       crypto.HashToken(rawToken),
+			APIKeyExpiresAt: &expiredAt,
+			APIKeyCanvasIDs: datatypes.NewJSONSlice([]string{}),
+		}
+		require.NoError(t, database.Conn().Create(apiKey).Error)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
 
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)

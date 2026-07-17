@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Retry wrapper around `go mod download`.
+#
+# Go does not retry the same proxy fetch on transient errors (`stream error`,
+# `INTERNAL_ERROR`, 5xx, TCP/GCS blips), so a single network hiccup fails CI on
+# an otherwise healthy PR (see issue #6161). This wraps the download in a short
+# retry loop with exponential backoff so those transient failures self-heal.
+#
+# Scope is intentionally limited to the download step: `go build` / `go test`
+# stay outside the loop so retries never mask real build or test failures.
+#
+# Tunable via environment:
+#   GO_MOD_DOWNLOAD_MAX_RETRIES   attempts before giving up (default 3)
+#   GO_MOD_DOWNLOAD_INITIAL_DELAY  seconds before the first retry (default 5)
+#   GO_MOD_DOWNLOAD_MAX_DELAY      cap on backoff delay in seconds (default 60)
+#
+# Any extra arguments are forwarded to `go mod download` (e.g. `-x`).
+
+set -euo pipefail
+
+MAX_RETRIES="${GO_MOD_DOWNLOAD_MAX_RETRIES:-3}"
+DELAY="${GO_MOD_DOWNLOAD_INITIAL_DELAY:-5}"
+MAX_DELAY="${GO_MOD_DOWNLOAD_MAX_DELAY:-60}"
+
+attempt=1
+while true; do
+  if go mod download "$@"; then
+    exit 0
+  fi
+
+  if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+    echo "go mod download failed after ${MAX_RETRIES} attempt(s)." >&2
+    echo "Probing ${GOPROXY:-proxy.golang.org} for diagnostics:" >&2
+    go env GOPROXY GOMODCACHE GOFLAGS >&2 || true
+    exit 1
+  fi
+
+  echo "go mod download failed (attempt ${attempt}/${MAX_RETRIES}); retrying in ${DELAY}s..." >&2
+  sleep "$DELAY"
+
+  attempt=$((attempt + 1))
+  DELAY=$((DELAY * 2))
+  if [ "$DELAY" -gt "$MAX_DELAY" ]; then
+    DELAY="$MAX_DELAY"
+  fi
+done

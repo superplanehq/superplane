@@ -92,14 +92,6 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	r := support.Setup(t)
 
-	pinnedCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{},
-		[]models.Edge{},
-	)
-
 	starredCanvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
@@ -108,16 +100,19 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 		[]models.Edge{},
 	)
 
+	plainCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	// Another user's star must not leak into this user's view.
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	_, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), otherUser.ID.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId: pinnedCanvas.ID.String(),
+		CanvasId: plainCanvas.ID.String(),
 		Starred:  proto.Bool(true),
-	})
-	require.NoError(t, err)
-
-	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId: pinnedCanvas.ID.String(),
-		Pinned:   proto.Bool(true),
 	})
 	require.NoError(t, err)
 
@@ -131,19 +126,15 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.Canvases, 2)
 
-	pinnedSummary := findCanvasSummary(response.Canvases, pinnedCanvas.ID.String())
-	require.NotNil(t, pinnedSummary)
-	assert.True(t, pinnedSummary.Pinned)
-	assert.False(t, pinnedSummary.Starred)
-	assert.NotNil(t, pinnedSummary.PinnedAt)
-	assert.Nil(t, pinnedSummary.StarredAt)
-
 	starredSummary := findCanvasSummary(response.Canvases, starredCanvas.ID.String())
 	require.NotNil(t, starredSummary)
-	assert.False(t, starredSummary.Pinned)
 	assert.True(t, starredSummary.Starred)
-	assert.Nil(t, starredSummary.PinnedAt)
 	assert.NotNil(t, starredSummary.StarredAt)
+
+	plainSummary := findCanvasSummary(response.Canvases, plainCanvas.ID.String())
+	require.NotNil(t, plainSummary)
+	assert.False(t, plainSummary.Starred)
+	assert.Nil(t, plainSummary.StarredAt)
 }
 
 func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.T) {

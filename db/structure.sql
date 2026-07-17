@@ -498,7 +498,6 @@ CREATE TABLE public.user_canvas_preferences (
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
-    pinned_at timestamp without time zone,
     starred_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -521,7 +520,9 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid
+    created_by uuid,
+    api_key_expires_at timestamp without time zone,
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -597,7 +598,8 @@ CREATE TABLE public.workflow_node_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     cancelled_by uuid,
-    run_id uuid NOT NULL
+    run_id uuid NOT NULL,
+    cancelled_at timestamp without time zone
 );
 
 
@@ -671,6 +673,8 @@ CREATE TABLE public.workflow_runs (
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
     version_id uuid NOT NULL,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid,
     parent_run_id uuid,
     parent_workflow_id uuid,
     parent_execution_id uuid,
@@ -1436,13 +1440,6 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
--- Name: idx_user_canvas_preferences_user_pinned; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_user_canvas_preferences_user_pinned ON public.user_canvas_preferences USING btree (organization_id, user_id, pinned_at DESC) WHERE (pinned_at IS NOT NULL);
-
-
---
 -- Name: idx_user_canvas_preferences_user_starred; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1590,6 +1587,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_cancelling; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1667,17 +1671,17 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'api_key'::text);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
-
-
---
--- Name: unique_service_account_in_organization; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_service_account_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'service_account'::text);
 
 
 --
@@ -2105,6 +2109,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.users(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2240,7 +2252,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260715232202	f
+20260717191931	f
 \.
 
 

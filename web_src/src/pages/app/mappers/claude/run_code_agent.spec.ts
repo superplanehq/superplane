@@ -104,6 +104,32 @@ describe("runCodeAgentMapper.getExecutionDetails", () => {
     expect(details["Summary"]).toBeUndefined();
     expect(details["Emitted At"]).toBeUndefined();
   });
+
+  it("joins artifact filenames and omits the entry when there are none", () => {
+    const withArtifacts = runCodeAgentMapper.getExecutionDetails(
+      buildDetailsCtx({
+        execution: {
+          outputs: {
+            default: [
+              buildOutput({
+                status: "idle",
+                artifacts: [
+                  { fileId: "file_1", filename: "report.pdf" },
+                  { fileId: "file_2", filename: "chart.png" },
+                ],
+              }),
+            ],
+          },
+        },
+      }),
+    );
+    expect(withArtifacts["Artifacts"]).toBe("report.pdf, chart.png");
+
+    const withoutArtifacts = runCodeAgentMapper.getExecutionDetails(
+      buildDetailsCtx({ execution: { outputs: { default: [buildOutput({ status: "idle", artifacts: [] })] } } }),
+    );
+    expect(withoutArtifacts["Artifacts"]).toBeUndefined();
+  });
 });
 
 describe("runCodeAgentMapper.props", () => {

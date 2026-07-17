@@ -72,8 +72,8 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "DELETE", Pattern: "/api/v1/service-accounts/{id}"}: {
-			Resource:   "service_accounts",
+		{Method: "DELETE", Pattern: "/api/v1/api-keys/{id}"}: {
+			Resource:   "api_keys",
 			Action:     "delete",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -160,6 +160,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/runs/{run_id}"}: {
 			Resource:           "canvases",
 			Action:             "read",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
+		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/runs/{run_id}/cancel"}: {
+			Resource:           "canvases",
+			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
@@ -257,13 +263,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/service-accounts"}: {
-			Resource:   "service_accounts",
+		{Method: "GET", Pattern: "/api/v1/api-keys"}: {
+			Resource:   "api_keys",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/service-accounts/{id}"}: {
-			Resource:   "service_accounts",
+		{Method: "GET", Pattern: "/api/v1/api-keys/{id}"}: {
+			Resource:   "api_keys",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -352,8 +358,8 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "PATCH", Pattern: "/api/v1/service-accounts/{id}"}: {
-			Resource:   "service_accounts",
+		{Method: "PATCH", Pattern: "/api/v1/api-keys/{id}"}: {
+			Resource:   "api_keys",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -450,13 +456,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "POST", Pattern: "/api/v1/service-accounts"}: {
-			Resource:   "service_accounts",
+		{Method: "POST", Pattern: "/api/v1/api-keys"}: {
+			Resource:   "api_keys",
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "POST", Pattern: "/api/v1/service-accounts/{id}/token"}: {
-			Resource:   "service_accounts",
+		{Method: "POST", Pattern: "/api/v1/api-keys/{id}/token"}: {
+			Resource:   "api_keys",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},

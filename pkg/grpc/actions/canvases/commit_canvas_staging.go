@@ -224,13 +224,7 @@ func publishDeletedNodeCleanupMessages(canvasID uuid.UUID, result changesets.Can
 			continue
 		}
 
-		message := messages.NewCanvasQueueItemDeletedMessage(
-			canvasID.String(),
-			queueItem.ID.String(),
-			queueItem.NodeID,
-			queueItem.RunID.String(),
-		)
-		if err := message.PublishDeleted(); err != nil {
+		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
 			log.Errorf("failed to publish deleted queue item RabbitMQ message: %v", err)
 		}
 	}
@@ -510,7 +504,7 @@ func createNewCanvasVersionFromLive(
 		case ConsoleYAMLRepositoryPath:
 			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
 			}
 
 			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))

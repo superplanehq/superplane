@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,6 +41,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
+	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -48,7 +50,6 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
-	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -71,6 +72,8 @@ const (
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
 )
+
+var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
 	httpServer            *http.Server
@@ -353,7 +356,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
-	err = pbServiceAccounts.RegisterServiceAccountsHandlerServer(ctx, grpcGatewayMux, services.ServiceAccounts)
+	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
 	}
@@ -410,7 +413,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/actions").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
@@ -457,9 +460,25 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 				return
 			}
 			r2.Header.Set("x-Token-Scopes", string(scopes))
+		} else if user.HasAPIKeyCanvasScope() {
+			scopes, err := json.Marshal(apiKeyCanvasScopes(user.APIKeyCanvasIDs))
+			if err != nil {
+				http.Error(w, "Failed to encode API key scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+	})
+}
+
+func apiKeyCanvasScopes(canvasIDs []string) []string {
+	return jwt.ScopesFromPermissions([]jwt.Permission{
+		{ResourceType: "canvases", Action: "read", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update_version", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "delete", Resources: canvasIDs},
 	})
 }
 
@@ -796,7 +815,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		// the full error chain here.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to load organization creation status")
-		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to load organization creation status", err)
 		return
 	}
 
@@ -865,6 +884,10 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 		return response, nil
 	}
 
+	if isTransientUsageServiceError(err) {
+		return nil, fmt.Errorf("%w: check account limits: %w", errUsageServiceUnavailable, err)
+	}
+
 	if status.Code(err) != codes.NotFound {
 		return nil, err
 	}
@@ -883,10 +906,31 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 			WithField("account_id", accountID).
 			WithField("grpc_code", status.Code(err).String()).
 			Error("failed to check account limits after lazy provisioning")
+		if isTransientUsageServiceError(err) {
+			return nil, fmt.Errorf("%w: check account limits after lazy provisioning: %w", errUsageServiceUnavailable, err)
+		}
 		return nil, err
 	}
 
 	return response, nil
+}
+
+func isTransientUsageServiceError(err error) bool {
+	switch status.Code(err) {
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+func writeOrganizationCreationStatusError(w http.ResponseWriter, fallbackMessage string, err error) {
+	if errors.Is(err, errUsageServiceUnavailable) {
+		http.Error(w, "Usage service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	http.Error(w, fallbackMessage, http.StatusInternalServerError)
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -920,7 +964,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		// error with stage-specific structured fields.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to check organization creation status before creating organization")
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to create organization", err)
 		return
 	}
 

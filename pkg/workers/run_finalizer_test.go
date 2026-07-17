@@ -10,8 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
 )
@@ -212,4 +214,217 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, touchedRun.UpdatedAt.After(staleUpdatedAt))
 	assert.Equal(t, models.CanvasRunStateStarted, touchedRun.State)
+}
+
+func Test__RunFinalizer_FinalizesCancellingRunWithForcedCancelledResult(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	require.NoError(t, execution.Cancel(nil))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+	}).Error)
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+}
+
+func Test__RunFinalizer_SweepCancellingRuns_FinalizesWhenNoOpenWork(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	require.NoError(t, execution.Cancel(nil))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+	}).Error)
+
+	require.NoError(t, finalizer.sweepCancellingRuns())
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+	assert.NotNil(t, updatedRun.FinishedAt)
+}
+
+func Test__RunFinalizer_SweepCancellingRuns_DrainsOpenWorkAndPublishesMessages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+
+	executionCancellingConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionCancellingRoutingKey)
+	executionCancellingConsumer.Start()
+	defer executionCancellingConsumer.Stop()
+
+	queueItemDeletedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemDeletedRoutingKey)
+	queueItemDeletedConsumer.Start()
+	defer queueItemDeletedConsumer.Stop()
+
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	execution.State = models.CanvasNodeExecutionStateStarted
+	require.NoError(t, database.Conn().Save(execution).Error)
+
+	now := time.Now()
+	queueItem := models.CanvasNodeQueueItem{
+		WorkflowID:  canvas.ID,
+		NodeID:      node,
+		RootEventID: event.ID,
+		RunID:       run.ID,
+		EventID:     event.ID,
+		CreatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(&queueItem).Error)
+
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+	}).Error)
+
+	require.NoError(t, finalizer.sweepCancellingRuns())
+
+	assert.True(t, executionCancellingConsumer.HasReceivedMessage())
+	assert.True(t, queueItemDeletedConsumer.HasReceivedMessage())
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+
+	var queueItemCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeQueueItem{}).Where("run_id = ?", run.ID).Count(&queueItemCount).Error)
+	assert.Zero(t, queueItemCount)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+
+	require.NoError(t, execution.Cancel(nil))
+
+	require.NoError(t, finalizer.sweepCancellingRuns())
+
+	updatedRun, err = models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+	assert.NotNil(t, updatedRun.FinishedAt)
+}
+
+func Test__RunFinalizer_SweepCancellingRuns_DoesNotBumpUpdatedAtWhenStillOpenAfterDrain(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	execution.State = models.CanvasNodeExecutionStateStarted
+	require.NoError(t, database.Conn().Save(execution).Error)
+
+	staleUpdatedAt := time.Now().Add(-time.Hour)
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+		"updated_at":   staleUpdatedAt,
+	}).Error)
+
+	require.NoError(t, finalizer.sweepCancellingRuns())
+
+	unchangedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, staleUpdatedAt.Unix(), unchangedRun.UpdatedAt.Unix())
+	assert.Equal(t, models.CanvasRunStateCancelling, unchangedRun.State)
 }
