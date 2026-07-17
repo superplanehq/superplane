@@ -29,6 +29,21 @@ function resourceField(): ConfigurationField {
   };
 }
 
+function multiResourceField(togglable: boolean): ConfigurationField {
+  return {
+    name: "assignees",
+    label: "Assignees",
+    type: "integration-resource",
+    togglable,
+    typeOptions: {
+      resource: {
+        type: "member",
+        multi: true,
+      },
+    },
+  };
+}
+
 function ControlledRenderer({ initialValue }: { initialValue?: string }) {
   const [value, setValue] = useState<string | string[] | undefined>(initialValue);
   return (
@@ -107,5 +122,41 @@ describe("IntegrationResourceFieldRenderer", () => {
     await user.click(screen.getByRole("tab", { name: "Fixed" }));
 
     expect(handleChange).not.toHaveBeenCalledWith(undefined);
+  });
+
+  it("clears a togglable multi-select to an empty array, not undefined, when the last chip is removed", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <IntegrationResourceFieldRenderer
+        field={multiResourceField(true)}
+        value={["resource-1"]}
+        onChange={onChange}
+        organizationId="org-1"
+        integrationId="int-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("remove-resource-1"));
+
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("clears a non-togglable multi-select to undefined when the last chip is removed", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <IntegrationResourceFieldRenderer
+        field={multiResourceField(false)}
+        value={["resource-1"]}
+        onChange={onChange}
+        organizationId="org-1"
+        integrationId="int-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("remove-resource-1"));
+
+    expect(onChange).toHaveBeenCalledWith(undefined);
   });
 });
