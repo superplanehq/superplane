@@ -28,14 +28,13 @@ func deleteCanvasNodeResourcesBatched(
 	eventCleanup canvasNodeEventCleanupMode,
 ) (resourcesDeleted int, allResourcesDeleted bool, err error) {
 	resourceTypes := []struct {
-		model     any
-		tableName string
+		model any
 	}{
-		{&models.CanvasNodeRequest{}, "workflow_node_requests"},
-		{&models.CanvasNodeExecutionKV{}, "workflow_node_execution_kvs"},
-		{&models.CanvasNodeExecution{}, "workflow_node_executions"},
-		{&models.CanvasNodeQueueItem{}, "workflow_node_queue_items"},
-		{&models.CanvasEvent{}, "workflow_events"},
+		{&models.CanvasNodeRequest{}},
+		{&models.CanvasNodeExecutionKV{}},
+		{&models.CanvasNodeExecution{}},
+		{&models.CanvasNodeQueueItem{}},
+		{&models.CanvasEvent{}},
 	}
 
 	totalDeleted := 0
@@ -49,13 +48,13 @@ func deleteCanvasNodeResourcesBatched(
 		var deleted int
 		var deleteErr error
 
-		if resourceType.tableName == "workflow_events" {
+		if _, isEvent := resourceType.model.(*models.CanvasEvent); isEvent {
 			deleted, deleteErr = deleteCanvasNodeEventsBatch(tx, workflowID, nodeID, remaining, eventCleanup)
 		} else {
-			deleted, deleteErr = deleteCanvasNodeResourceBatch(tx, resourceType.tableName, workflowID, nodeID, remaining)
+			deleted, deleteErr = deleteCanvasNodeResourceBatch(tx, resourceType.model, workflowID, nodeID, remaining)
 		}
 		if deleteErr != nil {
-			return totalDeleted, false, fmt.Errorf("failed to delete %s: %w", resourceType.tableName, deleteErr)
+			return totalDeleted, false, fmt.Errorf("failed to delete resources: %w", deleteErr)
 		}
 
 		totalDeleted += deleted
@@ -65,7 +64,7 @@ func deleteCanvasNodeResourcesBatched(
 
 		var count int64
 		if err := tx.Unscoped().Model(resourceType.model).Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Count(&count).Error; err != nil {
-			return totalDeleted, false, fmt.Errorf("failed to count remaining %s: %w", resourceType.tableName, err)
+			return totalDeleted, false, fmt.Errorf("failed to count remaining resources: %w", err)
 		}
 
 		if count > 0 {
@@ -86,7 +85,7 @@ func deleteCanvasNodeResourcesBatched(
 
 func deleteCanvasNodeResourceBatch(
 	tx *gorm.DB,
-	tableName string,
+	model any,
 	workflowID uuid.UUID,
 	nodeID string,
 	limit int,
@@ -95,21 +94,13 @@ func deleteCanvasNodeResourceBatch(
 		return 0, nil
 	}
 
-	// PostgreSQL does not support LIMIT on DELETE, so delete via a subquery.
-	result := tx.Exec(
-		fmt.Sprintf(
-			`DELETE FROM %s WHERE id IN (
-				SELECT id FROM %s
-				WHERE workflow_id = ? AND node_id = ?
-				LIMIT ?
-			)`,
-			tableName,
-			tableName,
-		),
-		workflowID,
-		nodeID,
-		limit,
-	)
+	// PostgreSQL has no DELETE ... LIMIT, so limit via a SELECT subquery.
+	ids := tx.Model(model).
+		Select("id").
+		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
+		Limit(limit)
+
+	result := tx.Where("id IN (?)", ids).Delete(model)
 	if result.Error != nil {
 		return 0, result.Error
 	}
@@ -129,27 +120,23 @@ func deleteCanvasNodeEventsBatch(
 	}
 
 	if eventCleanup == canvasNodeEventCleanupDeleteAll {
-		return deleteCanvasNodeResourceBatch(tx, "workflow_events", workflowID, nodeID, limit)
+		return deleteCanvasNodeResourceBatch(tx, &models.CanvasEvent{}, workflowID, nodeID, limit)
 	}
 
-	result := tx.Exec(
-		`DELETE FROM workflow_events WHERE id IN (
-			SELECT e.id FROM workflow_events e
-			WHERE e.workflow_id = ? AND e.node_id = ?
-			AND NOT EXISTS (
-				SELECT 1 FROM workflow_node_executions x
-				WHERE x.root_event_id = e.id OR x.event_id = e.id
-			)
-			AND NOT EXISTS (
-				SELECT 1 FROM workflow_node_queue_items q
-				WHERE q.root_event_id = e.id OR q.event_id = e.id
-			)
-			LIMIT ?
-		)`,
-		workflowID,
-		nodeID,
-		limit,
-	)
+	ids := tx.Model(&models.CanvasEvent{}).
+		Select("id").
+		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM workflow_node_executions x
+			WHERE x.root_event_id = workflow_events.id OR x.event_id = workflow_events.id
+		)`).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM workflow_node_queue_items q
+			WHERE q.root_event_id = workflow_events.id OR q.event_id = workflow_events.id
+		)`).
+		Limit(limit)
+
+	result := tx.Where("id IN (?)", ids).Delete(&models.CanvasEvent{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
