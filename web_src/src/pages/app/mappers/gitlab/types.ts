@@ -74,6 +74,8 @@ export interface MergeRequest {
   draft?: boolean;
   labels?: string[];
   author?: User;
+  assignees?: User[];
+  reviewers?: User[];
   web_url?: string;
 }
 
