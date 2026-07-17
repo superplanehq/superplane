@@ -64,11 +64,13 @@ var defaultRunTitleExpressions = map[string]string{
 	"github.onTagCreated":      "{{ root().data.ref }}",
 	"github.onWorkflowRun":     "{{ root().data.workflow_run.name }} {{ root().data.workflow_run.conclusion }} #{{ root().data.workflow_run.run_number }}",
 
+	"gitlab.onBranchCreated": "{{ root().data.ref }}",
 	"gitlab.onIssue":         "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onMergeComment":  "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",
 	"gitlab.onMergeRequest":  "!{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onMilestone":     "{{ root().data.object_attributes.title }}",
 	"gitlab.onPipeline":      "{{ root().data.object_attributes.ref }}",
+	"gitlab.onPush":          "{{ root().data.commits[-1].message }} - {{ root().data.commits[-1].id[:7] }}",
 	"gitlab.onRelease":       "{{ root().data.name }}",
 	"gitlab.onTag":           "{{ root().data.ref }}",
 	"gitlab.onVulnerability": "{{ root().data.object_attributes.title }}",

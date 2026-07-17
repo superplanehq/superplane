@@ -7,11 +7,13 @@ import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
 import { createIssueMapper } from "./create_issue";
 import { createMergeCommentMapper } from "./create_merge_comment";
+import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
 import { onMergeRequestTriggerRenderer } from "./on_merge_request";
 import { onMilestoneTriggerRenderer } from "./on_milestone";
 import { onPipelineTriggerRenderer } from "./on_pipeline";
+import { onPushTriggerRenderer } from "./on_push";
 import { onReleaseTriggerRenderer } from "./on_release";
 import { onTagTriggerRenderer } from "./on_tag";
 import { onVulnerabilityTriggerRenderer } from "./on_vulnerability";
@@ -47,11 +49,13 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
+  onBranchCreated: onBranchCreatedTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onMergeComment: onMergeCommentTriggerRenderer,
   onMergeRequest: onMergeRequestTriggerRenderer,
   onMilestone: onMilestoneTriggerRenderer,
   onPipeline: onPipelineTriggerRenderer,
+  onPush: onPushTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
   onTag: onTagTriggerRenderer,
   onVulnerability: onVulnerabilityTriggerRenderer,

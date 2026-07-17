@@ -105,7 +105,7 @@ To connect with a **Personal Access Token**:
 1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) — the link prefills the name and scopes (%s), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
 2. Paste the token into the **Access Token** field and click **Save**.
 
-**Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
+**Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
 
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
@@ -193,11 +193,13 @@ func (g *GitLab) Actions() []core.Action {
 
 func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&OnBranchCreated{},
 		&OnIssue{},
 		&OnMergeComment{},
 		&OnMergeRequest{},
 		&OnMilestone{},
 		&OnPipeline{},
+		&OnPush{},
 		&OnRelease{},
 		&OnTag{},
 		&OnVulnerability{},
