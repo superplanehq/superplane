@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import {
   canvasesCancelExecution,
+  canvasesCancelRun,
   canvasesDeleteNodeQueueItem,
-  canvasesDescribeRun,
   canvasesInvokeNodeExecutionHook,
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
@@ -63,8 +63,6 @@ export function useRunInspectorActions({
   const stopMutation = useStopMutation({
     canvasId,
     runId: run.id ?? null,
-    runningExecutionIds,
-    queuedItems,
     refreshRunQueries,
   });
   const stopNodeMutation = useStopNodeMutation({ canvasId, refreshRunQueries });
@@ -78,6 +76,7 @@ export function useRunInspectorActions({
     stopPending: stopMutation.isPending,
     stopDisabled:
       stopMutation.isPending ||
+      run.state === "STATE_CANCELLING" ||
       (runningExecutionIds.length === 0 &&
         queuedItems.length === 0 &&
         (executionsLoading || !run.rootEvent?.id || !hasLoadedActionSection)),
@@ -149,35 +148,29 @@ function useRerunMutation({
 function useStopMutation({
   canvasId,
   runId,
-  runningExecutionIds,
-  queuedItems,
   refreshRunQueries,
 }: {
   canvasId: string;
   runId: string | null;
-  runningExecutionIds: string[];
-  queuedItems: QueuedItemReference[];
   refreshRunQueries: () => Promise<void>;
 }) {
   return useMutation({
     mutationFn: async () => {
-      const workToStop = runId ? await fetchRunWorkForStop(canvasId, runId) : { runningExecutionIds, queuedItems };
-
-      if (workToStop.runningExecutionIds.length === 0 && workToStop.queuedItems.length === 0) {
-        return false;
+      if (!runId) {
+        return;
       }
 
-      await Promise.all([
-        ...workToStop.runningExecutionIds.map((executionId) => cancelExecution(canvasId, executionId)),
-        ...workToStop.queuedItems.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
-      ]);
-      return true;
+      await canvasesCancelRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId,
+          },
+        }),
+      );
     },
-    onSuccess: async (stoppedWork) => {
+    onSuccess: async () => {
       await refreshRunQueries();
-      if (stoppedWork) {
-        showSuccessToast("Run stopped");
-      }
     },
     onError: (error) => {
       console.error("Failed to stop run", error);
@@ -283,20 +276,6 @@ async function deleteQueuedItem(canvasId: string, nodeId: string, itemId: string
   );
 }
 
-async function fetchRunWorkForStop(canvasId: string, runId: string): Promise<StopRunWork> {
-  const response = await canvasesDescribeRun(
-    withOrganizationHeader({
-      path: { canvasId, runId },
-    }),
-  );
-
-  const run = response.data?.run;
-  return {
-    runningExecutionIds: runningExecutionIdsFromRun(run),
-    queuedItems: run?.queueItems?.filter(hasQueueItemIdentity).map(toQueuedItemReference) ?? [],
-  };
-}
-
 function invokeExecutionHook(canvasId: string) {
   return async ({
     executionId,
@@ -331,22 +310,6 @@ type QueuedItemReference = {
   nodeId: string;
   itemId: string;
 };
-
-type StopRunWork = {
-  runningExecutionIds: string[];
-  queuedItems: QueuedItemReference[];
-};
-
-function runningExecutionIdsFromRun(run: CanvasesCanvasRun | undefined): string[] {
-  const ids: string[] = [];
-  for (const executionRef of run?.executions ?? []) {
-    if (executionRef.id && executionRef.state === "STATE_STARTED") {
-      ids.push(executionRef.id);
-    }
-  }
-
-  return ids;
-}
 
 function hasQueueItemIdentity(
   queueItem: NonNullable<CanvasesCanvasRun["queueItems"]>[number],
