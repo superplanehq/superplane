@@ -738,6 +738,78 @@ func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvoking
 	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second)
 }
 
+func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvokingHook(t *testing.T) {
+	hookCalled := false
+	componentName := "cancelling_execution_request_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			hookCalled = true
+			return nil
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	cancellingAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateCancelling,
+		"updated_at": cancellingAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.False(t, hookCalled)
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, cancellingAt, *updatedExecution.UpdatedAt, time.Second)
+}
+
 func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionFinished(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

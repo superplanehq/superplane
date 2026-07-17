@@ -306,8 +306,8 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
-	if execution.State == models.CanvasNodeExecutionStateFinished {
-		logger.Infof("Execution %s already finished - completing request", execution.ID)
+	if execution.State == models.CanvasNodeExecutionStateFinished || execution.State == models.CanvasNodeExecutionStateCancelling {
+		logger.Infof("Execution %s already finished or cancelling - completing request", execution.ID)
 		return request.Complete(tx)
 	}
 
