@@ -76,6 +76,14 @@ func (j *Jira) Configuration() []configuration.Field {
 			Required:    true,
 			Description: "API token from https://id.atlassian.com/manage-profile/security/api-tokens",
 		},
+		{
+			Name:        "webhookSharedSecret",
+			Label:       "Webhook Shared Secret",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Required:    false,
+			Description: "Optional secret used to verify inbound issue-webhook requests (e.g. from a Jira Automation rule sending a custom Authorization: Bearer header). Leave empty if your setup can't send custom headers, such as native Jira Admin Webhooks.",
+		},
 	}
 }
 
@@ -103,7 +111,9 @@ func (j *Jira) Actions() []core.Action {
 }
 
 func (j *Jira) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnIssue{},
+	}
 }
 
 func (j *Jira) Cleanup(ctx core.IntegrationCleanupContext) error {

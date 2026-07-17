@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issue",
+  "data": {
+    "action": "created",
+    "issue": {
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001",
+      "fields": {
+        "summary": "Login page returns 500 on invalid password",
+        "issuetype": { "name": "Bug" },
+        "project": { "id": "10000", "key": "ENG", "name": "Engineering" },
+        "status": { "name": "To Do", "statusCategory": { "name": "To Do", "key": "new" } },
+        "priority": { "name": "High" },
+        "assignee": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+          "displayName": "Alice Smith",
+          "emailAddress": "alice@example.com"
+        },
+        "reporter": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+          "displayName": "Bob Jones",
+          "emailAddress": "bob@example.com"
+        },
+        "labels": ["auth", "regression"],
+        "created": "2026-07-17T09:30:00.000+0000",
+        "updated": "2026-07-17T09:30:00.000+0000"
+      }
+    },
+    "user": {
+      "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+      "displayName": "Bob Jones",
+      "emailAddress": "bob@example.com"
+    }
+  }
+}
