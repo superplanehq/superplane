@@ -19,9 +19,9 @@ const (
 	CanvasRunStateCancelling = "cancelling"
 	CanvasRunStateFinished   = "finished"
 
-	CanvasRunResultPassed    = "passed"
-	CanvasRunResultFailed    = "failed"
-	CanvasRunResultCancelled = "cancelled"
+	CanvasRunResultPassed    = core.RunResultPassed
+	CanvasRunResultFailed    = core.RunResultFailed
+	CanvasRunResultCancelled = core.RunResultCancelled
 
 	// Used when locking rows to update non-key columns only, so concurrent child
 	// inserts referencing the row via FK are not blocked (PostgreSQL FOR NO KEY UPDATE).
@@ -29,37 +29,22 @@ const (
 )
 
 type CanvasRun struct {
-	ID uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-
-	//
-	// The target node of the run
-	//
-	WorkflowID uuid.UUID
-	NodeID     string
-	VersionID  uuid.UUID
-
-	//
-	// The information for the parent of the run.
-	// Parent runs can be in a different workflow.
-	//
+	ID                uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	WorkflowID        uuid.UUID
+	NodeID            string
+	VersionID         uuid.UUID
 	ParentRunID       *uuid.UUID
 	ParentWorkflowID  *uuid.UUID
 	ParentExecutionID *uuid.UUID
-
-	//
-	// Callback definitions for the run.
-	// Allows controlling specific behavior to run throughout the run lifecycle.
-	//
-	Callbacks datatypes.JSONSlice[core.RunCallbackDefinition]
-
-	Input       JSONValue
-	State       string
-	Result      string
-	CreatedAt   *time.Time
-	UpdatedAt   *time.Time
-	CancelledAt *time.Time
-	CancelledBy *uuid.UUID
-	FinishedAt  *time.Time
+	Callbacks         datatypes.JSONSlice[core.RunCallback]
+	Input             JSONValue
+	State             string
+	Result            string
+	CreatedAt         *time.Time
+	UpdatedAt         *time.Time
+	CancelledAt       *time.Time
+	CancelledBy       *uuid.UUID
+	FinishedAt        *time.Time
 }
 
 func (r *CanvasRun) TableName() string {

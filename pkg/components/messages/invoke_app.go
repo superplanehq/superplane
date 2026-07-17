@@ -66,7 +66,7 @@ func (c *InvokeApp) ExampleOutput() map[string]any {
 	return map[string]any{
 		"run": map[string]any{
 			"id":     "123",
-			"result": models.CanvasRunResultPassed,
+			"result": core.RunResultPassed,
 		},
 	}
 }
@@ -189,15 +189,15 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		App:   nodeMetadata.App.ID,
 		Node:  nodeMetadata.Node.ID,
 		Input: config.Parameters,
-		Callbacks: []core.RunCallbackDefinition{
+		Callbacks: []core.RunCallback{
 			{
-				Kind: core.RunCallbackKindInit,
-				Ref:  core.RunCallbackRefTarget,
+				When: core.RunCallbackWhenPending,
+				On:   core.RunCallbackOnEntry,
 				Hook: "onMessage",
 			},
 			{
-				Kind: core.RunCallbackKindFinished,
-				Ref:  core.RunCallbackRefParent,
+				When: core.RunCallbackWhenFinished,
+				On:   core.RunCallbackOnParent,
 				Hook: "onRunFinished",
 			},
 		},

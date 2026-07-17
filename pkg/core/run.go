@@ -8,14 +8,9 @@ import (
 )
 
 const (
-	RunResultPassed = "passed"
-	RunResultFailed = "failed"
-
-	RunCallbackKindInit     = "init"
-	RunCallbackKindFinished = "finished"
-
-	RunCallbackRefTarget = "target"
-	RunCallbackRefParent = "parent"
+	RunResultPassed    = "passed"
+	RunResultFailed    = "failed"
+	RunResultCancelled = "cancelled"
 )
 
 type RunExecutionContext interface {
@@ -33,16 +28,30 @@ type RunCreationParams struct {
 	Input     any
 	App       string
 	Node      string
-	Callbacks []RunCallbackDefinition
+	Callbacks []RunCallback
 }
 
-type RunCallbackDefinition struct {
-	Kind string
-	Ref  string
-	Hook string
+const (
+	RunCallbackWhenPending  = "pending"
+	RunCallbackWhenFinished = "finished"
+
+	RunCallbackOnEntry  = "entry"
+	RunCallbackOnParent = "parent"
+)
+
+/*
+ * Run callbacks are the way for components
+ * to execute custom behavior during a run's lifecycle.
+ */
+type RunCallback struct {
+	When string `json:"when" mapstructure:"when"`
+	On   string `json:"on" mapstructure:"on"`
+	Hook string `json:"hook" mapstructure:"hook"`
 }
 
-// RunFinishedCallback is the payload for RunCallbackKindFinished hooks on the parent.
+/*
+ * RunFinishedCallback is the payload used in the RunCallbackWhenFinished run lifecycle callback.
+ */
 type RunFinishedCallback struct {
 	Run Run `json:"run" mapstructure:"run"`
 }
@@ -88,7 +97,6 @@ func decodeRunCallback[T any](params map[string]any) (T, error) {
 	return callback, nil
 }
 
-// NewRun builds the run snapshot carried in run callback payloads.
 func NewRun(id, appID uuid.UUID, result string, errMessage *string) Run {
 	return Run{
 		ID:     id,

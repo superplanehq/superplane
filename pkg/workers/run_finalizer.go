@@ -2,15 +2,12 @@ package workers
 
 import (
 	"context"
-	"fmt"
-	"slices"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -18,7 +15,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
@@ -321,7 +317,6 @@ func (w *RunFinalizer) consumeQueueItemDeleted(delivery tackle.Delivery) error {
 }
 
 func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) error {
-	messageCollector := NewRunFinalizerMessageCollector()
 
 	//
 	// For every run we process, we track the following metrics:
@@ -347,11 +342,21 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		"run_id":      runID,
 	})
 
+	var newEvents []models.CanvasEvent
+	eventCollector := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	var executionUpdates []models.CanvasNodeExecution
+	executionCollector := func(executions []models.CanvasNodeExecution) {
+		executionUpdates = append(executionUpdates, executions...)
+	}
+
 	var finalized bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, messageCollector)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -376,14 +381,22 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
 	}
 
-	if err := messageCollector.Publish(); err != nil {
-		w.logger.WithError(err).Warnf("Failed to publish messages for run %s", runID)
+	for _, event := range newEvents {
+		if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), event.RunID.String(), &event).Publish(); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, messageCollector *RunFinalizerMessageCollector) (bool, string, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return false, "", err
@@ -429,137 +442,14 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
-	if err := w.executeRunCallback(tx, run, messageCollector); err != nil {
+	err = NewRunCallbackDispatcher(tx, w.registry, run).
+		WithEventCollector(eventCollector).
+		WithExecutionCollector(executionCollector).
+		DispatchFinished()
+
+	if err != nil {
 		return false, "", err
 	}
 
 	return true, "", nil
-}
-
-func (w *RunFinalizer) executeRunCallback(tx *gorm.DB, run *models.CanvasRun, messageCollector *RunFinalizerMessageCollector) error {
-	callbackIndex := slices.IndexFunc(run.Callbacks, func(callback core.RunCallbackDefinition) bool {
-		return callback.Kind == core.RunCallbackKindFinished
-	})
-
-	//
-	// If no callback exists, nothing extra to execute here.
-	//
-	if callbackIndex == -1 {
-		return nil
-	}
-
-	return w.executeCallback(tx, run, run.Callbacks[callbackIndex], messageCollector)
-}
-
-func (w *RunFinalizer) executeCallback(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition, messageCollector *RunFinalizerMessageCollector) error {
-	//
-	// TODO: handle target callbacks too
-	//
-	switch callback.Ref {
-	case core.RunCallbackRefParent:
-		return w.executeCallbackOnParent(tx, run, callback, messageCollector)
-	default:
-		return fmt.Errorf("invalid callback reference: %s", callback.Ref)
-	}
-}
-
-func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition, messageCollector *RunFinalizerMessageCollector) error {
-	newEvents := []models.CanvasEvent{}
-	onNewEvents := func(events []models.CanvasEvent) {
-		newEvents = append(newEvents, events...)
-	}
-
-	if run.ParentExecutionID == nil || run.ParentWorkflowID == nil {
-		return fmt.Errorf("no parent information")
-	}
-
-	execution, err := models.FindNodeExecutionInTransaction(tx, *run.ParentWorkflowID, *run.ParentExecutionID)
-	if err != nil {
-		return fmt.Errorf("find parent execution: %w", err)
-	}
-
-	node, err := models.FindCanvasNode(tx, *run.ParentWorkflowID, execution.NodeID)
-	if err != nil {
-		return fmt.Errorf("find parent node: %w", err)
-	}
-
-	ref := node.Ref.Data()
-	action, err := w.registry.GetAction(ref.Component.Name)
-	if err != nil {
-		return fmt.Errorf("get action: %w", err)
-	}
-
-	params, err := core.NewRunFinishedCallback(core.NewRun(
-		run.ID,
-		run.WorkflowID,
-		run.Result,
-		nil,
-	)).ToParameters()
-	if err != nil {
-		return fmt.Errorf("build run finished callback: %w", err)
-	}
-
-	err = action.HandleHook(core.ActionHookContext{
-		Name:           callback.Hook,
-		Logger:         logging.ForNode(*node),
-		Configuration:  node.Configuration.Data(),
-		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Parameters:     params,
-	})
-
-	if err != nil {
-		return fmt.Errorf("handle hook: %w", err)
-	}
-
-	messageCollector.AddEvents(newEvents...)
-	err = tx.Save(&execution).Error
-	if err != nil {
-		return fmt.Errorf("save execution: %w", err)
-	}
-
-	messageCollector.AddExecutions(*execution)
-	return nil
-}
-
-type RunFinalizerMessageCollector struct {
-	Events     []models.CanvasEvent
-	Executions []models.CanvasNodeExecution
-}
-
-func NewRunFinalizerMessageCollector() *RunFinalizerMessageCollector {
-	return &RunFinalizerMessageCollector{
-		Events:     []models.CanvasEvent{},
-		Executions: []models.CanvasNodeExecution{},
-	}
-}
-
-func (c *RunFinalizerMessageCollector) AddEvents(events ...models.CanvasEvent) {
-	c.Events = append(c.Events, events...)
-}
-
-func (c *RunFinalizerMessageCollector) AddExecutions(executions ...models.CanvasNodeExecution) {
-	c.Executions = append(c.Executions, executions...)
-}
-
-func (c *RunFinalizerMessageCollector) Publish() error {
-	if len(c.Events) > 0 {
-		for _, event := range c.Events {
-			if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), event.RunID.String(), &event).Publish(); err != nil {
-				return err
-			}
-		}
-	}
-
-	if len(c.Executions) > 0 {
-		for _, execution := range c.Executions {
-			if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
