@@ -158,6 +158,18 @@ func (w *CanvasNodeCleanupWorker) processNodeBatch(node models.CanvasNode, batch
 
 		deleted = result.ResourcesDeleted
 		if !result.AllDeleted {
+			if deleted == 0 {
+				// Referenced events (or similar) block hard-delete with no
+				// progress — rotate so other deleted nodes are not starved.
+				if rotateErr := lockedNode.RotateCleanupQueue(tx); rotateErr != nil {
+					return fmt.Errorf("rotate blocked canvas node %s: %w", lockedNode.NodeID, rotateErr)
+				}
+				w.logger.Infof(
+					"No progress cleaning node %s from canvas %s; rotated cleanup queue position",
+					lockedNode.NodeID,
+					lockedNode.WorkflowID,
+				)
+			}
 			return nil
 		}
 

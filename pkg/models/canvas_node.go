@@ -277,7 +277,9 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 // ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas and
 // organization are still active. Nodes on soft-deleted canvases or organizations
 // are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
-// Results are oldest-first and capped by limit to keep cleanup ticks bounded.
+// Results are capped by limit. Ordering prefers nodes that have waited longest
+// for a cleanup pass (updated_at), then oldest soft-delete time, so nodes that
+// cannot make progress can be rotated to the back of the queue.
 func ListDeletedCanvasNodes(tx *gorm.DB, limit int) ([]CanvasNode, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
@@ -287,7 +289,7 @@ func ListDeletedCanvasNodes(tx *gorm.DB, limit int) ([]CanvasNode, error) {
 	query := tx.Unscoped().
 		Model(&CanvasNode{}).
 		Where("workflow_nodes.deleted_at IS NOT NULL").
-		Order("workflow_nodes.deleted_at ASC").
+		Order("workflow_nodes.updated_at ASC NULLS FIRST, workflow_nodes.deleted_at ASC").
 		Limit(limit)
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
@@ -298,6 +300,15 @@ func ListDeletedCanvasNodes(tx *gorm.DB, limit int) ([]CanvasNode, error) {
 	}
 
 	return nodes, nil
+}
+
+// RotateCleanupQueue bumps updated_at so a blocked soft-deleted node yields the
+// front of ListDeletedCanvasNodes to other candidates.
+func (c *CanvasNode) RotateCleanupQueue(tx *gorm.DB) error {
+	now := time.Now().UTC()
+	return tx.Unscoped().Model(c).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Update("updated_at", now).Error
 }
 
 // LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node
