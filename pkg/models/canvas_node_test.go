@@ -10,6 +10,36 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func Test__DeleteCanvasNodeWithResult__RequestsCancellationForActiveExecutions(t *testing.T) {
+	r := support.Setup(t)
+
+	nodeID := "node-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: nodeID, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, nodeID, rootEvent.ID, rootEvent.ID)
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, nodeID)
+	require.NoError(t, err)
+
+	result, err := models.DeleteCanvasNodeWithResult(database.Conn(), *node)
+	require.NoError(t, err)
+	require.Contains(t, result.CancelledExecutionIDs, execution.ID)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}
+
 func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndRequestsFinalization(t *testing.T) {
 	r := support.Setup(t)
 
