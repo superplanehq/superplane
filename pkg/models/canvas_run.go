@@ -256,7 +256,7 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 				SELECT 1
 				FROM workflow_node_executions
 				WHERE run_id = ?
-				AND state IN (?, ?)
+				AND state IN (?, ?, ?)
 			) AS has_active_executions,
 			EXISTS (
 				SELECT 1
@@ -273,6 +273,7 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 		runID,
 		CanvasNodeExecutionStatePending,
 		CanvasNodeExecutionStateStarted,
+		CanvasNodeExecutionStateCancelling,
 		runID,
 		runID,
 		CanvasEventStatePending,
