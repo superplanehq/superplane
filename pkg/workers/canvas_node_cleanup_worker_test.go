@@ -187,6 +187,77 @@ func Test__CanvasNodeCleanupWorker_ProcessesDeletedNodeResources(t *testing.T) {
 	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "keep-node"))
 }
 
+func Test__CanvasNodeCleanupWorker_RotatesBlockedNodesSoOthersProgress(t *testing.T) {
+	r := support.Setup(t)
+	worker := NewCanvasNodeCleanupWorker()
+	worker.maxNodesPerTick = 1
+	worker.pauseBetweenBatches = 0
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "blocked-node",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "keep-node",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "ready-node",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "blocked-node", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "keep-node", rootEvent.ID, rootEvent.ID)
+	support.EmitCanvasEventForNode(t, canvas.ID, "ready-node", "default", nil)
+
+	older := time.Now().AddDate(0, 0, -40)
+	newer := time.Now().AddDate(0, 0, -35)
+	blocked := softDeleteCanvasNode(t, canvas.ID, "blocked-node", older)
+	ready := softDeleteCanvasNode(t, canvas.ID, "ready-node", newer)
+
+	// Force blocked node to the front of the cleanup queue.
+	require.NoError(t, database.Conn().Unscoped().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "blocked-node").
+		Update("updated_at", older).Error)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "ready-node").
+		Update("updated_at", newer).Error)
+
+	candidates, err := models.ListDeletedCanvasNodes(database.Conn(), 1)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	assert.Equal(t, "blocked-node", candidates[0].NodeID)
+
+	require.NoError(t, worker.LockAndProcessNode(blocked))
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "blocked-node"))
+
+	candidates, err = models.ListDeletedCanvasNodes(database.Conn(), 1)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	assert.Equal(t, "ready-node", candidates[0].NodeID)
+
+	require.NoError(t, worker.LockAndProcessNode(ready))
+	assert.Equal(t, int64(0), countUnscopedCanvasNodes(t, canvas.ID, "ready-node"))
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "blocked-node"))
+}
+
 func Test__CanvasNodeCleanupWorker_PreservesEventsReferencedByOtherNodes(t *testing.T) {
 	r := support.Setup(t)
 	worker := NewCanvasNodeCleanupWorker()
