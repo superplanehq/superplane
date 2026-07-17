@@ -20,7 +20,7 @@ type OwnerStepProps = {
   onLastNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
-  onNext: (event: React.FormEvent) => void;
+  onSubmit: (event: React.FormEvent) => void;
 };
 
 const OwnerStepHeader = (
@@ -45,11 +45,11 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   onLastNameChange,
   onPasswordChange,
   onConfirmPasswordChange,
-  onNext,
+  onSubmit,
 }) => (
   <>
     {OwnerStepHeader}
-    <form onSubmit={onNext} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
@@ -142,7 +142,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       </div>
       <div className="flex justify-end">
         <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : "Next"}
+          {loading ? "Saving..." : "Finish setup"}
         </Button>
       </div>
     </form>
