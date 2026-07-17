@@ -13,7 +13,7 @@ import type {
 
 const defaultDefinition: ComponentDefinition = {
   name: "claude.runAgent",
-  label: "Run Claude Agent",
+  label: "Run Managed Agent",
   description: "",
   icon: "bot",
   color: "#C9784D",
@@ -126,7 +126,7 @@ describe("runAgentMapper.props", () => {
 
   it("falls back to the definition label when the node has no name", () => {
     const props = runAgentMapper.props(buildPropsContext({ node: buildNode({ name: "" }) }));
-    expect(props.title).toBe("Run Claude Agent");
+    expect(props.title).toBe("Run Managed Agent");
   });
 });
 
