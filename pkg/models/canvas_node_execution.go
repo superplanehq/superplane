@@ -124,9 +124,9 @@ func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
 	return executions, nil
 }
 
-func ListCancellingNodeExecutions() ([]CanvasNodeExecution, error) {
+func ListCancellingNodeExecutions(db *gorm.DB) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
-	query := database.Conn().
+	query := db.
 		Table("workflow_node_executions").
 		Select("workflow_node_executions.*").
 		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStateCancelling).
