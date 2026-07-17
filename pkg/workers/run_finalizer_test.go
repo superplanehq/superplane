@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
@@ -155,6 +157,206 @@ func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+}
+
+func Test__RunFinalizer_FailsStalledLoopExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	finalizer := NewRunFinalizer(amqpURL)
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	loopNode := "loop-1"
+	bodyNode := "body-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{
+				NodeID: loopNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+			},
+			{NodeID: bodyNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: loopNode, Channel: "default"},
+			{SourceID: loopNode, TargetID: bodyNode, Channel: "next"},
+			{SourceID: bodyNode, TargetID: loopNode, Channel: "default"},
+		},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, loopNode, event.ID, event.ID)
+	loopExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Model(loopExecution).Updates(map[string]any{
+		"run_id": run.ID,
+		"state":  models.CanvasNodeExecutionStateStarted,
+		"metadata": datatypes.NewJSONType(map[string]any{
+			"active":                   true,
+			"waitingBetweenIterations": false,
+		}),
+	}).Error)
+
+	bodyExecution := support.CreateCanvasNodeExecution(t, canvas.ID, bodyNode, event.ID, event.ID)
+	bodyExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Model(bodyExecution).Updates(map[string]any{
+		"run_id":         run.ID,
+		"state":          models.CanvasNodeExecutionStateFinished,
+		"result":         models.CanvasNodeExecutionResultFailed,
+		"result_reason":  models.CanvasNodeExecutionResultReasonError,
+		"result_message": "body failed",
+	}).Error)
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
+	assert.NotNil(t, updatedRun.FinishedAt)
+
+	updatedLoopExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, loopExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedLoopExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedLoopExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, updatedLoopExecution.ResultReason)
+	assert.Contains(t, updatedLoopExecution.ResultMessage, "cannot reach the loop conclusion")
+	assert.False(t, updatedLoopExecution.Metadata.Data()["active"].(bool))
+}
+
+func Test__RunFinalizer_FailsStalledLoopExecutionWithOtherActiveExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	finalizer := NewRunFinalizer(amqpURL)
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	loopNode := "loop-1"
+	activeNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{
+				NodeID: loopNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+			},
+			{NodeID: activeNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: loopNode, Channel: "default"},
+			{SourceID: trigger, TargetID: activeNode, Channel: "default"},
+		},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, loopNode, event.ID, event.ID)
+	loopExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Model(loopExecution).Updates(map[string]any{
+		"run_id": run.ID,
+		"state":  models.CanvasNodeExecutionStateStarted,
+		"metadata": datatypes.NewJSONType(map[string]any{
+			"active":                   true,
+			"waitingBetweenIterations": false,
+		}),
+	}).Error)
+
+	activeExecution := support.CreateCanvasNodeExecution(t, canvas.ID, activeNode, event.ID, event.ID)
+	activeExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Model(activeExecution).Updates(map[string]any{
+		"run_id": run.ID,
+		"state":  models.CanvasNodeExecutionStateStarted,
+	}).Error)
+
+	finalized, updatedExecutionIDs, skipReason, err := finalizer.maybeFinalizeRun(
+		database.Conn(),
+		run.ID,
+		runFinalizerTriggerExecutionFinished,
+	)
+	require.NoError(t, err)
+	assert.False(t, finalized)
+	assert.Equal(t, runFinalizerReasonOpenWork, skipReason)
+	assert.ElementsMatch(t, []uuid.UUID{loopExecution.ID}, updatedExecutionIDs)
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	updatedLoopExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, loopExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedLoopExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedLoopExecution.Result)
+	assert.Contains(t, updatedLoopExecution.ResultMessage, "cannot reach the loop conclusion")
+
+	updatedActiveExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, activeExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, updatedActiveExecution.State)
+}
+
+func Test__RunFinalizer_DoesNotFailLoopWaitingBetweenIterations(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	finalizer := NewRunFinalizer(amqpURL)
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	loopNode := "loop-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{
+				NodeID: loopNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: loopNode, Channel: "default"},
+		},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, loopNode, event.ID, event.ID)
+	loopExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Model(loopExecution).Updates(map[string]any{
+		"run_id": run.ID,
+		"state":  models.CanvasNodeExecutionStateStarted,
+		"metadata": datatypes.NewJSONType(map[string]any{
+			"active":                   true,
+			"waitingBetweenIterations": true,
+		}),
+	}).Error)
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerSweep))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	updatedLoopExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, loopExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, updatedLoopExecution.State)
 }
 
 func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
