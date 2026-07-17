@@ -539,8 +539,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	executionIDs := nodeExecutionIDs(executions)
-	cancelledExecutionIDs, err := cancelNodeExecutions(tx, workflowID, executionIDs)
+	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
@@ -575,45 +574,23 @@ func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (
 	return deletedQueueItems, nil
 }
 
-func nodeExecutionIDs(executions []CanvasNodeExecution) []uuid.UUID {
-	executionIDs := make([]uuid.UUID, 0, len(executions))
-	for _, execution := range executions {
-		executionIDs = append(executionIDs, execution.ID)
+func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid.UUID, error) {
+	requestedCancellationIDs := make([]uuid.UUID, 0, len(executions))
+
+	for i := range executions {
+		execution := executions[i]
+		if execution.State == CanvasNodeExecutionStateFinished || execution.State == CanvasNodeExecutionStateCancelling {
+			continue
+		}
+
+		if err := execution.RequestCancellation(tx, nil); err != nil {
+			return nil, err
+		}
+
+		requestedCancellationIDs = append(requestedCancellationIDs, execution.ID)
 	}
 
-	return executionIDs
-}
-
-func cancelNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) ([]uuid.UUID, error) {
-	if len(executionIDs) == 0 {
-		return []uuid.UUID{}, nil
-	}
-
-	var cancelledExecutions []CanvasNodeExecution
-	now := time.Now()
-	err := tx.
-		Model(&cancelledExecutions).
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
-		Where("workflow_id = ?", workflowID).
-		Where("id IN ?", executionIDs).
-		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
-		Updates(map[string]any{
-			"state":        CanvasNodeExecutionStateFinished,
-			"result":       CanvasNodeExecutionResultCancelled,
-			"cancelled_by": nil,
-			"updated_at":   &now,
-		}).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	cancelledExecutionIDs := make([]uuid.UUID, 0, len(cancelledExecutions))
-	for _, execution := range cancelledExecutions {
-		cancelledExecutionIDs = append(cancelledExecutionIDs, execution.ID)
-	}
-
-	return cancelledExecutionIDs, nil
+	return requestedCancellationIDs, nil
 }
 
 func completePendingRequestsForNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
