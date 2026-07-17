@@ -449,7 +449,7 @@ func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, err
 }
 
 func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
-	state, err := e.stateInTransaction(tx)
+	state, err := e.findState(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -589,7 +589,7 @@ func (e *CanvasNodeExecution) Fail(reason, message string) error {
 }
 
 func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) (bool, error) {
-	state, err := e.stateInTransaction(tx)
+	state, err := e.findState(tx)
 	if err != nil {
 		return false, err
 	}
@@ -752,7 +752,7 @@ func (e *CanvasNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]CanvasEven
 }
 
 func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
-	state, err := e.stateInTransaction(tx)
+	state, err := e.findState(tx)
 	if err != nil {
 		return false, err
 	}
@@ -760,7 +760,7 @@ func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
 	return state == CanvasNodeExecutionStateFinished, nil
 }
 
-func (e *CanvasNodeExecution) stateInTransaction(tx *gorm.DB) (string, error) {
+func (e *CanvasNodeExecution) findState(tx *gorm.DB) (string, error) {
 	var execution CanvasNodeExecution
 	err := tx.
 		Select("state").
