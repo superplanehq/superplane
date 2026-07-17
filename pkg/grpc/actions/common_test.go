@@ -171,6 +171,34 @@ func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
 	}
 }
 
+// GitLab sends push events for valid pushes that carry no commits (or omit the
+// key entirely). The default title must fall back to the branch ref instead of
+// failing to resolve commits[-1].
+func TestGitlabOnPushRunTitleFallsBackWithoutCommits(t *testing.T) {
+	expression := defaultRunTitleExpression("gitlab.onPush")
+	require.NotEmpty(t, expression)
+
+	cases := map[string]map[string]any{
+		"empty commits":   {"ref": "refs/heads/main", "commits": []any{}},
+		"missing commits": {"ref": "refs/heads/main"},
+	}
+
+	for name, data := range cases {
+		t.Run(name, func(t *testing.T) {
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(map[string]any{
+					"type":      "gitlab.onPush",
+					"timestamp": time.Now(),
+					"data":      data,
+				}).
+				ResolveTemplateExpressions(expression)
+
+			require.NoError(t, err)
+			require.Equal(t, "refs/heads/main", resolved)
+		})
+	}
+}
+
 func TestBuiltInTriggersHaveDefaultRunTitleExpressions(t *testing.T) {
 	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
