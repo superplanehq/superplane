@@ -281,27 +281,6 @@ describe("RunInspectorPanel queued steps", () => {
   it("renders queued steps and allows stop while executions are loading", async () => {
     mockedExecutions = [];
     mockedExecutionsLoading = true;
-    describeRunMock.mockResolvedValueOnce({
-      data: {
-        run: {
-          executions: [
-            {
-              id: "execution-ref-running",
-              nodeId: "action-2",
-              state: "STATE_STARTED",
-            },
-          ],
-          queueItems: [
-            {
-              id: "queue-approval",
-              nodeId: "approval-1",
-              rootEvent: { id: "event-running", nodeId: "trigger-1" },
-              input: { request: "approve deploy" },
-            },
-          ],
-        },
-      },
-    });
 
     renderInspector({
       run: {
@@ -335,24 +314,19 @@ describe("RunInspectorPanel queued steps", () => {
     fireEvent.click(stopButton);
 
     await waitFor(() => {
-      expect(cancelExecutionMock).toHaveBeenCalledWith(
+      expect(cancelRunMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: {
             canvasId: "canvas-1",
-            executionId: "execution-ref-running",
-          },
-        }),
-      );
-      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: {
-            canvasId: "canvas-1",
-            nodeId: "approval-1",
-            itemId: "queue-approval",
+            runId: "run-running",
           },
         }),
       );
     });
+
+    expect(cancelRunMock).toHaveBeenCalledTimes(1);
+    expect(cancelExecutionMock).not.toHaveBeenCalled();
+    expect(deleteNodeQueueItemMock).not.toHaveBeenCalled();
   });
 
   it("cancels a queued step from the node accordion header", async () => {

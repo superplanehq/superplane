@@ -296,11 +296,16 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 
 		run = r
 		queueItem = item
-		executionIDs, err = w.processNodeQueueItem(tx, logger, n, item, run, onNewEvents)
+		var queueItemRemoved bool
+		executionIDs, queueItemRemoved, err = w.processNodeQueueItem(tx, logger, n, item, run, onNewEvents)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
 			return err
+		}
+
+		if !queueItemRemoved {
+			queueItem = nil
 		}
 
 		return nil
@@ -358,14 +363,14 @@ func (w *NodeQueueWorker) processNodeQueueItem(
 	queueItem *models.CanvasNodeQueueItem,
 	run *models.CanvasRun,
 	onNewEvents func([]models.CanvasEvent),
-) ([]*uuid.UUID, error) {
+) ([]*uuid.UUID, bool, error) {
 	if run.State == models.CanvasRunStateCancelling {
 		if err := tx.Delete(queueItem).Error; err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		logger.Infof("Skipping queue item for cancelling run %s", queueItem.RunID)
-		return nil, nil
+		return nil, true, nil
 	}
 
 	logger = logging.WithQueueItem(logger, *queueItem)
@@ -373,7 +378,7 @@ func (w *NodeQueueWorker) processNodeQueueItem(
 
 	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
@@ -387,7 +392,7 @@ func (w *NodeQueueWorker) processNodeQueueItem(
 		//
 		var configErr *contexts.ConfigurationBuildError
 		if !errors.As(err, &configErr) {
-			return nil, err
+			return nil, false, err
 		}
 
 		//
@@ -401,10 +406,10 @@ func (w *NodeQueueWorker) processNodeQueueItem(
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
 		executions, err := w.handleNodeConfigurationError(tx, configErr, onNewEvents)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		return executions, nil
+		return executions, true, nil
 	}
 
 	var executionID *uuid.UUID
@@ -416,15 +421,15 @@ func (w *NodeQueueWorker) processNodeQueueItem(
 		 */
 		executionID, err = w.processComponentNode(ctx, node)
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s", node.Type)
+		return nil, false, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 
 	if errors.Is(err, core.ErrQueueItemDeferred) {
 		logger.Info("Queue item deferred")
-		return nil, nil
+		return nil, false, nil
 	}
 
-	return []*uuid.UUID{executionID}, err
+	return []*uuid.UUID{executionID}, true, err
 }
 
 func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {

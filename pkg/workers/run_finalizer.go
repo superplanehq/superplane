@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,48 +68,96 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			runs, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateStarted, startedRunsSweepLimit)
-			if err != nil {
-				w.logger.Errorf("Error listing started runs: %v", err)
-				continue
-			}
-
-			telemetry.RecordRunFinalizerRunsCount(context.Background(), len(runs))
-
-			for _, run := range runs {
-				if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
-					w.logger.WithFields(log.Fields{
-						"workflow_id": run.WorkflowID,
-						"run_id":      run.ID,
-					}).Errorf("Error finalizing run from sweep: %v", err)
-				}
-			}
-
-			cancellingRuns, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateCancelling, startedRunsSweepLimit)
-			if err != nil {
-				w.logger.Errorf("Error listing cancelling runs: %v", err)
-				continue
-			}
-
-			for _, run := range cancellingRuns {
-				logger := logging.WithRun(w.logger, run)
-
-				err := database.Conn().Transaction(func(tx *gorm.DB) error {
-					_, err := run.DrainForCancellation(tx, run.CancelledBy)
-					return err
-				})
-
-				if err != nil {
-					logger.WithError(err).Errorf("Error draining cancelling run from sweep: %v", err)
-					continue
-				}
-
-				if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
-					logger.WithError(err).Errorf("Error finalizing cancelling run from sweep: %v", err)
-				}
-			}
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				w.sweepStartedRuns()
+			}()
+			go func() {
+				defer wg.Done()
+				w.sweepCancellingRuns()
+			}()
+			wg.Wait()
 
 			telemetry.RecordRunFinalizerTickDuration(context.Background(), time.Since(tickStart))
+		}
+	}
+}
+
+func (w *RunFinalizer) sweepStartedRuns() error {
+	runs, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateStarted, startedRunsSweepLimit)
+	if err != nil {
+		w.logger.Errorf("Error listing started runs: %v", err)
+		return err
+	}
+
+	telemetry.RecordRunFinalizerRunsCount(context.Background(), len(runs))
+
+	for _, run := range runs {
+		if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
+			logger := logging.WithRun(w.logger, run)
+			logger.WithError(err).Errorf("Error finalizing run from sweep: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (w *RunFinalizer) sweepCancellingRuns() error {
+	cancellingRuns, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateCancelling, startedRunsSweepLimit)
+	if err != nil {
+		w.logger.Errorf("Error listing cancelling runs: %v", err)
+		return err
+	}
+
+	for _, run := range cancellingRuns {
+		logger := logging.WithRun(w.logger, run)
+
+		var cancellationResult *models.RunCancellationDrainResult
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			result, err := run.DrainForCancellation(tx, run.CancelledBy)
+			if err != nil {
+				return err
+			}
+
+			cancellationResult = result
+			return nil
+		})
+
+		if err != nil {
+			logger.WithError(err).Errorf("Error draining cancelling run from sweep: %v", err)
+			continue
+		}
+
+		if cancellationResult != nil {
+			w.publishRunCancellationDrainMessages(run.WorkflowID, cancellationResult)
+		}
+
+		if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
+			logger.WithError(err).Errorf("Error finalizing cancelling run from sweep: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (w *RunFinalizer) publishRunCancellationDrainMessages(workflowID uuid.UUID, result *models.RunCancellationDrainResult) {
+	for _, executionID := range result.RequestedExecutionIDs {
+		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
+			log.Errorf("failed to publish execution cancelling RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, queueItem := range result.DeletedQueueItems {
+		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
+			log.Errorf("failed to publish queue item deleted RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, event := range result.SupersededEvents {
+		if err := messages.PublishEventTerminal(event.WorkflowID, event.RunID, event.ID); err != nil {
+			log.Errorf("failed to publish event terminal RabbitMQ message: %v", err)
 		}
 	}
 }
