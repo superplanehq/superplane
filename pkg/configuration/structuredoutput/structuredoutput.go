@@ -14,8 +14,7 @@
 // Messages API's output_config.format — there is no server-side grammar
 // constraint for a Sessions-based run. For those, PromptSuffix and ExtractJSON
 // emulate structured output by asking the model to comply and best-effort
-// parsing its final message; callers should only trust the result on a normal
-// completion, never as a real schema guarantee.
+// parsing its final message
 package structuredoutput
 
 import (
