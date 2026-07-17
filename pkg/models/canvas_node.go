@@ -237,6 +237,13 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 	return result, tx.Delete(&webhook).Error
 }
 
+func (c *CanvasNode) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Delete(c).
+		Error
+}
+
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
 	var node CanvasNode
 	err := tx.
@@ -260,6 +267,51 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 		First(&node).
 		Error
 
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
+// ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas and
+// organization are still active. Nodes on soft-deleted canvases or organizations
+// are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
+func ListDeletedCanvasNodes(tx *gorm.DB) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	query := tx.Unscoped().
+		Model(&CanvasNode{}).
+		Where("workflow_nodes.deleted_at IS NOT NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+// LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node
+// whose parent canvas and organization are still active.
+func LockDeletedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+	query := tx.Unscoped().
+		Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_nodes"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_nodes.workflow_id = ?", workflowID).
+		Where("workflow_nodes.node_id = ?", nodeID).
+		Where("workflow_nodes.deleted_at IS NOT NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
+		First(&node).
+		Error
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +591,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions)
+	cancelledExecutionIDs, err := cancelNodeExecutions(tx, executions, nil)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
@@ -562,7 +614,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
 	err := tx.
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Delete(&deletedQueueItems).
@@ -574,7 +626,7 @@ func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (
 	return deletedQueueItems, nil
 }
 
-func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid.UUID, error) {
+func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution, cancelledBy *uuid.UUID) ([]uuid.UUID, error) {
 	requestedCancellationIDs := make([]uuid.UUID, 0, len(executions))
 
 	for i := range executions {
@@ -583,7 +635,7 @@ func cancelNodeExecutions(tx *gorm.DB, executions []CanvasNodeExecution) ([]uuid
 			continue
 		}
 
-		if err := execution.RequestCancellation(tx, nil); err != nil {
+		if err := execution.RequestCancellation(tx, cancelledBy); err != nil {
 			return nil, err
 		}
 

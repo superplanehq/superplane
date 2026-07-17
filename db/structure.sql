@@ -672,7 +672,9 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid
 );
 
 
@@ -1579,6 +1581,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_cancelling; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2094,6 +2103,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.users(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2205,7 +2222,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260716230544	f
+20260717021445	f
 \.
 
 

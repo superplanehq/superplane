@@ -224,13 +224,7 @@ func publishDeletedNodeCleanupMessages(canvasID uuid.UUID, result changesets.Can
 			continue
 		}
 
-		message := messages.NewCanvasQueueItemDeletedMessage(
-			canvasID.String(),
-			queueItem.ID.String(),
-			queueItem.NodeID,
-			queueItem.RunID.String(),
-		)
-		if err := message.PublishDeleted(); err != nil {
+		if err := messages.NewCanvasQueueItemMessage(queueItem).PublishDeleted(); err != nil {
 			log.Errorf("failed to publish deleted queue item RabbitMQ message: %v", err)
 		}
 	}
