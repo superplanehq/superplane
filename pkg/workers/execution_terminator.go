@@ -182,6 +182,11 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 			return err
 		}
 
+		err = execution.CancelInTransaction(tx, execution.CancelledBy)
+		if err != nil {
+			return err
+		}
+
 		logger.Info("Execution cancelled")
 		finished = true
 		return nil
@@ -264,5 +269,5 @@ func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, or
 		log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
 	}
 
-	return execution.CancelInTransaction(tx, execution.CancelledBy)
+	return nil
 }
