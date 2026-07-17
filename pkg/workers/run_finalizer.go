@@ -409,11 +409,11 @@ func (w *RunFinalizer) failStalledLoopExecutions(tx *gorm.DB, runID uuid.UUID) (
 		}
 
 		if !isLoop {
-			continue
+			return nil, nil
 		}
 
 		if loopExecutionIsWaitingBetweenIterations(execution) {
-			continue
+			return nil, nil
 		}
 
 		loopExecutions = append(loopExecutions, execution)

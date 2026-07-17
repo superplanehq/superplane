@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -231,7 +230,7 @@ func Test__RunFinalizer_FailsStalledLoopExecution(t *testing.T) {
 	assert.False(t, updatedLoopExecution.Metadata.Data()["active"].(bool))
 }
 
-func Test__RunFinalizer_FailsStalledLoopExecutionWithOtherActiveExecution(t *testing.T) {
+func Test__RunFinalizer_DoesNotFailLoopExecutionWithOtherActiveExecution(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 
 	finalizer := NewRunFinalizer(amqpURL)
@@ -290,7 +289,7 @@ func Test__RunFinalizer_FailsStalledLoopExecutionWithOtherActiveExecution(t *tes
 	require.NoError(t, err)
 	assert.False(t, finalized)
 	assert.Equal(t, runFinalizerReasonOpenWork, skipReason)
-	assert.ElementsMatch(t, []uuid.UUID{loopExecution.ID}, updatedExecutionIDs)
+	assert.Empty(t, updatedExecutionIDs)
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
@@ -298,9 +297,7 @@ func Test__RunFinalizer_FailsStalledLoopExecutionWithOtherActiveExecution(t *tes
 
 	updatedLoopExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, loopExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedLoopExecution.State)
-	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedLoopExecution.Result)
-	assert.Contains(t, updatedLoopExecution.ResultMessage, "cannot reach the loop conclusion")
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, updatedLoopExecution.State)
 
 	updatedActiveExecution, err := models.FindNodeExecutionInTransaction(database.Conn(), canvas.ID, activeExecution.ID)
 	require.NoError(t, err)

@@ -208,7 +208,7 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
-        onChange={(val) => onChange(val || undefined)}
+        onChange={(val) => onChange(val || (field.togglable ? "" : undefined))}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
     ) : (
@@ -223,7 +223,7 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteInput
         exampleObj={autocompleteExampleObj}
         value={expressionValue}
-        onChange={(nextValue) => onChange(nextValue || undefined)}
+        onChange={(nextValue) => onChange(nextValue || (field.togglable ? "" : undefined))}
         placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
         startWord="{{"
         prefix="{{ "
@@ -293,7 +293,9 @@ export const IntegrationResourceFieldRenderer = ({
 
   const handleChange = (selectedOptions: SelectOption[]) => {
     const selectedValues = selectedOptions.map((opt) => opt.value);
-    onChange(selectedValues.length > 0 ? selectedValues : undefined);
+    // undefined would read as "toggle off" to ConfigurationFieldRenderer, silently
+    // discarding an intentional clear-to-empty-selection on a togglable field.
+    onChange(selectedValues.length > 0 ? selectedValues : field.togglable ? [] : undefined);
   };
 
   return (
