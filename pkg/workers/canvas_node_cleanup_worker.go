@@ -60,7 +60,8 @@ func (w *CanvasNodeCleanupWorker) Start(ctx context.Context) {
 
 func (w *CanvasNodeCleanupWorker) tick() {
 	tickStart := time.Now()
-	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), w.maxNodesPerTick)
+	eligibleBefore := tickStart.UTC().AddDate(0, 0, -deletedResourceGracePeriodDays)
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn(), eligibleBefore, w.maxNodesPerTick)
 	if err != nil {
 		w.logger.Errorf("Error finding deleted canvas nodes: %v", err)
 		return
@@ -68,10 +69,6 @@ func (w *CanvasNodeCleanupWorker) tick() {
 
 	processed := 0
 	for _, node := range nodes {
-		if !node.DeletedAt.Valid || deletedResourceWithinGracePeriod(node.DeletedAt.Time, tickStart) {
-			continue
-		}
-
 		if err := w.LockAndProcessNode(node); err != nil {
 			w.logger.Errorf("Error processing canvas node %s/%s: %v", node.WorkflowID, node.NodeID, err)
 		}

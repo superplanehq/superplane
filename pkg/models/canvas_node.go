@@ -275,12 +275,13 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 }
 
 // ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas and
-// organization are still active. Nodes on soft-deleted canvases or organizations
-// are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
+// organization are still active, and whose deleted_at is on or before before
+// (typically now minus the cleanup grace period). Nodes on soft-deleted canvases
+// or organizations are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
 // Results are capped by limit. Ordering prefers nodes that have waited longest
 // for a cleanup pass (updated_at), then oldest soft-delete time, so nodes that
 // cannot make progress can be rotated to the back of the queue.
-func ListDeletedCanvasNodes(tx *gorm.DB, limit int) ([]CanvasNode, error) {
+func ListDeletedCanvasNodes(tx *gorm.DB, before time.Time, limit int) ([]CanvasNode, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
 	}
@@ -289,6 +290,7 @@ func ListDeletedCanvasNodes(tx *gorm.DB, limit int) ([]CanvasNode, error) {
 	query := tx.Unscoped().
 		Model(&CanvasNode{}).
 		Where("workflow_nodes.deleted_at IS NOT NULL").
+		Where("workflow_nodes.deleted_at <= ?", before.UTC()).
 		Order("workflow_nodes.updated_at ASC NULLS FIRST, workflow_nodes.deleted_at ASC").
 		Limit(limit)
 
