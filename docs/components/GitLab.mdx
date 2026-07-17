@@ -30,11 +30,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a deployment for a GitLab environment" />
   <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitLab deployment" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitLab issue" />
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
 </CardGrid>
 
 ## Instructions
@@ -1433,6 +1436,62 @@ The component outputs the created issue object, including:
 }
 ```
 
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+**Component key:** `gitlab.createIssueComment`
+
+The Create Issue Comment component adds a comment (note) to an existing GitLab issue.
+
+### Use Cases
+
+- **Automated updates**: Post deployment status or remediation updates to GitLab issues
+- **Runbook linking**: Add runbook links, error details, or status for responders
+- **Cross-platform sync**: Sync Slack or PagerDuty notes into GitLab as comments
+- **Automated comments**: Add automated comments based on workflow events
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to comment on (supports expressions)
+- **Body** (required): The comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the created note object, including:
+- **id**: The ID of the note
+- **body**: The comment text
+- **author**: The user who created the comment
+- **created_at**: When the comment was created
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "body": "This is an example comment created via SuperPlane",
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 302,
+    "noteable_id": 1,
+    "noteable_iid": 1,
+    "noteable_type": "Issue",
+    "system": false,
+    "updated_at": "2023-01-01T10:00:00.000Z"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.createIssueComment"
+}
+```
+
 <a id="create-merge-request-comment"></a>
 
 ## Create Merge Request Comment
@@ -1485,6 +1544,80 @@ Returns the created note object, including:
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.createMergeComment"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+**Component key:** `gitlab.getIssue`
+
+The Get Issue component fetches a single issue from a GitLab project by its internal ID (IID).
+
+### Use Cases
+
+- **Read state, then act**: Look up an issue's current title, description, state, labels, or assignees before deciding what to do next
+- **Data enrichment**: Pull issue details into a workflow to combine with other information
+- **Status checking**: Check whether an issue is open or closed before performing an action
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to fetch (supports expressions)
+
+### Output
+
+Returns the issue object, including:
+- **id** / **iid**: The internal and project-relative IDs of the issue
+- **title** / **description**: The issue's content
+- **state**: The current state of the issue (opened/closed)
+- **labels**, **assignees**, **milestone**: Metadata on the issue
+- **web_url**: The URL to view the issue in GitLab
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue created via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "opened",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.getIssue"
 }
 ```
 
@@ -1725,6 +1858,91 @@ The Run Pipeline component triggers a GitLab pipeline and waits for it to comple
   },
   "timestamp": "2026-02-13T18:04:12.000Z",
   "type": "gitlab.pipeline.finished"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+**Component key:** `gitlab.updateIssue`
+
+The Update Issue component modifies an existing GitLab issue: its title, description, state, labels, assignees, or milestone.
+
+### Use Cases
+
+- **Status updates**: Close or reopen an issue based on workflow results
+- **Label management**: Apply labels to an issue automatically
+- **Assignee updates**: Assign an issue to team members automatically
+- **Content updates**: Update the issue title or description with new information
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to update (supports expressions)
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description for the issue
+- **State** (toggle): Close or reopen the issue
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
+- **Milestone** (toggle): Milestone to associate with the issue
+
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+### Output
+
+Returns the updated issue object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": "2023-01-01T10:05:00.000Z",
+    "closed_by": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue updated via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "closed",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:05:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:05:00.000Z",
+  "type": "gitlab.updateIssue"
 }
 ```
 
