@@ -8,11 +8,24 @@ import (
 	"gorm.io/gorm"
 )
 
+type canvasNodeEventCleanupMode int
+
+const (
+	// canvasNodeEventCleanupDeleteAll deletes every event for the node.
+	// Used by CanvasCleanupWorker when the whole canvas is being torn down.
+	canvasNodeEventCleanupDeleteAll canvasNodeEventCleanupMode = iota
+	// canvasNodeEventCleanupDeleteUnreferenced deletes only events that are not
+	// still referenced by executions or queue items on other nodes. Remaining
+	// events stay for EventRetentionWorker / later cleanup ticks.
+	canvasNodeEventCleanupDeleteUnreferenced
+)
+
 func deleteCanvasNodeResourcesBatched(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
 	nodeID string,
 	maxResources int,
+	eventCleanup canvasNodeEventCleanupMode,
 ) (resourcesDeleted int, allResourcesDeleted bool, err error) {
 	resourceTypes := []struct {
 		model     any
@@ -26,18 +39,23 @@ func deleteCanvasNodeResourcesBatched(
 	}
 
 	totalDeleted := 0
-	allDeleted := true
 
 	for _, resourceType := range resourceTypes {
 		if totalDeleted >= maxResources {
-			allDeleted = false
-			break
+			return totalDeleted, false, nil
 		}
 
 		remaining := maxResources - totalDeleted
-		deleted, err := deleteCanvasNodeResourceBatch(tx, resourceType.tableName, workflowID, nodeID, remaining)
-		if err != nil {
-			return totalDeleted, false, fmt.Errorf("failed to delete %s: %w", resourceType.tableName, err)
+		var deleted int
+		var deleteErr error
+
+		if resourceType.tableName == "workflow_events" {
+			deleted, deleteErr = deleteCanvasNodeEventsBatch(tx, workflowID, nodeID, remaining, eventCleanup)
+		} else {
+			deleted, deleteErr = deleteCanvasNodeResourceBatch(tx, resourceType.tableName, workflowID, nodeID, remaining)
+		}
+		if deleteErr != nil {
+			return totalDeleted, false, fmt.Errorf("failed to delete %s: %w", resourceType.tableName, deleteErr)
 		}
 
 		totalDeleted += deleted
@@ -51,12 +69,19 @@ func deleteCanvasNodeResourcesBatched(
 		}
 
 		if count > 0 {
-			allDeleted = false
-			break
+			return totalDeleted, false, nil
 		}
 	}
 
-	return totalDeleted, allDeleted, nil
+	var remainingEvents int64
+	if err := tx.Unscoped().Model(&models.CanvasEvent{}).Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Count(&remainingEvents).Error; err != nil {
+		return totalDeleted, false, fmt.Errorf("failed to count remaining workflow_events: %w", err)
+	}
+	if remainingEvents > 0 {
+		return totalDeleted, false, nil
+	}
+
+	return totalDeleted, true, nil
 }
 
 func deleteCanvasNodeResourceBatch(
@@ -81,6 +106,46 @@ func deleteCanvasNodeResourceBatch(
 			tableName,
 			tableName,
 		),
+		workflowID,
+		nodeID,
+		limit,
+	)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return int(result.RowsAffected), nil
+}
+
+func deleteCanvasNodeEventsBatch(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	nodeID string,
+	limit int,
+	eventCleanup canvasNodeEventCleanupMode,
+) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	if eventCleanup == canvasNodeEventCleanupDeleteAll {
+		return deleteCanvasNodeResourceBatch(tx, "workflow_events", workflowID, nodeID, limit)
+	}
+
+	result := tx.Exec(
+		`DELETE FROM workflow_events WHERE id IN (
+			SELECT e.id FROM workflow_events e
+			WHERE e.workflow_id = ? AND e.node_id = ?
+			AND NOT EXISTS (
+				SELECT 1 FROM workflow_node_executions x
+				WHERE x.root_event_id = e.id OR x.event_id = e.id
+			)
+			AND NOT EXISTS (
+				SELECT 1 FROM workflow_node_queue_items q
+				WHERE q.root_event_id = e.id OR q.event_id = e.id
+			)
+			LIMIT ?
+		)`,
 		workflowID,
 		nodeID,
 		limit,

@@ -102,6 +102,7 @@ func (w *CanvasNodeCleanupWorker) processNode(tx *gorm.DB, node models.CanvasNod
 		node.WorkflowID,
 		node.NodeID,
 		w.maxResourcesPerTick,
+		canvasNodeEventCleanupDeleteUnreferenced,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)

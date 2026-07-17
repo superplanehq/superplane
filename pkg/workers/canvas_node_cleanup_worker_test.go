@@ -183,6 +183,56 @@ func Test__CanvasNodeCleanupWorker_ProcessesDeletedNodeResources(t *testing.T) {
 	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "keep-node"))
 }
 
+func Test__CanvasNodeCleanupWorker_PreservesEventsReferencedByOtherNodes(t *testing.T) {
+	r := support.Setup(t)
+	worker := NewCanvasNodeCleanupWorker()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "source-node",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "keep-node",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "source-node", "default", nil)
+	keepExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "keep-node", rootEvent.ID, rootEvent.ID)
+
+	deletedNode := softDeleteCanvasNode(t, canvas.ID, "source-node", time.Now().AddDate(0, 0, -31))
+	require.NoError(t, worker.LockAndProcessNode(deletedNode))
+
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "source-node"))
+	assert.Equal(t, int64(1), countNodeEvents(t, canvas.ID, "source-node"))
+	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "keep-node"))
+
+	var keepExecutionAfter models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", keepExecution.ID).First(&keepExecutionAfter).Error)
+	assert.Equal(t, rootEvent.ID, keepExecutionAfter.RootEventID)
+	assert.Equal(t, rootEvent.ID, keepExecutionAfter.EventID)
+
+	require.NoError(t, database.Conn().Where("id = ?", keepExecution.ID).Delete(&models.CanvasNodeExecution{}).Error)
+	require.NoError(t, worker.LockAndProcessNode(deletedNode))
+
+	assert.Equal(t, int64(0), countUnscopedCanvasNodes(t, canvas.ID, "source-node"))
+	assert.Equal(t, int64(0), countNodeEvents(t, canvas.ID, "source-node"))
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "keep-node"))
+}
+
 func Test__CanvasNodeCleanupWorker_HandlesMultiTickBatching(t *testing.T) {
 	r := support.Setup(t)
 	worker := NewCanvasNodeCleanupWorker()

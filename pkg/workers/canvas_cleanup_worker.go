@@ -195,7 +195,13 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 			break
 		}
 
-		resourcesDeleted, allResourcesDeleted, err := deleteCanvasNodeResourcesBatched(tx, canvas.ID, node.NodeID, w.maxResourcesPerTick-totalResourcesDeleted)
+		resourcesDeleted, allResourcesDeleted, err := deleteCanvasNodeResourcesBatched(
+			tx,
+			canvas.ID,
+			node.NodeID,
+			w.maxResourcesPerTick-totalResourcesDeleted,
+			canvasNodeEventCleanupDeleteAll,
+		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
 		}
