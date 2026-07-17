@@ -50,7 +50,8 @@ export function runMatchesStatusTriggerFilters(
   const statuses = filters.statuses;
   if (statuses && statuses.length > 0) {
     const status = getRunStatus(run);
-    if (status === "unknown" || !statuses.includes(status)) return false;
+    const filterStatus = status === "cancelling" ? "running" : status;
+    if (filterStatus === "unknown" || !statuses.includes(filterStatus)) return false;
   }
 
   const triggers = filters.triggers;

@@ -204,8 +204,8 @@ export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   cancelling: {
     icon: "refresh-cw",
     textColor: "text-gray-800",
-    backgroundColor: "bg-sky-100",
-    badgeColor: "bg-blue-500",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
     label: "Cancelling",
   },
 };

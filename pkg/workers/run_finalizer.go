@@ -67,7 +67,7 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			runs, err := models.ListStartedCanvasRuns(startedRunsSweepLimit)
+			runs, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateStarted, startedRunsSweepLimit)
 			if err != nil {
 				w.logger.Errorf("Error listing started runs: %v", err)
 				continue
@@ -81,6 +81,30 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 						"workflow_id": run.WorkflowID,
 						"run_id":      run.ID,
 					}).Errorf("Error finalizing run from sweep: %v", err)
+				}
+			}
+
+			cancellingRuns, err := models.ListCanvasRunsInState(database.Conn(), models.CanvasRunStateCancelling, startedRunsSweepLimit)
+			if err != nil {
+				w.logger.Errorf("Error listing cancelling runs: %v", err)
+				continue
+			}
+
+			for _, run := range cancellingRuns {
+				logger := logging.WithRun(w.logger, run)
+
+				err := database.Conn().Transaction(func(tx *gorm.DB) error {
+					_, err := run.DrainForCancellation(tx, run.CancelledBy)
+					return err
+				})
+
+				if err != nil {
+					logger.WithError(err).Errorf("Error draining cancelling run from sweep: %v", err)
+					continue
+				}
+
+				if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
+					logger.WithError(err).Errorf("Error finalizing cancelling run from sweep: %v", err)
 				}
 			}
 
@@ -327,7 +351,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, runFinalizerReasonAlreadyFinished, nil
 	}
 
-	openWork, err := models.FindOpenCanvasRunWorkInTransaction(tx, runID)
+	openWork, err := run.FindOpenWork(tx)
 	if err != nil {
 		return false, "", err
 	}
@@ -344,7 +368,7 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, runFinalizerReasonOpenWork, nil
 	}
 
-	result, err := models.CalculateCanvasRunResultInTransaction(tx, runID)
+	result, err := run.CalculateResult(tx)
 	if err != nil {
 		return false, "", err
 	}
