@@ -80,7 +80,7 @@ func (w *ExecutionTerminator) Start(ctx context.Context) {
 				go func(execution models.CanvasNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndCancelExecution(execution.ID); err != nil {
+					if err := w.LockAndCancelExecution(execution); err != nil {
 						if errors.Is(err, ErrRecordLocked) {
 							return
 						}
@@ -137,7 +137,19 @@ func (w *ExecutionTerminator) consumeCancelling(delivery tackle.Delivery) error 
 		return err
 	}
 
-	err = w.LockAndCancelExecution(executionID)
+	canvasID, err := uuid.Parse(data.CanvasId)
+	if err != nil {
+		w.logger.Errorf("Error parsing canvas id: %v", err)
+		return err
+	}
+
+	execution, err := models.FindNodeExecution(canvasID, executionID)
+	if err != nil {
+		w.logger.Errorf("Error finding execution: %v", err)
+		return err
+	}
+
+	err = w.LockAndCancelExecution(*execution)
 	if err == nil {
 		return nil
 	}
@@ -150,27 +162,27 @@ func (w *ExecutionTerminator) consumeCancelling(delivery tackle.Delivery) error 
 	return err
 }
 
-func (w *ExecutionTerminator) LockAndCancelExecution(executionID uuid.UUID) error {
-	var workflowID uuid.UUID
-	finished := false
+func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNodeExecution) error {
+	logger := logging.WithExecution(w.logger, &execution)
 
+	finished := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, executionID)
+		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, execution.ID)
 		if err != nil {
 			return err
 		}
 
-		workflowID = execution.WorkflowID
-
+		logger.Info("Cancelling execution")
 		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
 		if err != nil {
 			return err
 		}
 
-		if err := w.cancelComponent(tx, canvas.OrganizationID.String(), execution); err != nil {
+		if err := w.cancelComponent(tx, logger, canvas.OrganizationID.String(), execution); err != nil {
 			return err
 		}
 
+		logger.Info("Execution cancelled")
 		finished = true
 		return nil
 	})
@@ -186,15 +198,15 @@ func (w *ExecutionTerminator) LockAndCancelExecution(executionID uuid.UUID) erro
 		return nil
 	}
 
-	if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
+	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
 		w.logger.Errorf("failed to publish execution finished RabbitMQ message: %v", err)
 	}
 
 	return nil
 }
 
-func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, organizationID string, execution *models.CanvasNodeExecution) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, organizationID string, execution *models.CanvasNodeExecution) error {
+	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return err
 	}
@@ -214,7 +226,6 @@ func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, organizationID string
 		return err
 	}
 
-	logger := logging.ForExecution(execution)
 	orgUUID := uuid.MustParse(organizationID)
 	canvasName := ""
 	if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
