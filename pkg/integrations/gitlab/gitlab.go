@@ -188,6 +188,9 @@ func (g *GitLab) Actions() []core.Action {
 		&ApproveMergeRequest{},
 		&CreateDeployment{},
 		&CreateDeploymentStatus{},
+		&GetIssue{},
+		&UpdateIssue{},
+		&CreateIssueComment{},
 	}
 }
 
