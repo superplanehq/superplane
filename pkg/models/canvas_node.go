@@ -562,7 +562,7 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
 	err := tx.
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Delete(&deletedQueueItems).

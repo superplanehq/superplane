@@ -350,10 +350,6 @@ type RunCancellationDrainResult struct {
 	SupersededEvents      []CanvasEvent
 }
 
-func (r *RunCancellationDrainResult) Empty() bool {
-	return len(r.RequestedExecutionIDs) == 0 && len(r.DeletedQueueItems) == 0 && len(r.SupersededEvents) == 0
-}
-
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
 	executions, err := r.ListExecutionsInStates(tx, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
 	if err != nil {

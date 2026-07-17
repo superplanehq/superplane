@@ -309,6 +309,26 @@ func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, n
 		return err
 	}
 
+	//
+	// Check if the run is cancelling.
+	// If it is, we should not create new executions,
+	// and instead, delete the queue item and return.
+	//
+	run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
+	if err != nil {
+		return err
+	}
+
+	if run.State == models.CanvasRunStateCancelling {
+		if err := tx.Delete(item).Error; err != nil {
+			return err
+		}
+
+		logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
+		collector.AddQueueItemDeleted(item)
+		return nil
+	}
+
 	ctx, err := contexts.BuildProcessQueueContext(
 		w.registry.HTTPContextInTransaction(tx),
 		tx,
@@ -340,26 +360,6 @@ func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, n
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
 		return w.handleNodeConfigurationError(tx, configErr, collector)
-	}
-
-	//
-	// Check if the run is cancelling.
-	// If it is, we should not create new executions,
-	// and instead, delete the queue item and return.
-	//
-	run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
-	if err != nil {
-		return err
-	}
-
-	if run.State == models.CanvasRunStateCancelling {
-		if err := tx.Delete(item).Error; err != nil {
-			return err
-		}
-
-		logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
-		collector.AddQueueItemDeleted(item)
-		return nil
 	}
 
 	switch node.Type {
