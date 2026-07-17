@@ -58,17 +58,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 		}
 
 		publishCancelled = true
-
-		//
-		// If drain results are expected, we mark the run as cancelling,
-		// and let RunFinalizer do its job, moving it to cancelled state when everything is done.
-		// Otherwise, we can mark it as cancelled immediately.
-		//
-		if !drainResult.Empty() {
-			return run.MarkAsCancelling(tx, &user.ID)
-		} else {
-			return run.MarkAsCancelled(tx, &user.ID)
-		}
+		return run.MarkAsCancelling(tx, &user.ID)
 	})
 
 	if err != nil {

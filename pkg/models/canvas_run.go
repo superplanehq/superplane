@@ -456,24 +456,3 @@ func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error 
 		}).
 		Error
 }
-
-func (r *CanvasRun) MarkAsCancelled(tx *gorm.DB, cancelledBy *uuid.UUID) error {
-	now := time.Now()
-	r.State = CanvasRunStateFinished
-	r.Result = CanvasRunResultCancelled
-	r.CancelledAt = &now
-	r.CancelledBy = cancelledBy
-	r.FinishedAt = &now
-	r.UpdatedAt = &now
-
-	return tx.Model(r).
-		Updates(map[string]any{
-			"state":        CanvasRunStateFinished,
-			"result":       CanvasRunResultCancelled,
-			"cancelled_at": &now,
-			"cancelled_by": cancelledBy,
-			"finished_at":  &now,
-			"updated_at":   &now,
-		}).
-		Error
-}
