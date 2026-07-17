@@ -267,15 +267,16 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 	return &node, nil
 }
 
-// ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas is still active.
-// Nodes on soft-deleted canvases are owned by CanvasCleanupWorker.
+// ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas and
+// organization are still active. Nodes on soft-deleted canvases or organizations
+// are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
 func ListDeletedCanvasNodes(tx *gorm.DB) ([]CanvasNode, error) {
 	var nodes []CanvasNode
-	err := tx.Unscoped().
+	query := tx.Unscoped().
 		Model(&CanvasNode{}).
-		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
-		Where("workflow_nodes.deleted_at IS NOT NULL").
-		Where("workflows.deleted_at IS NULL").
+		Where("workflow_nodes.deleted_at IS NOT NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
 		Find(&nodes).
 		Error
 	if err != nil {
@@ -285,14 +286,23 @@ func ListDeletedCanvasNodes(tx *gorm.DB) ([]CanvasNode, error) {
 	return nodes, nil
 }
 
-// LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node.
+// LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node
+// whose parent canvas and organization are still active.
 func LockDeletedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
 	var node CanvasNode
-	err := tx.Unscoped().
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("deleted_at IS NOT NULL").
+	query := tx.Unscoped().
+		Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_nodes"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_nodes.workflow_id = ?", workflowID).
+		Where("workflow_nodes.node_id = ?", nodeID).
+		Where("workflow_nodes.deleted_at IS NOT NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
 		First(&node).
 		Error
 	if err != nil {

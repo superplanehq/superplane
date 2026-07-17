@@ -305,6 +305,7 @@ func Test__CanvasNodeCleanupWorker_IgnoresNonDeletedNodes(t *testing.T) {
 
 func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedCanvas(t *testing.T) {
 	r := support.Setup(t)
+	worker := NewCanvasNodeCleanupWorker()
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -325,7 +326,7 @@ func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedCanvas(t *testing.T) {
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
 
-	_ = softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
+	deletedNode := softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
 	require.NoError(t, canvas.SoftDelete())
 	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).
 		Where("id = ?", canvas.ID).
@@ -337,8 +338,57 @@ func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedCanvas(t *testing.T) {
 		assert.NotEqual(t, canvas.ID, node.WorkflowID)
 	}
 
+	require.NoError(t, worker.LockAndProcessNode(deletedNode))
+
 	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "node-1"))
 	assert.Equal(t, int64(1), countNodeEvents(t, canvas.ID, "node-1"))
+	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "node-1"))
+}
+
+func Test__CanvasNodeCleanupWorker_IgnoresNodesOnDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	worker := NewCanvasNodeCleanupWorker()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
+
+	deletedNode := softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	nodes, err := models.ListDeletedCanvasNodes(database.Conn())
+	require.NoError(t, err)
+	for _, node := range nodes {
+		assert.NotEqual(t, canvas.ID, node.WorkflowID)
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, err := models.LockDeletedCanvasNode(tx, canvas.ID, "node-1")
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, worker.LockAndProcessNode(deletedNode))
+
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "node-1"))
+	assert.Equal(t, int64(1), countNodeEvents(t, canvas.ID, "node-1"))
+	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "node-1"))
 }
 
 func Test__ListDeletedCanvasNodes_AndLock(t *testing.T) {
