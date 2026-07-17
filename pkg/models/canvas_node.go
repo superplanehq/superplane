@@ -267,6 +267,41 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 	return &node, nil
 }
 
+// ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas is still active.
+// Nodes on soft-deleted canvases are owned by CanvasCleanupWorker.
+func ListDeletedCanvasNodes(tx *gorm.DB) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := tx.Unscoped().
+		Model(&CanvasNode{}).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflow_nodes.deleted_at IS NOT NULL").
+		Where("workflows.deleted_at IS NULL").
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+// LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node.
+func LockDeletedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("deleted_at IS NOT NULL").
+		First(&node).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
 func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]CanvasNode, error) {
 	if len(nodeIDs) == 0 {
 		return nil, nil
