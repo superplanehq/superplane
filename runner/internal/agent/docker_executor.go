@@ -399,6 +399,8 @@ func dockerCommandsScript(directives []string) string {
 		script.WriteString("__sp_cmd_duration=$((__sp_cmd_end - __sp_cmd_start))\n")
 		script.WriteString("if [ \"$__sp_cmd_duration\" -lt 0 ]; then __sp_cmd_duration=0; fi\n")
 		script.WriteString("if [ \"$__sp_cmd_exit\" -eq 0 ]; then __sp_cmd_status=passed; else __sp_cmd_status=failed; fi\n")
+		// Force a newline so cmd_end JSON is not glued to stdout that omitted one.
+		script.WriteString("printf '\\n'\n")
 		script.WriteString(`printf '{"type":"cmd_end","index":`)
 		script.WriteString(strconv.Itoa(i))
 		script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
