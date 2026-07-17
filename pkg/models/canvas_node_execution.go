@@ -88,6 +88,11 @@ type CanvasNodeExecution struct {
 	Configuration datatypes.JSONType[map[string]any]
 }
 
+type CanvasRunActiveExecution struct {
+	CanvasNodeExecution
+	NodeComponentName string `gorm:"column:node_component_name"`
+}
+
 func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
 }
@@ -225,6 +230,34 @@ func ListActiveNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) 
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func ListActiveCanvasRunExecutions(tx *gorm.DB, runID uuid.UUID) ([]CanvasRunActiveExecution, error) {
+	var executions []CanvasRunActiveExecution
+	err := tx.
+		Table("workflow_node_executions").
+		Select(`
+			workflow_node_executions.*,
+			workflow_nodes.ref #>> '{component,name}' AS node_component_name
+		`).
+		Joins(`
+			INNER JOIN workflow_nodes
+				ON workflow_nodes.workflow_id = workflow_node_executions.workflow_id
+				AND workflow_nodes.node_id = workflow_node_executions.node_id
+				AND workflow_nodes.deleted_at IS NULL
+		`).
+		Where("workflow_node_executions.run_id = ?", runID).
+		Where("workflow_node_executions.state IN ?", []string{
+			CanvasNodeExecutionStatePending,
+			CanvasNodeExecutionStateStarted,
+		}).
 		Find(&executions).
 		Error
 	if err != nil {
