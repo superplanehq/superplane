@@ -121,3 +121,37 @@ func Test__CanvasNodeExecution_PassRetriesAfterRolledBackTransaction(t *testing.
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
 }
+
+func Test__CanvasNodeExecution_PassIsNoopWhileCancelling(t *testing.T) {
+	_, execution := setupRunWithExecution(t)
+	staleExecution := *execution
+
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateCancelling,
+	}).Error)
+
+	events, err := staleExecution.Pass(map[string][]any{"default": {map[string]any{"n": 1}}})
+	require.NoError(t, err)
+	assert.Empty(t, events)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}
+
+func Test__CanvasNodeExecution_FailIsNoopWhileCancelling(t *testing.T) {
+	_, execution := setupRunWithExecution(t)
+	staleExecution := *execution
+
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateCancelling,
+	}).Error)
+
+	failed, err := staleExecution.FailInTransaction(database.Conn(), models.CanvasNodeExecutionResultReasonError, "too late")
+	require.NoError(t, err)
+	assert.False(t, failed)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}

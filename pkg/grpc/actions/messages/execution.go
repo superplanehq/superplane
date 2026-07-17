@@ -12,14 +12,16 @@ import (
 const ExecutionsExchange = "superplane.executions-exchange"
 
 const (
-	ExecutionPendingRoutingKey  = "execution.pending"
-	ExecutionStartedRoutingKey  = "execution.started"
-	ExecutionFinishedRoutingKey = "execution.finished"
+	ExecutionPendingRoutingKey    = "execution.pending"
+	ExecutionStartedRoutingKey    = "execution.started"
+	ExecutionCancellingRoutingKey = "execution.cancelling"
+	ExecutionFinishedRoutingKey   = "execution.finished"
 )
 
 var ExecutionRoutingKeys = []string{
 	ExecutionPendingRoutingKey,
 	ExecutionStartedRoutingKey,
+	ExecutionCancellingRoutingKey,
 	ExecutionFinishedRoutingKey,
 }
 
@@ -46,6 +48,10 @@ func (m CanvasExecutionMessage) PublishStarted() error {
 	return Publish(ExecutionsExchange, ExecutionStartedRoutingKey, toBytes(m.message))
 }
 
+func (m CanvasExecutionMessage) PublishCancelling() error {
+	return Publish(ExecutionsExchange, ExecutionCancellingRoutingKey, toBytes(m.message))
+}
+
 func (m CanvasExecutionMessage) PublishFinished() error {
 	return Publish(ExecutionsExchange, ExecutionFinishedRoutingKey, toBytes(m.message))
 }
@@ -58,6 +64,8 @@ func PublishCanvasExecutionState(canvasID, executionID, nodeID, state string) er
 		return message.PublishPending()
 	case models.CanvasNodeExecutionStateStarted:
 		return message.PublishStarted()
+	case models.CanvasNodeExecutionStateCancelling:
+		return message.PublishCancelling()
 	case models.CanvasNodeExecutionStateFinished:
 		return message.PublishFinished()
 	default:

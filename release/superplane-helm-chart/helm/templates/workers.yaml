@@ -55,6 +55,8 @@ spec:
               value: "yes"
             - name: START_NODE_EXECUTOR
               value: "yes"
+            - name: START_EXECUTION_TERMINATOR
+              value: "yes"
             - name: START_NODE_QUEUE_WORKER
               value: "yes"
             - name: START_NODE_REQUEST_WORKER

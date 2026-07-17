@@ -107,6 +107,10 @@ export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): 
     return "cancelled";
   }
 
+  if (execution.state === "STATE_CANCELLING") {
+    return "cancelling";
+  }
+
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
     return "error";

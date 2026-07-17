@@ -158,6 +158,10 @@ const runnerStateFunction = (execution: ExecutionInfo): EventState => {
     return "cancelled";
   }
 
+  if (execution.state === "STATE_CANCELLING") {
+    return "cancelling";
+  }
+
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
   }
