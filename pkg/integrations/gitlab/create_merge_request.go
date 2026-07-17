@@ -116,18 +116,18 @@ func (c *CreateMergeRequest) Configuration() []configuration.Field {
 		{
 			Name:        "sourceBranch",
 			Label:       "Source Branch",
-			Type:        configuration.FieldTypeGitRef,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "feature/login-page or {{event.data.ref}}",
-			Description: "The branch containing the changes",
+			Description: "The name of the branch containing the changes",
 		},
 		{
 			Name:        "targetBranch",
 			Label:       "Target Branch",
-			Type:        configuration.FieldTypeGitRef,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "main",
-			Description: "The branch you want the changes merged into",
+			Description: "The name of the branch you want the changes merged into",
 		},
 		{
 			Name:     "title",
