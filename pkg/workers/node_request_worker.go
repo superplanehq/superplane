@@ -330,8 +330,8 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	// If node was deleted, we cancel the execution before completing the request.
 	//
 	if node.DeletedAt.Valid {
-		logger.Infof("Node %s deleted - cancelling execution and completing request", execution.NodeID)
-		if err := w.cancelExecutionForDeletedNode(logger, tx, node, execution); err != nil {
+		logger.Infof("Node %s deleted - requesting execution cancellation and completing request", execution.NodeID)
+		if err := w.cancelExecutionForDeletedNode(logger, tx, execution); err != nil {
 			return err
 		}
 
@@ -405,60 +405,11 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) cancelExecutionForDeletedNode(logger *log.Entry, tx *gorm.DB, node *models.CanvasNode, execution *models.CanvasNodeExecution) error {
-	if execution.State == models.CanvasNodeExecutionStateFinished {
+func (w *NodeRequestWorker) cancelExecutionForDeletedNode(logger *log.Entry, tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+	if execution.State == models.CanvasNodeExecutionStateFinished || execution.State == models.CanvasNodeExecutionStateCancelling {
 		return nil
 	}
 
-	ref := node.Ref.Data()
-	if node.Type != models.NodeTypeComponent || ref.Component == nil {
-		return execution.CancelInTransaction(tx, nil)
-	}
-
-	action, err := w.registry.GetAction(ref.Component.Name)
-	if err != nil {
-		return execution.CancelInTransaction(tx, nil)
-	}
-
-	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
-	if err != nil {
-		return fmt.Errorf("canvas not found: %w", err)
-	}
-
-	ctx := core.ExecutionContext{
-		ID:             execution.ID,
-		WorkflowID:     execution.WorkflowID.String(),
-		OrganizationID: canvas.OrganizationID.String(),
-		CanvasName:     canvas.Name,
-		NodeID:         execution.NodeID,
-		NodeName:       node.Name,
-		Configuration:  execution.Configuration.Data(),
-		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Auth:           contexts.NewAuthReader(tx, canvas.OrganizationID, w.authService, nil),
-	}
-
-	if node.AppInstallationID != nil {
-		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
-		if err != nil {
-			logger.Errorf("error finding app installation: %v", err)
-		} else {
-			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, w.encryptor, w.registry, nil)
-		}
-	}
-
-	ctx.Logger = logging.WithExecution(logger, execution)
-
-	//
-	// Best-effort for calling the Cancel() on the component implementation.
-	// If an error happens, we log it and continue with the execution cancellation.
-	//
-	err = action.Cancel(ctx)
-	if err != nil {
-		logger.Errorf("failed to cancel execution: %v", err)
-	}
-
-	return execution.CancelInTransaction(tx, nil)
+	logger.Infof("Requesting cancellation for execution %s", execution.ID)
+	return execution.RequestCancellation(tx, nil)
 }
