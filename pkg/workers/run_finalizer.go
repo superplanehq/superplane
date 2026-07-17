@@ -14,7 +14,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -28,8 +27,6 @@ const (
 
 	runFinalizerReasonAlreadyFinished = "already_finished"
 	runFinalizerReasonOpenWork        = "open_work"
-
-	loopComponentName = "loop"
 )
 
 type RunFinalizer struct {
@@ -289,11 +286,10 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	})
 
 	var finalized bool
-	var updatedExecutionIDs []uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, updatedExecutionIDs, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -306,12 +302,6 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		outcome = executorOutcomeFailed
 		reason = classifyProcessError(err)
 		return err
-	}
-
-	for _, executionID := range updatedExecutionIDs {
-		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
-			w.logger.WithError(err).Warnf("Failed to publish execution state message for execution %s", executionID)
-		}
 	}
 
 	if !finalized {
@@ -327,34 +317,19 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string) (bool, []uuid.UUID, string, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
-		return false, nil, "", err
+		return false, "", err
 	}
 
 	if run.State == models.CanvasRunStateFinished {
-		return false, nil, runFinalizerReasonAlreadyFinished, nil
+		return false, runFinalizerReasonAlreadyFinished, nil
 	}
 
 	openWork, err := models.FindOpenCanvasRunWorkInTransaction(tx, runID)
 	if err != nil {
-		return false, nil, "", err
-	}
-
-	var updatedExecutionIDs []uuid.UUID
-	if openWork.HasActiveExecutions && !openWork.HasQueueItems && !openWork.HasPendingEvents {
-		updatedExecutionIDs, err = w.failStalledLoopExecutions(tx, runID)
-		if err != nil {
-			return false, nil, "", err
-		}
-
-		if len(updatedExecutionIDs) > 0 {
-			openWork, err = models.FindOpenCanvasRunWorkInTransaction(tx, runID)
-			if err != nil {
-				return false, nil, "", err
-			}
-		}
+		return false, "", err
 	}
 
 	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
@@ -363,15 +338,15 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 			// LIMIT N. Bump updated_at here so a run that is still open is pushed to
 			// the back of the queue instead of being retried on every tick.
 			now := time.Now()
-			return false, updatedExecutionIDs, runFinalizerReasonOpenWork, tx.Model(run).Update("updated_at", &now).Error
+			return false, runFinalizerReasonOpenWork, tx.Model(run).Update("updated_at", &now).Error
 		}
 
-		return false, updatedExecutionIDs, runFinalizerReasonOpenWork, nil
+		return false, runFinalizerReasonOpenWork, nil
 	}
 
 	result, err := models.CalculateCanvasRunResultInTransaction(tx, runID)
 	if err != nil {
-		return false, nil, "", err
+		return false, "", err
 	}
 
 	now := time.Now()
@@ -385,68 +360,8 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		Error
 
 	if err != nil {
-		return false, nil, "", err
+		return false, "", err
 	}
 
-	return true, updatedExecutionIDs, "", nil
-}
-
-func (w *RunFinalizer) failStalledLoopExecutions(tx *gorm.DB, runID uuid.UUID) ([]uuid.UUID, error) {
-	activeExecutions, err := models.ListActiveCanvasRunExecutions(tx, runID)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(activeExecutions) == 0 {
-		return nil, nil
-	}
-
-	loopExecutions := make([]models.CanvasNodeExecution, 0, len(activeExecutions))
-	for _, execution := range activeExecutions {
-		if execution.NodeComponentName != loopComponentName {
-			return nil, nil
-		}
-
-		if loopExecutionIsWaitingBetweenIterations(execution.CanvasNodeExecution) {
-			return nil, nil
-		}
-
-		loopExecutions = append(loopExecutions, execution.CanvasNodeExecution)
-	}
-
-	failedExecutionIDs := make([]uuid.UUID, 0, len(loopExecutions))
-	for i := range loopExecutions {
-		if err := failStalledLoopExecution(tx, &loopExecutions[i]); err != nil {
-			return nil, err
-		}
-		failedExecutionIDs = append(failedExecutionIDs, loopExecutions[i].ID)
-	}
-
-	return failedExecutionIDs, nil
-}
-
-func loopExecutionIsWaitingBetweenIterations(execution models.CanvasNodeExecution) bool {
-	waiting, _ := execution.Metadata.Data()["waitingBetweenIterations"].(bool)
-	return waiting
-}
-
-func failStalledLoopExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
-	metadata := execution.Metadata.Data()
-	if metadata == nil {
-		metadata = map[string]any{}
-	}
-
-	metadata["active"] = false
-	metadata["waitingBetweenIterations"] = false
-	execution.Metadata = datatypes.NewJSONType(metadata)
-	if err := tx.Model(execution).Update("metadata", execution.Metadata).Error; err != nil {
-		return err
-	}
-
-	_, err := execution.FailInTransaction(
-		tx,
-		models.CanvasNodeExecutionResultReasonError,
-		"loop cannot reach the loop conclusion because all downstream work has reached a terminal state",
-	)
-	return err
+	return true, "", nil
 }
