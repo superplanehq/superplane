@@ -15,6 +15,7 @@ const (
 
 type RunExecutionContext interface {
 	Create(params RunCreationParams) (*Run, error)
+	Cancel() error
 }
 
 type Run struct {

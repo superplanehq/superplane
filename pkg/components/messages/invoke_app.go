@@ -255,7 +255,7 @@ func (c *InvokeApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 }
 
 func (c *InvokeApp) Cancel(ctx core.ExecutionContext) error {
-	return nil
+	return ctx.Runs.Cancel()
 }
 
 func (c *InvokeApp) Cleanup(ctx core.SetupContext) error {

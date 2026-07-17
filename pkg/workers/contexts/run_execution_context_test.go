@@ -74,6 +74,45 @@ func Test__RunExecutionContext__Create__AllowsSiblingSubRuns(t *testing.T) {
 	require.NotNil(t, run)
 }
 
+func Test__RunExecutionContext__Cancel__CancelsChildRuns(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	parentCanvas, parentNodes := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "invokeApp",
+				Name:   "Invoke App",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "invokeApp"}}),
+			},
+		},
+		nil,
+	)
+
+	childCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "onInvoke", Type: models.NodeTypeTrigger}},
+		nil,
+	)
+
+	parentRun := createRunRecord(t, parentCanvas.ID, "trigger", nil)
+	execution := createRunExecution(t, parentCanvas.ID, parentRun.ID, parentNodes[1].NodeID)
+	require.NoError(t, execution.RequestCancellation(database.Conn(), &r.User))
+
+	execution, err := models.FindNodeExecution(parentCanvas.ID, execution.ID)
+	require.NoError(t, err)
+
+	childRun := createChildRunRecord(t, childCanvas.ID, "onInvoke", parentRun.ID, parentCanvas.ID, execution.ID, models.CanvasRunStatePending)
+
+	ctx := NewRunExecutionContext(database.Conn(), parentCanvas, &parentNodes[1], execution)
+	require.NoError(t, ctx.Cancel())
+
+	updatedChild, err := models.FindCanvasRunInTransaction(database.Conn(), childCanvas.ID, childRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedChild.State)
+}
+
 func createRunRecord(t *testing.T, workflowID uuid.UUID, nodeID string, parentRunID *uuid.UUID) *models.CanvasRun {
 	t.Helper()
 
@@ -90,6 +129,37 @@ func createRunRecord(t *testing.T, workflowID uuid.UUID, nodeID string, parentRu
 		State:       models.CanvasRunStateStarted,
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return &run
+}
+
+func createChildRunRecord(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	parentRunID uuid.UUID,
+	parentWorkflowID uuid.UUID,
+	parentExecutionID uuid.UUID,
+	state string,
+) *models.CanvasRun {
+	t.Helper()
+
+	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+	require.NoError(t, err)
+
+	run := models.CanvasRun{
+		ID:                uuid.New(),
+		WorkflowID:        workflowID,
+		NodeID:            nodeID,
+		VersionID:         liveVersion.ID,
+		ParentRunID:       &parentRunID,
+		ParentWorkflowID:  &parentWorkflowID,
+		ParentExecutionID: &parentExecutionID,
+		State:             state,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 	require.NoError(t, database.Conn().Create(&run).Error)
 	return &run

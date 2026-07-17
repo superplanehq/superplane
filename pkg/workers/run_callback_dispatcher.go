@@ -178,6 +178,15 @@ func (d *RunCallbackDispatcher) dispatchFinishedCallbackOnParent(callback core.R
 		return err
 	}
 
+	if execution.State == models.CanvasNodeExecutionStateCancelling {
+		return nil
+	}
+
+	if execution.State == models.CanvasNodeExecutionStateFinished &&
+		execution.Result == models.CanvasNodeExecutionResultCancelled {
+		return nil
+	}
+
 	return d.dispatchActionHook(callback, node, execution, params)
 }
 

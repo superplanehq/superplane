@@ -1,6 +1,8 @@
 package contexts
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,6 +16,7 @@ type RunExecutionContext struct {
 	execution             *models.CanvasNodeExecution
 	maxCrossWorkflowDepth int
 	onPendingRunCreated   func(workflowID, runID uuid.UUID)
+	onRunCancelled        func(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult)
 }
 
 func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, execution *models.CanvasNodeExecution) *RunExecutionContext {
@@ -29,6 +32,48 @@ func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.Can
 func (c *RunExecutionContext) WithPendingRunCreated(fn func(workflowID, runID uuid.UUID)) *RunExecutionContext {
 	c.onPendingRunCreated = fn
 	return c
+}
+
+func (c *RunExecutionContext) WithRunCancelled(fn func(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult)) *RunExecutionContext {
+	c.onRunCancelled = fn
+	return c
+}
+
+func (c *RunExecutionContext) Cancel() error {
+	childRuns, err := models.ListChildRunsByParentExecutionsInTransaction(
+		c.tx,
+		c.canvas.ID,
+		[]uuid.UUID{c.execution.ID},
+	)
+	if err != nil {
+		return fmt.Errorf("list child runs: %w", err)
+	}
+
+	for _, childRun := range childRuns {
+		run, err := models.LockCanvasRunInTransaction(c.tx, childRun.ID)
+		if err != nil {
+			return fmt.Errorf("lock child run %s: %w", childRun.ID, err)
+		}
+
+		if run.State == models.CanvasRunStateFinished {
+			continue
+		}
+
+		drainResult, err := run.DrainForCancellation(c.tx, c.execution.CancelledBy)
+		if err != nil {
+			return fmt.Errorf("cancel child run %s: %w", childRun.ID, err)
+		}
+
+		if err := run.MarkAsCancelling(c.tx, c.execution.CancelledBy); err != nil {
+			return fmt.Errorf("mark child run %s cancelling: %w", childRun.ID, err)
+		}
+
+		if c.onRunCancelled != nil {
+			c.onRunCancelled(run.WorkflowID, run.ID, drainResult)
+		}
+	}
+
+	return nil
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
