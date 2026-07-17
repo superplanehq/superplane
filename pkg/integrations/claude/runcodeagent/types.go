@@ -26,7 +26,6 @@ const (
 	maxPollAttempts   = 80
 	maxPollErrors     = 5
 	finalMessageReads = 15
-	finalMessageDelay = 2 * time.Second
 
 	// Where attached files are mounted inside the sandbox.
 	attachmentsMountDir = "/workspace/attachments"
@@ -34,6 +33,10 @@ const (
 	networkingUnrestricted = "unrestricted"
 	networkingLimited      = "limited"
 )
+
+// finalMessageDelay is the pause between event-stream reads while waiting for
+// the terminal event to be written. A var so tests can shrink it.
+var finalMessageDelay = 2 * time.Second
 
 // defaultGitHubHosts are always allowed when networking is "limited" so the
 // agent can clone, push, and open pull requests.

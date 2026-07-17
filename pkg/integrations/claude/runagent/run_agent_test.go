@@ -653,6 +653,40 @@ func Test__RunAgent__poll__terminalWithIncompleteEventsReportsRealStatus(t *test
 	assert.True(t, deleted, "a finished session is still reclaimed by default")
 }
 
+// Past the poll budget with incomplete events, LastMessage may not be the
+// agent's real final message — structured output must not be trusted then,
+// even though the session is reported as genuinely finished (idle).
+func Test__RunAgent__poll__terminalWithIncompleteEventsSkipsStructuredOutput(t *testing.T) {
+	a := &RunAgent{}
+	restore := finalMessageDelay
+	finalMessageDelay = time.Millisecond
+	t.Cleanup(func() { finalMessageDelay = restore })
+
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))}, // get session: finished
+	}}
+	// Events never include session.status_idle, so Complete never becomes true,
+	// even though the message looks like valid structured-output JSON.
+	for range finalMessageReads {
+		httpContext.Responses = append(httpContext.Responses,
+			&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"data":[{"type":"agent.message","content":[{"type":"text","text":"{\"summary\":\"partial\"}"}]}]}`))})
+	}
+	httpContext.Responses = append(httpContext.Responses,
+		&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}) // delete session
+
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it", "outputSchema": structuredOutputSchema,
+	})))
+
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.NotEmpty(t, out.LastMessage, "the partial message we did collect must still be emitted")
+	assert.Nil(t, out.Parsed, "incomplete events must never be trusted for structured output")
+}
+
 // Repeated poll failures mean we lost sight of the session, not that it ended.
 func Test__RunAgent__poll__repeatedErrorsReclaimSession(t *testing.T) {
 	a := &RunAgent{}

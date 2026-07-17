@@ -93,8 +93,12 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 	}
 
 	out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
-	applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
 	if sm != nil {
+		// Only trust structured output once events are confirmed complete —
+		// past the poll budget, LastMessage may not be the real final message.
+		if sm.Complete {
+			applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
+		}
 		out.Artifacts = CollectSessionArtifacts(client, metadata.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	}
 	if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {

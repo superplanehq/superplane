@@ -790,3 +790,50 @@ func Test__RunCodeAgent__poll__terminalWithUnavailableEventsPastBudget(t *testin
 	assert.Equal(t, "idle", out.Status)
 	assert.Nil(t, out.Artifacts)
 }
+
+// Past the poll budget with incomplete events, LastMessage may not be the
+// agent's real final message — structured output must not be trusted then,
+// even though the session is reported as genuinely finished (idle).
+func Test__RunCodeAgent__poll__terminalWithIncompleteEventsSkipsStructuredOutput(t *testing.T) {
+	a := &RunCodeAgent{}
+	restore := finalMessageDelay
+	finalMessageDelay = time.Millisecond
+	t.Cleanup(func() { finalMessageDelay = restore })
+
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"idle"}`),
+	}}
+	// Events never include session.status_idle, so Complete never becomes
+	// true, even though the message looks like valid structured-output JSON.
+	for range finalMessageReads {
+		httpCtx.Responses = append(httpCtx.Responses, resp(
+			`{"data":[{"type":"agent.message","content":[{"type":"text","text":"{\"summary\":\"partial\"}"}]}]}`))
+	}
+	httpCtx.Responses = append(httpCtx.Responses, resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`)) // teardown
+
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:       "poll",
+		Parameters: map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		Configuration: map[string]any{
+			"sourceMode":   "repository",
+			"repository":   "o/r",
+			"task":         "do it",
+			"githubToken":  map[string]any{"secret": "gh", "key": "token"},
+			"outputSchema": `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`,
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.NotEmpty(t, out.LastMessage, "the partial message we did collect must still be emitted")
+	assert.Nil(t, out.Parsed, "incomplete events must never be trusted for structured output")
+}
