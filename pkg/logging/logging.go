@@ -60,3 +60,10 @@ func WithWebhook(logger *log.Entry, webhook models.Webhook) *log.Entry {
 		"webhook_id": webhook.ID,
 	})
 }
+
+func WithRun(logger *log.Entry, run models.CanvasRun) *log.Entry {
+	return logger.WithFields(log.Fields{
+		"run_id":      run.ID,
+		"workflow_id": run.WorkflowID,
+	})
+}

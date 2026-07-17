@@ -22,8 +22,9 @@ type RunStateWebsocketEvent struct {
 }
 
 const (
-	RunStartedEvent  = "run_started"
-	RunFinishedEvent = "run_finished"
+	RunStartedEvent    = "run_started"
+	RunCancellingEvent = "run_cancelling"
+	RunFinishedEvent   = "run_finished"
 )
 
 func HandleCanvasRun(messageBody []byte, wsHub *ws.Hub) error {
@@ -41,6 +42,8 @@ func runStateToWsEvent(runState string) string {
 	switch runState {
 	case models.CanvasRunStateStarted:
 		return RunStartedEvent
+	case models.CanvasRunStateCancelling:
+		return RunCancellingEvent
 	case models.CanvasRunStateFinished:
 		return RunFinishedEvent
 	default:
