@@ -60,9 +60,13 @@ yq --version
 rg --version
 fd --version
 make --version
-zip -v | head -n 1
-rsync --version | head -n 1
-wget --version | head -n 1
+# Avoid `cmd | head` under pipefail — SIGPIPE yields exit 141.
+command -v zip
+command -v rsync
+command -v wget
+zip -v >/dev/null
+rsync --version >/dev/null
+wget --version >/dev/null
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
