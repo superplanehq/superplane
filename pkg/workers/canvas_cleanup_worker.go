@@ -95,7 +95,7 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 
 	w.logger.Infof("Processing deleted canvas %s", canvas.ID)
 
-	totalRunsDeleted, err := w.cleanCanvasRuns(canvas)
+	totalRunsDeleted, err := w.cleanCanvasRuns(database.Conn(), canvas)
 	if err != nil {
 		return err
 	}
@@ -159,13 +159,13 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	return nil
 }
 
-func (w *CanvasCleanupWorker) cleanCanvasRuns(canvas models.Canvas) (int, error) {
+func (w *CanvasCleanupWorker) cleanCanvasRuns(db *gorm.DB, canvas models.Canvas) (int, error) {
 	if !canvas.DeletedAt.Valid {
 		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
 		return 0, nil
 	}
 
-	runs, err := canvas.ListRuns(database.Conn(), w.maxRunsPerTick)
+	runs, err := canvas.ListRuns(db, w.maxRunsPerTick)
 	if err != nil {
 		return 0, fmt.Errorf("list workflow runs for cleanup: %w", err)
 	}
@@ -184,7 +184,7 @@ func (w *CanvasCleanupWorker) cleanCanvasRuns(canvas models.Canvas) (int, error)
 		// transactions commit incrementally and match the list-then-lock pattern
 		// used elsewhere (EventRouter, NodeExecutor, EventRetentionWorker).
 		var summary *models.RunDeletionSummary
-		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		err := db.Transaction(func(tx *gorm.DB) error {
 			locked, err := models.LockCanvasRun(tx, canvas.ID, run.ID)
 			if err != nil {
 				return fmt.Errorf("lock run %s: %w", run.ID, err)
@@ -201,7 +201,6 @@ func (w *CanvasCleanupWorker) cleanCanvasRuns(canvas models.Canvas) (int, error)
 
 			return nil
 		})
-
 		if err != nil {
 			logger.Errorf("Error cleaning run: %v", err)
 			return deleted, err
@@ -283,9 +282,7 @@ func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) 
 		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
 	}
 
-	w.logger.WithFields(log.Fields{
-		"canvas_id": canvas.ID,
-	}).Info("Successfully cleaned up canvas")
+	logging.WithCanvas(w.logger, canvas).Info("Successfully cleaned up canvas")
 	return sessions, repositories, nil
 }
 
@@ -295,7 +292,7 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 		return nil, nil, nil
 	}
 
-	if _, err := w.cleanCanvasRuns(canvas); err != nil {
+	if _, err := w.cleanCanvasRuns(tx, canvas); err != nil {
 		return nil, nil, err
 	}
 

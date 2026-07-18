@@ -317,6 +317,21 @@ func deleteRows(db *gorm.DB, model any, query string, args ...any) (int64, error
 	return result.RowsAffected, nil
 }
 
+func deleteRowsLimited(db *gorm.DB, model any, limit int, query string, args ...any) (int64, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	// PostgreSQL does not support DELETE ... LIMIT; select matching IDs first.
+	subQuery := db.Model(model).Select("id").Where(query, args...).Limit(limit)
+	result := db.Where("id IN (?)", subQuery).Delete(model)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
 func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
 	return tx.
 		Table("workflow_runs").

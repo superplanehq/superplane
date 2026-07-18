@@ -407,69 +407,37 @@ func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64,
 // are workflow-scoped but not run-scoped — notably trigger node requests created
 // without an execution_id (CanvasNode.CreateRequest). Orphan or inconsistent rows
 // (e.g. nil run_id from partial routing) are also cleared here before nodes and
-// the canvas row can be removed. Deletes are capped per call via maxRecords so
-// large final sweeps do not exceed statement timeouts.
+// the canvas row can be removed. Each call deletes at most maxRecords rows total,
+// using SQL LIMIT per resource type so large orphan sets cannot time out.
 func (c *Canvas) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDeletionSummary, bool, error) {
 	summary := &RunDeletionSummary{}
 
-	count, err := deleteRows(db, &CanvasNodeRequest{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
+	type remainingResource struct {
+		model any
+		apply func(int64)
 	}
 
-	summary.NodeRequests = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
+	resources := []remainingResource{
+		{model: &CanvasNodeRequest{}, apply: func(count int64) { summary.NodeRequests = count }},
+		{model: &CanvasNodeExecutionKV{}, apply: func(count int64) { summary.NodeExecutionKVs = count }},
+		{model: &CanvasNodeQueueItem{}, apply: func(count int64) { summary.NodeQueueItems = count }},
+		{model: &CanvasEvent{}, apply: func(count int64) { summary.Events = count }},
+		{model: &CanvasNodeExecution{}, apply: func(count int64) { summary.NodeExecutions = count }},
+		{model: &CanvasRun{}, apply: func(count int64) { summary.Runs = count }},
 	}
 
-	count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
-	}
+	for _, resource := range resources {
+		if summary.TotalRecords() >= int64(maxRecords) {
+			return summary, false, nil
+		}
 
-	summary.NodeExecutionKVs = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
-	}
+		budget := maxRecords - int(summary.TotalRecords())
+		count, err := deleteRowsLimited(db, resource.model, budget, "workflow_id = ?", c.ID)
+		if err != nil {
+			return nil, false, err
+		}
 
-	count, err = deleteRows(db, &CanvasNodeQueueItem{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	summary.NodeQueueItems = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
-	}
-
-	count, err = deleteRows(db, &CanvasEvent{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	summary.Events = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
-	}
-
-	count, err = deleteRows(db, &CanvasNodeExecution{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	summary.NodeExecutions = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
-	}
-
-	count, err = deleteRows(db, &CanvasRun{}, "workflow_id = ?", c.ID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	summary.Runs = count
-	if summary.TotalRecords() >= int64(maxRecords) {
-		return summary, false, nil
+		resource.apply(count)
 	}
 
 	return summary, true, nil

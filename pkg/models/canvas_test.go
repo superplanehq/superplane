@@ -52,10 +52,36 @@ func Test__Canvas__DeleteRemainingResources__StopsBeforeLaterResourceTypesWhenLi
 	summary, complete, err := canvas.DeleteRemainingResources(database.Conn(), 250)
 	require.NoError(t, err)
 	require.False(t, complete)
-	require.Equal(t, &models.RunDeletionSummary{NodeRequests: 300}, summary)
-	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+	require.Equal(t, &models.RunDeletionSummary{NodeRequests: 250}, summary)
+	support.VerifyNodeRequestCount(t, canvas.ID, 50)
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 	support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
+}
+
+func Test__Canvas__DeleteRemainingResources__DeletesRemainingRowsOnNextCall(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Type: models.NodeTypeTrigger},
+		},
+		nil,
+	)
+
+	createOrphanNodeRequests(t, canvas.ID, "node-1", 300)
+
+	summary, complete, err := canvas.DeleteRemainingResources(database.Conn(), 250)
+	require.NoError(t, err)
+	require.False(t, complete)
+	require.Equal(t, int64(250), summary.NodeRequests)
+
+	summary, complete, err = canvas.DeleteRemainingResources(database.Conn(), 250)
+	require.NoError(t, err)
+	require.True(t, complete)
+	require.Equal(t, &models.RunDeletionSummary{NodeRequests: 50}, summary)
+	support.VerifyNodeRequestCount(t, canvas.ID, 0)
 }
 
 func Test__Canvas__DeleteRemainingResources__ReturnsIncompleteWhenFirstTypeExceedsLimit(t *testing.T) {
@@ -75,8 +101,8 @@ func Test__Canvas__DeleteRemainingResources__ReturnsIncompleteWhenFirstTypeExcee
 	summary, complete, err := canvas.DeleteRemainingResources(database.Conn(), 500)
 	require.NoError(t, err)
 	require.False(t, complete)
-	require.Equal(t, &models.RunDeletionSummary{NodeRequests: 600}, summary)
-	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+	require.Equal(t, &models.RunDeletionSummary{NodeRequests: 500}, summary)
+	support.VerifyNodeRequestCount(t, canvas.ID, 100)
 }
 
 func createOrphanNodeRequests(t *testing.T, workflowID uuid.UUID, nodeID string, count int) {
