@@ -91,7 +91,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 		"created_at": time.Now().AddDate(0, 0, -29),
 	}).Error)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -126,7 +126,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithoutCachedRetentionWindow(t *te
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -201,7 +201,9 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	markRunFinishedForRetention(t, rootEvent.ID, 31)
+
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 1, deleted)
 
@@ -244,7 +246,7 @@ func Test__EventRetentionWorker_CleansMultipleExpiredCompletedRootEventChains(t 
 	createExpiredCompletedRootEventChain(t, canvas.ID)
 	createExpiredCompletedRootEventChain(t, canvas.ID)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 2, deleted)
 
@@ -310,7 +312,7 @@ func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
 	createExpiredCompletedRootEventChain(t, eligibleCanvas.ID)
 	createCompletedRootEventChain(t, unrelatedCanvas.ID, 1)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 1, deleted)
 
@@ -325,7 +327,7 @@ func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
 	support.VerifyNodeRequestCount(t, unrelatedCanvas.ID, 1)
 }
 
-func Test__EventRetentionWorker_RespectsMaxRootEventsPerTick(t *testing.T) {
+func Test__EventRetentionWorker_RespectsMaxRunsPerTick(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -393,8 +395,9 @@ func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 	support.CreateQueueItem(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
+	markRunFinishedForRetention(t, rootEvent.ID, 31)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -462,7 +465,9 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	markRunFinishedForRetention(t, rootEvent.ID, 31)
+
+	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -512,6 +517,8 @@ func createCompletedRootEventChain(t *testing.T, canvasID uuid.UUID, daysAgo int
 		UpdatedAt: time.Now().AddDate(0, 0, -daysAgo),
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
+
+	markRunFinishedForRetention(t, rootEvent.ID, daysAgo)
 }
 
 func createExpiredRootEventForWorker(t *testing.T, canvasID uuid.UUID) *models.CanvasEvent {
@@ -528,6 +535,22 @@ func createRootEventForWorker(t *testing.T, canvasID uuid.UUID, daysAgo int) *mo
 		"state":      models.CanvasEventStateRouted,
 		"created_at": time.Now().AddDate(0, 0, -daysAgo),
 	}).Error)
+	markRunFinishedForRetention(t, rootEvent.ID, daysAgo)
 
 	return rootEvent
+}
+
+func markRunFinishedForRetention(t *testing.T, rootEventID uuid.UUID, daysAgo int) {
+	t.Helper()
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEventID)
+	require.NoError(t, err)
+
+	finishedAt := time.Now().AddDate(0, 0, -daysAgo)
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"finished_at": finishedAt,
+		"updated_at":  finishedAt,
+	}).Error)
 }

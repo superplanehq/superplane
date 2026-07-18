@@ -398,3 +398,39 @@ func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64,
 
 	return count, nil
 }
+
+func (c *Canvas) DeleteRemainingResources(db *gorm.DB) error {
+	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeRequest{}).Error; err != nil {
+		return err
+	}
+
+	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
+		return err
+	}
+
+	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasEvent{}).Error; err != nil {
+		return err
+	}
+
+	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeExecution{}).Error; err != nil {
+		return err
+	}
+
+	return db.Where("workflow_id = ?", c.ID).Delete(&CanvasRun{}).Error
+}
+
+func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {
+	var count int64
+	err := db.Model(&CanvasRun{}).
+		Where("workflow_id = ?", c.ID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
