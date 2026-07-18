@@ -170,7 +170,12 @@ func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([
 	var runs []CanvasRun
 
 	query := expiredFinishedRunsQuery(db, referenceTime).
-		Scopes(oldestCanvasRunsFirst)
+		Scopes(
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+			oldestCanvasRunsFirst,
+		)
 
 	if limit > 0 {
 		query = query.Limit(limit)

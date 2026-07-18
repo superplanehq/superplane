@@ -476,6 +476,53 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 	support.VerifyNodeRequestCount(t, canvas.ID, 1)
 }
 
+func Test__EventRetentionWorker_DoesNotStarveEligibleRunsWhenBlockedRunsAreOlder(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+			{
+				NodeID: "component",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	blockedRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).Where("id = ?", blockedRootEvent.ID).Updates(map[string]any{
+		"state":      models.CanvasEventStateRouted,
+		"created_at": time.Now().AddDate(0, 0, -40),
+	}).Error)
+	support.CreateQueueItem(t, canvas.ID, "component", blockedRootEvent.ID, blockedRootEvent.ID)
+	markRunFinishedForRetention(t, blockedRootEvent.ID, 40)
+
+	createExpiredRootEventForWorker(t, canvas.ID)
+
+	deleted, err := worker.cleanRuns(time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
+	support.VerifyNodeQueueCount(t, canvas.ID, 1)
+}
+
 func createExpiredCompletedRootEventChain(t *testing.T, canvasID uuid.UUID) {
 	t.Helper()
 
