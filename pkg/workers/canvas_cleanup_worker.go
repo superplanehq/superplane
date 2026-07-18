@@ -182,8 +182,8 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 	}
 
 	runCleaner, err := cleaners.NewRunCleaner(tx, cleaners.RunCleanerOptions{
-		Mode:       cleaners.RunCleanerModeCanvasTeardown,
-		WorkflowID: canvas.ID,
+		Mode:   cleaners.RunCleanerModeCanvasTeardown,
+		Canvas: &canvas,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("create run cleaner: %w", err)

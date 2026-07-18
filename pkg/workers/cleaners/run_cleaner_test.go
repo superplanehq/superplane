@@ -20,7 +20,7 @@ func Test__RunCleanerOptions_Validate(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("canvas teardown mode requires workflow id", func(t *testing.T) {
+	t.Run("canvas teardown mode requires canvas", func(t *testing.T) {
 		_, err := cleaners.NewRunCleaner(nil, cleaners.RunCleanerOptions{
 			Mode: cleaners.RunCleanerModeCanvasTeardown,
 		})
@@ -107,8 +107,8 @@ func Test__RunCleaner_CleanBatch_CanvasTeardown(t *testing.T) {
 	var deleted int
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		runCleaner, err := cleaners.NewRunCleaner(tx, cleaners.RunCleanerOptions{
-			Mode:       cleaners.RunCleanerModeCanvasTeardown,
-			WorkflowID: canvas.ID,
+			Mode:   cleaners.RunCleanerModeCanvasTeardown,
+			Canvas: &canvas,
 		})
 		if err != nil {
 			return err

@@ -177,12 +177,12 @@ func LockRetainedFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) (
 	return runs, nil
 }
 
-func LockCanvasRunsForCleanup(db *gorm.DB, workflowID uuid.UUID, limit int) ([]CanvasRun, error) {
+func (c *Canvas) LockRunsForCleanup(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
 	query := db.
 		Scopes(lockCanvasRunsForUpdate).
-		Where("workflow_id = ?", workflowID).
+		Where("workflow_id = ?", c.ID).
 		Order("created_at ASC")
 
 	if limit > 0 {

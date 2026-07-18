@@ -19,7 +19,7 @@ const (
 type RunCleanerOptions struct {
 	Mode          RunCleanerMode
 	ReferenceTime time.Time
-	WorkflowID    uuid.UUID
+	Canvas        *models.Canvas
 }
 
 func (o RunCleanerOptions) Validate() error {
@@ -29,8 +29,8 @@ func (o RunCleanerOptions) Validate() error {
 			return fmt.Errorf("reference time is required for retention cleanup")
 		}
 	case RunCleanerModeCanvasTeardown:
-		if o.WorkflowID == uuid.Nil {
-			return fmt.Errorf("workflow id is required for canvas teardown cleanup")
+		if o.Canvas == nil {
+			return fmt.Errorf("canvas is required for canvas teardown cleanup")
 		}
 	default:
 		return fmt.Errorf("unknown run cleaner mode")
@@ -86,7 +86,7 @@ func (c *RunCleaner) lockRuns(limit int) ([]models.CanvasRun, error) {
 	case RunCleanerModeRetention:
 		return models.LockRetainedFinishedRuns(c.tx, c.options.ReferenceTime, limit)
 	case RunCleanerModeCanvasTeardown:
-		return models.LockCanvasRunsForCleanup(c.tx, c.options.WorkflowID, limit)
+		return c.options.Canvas.LockRunsForCleanup(c.tx, limit)
 	default:
 		return nil, fmt.Errorf("unknown run cleaner mode")
 	}
