@@ -107,6 +107,7 @@ export const runAppMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const nodeMetadata = context.node.metadata as RunAppMetadata | undefined;
+    const metadata = context.execution.metadata as RunAppExecutionMetadata | undefined;
     const childRun = resolveChildRun(context.execution.runs, nodeMetadata?.app?.id);
     const app = nodeMetadata?.app;
 
@@ -119,12 +120,12 @@ export const runAppMapper: ComponentBaseMapper = {
       details["Run"] = appRunPath(organizationId, childRun.canvasId, childRun.id);
     }
 
-    if (context.execution.result === "RESULT_PASSED") {
-      details["Result"] = "passed";
-    } else if (context.execution.result === "RESULT_FAILED") {
-      details["Result"] = "failed";
-    } else if (context.execution.result === "RESULT_CANCELLED") {
-      details["Result"] = "cancelled";
+    if (metadata?.run?.result) {
+      details["Result"] = metadata.run.result;
+    }
+
+    if (metadata?.run?.error) {
+      details["Error"] = metadata.run.error;
     }
 
     return details;

@@ -5,6 +5,7 @@ ALTER TABLE workflow_runs ADD COLUMN parent_workflow_id uuid REFERENCES workflow
 ALTER TABLE workflow_runs ADD COLUMN parent_execution_id uuid REFERENCES workflow_node_executions(id);
 ALTER TABLE workflow_runs ADD COLUMN callbacks jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE workflow_runs ADD COLUMN input jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE workflow_runs ADD COLUMN result_message TEXT;
 
 --
 -- TODO: do I need to turn this into a foreign key?

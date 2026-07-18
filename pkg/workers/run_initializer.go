@@ -159,6 +159,11 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		newEvents = append(newEvents, events...)
 	}
 
+	executionUpdates := []models.CanvasNodeExecution{}
+	executionCollector := func(executions []models.CanvasNodeExecution) {
+		executionUpdates = append(executionUpdates, executions...)
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
@@ -182,16 +187,27 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		err = NewRunCallbackDispatcher(tx, w.registry, locked).
 			WithEventCollector(eventCollector).
 			DispatchPending()
+
+		//
+		// If there's an error dispatching the pending run callback,
+		// the run initialization failed, so we need to fail the run,
+		// and run any additional run finished callbacks we might have configured for the run.
+		//
 		if err != nil {
-			return fmt.Errorf("dispatch pending: %w", err)
+			logger.WithError(err).Errorf("Error dispatching pending run callback")
+			return w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
 		}
 
+		//
+		// Otherwise, we start the run.
+		//
 		if err := locked.Start(tx); err != nil {
 			return fmt.Errorf("start run: %w", err)
 		}
 
 		return nil
 	})
+
 	if err != nil {
 		return err
 	}
@@ -202,5 +218,39 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		}
 	}
 
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (w *RunInitializer) failRun(
+	tx *gorm.DB,
+	run *models.CanvasRun,
+	eventCollector func([]models.CanvasEvent),
+	executionCollector func([]models.CanvasNodeExecution),
+	resultMessage string,
+) error {
+	now := time.Now()
+	err := tx.Model(run).
+		Updates(map[string]any{
+			"state":          models.CanvasRunStateFinished,
+			"result":         models.CanvasRunResultFailed,
+			"result_message": &resultMessage,
+			"updated_at":     &now,
+			"finished_at":    &now,
+		}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	return NewRunCallbackDispatcher(tx, w.registry, run).
+		WithEventCollector(eventCollector).
+		WithExecutionCollector(executionCollector).
+		DispatchFinished()
 }

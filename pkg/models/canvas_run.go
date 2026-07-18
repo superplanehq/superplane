@@ -40,6 +40,7 @@ type CanvasRun struct {
 	Input             JSONValue
 	State             string
 	Result            string
+	ResultMessage     string
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	CancelledAt       *time.Time

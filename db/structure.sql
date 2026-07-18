@@ -680,6 +680,7 @@ CREATE TABLE public.workflow_runs (
     parent_execution_id uuid,
     callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
     input jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result_message text,
     node_id character varying(255)
 );
 
