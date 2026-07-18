@@ -153,6 +153,158 @@ func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	return runs, nil
 }
 
+func LockRetainedFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := retainedFinishedRunsQuery(db, referenceTime).
+		Scopes(
+			lockCanvasRunsForUpdate,
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+			oldestCanvasRunsFirst,
+		)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func LockCanvasRunsForCleanup(db *gorm.DB, workflowID uuid.UUID, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := db.
+		Scopes(lockCanvasRunsForUpdate).
+		Where("workflow_id = ?", workflowID).
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func DeleteCanvasRunChains(db *gorm.DB, runIDs []uuid.UUID) error {
+	if len(runIDs) == 0 {
+		return nil
+	}
+
+	var executionIDs []uuid.UUID
+	err := db.
+		Model(&CanvasNodeExecution{}).
+		Where("run_id IN ?", runIDs).
+		Pluck("id", &executionIDs).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(executionIDs) > 0 {
+		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
+			return err
+		}
+
+		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
+			return err
+		}
+
+		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasEvent{}).Error; err != nil {
+			return err
+		}
+
+		if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasNodeExecution{}).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasEvent{}).Error; err != nil {
+		return err
+	}
+
+	return db.Where("id IN ?", runIDs).Delete(&CanvasRun{}).Error
+}
+
+func retainedFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+	return tx.
+		Table("workflow_runs").
+		Select("workflow_runs.*").
+		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflow_runs.state = ?", CanvasRunStateFinished).
+		Where("workflow_runs.finished_at IS NOT NULL").
+		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+}
+
+func lockCanvasRunsForUpdate(tx *gorm.DB) *gorm.DB {
+	return tx.Clauses(clause.Locking{
+		Strength: "UPDATE",
+		Table:    clause.Table{Name: "workflow_runs"},
+		Options:  "SKIP LOCKED",
+	})
+}
+
+func withoutRunQueueItems(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_events root_events
+			INNER JOIN workflow_node_queue_items ON workflow_node_queue_items.root_event_id = root_events.id
+			WHERE root_events.run_id = workflow_runs.id
+			AND root_events.execution_id IS NULL
+		)
+	`)
+}
+
+func withoutActiveRunExecutions(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_executions
+			INNER JOIN workflow_events root_events ON workflow_node_executions.root_event_id = root_events.id
+			WHERE root_events.run_id = workflow_runs.id
+			AND root_events.execution_id IS NULL
+			AND workflow_node_executions.state IN ?
+		)
+	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted, CanvasNodeExecutionStateCancelling})
+}
+
+func withoutPendingRunRequests(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_requests
+			INNER JOIN workflow_node_executions ON workflow_node_requests.execution_id = workflow_node_executions.id
+			INNER JOIN workflow_events root_events ON workflow_node_executions.root_event_id = root_events.id
+			WHERE root_events.run_id = workflow_runs.id
+			AND root_events.execution_id IS NULL
+			AND workflow_node_requests.state = ?
+		)
+	`, NodeExecutionRequestStatePending)
+}
+
+func oldestCanvasRunsFirst(tx *gorm.DB) *gorm.DB {
+	return tx.Order("workflow_runs.finished_at ASC")
+}
+
 type CanvasRunFilters struct {
 	States  []string
 	Results []string

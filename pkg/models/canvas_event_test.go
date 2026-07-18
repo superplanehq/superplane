@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ReturnsMultipleEligibleEvents(t *testing.T) {
+func Test__LockRetainedFinishedRuns_ReturnsMultipleEligibleRuns(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	org := createOrganization(t)
@@ -22,17 +22,20 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ReturnsMultipleEligibl
 	event1 := createExpiredRootEvent(t, canvas.ID)
 	event2 := createExpiredRootEvent(t, canvas.ID)
 
-	var events []models.CanvasEvent
+	var runs []models.CanvasRun
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		events, err = models.LockExpiredRoutedRootCanvasEventsInTransaction(tx, time.Now(), 10)
+		runs, err = models.LockRetainedFinishedRuns(tx, time.Now(), 10)
 		return err
 	})
 	require.NoError(t, err)
-	require.ElementsMatch(t, []uuid.UUID{event1.ID, event2.ID}, canvasEventIDs(events))
+	require.ElementsMatch(t, []uuid.UUID{
+		runIDForRootEvent(t, event1.ID),
+		runIDForRootEvent(t, event2.ID),
+	}, canvasRunIDs(runs))
 }
 
-func Test__LockExpiredRoutedRootCanvasEventsInTransaction_IncludesSoftDeletedCanvasesAndOrganizations(t *testing.T) {
+func Test__LockRetainedFinishedRuns_IncludesSoftDeletedCanvasesAndOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	org := createOrganization(t)
@@ -42,6 +45,7 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_IncludesSoftDeletedCan
 
 	withinRetention := createRootEvent(t, canvas.ID)
 	updateRootEventAgeAndState(t, withinRetention.ID, 29, models.CanvasEventStateRouted)
+	markRunFinishedForRootEvent(t, withinRetention.ID, 29)
 
 	noRetentionOrg := createOrganization(t)
 	noRetentionCanvas := createRetentionCanvas(t, noRetentionOrg.ID)
@@ -80,14 +84,18 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_IncludesSoftDeletedCan
 		Error)
 	createNodeRequest(t, canvas.ID, "component", pendingRequestExecution.ID, models.NodeExecutionRequestStatePending)
 
-	var events []models.CanvasEvent
+	var runs []models.CanvasRun
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		events, err = models.LockExpiredRoutedRootCanvasEventsInTransaction(tx, time.Now(), 20)
+		runs, err = models.LockRetainedFinishedRuns(tx, time.Now(), 20)
 		return err
 	})
 	require.NoError(t, err)
-	require.ElementsMatch(t, []uuid.UUID{eligible.ID, deletedCanvasEvent.ID, deletedOrgEvent.ID}, canvasEventIDs(events))
+	require.ElementsMatch(t, []uuid.UUID{
+		runIDForRootEvent(t, eligible.ID),
+		runIDForRootEvent(t, deletedCanvasEvent.ID),
+		runIDForRootEvent(t, deletedOrgEvent.ID),
+	}, canvasRunIDs(runs))
 }
 
 func createOrganization(t *testing.T) *models.Organization {
@@ -164,6 +172,7 @@ func createExpiredRootEvent(t *testing.T, canvasID uuid.UUID) *models.CanvasEven
 
 	event := createRootEvent(t, canvasID)
 	updateRootEventAgeAndState(t, event.ID, 31, models.CanvasEventStateRouted)
+	markRunFinishedForRootEvent(t, event.ID, 31)
 	return event
 }
 
@@ -182,6 +191,29 @@ func createRootEvent(t *testing.T, canvasID uuid.UUID) *models.CanvasEvent {
 
 	require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&event).Error)
 	return &event
+}
+
+func markRunFinishedForRootEvent(t *testing.T, rootEventID uuid.UUID, daysAgo int) {
+	t.Helper()
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEventID)
+	require.NoError(t, err)
+
+	finishedAt := time.Now().AddDate(0, 0, -daysAgo)
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"finished_at": finishedAt,
+		"updated_at":  finishedAt,
+	}).Error)
+}
+
+func runIDForRootEvent(t *testing.T, rootEventID uuid.UUID) uuid.UUID {
+	t.Helper()
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEventID)
+	require.NoError(t, err)
+	return run.ID
 }
 
 func updateRootEventAgeAndState(t *testing.T, id uuid.UUID, daysAgo int, state string) {
@@ -228,12 +260,16 @@ func createNodeRequest(t *testing.T, canvasID uuid.UUID, nodeID string, executio
 func createQueueItem(t *testing.T, canvasID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) {
 	t.Helper()
 
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEventID)
+	require.NoError(t, err)
+
 	now := time.Now()
 	queueItem := models.CanvasNodeQueueItem{
 		ID:          uuid.New(),
 		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		RootEventID: rootEventID,
+		RunID:       run.ID,
 		EventID:     eventID,
 		CreatedAt:   &now,
 	}
@@ -244,12 +280,16 @@ func createQueueItem(t *testing.T, canvasID uuid.UUID, nodeID string, rootEventI
 func createExecution(t *testing.T, canvasID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.CanvasNodeExecution {
 	t.Helper()
 
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEventID)
+	require.NoError(t, err)
+
 	now := time.Now()
 	execution := models.CanvasNodeExecution{
 		ID:            uuid.New(),
 		WorkflowID:    canvasID,
 		NodeID:        nodeID,
 		RootEventID:   rootEventID,
+		RunID:         run.ID,
 		EventID:       eventID,
 		State:         models.CanvasNodeExecutionStatePending,
 		Configuration: datatypes.NewJSONType(map[string]any{}),
@@ -261,10 +301,10 @@ func createExecution(t *testing.T, canvasID uuid.UUID, nodeID string, rootEventI
 	return &execution
 }
 
-func canvasEventIDs(events []models.CanvasEvent) []uuid.UUID {
-	ids := make([]uuid.UUID, 0, len(events))
-	for _, event := range events {
-		ids = append(ids, event.ID)
+func canvasRunIDs(runs []models.CanvasRun) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(runs))
+	for _, run := range runs {
+		ids = append(ids, run.ID)
 	}
 
 	return ids
