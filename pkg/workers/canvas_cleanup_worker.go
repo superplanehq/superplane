@@ -19,19 +19,19 @@ import (
 )
 
 type CanvasCleanupWorker struct {
-	semaphore           *semaphore.Weighted
-	logger              *log.Entry
-	maxResourcesPerTick int
-	sessionCleaner      agents.ProviderSessionCleaner
-	gitProvider         git.Provider
+	semaphore      *semaphore.Weighted
+	logger         *log.Entry
+	maxRunsPerTick int
+	sessionCleaner agents.ProviderSessionCleaner
+	gitProvider    git.Provider
 }
 
 func NewCanvasCleanupWorker(gitProvider git.Provider, providers ...agents.Provider) *CanvasCleanupWorker {
 	w := &CanvasCleanupWorker{
-		semaphore:           semaphore.NewWeighted(25),
-		logger:              log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
-		maxResourcesPerTick: 500,
-		gitProvider:         gitProvider,
+		semaphore:      semaphore.NewWeighted(25),
+		logger:         log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
+		maxRunsPerTick: 50,
+		gitProvider:    gitProvider,
 	}
 
 	if len(providers) > 0 {
@@ -190,8 +190,8 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 	}
 
 	totalRunsDeleted := 0
-	for totalRunsDeleted < w.maxResourcesPerTick {
-		deleted, err := runCleaner.CleanBatch(w.maxResourcesPerTick - totalRunsDeleted)
+	for totalRunsDeleted < w.maxRunsPerTick {
+		deleted, err := runCleaner.CleanBatch(w.maxRunsPerTick - totalRunsDeleted)
 		if err != nil {
 			return nil, nil, fmt.Errorf("clean workflow runs: %w", err)
 		}

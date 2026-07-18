@@ -98,6 +98,58 @@ func Test__LockRetainedFinishedRuns_IncludesSoftDeletedCanvasesAndOrganizations(
 	}, canvasRunIDs(runs))
 }
 
+func Test__LockRetainedFinishedRuns_ExcludesOpenWorkByRunIDWhenRootEventIDIsNull(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org := createOrganization(t)
+	cacheRetentionWindow(t, org.ID, 30)
+	canvas := createRetentionCanvas(t, org.ID)
+
+	eligible := createExpiredRootEvent(t, canvas.ID)
+
+	queuedRoot := createExpiredRootEvent(t, canvas.ID)
+	queuedRunID := runIDForRootEvent(t, queuedRoot.ID)
+	createQueueItem(t, canvas.ID, "component", queuedRoot.ID, queuedRoot.ID)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNodeQueueItem{}).
+		Where("run_id = ?", queuedRunID).
+		Update("root_event_id", nil).
+		Error)
+
+	activeRoot := createExpiredRootEvent(t, canvas.ID)
+	activeExecution := createExecution(t, canvas.ID, "component", activeRoot.ID, activeRoot.ID)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNodeExecution{}).
+		Where("id = ?", activeExecution.ID).
+		Updates(map[string]any{
+			"state":         models.CanvasNodeExecutionStateStarted,
+			"root_event_id": nil,
+		}).
+		Error)
+
+	pendingRequestRoot := createExpiredRootEvent(t, canvas.ID)
+	pendingRequestExecution := createExecution(t, canvas.ID, "component", pendingRequestRoot.ID, pendingRequestRoot.ID)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNodeExecution{}).
+		Where("id = ?", pendingRequestExecution.ID).
+		Updates(map[string]any{
+			"state":         models.CanvasNodeExecutionStateFinished,
+			"result":        models.CanvasNodeExecutionResultPassed,
+			"root_event_id": nil,
+		}).
+		Error)
+	createNodeRequest(t, canvas.ID, "component", pendingRequestExecution.ID, models.NodeExecutionRequestStatePending)
+
+	var runs []models.CanvasRun
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		runs, err = models.LockRetainedFinishedRuns(tx, time.Now(), 20)
+		return err
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uuid.UUID{runIDForRootEvent(t, eligible.ID)}, canvasRunIDs(runs))
+}
+
 func createOrganization(t *testing.T) *models.Organization {
 	t.Helper()
 

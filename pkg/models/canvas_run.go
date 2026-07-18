@@ -266,10 +266,8 @@ func withoutRunQueueItems(tx *gorm.DB) *gorm.DB {
 	return tx.Where(`
 		NOT EXISTS (
 			SELECT 1
-			FROM workflow_events root_events
-			INNER JOIN workflow_node_queue_items ON workflow_node_queue_items.root_event_id = root_events.id
-			WHERE root_events.run_id = workflow_runs.id
-			AND root_events.execution_id IS NULL
+			FROM workflow_node_queue_items
+			WHERE workflow_node_queue_items.run_id = workflow_runs.id
 		)
 	`)
 }
@@ -279,9 +277,7 @@ func withoutActiveRunExecutions(tx *gorm.DB) *gorm.DB {
 		NOT EXISTS (
 			SELECT 1
 			FROM workflow_node_executions
-			INNER JOIN workflow_events root_events ON workflow_node_executions.root_event_id = root_events.id
-			WHERE root_events.run_id = workflow_runs.id
-			AND root_events.execution_id IS NULL
+			WHERE workflow_node_executions.run_id = workflow_runs.id
 			AND workflow_node_executions.state IN ?
 		)
 	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted, CanvasNodeExecutionStateCancelling})
@@ -293,9 +289,7 @@ func withoutPendingRunRequests(tx *gorm.DB) *gorm.DB {
 			SELECT 1
 			FROM workflow_node_requests
 			INNER JOIN workflow_node_executions ON workflow_node_requests.execution_id = workflow_node_executions.id
-			INNER JOIN workflow_events root_events ON workflow_node_executions.root_event_id = root_events.id
-			WHERE root_events.run_id = workflow_runs.id
-			AND root_events.execution_id IS NULL
+			WHERE workflow_node_executions.run_id = workflow_runs.id
 			AND workflow_node_requests.state = ?
 		)
 	`, NodeExecutionRequestStatePending)
