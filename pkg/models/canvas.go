@@ -399,28 +399,80 @@ func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64,
 	return count, nil
 }
 
-func (c *Canvas) DeleteRemainingResources(db *gorm.DB) error {
-	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeRequest{}).Error; err != nil {
-		return err
+// DeleteRemainingResources removes workflow execution rows still scoped to this
+// canvas after all runs have been deleted via CanvasRun.DeleteChain.
+//
+// Run cleanup covers the normal path: events, executions, queue items, KVs, and
+// requests that belong to a run. This sweep is still required because some rows
+// are workflow-scoped but not run-scoped — notably trigger node requests created
+// without an execution_id (CanvasNode.CreateRequest). Orphan or inconsistent rows
+// (e.g. nil run_id from partial routing) are also cleared here before nodes and
+// the canvas row can be removed. Deletes are capped per call via maxRecords so
+// large final sweeps do not exceed statement timeouts.
+func (c *Canvas) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDeletionSummary, bool, error) {
+	summary := &RunDeletionSummary{}
+
+	count, err := deleteRows(db, &CanvasNodeRequest{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
 	}
 
-	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
-		return err
+	summary.NodeRequests = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
 	}
 
-	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
-		return err
+	count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
 	}
 
-	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasEvent{}).Error; err != nil {
-		return err
+	summary.NodeExecutionKVs = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
 	}
 
-	if err := db.Where("workflow_id = ?", c.ID).Delete(&CanvasNodeExecution{}).Error; err != nil {
-		return err
+	count, err = deleteRows(db, &CanvasNodeQueueItem{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
 	}
 
-	return db.Where("workflow_id = ?", c.ID).Delete(&CanvasRun{}).Error
+	summary.NodeQueueItems = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
+	}
+
+	count, err = deleteRows(db, &CanvasEvent{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	summary.Events = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
+	}
+
+	count, err = deleteRows(db, &CanvasNodeExecution{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	summary.NodeExecutions = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
+	}
+
+	count, err = deleteRows(db, &CanvasRun{}, "workflow_id = ?", c.ID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	summary.Runs = count
+	if summary.TotalRecords() >= int64(maxRecords) {
+		return summary, false, nil
+	}
+
+	return summary, true, nil
 }
 
 func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {

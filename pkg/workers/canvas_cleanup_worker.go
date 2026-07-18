@@ -13,25 +13,27 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/workers/cleaners"
 )
 
 type CanvasCleanupWorker struct {
-	semaphore      *semaphore.Weighted
-	logger         *log.Entry
-	maxRunsPerTick int
-	sessionCleaner agents.ProviderSessionCleaner
-	gitProvider    git.Provider
+	semaphore           *semaphore.Weighted
+	logger              *log.Entry
+	maxRunsPerTick      int
+	maxResourcesPerTick int
+	sessionCleaner      agents.ProviderSessionCleaner
+	gitProvider         git.Provider
 }
 
 func NewCanvasCleanupWorker(gitProvider git.Provider, providers ...agents.Provider) *CanvasCleanupWorker {
 	w := &CanvasCleanupWorker{
-		semaphore:      semaphore.NewWeighted(25),
-		logger:         log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
-		maxRunsPerTick: 50,
-		gitProvider:    gitProvider,
+		semaphore:           semaphore.NewWeighted(25),
+		logger:              log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
+		maxRunsPerTick:      50,
+		maxResourcesPerTick: 500,
+		gitProvider:         gitProvider,
 	}
 
 	if len(providers) > 0 {
@@ -44,7 +46,7 @@ func NewCanvasCleanupWorker(gitProvider git.Provider, providers ...agents.Provid
 }
 
 func (w *CanvasCleanupWorker) Start(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -55,10 +57,11 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 			tickStart := time.Now()
 			canvases, err := models.ListDeletedCanvases()
 			if err != nil {
-				w.logger.Errorf("Error finding deleted workflows: %v", err)
+				w.logger.Errorf("Error finding deleted canvases: %v", err)
 				continue
 			}
 
+			w.logger.Infof("Found %d deleted canvases for cleanup", len(canvases))
 			telemetry.RecordWorkflowCleanupWorkerCanvasesCount(context.Background(), len(canvases))
 
 			for _, canvas := range canvases {
@@ -90,17 +93,54 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 		return nil
 	}
 
+	w.logger.Infof("Processing deleted canvas %s", canvas.ID)
+
+	totalRunsDeleted, err := w.cleanCanvasRuns(canvas)
+	if err != nil {
+		return err
+	}
+
+	remainingRuns, err := canvas.CountRuns(database.Conn())
+	if err != nil {
+		return fmt.Errorf("count remaining workflow runs: %w", err)
+	}
+
+	if remainingRuns > 0 {
+		w.logger.Infof("Partially cleaned runs from canvas %s (deleted %d runs, %d remaining)", canvas.ID, totalRunsDeleted, remainingRuns)
+		return nil
+	}
+
+	// Run-scoped rows are removed first. DeleteRemainingResources then sweeps
+	// workflow rows that are not tied to a run (see Canvas.DeleteRemainingResources).
+	complete, err := w.cleanRemainingResources(canvas)
+	if err != nil {
+		return err
+	}
+
+	if !complete {
+		w.logger.Infof("Reached max resources per tick (%d), stopping remaining resource cleanup for canvas %s", w.maxResourcesPerTick, canvas.ID)
+		return nil
+	}
+
 	var sessionsToClean []models.AgentSession
 	var repositoriesToClean []models.Repository
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {
-			w.logger.Infof("Canvas %s already being processed - skipping", canvas.ID)
+			w.logger.Infof("Canvas %s already being finalized - skipping", canvas.ID)
 			return nil
 		}
 
-		w.logger.Infof("Processing deleted canvas %s", lockedCanvas.ID)
-		sessions, repositories, err := w.processCanvas(tx, *lockedCanvas)
+		remainingRuns, err := lockedCanvas.CountRuns(tx)
+		if err != nil {
+			return fmt.Errorf("count remaining workflow runs: %w", err)
+		}
+
+		if remainingRuns > 0 {
+			return nil
+		}
+
+		sessions, repositories, err := w.finalizeCanvas(tx, *lockedCanvas)
 		if err != nil {
 			return err
 		}
@@ -117,6 +157,205 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	w.cleanupProviderSessions(ctx, sessionsToClean)
 	w.cleanupGitRepositories(ctx, repositoriesToClean)
 	return nil
+}
+
+func (w *CanvasCleanupWorker) cleanCanvasRuns(canvas models.Canvas) (int, error) {
+	if !canvas.DeletedAt.Valid {
+		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
+		return 0, nil
+	}
+
+	runs, err := canvas.ListRuns(database.Conn(), w.maxRunsPerTick)
+	if err != nil {
+		return 0, fmt.Errorf("list workflow runs for cleanup: %w", err)
+	}
+
+	if len(runs) == 0 {
+		return 0, nil
+	}
+
+	deleted := 0
+	for _, run := range runs {
+		logger := logging.WithRun(w.logger, run)
+
+		// One transaction per run, not one transaction for the whole batch. A run
+		// delete must be atomic, but batching many runs in a single transaction
+		// risks statement timeouts and rolls back all progress on failure; per-run
+		// transactions commit incrementally and match the list-then-lock pattern
+		// used elsewhere (EventRouter, NodeExecutor, EventRetentionWorker).
+		var summary *models.RunDeletionSummary
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			locked, err := models.LockCanvasRun(tx, canvas.ID, run.ID)
+			if err != nil {
+				return fmt.Errorf("lock run %s: %w", run.ID, err)
+			}
+
+			if locked == nil {
+				return nil
+			}
+
+			summary, err = locked.DeleteChain(tx)
+			if err != nil {
+				return fmt.Errorf("delete run chain: %w", err)
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			logger.Errorf("Error cleaning run: %v", err)
+			return deleted, err
+		}
+
+		if summary != nil {
+			logger.WithFields(log.Fields{
+				"runs":          summary.Runs,
+				"events":        summary.Events,
+				"executions":    summary.NodeExecutions,
+				"requests":      summary.NodeRequests,
+				"execution_kvs": summary.NodeExecutionKVs,
+				"queue_items":   summary.NodeQueueItems,
+			}).Info("Cleaned run")
+			deleted++
+		}
+	}
+
+	return deleted, nil
+}
+
+func (w *CanvasCleanupWorker) cleanRemainingResources(canvas models.Canvas) (bool, error) {
+	var complete bool
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		summary, done, err := canvas.DeleteRemainingResources(tx, w.maxResourcesPerTick)
+		if err != nil {
+			return err
+		}
+
+		complete = done
+
+		if summary != nil && summary.TotalRecords() > 0 {
+			w.logger.WithFields(log.Fields{
+				"canvas_id":     canvas.ID,
+				"runs":          summary.Runs,
+				"events":        summary.Events,
+				"executions":    summary.NodeExecutions,
+				"requests":      summary.NodeRequests,
+				"execution_kvs": summary.NodeExecutionKVs,
+				"queue_items":   summary.NodeQueueItems,
+			}).Info("Cleaned remaining workflow resources")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("delete remaining workflow resources: %w", err)
+	}
+
+	return complete, nil
+}
+
+func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, []models.Repository, error) {
+	if err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Delete(&models.CanvasNode{}).Error; err != nil {
+		return nil, nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
+	}
+
+	sessions, err := models.ListAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list canvas agent sessions: %w", err)
+	}
+
+	var repositories []models.Repository
+	repository, err := models.FindRepositoryInTransaction(tx, canvas.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, fmt.Errorf("find canvas repository: %w", err)
+	}
+
+	if repository != nil {
+		repositories = append(repositories, *repository)
+	}
+
+	if err := models.DeleteAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID); err != nil {
+		return nil, nil, fmt.Errorf("delete canvas agent sessions: %w", err)
+	}
+
+	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
+		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
+	}
+
+	w.logger.WithFields(log.Fields{
+		"canvas_id": canvas.ID,
+	}).Info("Successfully cleaned up canvas")
+	return sessions, repositories, nil
+}
+
+func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, []models.Repository, error) {
+	if !canvas.DeletedAt.Valid {
+		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
+		return nil, nil, nil
+	}
+
+	if _, err := w.cleanCanvasRuns(canvas); err != nil {
+		return nil, nil, err
+	}
+
+	remainingRuns, err := canvas.CountRuns(tx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
+	}
+
+	if remainingRuns > 0 {
+		return nil, nil, nil
+	}
+
+	summary, complete, err := canvas.DeleteRemainingResources(tx, w.maxResourcesPerTick)
+	if err != nil {
+		return nil, nil, fmt.Errorf("delete remaining workflow resources: %w", err)
+	}
+
+	if !complete {
+		if summary != nil && summary.TotalRecords() > 0 {
+			w.logger.WithFields(log.Fields{
+				"canvas_id":     canvas.ID,
+				"runs":          summary.Runs,
+				"events":        summary.Events,
+				"executions":    summary.NodeExecutions,
+				"requests":      summary.NodeRequests,
+				"execution_kvs": summary.NodeExecutionKVs,
+				"queue_items":   summary.NodeQueueItems,
+			}).Info("Partially cleaned remaining workflow resources")
+		}
+
+		return nil, nil, nil
+	}
+
+	if summary != nil && summary.TotalRecords() > 0 {
+		w.logger.WithFields(log.Fields{
+			"canvas_id":     canvas.ID,
+			"runs":          summary.Runs,
+			"events":        summary.Events,
+			"executions":    summary.NodeExecutions,
+			"requests":      summary.NodeRequests,
+			"execution_kvs": summary.NodeExecutionKVs,
+			"queue_items":   summary.NodeQueueItems,
+		}).Info("Cleaned remaining workflow resources")
+	}
+
+	lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
+	if err != nil {
+		return nil, nil, nil
+	}
+
+	remainingRuns, err = lockedCanvas.CountRuns(tx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
+	}
+
+	if remainingRuns > 0 {
+		return nil, nil, nil
+	}
+
+	return w.finalizeCanvas(tx, *lockedCanvas)
 }
 
 func (w *CanvasCleanupWorker) cleanupProviderSessions(ctx context.Context, sessions []models.AgentSession) {
@@ -173,77 +412,4 @@ func (w *CanvasCleanupWorker) cleanupGitRepositories(ctx context.Context, reposi
 			}).WithError(err).Warn("Failed to cleanup git repository")
 		}
 	}
-}
-
-func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, []models.Repository, error) {
-	if !canvas.DeletedAt.Valid {
-		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
-		return nil, nil, nil
-	}
-
-	runCleaner, err := cleaners.NewRunCleaner(tx, cleaners.RunCleanerOptions{
-		Mode:   cleaners.RunCleanerModeCanvasTeardown,
-		Canvas: &canvas,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("create run cleaner: %w", err)
-	}
-
-	totalRunsDeleted := 0
-	for totalRunsDeleted < w.maxRunsPerTick {
-		deleted, err := runCleaner.CleanBatch(w.maxRunsPerTick - totalRunsDeleted)
-		if err != nil {
-			return nil, nil, fmt.Errorf("clean workflow runs: %w", err)
-		}
-
-		if deleted == 0 {
-			break
-		}
-
-		totalRunsDeleted += deleted
-	}
-
-	remainingRuns, err := canvas.CountRuns(tx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
-	}
-
-	if remainingRuns > 0 {
-		w.logger.Infof("Partially cleaned runs from canvas %s (deleted %d runs, %d remaining)", canvas.ID, totalRunsDeleted, remainingRuns)
-		return nil, nil, nil
-	}
-
-	if err := canvas.DeleteRemainingResources(tx); err != nil {
-		return nil, nil, fmt.Errorf("delete remaining workflow resources: %w", err)
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Delete(&models.CanvasNode{}).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
-	}
-
-	sessions, err := models.ListAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("list canvas agent sessions: %w", err)
-	}
-
-	var repositories []models.Repository
-	repository, err := models.FindRepositoryInTransaction(tx, canvas.ID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, fmt.Errorf("find canvas repository: %w", err)
-	}
-
-	if repository != nil {
-		repositories = append(repositories, *repository)
-	}
-
-	if err := models.DeleteAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID); err != nil {
-		return nil, nil, fmt.Errorf("delete canvas agent sessions: %w", err)
-	}
-
-	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
-	}
-
-	w.logger.Infof("Successfully cleaned up canvas %s (deleted %d runs)", canvas.ID, totalRunsDeleted)
-	return sessions, repositories, nil
 }

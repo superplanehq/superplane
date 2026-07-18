@@ -91,7 +91,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 		"created_at": time.Now().AddDate(0, 0, -29),
 	}).Error)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -126,7 +126,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithoutCachedRetentionWindow(t *te
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -203,7 +203,7 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 
 	markRunFinishedForRetention(t, rootEvent.ID, 31)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 1, deleted)
 
@@ -246,7 +246,7 @@ func Test__EventRetentionWorker_CleansMultipleExpiredCompletedRootEventChains(t 
 	createExpiredCompletedRootEventChain(t, canvas.ID)
 	createExpiredCompletedRootEventChain(t, canvas.ID)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 2, deleted)
 
@@ -312,7 +312,7 @@ func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
 	createExpiredCompletedRootEventChain(t, eligibleCanvas.ID)
 	createCompletedRootEventChain(t, unrelatedCanvas.ID, 1)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 1, deleted)
 
@@ -353,7 +353,7 @@ func Test__EventRetentionWorker_RespectsMaxRunsPerTick(t *testing.T) {
 	createExpiredRootEventForWorker(t, canvas.ID)
 	createExpiredRootEventForWorker(t, canvas.ID)
 
-	deleted, err := worker.processRetentionBatches(context.Background(), time.Now(), 1)
+	deleted, err := worker.cleanRuns(time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, deleted)
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
@@ -397,7 +397,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
 	support.CreateQueueItem(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 	markRunFinishedForRetention(t, rootEvent.ID, 31)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 
@@ -467,7 +467,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 
 	markRunFinishedForRetention(t, rootEvent.ID, 31)
 
-	deleted, err := worker.cleanRetainedRuns(time.Now(), eventRetentionBatchSize)
+	deleted, err := worker.cleanRuns(time.Now(), 100)
 	require.NoError(t, err)
 	require.Equal(t, 0, deleted)
 

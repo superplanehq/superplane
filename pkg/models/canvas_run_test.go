@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__DeleteCanvasRunChains_DeletesFullRunData(t *testing.T) {
+func Test__CanvasRun__DeleteChain__DeletesAllData(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 
 	childEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "node-1", "default", &execution.ID)
@@ -39,9 +39,21 @@ func Test__DeleteCanvasRunChains_DeletesFullRunData(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
+	var summary *models.RunDeletionSummary
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		return models.DeleteCanvasRunChains(tx, []uuid.UUID{run.ID})
+		var err error
+		summary, err = run.DeleteChain(tx)
+		return err
 	}))
+
+	require.Equal(t, &models.RunDeletionSummary{
+		Runs:             1,
+		Events:           2,
+		NodeExecutions:   1,
+		NodeRequests:     1,
+		NodeExecutionKVs: 1,
+		NodeQueueItems:   1,
+	}, summary)
 
 	var runCount int64
 	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)

@@ -37,6 +37,19 @@ type CanvasRun struct {
 	FinishedAt  *time.Time
 }
 
+type RunDeletionSummary struct {
+	Runs             int64
+	Events           int64
+	NodeExecutions   int64
+	NodeRequests     int64
+	NodeExecutionKVs int64
+	NodeQueueItems   int64
+}
+
+func (s *RunDeletionSummary) TotalRecords() int64 {
+	return s.Runs + s.Events + s.NodeExecutions + s.NodeRequests + s.NodeExecutionKVs + s.NodeQueueItems
+}
+
 func (r *CanvasRun) TableName() string {
 	return "workflow_runs"
 }
@@ -153,17 +166,11 @@ func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	return runs, nil
 }
 
-func LockRetainedFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
+func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
-	query := retainedFinishedRunsQuery(db, referenceTime).
-		Scopes(
-			lockCanvasRunsForUpdate,
-			withoutRunQueueItems,
-			withoutActiveRunExecutions,
-			withoutPendingRunRequests,
-			oldestCanvasRunsFirst,
-		)
+	query := expiredFinishedRunsQuery(db, referenceTime).
+		Scopes(oldestCanvasRunsFirst)
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -177,11 +184,35 @@ func LockRetainedFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) (
 	return runs, nil
 }
 
-func (c *Canvas) LockRunsForCleanup(db *gorm.DB, limit int) ([]CanvasRun, error) {
+func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+
+	err := expiredFinishedRunsQuery(db, referenceTime).
+		Scopes(
+			lockCanvasRunsForUpdate,
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+		).
+		Where("workflow_runs.id = ?", runID).
+		First(&run).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
 	query := db.
-		Scopes(lockCanvasRunsForUpdate).
+		Model(&CanvasRun{}).
 		Where("workflow_id = ?", c.ID).
 		Order("created_at ASC")
 
@@ -197,51 +228,96 @@ func (c *Canvas) LockRunsForCleanup(db *gorm.DB, limit int) ([]CanvasRun, error)
 	return runs, nil
 }
 
-func DeleteCanvasRunChains(db *gorm.DB, runIDs []uuid.UUID) error {
-	if len(runIDs) == 0 {
-		return nil
+func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+
+	err := db.
+		Scopes(lockCanvasRunsForUpdate).
+		Where("workflow_id = ?", workflowID).
+		Where("id = ?", runID).
+		First(&run).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
 	}
+
+	return &run, nil
+}
+
+func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
+	summary := &RunDeletionSummary{}
 
 	var executionIDs []uuid.UUID
 	err := db.
 		Model(&CanvasNodeExecution{}).
-		Where("run_id IN ?", runIDs).
+		Where("run_id = ?", r.ID).
 		Pluck("id", &executionIDs).
 		Error
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(executionIDs) > 0 {
-		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
-			return err
+		count, err := deleteRows(db, &CanvasNodeRequest{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
 		}
+		summary.NodeRequests = count
 
-		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
-			return err
+		count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
 		}
+		summary.NodeExecutionKVs = count
 
-		if err := db.Where("execution_id IN ?", executionIDs).Delete(&CanvasEvent{}).Error; err != nil {
-			return err
+		count, err = deleteRows(db, &CanvasEvent{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
 		}
+		summary.Events += count
 
-		if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasNodeExecution{}).Error; err != nil {
-			return err
+		count, err = deleteRows(db, &CanvasNodeExecution{}, "run_id = ?", r.ID)
+		if err != nil {
+			return nil, err
 		}
+		summary.NodeExecutions = count
 	}
 
-	if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
-		return err
+	count, err := deleteRows(db, &CanvasNodeQueueItem{}, "run_id = ?", r.ID)
+	if err != nil {
+		return nil, err
 	}
+	summary.NodeQueueItems = count
 
-	if err := db.Where("run_id IN ?", runIDs).Delete(&CanvasEvent{}).Error; err != nil {
-		return err
+	count, err = deleteRows(db, &CanvasEvent{}, "run_id = ?", r.ID)
+	if err != nil {
+		return nil, err
 	}
+	summary.Events += count
 
-	return db.Where("id IN ?", runIDs).Delete(&CanvasRun{}).Error
+	count, err = deleteRows(db, &CanvasRun{}, "id = ?", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.Runs = count
+
+	return summary, nil
 }
 
-func retainedFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+func deleteRows(db *gorm.DB, model any, query string, args ...any) (int64, error) {
+	result := db.Where(query, args...).Delete(model)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
+func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
 	return tx.
 		Table("workflow_runs").
 		Select("workflow_runs.*").
