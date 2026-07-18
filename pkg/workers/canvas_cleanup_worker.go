@@ -270,6 +270,7 @@ func (w *CanvasCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflowID
 		{&models.CanvasNodeExecution{}, "canvas_node_executions"},
 		{&models.CanvasNodeQueueItem{}, "canvas_node_queue_items"},
 		{&models.CanvasEvent{}, "canvas_events"},
+		{&models.CanvasRun{}, "workflow_runs"},
 	}
 
 	totalDeleted := 0

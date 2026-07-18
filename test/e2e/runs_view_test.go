@@ -145,6 +145,7 @@ func (s *runsViewSteps) givenFinishedRuns(count int) {
 		run := models.CanvasRun{
 			ID:         uuid.New(),
 			WorkflowID: s.canvas.WorkflowID,
+			NodeID:     triggerID,
 			VersionID:  liveVersion.ID,
 			State:      models.CanvasRunStateFinished,
 			Result:     models.CanvasRunResultPassed,
