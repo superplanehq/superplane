@@ -14,6 +14,46 @@ import (
 	"gorm.io/gorm"
 )
 
+func Test__DeleteCanvasRunChains_DeletesFullRunData(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+
+	childEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "node-1", "default", &execution.ID)
+	require.NoError(t, database.Conn().Model(childEvent).Update("state", models.CanvasEventStateRouted).Error)
+
+	queueItem := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
+	queueItem.RunID = run.ID
+	require.NoError(t, database.Conn().Save(queueItem).Error)
+
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(database.Conn(), run.WorkflowID, "node-1", execution.ID, "test-key", "test-value"))
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  run.WorkflowID,
+		NodeID:      "node-1",
+		ExecutionID: &execution.ID,
+		State:       models.NodeExecutionRequestStateCompleted,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{ActionName: "test", Parameters: map[string]any{}},
+		}),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return models.DeleteCanvasRunChains(tx, []uuid.UUID{run.ID})
+	}))
+
+	var runCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	require.Equal(t, int64(0), runCount)
+
+	support.VerifyCanvasEventsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeQueueCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionKVCount(t, run.WorkflowID, 0)
+	support.VerifyNodeRequestCount(t, run.WorkflowID, 0)
+}
+
 func Test__CanvasRun__FindOpenWork__PendingOutputEvent(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 

@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/workers/cleaners"
 )
 
 type CanvasCleanupWorker struct {
@@ -181,55 +181,44 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 		return nil, nil, nil
 	}
 
-	var nodes []models.CanvasNode
-	err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Find(&nodes).Error
+	runCleaner, err := cleaners.NewRunCleaner(tx, cleaners.RunCleanerOptions{
+		Mode:   cleaners.RunCleanerModeCanvasTeardown,
+		Canvas: &canvas,
+	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to find workflow nodes: %w", err)
+		return nil, nil, fmt.Errorf("create run cleaner: %w", err)
 	}
 
-	totalResourcesDeleted := 0
-	nodesProcessed := 0
+	totalRunsDeleted := 0
+	for totalRunsDeleted < w.maxResourcesPerTick {
+		deleted, err := runCleaner.CleanBatch(w.maxResourcesPerTick - totalRunsDeleted)
+		if err != nil {
+			return nil, nil, fmt.Errorf("clean workflow runs: %w", err)
+		}
 
-	for _, node := range nodes {
-		if totalResourcesDeleted >= w.maxResourcesPerTick {
-			w.logger.Infof("Reached max resources per tick (%d), stopping for this cycle", w.maxResourcesPerTick)
+		if deleted == 0 {
 			break
 		}
 
-		resourcesDeleted, allResourcesDeleted, err := w.deleteNodeResourcesBatched(tx, canvas.ID, node.NodeID, w.maxResourcesPerTick-totalResourcesDeleted)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
-		}
-
-		totalResourcesDeleted += resourcesDeleted
-
-		if !allResourcesDeleted {
-			w.logger.Infof("Partially cleaned node %s from canvas %s (deleted %d resources, more remain)", node.NodeID, canvas.ID, resourcesDeleted)
-			nodesProcessed++
-
-			continue
-		}
-
-		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvas.ID, node.NodeID).Delete(&models.CanvasNode{}).Error; err != nil {
-			return nil, nil, fmt.Errorf("failed to delete canvas node %s: %w", node.NodeID, err)
-		}
-
-		w.logger.Infof("Deleted node %s from canvas %s (deleted %d resources)", node.NodeID, canvas.ID, resourcesDeleted)
-		nodesProcessed++
+		totalRunsDeleted += deleted
 	}
 
-	//
-	// Check if all nodes are gone, then delete the canvas
-	//
-	var remainingNodesCount int64
-	err = tx.Unscoped().Model(&models.CanvasNode{}).Where("workflow_id = ?", canvas.ID).Count(&remainingNodesCount).Error
+	remainingRuns, err := canvas.CountRuns(tx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to check remaining canvas nodes: %w", err)
+		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
 	}
 
-	if remainingNodesCount > 0 {
-		w.logger.Infof("Processed %d nodes from canvas %s (deleted %d resources, %d nodes remaining)", nodesProcessed, canvas.ID, totalResourcesDeleted, remainingNodesCount)
+	if remainingRuns > 0 {
+		w.logger.Infof("Partially cleaned runs from canvas %s (deleted %d runs, %d remaining)", canvas.ID, totalRunsDeleted, remainingRuns)
 		return nil, nil, nil
+	}
+
+	if err := canvas.DeleteRemainingResources(tx); err != nil {
+		return nil, nil, fmt.Errorf("delete remaining workflow resources: %w", err)
+	}
+
+	if err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Delete(&models.CanvasNode{}).Error; err != nil {
+		return nil, nil, fmt.Errorf("failed to delete canvas nodes: %w", err)
 	}
 
 	sessions, err := models.ListAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID)
@@ -247,7 +236,6 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 		repositories = append(repositories, *repository)
 	}
 
-	w.logger.Infof("Processed %d nodes from canvas %s (deleted %d resources, %d nodes remaining)", nodesProcessed, canvas.ID, totalResourcesDeleted, remainingNodesCount)
 	if err := models.DeleteAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID); err != nil {
 		return nil, nil, fmt.Errorf("delete canvas agent sessions: %w", err)
 	}
@@ -256,57 +244,6 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) (
 		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
 	}
 
-	w.logger.Infof("Successfully cleaned up canvas %s (deleted %d resources total)", canvas.ID, totalResourcesDeleted)
+	w.logger.Infof("Successfully cleaned up canvas %s (deleted %d runs)", canvas.ID, totalRunsDeleted)
 	return sessions, repositories, nil
-}
-
-func (w *CanvasCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflowID uuid.UUID, nodeID string, maxResources int) (resourcesDeleted int, allResourcesDeleted bool, err error) {
-	resourceTypes := []struct {
-		model     any
-		tableName string
-	}{
-		{&models.CanvasNodeRequest{}, "canvas_node_requests"},
-		{&models.CanvasNodeExecutionKV{}, "canvas_node_execution_kvs"},
-		{&models.CanvasNodeExecution{}, "canvas_node_executions"},
-		{&models.CanvasNodeQueueItem{}, "canvas_node_queue_items"},
-		{&models.CanvasEvent{}, "canvas_events"},
-	}
-
-	totalDeleted := 0
-	allDeleted := true
-
-	for _, resourceType := range resourceTypes {
-		if totalDeleted >= maxResources {
-			allDeleted = false
-			break
-		}
-
-		remaining := maxResources - totalDeleted
-
-		// Delete in batches with LIMIT
-		result := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Limit(remaining).Delete(resourceType.model)
-		if result.Error != nil {
-			return totalDeleted, false, fmt.Errorf("failed to delete %s: %w", resourceType.tableName, result.Error)
-		}
-
-		deleted := int(result.RowsAffected)
-		totalDeleted += deleted
-
-		if deleted != remaining {
-			continue
-		}
-
-		var count int64
-
-		if err := tx.Unscoped().Model(resourceType.model).Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Count(&count).Error; err != nil {
-			return totalDeleted, false, fmt.Errorf("failed to count remaining %s: %w", resourceType.tableName, err)
-		}
-
-		if count > 0 {
-			allDeleted = false
-			break
-		}
-	}
-
-	return totalDeleted, allDeleted, nil
 }

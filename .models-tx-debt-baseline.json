@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 165,
-  "maxAllowedDatabaseConnCalls": 191,
+  "maxAllowedInTransactionDefinitions": 161,
+  "maxAllowedDatabaseConnCalls": 189,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -38,10 +38,6 @@
     "pkg/models/canvas.go:CountCanvasesByOrganizationInTransaction",
     "pkg/models/canvas_event.go:FindCanvasEventInTransaction",
     "pkg/models/canvas_event.go:ListCanvasEventsByIDsInTransaction",
-    "pkg/models/canvas_event.go:ListRootCanvasEventsInTransaction",
-    "pkg/models/canvas_event.go:CountRootCanvasEventsInTransaction",
-    "pkg/models/canvas_event.go:LockExpiredRoutedRootCanvasEventsInTransaction",
-    "pkg/models/canvas_event.go:DeleteRootCanvasEventChainsInTransaction",
     "pkg/models/canvas_event.go:RoutedInTransaction",
     "pkg/models/canvas_folder.go:ListCanvasFoldersInTransaction",
     "pkg/models/canvas_folder.go:FindCanvasFolderInTransaction",
@@ -218,8 +214,6 @@
     "pkg/models/canvas_event.go:FindCanvasEvent:database.Conn()#1",
     "pkg/models/canvas_event.go:ListCanvasEvents:database.Conn()#1",
     "pkg/models/canvas_event.go:CountCanvasEvents:database.Conn()#1",
-    "pkg/models/canvas_event.go:ListRootCanvasEvents:database.Conn()#1",
-    "pkg/models/canvas_event.go:CountRootCanvasEvents:database.Conn()#1",
     "pkg/models/canvas_event.go:ListPendingCanvasEvents:database.Conn()#1",
     "pkg/models/canvas_event.go:Routed:database.Conn()#1",
     "pkg/models/canvas_folder.go:ListCanvasFolders:database.Conn()#1",
@@ -361,5 +355,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-17T03:07:38Z"
+  "updatedAt": "2026-07-18T13:45:10Z"
 }
