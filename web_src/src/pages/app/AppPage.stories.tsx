@@ -17,8 +17,8 @@ import { canvasAppIds } from "./__fixtures__/handlers";
  * on a Service Worker, which is silently disabled in non-secure contexts
  * (opening Storybook via a LAN IP instead of `localhost`), causing every
  * request to escape to the live API. The fetch override has no such dependency,
- * so the graph, runs sidebar, versions, and run inspector render deterministic
- * fake data however Storybook is opened.
+ * so the graph, runs sidebar, versions, agent chat, and run inspector render
+ * deterministic fake data however Storybook is opened.
  */
 const meta = {
   title: "Pages/AppPage",
@@ -32,9 +32,21 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Live canvas view: the ReactFlow graph plus the runs history sidebar. */
+/**
+ * Live canvas view: the ReactFlow graph plus the runs history sidebar.
+ * Agent chat is enabled (header Agent toggle) but starts closed.
+ */
 export const LiveCanvas: Story = {
   render: () => <AppPageHarness />,
+};
+
+/**
+ * AI chat: same Software Factory canvas with the agent sidebar open and a
+ * seeded transcript (user + assistant turns).
+ */
+export const AIChat: Story = {
+  name: "AI Chat",
+  render: () => <AppPageHarness openAgentSidebar />,
 };
 
 /**

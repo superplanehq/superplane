@@ -31,8 +31,22 @@ describe("createHomeFixtureFetch", () => {
     });
 
     const me = await fetchFixture("/api/v1/me");
-    await expect(me.json()).resolves.toMatchObject({
+    const meBody = await me.json();
+    expect(meBody).toMatchObject({
       user: expect.objectContaining({ organizationId: expect.any(String) }),
+    });
+    expect(meBody.user.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: "agents", action: "read" }),
+        expect.objectContaining({ resource: "agents", action: "create" }),
+      ]),
+    );
+  });
+
+  it("exposes the managed-agents experimental feature", async () => {
+    const features = await fetchFixture("/account/experimental-features");
+    await expect(features.json()).resolves.toMatchObject({
+      features: expect.arrayContaining([expect.objectContaining({ id: "claude_managed_agents", released: true })]),
     });
   });
 });

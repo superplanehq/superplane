@@ -125,3 +125,57 @@ describe("createFixtureFetch run routes", () => {
     });
   });
 });
+
+describe("createFixtureFetch agent routes", () => {
+  it("serves canvas agent chat and seeded messages", async () => {
+    const { createFixtureFetch: createDefaultFixtureFetch, canvasAppIds } = await import("./handlers");
+    const fallback = vi.fn() as unknown as typeof fetch;
+    const fixtureFetch = createDefaultFixtureFetch(fallback);
+
+    const chat = await fixtureFetch(`http://localhost/api/v1/agents/canvases/${canvasAppIds.canvasId}/chat`);
+    await expect(chat.json()).resolves.toMatchObject({
+      chat: expect.objectContaining({ id: "storybook-agent-chat", canvasId: canvasAppIds.canvasId, status: "idle" }),
+    });
+
+    const messages = await fixtureFetch("http://localhost/api/v1/agents/chats/storybook-agent-chat/messages");
+    const body = await messages.json();
+    expect(body.hasMore).toBe(false);
+    expect(body.messages.length).toBeGreaterThanOrEqual(2);
+    expect(body.messages[0]).toEqual(expect.objectContaining({ role: "user" }));
+  });
+
+  it("echoes POST message content for send acknowledgements", async () => {
+    const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
+    const fallback = vi.fn() as unknown as typeof fetch;
+    const fixtureFetch = createDefaultFixtureFetch(fallback);
+    const response = await fixtureFetch("http://localhost/api/v1/agents/chats/storybook-agent-chat/messages", {
+      method: "POST",
+      body: JSON.stringify({ content: "Hello agent" }),
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      message: expect.objectContaining({ role: "user", content: "Hello agent" }),
+    });
+  });
+});
+
+describe("createFixtureFetch agent gates", () => {
+  it("exposes agents permissions and managed-agents feature", async () => {
+    const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
+    const fallback = vi.fn() as unknown as typeof fetch;
+    const fixtureFetch = createDefaultFixtureFetch(fallback);
+
+    const me = await fixtureFetch("http://localhost/api/v1/me");
+    const meBody = await me.json();
+    expect(meBody.user.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: "agents", action: "read" }),
+        expect.objectContaining({ resource: "agents", action: "create" }),
+      ]),
+    );
+
+    const features = await fixtureFetch("http://localhost/account/experimental-features");
+    await expect(features.json()).resolves.toMatchObject({
+      features: expect.arrayContaining([expect.objectContaining({ id: "claude_managed_agents", released: true })]),
+    });
+  });
+});

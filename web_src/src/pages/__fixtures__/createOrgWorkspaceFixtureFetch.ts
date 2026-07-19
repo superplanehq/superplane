@@ -43,10 +43,11 @@ export function createOrgWorkspaceFixtureFetch(
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = requestMethod(input, init);
+    const body = parseRequestBody(init);
     // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
     const resolved =
       matchHomePageFixture(url, method, homeFixture) ??
-      (appFixture ? matchCanvasAppFixture(url, appFixture) : matchCanvasAppFixture(url)) ??
+      matchCanvasAppFixture(url, appFixture, method, body) ??
       emptyOrgWorkspaceCatchAll(url);
     if (!resolved) {
       return fallback(input, init);
@@ -54,4 +55,13 @@ export function createOrgWorkspaceFixtureFetch(
     return fixtureResponse(resolved);
   };
   return impl as typeof fetch;
+}
+
+function parseRequestBody(init?: RequestInit): unknown {
+  if (!init?.body || typeof init.body !== "string") return undefined;
+  try {
+    return JSON.parse(init.body);
+  } catch {
+    return undefined;
+  }
 }

@@ -15,7 +15,7 @@ function buildMeUser(orgId: string) {
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization"].flatMap(
+    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
       (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
     ),
   };
@@ -116,7 +116,21 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         },
       }),
     },
-    { pattern: re("/account/experimental-features"), resolve: () => ({ json: { features: [] } }) },
+    {
+      pattern: re("/account/experimental-features"),
+      resolve: () => ({
+        json: {
+          features: [
+            {
+              id: "claude_managed_agents",
+              label: "Managed agents",
+              description: "Canvas agent chat",
+              released: true,
+            },
+          ],
+        },
+      }),
+    },
     {
       pattern: re("/account"),
       resolve: () => ({

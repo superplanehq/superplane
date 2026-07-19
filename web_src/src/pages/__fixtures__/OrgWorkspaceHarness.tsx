@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 
+import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { AppPage } from "@/pages/app";
@@ -45,6 +46,11 @@ export interface OrgWorkspaceHarnessProps {
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
   appQuery?: string;
+  /**
+   * When true, opens the canvas agent sidebar via localStorage before mount.
+   * Always written (true/false) so story switches do not leak open state.
+   */
+  openAgentSidebar?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
 }
@@ -57,10 +63,16 @@ export function OrgWorkspaceHarness({
   startAt = "home",
   pathSuffix = "",
   appQuery = "",
+  openAgentSidebar = false,
   homeFixture,
   appFixture,
 }: OrgWorkspaceHarnessProps) {
+  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+
   const [fixtureFetch] = useState(() => {
+    // Persist before AppPage reads the preference in useState initializers.
+    writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
     const state = fixtureFetchState();
     const impl = createOrgWorkspaceFixtureFetch(state.original, { homeFixture, appFixture });
     state.delegate = impl;
@@ -68,6 +80,7 @@ export function OrgWorkspaceHarness({
   });
 
   useEffect(() => {
+    writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
     const state = fixtureFetchState();
     if (state.delegate === null) {
       state.delegate = fixtureFetch;
@@ -77,10 +90,8 @@ export function OrgWorkspaceHarness({
         state.delegate = null;
       }
     };
-  }, [fixtureFetch]);
+  }, [canvasId, fixtureFetch, openAgentSidebar]);
 
-  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
   const initialPath = startAt === "app" ? appPath : homePath;

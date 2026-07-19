@@ -1,5 +1,6 @@
 import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
+import { buildStorybookAgentChat, buildStorybookAgentMessages, STORYBOOK_AGENT_CHAT_ID } from "./agentChatResponses";
 import defaultRaw from "./canvasAppResponses.json";
 import softwareFactoryReadme from "./repository/softwareFactory.README.md?raw";
 
@@ -63,6 +64,10 @@ export interface CanvasAppFixture {
    * keys from `repositoryFileContents`.
    */
   repositoryFilePaths?: string[];
+  /** GET /api/v1/agents/canvases/{canvasId}/chat */
+  agentChat?: { chat?: Record<string, unknown> };
+  /** GET /api/v1/agents/chats/{chatId}/messages */
+  agentMessages?: { messages?: Array<Record<string, unknown>>; hasMore?: boolean };
 }
 
 const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
@@ -121,7 +126,7 @@ function buildMeUser(orgId: string) {
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization"].flatMap(
+    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
       (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
     ),
   };
@@ -135,7 +140,7 @@ const CANVAS = "/api/v1/canvases/[^/]+";
 
 interface Route {
   pattern: RegExp;
-  resolve: (match: RegExpExecArray, url: URL) => FixtureResult;
+  resolve: (match: RegExpExecArray, url: URL, method: string, body: unknown) => FixtureResult;
 }
 
 function buildRoutes(fixture: CanvasAppFixture): Route[] {
@@ -266,6 +271,48 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas ?? { canvas: {} } }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
 
+    {
+      pattern: re("/api/v1/agents/canvases/([^/]+)/chat/reset"),
+      resolve: (_m, _url, method) => {
+        if (method !== "POST") return null;
+        return { json: fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId) };
+      },
+    },
+    {
+      pattern: re("/api/v1/agents/canvases/([^/]+)/chat"),
+      resolve: () => ({ json: fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId) }),
+    },
+    {
+      pattern: re("/api/v1/agents/chats/([^/]+)/messages"),
+      resolve: (_m, _url, method, body) => {
+        if (method === "POST") {
+          const content =
+            body && typeof body === "object" && "content" in body
+              ? String((body as { content?: unknown }).content ?? "")
+              : "";
+          return {
+            json: {
+              message: {
+                id: `storybook-sent-${Date.now()}`,
+                role: "user",
+                content,
+                createdAt: new Date().toISOString(),
+              },
+            },
+          };
+        }
+        return { json: fixture.agentMessages ?? buildStorybookAgentMessages() };
+      },
+    },
+    {
+      pattern: re("/api/v1/agents/chats/([^/]+)/interrupt"),
+      resolve: (_m, _url, method) => (method === "POST" ? { json: {} } : null),
+    },
+    {
+      pattern: re("/api/v1/agents/chats/([^/]+)/outcome"),
+      resolve: (_m, _url, method) => (method === "POST" ? { json: {} } : null),
+    },
+
     { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
@@ -277,21 +324,43 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     },
 
     // Non-versioned account endpoints hit outside the /api/v1 tree.
-    { pattern: re("/account/experimental-features"), resolve: () => ({ json: { features: [] } }) },
+    {
+      pattern: re("/account/experimental-features"),
+      resolve: () => ({
+        json: {
+          features: [
+            {
+              id: "claude_managed_agents",
+              label: "Managed agents",
+              description: "Canvas agent chat",
+              released: true,
+            },
+          ],
+        },
+      }),
+    },
     { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
   ];
 }
 
 /** Match a registered canvas-app fixture route. Returns `null` when none match (no catch-all). */
-export function matchCanvasAppFixture(url: URL, fixture: CanvasAppFixture = defaultFixture): FixtureResult {
-  for (const route of buildRoutes(fixture)) {
+export function matchCanvasAppFixture(
+  url: URL,
+  fixture?: CanvasAppFixture,
+  method = "GET",
+  body: unknown = undefined,
+): FixtureResult {
+  const activeFixture = fixture ?? defaultFixture;
+  for (const route of buildRoutes(activeFixture)) {
     const match = route.pattern.exec(url.pathname);
     if (match) {
-      return route.resolve(match, url);
+      return route.resolve(match, url, method, body);
     }
   }
   return null;
 }
+
+export { STORYBOOK_AGENT_CHAT_ID };
 
 function emptyCanvasApiCatchAll(url: URL): FixtureResult {
   // Safety net: any other API call degrades gracefully to an empty object
@@ -329,7 +398,12 @@ function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
 export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFixture = defaultFixture): typeof fetch {
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
-    const resolved = matchCanvasAppFixture(url, fixture) ?? emptyCanvasApiCatchAll(url);
+    const method = (
+      init?.method ??
+      (typeof input !== "string" && !(input instanceof URL) ? input.method : "GET") ??
+      "GET"
+    ).toUpperCase();
+    const resolved = matchCanvasAppFixture(url, fixture, method, parseRequestBody(init)) ?? emptyCanvasApiCatchAll(url);
     if (!resolved) {
       return fallback(input, init);
     }
@@ -342,6 +416,15 @@ function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
   return input.url;
+}
+
+function parseRequestBody(init?: RequestInit): unknown {
+  if (!init?.body || typeof init.body !== "string") return undefined;
+  try {
+    return JSON.parse(init.body);
+  } catch {
+    return undefined;
+  }
 }
 
 function listRuns(fixture: CanvasAppFixture): Array<Record<string, unknown>> {
