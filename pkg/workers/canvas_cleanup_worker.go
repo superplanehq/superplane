@@ -55,7 +55,7 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			canvases, err := models.ListDeletedCanvases()
+			canvases, err := models.ListDeletedCanvases(database.Conn())
 			if err != nil {
 				w.logger.Errorf("Error finding deleted canvases: %v", err)
 				continue
@@ -284,75 +284,6 @@ func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) 
 
 	logging.WithCanvas(w.logger, canvas).Info("Successfully cleaned up canvas")
 	return sessions, repositories, nil
-}
-
-func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) ([]models.AgentSession, []models.Repository, error) {
-	if !canvas.DeletedAt.Valid {
-		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
-		return nil, nil, nil
-	}
-
-	if _, err := w.cleanCanvasRuns(tx, canvas); err != nil {
-		return nil, nil, err
-	}
-
-	remainingRuns, err := canvas.CountRuns(tx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
-	}
-
-	if remainingRuns > 0 {
-		return nil, nil, nil
-	}
-
-	summary, complete, err := canvas.DeleteRemainingResources(tx, w.maxResourcesPerTick)
-	if err != nil {
-		return nil, nil, fmt.Errorf("delete remaining workflow resources: %w", err)
-	}
-
-	if !complete {
-		if summary != nil && summary.TotalRecords() > 0 {
-			w.logger.WithFields(log.Fields{
-				"canvas_id":     canvas.ID,
-				"runs":          summary.Runs,
-				"events":        summary.Events,
-				"executions":    summary.NodeExecutions,
-				"requests":      summary.NodeRequests,
-				"execution_kvs": summary.NodeExecutionKVs,
-				"queue_items":   summary.NodeQueueItems,
-			}).Info("Partially cleaned remaining workflow resources")
-		}
-
-		return nil, nil, nil
-	}
-
-	if summary != nil && summary.TotalRecords() > 0 {
-		w.logger.WithFields(log.Fields{
-			"canvas_id":     canvas.ID,
-			"runs":          summary.Runs,
-			"events":        summary.Events,
-			"executions":    summary.NodeExecutions,
-			"requests":      summary.NodeRequests,
-			"execution_kvs": summary.NodeExecutionKVs,
-			"queue_items":   summary.NodeQueueItems,
-		}).Info("Cleaned remaining workflow resources")
-	}
-
-	lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
-	if err != nil {
-		return nil, nil, nil
-	}
-
-	remainingRuns, err = lockedCanvas.CountRuns(tx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("count remaining workflow runs: %w", err)
-	}
-
-	if remainingRuns > 0 {
-		return nil, nil, nil
-	}
-
-	return w.finalizeCanvas(tx, *lockedCanvas)
 }
 
 func (w *CanvasCleanupWorker) cleanupProviderSessions(ctx context.Context, sessions []models.AgentSession) {

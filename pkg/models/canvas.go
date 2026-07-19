@@ -269,9 +269,9 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListDeletedCanvases() ([]Canvas, error) {
+func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 	var canvases []Canvas
-	err := database.Conn().
+	err := db.
 		Model(&Canvas{}).
 		Unscoped().
 		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
