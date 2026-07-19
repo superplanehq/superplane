@@ -85,6 +85,7 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		defer r2.Close()
 
 		cleaner := &cleanupProvider{}
+		canvasWorker := NewCanvasCleanupWorker(r2.GitProvider, cleaner)
 		worker := NewOrganizationCleanupWorker(r2.GitProvider, cleaner)
 		canvas, _ := support.CreateCanvas(t, r2.Organization.ID, r2.User, []models.CanvasNode{}, []models.Edge{})
 		orphanSession := createAgentSessionWithMessage(t, r2.Organization.ID, r2.User, uuid.New())
@@ -92,6 +93,12 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		require.NoError(t, models.SoftDeleteOrganization(r2.Organization.ID.String()))
 		deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
 		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r2.Organization.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
+
+		deletedCanvases, err := models.ListDeletedCanvases(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, deletedCanvases, 1)
+		require.Equal(t, canvas.ID, deletedCanvases[0].ID)
+		require.NoError(t, canvasWorker.LockAndProcessCanvas(deletedCanvases[0]))
 
 		deletedOrganizations, err := models.ListDeletedOrganizations()
 		require.NoError(t, err)

@@ -675,13 +675,13 @@ CREATE TABLE public.workflow_runs (
     version_id uuid NOT NULL,
     cancelled_at timestamp without time zone,
     cancelled_by uuid,
+    node_id character varying(128),
     parent_run_id uuid,
     parent_workflow_id uuid,
     parent_execution_id uuid,
     callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
     input jsonb DEFAULT '{}'::jsonb NOT NULL,
-    result_message text,
-    node_id character varying(255)
+    result_message text
 );
 
 
@@ -1609,6 +1609,13 @@ CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING
 
 
 --
+-- Name: idx_workflow_runs_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_node_id ON public.workflow_runs USING btree (workflow_id, node_id);
+
+
+--
 -- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1867,6 +1874,14 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_node_requests
     ADD CONSTRAINT fk_workflow_node_requests_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: workflow_runs fk_workflow_runs_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT fk_workflow_runs_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
 
 
 --
@@ -2253,7 +2268,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260717191931	f
+20260719155617	f
 \.
 
 

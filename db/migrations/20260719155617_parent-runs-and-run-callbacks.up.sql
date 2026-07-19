@@ -7,9 +7,4 @@ ALTER TABLE workflow_runs ADD COLUMN callbacks jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE workflow_runs ADD COLUMN input jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE workflow_runs ADD COLUMN result_message TEXT;
 
---
--- TODO: do I need to turn this into a foreign key?
---
-ALTER TABLE workflow_runs ADD COLUMN node_id VARCHAR(255);
-
 commit;
