@@ -19,12 +19,13 @@ import (
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	router := NewEventRouter(amqpURL)
-	finalizer := NewRunFinalizer(amqpURL)
-	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	logger := log.NewEntry(log.New())
 
 	trigger := "trigger-1"
 	node := "component-1"
@@ -73,10 +74,11 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 }
 
 func Test__RunFinalizer_FinalizesRunAfterQueueItemDeleted(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	node := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -117,10 +119,11 @@ func Test__RunFinalizer_FinalizesRunAfterQueueItemDeleted(t *testing.T) {
 }
 
 func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	trigger := "trigger-1"
 	node := "component-1"
@@ -160,10 +163,11 @@ func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
 }
 
 func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	trigger := "trigger-1"
 	node := "component-1"
@@ -213,10 +217,11 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 }
 
 func Test__RunFinalizer_FinalizesCancellingRunWithForcedCancelledResult(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	node := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -255,10 +260,11 @@ func Test__RunFinalizer_FinalizesCancellingRunWithForcedCancelledResult(t *testi
 }
 
 func Test__RunFinalizer_SweepCancellingRuns_FinalizesWhenNoOpenWork(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	node := "component-1"
 	canvas, _ := support.CreateCanvas(
@@ -298,10 +304,11 @@ func Test__RunFinalizer_SweepCancellingRuns_FinalizesWhenNoOpenWork(t *testing.T
 }
 
 func Test__RunFinalizer_SweepCancellingRuns_DrainsOpenWorkAndPublishesMessages(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	executionCancellingConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionCancellingRoutingKey)
 	executionCancellingConsumer.Start()
@@ -378,10 +385,11 @@ func Test__RunFinalizer_SweepCancellingRuns_DrainsOpenWorkAndPublishesMessages(t
 }
 
 func Test__RunFinalizer_SweepCancellingRuns_DoesNotBumpUpdatedAtWhenStillOpenAfterDrain(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-
-	finalizer := NewRunFinalizer(amqpURL)
 	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	node := "component-1"
 	canvas, _ := support.CreateCanvas(

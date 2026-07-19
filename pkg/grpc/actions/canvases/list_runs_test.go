@@ -187,6 +187,14 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 	assert.Equal(t, uint32(1), response.TotalCount)
 }
 
+func Test__RunStateMapping__Pending(t *testing.T) {
+	assert.Equal(t, pb.CanvasRun_STATE_PENDING, RunStateToProto(models.CanvasRunStatePending))
+
+	modelState, err := ProtoRunStateToModel(pb.CanvasRun_STATE_PENDING)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStatePending, modelState)
+}
+
 func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
@@ -212,6 +220,59 @@ func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_UNKNOWN},
 	)
 	require.Error(t, err)
+}
+
+func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
+	r := support.Setup(t)
+
+	parentCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "runApp", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+	childCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "onRun", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	parentRootEvent := support.EmitCanvasEventForNode(t, parentCanvas.ID, "trigger", "default", nil)
+	parentRun := createStartedRun(t, parentRootEvent)
+	parentExecution := createRunExecution(t, parentRun, parentRootEvent.ID, "runApp", models.CanvasNodeExecutionResultPassed)
+
+	childRun := createSubRunRecord(
+		t,
+		childCanvas.ID,
+		"onRun",
+		&parentRun.ID,
+		&parentCanvas.ID,
+		&parentExecution.ID,
+		models.CanvasRunStateStarted,
+		models.CanvasRunResultPassed,
+	)
+	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onRun", "default", nil)
+	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
+
+	parentResponse, err := ListRuns(context.Background(), r.Registry, parentCanvas.ID, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, parentResponse.Runs, 1)
+	require.Len(t, parentResponse.Runs[0].Executions, 1)
+	require.Len(t, parentResponse.Runs[0].Executions[0].Runs, 1)
+	assert.Equal(t, childRun.ID.String(), parentResponse.Runs[0].Executions[0].Runs[0].Id)
+	assert.Equal(t, childCanvas.ID.String(), parentResponse.Runs[0].Executions[0].Runs[0].CanvasId)
+
+	childResponse, err := DescribeRun(context.Background(), r.Registry, childCanvas.ID, childRun.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, childResponse.Run.Parent)
+	assert.Equal(t, parentRun.ID.String(), childResponse.Run.Parent.Id)
+	assert.Equal(t, parentCanvas.ID.String(), childResponse.Run.Parent.CanvasId)
 }
 
 func createStartedRun(t *testing.T, rootEvent *models.CanvasEvent) *models.CanvasRun {
@@ -267,4 +328,37 @@ func createRunExecution(t *testing.T, run *models.CanvasRun, rootEventID uuid.UU
 	}
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return &execution
+}
+
+func createSubRunRecord(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	parentRunID *uuid.UUID,
+	parentWorkflowID *uuid.UUID,
+	parentExecutionID *uuid.UUID,
+	state string,
+	result string,
+) *models.CanvasRun {
+	t.Helper()
+
+	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+	require.NoError(t, err)
+
+	run := models.CanvasRun{
+		ID:                uuid.New(),
+		WorkflowID:        workflowID,
+		NodeID:            nodeID,
+		VersionID:         liveVersion.ID,
+		ParentRunID:       parentRunID,
+		ParentWorkflowID:  parentWorkflowID,
+		ParentExecutionID: parentExecutionID,
+		State:             state,
+		Result:            result,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return &run
 }

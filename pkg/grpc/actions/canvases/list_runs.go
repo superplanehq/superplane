@@ -37,17 +37,20 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		return nil, err
 	}
 
-	runIDs := make([]uuid.UUID, len(runs))
-	for i, run := range runs {
-		runIDs[i] = run.ID
-	}
-
-	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, runIDs)
+	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, runs)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := serializeCanvasRuns(ctx, runs, runDetails.rootEventsByRunID, runDetails.executionsByRunID, runDetails.queueItemsByRunID)
+	serialized, err := serializeCanvasRuns(
+		ctx,
+		runs,
+		runDetails.rootEventsByRunID,
+		runDetails.executionsByRunID,
+		runDetails.queueItemsByRunID,
+		runDetails.parentRunsByRunID,
+		runDetails.childRunsByExecutionID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +120,8 @@ func SerializeCanvasRuns(
 	rootEventsByRunID map[string]models.CanvasEvent,
 	executionsByRunID map[string][]models.CanvasNodeExecution,
 	queueItemsByRunID map[string][]models.CanvasNodeQueueItem,
+	parentRunsByRunID map[string]models.CanvasRun,
+	childRunsByExecutionID map[string][]models.CanvasRun,
 ) ([]*pb.CanvasRun, error) {
 	inputEvents, err := loadInputEventsForQueueItems(db, queueItemsForRuns(runs, queueItemsByRunID))
 	if err != nil {
@@ -132,6 +137,8 @@ func SerializeCanvasRuns(
 			executionsByRunID[run.ID.String()],
 			queueItemsByRunID[run.ID.String()],
 			inputEvents,
+			parentRunsByRunID[run.ID.String()],
+			childRunsByExecutionID,
 		)
 		if err != nil {
 			return nil, err
@@ -149,13 +156,20 @@ func SerializeCanvasRun(
 	rootEvent models.CanvasEvent,
 	executions []models.CanvasNodeExecution,
 	queueItems []models.CanvasNodeQueueItem,
+	parentRun *models.CanvasRun,
+	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
 	inputEvents, err := loadInputEventsForQueueItems(db, queueItems)
 	if err != nil {
 		return nil, err
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents)
+	var parent models.CanvasRun
+	if parentRun != nil {
+		parent = *parentRun
+	}
+
+	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
 }
 
 func serializeCanvasRunWithQueueItemInputs(
@@ -164,6 +178,8 @@ func serializeCanvasRunWithQueueItemInputs(
 	executions []models.CanvasNodeExecution,
 	queueItems []models.CanvasNodeQueueItem,
 	inputEvents []models.CanvasEvent,
+	parentRun models.CanvasRun,
+	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
 	if rootEvent.ID == uuid.Nil {
 		return nil, grpcerrors.NotFound(nil, "root event not found")
@@ -176,7 +192,10 @@ func serializeCanvasRunWithQueueItemInputs(
 
 	executionRefs := make([]*pb.CanvasNodeExecutionRef, 0, len(executions))
 	for _, execution := range executions {
-		executionRefs = append(executionRefs, SerializeNodeExecutionRef(execution))
+		executionRefs = append(executionRefs, SerializeNodeExecutionRef(
+			execution,
+			childRunsByExecutionID[execution.ID.String()],
+		))
 	}
 
 	serializedQueueItems, err := serializeNodeQueueItemsWithInputEvents(queueItems, inputEvents)
@@ -195,6 +214,10 @@ func serializeCanvasRunWithQueueItemInputs(
 		QueueItems: serializedQueueItems,
 		CreatedAt:  timestamppb.New(*run.CreatedAt),
 		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
+	}
+
+	if parentRun.ID != uuid.Nil {
+		serialized.Parent = SerializeCanvasRunRef(parentRun)
 	}
 
 	if run.FinishedAt != nil {
@@ -224,6 +247,8 @@ func queueItemsForRuns(runs []models.CanvasRun, queueItemsByRunID map[string][]m
 
 func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
 	switch state {
+	case pb.CanvasRun_STATE_PENDING:
+		return models.CanvasRunStatePending, nil
 	case pb.CanvasRun_STATE_STARTED:
 		return models.CanvasRunStateStarted, nil
 	case pb.CanvasRun_STATE_CANCELLING:
@@ -250,6 +275,8 @@ func ProtoRunResultToModel(result pb.CanvasRun_Result) (string, error) {
 
 func RunStateToProto(state string) pb.CanvasRun_State {
 	switch state {
+	case models.CanvasRunStatePending:
+		return pb.CanvasRun_STATE_PENDING
 	case models.CanvasRunStateStarted:
 		return pb.CanvasRun_STATE_STARTED
 	case models.CanvasRunStateCancelling:
@@ -275,23 +302,34 @@ func RunResultToProto(result string) pb.CanvasRun_Result {
 }
 
 type runDetailsForRuns struct {
-	rootEventsByRunID map[string]models.CanvasEvent
-	executionsByRunID map[string][]models.CanvasNodeExecution
-	queueItemsByRunID map[string][]models.CanvasNodeQueueItem
+	rootEventsByRunID      map[string]models.CanvasEvent
+	executionsByRunID      map[string][]models.CanvasNodeExecution
+	queueItemsByRunID      map[string][]models.CanvasNodeQueueItem
+	parentRunsByRunID      map[string]models.CanvasRun
+	childRunsByExecutionID map[string][]models.CanvasRun
 }
 
-func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (*runDetailsForRuns, error) {
+func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []models.CanvasRun) (*runDetailsForRuns, error) {
+	runIDs := make([]uuid.UUID, len(runs))
+	for i, run := range runs {
+		runIDs[i] = run.ID
+	}
+
 	if len(runIDs) == 0 {
 		return &runDetailsForRuns{
-			rootEventsByRunID: map[string]models.CanvasEvent{},
-			executionsByRunID: map[string][]models.CanvasNodeExecution{},
-			queueItemsByRunID: map[string][]models.CanvasNodeQueueItem{},
+			rootEventsByRunID:      map[string]models.CanvasEvent{},
+			executionsByRunID:      map[string][]models.CanvasNodeExecution{},
+			queueItemsByRunID:      map[string][]models.CanvasNodeQueueItem{},
+			parentRunsByRunID:      map[string]models.CanvasRun{},
+			childRunsByExecutionID: map[string][]models.CanvasRun{},
 		}, nil
 	}
 
 	var rootEventsByRunID map[string]models.CanvasEvent
 	var executionsByRunID map[string][]models.CanvasNodeExecution
 	var queueItemsByRunID map[string][]models.CanvasNodeQueueItem
+	var parentRunsByRunID map[string]models.CanvasRun
+	var childRunsByExecutionID map[string][]models.CanvasRun
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -311,6 +349,18 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uui
 		}
 
 		executionsByRunID = groupExecutionsByRunID(executions, len(runIDs))
+
+		executionIDs := make([]uuid.UUID, len(executions))
+		for i, execution := range executions {
+			executionIDs[i] = execution.ID
+		}
+
+		childRuns, err := listChildRunsForExecutions(gctx, canvasID, executionIDs)
+		if err != nil {
+			return err
+		}
+
+		childRunsByExecutionID = groupChildRunsByParentExecutionID(childRuns)
 		return nil
 	})
 
@@ -324,14 +374,22 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uui
 		return nil
 	})
 
+	g.Go(func() error {
+		var err error
+		parentRunsByRunID, err = loadParentRunsForRuns(gctx, runs)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
 	return &runDetailsForRuns{
-		rootEventsByRunID: rootEventsByRunID,
-		executionsByRunID: executionsByRunID,
-		queueItemsByRunID: queueItemsByRunID,
+		rootEventsByRunID:      rootEventsByRunID,
+		executionsByRunID:      executionsByRunID,
+		queueItemsByRunID:      queueItemsByRunID,
+		parentRunsByRunID:      parentRunsByRunID,
+		childRunsByExecutionID: childRunsByExecutionID,
 	}, nil
 }
 
@@ -358,11 +416,21 @@ func serializeCanvasRuns(
 	rootEventsByRunID map[string]models.CanvasEvent,
 	executionsByRunID map[string][]models.CanvasNodeExecution,
 	queueItemsByRunID map[string][]models.CanvasNodeQueueItem,
+	parentRunsByRunID map[string]models.CanvasRun,
+	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (serialized []*pb.CanvasRun, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.serialize")
 	defer done(&err)
 
-	serialized, err = SerializeCanvasRuns(database.DB(ctx), runs, rootEventsByRunID, executionsByRunID, queueItemsByRunID)
+	serialized, err = SerializeCanvasRuns(
+		database.DB(ctx),
+		runs,
+		rootEventsByRunID,
+		executionsByRunID,
+		queueItemsByRunID,
+		parentRunsByRunID,
+		childRunsByExecutionID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -418,6 +486,25 @@ func loadQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uui
 	}
 
 	return queueItemsByRunID, nil
+}
+
+func loadParentRunsForRuns(ctx context.Context, runs []models.CanvasRun) (map[string]models.CanvasRun, error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_parent_runs")
+	defer done(nil)
+
+	parents, err := models.FindCanvasRunsByKeysInTransaction(database.DB(ctx), models.CollectParentRunKeys(runs))
+	if err != nil {
+		return nil, err
+	}
+
+	return indexParentRunsByChildID(runs, parents), nil
+}
+
+func listChildRunsForExecutions(ctx context.Context, canvasID uuid.UUID, executionIDs []uuid.UUID) ([]models.CanvasRun, error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_child_runs")
+	defer done(nil)
+
+	return models.ListChildRunsByParentExecutionsInTransaction(database.DB(ctx), canvasID, executionIDs)
 }
 
 func listQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (queueItems []models.CanvasNodeQueueItem, err error) {

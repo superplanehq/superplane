@@ -97,11 +97,17 @@ type TriggerContext struct {
 
 type AppContext interface {
 	Get(idOrName string) (*App, error)
+	GetNode(app, node string) (*CanvasNode, error)
 	Subscribe(id string) error
 	Unsubscribe() error
 }
 
 type App struct {
+	ID   string
+	Name string
+}
+
+type CanvasNode struct {
 	ID   string
 	Name string
 }

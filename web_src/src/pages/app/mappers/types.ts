@@ -2,6 +2,7 @@ import type {
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionResult,
   CanvasesCanvasNodeExecutionState,
+  CanvasesCanvasRunRef,
   OrganizationsIntegration,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
@@ -85,6 +86,7 @@ export type ExecutionInfo = {
   outputs?: {
     [key: string]: unknown;
   };
+  runs?: CanvasesCanvasRunRef[];
 };
 
 export type QueueItemInfo = {

@@ -255,7 +255,7 @@ export function buildRunInspectorNodeSections({
     const tabData = isTrigger
       ? buildTriggerTabData(run, workflowNode)
       : execution
-        ? buildExecutionTabData(execution, workflowNode, workflowNodes)
+        ? buildExecutionTabData(execution, workflowNode, workflowNodes, executionRef)
         : null;
     const upstreamSections = isTrigger
       ? []
