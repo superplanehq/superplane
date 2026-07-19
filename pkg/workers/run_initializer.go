@@ -164,6 +164,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		executionUpdates = append(executionUpdates, executions...)
 	}
 
+	stateUpdated := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
@@ -195,7 +196,11 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		//
 		if err != nil {
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
-			return w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
+			if err := w.failRun(tx, locked, eventCollector, executionCollector, err.Error()); err != nil {
+				return err
+			}
+			stateUpdated = true
+			return nil
 		}
 
 		//
@@ -205,11 +210,18 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			return fmt.Errorf("start run: %w", err)
 		}
 
+		stateUpdated = true
 		return nil
 	})
 
 	if err != nil {
 		return err
+	}
+
+	if stateUpdated {
+		if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
+		}
 	}
 
 	for _, event := range newEvents {
