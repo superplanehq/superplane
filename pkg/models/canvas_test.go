@@ -125,6 +125,7 @@ func Test__Canvas__DeleteRemainingResources__ReturnsIncompleteWhenLastTypeExceed
 		run := models.CanvasRun{
 			ID:         uuid.New(),
 			WorkflowID: canvas.ID,
+			NodeID:     "node-1",
 			VersionID:  liveVersion.ID,
 			State:      models.CanvasRunStateFinished,
 			Result:     models.CanvasRunResultPassed,
