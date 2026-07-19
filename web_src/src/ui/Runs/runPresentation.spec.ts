@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasesCanvasRunRef } from "@/api-client";
 
-import { getRunRefStatus } from "./runPresentation";
+import { ACTIVE_RUN_API_STATES, getRunRefStatus, statusFiltersToApiFilters } from "./runPresentation";
 
 function runRef(overrides: Partial<CanvasesCanvasRunRef> = {}): CanvasesCanvasRunRef {
   return {
@@ -26,5 +26,14 @@ describe("getRunRefStatus", () => {
     expect(getRunRefStatus(runRef({ state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe("failed");
     expect(getRunRefStatus(runRef({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }))).toBe("cancelled");
     expect(getRunRefStatus(runRef({ state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe("passed");
+  });
+});
+
+describe("statusFiltersToApiFilters", () => {
+  it("includes pending runs in the running state filter", () => {
+    expect(statusFiltersToApiFilters(["running"])).toEqual({
+      states: [...ACTIVE_RUN_API_STATES],
+      results: [],
+    });
   });
 });

@@ -247,6 +247,8 @@ func queueItemsForRuns(runs []models.CanvasRun, queueItemsByRunID map[string][]m
 
 func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
 	switch state {
+	case pb.CanvasRun_STATE_PENDING:
+		return models.CanvasRunStatePending, nil
 	case pb.CanvasRun_STATE_STARTED:
 		return models.CanvasRunStateStarted, nil
 	case pb.CanvasRun_STATE_CANCELLING:
@@ -273,6 +275,8 @@ func ProtoRunResultToModel(result pb.CanvasRun_Result) (string, error) {
 
 func RunStateToProto(state string) pb.CanvasRun_State {
 	switch state {
+	case models.CanvasRunStatePending:
+		return pb.CanvasRun_STATE_PENDING
 	case models.CanvasRunStateStarted:
 		return pb.CanvasRun_STATE_STARTED
 	case models.CanvasRunStateCancelling:

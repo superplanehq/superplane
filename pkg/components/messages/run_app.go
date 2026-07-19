@@ -76,9 +76,13 @@ func (c *RunApp) Description() string {
 
 func (c *RunApp) ExampleOutput() map[string]any {
 	return map[string]any{
-		"run": map[string]any{
-			"id":     "123",
-			"result": core.RunResultPassed,
+		"timestamp": "2026-07-19T12:00:00Z",
+		"type":      "app.invocation.passed",
+		"data": map[string]any{
+			"run": map[string]any{
+				"id":     "123",
+				"result": core.RunResultPassed,
+			},
 		},
 	}
 }

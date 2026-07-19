@@ -187,6 +187,14 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 	assert.Equal(t, uint32(1), response.TotalCount)
 }
 
+func Test__RunStateMapping__Pending(t *testing.T) {
+	assert.Equal(t, pb.CanvasRun_STATE_PENDING, RunStateToProto(models.CanvasRunStatePending))
+
+	modelState, err := ProtoRunStateToModel(pb.CanvasRun_STATE_PENDING)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStatePending, modelState)
+}
+
 func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})

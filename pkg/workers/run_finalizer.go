@@ -429,6 +429,10 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	}
 
 	now := time.Now()
+	run.State = models.CanvasRunStateFinished
+	run.Result = result
+	run.UpdatedAt = &now
+	run.FinishedAt = &now
 	err = tx.Model(run).
 		Updates(map[string]any{
 			"state":       models.CanvasRunStateFinished,

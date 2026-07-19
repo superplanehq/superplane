@@ -17,6 +17,12 @@ export type { RunStatusFilter };
 export type RunResultFilter = Exclude<RunStatusFilter, "running">;
 export type RunStatusKey = RunStatusFilter | "cancelling" | "unknown";
 
+export const ACTIVE_RUN_API_STATES = [
+  "STATE_PENDING",
+  "STATE_STARTED",
+  "STATE_CANCELLING",
+] as const satisfies readonly CanvasesCanvasRunState[];
+
 const RUN_STATUS_FILTER_OPTION_META: Record<RunStatusFilter, { label: string; dotClassName: string }> = {
   running: { label: "Running", dotClassName: "bg-blue-500" },
   passed: { label: "Passed", dotClassName: "bg-emerald-500" },
@@ -88,7 +94,7 @@ export function statusFiltersToApiFilters(filters: RunStatusFilter[]): {
     cancelled: "RESULT_CANCELLED",
   };
 
-  const states: CanvasesCanvasRunState[] = filters.includes("running") ? ["STATE_STARTED", "STATE_CANCELLING"] : [];
+  const states: CanvasesCanvasRunState[] = filters.includes("running") ? [...ACTIVE_RUN_API_STATES] : [];
   const results = filters
     .filter((filter): filter is RunResultFilter => filter !== "running")
     .map((filter) => resultByFilter[filter]);

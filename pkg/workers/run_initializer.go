@@ -235,6 +235,11 @@ func (w *RunInitializer) failRun(
 	resultMessage string,
 ) error {
 	now := time.Now()
+	run.State = models.CanvasRunStateFinished
+	run.Result = models.CanvasRunResultFailed
+	run.ResultMessage = resultMessage
+	run.UpdatedAt = &now
+	run.FinishedAt = &now
 	err := tx.Model(run).
 		Updates(map[string]any{
 			"state":          models.CanvasRunStateFinished,
