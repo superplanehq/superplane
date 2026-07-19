@@ -231,6 +231,7 @@ func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string
 	run := models.CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: workflowID,
+		NodeID:     "trigger",
 		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
@@ -276,6 +277,7 @@ func createRunForRootEvent(t *testing.T, rootEvent *models.CanvasEvent) *models.
 		return rootEvent.RoutedInTransaction(tx)
 	}))
 
+	require.Equal(t, "trigger", run.NodeID)
 	return run
 }
 
