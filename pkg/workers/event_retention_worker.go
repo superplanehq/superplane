@@ -5,19 +5,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 const (
-	eventRetentionBatchSize            = 100
-	eventRetentionMaxRootEventsPerTick = 1000
-	eventRetentionEvery                = 1 * time.Minute
+	eventRetentionMaxRunsPerTick = 1000
+	eventRetentionEvery          = 1 * time.Minute
 )
 
 type EventRetentionWorker struct {
@@ -54,79 +53,88 @@ func (w *EventRetentionWorker) Start(ctx context.Context) {
 }
 
 func (w *EventRetentionWorker) tick(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+
 	startedAt := time.Now()
 	referenceTime := time.Now().UTC()
-	deleted, err := w.processRetentionBatches(ctx, referenceTime, eventRetentionMaxRootEventsPerTick)
+	deleted, err := w.cleanRuns(referenceTime, eventRetentionMaxRunsPerTick)
 	if err != nil {
-		w.logger.Errorf("Error processing expired root events for retention cleanup: %v", err)
+		w.logger.Errorf("Error processing expired runs for retention cleanup: %v", err)
 		return
 	}
 
 	if deleted == 0 {
+		w.logger.Info("No runs found for retention cleanup")
 		return
 	}
 
 	logger := w.logger.WithFields(log.Fields{
-		"deleted_root_events": deleted,
-		"max_root_events":     eventRetentionMaxRootEventsPerTick,
-		"duration_ms":         time.Since(startedAt).Milliseconds(),
+		"deleted":  deleted,
+		"duration": time.Since(startedAt).String(),
 	})
 
-	if deleted >= eventRetentionMaxRootEventsPerTick {
-		logger.Warn("Event retention cleanup reached the per-tick limit; more expired root events may remain")
+	if deleted >= eventRetentionMaxRunsPerTick {
+		logger.Warn("Event retention cleanup reached the per-tick limit; more expired runs may remain")
 		return
 	}
 
-	logger.Info("Deleted retained root events")
+	logger.Info("Deleted runs")
 }
 
-func (w *EventRetentionWorker) processRetentionBatches(ctx context.Context, referenceTime time.Time, maxRootEvents int) (int, error) {
-	totalDeleted := 0
-	for totalDeleted < maxRootEvents {
-		if ctx.Err() != nil {
-			return totalDeleted, ctx.Err()
-		}
-
-		limit := min(eventRetentionBatchSize, maxRootEvents-totalDeleted)
-		deleted, err := w.LockAndProcessRootEvents(referenceTime, limit)
-		if err != nil {
-			return totalDeleted, err
-		}
-
-		if deleted == 0 {
-			return totalDeleted, nil
-		}
-
-		totalDeleted += deleted
+func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (int, error) {
+	runs, err := models.ListExpiredFinishedRuns(database.Conn(), referenceTime, limit)
+	if err != nil {
+		return 0, err
 	}
 
-	return totalDeleted, nil
-}
+	if len(runs) == 0 {
+		return 0, nil
+	}
 
-func (w *EventRetentionWorker) LockAndProcessRootEvents(referenceTime time.Time, limit int) (int, error) {
-	var deleted int
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		events, err := models.LockExpiredRoutedRootCanvasEventsInTransaction(tx, referenceTime, limit)
-		if err != nil {
-			return fmt.Errorf("lock expired routed root events: %w", err)
-		}
+	w.logger.Infof("Found %d runs for cleanup outside the retention window", len(runs))
 
-		if len(events) == 0 {
+	deleted := 0
+	for _, run := range runs {
+		logger := logging.WithRun(w.logger, run)
+
+		var summary *models.RunDeletionSummary
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			locked, err := models.LockExpiredFinishedRun(tx, referenceTime, run.ID)
+			if err != nil {
+				return fmt.Errorf("lock run %s: %w", run.ID, err)
+			}
+
+			if locked == nil {
+				return nil
+			}
+
+			summary, err = locked.DeleteChain(tx)
+			if err != nil {
+				return fmt.Errorf("delete run chain: %w", err)
+			}
+
 			return nil
+		})
+
+		if err != nil {
+			logger.Errorf("Error deleting run: %v", err)
+			return deleted, err
 		}
 
-		rootEventIDs := make([]uuid.UUID, 0, len(events))
-		for _, event := range events {
-			rootEventIDs = append(rootEventIDs, event.ID)
+		if summary != nil {
+			logger.WithFields(log.Fields{
+				"runs":          summary.Runs,
+				"events":        summary.Events,
+				"executions":    summary.NodeExecutions,
+				"requests":      summary.NodeRequests,
+				"execution_kvs": summary.NodeExecutionKVs,
+				"queue_items":   summary.NodeQueueItems,
+			}).Info("Deleted run")
+			deleted++
 		}
+	}
 
-		if err := models.DeleteRootCanvasEventChainsInTransaction(tx, rootEventIDs); err != nil {
-			return fmt.Errorf("delete root event chains: %w", err)
-		}
-
-		deleted = len(rootEventIDs)
-		return nil
-	})
-
-	return deleted, err
+	return deleted, nil
 }
