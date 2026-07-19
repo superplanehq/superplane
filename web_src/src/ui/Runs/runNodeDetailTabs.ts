@@ -1,4 +1,9 @@
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasRun,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 import { flattenObject } from "@/lib/utils";
 import { getExecutionDetails, getTriggerRenderer } from "@/pages/app/mappers";
 import { buildEventInfo } from "@/pages/app/utils";
@@ -9,10 +14,14 @@ export function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
   workflowNode: SuperplaneComponentsNode | undefined,
   workflowNodes: SuperplaneComponentsNode[],
+  executionRef?: CanvasesCanvasNodeExecutionRef,
 ): RunNodeDetailTabData {
   const tabData: RunNodeDetailTabData = {
     details: filterEmptyDetailEntries(
-      applyExecutionResultDetails(buildDefaultExecutionDetails(execution, workflowNode, workflowNodes), execution),
+      applyExecutionResultDetails(
+        buildDefaultExecutionDetails(execution, workflowNode, workflowNodes, executionRef),
+        execution,
+      ),
     ),
     payload: extractExecutionPayload(execution),
   };
@@ -72,11 +81,18 @@ function buildDefaultExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   workflowNode: SuperplaneComponentsNode | undefined,
   workflowNodes: SuperplaneComponentsNode[],
+  executionRef?: CanvasesCanvasNodeExecutionRef,
 ): Record<string, unknown> {
   const componentName = typeof workflowNode?.component === "string" ? workflowNode.component : undefined;
 
   if (componentName && workflowNode) {
-    const customDetails = getExecutionDetails(componentName, execution, workflowNode, workflowNodes);
+    const customDetails = getExecutionDetails(
+      componentName,
+      execution,
+      workflowNode,
+      workflowNodes,
+      executionRef?.runs,
+    );
     if (customDetails && Object.keys(customDetails).length > 0) {
       return { ...customDetails };
     }

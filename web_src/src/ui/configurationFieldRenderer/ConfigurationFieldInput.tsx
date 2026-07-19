@@ -12,6 +12,8 @@ import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
+import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
+import { RunParametersFieldRenderer } from "./RunParametersFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -90,6 +92,34 @@ export function ConfigurationFieldInput({
         onChange={onChange}
         organizationId={organizationId}
         readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "app-canvas-node") {
+    return (
+      <AppCanvasNodeFieldRenderer
+        field={field}
+        value={value as string | undefined}
+        onChange={onChange}
+        allValues={allValues}
+        organizationId={organizationId}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "run-parameters") {
+    return (
+      <RunParametersFieldRenderer
+        {...commonProps}
+        domainId={domainId}
+        domainType={domainType}
+        organizationId={organizationId}
+        allowExpressions={allowExpressions}
+        autocompleteExampleObj={autocompleteExampleObj}
+        validationErrors={validationErrors}
+        fieldPath={fieldPath}
       />
     );
   }

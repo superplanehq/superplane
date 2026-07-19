@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -32,12 +33,14 @@ const (
 
 type RunFinalizer struct {
 	logger      *log.Entry
+	registry    *registry.Registry
 	rabbitMQURL string
 }
 
-func NewRunFinalizer(rabbitMQURL string) *RunFinalizer {
+func NewRunFinalizer(rabbitMQURL string, registry *registry.Registry) *RunFinalizer {
 	return &RunFinalizer{
 		logger:      log.WithFields(log.Fields{"worker": "RunFinalizer"}),
+		registry:    registry,
 		rabbitMQURL: rabbitMQURL,
 	}
 }
@@ -314,6 +317,7 @@ func (w *RunFinalizer) consumeQueueItemDeleted(delivery tackle.Delivery) error {
 }
 
 func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) error {
+
 	//
 	// For every run we process, we track the following metrics:
 	// - trigger: sweep, execution_finished, event_terminal, queue_item_deleted
@@ -338,11 +342,21 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		"run_id":      runID,
 	})
 
+	var newEvents []models.CanvasEvent
+	eventCollector := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
+	var executionUpdates []models.CanvasNodeExecution
+	executionCollector := func(executions []models.CanvasNodeExecution) {
+		executionUpdates = append(executionUpdates, executions...)
+	}
+
 	var finalized bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -367,10 +381,22 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
 	}
 
+	for _, event := range newEvents {
+		if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), event.RunID.String(), &event).Publish(); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executionUpdates {
+		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string) (bool, string, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return false, "", err
@@ -411,6 +437,15 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 			"finished_at": &now,
 		}).
 		Error
+
+	if err != nil {
+		return false, "", err
+	}
+
+	err = NewRunCallbackDispatcher(tx, w.registry, run).
+		WithEventCollector(eventCollector).
+		WithExecutionCollector(executionCollector).
+		DispatchFinished()
 
 	if err != nil {
 		return false, "", err

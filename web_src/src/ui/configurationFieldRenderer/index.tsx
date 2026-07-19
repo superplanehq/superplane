@@ -471,6 +471,8 @@ function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
     field.type === "role" ||
     field.type === "group" ||
     field.type === "app" ||
+    field.type === "app-canvas-node" ||
+    field.type === "run-parameters" ||
     (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
   );
 }

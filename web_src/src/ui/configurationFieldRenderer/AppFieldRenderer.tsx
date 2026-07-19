@@ -17,6 +17,7 @@ interface AppFieldRendererProps {
 export function AppFieldRenderer({ field, value, onChange, organizationId, readOnly = false }: AppFieldRendererProps) {
   const { appId: currentAppId } = useParams<{ appId?: string }>();
   const { data: canvases, isLoading, error } = useCanvases(organizationId ?? "");
+  const allowSelf = field.typeOptions?.app?.allowSelf ?? false;
 
   const options: AutoCompleteOption[] = useMemo(() => {
     if (!canvases?.length) {
@@ -29,14 +30,18 @@ export function AppFieldRenderer({ field, value, onChange, organizationId, readO
           return false;
         }
 
-        return canvas.id !== currentAppId;
+        if (!allowSelf && canvas.id === currentAppId) {
+          return false;
+        }
+
+        return true;
       })
       .map((canvas) => ({
         value: canvas.id!,
         label: canvas.name!,
       }))
       .sort((left, right) => left.label.localeCompare(right.label));
-  }, [canvases, currentAppId]);
+  }, [allowSelf, canvases, currentAppId]);
 
   const selectedValue = useMemo(() => {
     if (!value) {
@@ -80,7 +85,9 @@ export function AppFieldRenderer({ field, value, onChange, organizationId, readO
           </SelectTrigger>
         </Select>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Create another app in this organization to subscribe to its events.
+          {allowSelf
+            ? "Select an app in this organization to invoke."
+            : "Create another app in this organization to subscribe to its events."}
         </p>
       </div>
     );

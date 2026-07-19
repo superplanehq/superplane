@@ -32,7 +32,7 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		return nil, grpcerrors.Internal(err, "failed to find run")
 	}
 
-	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, []uuid.UUID{run.ID})
+	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, []models.CanvasRun{*run})
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +43,8 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		runDetails.rootEventsByRunID[run.ID.String()],
 		runDetails.executionsByRunID[run.ID.String()],
 		runDetails.queueItemsByRunID[run.ID.String()],
+		parentRunForDescribe(runDetails.parentRunsByRunID, run.ID.String()),
+		runDetails.childRunsByExecutionID,
 	)
 	if err != nil {
 		return nil, err
@@ -51,4 +53,13 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 	return &pb.DescribeRunResponse{
 		Run: serializedRun,
 	}, nil
+}
+
+func parentRunForDescribe(parentRunsByRunID map[string]models.CanvasRun, runID string) *models.CanvasRun {
+	parent, ok := parentRunsByRunID[runID]
+	if !ok {
+		return nil
+	}
+
+	return &parent
 }

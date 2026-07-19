@@ -78,7 +78,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 		return nil, grpcerrors.Internal(err, "failed to load run")
 	}
 
-	runDetails, err := loadRunDetailsForRuns(ctx, workflowID, []uuid.UUID{run.ID})
+	runDetails, err := loadRunDetailsForRuns(ctx, workflowID, []models.CanvasRun{*run})
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +89,8 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 		runDetails.rootEventsByRunID[run.ID.String()],
 		runDetails.executionsByRunID[run.ID.String()],
 		runDetails.queueItemsByRunID[run.ID.String()],
+		run,
+		map[string][]models.CanvasRun{},
 	)
 	if err != nil {
 		return nil, err
