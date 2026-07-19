@@ -105,6 +105,46 @@ func Test__Canvas__DeleteRemainingResources__ReturnsIncompleteWhenFirstTypeExcee
 	support.VerifyNodeRequestCount(t, canvas.ID, 100)
 }
 
+func Test__Canvas__DeleteRemainingResources__ReturnsIncompleteWhenLastTypeExceedsLimit(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Type: models.NodeTypeTrigger},
+		},
+		nil,
+	)
+
+	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+
+	for range 600 {
+		run := models.CanvasRun{
+			ID:         uuid.New(),
+			WorkflowID: canvas.ID,
+			VersionID:  liveVersion.ID,
+			State:      models.CanvasRunStateFinished,
+			Result:     models.CanvasRunResultPassed,
+			FinishedAt: &now,
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
+		}
+		require.NoError(t, database.Conn().Create(&run).Error)
+	}
+
+	summary, complete, err := canvas.DeleteRemainingResources(database.Conn(), 500)
+	require.NoError(t, err)
+	require.False(t, complete)
+	require.Equal(t, &models.RunDeletionSummary{Runs: 500}, summary)
+
+	var remainingRuns int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("workflow_id = ?", canvas.ID).Count(&remainingRuns).Error)
+	require.Equal(t, int64(100), remainingRuns)
+}
+
 func createOrphanNodeRequests(t *testing.T, workflowID uuid.UUID, nodeID string, count int) {
 	t.Helper()
 

@@ -1,5 +1,5 @@
 {
-  "maxAllowedInTransactionDefinitions": 161,
+  "maxAllowedInTransactionDefinitions": 160,
   "maxAllowedDatabaseConnCalls": 188,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
@@ -34,7 +34,6 @@
     "pkg/models/canvas.go:FindCanvasInTransaction",
     "pkg/models/canvas.go:FindCanvasWithoutOrgScopeInTransaction",
     "pkg/models/canvas.go:FindUnscopedCanvasInTransaction",
-    "pkg/models/canvas.go:ListMaybeDeletedCanvasesByOrganizationInTransaction",
     "pkg/models/canvas.go:CountCanvasesByOrganizationInTransaction",
     "pkg/models/canvas_event.go:FindCanvasEventInTransaction",
     "pkg/models/canvas_event.go:ListCanvasEventsByIDsInTransaction",
@@ -354,5 +353,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-19T12:00:35Z"
+  "updatedAt": "2026-07-19T12:05:26Z"
 }

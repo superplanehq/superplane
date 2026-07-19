@@ -298,23 +298,6 @@ func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Canvas, error) {
-	var canvases []Canvas
-
-	// Organization teardown must include every workflow for the org when deciding
-	// whether cleanup can continue.
-	err := tx.
-		Unscoped().
-		Where("organization_id = ?", orgID).
-		Find(&canvases).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return canvases, nil
-}
-
 func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 
@@ -440,7 +423,7 @@ func (c *Canvas) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDele
 		resource.apply(count)
 	}
 
-	return summary, true, nil
+	return summary, summary.TotalRecords() < int64(maxRecords), nil
 }
 
 func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {
