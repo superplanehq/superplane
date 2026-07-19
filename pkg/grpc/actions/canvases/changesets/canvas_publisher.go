@@ -498,7 +498,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
 		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
-		Events:        contexts.NewEventContext(p.tx, node, nil),
+		Events:        contexts.NewEventContext(p.tx, node, nil, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}

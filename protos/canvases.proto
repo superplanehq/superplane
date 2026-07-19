@@ -693,6 +693,7 @@ message CanvasNodeExecutionRef {
   string result_message = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  repeated CanvasRunRef runs = 9;
 }
 
 //
@@ -870,9 +871,10 @@ message CanvasEvent {
 message CanvasRun {
   enum State {
     STATE_UNKNOWN = 0;
-    STATE_STARTED = 1;
-    STATE_FINISHED = 2;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
     STATE_CANCELLING = 3;
+    STATE_FINISHED = 4;
   }
 
   enum Result {
@@ -894,6 +896,14 @@ message CanvasRun {
   string version_id = 10;
   repeated CanvasNodeQueueItem queue_items = 11;
   google.protobuf.Timestamp cancelled_at = 12;
+  CanvasRunRef parent = 13;
+}
+
+message CanvasRunRef {
+  string id = 1;
+  string canvas_id = 2;
+  CanvasRun.State state = 3;
+  CanvasRun.Result result = 4;
 }
 
 message ListEventExecutionsRequest {

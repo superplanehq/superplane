@@ -56,7 +56,7 @@ func dispatchOnError(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEv
 	}
 
 	for i := range onErrorNodes {
-		eventCtx := NewEventContext(tx, &onErrorNodes[i], onNewEvents)
+		eventCtx := NewEventContext(tx, &onErrorNodes[i], nil, onNewEvents)
 		if err := eventCtx.Emit(onerror.PayloadType, payload); err != nil {
 			return err
 		}
