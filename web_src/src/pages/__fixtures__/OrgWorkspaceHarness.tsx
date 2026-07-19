@@ -8,6 +8,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { AppPage } from "@/pages/app";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { HomePage } from "@/pages/home";
+import { FreshOrgLandingPage } from "@/pages/home/__fixtures__/FreshOrgLandingPoc";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -115,6 +116,8 @@ export function OrgWorkspaceHarness({
                 >
                   <Route index element={<HomePage />} />
                   <Route path="apps/new" element={<NewAppPage />} />
+                  {/* Storybook-only POC landing; must stay above apps/:appId. */}
+                  <Route path="apps/welcome" element={<FreshOrgLandingPage />} />
                   <Route path="apps/:appId" element={<AppPage />} />
                 </Route>
               </Routes>
