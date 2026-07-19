@@ -182,6 +182,54 @@ func Test__CancelRun__NoOpForFinishedRun(t *testing.T) {
 	assert.Equal(t, pb.CanvasRun_STATE_FINISHED, response.Run.State)
 }
 
+func Test__CancelRun__ReturnsParentRefForSubRun(t *testing.T) {
+	r := support.Setup(t)
+
+	parentCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "runApp", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+	childCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "onRun", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	parentRootEvent := support.EmitCanvasEventForNode(t, parentCanvas.ID, "trigger", "default", nil)
+	parentRun := createStartedRun(t, parentRootEvent)
+	parentExecution := createRunExecution(t, parentRun, parentRootEvent.ID, "runApp", models.CanvasNodeExecutionResultPassed)
+
+	childRun := createSubRunRecord(
+		t,
+		childCanvas.ID,
+		"onRun",
+		&parentRun.ID,
+		&parentCanvas.ID,
+		&parentExecution.ID,
+		models.CanvasRunStateStarted,
+		models.CanvasRunResultPassed,
+	)
+	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onRun", "default", nil)
+	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	response, err := CancelRun(ctx, r.Organization.ID.String(), childCanvas.ID, childRun.ID)
+	require.NoError(t, err)
+	require.NotNil(t, response.Run.Parent)
+	assert.Equal(t, parentRun.ID.String(), response.Run.Parent.Id)
+	assert.Equal(t, parentCanvas.ID.String(), response.Run.Parent.CanvasId)
+	assert.NotEqual(t, childRun.ID.String(), response.Run.Parent.Id)
+}
+
 func Test__CancelRun__ReturnsNotFoundForMissingRun(t *testing.T) {
 	r := support.Setup(t)
 

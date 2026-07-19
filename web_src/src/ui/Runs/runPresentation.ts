@@ -2,6 +2,7 @@
 import type {
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  CanvasesCanvasRunRef,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   SuperplaneComponentsNode,
@@ -96,11 +97,15 @@ export function statusFiltersToApiFilters(filters: RunStatusFilter[]): {
 }
 
 export function getRunStatus(run: CanvasesCanvasRun): RunStatusKey {
-  if (run.state === "STATE_CANCELLING") return "cancelling";
-  if (run.state === "STATE_STARTED") return "running";
-  if (run.result === "RESULT_FAILED") return "failed";
-  if (run.result === "RESULT_CANCELLED") return "cancelled";
-  if (run.result === "RESULT_PASSED" || run.state === "STATE_FINISHED") return "passed";
+  return getRunRefStatus(run);
+}
+
+export function getRunRefStatus(ref: CanvasesCanvasRunRef): RunStatusKey {
+  if (ref.state === "STATE_PENDING" || ref.state === "STATE_STARTED") return "running";
+  if (ref.state === "STATE_CANCELLING") return "cancelling";
+  if (ref.result === "RESULT_FAILED") return "failed";
+  if (ref.result === "RESULT_CANCELLED") return "cancelled";
+  if (ref.result === "RESULT_PASSED" || ref.state === "STATE_FINISHED") return "passed";
   return "unknown";
 }
 

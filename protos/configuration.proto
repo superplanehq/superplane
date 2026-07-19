@@ -33,6 +33,18 @@ message TypeOptions {
   optional StringTypeOptions string = 11;
   optional ExpressionTypeOptions expression = 12;
   optional TextTypeOptions text = 13;
+  optional AppCanvasNodeTypeOptions app_canvas_node = 14;
+  optional AppTypeOptions app = 15;
+}
+
+message AppTypeOptions {
+  bool allow_self = 1;
+}
+
+message AppCanvasNodeTypeOptions {
+  repeated string node_types = 1;
+  repeated string component_types = 2;
+  repeated ParameterRef parameters = 3;
 }
 
 message NumberTypeOptions {

@@ -35,7 +35,7 @@ func Test__EventContext__Emit(t *testing.T) {
 	)
 
 	t.Run("rejects large payload", func(t *testing.T) {
-		ctx := NewEventContext(database.Conn(), &nodes[0], nil)
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil, nil)
 		largePayload := map[string]any{
 			"value": strings.Repeat("a", config.MaxPayloadSize()+100),
 		}
@@ -52,7 +52,7 @@ func Test__EventContext__Emit(t *testing.T) {
 			newEvents = append(newEvents, events...)
 		}
 
-		ctx := NewEventContext(database.Conn(), &nodes[0], onNewEvents)
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil, onNewEvents)
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 2}))
 		assert.Len(t, newEvents, 2)
