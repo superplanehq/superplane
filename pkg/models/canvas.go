@@ -269,9 +269,9 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListDeletedCanvases() ([]Canvas, error) {
+func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 	var canvases []Canvas
-	err := database.Conn().
+	err := db.
 		Model(&Canvas{}).
 		Unscoped().
 		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
@@ -396,5 +396,61 @@ func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64,
 		return 0, err
 	}
 
+	return count, nil
+}
+
+// DeleteRemainingResources removes workflow execution rows still scoped to this
+// canvas after all runs have been deleted via CanvasRun.DeleteChain.
+//
+// Run cleanup covers the normal path: events, executions, queue items, KVs, and
+// requests that belong to a run. This sweep is still required because some rows
+// are workflow-scoped but not run-scoped — notably trigger node requests created
+// without an execution_id (CanvasNode.CreateRequest). Orphan or inconsistent rows
+// (e.g. nil run_id from partial routing) are also cleared here before nodes and
+// the canvas row can be removed. Each call deletes at most maxRecords rows total,
+// using SQL LIMIT per resource type so large orphan sets cannot time out.
+func (c *Canvas) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDeletionSummary, bool, error) {
+	summary := &RunDeletionSummary{}
+
+	type remainingResource struct {
+		model any
+		apply func(int64)
+	}
+
+	resources := []remainingResource{
+		{model: &CanvasNodeRequest{}, apply: func(count int64) { summary.NodeRequests = count }},
+		{model: &CanvasNodeExecutionKV{}, apply: func(count int64) { summary.NodeExecutionKVs = count }},
+		{model: &CanvasNodeQueueItem{}, apply: func(count int64) { summary.NodeQueueItems = count }},
+		{model: &CanvasEvent{}, apply: func(count int64) { summary.Events = count }},
+		{model: &CanvasNodeExecution{}, apply: func(count int64) { summary.NodeExecutions = count }},
+		{model: &CanvasRun{}, apply: func(count int64) { summary.Runs = count }},
+	}
+
+	for _, resource := range resources {
+		if summary.TotalRecords() >= int64(maxRecords) {
+			return summary, false, nil
+		}
+
+		budget := maxRecords - int(summary.TotalRecords())
+		count, err := deleteRowsLimited(db, resource.model, budget, "workflow_id = ?", c.ID)
+		if err != nil {
+			return nil, false, err
+		}
+
+		resource.apply(count)
+	}
+
+	return summary, true, nil
+}
+
+func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {
+	var count int64
+	err := db.Model(&CanvasRun{}).
+		Where("workflow_id = ?", c.ID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
 	return count, nil
 }
