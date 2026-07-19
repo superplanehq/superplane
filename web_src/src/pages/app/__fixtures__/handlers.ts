@@ -1,7 +1,7 @@
 import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
 import defaultRaw from "./canvasAppResponses.json";
-import cleanCodeAssessmentReadme from "./repository/cleanCodeAssessment.README.md?raw";
+import softwareFactoryReadme from "./repository/softwareFactory.README.md?raw";
 
 // Shape of a captured fixture. Endpoint bodies are stored verbatim as the
 // live API returned them (after trimming GitHub webhook payloads and
@@ -28,11 +28,26 @@ export interface CanvasAppFixture {
   /** GET /api/v1/canvases/{canvasId}/versions?limit=1 */
   versionsLatest?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
   /** GET /api/v1/canvases/{canvasId}/runs (all pages collapsed into one) */
-  runs?: unknown;
-  /** GET /api/v1/canvases/{canvasId}/runs/{runId} */
-  runDetail?: unknown;
-  /** GET /api/v1/canvases/{canvasId}/events/{eventId}/executions */
-  executions?: unknown;
+  runs?: {
+    runs?: Array<Record<string, unknown>>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+  };
+  /**
+   * GET /api/v1/canvases/{canvasId}/runs/{runId}
+   * Prefer `runDetailsById` when multiple runs need distinct describe payloads.
+   */
+  runDetail?: { run?: Record<string, unknown> };
+  /** Per-run describe payloads keyed by run id. */
+  runDetailsById?: Record<string, { run?: Record<string, unknown> }>;
+  /**
+   * GET /api/v1/canvases/{canvasId}/events/{eventId}/executions
+   * Prefer `executionsByEventId` so each run's root event returns its own steps.
+   */
+  executions?: { executions?: unknown[] };
+  /** Per-root-event execution lists keyed by root event id. */
+  executionsByEventId?: Record<string, { executions?: unknown[] }>;
   /** GET /api/v1/canvases/{canvasId}/memory (real API returns `{items: []}`) */
   memory?: { items?: unknown[] };
   /** GET /api/v1/canvases/{canvasId}/repository/file?path=console.yaml */
@@ -62,14 +77,14 @@ const defaultConsoleYaml =
   capturedFixture.consoleYaml ??
   materializeConsoleSpec({
     canvasId: capturedFixture.canvasId,
-    canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Clean Code Assessment",
+    canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Software Factory",
     panels: [
       {
         id: "markdown-showcase",
         type: "markdown",
         content: {
-          title: "Markdown showcase",
-          body: cleanCodeAssessmentReadme,
+          title: "Software Factory",
+          body: softwareFactoryReadme,
           variables: [],
         },
       },
@@ -81,7 +96,7 @@ const defaultFixture = {
   ...capturedFixture,
   consoleYaml: defaultConsoleYaml,
   repositoryFileContents: {
-    "README.md": cleanCodeAssessmentReadme,
+    "README.md": softwareFactoryReadme,
     ...capturedFixture.repositoryFileContents,
   },
 } satisfies CanvasAppFixture;
@@ -170,23 +185,54 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     },
 
     // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).
-    { pattern: re(`${CANVAS}/runs/([^/]+)`), resolve: () => ({ json: fixture.runDetail ?? {} }) },
+    {
+      pattern: re(`${CANVAS}/runs/([^/]+)`),
+      resolve: (m) => {
+        const runId = m[1];
+        const byId = fixture.runDetailsById?.[runId];
+        if (byId) return { json: byId };
+        const listed = listRuns(fixture).find((run) => run.id === runId);
+        if (listed) return { json: { run: listed } };
+        return { json: fixture.runDetail ?? {} };
+      },
+    },
     // For paginated `?before=…` requests we return an empty page so React
     // Query's infinite-scroll stops after the first batch. Widgets that ask
     // for larger sets configure their own `limit`; the console tab captures
     // enough runs on the first page to satisfy the visible panels.
+    //
+    // Honor `states` / `results` filters (exploded form style) so the running-
+    // runs badge query (`states=STATE_STARTED`) does not see every run.
     {
       pattern: re(`${CANVAS}/runs`),
       resolve: (_m, url) => {
         if (url.searchParams.get("before")) {
           return { json: { runs: [], totalCount: 0, hasNextPage: false } };
         }
-        return { json: fixture.runs ?? { runs: [], totalCount: 0, hasNextPage: false } };
+        const runs = filterRuns(listRuns(fixture), url);
+        return {
+          json: {
+            runs,
+            totalCount: runs.length,
+            hasNextPage: false,
+            lastTimestamp:
+              typeof runs[runs.length - 1]?.createdAt === "string" ? runs[runs.length - 1]?.createdAt : undefined,
+          },
+        };
       },
     },
     {
       pattern: re(`${CANVAS}/events/([^/]+)/executions`),
-      resolve: () => ({ json: fixture.executions ?? { executions: [] } }),
+      resolve: (m) => {
+        const eventId = m[1];
+        const byEvent = fixture.executionsByEventId?.[eventId];
+        if (byEvent) return { json: byEvent };
+        // Legacy single-capture fallback used by older fixtures / RunInspection.
+        if (fixture.rootEventId && eventId === fixture.rootEventId) {
+          return { json: fixture.executions ?? { executions: [] } };
+        }
+        return { json: { executions: [] } };
+      },
     },
     // Real API shape is `{items: []}`; some legacy fixtures used `{memory: []}`
     // which no widget ever read successfully — normalize on `items` here.
@@ -236,16 +282,18 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
   ];
 }
 
-// Maps an API request to its fixture body. Returns `null` for anything that
-// isn't an API call (assets, HMR, etc.) so the caller falls back to the real
-// network.
-function resolveFixture(url: URL, routes: Route[]): FixtureResult {
-  for (const route of routes) {
+/** Match a registered canvas-app fixture route. Returns `null` when none match (no catch-all). */
+export function matchCanvasAppFixture(url: URL, fixture: CanvasAppFixture = defaultFixture): FixtureResult {
+  for (const route of buildRoutes(fixture)) {
     const match = route.pattern.exec(url.pathname);
     if (match) {
       return route.resolve(match, url);
     }
   }
+  return null;
+}
+
+function emptyCanvasApiCatchAll(url: URL): FixtureResult {
   // Safety net: any other API call degrades gracefully to an empty object
   // instead of escaping to the network.
   if (url.pathname.startsWith("/api") || url.pathname.startsWith("/admin/api")) {
@@ -254,13 +302,23 @@ function resolveFixture(url: URL, routes: Route[]): FixtureResult {
   return null;
 }
 
+function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
+  if ("text" in resolved) {
+    return new Response(resolved.text, { status: 200, headers: { "content-type": "text/plain" } });
+  }
+  return new Response(JSON.stringify(resolved.json), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 /**
  * Builds a `fetch` implementation that serves the captured canvas fixture
  * entirely in-process, falling back to `fallback` for non-API requests.
  *
  * The fixture is injected so different stories can render different apps
- * without touching this module. When omitted it defaults to the Clean Code
- * Assessment capture used by the `LiveCanvas`/`RunInspection` stories.
+ * without touching this module. When omitted it defaults to the Software
+ * Factory capture used by the `LiveCanvas`/`RunInspection` stories.
  *
  * We deliberately avoid MSW here: MSW intercepts via a Service Worker, which is
  * silently unavailable in non-secure contexts (e.g. opening Storybook through a
@@ -269,20 +327,13 @@ function resolveFixture(url: URL, routes: Route[]): FixtureResult {
  * data no matter how Storybook is accessed.
  */
 export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFixture = defaultFixture): typeof fetch {
-  const routes = buildRoutes(fixture);
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
-    const resolved = resolveFixture(url, routes);
+    const resolved = matchCanvasAppFixture(url, fixture) ?? emptyCanvasApiCatchAll(url);
     if (!resolved) {
       return fallback(input, init);
     }
-    if ("text" in resolved) {
-      return new Response(resolved.text, { status: 200, headers: { "content-type": "text/plain" } });
-    }
-    return new Response(JSON.stringify(resolved.json), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+    return fixtureResponse(resolved);
   };
   return impl as typeof fetch;
 }
@@ -291,6 +342,24 @@ function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
   return input.url;
+}
+
+function listRuns(fixture: CanvasAppFixture): Array<Record<string, unknown>> {
+  return (fixture.runs?.runs ?? []) as Array<Record<string, unknown>>;
+}
+
+function filterRuns(runs: Array<Record<string, unknown>>, url: URL): Array<Record<string, unknown>> {
+  const states = url.searchParams.getAll("states");
+  const results = url.searchParams.getAll("results");
+  return runs.filter((run) => {
+    if (states.length > 0 && !states.includes(String(run.state ?? ""))) {
+      return false;
+    }
+    if (results.length > 0 && !results.includes(String(run.result ?? ""))) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function resolveRepositoryFilePaths(fixture: CanvasAppFixture): string[] {
