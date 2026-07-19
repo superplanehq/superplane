@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,7 @@ const (
 type CanvasRun struct {
 	ID          uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID  uuid.UUID
+	NodeID      string
 	VersionID   uuid.UUID
 	State       string
 	Result      string
@@ -84,11 +86,24 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
 	if rootEvent.RunID != uuid.Nil {
-		return FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
+		run, err := FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := ensureCanvasRunNodeID(tx, run, rootEvent.NodeID); err != nil {
+			return nil, err
+		}
+
+		return run, nil
 	}
 
 	run, err := FindCanvasRunByRootEventInTransaction(tx, rootEvent.ID)
 	if err == nil {
+		if err := ensureCanvasRunNodeID(tx, run, rootEvent.NodeID); err != nil {
+			return nil, err
+		}
+
 		return run, nil
 	}
 
@@ -96,7 +111,7 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
-	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, CanvasRunStateStarted, "")
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.NodeID, CanvasRunStateStarted, "")
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +124,24 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 	return run, nil
 }
 
-func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+func ensureCanvasRunNodeID(tx *gorm.DB, run *CanvasRun, nodeID string) error {
+	if run.NodeID != "" || nodeID == "" {
+		return nil
+	}
+
+	if err := tx.Model(run).Update("node_id", nodeID).Error; err != nil {
+		return err
+	}
+
+	run.NodeID = nodeID
+	return nil
+}
+
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, state, result string) (*CanvasRun, error) {
+	if nodeID == "" {
+		return nil, fmt.Errorf("node id is required")
+	}
+
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
@@ -118,6 +150,7 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	now := time.Now()
 	run := &CanvasRun{
 		WorkflowID: workflowID,
+		NodeID:     nodeID,
 		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
