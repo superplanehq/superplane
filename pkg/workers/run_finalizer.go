@@ -382,7 +382,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	for _, event := range newEvents {
-		if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), event.RunID.String(), &event).Publish(); err != nil {
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
 			return err
 		}
 	}

@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationField } from "@/api-client";
 import { useCanvas } from "@/hooks/useCanvasData";
 
-import { AppCanvasNodeFieldRenderer, filterAppCanvasNodes, resolveAppCanvasId } from "./AppCanvasNodeFieldRenderer";
+import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
+import { filterAppCanvasNodes, resolveAppCanvasId } from "./appCanvasNodeField";
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: vi.fn(),

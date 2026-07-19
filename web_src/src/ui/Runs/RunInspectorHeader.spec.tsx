@@ -48,4 +48,27 @@ describe("RunInspectorHeader", () => {
 
     expect(screen.queryByRole("link", { name: "See parent" })).not.toBeInTheDocument();
   });
+
+  it("shows a disabled cancelling action while the run is stopping", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
+        <RunInspectorHeader
+          run={{
+            ...baseRun,
+            state: "STATE_CANCELLING",
+            result: "RESULT_UNKNOWN",
+          }}
+          title="Child run"
+          stepCount={1}
+          organizationId="org-1"
+          actionPending={false}
+          actionDisabled
+          onAction={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("Cancelling")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelling" })).toBeDisabled();
+  });
 });

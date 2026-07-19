@@ -89,7 +89,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 		runDetails.rootEventsByRunID[run.ID.String()],
 		runDetails.executionsByRunID[run.ID.String()],
 		runDetails.queueItemsByRunID[run.ID.String()],
-		run,
+		parentRunForDescribe(runDetails.parentRunsByRunID, run.ID.String()),
 		map[string][]models.CanvasRun{},
 	)
 	if err != nil {

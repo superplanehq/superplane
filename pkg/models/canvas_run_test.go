@@ -299,12 +299,25 @@ func createExecutionForRun(t *testing.T, run *models.CanvasRun, rootEventID uuid
 	return &execution
 }
 
+func subRunTestCanvasNodes(entrypoints ...string) []models.CanvasNode {
+	nodes := []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+	}
+	for _, nodeID := range entrypoints {
+		nodes = append(nodes, models.CanvasNode{
+			NodeID: nodeID,
+			Type:   models.NodeTypeComponent,
+		})
+	}
+	return nodes
+}
+
 func Test__ValidateSubRunCreationInTransaction__SameWorkflowDoesNotIncreaseCrossWorkflowDepth(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("run1", "run2"),
 		nil,
 	)
 
@@ -324,15 +337,15 @@ func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *
 	defer r.Close()
 
 	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runA"),
 		nil,
 	)
 	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runB"),
 		nil,
 	)
 	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runC"),
 		nil,
 	)
 
@@ -364,15 +377,15 @@ func Test__ValidateSubRunCreationInTransaction__WorkflowCycleAcrossApps(t *testi
 	defer r.Close()
 
 	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runA"),
 		nil,
 	)
 	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runB"),
 		nil,
 	)
 	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("runC"),
 		nil,
 	)
 
@@ -395,7 +408,7 @@ func Test__ValidateSubRunCreationInTransaction__EntrypointCycleWithinWorkflow(t 
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("run1", "run2"),
 		nil,
 	)
 
@@ -418,7 +431,7 @@ func Test__ValidateSubRunCreationInTransaction__SiblingSubRunsAllowRepeatedEntry
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		subRunTestCanvasNodes("forEach", "item"),
 		nil,
 	)
 
@@ -449,10 +462,15 @@ func createSubRun(
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
 	require.NoError(t, err)
 
+	effectiveNodeID := nodeID
+	if effectiveNodeID == "" {
+		effectiveNodeID = "trigger"
+	}
+
 	run := models.CanvasRun{
 		ID:                uuid.New(),
 		WorkflowID:        workflowID,
-		NodeID:            nodeID,
+		NodeID:            effectiveNodeID,
 		VersionID:         liveVersion.ID,
 		ParentRunID:       parentRunID,
 		ParentWorkflowID:  parentWorkflowID,

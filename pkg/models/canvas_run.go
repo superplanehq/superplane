@@ -907,18 +907,18 @@ func (r *CanvasRun) SupersedePendingEvents(tx *gorm.DB) ([]CanvasEvent, error) {
 	return events, nil
 }
 
-type canvasRunKey struct {
+type CanvasRunKey struct {
 	WorkflowID uuid.UUID
 	RunID      uuid.UUID
 }
 
-func FindCanvasRunsByKeysInTransaction(tx *gorm.DB, keys []canvasRunKey) ([]CanvasRun, error) {
+func FindCanvasRunsByKeysInTransaction(tx *gorm.DB, keys []CanvasRunKey) ([]CanvasRun, error) {
 	if len(keys) == 0 {
 		return []CanvasRun{}, nil
 	}
 
-	seen := make(map[canvasRunKey]struct{}, len(keys))
-	unique := make([]canvasRunKey, 0, len(keys))
+	seen := make(map[CanvasRunKey]struct{}, len(keys))
+	unique := make([]CanvasRunKey, 0, len(keys))
 	for _, key := range keys {
 		if key.WorkflowID == uuid.Nil || key.RunID == uuid.Nil {
 			continue
@@ -949,14 +949,14 @@ func FindCanvasRunsByKeysInTransaction(tx *gorm.DB, keys []canvasRunKey) ([]Canv
 	return runs, nil
 }
 
-func CollectParentRunKeys(runs []CanvasRun) []canvasRunKey {
-	keys := make([]canvasRunKey, 0)
+func CollectParentRunKeys(runs []CanvasRun) []CanvasRunKey {
+	keys := make([]CanvasRunKey, 0)
 	for _, run := range runs {
 		if run.ParentRunID == nil || run.ParentWorkflowID == nil {
 			continue
 		}
 
-		keys = append(keys, canvasRunKey{
+		keys = append(keys, CanvasRunKey{
 			WorkflowID: *run.ParentWorkflowID,
 			RunID:      *run.ParentRunID,
 		})

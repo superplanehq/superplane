@@ -45,16 +45,10 @@ func (c *OnRun) Documentation() string {
 
 func (c *OnRun) ExampleData() map[string]any {
 	return map[string]any{
-		"app": map[string]any{
-			"id":   "123",
-			"name": "Caller App",
-		},
-		"node": map[string]any{
-			"id":   "runApp",
-			"name": "Run App",
-		},
-		"payload": map[string]any{
-			"message": "Hello, World!",
+		"timestamp": "2026-07-19T12:00:00Z",
+		"type":      "app.invocation",
+		"data": map[string]any{
+			"parameter": "hello",
 		},
 	}
 }
@@ -93,7 +87,6 @@ func (c *OnRun) Configuration() []configuration.Field {
 												Label: "Boolean",
 												Value: configuration.FieldTypeBool,
 											},
-											// TODO: support other types
 										},
 									},
 								},
@@ -154,7 +147,6 @@ func (c *OnRun) Configuration() []configuration.Field {
 }
 
 func (c *OnRun) Setup(ctx core.TriggerContext) error {
-	// TODO: validate configuration for parameters is correct
 	return nil
 }
 
