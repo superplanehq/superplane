@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strconv"
@@ -154,13 +155,16 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
-	if field.TypeOptions != nil {
-		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
-			if obj, ok := asAnyMap(value); ok {
-				return b.resolveWithSchema(obj, field.TypeOptions.Object.Schema)
-			}
+	switch field.Type {
+	case configuration.FieldTypeObject:
+		return b.resolveObjectFieldValue(value, field)
+	case configuration.FieldTypeNumber, configuration.FieldTypeBool:
+		if text, ok := value.(string); ok {
+			return b.resolveTemplatePreservingWholeValue(text)
 		}
+	}
 
+	if field.TypeOptions != nil {
 		if field.TypeOptions.List != nil && field.TypeOptions.List.ItemDefinition != nil {
 			if list, ok := value.([]any); ok {
 				return b.resolveListItems(list, field.TypeOptions.List.ItemDefinition)
@@ -172,20 +176,16 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
+	itemField := configuration.Field{Type: itemDef.Type}
+	if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
+		itemField.TypeOptions = &configuration.TypeOptions{
+			Object: &configuration.ObjectTypeOptions{Schema: itemDef.Schema},
+		}
+	}
+
 	result := make([]any, len(list))
 	for i, item := range list {
-		if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
-			if itemMap, ok := asAnyMap(item); ok {
-				resolved, err := b.resolveWithSchema(itemMap, itemDef.Schema)
-				if err != nil {
-					return nil, fmt.Errorf("list item %d: %w", i, err)
-				}
-				result[i] = resolved
-				continue
-			}
-		}
-
-		resolved, err := b.resolveValue(item)
+		resolved, err := b.resolveFieldValue(item, itemField)
 		if err != nil {
 			return nil, fmt.Errorf("list item %d: %w", i, err)
 		}
@@ -195,25 +195,47 @@ func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configu
 	return result, nil
 }
 
+// resolveValue walks configuration values and stringifies every template result.
 func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
+	return b.walkResolvedValue(value, false)
+}
+
+// resolveValuePreservingTypes walks object/JSON trees and keeps native types
+// when a leaf is a whole {{ ... }} expression (e.g. JSON body numbers/bools).
+func (b *NodeConfigurationBuilder) resolveValuePreservingTypes(value any) (any, error) {
+	return b.walkResolvedValue(value, true)
+}
+
+func (b *NodeConfigurationBuilder) walkResolvedValue(value any, preserveTypes bool) (any, error) {
 	switch v := value.(type) {
 	case string:
+		if preserveTypes {
+			return b.resolveTemplatePreservingWholeValue(v)
+		}
 		return b.ResolveTemplateExpressions(v)
 
 	case map[string]any:
-		return b.resolve(v)
+		result := make(map[string]any, len(v))
+		for key, nested := range v {
+			resolved, err := b.walkResolvedValue(nested, preserveTypes)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
 
 	case map[string]string:
 		anyMap := make(map[string]any, len(v))
-		for key, value := range v {
-			anyMap[key] = value
+		for key, nested := range v {
+			anyMap[key] = nested
 		}
+		return b.walkResolvedValue(anyMap, preserveTypes)
 
-		return b.resolve(anyMap)
 	case []any:
 		result := make([]any, len(v))
 		for i, item := range v {
-			resolved, err := b.resolveValue(item)
+			resolved, err := b.walkResolvedValue(item, preserveTypes)
 			if err != nil {
 				return nil, err
 			}
@@ -224,6 +246,109 @@ func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 	default:
 		return v, nil
 	}
+}
+
+func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field configuration.Field) (any, error) {
+	normalized, err := b.normalizeObjectFieldInput(value)
+	if err != nil {
+		return nil, err
+	}
+
+	schema := objectFieldSchema(field)
+	if len(schema) == 0 {
+		return b.resolveValuePreservingTypes(normalized)
+	}
+
+	obj, ok := asAnyMap(normalized)
+	if !ok {
+		return nil, fmt.Errorf("object field must resolve to an object")
+	}
+
+	return b.resolveWithSchema(obj, schema)
+}
+
+func objectFieldSchema(field configuration.Field) []configuration.Field {
+	if field.TypeOptions == nil || field.TypeOptions.Object == nil {
+		return nil
+	}
+
+	return field.TypeOptions.Object.Schema
+}
+
+// normalizeObjectFieldInput turns an object field's stored value into a
+// structured value. Maps/arrays pass through; strings may be a whole
+// expression or a JSON template that still needs expression substitution.
+func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, error) {
+	if obj, ok := asAnyMap(value); ok {
+		return obj, nil
+	}
+	if list, ok := value.([]any); ok {
+		return list, nil
+	}
+
+	text, ok := value.(string)
+	if !ok {
+		return value, nil
+	}
+
+	resolved, err := b.resolveTemplatePreservingWholeValue(text)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedText, ok := resolved.(string)
+	if !ok {
+		return resolved, nil
+	}
+
+	decoded, err := decodeJSONValue(resolvedText)
+	if err != nil {
+		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
+	}
+
+	return decoded, nil
+}
+
+// resolveTemplatePreservingWholeValue returns the native expression result when
+// the entire string is a single {{ ... }} template; otherwise stringifies.
+func (b *NodeConfigurationBuilder) resolveTemplatePreservingWholeValue(value string) (any, error) {
+	if expression, ok := unwrapExpressionTemplate(value); ok {
+		return b.ResolveExpression(expression)
+	}
+
+	return b.ResolveTemplateExpressions(value)
+}
+
+func unwrapExpressionTemplate(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	matches := expressionRegex.FindStringSubmatch(trimmed)
+	if len(matches) != 2 || matches[0] != trimmed {
+		return "", false
+	}
+
+	expression := strings.TrimSpace(matches[1])
+	if expression == "" {
+		return "", false
+	}
+
+	return expression, true
+}
+
+func decodeJSONValue(value string) (any, error) {
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+
+	var decoded any
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return nil, fmt.Errorf("must contain a single JSON value")
+	}
+
+	return decoded, nil
 }
 
 func asAnyMap(value any) (map[string]any, bool) {
