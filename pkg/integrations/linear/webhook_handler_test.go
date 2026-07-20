@@ -118,6 +118,40 @@ func Test__WebhookHandler__Cleanup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	// A failed Setup (e.g. the API key owner is not a workspace admin) leaves the
+	// webhook record without a Linear id, so there is nothing to delete remotely.
+	t.Run("skips the API call when no webhook was ever created", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      WebhookMetadata{},
+				Configuration: WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests, "must not call Linear with an empty webhook id")
+	})
+
+	t.Run("skips the API call when metadata is absent entirely", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      map[string]any{},
+				Configuration: WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
+	})
+
 	t.Run("delete failure is surfaced", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

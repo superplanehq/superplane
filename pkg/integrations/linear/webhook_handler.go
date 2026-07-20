@@ -77,14 +77,19 @@ func (h *LinearWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 }
 
 func (h *LinearWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %v", err)
-	}
-
 	metadata := WebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode webhook metadata: %v", err)
+	}
+
+	// If the webhook was never created (Setup failed), there's nothing to clean up.
+	if metadata.ID == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
 	}
 
 	if err := client.DeleteWebhook(metadata.ID); err != nil {
