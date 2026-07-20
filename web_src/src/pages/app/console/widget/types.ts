@@ -383,7 +383,74 @@ export interface WidgetScorecardRender {
   changeCaption?: string;
 }
 
-export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender | WidgetScorecardRender;
+/**
+ * Palette accepted by `WidgetBoardLane.color`. Kept intentionally small
+ * (neutral + status-family tones); YAML stays stable across future
+ * Tailwind refactors thanks to `BOARD_LANE_STYLE` in `widget/boardLaneStyles.ts`.
+ */
+export type WidgetBoardLaneColor = "neutral" | "gray" | "blue" | "green" | "yellow" | "orange" | "red" | "purple";
+
+export const WIDGET_BOARD_LANE_COLORS: WidgetBoardLaneColor[] = [
+  "neutral",
+  "gray",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "red",
+  "purple",
+];
+
+/** One lane in a `WidgetBoardRender.lanes` list. */
+export interface WidgetBoardLane {
+  /** Value to match against `groupBy` (case-insensitive, trimmed). Required. */
+  value: string;
+  /** Optional lane header label; defaults to `value`. */
+  label?: string;
+  /** Optional lane color from the {@link WidgetBoardLaneColor} palette. */
+  color?: WidgetBoardLaneColor;
+}
+
+/** Card configuration for a board panel. */
+export interface WidgetBoardCard {
+  /** Row field to display as the card title. Required. */
+  titleField: string;
+  /**
+   * Optional additional card fields. Each entry reuses {@link WidgetTableColumn}
+   * semantics — `field`, optional `label`, `format`, `show`, and `href`.
+   */
+  fields?: WidgetTableColumn[];
+}
+
+export interface WidgetBoardRender {
+  kind: "board";
+  /** Required row field name used to group rows into lanes. */
+  groupBy: string;
+  /** Required list of lanes; at least one entry. */
+  lanes: WidgetBoardLane[];
+  /** Card display config. */
+  card: WidgetBoardCard;
+  /**
+   * When true, rows whose `groupBy` value does not match any configured
+   * lane render in a trailing "Other" lane instead of being hidden.
+   */
+  otherLane?: boolean;
+  /** Same structured filters as the table widget. */
+  where?: WidgetTableFilter[];
+  /** Optional widget-level sort applied to rows inside each lane. */
+  sort?: WidgetSort;
+  /** Optional row actions (trigger-only, same rules as the table widget). */
+  rowActions?: WidgetRowAction[];
+  /** Optional label rendered when no rows match the current filters. */
+  emptyMessage?: string;
+}
+
+export type WidgetRender =
+  | WidgetTableRender
+  | WidgetChartRender
+  | WidgetNumberRender
+  | WidgetScorecardRender
+  | WidgetBoardRender;
 
 export interface WidgetConfig {
   title?: string;

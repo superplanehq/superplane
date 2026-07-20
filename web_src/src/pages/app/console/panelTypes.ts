@@ -25,6 +25,7 @@ import {
 import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
+import { templateForBoardPanel, validateBoardContent } from "./boardPanelContent";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
@@ -38,6 +39,10 @@ import { validateScorecardContent } from "./scorecardRenderValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
+
+// Re-export board-panel types so callers keep going through this module.
+export type { BoardPanelContent } from "./boardPanelContent";
+export { templateForBoardPanel, validateBoardContent, normalizeBoardPanelContent } from "./boardPanelContent";
 
 // Re-export runs filter schema helpers so existing import paths keep working.
 export {
@@ -53,7 +58,17 @@ export {
 export { asObject };
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"] as const;
+export const PANEL_TYPES = [
+  "markdown",
+  "html",
+  "node",
+  "nodes",
+  "table",
+  "board",
+  "chart",
+  "number",
+  "scorecard",
+] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 /**
@@ -101,6 +116,12 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "table",
     label: "Table",
     description: "List rows from canvas executions or memory, with optional row actions.",
+  },
+  board: {
+    type: "board",
+    label: "Board",
+    description:
+      "Kanban-style board grouping table rows into status lanes. Same data sources and filters as the table panel.",
   },
   chart: {
     type: "chart",
@@ -324,6 +345,8 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
         dataSource: { kind: "memory", namespace: "" },
         render: DEFAULT_TABLE_RENDER,
       } satisfies TablePanelContent;
+    case "board":
+      return { ...templateForBoardPanel(defaultTitle) };
     case "chart":
       return {
         title: defaultTitle ?? "",
@@ -367,6 +390,8 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateNodesContent(content);
     case "table":
       return validateTableContent(content);
+    case "board":
+      return validateBoardContent(content);
     case "chart":
       return validateChartContent(content);
     case "number":
