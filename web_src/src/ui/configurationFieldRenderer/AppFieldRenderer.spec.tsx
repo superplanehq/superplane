@@ -18,20 +18,27 @@ vi.mock("@/hooks/useCanvasData", () => ({
 
 const mockUseCanvases = vi.mocked(useCanvases);
 
-function appField(): ConfigurationField {
+function appField(overrides: Partial<ConfigurationField> = {}): ConfigurationField {
   return {
     name: "app",
     label: "Source app",
     type: "app",
+    ...overrides,
   };
 }
 
-function ControlledRenderer({ initialValue }: { initialValue?: string }) {
+function ControlledRenderer({
+  initialValue,
+  field = appField(),
+}: {
+  initialValue?: string;
+  field?: ConfigurationField;
+}) {
   const [value, setValue] = useState<string | undefined>(initialValue);
   return (
     <>
       <span data-testid="current-value">{value ?? ""}</span>
-      <AppFieldRenderer field={appField()} value={value} onChange={setValue} organizationId="org-1" />
+      <AppFieldRenderer field={field} value={value} onChange={setValue} organizationId="org-1" />
     </>
   );
 }
@@ -49,13 +56,30 @@ beforeEach(() => {
 });
 
 describe("AppFieldRenderer", () => {
-  it("excludes the current app from selectable options", async () => {
+  it("excludes the current app from selectable options by default", async () => {
     render(<ControlledRenderer />);
 
     await userEvent.click(screen.getByRole("combobox"));
     expect(screen.getByText("Billing Alerts")).toBeInTheDocument();
     expect(screen.getByText("Customer Onboarding")).toBeInTheDocument();
     expect(screen.queryByText("Current App")).not.toBeInTheDocument();
+  });
+
+  it("includes the current app when allowSelf is enabled", async () => {
+    render(
+      <ControlledRenderer
+        field={appField({
+          typeOptions: {
+            app: {
+              allowSelf: true,
+            },
+          },
+        })}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+    expect(screen.getByText("Current App")).toBeInTheDocument();
   });
 
   it("stores the selected app id", async () => {

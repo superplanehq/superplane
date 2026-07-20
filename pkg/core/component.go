@@ -47,6 +47,7 @@ type ExecutionContext struct {
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
+	Runs           RunExecutionContext
 }
 
 type AppExecutionContext interface {
