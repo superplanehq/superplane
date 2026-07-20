@@ -90,7 +90,7 @@ type brokerCreateTaskRequest struct {
 	RunMode                 string                      `json:"run_mode,omitempty"`
 	Script                  string                      `json:"script,omitempty"`
 	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
-	Commands                []string                    `json:"commands,omitempty"`
+	Commands                []BrokerCommand             `json:"commands,omitempty"`
 	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
@@ -98,6 +98,63 @@ type brokerCreateTaskRequest struct {
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
+}
+
+// BrokerCommand is one command_list entry. JSON is a plain string when Name is
+// empty, or {"name","command"} when Name is set (task-broker accepts both).
+type BrokerCommand struct {
+	Name    string `json:"name,omitempty"`
+	Command string `json:"command"`
+}
+
+func (c BrokerCommand) MarshalJSON() ([]byte, error) {
+	name := strings.TrimSpace(c.Name)
+	command := strings.TrimSpace(c.Command)
+	if name == "" {
+		return json.Marshal(command)
+	}
+	return json.Marshal(struct {
+		Name    string `json:"name"`
+		Command string `json:"command"`
+	}{Name: name, Command: command})
+}
+
+func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		*c = BrokerCommand{}
+		return nil
+	}
+	if data[0] == '"' {
+		var command string
+		if err := json.Unmarshal(data, &command); err != nil {
+			return err
+		}
+		*c = BrokerCommand{Command: strings.TrimSpace(command)}
+		return nil
+	}
+	var raw struct {
+		Name    string `json:"name"`
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*c = BrokerCommand{Name: strings.TrimSpace(raw.Name), Command: strings.TrimSpace(raw.Command)}
+	return nil
+}
+
+// BrokerCommandsFromLines adapts plain shell lines into unnamed broker commands.
+func BrokerCommandsFromLines(lines []string) []BrokerCommand {
+	out := make([]BrokerCommand, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out = append(out, BrokerCommand{Command: line})
+	}
+	return out
 }
 
 // BrokerEnvironmentVariable is forwarded to the task broker as JSON.
@@ -118,7 +175,7 @@ type CreateTaskParams struct {
 	RunMode                 string
 	Script                  string
 	MessageChain            json.RawMessage
-	Commands                []string
+	Commands                []BrokerCommand
 	SetupCommands           []string
 	WebhookURL              string
 	WebhookPayloadSizeLimit int
