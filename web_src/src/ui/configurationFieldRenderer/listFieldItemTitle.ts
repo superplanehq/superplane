@@ -10,6 +10,10 @@ export function listFieldItemTitle(item: unknown, index: number, itemLabel: stri
     const type = typeof record.type === "string" ? record.type.trim() : "";
     if (type) {
       const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+      // Generic container labels ("Step", "Item") read better as just the type.
+      if (itemLabel === "Step" || itemLabel === "Item") {
+        return typeLabel;
+      }
       return `${itemLabel} (${typeLabel})`;
     }
   }
