@@ -680,3 +680,34 @@ func (c *AppContext) Unsubscribe() error {
 	c.UnsubscribeCalls++
 	return nil
 }
+
+type RunExecutionContext struct {
+	CreateRunID      uuid.UUID
+	CreateErr        error
+	CancelErr        error
+	CancelCalled     bool
+	LastCreateParams *core.RunCreationParams
+}
+
+func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
+	if c.CreateErr != nil {
+		return nil, c.CreateErr
+	}
+
+	runID := c.CreateRunID
+	if runID == uuid.Nil {
+		runID = uuid.New()
+	}
+
+	c.LastCreateParams = &params
+
+	return &core.Run{
+		ID:    runID,
+		AppID: uuid.MustParse(params.App),
+	}, nil
+}
+
+func (c *RunExecutionContext) Cancel() error {
+	c.CancelCalled = true
+	return c.CancelErr
+}

@@ -2,6 +2,7 @@ import type { CanvasesCanvasRunRef } from "@/api-client";
 import type { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatDuration } from "@/lib/duration";
 import { appRunPath } from "@/lib/appPaths";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap, getTriggerRenderer } from ".";
@@ -19,6 +20,13 @@ import type {
 type RunAppMetadata = {
   app?: AppMetadata;
   node?: NodeMetadata;
+};
+
+type RunAppConfiguration = {
+  app?: string;
+  node?: string;
+  parameters?: Record<string, unknown>;
+  timeout?: number;
 };
 
 type NodeMetadata = {
@@ -62,8 +70,12 @@ export const runAppStateFunction: StateFunction = (execution: ExecutionInfo): Ev
 
   const metadata = execution.metadata as RunAppExecutionMetadata;
   const runResult = metadata?.run?.result;
-  if (runResult === "failed") {
+  if (runResult === "failed" || runResult === "cancelled") {
     return "failed";
+  }
+
+  if (runResult === "passed") {
+    return "success";
   }
 
   return "success";
@@ -162,12 +174,22 @@ function resolveChildRun(
 function runAppMetadataList(node: NodeInfo): MetadataItem[] {
   const metadataList: MetadataItem[] = [];
   const metadata = node.metadata as RunAppMetadata | undefined;
+  const configuration = node.configuration as RunAppConfiguration | undefined;
+
   if (metadata?.app) {
     metadataList.push({ icon: "layout-grid", label: metadata.app.name });
   }
 
   if (metadata?.node) {
     metadataList.push({ icon: "workflow", label: metadata.node.name });
+  }
+
+  const timeout = configuration?.timeout;
+  if (timeout && timeout > 0) {
+    metadataList.push({
+      icon: "clock",
+      label: `Timeout: ${formatDuration(timeout * 1000) || `${timeout}s`}`,
+    });
   }
 
   return metadataList;
