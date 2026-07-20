@@ -222,6 +222,19 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		memoryChangedCanvasID = canvasID
 	}
 
+	type pendingRunRef struct {
+		workflowID uuid.UUID
+		runID      uuid.UUID
+	}
+
+	pendingRuns := []pendingRunRef{}
+	onPendingRunCreated := func(workflowID, runID uuid.UUID) {
+		pendingRuns = append(pendingRuns, pendingRunRef{
+			workflowID: workflowID,
+			runID:      runID,
+		})
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -258,7 +271,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -281,6 +294,12 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	for _, pendingRun := range pendingRuns {
+		if err := messages.NewCanvasRunMessage(pendingRun.workflowID.String(), pendingRun.runID.String()).PublishPending(); err != nil {
+			w.logger.Errorf("failed to publish pending run RabbitMQ message: %v", err)
+		}
+	}
+
 	if memoryChangedCanvasID != uuid.Nil {
 		if err := messages.NewCanvasMemoryUpdatedMessage(memoryChangedCanvasID.String()).PublishMemoryUpdated(); err != nil {
 			w.logger.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
@@ -290,7 +309,14 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
-func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent), onMemoryChanged func(uuid.UUID)) error {
+func (w *NodeExecutor) executeActionNode(
+	tx *gorm.DB,
+	execution *models.CanvasNodeExecution,
+	node *models.CanvasNode,
+	onNewEvents func([]models.CanvasEvent),
+	onMemoryChanged func(uuid.UUID),
+	onPendingRunCreated func(workflowID, runID uuid.UUID),
+) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -356,7 +382,9 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
-		Apps:        contexts.NewAppExecutionContext(tx, workflow, node),
+		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
+		Runs: contexts.NewRunExecutionContext(tx, workflow, node, execution).
+			WithPendingRunCreated(onPendingRunCreated),
 	}
 
 	if node.AppInstallationID != nil {

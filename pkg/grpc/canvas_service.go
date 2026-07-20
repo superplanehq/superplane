@@ -234,6 +234,21 @@ func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequ
 	return canvases.DescribeRun(ctx, s.registry, canvasID, req.RunId)
 }
 
+func (s *CanvasService) CancelRun(ctx context.Context, req *pb.CancelRunRequest) (*pb.CancelRunResponse, error) {
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas id")
+	}
+
+	runID, err := uuid.Parse(req.RunId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid run id")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CancelRun(ctx, organizationID, canvasID, runID)
+}
+
 func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanvasMemoriesRequest) (*pb.ListCanvasMemoriesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.ListCanvasMemories(ctx, s.registry, organizationID, req.CanvasId)

@@ -1,5 +1,5 @@
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 const RUNNER_COMPONENTS = new Set(["runner", "runnerBash", "runnerJS", "runnerPython", "runnerClaudeCode"]);
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";

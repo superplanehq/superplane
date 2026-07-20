@@ -114,6 +114,13 @@ function getTimeGateCustomField(context: ComponentBaseContext): React.ReactNode 
 
 export const TIME_GATE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
+  cancelling: {
+    icon: "refresh-cw",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
+    label: "Cancelling",
+  },
   waiting: {
     icon: "clock",
     textColor: "text-gray-800",
@@ -147,6 +154,10 @@ export const timeGateStateFunction: StateFunction = (execution: ExecutionInfo): 
 
   if (execution.result === "RESULT_CANCELLED") {
     return "cancelled";
+  }
+
+  if (execution.state === "STATE_CANCELLING") {
+    return "cancelling";
   }
 
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {

@@ -2,6 +2,7 @@
 import type {
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  CanvasesCanvasRunRef,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   SuperplaneComponentsNode,
@@ -14,7 +15,13 @@ import { RUN_STATUS_FILTER_IDS, type RunStatusFilter } from "./runStatusFilterVo
 
 export type { RunStatusFilter };
 export type RunResultFilter = Exclude<RunStatusFilter, "running">;
-export type RunStatusKey = RunStatusFilter | "unknown";
+export type RunStatusKey = RunStatusFilter | "cancelling" | "unknown";
+
+export const ACTIVE_RUN_API_STATES = [
+  "STATE_PENDING",
+  "STATE_STARTED",
+  "STATE_CANCELLING",
+] as const satisfies readonly CanvasesCanvasRunState[];
 
 const RUN_STATUS_FILTER_OPTION_META: Record<RunStatusFilter, { label: string; dotClassName: string }> = {
   running: { label: "Running", dotClassName: "bg-blue-500" },
@@ -31,6 +38,12 @@ export const RUN_STATUS_META = {
     label: "Running",
     badgeClassName: "bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300",
     dotClassName: "bg-blue-500 animate-pulse",
+    icon: Clock,
+  },
+  cancelling: {
+    label: "Cancelling",
+    badgeClassName: "bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300",
+    dotClassName: "bg-amber-500 animate-pulse",
     icon: Clock,
   },
   failed: {
@@ -81,7 +94,7 @@ export function statusFiltersToApiFilters(filters: RunStatusFilter[]): {
     cancelled: "RESULT_CANCELLED",
   };
 
-  const states: CanvasesCanvasRunState[] = filters.includes("running") ? ["STATE_STARTED"] : [];
+  const states: CanvasesCanvasRunState[] = filters.includes("running") ? [...ACTIVE_RUN_API_STATES] : [];
   const results = filters
     .filter((filter): filter is RunResultFilter => filter !== "running")
     .map((filter) => resultByFilter[filter]);
@@ -90,39 +103,64 @@ export function statusFiltersToApiFilters(filters: RunStatusFilter[]): {
 }
 
 export function getRunStatus(run: CanvasesCanvasRun): RunStatusKey {
-  if (run.state === "STATE_STARTED") return "running";
-  if (run.result === "RESULT_FAILED") return "failed";
-  if (run.result === "RESULT_CANCELLED") return "cancelled";
-  if (run.result === "RESULT_PASSED" || run.state === "STATE_FINISHED") return "passed";
+  return getRunRefStatus(run);
+}
+
+export function getRunRefStatus(ref: CanvasesCanvasRunRef): RunStatusKey {
+  if (ref.state === "STATE_PENDING" || ref.state === "STATE_STARTED") return "running";
+  if (ref.state === "STATE_CANCELLING") return "cancelling";
+  if (ref.result === "RESULT_FAILED") return "failed";
+  if (ref.result === "RESULT_CANCELLED") return "cancelled";
+  if (ref.result === "RESULT_PASSED" || ref.state === "STATE_FINISHED") return "passed";
   return "unknown";
 }
 
+function getExecutionStatusLabel(execution: CanvasesCanvasNodeExecutionRef) {
+  if (execution.state === "STATE_PENDING") return "Pending";
+  if (execution.state === "STATE_CANCELLING") return "Cancelling";
+  if (execution.state === "STATE_STARTED") return "Running";
+  if (execution.result === "RESULT_FAILED") return "Failed";
+  if (execution.result === "RESULT_CANCELLED") return "Cancelled";
+  if (execution.result === "RESULT_PASSED") return "Passed";
+  return "Unknown";
+}
+
 export function getExecutionStatus(execution: CanvasesCanvasNodeExecutionRef) {
+  const statusLabel = getExecutionStatusLabel(execution);
+
+  if (execution.state === "STATE_CANCELLING") {
+    return {
+      label: statusLabel,
+      className: "bg-amber-50 text-amber-800 ring-amber-200",
+      dotClassName: "bg-amber-500 animate-pulse",
+    };
+  }
+
   if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
     return {
-      label: execution.state === "STATE_PENDING" ? "Pending" : "Running",
+      label: statusLabel,
       className: "bg-blue-50 text-blue-700 ring-blue-200",
       dotClassName: "bg-blue-500",
     };
   }
 
   if (execution.result === "RESULT_FAILED") {
-    return { label: "Failed", className: "bg-red-50 text-red-700 ring-red-200", dotClassName: "bg-red-500" };
+    return { label: statusLabel, className: "bg-red-50 text-red-700 ring-red-200", dotClassName: "bg-red-500" };
   }
 
   if (execution.result === "RESULT_CANCELLED") {
-    return { label: "Cancelled", className: "bg-gray-100 text-gray-700 ring-gray-200", dotClassName: "bg-gray-400" };
+    return { label: statusLabel, className: "bg-gray-100 text-gray-700 ring-gray-200", dotClassName: "bg-gray-400" };
   }
 
   if (execution.result === "RESULT_PASSED" || execution.state === "STATE_FINISHED") {
     return {
-      label: "Passed",
+      label: statusLabel,
       className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
       dotClassName: "bg-emerald-500",
     };
   }
 
-  return { label: "Unknown", className: "bg-slate-100 text-slate-600 ring-slate-200", dotClassName: "bg-slate-300" };
+  return { label: statusLabel, className: "bg-slate-100 text-slate-600 ring-slate-200", dotClassName: "bg-slate-300" };
 }
 
 export function buildNodeMap(workflowNodes: SuperplaneComponentsNode[]) {

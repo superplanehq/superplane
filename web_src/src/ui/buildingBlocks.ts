@@ -198,7 +198,7 @@ function isRunnerBlock(component: { name?: string }): boolean {
   );
 }
 
-const SUPERPLANE_BLOCK_NAMES = new Set(["onbroadcast", "broadcastmessage"]);
+const SUPERPLANE_BLOCK_NAMES = new Set(["onbroadcast", "broadcastmessage", "onrun", "runapp"]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
   return SUPERPLANE_BLOCK_NAMES.has((component.name || "").toLowerCase());

@@ -230,6 +230,12 @@ export const runningRun: CanvasesCanvasRun = {
   },
 };
 
+export const cancellingRun: CanvasesCanvasRun = {
+  ...runningRun,
+  id: "run-cancelling",
+  state: "STATE_CANCELLING",
+};
+
 export const workflowNodes: SuperplaneComponentsNode[] = [
   {
     id: "trigger-1",

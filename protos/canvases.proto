@@ -311,6 +311,18 @@ service Canvases {
     };
   }
 
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/runs/{run_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a run";
+      description: "Requests cancellation of a run and its active work";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -681,6 +693,7 @@ message CanvasNodeExecutionRef {
   string result_message = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  repeated CanvasRunRef runs = 9;
 }
 
 //
@@ -693,6 +706,7 @@ message CanvasNodeExecution {
     STATE_PENDING = 1;
     STATE_STARTED = 2;
     STATE_FINISHED = 3;
+    STATE_CANCELLING = 4;
   }
 
   enum Result {
@@ -724,6 +738,7 @@ message CanvasNodeExecution {
   CanvasEvent root_event = 14;
   UserRef cancelled_by = 15;
   string run_id = 16;
+  google.protobuf.Timestamp cancelled_at = 17;
 }
 
 message CanvasNodeQueueItem {
@@ -776,6 +791,15 @@ message DescribeRunRequest {
 }
 
 message DescribeRunResponse {
+  CanvasRun run = 1;
+}
+
+message CancelRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message CancelRunResponse {
   CanvasRun run = 1;
 }
 
@@ -847,8 +871,10 @@ message CanvasEvent {
 message CanvasRun {
   enum State {
     STATE_UNKNOWN = 0;
-    STATE_STARTED = 1;
-    STATE_FINISHED = 2;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_CANCELLING = 3;
+    STATE_FINISHED = 4;
   }
 
   enum Result {
@@ -869,6 +895,15 @@ message CanvasRun {
   google.protobuf.Timestamp finished_at = 9;
   string version_id = 10;
   repeated CanvasNodeQueueItem queue_items = 11;
+  google.protobuf.Timestamp cancelled_at = 12;
+  CanvasRunRef parent = 13;
+}
+
+message CanvasRunRef {
+  string id = 1;
+  string canvas_id = 2;
+  CanvasRun.State state = 3;
+  CanvasRun.Result result = 4;
 }
 
 message ListEventExecutionsRequest {

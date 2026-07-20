@@ -248,6 +248,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onToggleAutoFocus?: () => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
@@ -1554,6 +1556,8 @@ function CanvasPage(props: CanvasPageProps) {
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
                   autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                  isAutoFocusEnabled={props.isAutoFocusEnabled}
+                  onToggleAutoFocus={props.onToggleAutoFocus}
                   readOnly={props.readOnly}
                   logEntries={props.logEntries}
                   focusRequest={props.focusRequest}
@@ -1860,7 +1864,6 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
-      domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
         getCustomField && state.componentSidebar.selectedNodeId
           ? getCustomField(
@@ -2166,6 +2169,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  isAutoFocusEnabled = true,
+  onToggleAutoFocus,
   readOnly,
   logEntries = [],
   focusRequest,
@@ -2220,6 +2225,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onToggleAutoFocus?: () => void;
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -2546,6 +2553,12 @@ function CanvasContent({
         selected: node.id === focusRequest.nodeId,
       })),
     );
+    // Auto-focus toggle: when disabled, still record the focus request as handled
+    // (so re-enabling later does not replay a stale request) and let the sidebar/
+    // selection update above stand, but keep the viewport where the user left it.
+    if (!isAutoFocusEnabled) {
+      return;
+    }
     void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
       () => {
         const nextViewport = getViewport();
@@ -2560,6 +2573,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasReactFlowInitialized,
+    isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
     runCanvasNodeIdsKey,
@@ -2757,7 +2771,10 @@ function CanvasContent({
     const last = lastFitAllRequestRef.current;
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
+    // Consume the nonce so re-enabling auto-focus later does not retroactively
+    // replay this run's participant fit. The viewport stays where the user is.
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
+    if (!isAutoFocusEnabled) return;
     let timeoutId: number | null = null;
     const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
@@ -2799,6 +2816,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasFitToViewRef,
+    isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
     viewportRef,
@@ -3295,6 +3313,8 @@ function CanvasContent({
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
                   }
+                  isAutoFocusEnabled={isAutoFocusEnabled}
+                  onAutoFocusToggle={onToggleAutoFocus}
                 >
                   {zoomSliderContent}
                 </ZoomSlider>

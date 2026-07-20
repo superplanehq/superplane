@@ -195,6 +195,7 @@ export function useCanvasWebsocket(
           break;
         case "execution_created":
         case "execution_started":
+        case "execution_cancelling":
         case "execution_finished":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const execution = payload as CanvasesCanvasNodeExecution;
@@ -234,6 +235,7 @@ export function useCanvasWebsocket(
           }
           break;
         case "run_started":
+        case "run_cancelling":
         case "run_finished": {
           const run = payload as CanvasesCanvasRun;
           if (!run.canvasId || run.canvasId !== canvasId) {
