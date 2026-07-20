@@ -93,11 +93,19 @@ type brokerCreateTaskRequest struct {
 	Commands                []BrokerCommand             `json:"commands,omitempty"`
 	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
+	Files                   []BrokerTaskFile            `json:"files,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
 	WebhookPayloadSizeLimit int                         `json:"webhook_payload_size_limit"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
+}
+
+// BrokerTaskFile is materialized under SUPERPLANE_TASK_DIR before execution.
+type BrokerTaskFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Mode    string `json:"mode,omitempty"`
 }
 
 // BrokerCommand is one command_list entry. JSON is a plain string when Name is
@@ -180,6 +188,7 @@ type CreateTaskParams struct {
 	WebhookURL              string
 	WebhookPayloadSizeLimit int
 	Environment             []BrokerEnvironmentVariable
+	Files                   []BrokerTaskFile
 	ExecutionMode           string
 	DockerImage             string
 	TimeoutSeconds          int // 0 = DefaultExecutionTimeoutSeconds
@@ -213,6 +222,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		Commands:                p.Commands,
 		SetupCommands:           p.SetupCommands,
 		Environment:             p.Environment,
+		Files:                   p.Files,
 		WebhookURL:              p.WebhookURL,
 		WebhookPayloadSizeLimit: webhookPayloadSizeLimit,
 		ExecutionMode:           mode,
