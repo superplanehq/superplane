@@ -171,8 +171,7 @@ function normalizeBoardSort(raw: unknown): { field: string; order?: "asc" | "des
   if (!obj) return undefined;
   const field = typeof obj.field === "string" ? obj.field.trim() : "";
   if (!field) return undefined;
-  const order: "asc" | "desc" | undefined =
-    obj.order === "desc" ? "desc" : obj.order === "asc" ? "asc" : undefined;
+  const order: "asc" | "desc" | undefined = obj.order === "desc" ? "desc" : obj.order === "asc" ? "asc" : undefined;
   return order ? { field, order } : { field };
 }
 
@@ -200,25 +199,31 @@ export function validateBoardContent(content: unknown): string | null {
   if (!render) return "render must be an object.";
   if (render.kind !== "board") return 'render.kind must be "board".';
 
+  return validateBoardRender(render);
+}
+
+function validateBoardRender(render: Record<string, unknown>): string | null {
   if (typeof render.groupBy !== "string" || render.groupBy.trim() === "") {
     return "render.groupBy must be a non-empty string.";
   }
   const lanesError = validateLanes(render.lanes);
   if (lanesError) return lanesError;
-
-  if (render.otherLane !== undefined && render.otherLane !== null && typeof render.otherLane !== "boolean") {
-    return "render.otherLane must be a boolean.";
-  }
-
+  const otherLaneError = validateOtherLane(render.otherLane);
+  if (otherLaneError) return otherLaneError;
   const cardError = validateCard(render.card);
   if (cardError) return cardError;
-
   return (
     validateBoardWhere(render.where) ??
     validateSort(render.sort) ??
     validateBoardRowActions(render.rowActions) ??
     optionalStringError("render.emptyMessage", render.emptyMessage)
   );
+}
+
+function validateOtherLane(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "boolean") return "render.otherLane must be a boolean.";
+  return null;
 }
 
 function validateLanes(raw: unknown): string | null {

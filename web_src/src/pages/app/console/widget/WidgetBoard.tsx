@@ -12,7 +12,8 @@ import { resolveCellValue } from "./resolveCellValue";
 import { evaluateRowShow } from "./rowVisibility";
 import { applySort } from "./widgetData";
 import { WidgetBoardCardField } from "./WidgetBoardCardField";
-import { WidgetRowActionButton, rowKeyForRow } from "./WidgetRowActionButton";
+import { WidgetRowActionButton } from "./WidgetRowActionButton";
+import { rowKeyForRow } from "./rowKey";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import type { WidgetBoardLane, WidgetBoardRender, WidgetRowAction } from "./types";
 
@@ -166,13 +167,7 @@ function BoardLane({
           <p className="p-2 text-center text-[11px] text-slate-400 dark:text-gray-500">Empty lane</p>
         ) : (
           bucket.rows.map((row, idx) => (
-            <BoardCard
-              key={rowKeyForRow(row, idx)}
-              row={row}
-              index={idx}
-              rowActions={rowActions}
-              render={render}
-            />
+            <BoardCard key={rowKeyForRow(row, idx)} row={row} index={idx} rowActions={rowActions} render={render} />
           ))
         )}
       </div>

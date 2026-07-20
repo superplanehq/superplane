@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  normalizeBoardPanelContent,
-  templateForBoardPanel,
-  validateBoardContent,
-} from "./boardPanelContent";
+import { normalizeBoardPanelContent, templateForBoardPanel, validateBoardContent } from "./boardPanelContent";
 
 const validBoardBody = () => ({
   title: "Pipeline",
@@ -135,11 +131,7 @@ describe("normalizeBoardPanelContent", () => {
         ],
         card: {
           titleField: "title",
-          fields: [
-            { field: "pr_url", format: "link", extras: 1 },
-            { field: "" },
-            "not-an-object",
-          ],
+          fields: [{ field: "pr_url", format: "link", extras: 1 }, { field: "" }, "not-an-object"],
         },
       },
     });

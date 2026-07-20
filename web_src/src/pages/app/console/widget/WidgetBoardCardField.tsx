@@ -28,7 +28,10 @@ export function WidgetBoardCardField({ col, row }: { col: WidgetTableColumn; row
   const displayLabel = col.label?.trim();
 
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-gray-300" data-testid="board-card-field">
+    <div
+      className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-gray-300"
+      data-testid="board-card-field"
+    >
       {displayLabel ? <span className="shrink-0 text-slate-400 dark:text-gray-500">{displayLabel}</span> : null}
       <span className="min-w-0 truncate">
         <FieldValue col={col} row={row} value={value} formatted={formatted} />

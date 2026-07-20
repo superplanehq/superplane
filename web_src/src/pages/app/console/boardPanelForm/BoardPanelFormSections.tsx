@@ -51,7 +51,7 @@ export function BoardHeaderFields({
         <Input
           value={value.render.groupBy}
           onChange={(e) => onChange({ ...value, render: { ...value.render, groupBy: e.target.value } })}
-          placeholder='e.g. status or {{ payload.state }}'
+          placeholder="e.g. status or {{ payload.state }}"
           list={fieldOptions.length > 0 ? "board-field-options" : undefined}
           data-testid="board-groupby-field"
         />
@@ -68,7 +68,10 @@ export function BoardHeaderFields({
           }
           data-testid="board-other-lane-toggle"
         />
-        <Label htmlFor="board-other-lane" className="cursor-pointer text-xs font-medium text-slate-600 dark:text-gray-400">
+        <Label
+          htmlFor="board-other-lane"
+          className="cursor-pointer text-xs font-medium text-slate-600 dark:text-gray-400"
+        >
           Show unmatched rows in a trailing &ldquo;Other&rdquo; lane
         </Label>
       </div>
@@ -76,13 +79,7 @@ export function BoardHeaderFields({
   );
 }
 
-export function BoardLanesSection({
-  value,
-  actions,
-}: {
-  value: BoardPanelContent;
-  actions: BoardPanelFormActions;
-}) {
+export function BoardLanesSection({ value, actions }: { value: BoardPanelContent; actions: BoardPanelFormActions }) {
   const lanes = value.render.lanes;
   return (
     <div className="space-y-1.5">
@@ -103,8 +100,8 @@ export function BoardLanesSection({
         ))}
         {lanes.length === 0 ? (
           <p className="text-xs text-slate-500 dark:text-gray-400">
-            Add at least one lane. Each lane matches rows whose <code className="text-[11px]">groupBy</code> value equals
-            the lane value.
+            Add at least one lane. Each lane matches rows whose <code className="text-[11px]">groupBy</code> value
+            equals the lane value.
           </p>
         ) : null}
       </div>
@@ -200,9 +197,12 @@ export function BoardCardSection({
         <Input
           value={value.render.card.titleField}
           onChange={(e) =>
-            onChange({ ...value, render: { ...value.render, card: { ...value.render.card, titleField: e.target.value } } })
+            onChange({
+              ...value,
+              render: { ...value.render, card: { ...value.render.card, titleField: e.target.value } },
+            })
           }
-          placeholder='e.g. title or {{ payload.name }}'
+          placeholder="e.g. title or {{ payload.name }}"
           list={fieldOptions.length > 0 ? "board-field-options" : undefined}
           data-testid="board-card-title-field"
         />

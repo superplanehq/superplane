@@ -25,8 +25,8 @@ import {
 import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
-import { templateForBoardPanel, validateBoardContent } from "./boardPanelContent";
-import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
+import { validateBoardContent } from "./boardPanelContent";
+import { validateNodesContent } from "./nodesPanelContent";
 import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
@@ -36,6 +36,7 @@ import {
   validateRunTriggersArray,
 } from "./runDataSourceFilterSchema";
 import { validateScorecardContent } from "./scorecardRenderValidation";
+import { buildTemplateForPanelType } from "./panelTypeTemplates";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
@@ -301,71 +302,14 @@ export function isMultiNumberContent(content: unknown): boolean {
 // Templates — used to seed new panels
 // ────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_TABLE_RENDER: WidgetTableRender = {
-  kind: "table",
-  columns: [],
-};
-
-const DEFAULT_CHART_RENDER: WidgetChartRender = {
-  kind: "chart",
-  type: "bar",
-  xField: "status",
-  series: [{ label: "Count" }],
-};
-
-const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
-  kind: "number",
-  aggregation: "count",
-  label: "Runs",
-};
-
-// `count` needs no field, so a fresh scorecard validates before the author
-// picks a data source or switches to a field-backed aggregation.
-const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
-  kind: "scorecard",
-  aggregation: "count",
-  better: "up",
-  showChange: "both",
-  changeCaption: "vs previous",
-};
-
-/** Default content for a newly-added panel of the given kind. */
+/**
+ * Default content for a newly-added panel of the given kind. The per-type
+ * template bodies live in `./panelTypeTemplates.ts` — kept in a separate
+ * module so this file stays under the lint budget and the entry point
+ * dispatches through a simple lookup rather than a large `switch`.
+ */
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
-  switch (type) {
-    case "markdown":
-    case "html":
-      return { title: defaultTitle ?? "", body: "", variables: [] } satisfies MarkdownPanelContent;
-    case "node":
-      return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
-    case "nodes":
-      return { ...templateForNodesPanel(defaultTitle) };
-    case "table":
-      return {
-        title: defaultTitle ?? "",
-        dataSource: { kind: "memory", namespace: "" },
-        render: DEFAULT_TABLE_RENDER,
-      } satisfies TablePanelContent;
-    case "board":
-      return { ...templateForBoardPanel(defaultTitle) };
-    case "chart":
-      return {
-        title: defaultTitle ?? "",
-        dataSource: { kind: "executions", limit: 100 },
-        render: DEFAULT_CHART_RENDER,
-      } satisfies ChartPanelContent;
-    case "number":
-      return {
-        title: defaultTitle ?? "",
-        dataSource: { kind: "runs", limit: 100 },
-        render: DEFAULT_NUMBER_RENDER,
-      } satisfies NumberPanelContent;
-    case "scorecard":
-      return {
-        title: defaultTitle ?? "",
-        dataSource: { kind: "memory", namespace: "" },
-        render: DEFAULT_SCORECARD_RENDER,
-      } satisfies ScorecardPanelContent;
-  }
+  return buildTemplateForPanelType(type, defaultTitle);
 }
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -121,9 +121,7 @@ describe("WidgetBoard sort", () => {
 describe("WidgetBoard card fields", () => {
   it("renders configured card fields with formatted values", () => {
     renderBoard({
-      rows: [
-        { id: "row-1", title: "T1", status: "Todo", url: "https://example.test/1" },
-      ],
+      rows: [{ id: "row-1", title: "T1", status: "Todo", url: "https://example.test/1" }],
       render: baseRender({
         card: {
           titleField: "title",
@@ -139,9 +137,7 @@ describe("WidgetBoard card fields", () => {
 });
 
 describe("WidgetBoard row actions", () => {
-  const ACTION_ROWS = [
-    { id: "row-1", title: "T1", status: "Todo", service: "api" },
-  ];
+  const ACTION_ROWS = [{ id: "row-1", title: "T1", status: "Todo", service: "api" }];
   const RENDER: WidgetBoardRender = baseRender({
     rowActions: [
       {

@@ -14,7 +14,8 @@ import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { WidgetTableCell } from "./WidgetTableCell";
-import { WidgetRowActionButton, rowKeyForRow } from "./WidgetRowActionButton";
+import { WidgetRowActionButton } from "./WidgetRowActionButton";
+import { rowKeyForRow } from "./rowKey";
 import type { WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
