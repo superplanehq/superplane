@@ -91,8 +91,8 @@ func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
 	require.Len(t, task.Commands, 2)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Contains(t, task.Commands[0].Command, "node not found on PATH")
-	assert.Contains(t, task.Commands[0].Command, "format.js")
-	promptScript := buildClaudePromptStepScript("do it", "")
+	assert.Equal(t, streamFormatJS, requireTaskFile(t, task.Files, "format.js").Content)
+	promptScript := requireTaskFile(t, task.Files, "steps/01-do-it.sh").Content
 	assert.Contains(t, promptScript, `node "$SP/format.js"`)
 	assert.Contains(t, promptScript, "tee -a")
 }

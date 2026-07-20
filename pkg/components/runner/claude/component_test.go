@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -26,6 +25,7 @@ type createTaskRequest struct {
 	Commands      []runner.BrokerCommand             `json:"commands,omitempty"`
 	SetupCommands []string                           `json:"setup_commands,omitempty"`
 	Environment   []runner.BrokerEnvironmentVariable `json:"environment,omitempty"`
+	Files         []runner.BrokerTaskFile            `json:"files,omitempty"`
 	ExecutionMode string                             `json:"execution_mode,omitempty"`
 	DockerImage   string                             `json:"docker_image,omitempty"`
 }
@@ -86,20 +86,25 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.True(t, strings.HasPrefix(req.Commands[0].Command, "bash -c "))
 	assert.Contains(t, req.Commands[0].Command, "claude CLI not found")
+	assert.Contains(t, req.Commands[0].Command, "SUPERPLANE_TASK_DIR")
 	assert.Contains(t, req.Commands[0].Command, "/tmp")
-	assert.Equal(t, runner.BrokerCommand{Name: "Clone", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-clone.sh"`}, req.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-fix-tests.sh"`}, req.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{Name: "Open PR", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-open-pr.sh"`}, req.Commands[3])
-	assert.Equal(t, runner.BrokerCommand{Name: "Status", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/04-status.sh"`}, req.Commands[4])
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git clone https://github.com/acme/widgets.git /tmp/repo"))
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudePromptStep("Fix the failing tests", "sonnet"))
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git -C /tmp/repo status"))
+	assert.NotContains(t, req.Commands[0].Command, "base64 -d")
+	assert.Equal(t, runner.BrokerCommand{Name: "Clone", Command: `bash "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`}, req.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$SUPERPLANE_TASK_DIR/steps/02-fix-tests.sh"`}, req.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{Name: "Open PR", Command: `bash "$SUPERPLANE_TASK_DIR/steps/03-open-pr.sh"`}, req.Commands[3])
+	assert.Equal(t, runner.BrokerCommand{Name: "Status", Command: `bash "$SUPERPLANE_TASK_DIR/steps/04-status.sh"`}, req.Commands[4])
 	assert.Contains(t, string(body), `"name":"Clone"`)
 	assert.Empty(t, req.DockerImage)
 	require.Len(t, req.Environment, 1)
 	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
 	assert.Equal(t, "sk-test-key", req.Environment[0].Value)
 	assert.NotContains(t, string(body), `"message_chain"`)
+
+	require.Len(t, req.Files, 6)
+	assert.Equal(t, streamFormatJS, requireTaskFile(t, req.Files, "format.js").Content)
+	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git /tmp/repo"), requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
+	assert.Equal(t, buildClaudePromptStepScript("Fix the failing tests", "sonnet"), requireTaskFile(t, req.Files, "steps/02-fix-tests.sh").Content)
+	assert.Equal(t, buildClaudeBashStepScript("git -C /tmp/repo status"), requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
 }
 
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
@@ -148,20 +153,13 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	require.Len(t, req.Commands, 4)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.True(t, strings.HasPrefix(req.Commands[0].Command, "bash -c "))
-	assert.Equal(t, runner.BrokerCommand{Name: "Setup", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-setup.sh"`}, req.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{Name: "Prompt", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-prompt.sh"`}, req.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{Name: "After", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-after.sh"`}, req.Commands[3])
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git clone https://github.com/acme/widgets.git /tmp/repo"))
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudePromptStep("implement the issue", ""))
-	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git push"))
-}
-
-func base64OfClaudeBashStep(command string) string {
-	return base64.StdEncoding.EncodeToString([]byte(buildClaudeBashStepScript(command)))
-}
-
-func base64OfClaudePromptStep(prompt, model string) string {
-	return base64.StdEncoding.EncodeToString([]byte(buildClaudePromptStepScript(prompt, model)))
+	assert.Equal(t, runner.BrokerCommand{Name: "Setup", Command: `bash "$SUPERPLANE_TASK_DIR/steps/01-setup.sh"`}, req.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Prompt", Command: `bash "$SUPERPLANE_TASK_DIR/steps/02-prompt.sh"`}, req.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{Name: "After", Command: `bash "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`}, req.Commands[3])
+	require.Len(t, req.Files, 5)
+	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git /tmp/repo"), requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
+	assert.Equal(t, buildClaudePromptStepScript("implement the issue", ""), requireTaskFile(t, req.Files, "steps/02-prompt.sh").Content)
+	assert.Equal(t, buildClaudeBashStepScript("git push"), requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
 }
 
 func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {

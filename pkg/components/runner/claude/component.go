@@ -332,11 +332,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	// command_list tasks only accept commands (no message_chain / script fields).
+	// command_list tasks only accept commands (+ optional files).
 	task := buildClaudeCodeBrokerTask(spec)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
+		Files:          task.Files,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
