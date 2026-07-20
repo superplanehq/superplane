@@ -1695,6 +1695,63 @@ func TestValidateConsoleContent_RejectsNodesPanelWithBadPromptConfirmation(t *te
 	assert.Contains(t, err.Error(), "content.nodes[0].promptConfirmation must be a boolean")
 }
 
+func TestValidateConsoleContent_AcceptsNodesPanelWithFormMode(t *testing.T) {
+	for _, mode := range []string{ConsoleNodesPanelFormModeModal, ConsoleNodesPanelFormModeInline} {
+		t.Run(mode, func(t *testing.T) {
+			panels := []ConsolePanel{
+				{
+					ID:   "prompt",
+					Type: ConsolePanelTypeNodes,
+					Content: map[string]any{
+						"nodes": []any{
+							map[string]any{"node": "start", "showRun": true, "formMode": mode},
+						},
+					},
+				},
+			}
+
+			err := ValidateConsoleContent(panels, nil)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateConsoleContent_RejectsNodesPanelWithUnknownFormMode(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "prompt",
+			Type: ConsolePanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"node": "start", "showRun": true, "formMode": "drawer"},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `content.nodes[0].formMode must be "modal" or "inline"`)
+}
+
+func TestValidateConsoleContent_RejectsNodesPanelWithNonStringFormMode(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "prompt",
+			Type: ConsolePanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"node": "start", "showRun": true, "formMode": true},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].formMode must be a string")
+}
+
 func TestValidateConsoleContent_RejectsNodePanelWithBadPromptConfirmation(t *testing.T) {
 	panels := []ConsolePanel{
 		{

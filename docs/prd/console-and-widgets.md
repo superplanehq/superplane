@@ -126,7 +126,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
@@ -915,8 +915,20 @@ Per-entry fields:
 | `showRun` | When true and the resolved node is a manual-run trigger (see [Node Panels](#node-panels)), surface a manual "Run" button. Still gated by `canRunNodes` and the shared in-flight lock. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
 | `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
+| `formMode` | How the parameter form is presented. `"modal"` (default) opens `NodeRunConfirmDialog` on Run; `"inline"` renders `StartRunParameterFields` plus a submit button directly in the panel body — prompt-submission style. Only honored when the entry resolves to a manual-run Start trigger whose selected template exposes at least one `parameters[]` entry; otherwise the entry falls back to the modal path. `promptConfirmation` is ignored while inline mode is active — the form itself is the confirmation. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
+
+### Inline Run Form
+
+When an entry sets `formMode: inline`, `NodesPanelCard` renders `NodesPanelInlineRunForm` instead of the modal-based Run button. The inline form reuses the same `StartRunParameterFields` renderer used inside `NodeRunConfirmDialog`, so string / text (multi-line) / number / boolean / select parameters behave identically in both surfaces. Submissions still flow through `useConsoleRunTrigger` → `InvokeNodeTriggerHook`, so authorization, the shared per-panel `useConsoleTriggerLock`, and the invalidation of run/execution/memory queries are unchanged.
+
+Non-inline paths remain the default:
+
+- Row entries whose resolved template has no `parameters[]` render the Run button and fire immediately (or open the bare "Run X?" confirmation when `promptConfirmation: true`).
+- Row entries pointing at non-manual-run triggers (event triggers such as `github.onPullRequest`) never surface a Run affordance, inline or otherwise.
+
+Inline mode is intended for a single prompt-submission panel per console (agent-oriented workflow start, task submission, one-off backfill, etc.); pair with the `text` parameter type on the Start trigger for multi-line prompt inputs.
 
 ## YAML Import And Export
 

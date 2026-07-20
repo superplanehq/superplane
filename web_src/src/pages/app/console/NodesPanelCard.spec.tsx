@@ -353,6 +353,70 @@ describe("NodesPanelCard — in-flight lock", () => {
   });
 });
 
+describe("NodesPanelCard — inline form mode", () => {
+  it("renders the parameter form inline and submits without opening the modal", async () => {
+    const onTrigger = vi.fn();
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: onTrigger,
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    // Modal must NOT be present; inline form and submit are.
+    expect(screen.queryByTestId("node-panel-run-dialog-submit")).toBeNull();
+    expect(screen.getByTestId("node-panel-run-inline-form")).toBeInTheDocument();
+
+    const branch = screen.getByLabelText("branch") as HTMLInputElement;
+    fireEvent.change(branch, { target: { value: "release/inline" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("node-panel-run-inline-submit"));
+    });
+    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
+    expect(onTrigger).toHaveBeenCalledWith("node-1", {
+      hookName: "run",
+      templateName: "manual",
+      parameters: { template: "manual", branch: "release/inline" },
+    });
+  });
+
+  it("falls back to the modal path for parameter-less templates even with formMode inline", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      nodes: [NODE_NO_PARAMS],
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    expect(screen.queryByTestId("node-panel-run-inline-form")).toBeNull();
+    expect(screen.getByTestId("node-panel-run")).toBeInTheDocument();
+  });
+
+  it("falls back to the modal path when the resolved node is not manual-runnable", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      nodes: [PR_TRIGGER],
+      panel: multiNodePanel([{ node: "on-pr", showRun: true, formMode: "inline" }]),
+    });
+
+    // Non-manual trigger — Run affordance is hidden entirely, and the inline
+    // form must not appear.
+    expect(screen.queryByTestId("nodes-panel-row-run-inline-form")).toBeNull();
+    expect(screen.queryByTestId("nodes-panel-row-run")).toBeNull();
+  });
+
+  it("disables the inline submit button while the same trigger has a run in flight", () => {
+    mockInFlight = new Set(["node-1"]);
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+    const submit = screen.getByTestId("node-panel-run-inline-submit");
+    expect(submit).toBeDisabled();
+  });
+});
+
 describe("NodesPanelCard — multi-entry layout", () => {
   const MULTI_PANEL = multiNodePanel([
     { node: "deploy-prod", description: "Deploys production", showRun: true, triggerName: "manual" },

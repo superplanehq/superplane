@@ -24,6 +24,13 @@ const (
 	ConsolePanelTypeNumber    = "number"
 	ConsolePanelTypeScorecard = "scorecard"
 
+	// ConsoleNodesPanelFormMode* control whether a `nodes` panel entry
+	// renders its manual-run parameter form as a modal dialog (default)
+	// or inline in the panel body. Keep in lockstep with
+	// `NODES_PANEL_FORM_MODES` in the frontend `nodesPanelContent.ts`.
+	ConsoleNodesPanelFormModeModal  = "modal"
+	ConsoleNodesPanelFormModeInline = "inline"
+
 	MaxConsolePanels       = 50
 	MaxConsolePayloadBytes = 1024 * 1024
 )
@@ -618,6 +625,21 @@ func validateNodesPanelEntry(panelID string, index int, raw any) error {
 	if rawPrompt, present := entry["promptConfirmation"]; present && rawPrompt != nil {
 		if _, ok := rawPrompt.(bool); !ok {
 			return fmt.Errorf("panel %q content.nodes[%d].promptConfirmation must be a boolean", panelID, index)
+		}
+	}
+	if rawFormMode, present := entry["formMode"]; present && rawFormMode != nil {
+		mode, ok := rawFormMode.(string)
+		if !ok {
+			return fmt.Errorf("panel %q content.nodes[%d].formMode must be a string", panelID, index)
+		}
+		switch mode {
+		case ConsoleNodesPanelFormModeModal, ConsoleNodesPanelFormModeInline:
+		default:
+			return fmt.Errorf(
+				"panel %q content.nodes[%d].formMode must be %q or %q",
+				panelID, index,
+				ConsoleNodesPanelFormModeModal, ConsoleNodesPanelFormModeInline,
+			)
 		}
 	}
 	return nil
