@@ -13,7 +13,6 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
-  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,
@@ -73,7 +72,7 @@ import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEven
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
-import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { ACTIVE_RUN_API_STATES, statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import type { CanvasEchoRelease, CanvasSaveResult, QueuedCanvasSaveRequest } from "./canvasSaveTypes";
 import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
@@ -170,7 +169,7 @@ import {
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
-const RUNNING_RUNS_FILTERS = { states: ["STATE_STARTED" as CanvasesCanvasRunState] };
+const RUNNING_RUNS_FILTERS = { states: [...ACTIVE_RUN_API_STATES] };
 
 function getCanvasVersionEditPermissionState({
   canEditCanvasDraft,

@@ -298,3 +298,187 @@ func createExecutionForRun(t *testing.T, run *models.CanvasRun, rootEventID uuid
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return &execution
 }
+
+func subRunTestCanvasNodes(entrypoints ...string) []models.CanvasNode {
+	nodes := []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+	}
+	for _, nodeID := range entrypoints {
+		nodes = append(nodes, models.CanvasNode{
+			NodeID: nodeID,
+			Type:   models.NodeTypeComponent,
+		})
+	}
+	return nodes
+}
+
+func Test__ValidateSubRunCreationInTransaction__SameWorkflowDoesNotIncreaseCrossWorkflowDepth(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("run1", "run2"),
+		nil,
+	)
+
+	parentRun := createSubRun(t, canvas.ID, "run1", nil, nil, nil)
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"run2",
+		8,
+	)
+	require.NoError(t, err)
+}
+
+func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runA"),
+		nil,
+	)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runB"),
+		nil,
+	)
+	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runC"),
+		nil,
+	)
+
+	runA := createSubRun(t, canvasA.ID, "runA", nil, nil, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		uuid.New(),
+		"runD",
+		8,
+	)
+	require.NoError(t, err)
+
+	err = models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		uuid.New(),
+		"runD",
+		2,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunCrossWorkflowDepthExceeded)
+}
+
+func Test__ValidateSubRunCreationInTransaction__WorkflowCycleAcrossApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runA"),
+		nil,
+	)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runB"),
+		nil,
+	)
+	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runC"),
+		nil,
+	)
+
+	runA := createSubRun(t, canvasA.ID, "", nil, nil, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		canvasA.ID,
+		"runA",
+		8,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunWorkflowCycle)
+}
+
+func Test__ValidateSubRunCreationInTransaction__EntrypointCycleWithinWorkflow(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("run1", "run2"),
+		nil,
+	)
+
+	rootRun := createSubRun(t, canvas.ID, "", nil, nil, nil)
+	run2InChain := createSubRun(t, canvas.ID, "run2", &rootRun.ID, &canvas.ID, nil)
+	parentRun := createSubRun(t, canvas.ID, "run1", &run2InChain.ID, &canvas.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"run2",
+		8,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunEntrypointCycle)
+}
+
+func Test__ValidateSubRunCreationInTransaction__SiblingSubRunsAllowRepeatedEntrypoint(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("forEach", "item"),
+		nil,
+	)
+
+	parentRun := createSubRun(t, canvas.ID, "forEach", nil, nil, nil)
+	createSubRun(t, canvas.ID, "item", &parentRun.ID, &canvas.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"item",
+		8,
+	)
+	require.NoError(t, err)
+}
+
+func createSubRun(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	parentRunID *uuid.UUID,
+	parentWorkflowID *uuid.UUID,
+	parentExecutionID *uuid.UUID,
+) *models.CanvasRun {
+	t.Helper()
+
+	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+	require.NoError(t, err)
+
+	effectiveNodeID := nodeID
+	if effectiveNodeID == "" {
+		effectiveNodeID = "trigger"
+	}
+
+	run := models.CanvasRun{
+		ID:                uuid.New(),
+		WorkflowID:        workflowID,
+		NodeID:            effectiveNodeID,
+		VersionID:         liveVersion.ID,
+		ParentRunID:       parentRunID,
+		ParentWorkflowID:  parentWorkflowID,
+		ParentExecutionID: parentExecutionID,
+		State:             models.CanvasRunStatePending,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return &run
+}

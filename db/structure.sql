@@ -675,7 +675,13 @@ CREATE TABLE public.workflow_runs (
     version_id uuid NOT NULL,
     cancelled_at timestamp without time zone,
     cancelled_by uuid,
-    node_id character varying(128)
+    node_id character varying(128),
+    parent_run_id uuid,
+    parent_workflow_id uuid,
+    parent_execution_id uuid,
+    callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    input jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result_message text
 );
 
 
@@ -2127,6 +2133,30 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_runs workflow_runs_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.workflow_runs(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_workflow_id_fkey FOREIGN KEY (parent_workflow_id) REFERENCES public.workflows(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2238,7 +2268,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260718092719	f
+20260719155617	f
 \.
 
 

@@ -82,6 +82,50 @@ func Test__DescribeRun(t *testing.T) {
 		assert.Equal(t, "waiting", serializedQueueItem.Input.AsMap()["approval"])
 	})
 
+	t.Run("returns pending sub-run without root event", func(t *testing.T) {
+		parentCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{NodeID: "trigger", Type: models.NodeTypeTrigger},
+				{NodeID: "runApp", Type: models.NodeTypeComponent},
+			},
+			[]models.Edge{},
+		)
+		childCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{{NodeID: "onRun", Type: models.NodeTypeTrigger}},
+			[]models.Edge{},
+		)
+
+		parentRootEvent := support.EmitCanvasEventForNode(t, parentCanvas.ID, "trigger", "default", nil)
+		parentRun := createStartedRun(t, parentRootEvent)
+		parentExecution := createRunExecution(t, parentRun, parentRootEvent.ID, "runApp", models.CanvasNodeExecutionResultPassed)
+
+		childRun := createSubRunRecord(
+			t,
+			childCanvas.ID,
+			"onRun",
+			&parentRun.ID,
+			&parentCanvas.ID,
+			&parentExecution.ID,
+			models.CanvasRunStatePending,
+			"",
+		)
+
+		response, err := DescribeRun(context.Background(), r.Registry, childCanvas.ID, childRun.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Run)
+		assert.Equal(t, childRun.ID.String(), response.Run.Id)
+		assert.Equal(t, pb.CanvasRun_STATE_PENDING, response.Run.State)
+		assert.Nil(t, response.Run.RootEvent)
+		require.NotNil(t, response.Run.Parent)
+		assert.Equal(t, parentRun.ID.String(), response.Run.Parent.Id)
+	})
+
 	t.Run("scopes run to canvas", func(t *testing.T) {
 		canvasOne, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 		canvasTwo, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
