@@ -79,7 +79,7 @@ Example:
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
-- **Working directory**: Optional starting directory. Bash steps also persist their ending ` + "`cd`" + ` for following steps.
+- **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
 ## Output
@@ -197,7 +197,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Label:       "Working directory",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional starting directory. Bash steps persist their ending directory for later steps.",
+			Description: "Optional starting directory.",
 			Placeholder: "/tmp/repo",
 		},
 		{

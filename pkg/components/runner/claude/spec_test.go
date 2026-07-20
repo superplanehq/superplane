@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -110,14 +109,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	task := buildClaudeCodeBrokerTask(spec)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
-	assert.True(t, strings.HasPrefix(task.Commands[0].Command, "bash -c "))
-	assert.Contains(t, task.Commands[0].Command, "claude CLI not found")
-	assert.Contains(t, task.Commands[0].Command, "node not found")
-	assert.Contains(t, task.Commands[0].Command, "SUPERPLANE_TASK_DIR")
-	assert.Contains(t, task.Commands[0].Command, "/tmp/workspace")
-	assert.NotContains(t, task.Commands[0].Command, "base64 -d")
+	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
 
-	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `bash "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`}, task.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `source "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`}, task.Commands[1])
 	assert.Equal(t, runner.BrokerCommand{
 		Name:    "Fix panic",
 		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`,
@@ -126,16 +120,22 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		Name:    "Fix tests",
 		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`,
 	}, task.Commands[3])
-	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `bash "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`}, task.Commands[4])
+	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`}, task.Commands[4])
 
-	require.Len(t, task.Files, 5)
+	require.Len(t, task.Files, 6)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
+	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
+	assert.Contains(t, prepare, "claude CLI not found")
+	assert.Contains(t, prepare, "node not found")
+	assert.Contains(t, prepare, "cd '/tmp/workspace'")
+	assert.Contains(t, prepare, `echo "Claude Code ready"`)
+	assert.Contains(t, prepare, "claude --version")
+	assert.Contains(t, prepare, "node --version")
 
 	cloneScript := requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content
 	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo"), cloneScript)
 	assert.Contains(t, cloneScript, "git clone https://github.com/acme/widgets.git repo\n")
-	assert.Contains(t, cloneScript, `pwd -P >"$SP/workdir"`)
-	assert.Contains(t, cloneScript, "SUPERPLANE_TASK_DIR")
+	assert.NotContains(t, cloneScript, "workdir")
 
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
@@ -145,6 +145,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "plain terminal text")
 	assert.Contains(t, runScript, "--continue")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
+	assert.NotContains(t, runScript, "workdir")
 }
 
 func TestClaudeStepScriptName(t *testing.T) {

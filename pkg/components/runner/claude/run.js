@@ -5,7 +5,6 @@
  * Run Claude Code and format stream-json into readable live logs.
  *
  *   node run.js <prompt-file> [model]
- *   node run.js --format   # format NDJSON from stdin (tests / debug)
  */
 
 const fs = require("fs");
@@ -23,10 +22,6 @@ const SYSTEM_PROMPT =
 
 function main() {
   const args = process.argv.slice(2);
-  if (args[0] === "--format") {
-    formatStdin();
-    return;
-  }
   if (args.length < 1) {
     console.error("usage: node run.js <prompt-file> [model]");
     process.exit(2);
@@ -39,13 +34,6 @@ function main() {
     });
 }
 
-function formatStdin() {
-  const formatter = createFormatter();
-  const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-  rl.on("line", (raw) => formatter.handleLine(raw));
-  rl.on("close", () => formatter.flush());
-}
-
 async function runPrompt(promptFile, model) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -54,14 +42,6 @@ async function runPrompt(promptFile, model) {
   const resultFile = process.env.SUPERPLANE_RESULT_FILE;
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
-  }
-
-  const workdirFile = path.join(sp, "workdir");
-  if (fs.existsSync(workdirFile)) {
-    const dir = fs.readFileSync(workdirFile, "utf8").trim();
-    if (dir) {
-      process.chdir(dir);
-    }
   }
 
   const prompt = fs.readFileSync(promptFile, "utf8");
@@ -96,37 +76,27 @@ async function runPrompt(promptFile, model) {
     args = ["-oL", "-eL", "claude", ...claudeArgs];
   }
 
-  const streamPath = path.join(sp, "stream.jsonl");
-  const streamFd = fs.openSync(streamPath, "a");
   const formatter = createFormatter();
+  const child = spawn(command, args, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  child.stderr.pipe(process.stderr);
 
-  try {
-    const child = spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    child.stderr.pipe(process.stderr);
+  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  rl.on("line", (raw) => formatter.handleLine(raw));
 
-    const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
-    rl.on("line", (raw) => {
-      fs.writeSync(streamFd, `${raw}\n`);
-      formatter.handleLine(raw);
-    });
+  const exitCode = await Promise.all([
+    new Promise((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code == null ? 1 : code));
+    }),
+    new Promise((resolve) => rl.on("close", resolve)),
+  ]).then(([code]) => code);
 
-    const exitCode = await Promise.all([
-      new Promise((resolve, reject) => {
-        child.on("error", reject);
-        child.on("close", (code) => resolve(code == null ? 1 : code));
-      }),
-      new Promise((resolve) => rl.on("close", resolve)),
-    ]).then(([code]) => code);
-
-    formatter.flush();
-    fs.writeFileSync(resultFile, `${formatter.resultJSON()}\n`);
-    fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
-    return exitCode;
-  } finally {
-    fs.closeSync(streamFd);
-  }
+  formatter.flush();
+  fs.writeFileSync(resultFile, `${formatter.resultJSON()}\n`);
+  fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  return exitCode;
 }
 
 function commandExists(name) {

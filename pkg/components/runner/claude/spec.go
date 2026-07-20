@@ -164,49 +164,26 @@ func validateClaudeCodeSteps(steps []ClaudeCodeStep) error {
 
 // buildClaudeCodeBrokerTask builds broker commands plus task files.
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
-// Prepare only checks claude/node and initializes mutable run state.
+// Bash steps are sourced into the runner's shared shell so cwd persists across steps.
 func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
 	files := []runner.BrokerTaskFile{
 		{Path: "run.js", Content: runScript, Mode: "0644"},
+		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		stepSlug := claudeStepSlug(i+1, step.Name)
-		switch normalizeClaudeStepType(step.Type) {
-		case claudeStepBash:
-			command := ""
-			if step.Command != nil {
-				command = *step.Command
-			}
-			scriptName := stepSlug + ".sh"
-			files = append(files, runner.BrokerTaskFile{
-				Path:    "steps/" + scriptName,
-				Content: buildClaudeBashStepScript(command),
-				Mode:    "0755",
-			})
-			stepCommands = append(stepCommands, claudeBashStepBrokerCommand(step.Name, scriptName))
-		case claudeStepPrompt:
-			prompt := ""
-			if step.Prompt != nil {
-				prompt = *step.Prompt
-			}
-			promptName := stepSlug + ".txt"
-			files = append(files, runner.BrokerTaskFile{
-				Path:    "prompts/" + promptName,
-				Content: prompt,
-				Mode:    "0644",
-			})
-			stepCommands = append(stepCommands, claudePromptStepBrokerCommand(step.Name, promptName, model))
-		}
+		file, command := buildClaudeCodeStep(i+1, step, model)
+		files = append(files, file)
+		stepCommands = append(stepCommands, command)
 	}
 
 	prepareCommand := runner.BrokerCommand{
 		Name:    "Prepare Claude Code",
-		Command: "bash -c " + shellSingleQuote(claudePrepareScript(workdir)),
+		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
 	}
 	return ClaudeCodeBrokerTask{
 		Commands: append([]runner.BrokerCommand{prepareCommand}, stepCommands...),
@@ -214,72 +191,88 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	}
 }
 
+func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (runner.BrokerTaskFile, runner.BrokerCommand) {
+	stepSlug := claudeStepSlug(stepNumber, step.Name)
+	switch normalizeClaudeStepType(step.Type) {
+	case claudeStepBash:
+		command := ""
+		if step.Command != nil {
+			command = *step.Command
+		}
+		scriptName := stepSlug + ".sh"
+		return runner.BrokerTaskFile{
+			Path:    "steps/" + scriptName,
+			Content: buildClaudeBashStepScript(command),
+			Mode:    "0644",
+		}, claudeBashStepBrokerCommand(step.Name, scriptName)
+	default:
+		prompt := ""
+		if step.Prompt != nil {
+			prompt = *step.Prompt
+		}
+		promptName := stepSlug + ".txt"
+		return runner.BrokerTaskFile{
+			Path:    "prompts/" + promptName,
+			Content: prompt,
+			Mode:    "0644",
+		}, claudePromptStepBrokerCommand(step.Name, promptName, model)
+	}
+}
+
 func claudePrepareScript(workdir string) string {
 	var prepare strings.Builder
 	prepare.WriteString("set -euo pipefail\n")
-	prepare.WriteString(claudeCodeStateDirAssignment())
+	prepare.WriteString(": \"${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}\"\n")
 	prepare.WriteString("if ! command -v claude >/dev/null 2>&1; then\n")
 	prepare.WriteString("  echo \"claude CLI not found on PATH; install Claude Code on the runner\" >&2\n")
-	prepare.WriteString("  exit 127\n")
+	prepare.WriteString("  return 127\n")
 	prepare.WriteString("fi\n")
 	prepare.WriteString("if ! command -v node >/dev/null 2>&1; then\n")
 	prepare.WriteString("  echo \"node not found on PATH; required to format Claude Code live logs\" >&2\n")
-	prepare.WriteString("  exit 127\n")
+	prepare.WriteString("  return 127\n")
 	prepare.WriteString("fi\n")
-	prepare.WriteString(": >\"$SP/stream.jsonl\"\n")
-	prepare.WriteString("printf '0\\n' >\"$SP/prompt_count\"\n")
+	prepare.WriteString("printf '0\\n' >\"$SUPERPLANE_TASK_DIR/prompt_count\"\n")
 	if workdir != "" {
-		fmt.Fprintf(&prepare, "printf '%%s\\n' %s >\"$SP/workdir\"\n", shellSingleQuote(workdir))
-	} else {
-		prepare.WriteString("rm -f \"$SP/workdir\"\n")
+		fmt.Fprintf(&prepare, "cd %s\n", shellSingleQuote(workdir))
 	}
+	prepare.WriteString("echo \"Claude Code ready\"\n")
+	prepare.WriteString("echo \"claude=$(claude --version 2>/dev/null | head -n1)\"\n")
+	prepare.WriteString("echo \"node=$(node --version 2>/dev/null)\"\n")
+	prepare.WriteString("echo \"cwd=$(pwd -P)\"\n")
 	return prepare.String()
 }
 
 func buildClaudeBashStepScript(command string) string {
 	var b strings.Builder
-	b.WriteString("#!/usr/bin/env bash\n")
 	b.WriteString("set -euo pipefail\n")
-	b.WriteString(claudeCodeStateDirAssignment())
-	b.WriteString("if [[ -f \"$SP/workdir\" ]]; then\n")
-	b.WriteString("  cd \"$(cat \"$SP/workdir\")\"\n")
-	b.WriteString("fi\n")
-	// Run in this shell (not a nested bash -c) so cd persists, then share
-	// the ending directory with later steps via $SP/workdir.
 	b.WriteString(strings.TrimRight(command, "\n"))
 	b.WriteString("\n")
-	b.WriteString("pwd -P >\"$SP/workdir\"\n")
 	return b.String()
 }
 
-func claudeCodeStateDirAssignment() string {
-	return ": \"${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}\"\nSP=\"$SUPERPLANE_TASK_DIR\"\n"
-}
-
 func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
-	label := strings.TrimSpace(stepName)
-	if label == "" {
-		label = scriptName
-	}
 	return runner.BrokerCommand{
-		Name:    label,
-		Command: fmt.Sprintf(`bash "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
+		Name:    claudeStepLabel(stepName, scriptName),
+		Command: fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
 	}
 }
 
 func claudePromptStepBrokerCommand(stepName, promptName, model string) runner.BrokerCommand {
-	label := strings.TrimSpace(stepName)
-	if label == "" {
-		label = promptName
-	}
 	return runner.BrokerCommand{
-		Name: label,
+		Name: claudeStepLabel(stepName, promptName),
 		Command: fmt.Sprintf(
 			`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
 			promptName,
 			shellSingleQuote(model),
 		),
 	}
+}
+
+func claudeStepLabel(stepName, fallback string) string {
+	if label := strings.TrimSpace(stepName); label != "" {
+		return label
+	}
+	return fallback
 }
 
 func claudeStepSlug(stepNumber int, name string) string {
