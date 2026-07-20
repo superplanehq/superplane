@@ -259,9 +259,12 @@ func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field conf
 		return b.resolveValuePreservingTypes(normalized)
 	}
 
+	// Schemed objects normally resolve key-by-key. If the value is not a map
+	// (e.g. a whole {{ … }} expression that returned something else), fall back
+	// to generic resolution — same as before type-preserving object handling.
 	obj, ok := asAnyMap(normalized)
 	if !ok {
-		return nil, fmt.Errorf("object field must resolve to an object")
+		return b.resolveValue(normalized)
 	}
 
 	return b.resolveWithSchema(obj, schema)
@@ -303,6 +306,11 @@ func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, er
 
 	decoded, err := decodeJSONValue(resolvedText)
 	if err != nil {
+		// A whole {{ … }} that evaluated to a non-JSON string is kept so schemed
+		// object fields can fall back to generic resolution (pre-existing behavior).
+		if _, isWholeExpression := unwrapExpressionTemplate(text); isWholeExpression {
+			return resolvedText, nil
+		}
 		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
 	}
 

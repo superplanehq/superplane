@@ -187,6 +187,47 @@ func Test_NodeConfigurationBuilder_ObjectFieldResolvesRawJSONTemplateString(t *t
 	assert.Equal(t, json.Number("0.9"), poolWeights["pool-b"])
 }
 
+func Test_NodeConfigurationBuilder_SchemedObjectFallsBackForNonMapExpression(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"token": "secret-token",
+				"auth": map[string]any{
+					"type":  "bearer",
+					"token": "from-map",
+				},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{
+				Name: "authorization",
+				Type: configuration.FieldTypeObject,
+				TypeOptions: &configuration.TypeOptions{
+					Object: &configuration.ObjectTypeOptions{
+						Schema: []configuration.Field{
+							{Name: "type", Type: configuration.FieldTypeString},
+							{Name: "token", Type: configuration.FieldTypeString},
+						},
+					},
+				},
+			},
+		})
+
+	nonMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().token }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "secret-token", nonMap["authorization"])
+
+	asMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().auth }}",
+	})
+	require.NoError(t, err)
+	auth := asMap["authorization"].(map[string]any)
+	assert.Equal(t, "bearer", auth["type"])
+	assert.Equal(t, "from-map", auth["token"])
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
