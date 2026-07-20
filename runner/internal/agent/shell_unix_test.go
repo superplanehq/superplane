@@ -39,7 +39,7 @@ func TestRunShellPTYSessionEcho(t *testing.T) {
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	code, out, err := runShellPTYSession(ctx, 128*1024, cmd, []string{`echo 'hello'`}, nil, "")
+	code, out, err := runShellPTYSession(ctx, 128*1024, cmd, directivesFromStrings([]string{`echo 'hello'`}), nil, "")
 	t.Logf("code=%d out=%q err=%v", code, out, err)
 	if err != nil || code != 0 {
 		t.Fatalf("runShellPTYSession: code=%d err=%v out=%q", code, err, out)
@@ -185,9 +185,9 @@ func TestRunShellPTYSessionLiveStreamsIncrementally(t *testing.T) {
 	var code int
 	var runErr error
 	go func() {
-		code, _, runErr = runShellPTYSession(ctx, 128*1024, cmd, []string{
+		code, _, runErr = runShellPTYSession(ctx, 128*1024, cmd, directivesFromStrings([]string{
 			`for i in 1 2 3; do echo line$i; sleep 0.15; done`,
-		}, live, "")
+		}), live, "")
 		close(done)
 	}()
 

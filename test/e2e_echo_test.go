@@ -25,9 +25,9 @@ func TestEchoHelloWorld(t *testing.T) {
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands: []string{
-				`echo 'hello world'`,
-				`echo 'second'`,
+			Commands: models.CommandList{
+				{Command: `echo 'hello world'`},
+				{Command: `echo 'second'`},
 			},
 			WebhookURL: wh,
 		}
@@ -49,10 +49,10 @@ func TestCommandsFailOnFirstFailedLine(t *testing.T) {
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands: []string{
-				"echo before",
-				"false",
-				"echo AFTER_SHOULD_NOT_RUN",
+			Commands: models.CommandList{
+				{Command: "echo before"},
+				{Command: "false"},
+				{Command: "echo AFTER_SHOULD_NOT_RUN"},
 			},
 			WebhookURL: wh,
 		}
@@ -71,9 +71,9 @@ func TestCommandsShareShellEnv(t *testing.T) {
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands: []string{
-				"export A=123",
-				`printf '{"a":%s}' "$A" > "$SUPERPLANE_RESULT_FILE"`,
+			Commands: models.CommandList{
+				{Command: "export A=123"},
+				{Command: `printf '{"a":%s}' "$A" > "$SUPERPLANE_RESULT_FILE"`},
 			},
 			WebhookURL: wh,
 		}
@@ -105,7 +105,7 @@ func TestTaskEnvironmentVariablesCommands(t *testing.T) {
 	const value = "commands-env-ok"
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands:    []string{`printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`},
+			Commands:    models.CommandList{{Command: `printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`}},
 			WebhookURL:  wh,
 			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
 		}

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
@@ -39,7 +40,7 @@ func TestCreateBrokerTaskPersistsEnvironment(t *testing.T) {
 
 	body, err := json.Marshal(api.BrokerCreateTaskRequest{
 		CreateTaskRequest: api.CreateTaskRequest{
-			Commands:   []string{"echo \"$COMMIT_AUTHOR\""},
+			Commands:   models.CommandList{{Command: "echo \"$COMMIT_AUTHOR\""}},
 			WebhookURL: "https://example.com/hook",
 			Environment: []api.EnvironmentVariable{
 				{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},

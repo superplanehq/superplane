@@ -71,7 +71,7 @@ func TestCreateTaskRecordsTasksCreatedMetric(t *testing.T) {
 
 	body, err := json.Marshal(api.BrokerCreateTaskRequest{
 		CreateTaskRequest: api.CreateTaskRequest{
-			Commands:   []string{"echo hi"},
+			Commands:   models.CommandList{{Command: "echo hi"}},
 			WebhookURL: "https://example.com/hook",
 		},
 		FleetID: "fleet-1",

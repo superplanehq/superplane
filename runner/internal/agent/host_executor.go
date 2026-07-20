@@ -39,7 +39,7 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		return runBashHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
 	}
 	if len(task.Commands) > 0 {
-		return runHostShellDirectives(ctx, max, h.TaskWorkDir, task.Commands, env, live, resultHostPath)
+		return runHostShellDirectiveList(ctx, max, h.TaskWorkDir, directivesFromCommands(task.Commands), env, live, resultHostPath)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")

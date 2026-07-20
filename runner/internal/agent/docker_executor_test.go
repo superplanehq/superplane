@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 )
 
 // skipIfNoDocker skips tests when docker is unavailable. Production runners
@@ -162,7 +163,7 @@ func TestDockerExecutorLiveWriterReceivesExecOutput(t *testing.T) {
 		ID:            uniqueTaskID(),
 		ExecutionMode: "docker",
 		DockerImage:   "alpine:3.20",
-		Commands:      []string{"echo live-exec-marker"},
+		Commands:      models.CommandList{{Command: "echo live-exec-marker"}},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
@@ -190,9 +191,9 @@ func TestDockerExecutorBundledCommandsShareEnv(t *testing.T) {
 		ID:            uniqueTaskID(),
 		ExecutionMode: "docker",
 		DockerImage:   "alpine:3.20",
-		Commands: []string{
-			"export DOCKER_TEST_VAR=hello-shared-env",
-			"echo $DOCKER_TEST_VAR",
+		Commands: models.CommandList{
+			{Command: "export DOCKER_TEST_VAR=hello-shared-env"},
+			{Command: "echo $DOCKER_TEST_VAR"},
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -218,10 +219,10 @@ func TestDockerExecutorBundledCommandsFailFast(t *testing.T) {
 		ID:            uniqueTaskID(),
 		ExecutionMode: "docker",
 		DockerImage:   "alpine:3.20",
-		Commands: []string{
-			"echo before",
-			"false",
-			"echo NEVER",
+		Commands: models.CommandList{
+			{Command: "echo before"},
+			{Command: "false"},
+			{Command: "echo NEVER"},
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)

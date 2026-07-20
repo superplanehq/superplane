@@ -56,7 +56,7 @@ func TestWriteLiveLogCommandEndSeparatesFromIncompleteStdout(t *testing.T) {
 }
 
 func TestDockerCommandsScriptEmitsNewlineBeforeCmdEnd(t *testing.T) {
-	script := dockerCommandsScript([]string{`printf 'no trailing newline'`})
+	script := dockerCommandsScript([]shellDirective{{Text: `printf 'no trailing newline'`, Shell: `printf 'no trailing newline'`}})
 	idx := strings.Index(script, `printf '{"type":"cmd_end"`)
 	if idx < 0 {
 		t.Fatal("missing cmd_end printf")
@@ -68,6 +68,21 @@ func TestDockerCommandsScriptEmitsNewlineBeforeCmdEnd(t *testing.T) {
 			start = 0
 		}
 		t.Fatalf("expected printf newline before cmd_end; script snippet:\n%s", before[start:])
+	}
+}
+
+func TestDockerCommandsScriptUsesDisplayNameInCmdStart(t *testing.T) {
+	script := dockerCommandsScript([]shellDirective{
+		{Text: "Clone", Shell: "git clone repo"},
+	})
+	if !strings.Contains(script, `"text":"Clone"`) {
+		t.Fatalf("expected named cmd_start text, script:\n%s", script)
+	}
+	if strings.Contains(script, `"text":"git clone repo"`) {
+		t.Fatalf("expected display name, not shell, script:\n%s", script)
+	}
+	if !strings.Contains(script, "git clone repo") {
+		t.Fatalf("expected shell body still present, script:\n%s", script)
 	}
 }
 
