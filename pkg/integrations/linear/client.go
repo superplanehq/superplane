@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -217,94 +218,160 @@ func (c *Client) GetViewer() (*Viewer, error) {
 	return &viewer, nil
 }
 
+const (
+	// pageSize is how many nodes each page requests. Linear rejects a single
+	// query above 10,000 complexity points and a connection multiplies its
+	// children by this argument, so this stays well clear of that ceiling.
+	pageSize = 100
+
+	// maxPages bounds a paginated fetch so a misbehaving cursor cannot loop
+	// forever. At pageSize this covers 25,000 records.
+	maxPages = 250
+)
+
+type pageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type connection[T any] struct {
+	Nodes    []T      `json:"nodes"`
+	PageInfo pageInfo `json:"pageInfo"`
+}
+
+// collectPages walks a Linear connection to completion, following the cursor
+// until the API reports no further pages. decode selects the connection from
+// each response, since every query nests it under a different field.
+func collectPages[T any](c *Client, query string, variables map[string]any, decode func(json.RawMessage) (*connection[T], error)) ([]T, error) {
+	pageVariables := map[string]any{}
+	maps.Copy(pageVariables, variables)
+
+	all := []T{}
+	for range maxPages {
+		data := json.RawMessage{}
+		if err := c.execute(query, pageVariables, &data); err != nil {
+			return nil, err
+		}
+
+		page, err := decode(data)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, page.Nodes...)
+
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			return all, nil
+		}
+
+		pageVariables["after"] = page.PageInfo.EndCursor
+	}
+
+	return nil, fmt.Errorf("gave up paginating after %d pages", maxPages)
+}
+
 const teamsQuery = `
-query Teams {
-  teams(first: 250) { nodes { id key name } }
+query Teams($first: Int!, $after: String) {
+  teams(first: $first, after: $after) {
+    nodes { id key name }
+    pageInfo { hasNextPage endCursor }
+  }
 }`
 
 func (c *Client) ListTeams() ([]Team, error) {
-	response := struct {
-		Teams struct {
-			Nodes []Team `json:"nodes"`
-		} `json:"teams"`
-	}{}
+	return collectPages(c, teamsQuery, map[string]any{"first": pageSize}, func(data json.RawMessage) (*connection[Team], error) {
+		response := struct {
+			Teams connection[Team] `json:"teams"`
+		}{}
 
-	if err := c.execute(teamsQuery, nil, &response); err != nil {
-		return nil, err
-	}
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("error parsing teams: %v", err)
+		}
 
-	return response.Teams.Nodes, nil
+		return &response.Teams, nil
+	})
 }
 
 const workflowStatesQuery = `
-query WorkflowStates($teamId: ID!) {
-  workflowStates(first: 250, filter: { team: { id: { eq: $teamId } } }) {
+query WorkflowStates($teamId: ID!, $first: Int!, $after: String) {
+  workflowStates(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
     nodes { id name type }
+    pageInfo { hasNextPage endCursor }
   }
 }`
 
 func (c *Client) ListWorkflowStates(teamID string) ([]WorkflowState, error) {
-	response := struct {
-		WorkflowStates struct {
-			Nodes []WorkflowState `json:"nodes"`
-		} `json:"workflowStates"`
-	}{}
+	variables := map[string]any{"teamId": teamID, "first": pageSize}
 
-	if err := c.execute(workflowStatesQuery, map[string]any{"teamId": teamID}, &response); err != nil {
-		return nil, err
-	}
+	return collectPages(c, workflowStatesQuery, variables, func(data json.RawMessage) (*connection[WorkflowState], error) {
+		response := struct {
+			WorkflowStates connection[WorkflowState] `json:"workflowStates"`
+		}{}
 
-	return response.WorkflowStates.Nodes, nil
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("error parsing workflow states: %v", err)
+		}
+
+		return &response.WorkflowStates, nil
+	})
 }
 
 const teamMembersQuery = `
-query TeamMembers($teamId: String!) {
+query TeamMembers($teamId: String!, $first: Int!, $after: String) {
   team(id: $teamId) {
-    members(first: 250) { nodes { id name displayName email } }
+    members(first: $first, after: $after) {
+      nodes { id name displayName email }
+      pageInfo { hasNextPage endCursor }
+    }
   }
 }`
 
 func (c *Client) ListTeamMembers(teamID string) ([]User, error) {
-	response := struct {
-		Team *struct {
-			Members struct {
-				Nodes []User `json:"nodes"`
-			} `json:"members"`
-		} `json:"team"`
-	}{}
+	variables := map[string]any{"teamId": teamID, "first": pageSize}
 
-	if err := c.execute(teamMembersQuery, map[string]any{"teamId": teamID}, &response); err != nil {
-		return nil, err
-	}
+	return collectPages(c, teamMembersQuery, variables, func(data json.RawMessage) (*connection[User], error) {
+		response := struct {
+			Team *struct {
+				Members connection[User] `json:"members"`
+			} `json:"team"`
+		}{}
 
-	if response.Team == nil {
-		return nil, fmt.Errorf("team %s not found", teamID)
-	}
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("error parsing team members: %v", err)
+		}
 
-	return response.Team.Members.Nodes, nil
+		if response.Team == nil {
+			return nil, fmt.Errorf("team %s not found", teamID)
+		}
+
+		return &response.Team.Members, nil
+	})
 }
 
 // labelsQuery includes workspace-level labels alongside the team's own labels.
 // Workspace labels have a null team, so filtering on team id alone hides them.
 const labelsQuery = `
-query Labels($teamId: ID!) {
-  issueLabels(first: 250, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
+query Labels($teamId: ID!, $first: Int!, $after: String) {
+  issueLabels(first: $first, after: $after, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
     nodes { id name }
+    pageInfo { hasNextPage endCursor }
   }
 }`
 
 func (c *Client) ListLabels(teamID string) ([]Label, error) {
-	response := struct {
-		IssueLabels struct {
-			Nodes []Label `json:"nodes"`
-		} `json:"issueLabels"`
-	}{}
+	variables := map[string]any{"teamId": teamID, "first": pageSize}
 
-	if err := c.execute(labelsQuery, map[string]any{"teamId": teamID}, &response); err != nil {
-		return nil, err
-	}
+	return collectPages(c, labelsQuery, variables, func(data json.RawMessage) (*connection[Label], error) {
+		response := struct {
+			IssueLabels connection[Label] `json:"issueLabels"`
+		}{}
 
-	return response.IssueLabels.Nodes, nil
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("error parsing labels: %v", err)
+		}
+
+		return &response.IssueLabels, nil
+	})
 }
 
 const issueFields = `

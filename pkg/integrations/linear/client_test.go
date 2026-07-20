@@ -1,6 +1,7 @@
 package linear
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -106,6 +107,167 @@ func Test__Client__ListTeams(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, teams, 1)
 	assert.Equal(t, "ENG", teams[0].Key)
+}
+
+// variablesFromRequest returns the GraphQL variables sent on the nth request.
+// Reading a request body consumes it, so the body is put back to keep the
+// helper safe to call more than once for the same request.
+func variablesFromRequest(t *testing.T, httpContext *contexts.HTTPContext, n int) map[string]any {
+	t.Helper()
+
+	require.Greater(t, len(httpContext.Requests), n)
+	body := readAndRestoreBody(t, httpContext.Requests[n])
+
+	payload := struct {
+		Variables map[string]any `json:"variables"`
+	}{}
+
+	require.NoError(t, json.Unmarshal(body, &payload))
+	return payload.Variables
+}
+
+func readAndRestoreBody(t *testing.T, request *http.Request) []byte {
+	t.Helper()
+
+	body, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	request.Body = io.NopCloser(bytes.NewReader(body))
+
+	return body
+}
+
+func Test__Client__Pagination(t *testing.T) {
+	t.Run("follows the cursor across pages", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ONE","name":"One"}],"pageInfo":{"hasNextPage":true,"endCursor":"cursor-1"}}}}`),
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t2","key":"TWO","name":"Two"}],"pageInfo":{"hasNextPage":true,"endCursor":"cursor-2"}}}}`),
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t3","key":"THREE","name":"Three"}],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		teams, err := client.ListTeams()
+		require.NoError(t, err)
+
+		// Every page is merged, not just the first.
+		require.Len(t, teams, 3)
+		assert.Equal(t, []string{"ONE", "TWO", "THREE"}, []string{teams[0].Key, teams[1].Key, teams[2].Key})
+
+		require.Len(t, httpContext.Requests, 3)
+		assert.NotContains(t, variablesFromRequest(t, httpContext, 0), "after", "first page must not send a cursor")
+		assert.Equal(t, "cursor-1", variablesFromRequest(t, httpContext, 1)["after"])
+		assert.Equal(t, "cursor-2", variablesFromRequest(t, httpContext, 2)["after"])
+	})
+
+	t.Run("stops after a single page when there is no next page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ONE","name":"One"}],"pageInfo":{"hasNextPage":false,"endCursor":"c1"}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		teams, err := client.ListTeams()
+		require.NoError(t, err)
+		assert.Len(t, teams, 1)
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("stops when hasNextPage is true but the cursor is empty", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ONE","name":"One"}],"pageInfo":{"hasNextPage":true,"endCursor":""}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		teams, err := client.ListTeams()
+		require.NoError(t, err)
+		assert.Len(t, teams, 1)
+		assert.Len(t, httpContext.Requests, 1, "an empty cursor must not trigger another page")
+	})
+
+	t.Run("gives up rather than looping forever on a stuck cursor", func(t *testing.T) {
+		responses := make([]*http.Response, 0, maxPages+1)
+		for range maxPages + 1 {
+			responses = append(responses, jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ONE","name":"One"}],"pageInfo":{"hasNextPage":true,"endCursor":"same-cursor"}}}}`))
+		}
+
+		client, err := NewClient(&contexts.HTTPContext{Responses: responses}, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.ListTeams()
+		require.ErrorContains(t, err, "gave up paginating")
+	})
+
+	t.Run("paginates team members", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"team":{"members":{"nodes":[{"id":"u1","name":"One"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}}`),
+				jsonResponse(`{"data":{"team":{"members":{"nodes":[{"id":"u2","name":"Two"}],"pageInfo":{"hasNextPage":false}}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		members, err := client.ListTeamMembers("t1")
+		require.NoError(t, err)
+		require.Len(t, members, 2)
+		assert.Equal(t, "c1", variablesFromRequest(t, httpContext, 1)["after"])
+		assert.Equal(t, "t1", variablesFromRequest(t, httpContext, 1)["teamId"], "filter variables persist across pages")
+	})
+
+	t.Run("paginates labels", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l1","name":"bug"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}`),
+				jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l2","name":"chore"}],"pageInfo":{"hasNextPage":false}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		labels, err := client.ListLabels("t1")
+		require.NoError(t, err)
+		assert.Len(t, labels, 2)
+	})
+
+	t.Run("paginates workflow states", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"workflowStates":{"nodes":[{"id":"s1","name":"Todo"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}`),
+				jsonResponse(`{"data":{"workflowStates":{"nodes":[{"id":"s2","name":"Done"}],"pageInfo":{"hasNextPage":false}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		states, err := client.ListWorkflowStates("t1")
+		require.NoError(t, err)
+		assert.Len(t, states, 2)
+	})
+
+	t.Run("missing team is still reported", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{jsonResponse(`{"data":{"team":null}}`)},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.ListTeamMembers("nope")
+		require.ErrorContains(t, err, "team nope not found")
+	})
 }
 
 func Test__Client__CreateIssue(t *testing.T) {
