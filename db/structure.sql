@@ -1561,10 +1561,24 @@ CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_
 
 
 --
+-- Name: idx_workflow_node_queue_items_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_queue_items_workflow_node_id ON public.workflow_node_queue_items USING btree (workflow_id, node_id);
+
+
+--
 -- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
+
+
+--
+-- Name: idx_workflow_node_requests_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_workflow_node_id ON public.workflow_node_requests USING btree (workflow_id, node_id);
 
 
 --
@@ -2238,7 +2252,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260718092719	f
+20260720125600	f
 \.
 
 

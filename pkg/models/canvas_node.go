@@ -237,6 +237,133 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 	return result, tx.Delete(&webhook).Error
 }
 
+func (c *CanvasNode) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Delete(c).
+		Error
+}
+
+// ListFinishedRuns returns finished runs rooted on this node, oldest first.
+// Active/cancelling runs are excluded so live-canvas cleanup never tears down
+// in-flight work that may still touch other nodes.
+func (c *CanvasNode) ListFinishedRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := db.
+		Model(&CanvasRun{}).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Where("state = ?", CanvasRunStateFinished).
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func (c *CanvasNode) CountRuns(db *gorm.DB) (int64, error) {
+	var count int64
+	err := db.Model(&CanvasRun{}).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// DeleteRemainingResources deletes node-scoped rows that are not owned by a
+// still-existing workflow run. Rows belonging to live runs rooted elsewhere are
+// left alone so those runs stay consistent.
+func (c *CanvasNode) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDeletionSummary, bool, error) {
+	summary := &RunDeletionSummary{}
+	if maxRecords <= 0 {
+		return summary, true, nil
+	}
+
+	type remainingResource struct {
+		model any
+		query string
+		args  []any
+		apply func(int64)
+	}
+
+	nodeScope := []any{c.WorkflowID, c.NodeID}
+	runOrphan := `workflow_id = ? AND node_id = ? AND (
+		run_id IS NULL OR NOT EXISTS (
+			SELECT 1 FROM workflow_runs r WHERE r.id = run_id
+		)
+	)`
+	executionOrphan := `workflow_id = ? AND node_id = ? AND (
+		execution_id IS NULL OR NOT EXISTS (
+			SELECT 1 FROM workflow_node_executions e
+			WHERE e.id = execution_id
+			AND EXISTS (SELECT 1 FROM workflow_runs r WHERE r.id = e.run_id)
+		)
+	)`
+
+	resources := []remainingResource{
+		{model: &CanvasNodeRequest{}, query: executionOrphan, args: nodeScope, apply: func(count int64) { summary.NodeRequests = count }},
+		{model: &CanvasNodeExecutionKV{}, query: executionOrphan, args: nodeScope, apply: func(count int64) { summary.NodeExecutionKVs = count }},
+		{model: &CanvasNodeQueueItem{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.NodeQueueItems = count }},
+		{model: &CanvasEvent{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.Events = count }},
+		{model: &CanvasNodeExecution{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.NodeExecutions = count }},
+	}
+
+	for _, resource := range resources {
+		if summary.TotalRecords() >= int64(maxRecords) {
+			return summary, false, nil
+		}
+
+		budget := maxRecords - int(summary.TotalRecords())
+		count, err := deleteRowsLimited(db, resource.model, budget, resource.query, resource.args...)
+		if err != nil {
+			return nil, false, err
+		}
+
+		resource.apply(count)
+	}
+
+	return summary, summary.TotalRecords() < int64(maxRecords), nil
+}
+
+// HasRemainingResources reports whether any node-scoped rows still exist for this
+// node, including rows owned by runs rooted on other nodes.
+func (c *CanvasNode) HasRemainingResources(db *gorm.DB) (bool, error) {
+	models := []any{
+		&CanvasNodeRequest{},
+		&CanvasNodeExecutionKV{},
+		&CanvasNodeQueueItem{},
+		&CanvasEvent{},
+		&CanvasNodeExecution{},
+		&CanvasRun{},
+	}
+
+	for _, model := range models {
+		var rows []map[string]any
+		err := db.Unscoped().Model(model).
+			Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+			Limit(1).
+			Find(&rows).Error
+		if err != nil {
+			return false, err
+		}
+		if len(rows) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
 	var node CanvasNode
 	err := tx.
@@ -260,6 +387,73 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 		First(&node).
 		Error
 
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
+// ListDeletedCanvasNodes returns soft-deleted nodes whose parent canvas and
+// organization are still active, and whose deleted_at is on or before before
+// (typically now minus the cleanup grace period). Nodes on soft-deleted canvases
+// or organizations are owned by CanvasCleanupWorker / OrganizationCleanupWorker.
+// Results are capped by limit. Ordering prefers nodes that have waited longest
+// for a cleanup pass (updated_at), then oldest soft-delete time, so nodes that
+// cannot make progress can be rotated to the back of the queue.
+func ListDeletedCanvasNodes(tx *gorm.DB, before time.Time, limit int) ([]CanvasNode, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	var nodes []CanvasNode
+	query := tx.Unscoped().
+		Model(&CanvasNode{}).
+		Where("workflow_nodes.deleted_at IS NOT NULL").
+		Where("workflow_nodes.deleted_at <= ?", before.UTC()).
+		Order("workflow_nodes.updated_at ASC NULLS FIRST, workflow_nodes.deleted_at ASC").
+		Limit(limit)
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+// RotateCleanupQueue bumps updated_at so a blocked soft-deleted node yields the
+// front of ListDeletedCanvasNodes to other candidates.
+// Use local time.Now() to match other workflow_nodes writers; the column is
+// timestamp without time zone, so UTC() would sort rotated nodes as older in
+// UTC+ environments and recreate queue starvation.
+func (c *CanvasNode) RotateCleanupQueue(tx *gorm.DB) error {
+	return tx.Unscoped().Model(c).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Update("updated_at", time.Now()).Error
+}
+
+// LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node
+// whose parent canvas and organization are still active.
+func LockDeletedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+	query := tx.Unscoped().
+		Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_nodes"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_nodes.workflow_id = ?", workflowID).
+		Where("workflow_nodes.node_id = ?", nodeID).
+		Where("workflow_nodes.deleted_at IS NOT NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
+		First(&node).
+		Error
 	if err != nil {
 		return nil, err
 	}
