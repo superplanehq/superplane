@@ -19,6 +19,7 @@ const (
 	runAppChildOnRunNodeID   = "on-run-trigger"
 	runAppChildDoneNodeID    = "child-done"
 	runAppChildFailNodeID    = "child-fail"
+	runAppChildWaitNodeID    = "child-wait"
 	runAppParentStartNodeID  = "start-trigger"
 	runAppParentRunAppNodeID = "run-app"
 	runAppParentOutputNodeID = "parent-output"
@@ -59,6 +60,17 @@ func TestRunApp(t *testing.T) {
 		steps.whenTheParentManualTriggerRuns()
 		steps.thenTheChildRunFinishedWithResult(models.CanvasRunResultFailed)
 		steps.thenTheChildRunResultMessageContains("field 'message' is required")
+		steps.thenTheParentOutputNodeFinished()
+		steps.thenTheParentRunFinishedWithResult(models.CanvasRunResultPassed)
+	})
+
+	t.Run("timeout cancels child run and routes parent through failed output", func(t *testing.T) {
+		steps := &runAppSteps{t: t}
+		steps.start()
+		steps.givenChildAppWithOnRunAndLongWait()
+		steps.givenParentAppCallingChildOnFailedWithTimeout(map[string]any{}, 2)
+		steps.whenTheParentManualTriggerRuns()
+		steps.thenTheChildRunFinishedWithResult(models.CanvasRunResultCancelled)
 		steps.thenTheParentOutputNodeFinished()
 		steps.thenTheParentRunFinishedWithResult(models.CanvasRunResultPassed)
 	})
@@ -146,15 +158,46 @@ func (s *runAppSteps) givenChildAppWithRequiredOnRunParameter() {
 	})
 }
 
+func (s *runAppSteps) givenChildAppWithOnRunAndLongWait() {
+	s.childCanvas = s.createChildCanvas(childCanvasOptions{
+		name: "Run App Child Slow",
+		onRunParameters: []any{
+			map[string]any{
+				"type":     "string",
+				"name":     "message",
+				"label":    "Message",
+				"required": false,
+			},
+		},
+		targetNode: childTargetNodeSpec{
+			id:   runAppChildWaitNodeID,
+			name: "Wait",
+			ref: models.NodeRef{
+				Component: &models.ComponentRef{Name: "wait"},
+			},
+			configuration: map[string]any{
+				"mode":    "interval",
+				"waitFor": 120,
+				"unit":    "seconds",
+			},
+		},
+	})
+}
+
 func (s *runAppSteps) givenParentAppCallingChildOnPassed(parameters map[string]any) {
-	s.givenParentAppCallingChild("passed", parameters)
+	s.givenParentAppCallingChild("passed", parameters, nil)
 }
 
 func (s *runAppSteps) givenParentAppCallingChildOnFailed(parameters map[string]any) {
-	s.givenParentAppCallingChild("failed", parameters)
+	s.givenParentAppCallingChild("failed", parameters, nil)
 }
 
-func (s *runAppSteps) givenParentAppCallingChild(runAppOutputChannel string, parameters map[string]any) {
+func (s *runAppSteps) givenParentAppCallingChildOnFailedWithTimeout(parameters map[string]any, timeoutSeconds int) {
+	timeout := timeoutSeconds
+	s.givenParentAppCallingChild("failed", parameters, &timeout)
+}
+
+func (s *runAppSteps) givenParentAppCallingChild(runAppOutputChannel string, parameters map[string]any, timeoutSeconds *int) {
 	require.NotNil(s.t, s.childCanvas, "child canvas must exist before creating parent canvas")
 
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
@@ -179,11 +222,17 @@ func (s *runAppSteps) givenParentAppCallingChild(runAppOutputChannel string, par
 			Ref: datatypes.NewJSONType(models.NodeRef{
 				Component: &models.ComponentRef{Name: "runApp"},
 			}),
-			Configuration: datatypes.NewJSONType(map[string]any{
-				"app":        s.childCanvas.ID.String(),
-				"node":       runAppChildOnRunNodeID,
-				"parameters": parameters,
-			}),
+			Configuration: datatypes.NewJSONType(func() map[string]any {
+				config := map[string]any{
+					"app":        s.childCanvas.ID.String(),
+					"node":       runAppChildOnRunNodeID,
+					"parameters": parameters,
+				}
+				if timeoutSeconds != nil {
+					config["timeout"] = *timeoutSeconds
+				}
+				return config
+			}()),
 			Metadata: datatypes.NewJSONType(map[string]any{
 				"app": map[string]any{
 					"id":   s.childCanvas.ID.String(),
