@@ -244,12 +244,16 @@ func (c *CanvasNode) HardDelete(tx *gorm.DB) error {
 		Error
 }
 
-func (c *CanvasNode) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+// ListFinishedRuns returns finished runs rooted on this node, oldest first.
+// Active/cancelling runs are excluded so live-canvas cleanup never tears down
+// in-flight work that may still touch other nodes.
+func (c *CanvasNode) ListFinishedRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
 
 	query := db.
 		Model(&CanvasRun{}).
 		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Where("state = ?", CanvasRunStateFinished).
 		Order("created_at ASC")
 
 	if limit > 0 {
@@ -422,11 +426,13 @@ func ListDeletedCanvasNodes(tx *gorm.DB, before time.Time, limit int) ([]CanvasN
 
 // RotateCleanupQueue bumps updated_at so a blocked soft-deleted node yields the
 // front of ListDeletedCanvasNodes to other candidates.
+// Use local time.Now() to match other workflow_nodes writers; the column is
+// timestamp without time zone, so UTC() would sort rotated nodes as older in
+// UTC+ environments and recreate queue starvation.
 func (c *CanvasNode) RotateCleanupQueue(tx *gorm.DB) error {
-	now := time.Now().UTC()
 	return tx.Unscoped().Model(c).
 		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
-		Update("updated_at", now).Error
+		Update("updated_at", time.Now()).Error
 }
 
 // LockDeletedCanvasNode acquires a row-level lock on a soft-deleted canvas node

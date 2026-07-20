@@ -79,6 +79,21 @@ func eligibleBeforeNow() time.Time {
 	return time.Now().AddDate(0, 0, -deletedResourceGracePeriodDays)
 }
 
+func finishRunForEvent(t *testing.T, eventID uuid.UUID) {
+	t.Helper()
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), eventID)
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"finished_at": now,
+		"updated_at":  now,
+	}).Error)
+}
+
 func Test__CanvasNodeCleanupWorker_GracePeriod(t *testing.T) {
 	r := support.Setup(t)
 
@@ -140,6 +155,7 @@ func Test__CanvasNodeCleanupWorker_GracePeriod(t *testing.T) {
 			"test-key",
 			"test-value",
 		))
+		finishRunForEvent(t, event.ID)
 
 		deletedNode := softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
 		require.NoError(t, worker.LockAndProcessNode(deletedNode))
@@ -187,6 +203,7 @@ func Test__CanvasNodeCleanupWorker_DeletesRunsThenHardDeletesNode(t *testing.T) 
 
 	deleteEvent := support.EmitCanvasEventForNode(t, canvas.ID, "delete-node", "default", nil)
 	support.CreateCanvasNodeExecution(t, canvas.ID, "delete-node", deleteEvent.ID, deleteEvent.ID)
+	finishRunForEvent(t, deleteEvent.ID)
 
 	deletedNode := softDeleteCanvasNode(t, canvas.ID, "delete-node", time.Now().AddDate(0, 0, -31))
 	require.NoError(t, worker.LockAndProcessNode(deletedNode))
@@ -197,6 +214,56 @@ func Test__CanvasNodeCleanupWorker_DeletesRunsThenHardDeletesNode(t *testing.T) 
 	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "keep-node"))
 	assert.Equal(t, int64(1), countNodeEvents(t, canvas.ID, "keep-node"))
 	assert.Equal(t, int64(1), countNodeRuns(t, canvas.ID, "keep-node"))
+}
+
+func Test__CanvasNodeCleanupWorker_SkipsActiveRunsOnLiveCanvas(t *testing.T) {
+	r := support.Setup(t)
+	worker := NewCanvasNodeCleanupWorker()
+	worker.pauseBetweenBatches = 0
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "delete-node",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "live-node",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "delete-node", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "live-node", rootEvent.ID, rootEvent.ID)
+
+	older := time.Now().AddDate(0, 0, -40)
+	deletedNode := softDeleteCanvasNode(t, canvas.ID, "delete-node", older)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "delete-node").
+		Update("updated_at", older).Error)
+
+	require.NoError(t, worker.LockAndProcessNode(deletedNode))
+
+	assert.Equal(t, int64(1), countUnscopedCanvasNodes(t, canvas.ID, "delete-node"))
+	assert.Equal(t, int64(1), countNodeRuns(t, canvas.ID, "delete-node"))
+	assert.Equal(t, int64(1), countNodeExecutions(t, canvas.ID, "live-node"))
+
+	// Active run blocks cleanup; rotation should yield the queue slot.
+	updated, err := models.FindUnscopedCanvasNode(database.Conn(), canvas.ID, "delete-node")
+	require.NoError(t, err)
+	require.NotNil(t, updated.UpdatedAt)
+	assert.True(t, updated.UpdatedAt.After(older))
 }
 
 func Test__CanvasNodeCleanupWorker_RotatesWhenBlockedByForeignRun(t *testing.T) {
@@ -243,6 +310,7 @@ func Test__CanvasNodeCleanupWorker_RotatesWhenBlockedByForeignRun(t *testing.T) 
 
 	readyEvent := support.EmitCanvasEventForNode(t, canvas.ID, "ready-node", "default", nil)
 	support.CreateCanvasNodeExecution(t, canvas.ID, "ready-node", readyEvent.ID, readyEvent.ID)
+	finishRunForEvent(t, readyEvent.ID)
 
 	older := time.Now().AddDate(0, 0, -40)
 	newer := time.Now().AddDate(0, 0, -35)
@@ -306,6 +374,7 @@ func Test__CanvasNodeCleanupWorker_HandlesMultiTickRunBudget(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
+		finishRunForEvent(t, event.ID)
 	}
 
 	deletedNode := softDeleteCanvasNode(t, canvas.ID, "node-1", time.Now().AddDate(0, 0, -31))
@@ -580,6 +649,7 @@ func Test__CanvasNodeCleanupWorker_LoadDoesNotStarveHotPath(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			event := support.EmitCanvasEventForNode(t, canvas.ID, node.NodeID, "default", nil)
 			support.CreateCanvasNodeExecution(t, canvas.ID, node.NodeID, event.ID, event.ID)
+			finishRunForEvent(t, event.ID)
 		}
 		deletedNodes = append(deletedNodes, softDeleteCanvasNode(t, canvas.ID, node.NodeID, time.Now().AddDate(0, 0, -31)))
 	}

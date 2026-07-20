@@ -200,9 +200,11 @@ func (w *CanvasNodeCleanupWorker) LockAndProcessNode(node models.CanvasNode) err
 }
 
 func (w *CanvasNodeCleanupWorker) cleanNodeRuns(node models.CanvasNode) (int, error) {
-	runs, err := node.ListRuns(database.Conn(), w.maxRunsPerNodePerTick)
+	// Only finished runs: the parent canvas is still live, so deleting an
+	// in-flight run would remove executions/events on other active nodes.
+	runs, err := node.ListFinishedRuns(database.Conn(), w.maxRunsPerNodePerTick)
 	if err != nil {
-		return 0, fmt.Errorf("list workflow runs for node cleanup: %w", err)
+		return 0, fmt.Errorf("list finished workflow runs for node cleanup: %w", err)
 	}
 
 	deleted := 0
