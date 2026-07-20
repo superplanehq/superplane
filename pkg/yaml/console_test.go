@@ -2036,3 +2036,122 @@ func TestValidateConsoleContent_RejectsScorecardWithNonStringTarget(t *testing.T
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render.target must be a string")
 }
+
+// boardPanel returns a ConsolePanel of type "board" with the given render
+// map merged over a minimal valid base. Tests customize just the fields
+// they exercise so the intent stays legible.
+func boardPanel(render map[string]any) ConsolePanel {
+	base := map[string]any{
+		"kind":    "board",
+		"groupBy": "status",
+		"lanes":   []any{map[string]any{"value": "Todo"}, map[string]any{"value": "Done", "color": "green"}},
+		"card":    map[string]any{"titleField": "title"},
+	}
+	for k, v := range render {
+		base[k] = v
+	}
+	return ConsolePanel{
+		ID:   "factory",
+		Type: ConsolePanelTypeBoard,
+		Content: map[string]any{
+			"dataSource": map[string]any{"kind": "memory", "namespace": "factory_tasks"},
+			"render":     base,
+		},
+	}
+}
+
+func TestValidateConsoleContent_AcceptsBoardPanel(t *testing.T) {
+	panel := boardPanel(map[string]any{
+		"otherLane": true,
+		"card": map[string]any{
+			"titleField": "title",
+			"fields": []any{
+				map[string]any{"field": "pr_url", "format": "link", "label": "PR"},
+				map[string]any{"field": "updatedAt", "format": "relative"},
+			},
+		},
+		"where":      []any{map[string]any{"field": "archived", "op": "not_exists"}},
+		"sort":       map[string]any{"field": "updatedAt", "order": "desc"},
+		"rowActions": []any{map[string]any{"kind": "trigger", "node": "start", "hook": "run"}},
+	})
+
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_RejectsBoardWithoutGroupBy(t *testing.T) {
+	panel := boardPanel(map[string]any{"groupBy": ""})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.groupBy must be a non-empty string")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithEmptyLanes(t *testing.T) {
+	panel := boardPanel(map[string]any{"lanes": []any{}})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.lanes must be a non-empty array")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithBlankLaneValue(t *testing.T) {
+	panel := boardPanel(map[string]any{"lanes": []any{map[string]any{"value": " "}}})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.lanes[0].value must be a non-empty string")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithUnknownLaneColor(t *testing.T) {
+	panel := boardPanel(map[string]any{"lanes": []any{map[string]any{"value": "Todo", "color": "fuchsia"}}})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.lanes[0].color must be one of")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithoutCard(t *testing.T) {
+	panel := boardPanel(map[string]any{"card": nil})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.card must be an object")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithBlankTitleField(t *testing.T) {
+	panel := boardPanel(map[string]any{"card": map[string]any{"titleField": ""}})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.card.titleField must be a non-empty string")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithBadCardField(t *testing.T) {
+	panel := boardPanel(map[string]any{
+		"card": map[string]any{
+			"titleField": "title",
+			"fields":     []any{map[string]any{"field": ""}},
+		},
+	})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.card.fields[0].field must be a non-empty string")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithNonBooleanOtherLane(t *testing.T) {
+	panel := boardPanel(map[string]any{"otherLane": "yes"})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.otherLane must be a boolean")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithBadRowAction(t *testing.T) {
+	panel := boardPanel(map[string]any{
+		"rowActions": []any{map[string]any{"kind": "trigger", "hook": "run"}},
+	})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.rowActions[0].node must be set to a trigger node")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithWrongRenderKind(t *testing.T) {
+	panel := boardPanel(map[string]any{"kind": "table"})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.kind must be "board"`)
+}
