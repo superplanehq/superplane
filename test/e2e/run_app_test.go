@@ -2,9 +2,11 @@ package e2e
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,6 +16,8 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+const runAppTimeoutFlowDeadline = 10 * time.Second
 
 const (
 	runAppChildOnRunNodeID   = "on-run-trigger"
@@ -70,9 +74,10 @@ func TestRunApp(t *testing.T) {
 		steps.givenChildAppWithOnRunAndLongWait()
 		steps.givenParentAppCallingChildOnFailedWithTimeout(map[string]any{}, 2)
 		steps.whenTheParentManualTriggerRuns()
-		steps.thenTheChildRunFinishedWithResult(models.CanvasRunResultCancelled)
-		steps.thenTheParentOutputNodeFinished()
-		steps.thenTheParentRunFinishedWithResult(models.CanvasRunResultPassed)
+		steps.thenTheChildRunFinishedWithResultWithin(runAppTimeoutFlowDeadline, models.CanvasRunResultCancelled)
+		steps.thenTheParentRunAppExecutionReportsTimeoutWithin(steps.remainingWithin(runAppTimeoutFlowDeadline), 2)
+		steps.thenTheParentOutputNodeFinishedWithin(steps.remainingWithin(runAppTimeoutFlowDeadline))
+		steps.thenTheParentRunFinishedWithResultWithin(steps.remainingWithin(runAppTimeoutFlowDeadline), models.CanvasRunResultPassed)
 	})
 }
 
@@ -82,6 +87,8 @@ type runAppSteps struct {
 
 	childCanvas  *models.Canvas
 	parentCanvas *shared.CanvasSteps
+
+	triggeredAt time.Time
 }
 
 func (s *runAppSteps) start() {
@@ -270,11 +277,24 @@ func (s *runAppSteps) givenParentAppCallingChild(runAppOutputChannel string, par
 }
 
 func (s *runAppSteps) whenTheParentManualTriggerRuns() {
+	s.triggeredAt = time.Now()
 	s.parentCanvas.EmitManualTrigger("Start")
 }
 
+func (s *runAppSteps) remainingWithin(total time.Duration) time.Duration {
+	require.False(s.t, s.triggeredAt.IsZero(), "parent trigger must run before checking remaining timeout")
+
+	remaining := total - time.Since(s.triggeredAt)
+	require.Positivef(s.t, remaining, "expected workflow step to finish within %s", total)
+	return remaining
+}
+
 func (s *runAppSteps) thenTheChildRunFinishedWithResult(expected string) {
-	childRun := s.waitForChildRunFinished(90 * time.Second)
+	s.thenTheChildRunFinishedWithResultWithin(90*time.Second, expected)
+}
+
+func (s *runAppSteps) thenTheChildRunFinishedWithResultWithin(within time.Duration, expected string) {
+	childRun := s.waitForChildRunFinished(within)
 	require.Equal(s.t, expected, childRun.Result)
 }
 
@@ -284,12 +304,73 @@ func (s *runAppSteps) thenTheChildRunResultMessageContains(expected string) {
 }
 
 func (s *runAppSteps) thenTheParentOutputNodeFinished() {
-	s.parentCanvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
+	s.thenTheParentOutputNodeFinishedWithin(90 * time.Second)
+}
+
+func (s *runAppSteps) thenTheParentOutputNodeFinishedWithin(within time.Duration) {
+	s.parentCanvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, within)
 }
 
 func (s *runAppSteps) thenTheParentRunFinishedWithResult(expected string) {
-	parentRun := s.waitForParentRunFinished(90 * time.Second)
+	s.thenTheParentRunFinishedWithResultWithin(90*time.Second, expected)
+}
+
+func (s *runAppSteps) thenTheParentRunFinishedWithResultWithin(within time.Duration, expected string) {
+	parentRun := s.waitForParentRunFinished(within)
 	require.Equal(s.t, expected, parentRun.Result)
+}
+
+func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within time.Duration, timeoutSeconds int) {
+	deadline := time.Now().Add(within)
+	expectedError := fmt.Sprintf("timed out after %ds", timeoutSeconds)
+
+	for time.Now().Before(deadline) {
+		executions := s.parentCanvas.GetExecutionsForNode("Run Child")
+		if len(executions) == 0 {
+			time.Sleep(300 * time.Millisecond)
+			continue
+		}
+
+		execution := executions[0]
+		if execution.State != models.CanvasNodeExecutionStateFinished {
+			time.Sleep(300 * time.Millisecond)
+			continue
+		}
+
+		metadata := runAppExecutionMetadataFromExecution(execution)
+		if metadata.TimedOutAt != nil && *metadata.TimedOutAt != "" &&
+			metadata.Run != nil && metadata.Run.Error != nil && *metadata.Run.Error == expectedError {
+			return
+		}
+
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	executions := s.parentCanvas.GetExecutionsForNode("Run Child")
+	require.NotEmpty(s.t, executions, "expected run app execution")
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, executions[0].State)
+
+	metadata := runAppExecutionMetadataFromExecution(executions[0])
+	require.NotNil(s.t, metadata.TimedOutAt)
+	require.NotEmpty(s.t, *metadata.TimedOutAt)
+	require.NotNil(s.t, metadata.Run)
+	require.NotNil(s.t, metadata.Run.Error)
+	require.Equal(s.t, expectedError, *metadata.Run.Error)
+}
+
+type runAppExecutionMetadata struct {
+	Run        *runAppRunMetadata `mapstructure:"run"`
+	TimedOutAt *string            `mapstructure:"timedOutAt"`
+}
+
+type runAppRunMetadata struct {
+	Error *string `mapstructure:"error"`
+}
+
+func runAppExecutionMetadataFromExecution(execution models.CanvasNodeExecution) runAppExecutionMetadata {
+	var metadata runAppExecutionMetadata
+	_ = mapstructure.Decode(execution.Metadata.Data(), &metadata)
+	return metadata
 }
 
 func (s *runAppSteps) waitForParentRunFinished(timeout time.Duration) *models.CanvasRun {
