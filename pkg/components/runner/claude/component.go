@@ -51,7 +51,7 @@ func (c *RunClaudeCode) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *RunClaudeCode) Description() string {
-	return "Runs the Claude Code CLI on a fleet runner (claude must already be installed on the machine)"
+	return "Runs Claude Code on a fleet runner"
 }
 
 func (c *RunClaudeCode) Documentation() string {
@@ -59,17 +59,17 @@ func (c *RunClaudeCode) Documentation() string {
 
 ## Prerequisites
 - The ` + "`claude`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + `.
-- An Anthropic API key stored as a SuperPlane secret (passed as ` + "`ANTHROPIC_API_KEY`" + `).
+- An Anthropic API key stored as a SuperPlane secret.
 
 ## Steps
-Configure an ordered list of **bash** and **prompt** steps. Each step runs as its own broker command so **View logs** shows a separate section per step:
+Configure an ordered list of **bash** and **prompt** steps:
 
 - **bash** — shell commands (clone a repo, install deps, run tests, push).
-- **prompt** — a Claude Code headless turn (` + "`claude --bare -p`" + `). After the first prompt, later prompts use ` + "`--continue`" + ` so they share the same Claude session.
+- **prompt** — a Claude Code turn. Later prompts continue the same session.
 
 Example:
 
-1. bash — ` + "`git clone …`" + ` then ` + "`cd repo`" + ` (directory carries to later steps)
+1. bash — ` + "`git clone …`" + `
 2. prompt — implement the feature
 3. prompt — run tests and fix failures
 4. bash — ` + "`git push`" + `
@@ -83,7 +83,7 @@ Example:
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
 ## Output
-Prompt steps stream readable agent activity to **View logs** (Claude text, tool calls, and truncated tool results). The latest stream ` + "`result`" + ` event is emitted as **result** on the finished event.
+Prompt steps stream agent activity to **View logs**. The finished event includes the latest Claude ` + "`result`" + `.
 
 ## Output channels
 - **Passed**: All steps finished with exit code **0**.
