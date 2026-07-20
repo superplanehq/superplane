@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
+  <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
@@ -35,6 +36,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
@@ -158,6 +160,32 @@ Each emitted event carries:
   },
   "timestamp": "2024-01-01T09:00:00Z",
   "type": "onError.triggered"
+}
+```
+
+<a id="on-run"></a>
+
+## On Run
+
+**Trigger key:** `onRun`
+
+Handle runs started from another app
+
+### Example Data
+
+```json
+{
+  "data": {
+    "app": {
+      "id": "123",
+      "name": "Source App"
+    },
+    "parameters": {
+      "parameter": "hello"
+    }
+  },
+  "timestamp": "2026-07-19T12:00:00Z",
+  "type": "app.invocation"
 }
 ```
 
@@ -1025,6 +1053,29 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="run-app"></a>
+
+## Run App
+
+**Component key:** `runApp`
+
+Run another SuperPlane app and wait for its run to finish
+
+### Example Output
+
+```json
+{
+  "data": {
+    "run": {
+      "id": "123",
+      "result": "passed"
+    }
+  },
+  "timestamp": "2026-07-19T12:00:00Z",
+  "type": "app.invocation.passed"
 }
 ```
 

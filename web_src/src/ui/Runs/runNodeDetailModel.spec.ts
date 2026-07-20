@@ -425,6 +425,39 @@ describe("buildRunInspectorNodeSections", () => {
     expect(failedAction?.errorMessage).toBe("failed before details loaded");
   });
 
+  it("does not treat successful execution refs as node errors", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+      executions: [
+        {
+          id: "execution-passed",
+          nodeId: "passed-action",
+          result: "RESULT_PASSED",
+          resultReason: "RESULT_REASON_OK",
+          resultMessage: "",
+        },
+      ],
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "passed-action", name: "Passed Action", type: "TYPE_ACTION", component: "test.passed" },
+      ],
+    });
+
+    const passedAction = sections.find((section) => section.nodeId === "passed-action");
+
+    expect(passedAction?.errorMessage).toBeUndefined();
+  });
+
   it("keeps channel names when displaying multiple execution output channels", () => {
     const run: CanvasesCanvasRun = {
       rootEvent: {

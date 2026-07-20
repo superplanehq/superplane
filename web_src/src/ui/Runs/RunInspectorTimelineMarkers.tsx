@@ -2,7 +2,7 @@ import { ScrollText, SquareCheckBig } from "lucide-react";
 import type { ReactNode } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
-import type { RunInspectorNodeSection, RunInspectorUpstreamSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection, RunInspectorUpstreamSection } from "./types";
 import type { TimelineStepType } from "./RunInspectorTimelineTypes";
 
 export function TimelineRail({

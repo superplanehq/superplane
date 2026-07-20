@@ -6,7 +6,6 @@ import {
   ConfigurationStorySeed,
   STORY_AUTOCOMPLETE_CONTEXT,
   STORY_DOMAIN_ID,
-  STORY_DOMAIN_TYPE,
   STORY_INTEGRATION_ID,
   rendererCategoryOrder,
   rendererExampleMap,
@@ -78,8 +77,6 @@ function RendererPlayground({ example }: { example: RendererExample }) {
           value={value}
           onChange={setValue}
           allValues={allValues}
-          domainId={STORY_DOMAIN_ID}
-          domainType={STORY_DOMAIN_TYPE}
           organizationId={STORY_DOMAIN_ID}
           integrationId={STORY_INTEGRATION_ID}
           autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
@@ -153,8 +150,6 @@ function RendererCatalog() {
                         }))
                       }
                       allValues={allValues}
-                      domainId={STORY_DOMAIN_ID}
-                      domainType={STORY_DOMAIN_TYPE}
                       organizationId={STORY_DOMAIN_ID}
                       integrationId={STORY_INTEGRATION_ID}
                       autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
@@ -222,6 +217,7 @@ export const RoleField = createExampleStory("role");
 export const GroupField = createExampleStory("group");
 export const IntegrationResourceField = createExampleStory("integration-resource");
 export const AppField = createExampleStory("app");
+export const AppCanvasNodeField = createExampleStory("app-canvas-node");
 export const AnyPredicateListField = createExampleStory("any-predicate-list");
 export const GitRefField = createExampleStory("git-ref");
 export const SecretKeyField = createExampleStory("secret-key");

@@ -652,6 +652,10 @@ func (c *AppContext) Get(idOrName string) (*core.App, error) {
 	return app, nil
 }
 
+func (c *AppContext) GetNode(app, node string) (*core.CanvasNode, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
 func (c *AppContext) Subscribe(id string) error {
 	if c.SubscribeErrFor != nil {
 		if err, ok := c.SubscribeErrFor[id]; ok {

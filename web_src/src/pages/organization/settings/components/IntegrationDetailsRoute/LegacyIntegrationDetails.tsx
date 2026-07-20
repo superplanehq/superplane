@@ -292,8 +292,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                         value={configValues[field.name!]}
                         onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
                         allValues={configValues}
-                        domainId={organizationId}
-                        domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={organizationId}
                         integrationId={integration?.metadata?.id}
                       />

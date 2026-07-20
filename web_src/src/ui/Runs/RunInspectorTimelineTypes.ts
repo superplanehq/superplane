@@ -1,4 +1,4 @@
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 export const ACCORDION_STORAGE_KEY = "superplane.runInspector.internalAccordions";
 

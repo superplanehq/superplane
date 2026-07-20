@@ -1864,7 +1864,6 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
-      domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
         getCustomField && state.componentSidebar.selectedNodeId
           ? getCustomField(

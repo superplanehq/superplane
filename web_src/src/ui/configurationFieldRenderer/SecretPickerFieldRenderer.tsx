@@ -12,7 +12,7 @@ interface SecretPickerFieldRendererProps {
   required?: boolean;
   value: string | undefined;
   onChange: (value: string) => void;
-  organizationId: string | undefined;
+  organizationId?: string;
 }
 
 /**
