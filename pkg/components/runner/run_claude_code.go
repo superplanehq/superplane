@@ -60,7 +60,7 @@ func (c *RunClaudeCode) Documentation() string {
 - An Anthropic API key stored as a SuperPlane secret (passed as ` + "`ANTHROPIC_API_KEY`" + `).
 
 ## Steps
-Configure an ordered list of **bash** and **prompt** steps. They run top-to-bottom in one shell session:
+Configure an ordered list of **bash** and **prompt** steps. Each step runs as its own broker command so **View logs** shows a separate section per step:
 
 - **bash** — shell commands (clone a repo, install deps, run tests, push).
 - **prompt** — a Claude Code headless turn (` + "`claude --bare -p`" + `). After the first prompt, later prompts use ` + "`--continue`" + ` so they share the same Claude session.
@@ -77,14 +77,14 @@ Example:
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
-- **Working directory**: Optional directory the script starts in before the first step.
+- **Working directory**: Optional directory each step starts in.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
 ## Output
-Prompt steps stream readable agent activity to **View logs** (Claude text, tool calls, and truncated tool results). The final stream ` + "`result`" + ` event is emitted as **result** on the finished event.
+Prompt steps stream readable agent activity to **View logs** (Claude text, tool calls, and truncated tool results). The latest stream ` + "`result`" + ` event is emitted as **result** on the finished event.
 
 ## Output channels
-- **Passed**: The script finished with exit code **0**.
+- **Passed**: All steps finished with exit code **0**.
 - **Failed**: A bash or prompt step failed (non-zero exit).
 `
 }
@@ -325,21 +325,16 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	messageChain, err := messageChainJSON(ctx.Expressions)
-	if err != nil {
-		return err
-	}
-
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
+	// command_list tasks only accept commands (no message_chain / script fields).
+	task := buildClaudeCodeBrokerTask(spec)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
-		RunMode:        RunModeBash,
-		Script:         buildClaudeCodeScript(spec),
-		MessageChain:   messageChain,
+		Commands:       task.Commands,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  ExecutionModeHost,

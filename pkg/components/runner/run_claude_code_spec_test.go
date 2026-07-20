@@ -2,6 +2,7 @@ package runner
 
 import (
 	"encoding/base64"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -86,7 +87,7 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 	})
 }
 
-func TestBuildClaudeCodeScriptRunsOrderedSteps(t *testing.T) {
+func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	t.Parallel()
 
 	spec := RunClaudeCodeSpec{
@@ -100,21 +101,42 @@ func TestBuildClaudeCodeScriptRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	script := buildClaudeCodeScript(spec)
-	assert.Contains(t, script, "cd '/tmp/workspace'")
-	assert.Contains(t, script, "==> Step 1: bash (Clone repo)")
-	assert.Contains(t, script, "git clone https://github.com/acme/widgets.git repo")
-	assert.Contains(t, script, "==> Step 2: prompt (Fix panic)")
-	assert.Contains(t, script, "==> Step 3: prompt (Fix tests)")
-	assert.Contains(t, script, "==> Step 4: bash (Push)")
-	assert.Contains(t, script, "git push")
-	assert.Contains(t, script, "--continue")
-	assert.Contains(t, script, "--output-format stream-json")
-	assert.Contains(t, script, "--verbose")
-	assert.Contains(t, script, "--include-partial-messages")
-	assert.Contains(t, script, "python3 -u")
-	assert.Contains(t, script, "write_claude_result")
-	assert.Contains(t, script, base64.StdEncoding.EncodeToString([]byte("Fix auth.py's nil panic")))
+	task := buildClaudeCodeBrokerTask(spec)
+	require.Len(t, task.Commands, 5)
+	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.True(t, strings.HasPrefix(task.Commands[0].Command, "bash -c "))
+	assert.Contains(t, task.Commands[0].Command, "claude CLI not found")
+	assert.Contains(t, task.Commands[0].Command, "python3 not found")
+	assert.Contains(t, task.Commands[0].Command, "/tmp/workspace")
+	assert.Contains(t, task.Commands[0].Command, "01-clone-repo.sh")
+	assert.Contains(t, task.Commands[0].Command, "02-fix-panic.sh")
+	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(claudeStreamFormatPython)))
+	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(claudeWriteResultScript())))
+
+	assert.Equal(t, BrokerCommand{Name: "Clone repo", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-clone-repo.sh"`}, task.Commands[1])
+	assert.Equal(t, BrokerCommand{Name: "Fix panic", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-fix-panic.sh"`}, task.Commands[2])
+	assert.Equal(t, BrokerCommand{Name: "Fix tests", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-fix-tests.sh"`}, task.Commands[3])
+	assert.Equal(t, BrokerCommand{Name: "Push", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/04-push.sh"`}, task.Commands[4])
+
+	cloneScript := buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo")
+	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(cloneScript)))
+
+	promptScript := buildClaudePromptStepScript("Fix auth.py's nil panic", "sonnet")
+	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(promptScript)))
+	assert.Contains(t, promptScript, "--output-format stream-json")
+	assert.Contains(t, promptScript, "--continue")
+	assert.Contains(t, promptScript, "python3 -u")
+	assert.Contains(t, promptScript, base64.StdEncoding.EncodeToString([]byte("Fix auth.py's nil panic")))
+	assert.Contains(t, promptScript, "--model 'sonnet'")
+	assert.Contains(t, promptScript, "write-result.sh")
+}
+
+func TestClaudeStepScriptName(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "01-clone-repo.sh", claudeStepScriptName(1, "Clone repo"))
+	assert.Equal(t, "02-step.sh", claudeStepScriptName(2, "!!!"))
+	assert.Equal(t, "03-step.sh", claudeStepScriptName(3, "   "))
 }
 
 func TestShellSingleQuote(t *testing.T) {

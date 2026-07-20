@@ -50,16 +50,19 @@ func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 	assert.NotContains(t, got, `"type":"assistant"`)
 }
 
-func TestBuildClaudeCodeScriptUsesReadableFormatter(t *testing.T) {
+func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
 	t.Parallel()
 
-	script := buildClaudeCodeScript(RunClaudeCodeSpec{
+	task := buildClaudeCodeBrokerTask(RunClaudeCodeSpec{
 		Steps: []ClaudeCodeStep{
 			{Name: "Do it", Type: claudeStepPrompt, Prompt: strPtr("do it")},
 		},
 	})
-	assert.Contains(t, script, "python3 -u")
-	assert.Contains(t, script, "format_script")
-	assert.Contains(t, script, "tee -a")
-	assert.Contains(t, script, "python3 not found on PATH")
+	require.Len(t, task.Commands, 2)
+	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.Contains(t, task.Commands[0].Command, "python3 not found on PATH")
+	assert.Contains(t, task.Commands[0].Command, "format.py")
+	promptScript := buildClaudePromptStepScript("do it", "")
+	assert.Contains(t, promptScript, "python3 -u")
+	assert.Contains(t, promptScript, "tee -a")
 }
