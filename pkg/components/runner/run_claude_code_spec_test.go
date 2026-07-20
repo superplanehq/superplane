@@ -2,19 +2,22 @@ package runner
 
 import (
 	"encoding/base64"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func strPtr(v string) *string { return &v }
+
 func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
 		"machine_type": testRunnerMachineType,
-		"prompt":       "fix the bug",
+		"steps": []map[string]any{
+			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
+		},
 		"anthropicApiKey": map[string]any{
 			"secret": "anthropic",
 			"key":    "api_key",
@@ -22,89 +25,96 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	require.Len(t, spec.Steps, 1)
+	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
+	assert.Equal(t, claudeStepPrompt, spec.Steps[0].Type)
+}
+
+func TestDecodeRunClaudeCodeSpecMigratesLegacyFields(t *testing.T) {
+	t.Parallel()
+
+	spec, err := decodeRunClaudeCodeSpec(map[string]any{
+		"machine_type":          testRunnerMachineType,
+		"prompt":                "implement the issue",
+		"enable_setup_commands": true,
+		"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",
+		"enable_after_commands": true,
+		"after_commands":        "git push",
+		"anthropicApiKey": map[string]any{
+			"secret": "anthropic",
+			"key":    "api_key",
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, spec.Steps, 3)
+	assert.Equal(t, "Setup", spec.Steps[0].Name)
+	assert.Equal(t, claudeStepBash, spec.Steps[0].Type)
+	assert.Equal(t, "Prompt", spec.Steps[1].Name)
+	assert.Equal(t, claudeStepPrompt, spec.Steps[1].Type)
+	assert.Equal(t, "After", spec.Steps[2].Name)
+	assert.Equal(t, claudeStepBash, spec.Steps[2].Type)
 }
 
 func TestValidateRunClaudeCodeSpec(t *testing.T) {
 	t.Parallel()
 
 	valid := RunClaudeCodeSpec{
-		MachineType:     testRunnerMachineType,
-		Prompt:          "do the thing",
+		MachineType: testRunnerMachineType,
+		Steps: []ClaudeCodeStep{
+			{Name: "Do the thing", Type: claudeStepPrompt, Prompt: strPtr("do the thing")},
+		},
 		AnthropicAPIKey: secretRef("anthropic", "api_key"),
 	}
 	require.NoError(t, validateRunClaudeCodeSpec(valid))
 
-	t.Run("requires prompt", func(t *testing.T) {
+	t.Run("requires step name", func(t *testing.T) {
 		spec := valid
-		spec.Prompt = "  "
+		spec.Steps = []ClaudeCodeStep{{Type: claudeStepPrompt, Prompt: strPtr("go")}}
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires api key", func(t *testing.T) {
+	t.Run("requires steps", func(t *testing.T) {
 		spec := valid
-		spec.AnthropicAPIKey = secretRef("", "")
+		spec.Steps = nil
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("rejects ANTHROPIC_API_KEY in environment", func(t *testing.T) {
-		value := "should-not-use"
+	t.Run("requires at least one prompt", func(t *testing.T) {
 		spec := valid
-		spec.Environment = []EnvironmentVariable{{
-			Name:        envAnthropicAPIKey,
-			ValueSource: EnvironmentValueSourceLiteral,
-			Value:       &value,
-		}}
-		require.Error(t, validateRunClaudeCodeSpec(spec))
-	})
-
-	t.Run("requires setup commands when enabled", func(t *testing.T) {
-		spec := valid
-		spec.EnableSetupCommands = true
-		spec.SetupCommands = "   \n  "
-		require.Error(t, validateRunClaudeCodeSpec(spec))
-	})
-
-	t.Run("requires after commands when enabled", func(t *testing.T) {
-		spec := valid
-		spec.EnableAfterCommands = true
-		spec.AfterCommands = "   \n  "
+		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: claudeStepBash, Command: strPtr("echo hi")}}
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 }
 
-func TestBuildClaudeCodeScript(t *testing.T) {
+func TestBuildClaudeCodeScriptRunsOrderedSteps(t *testing.T) {
 	t.Parallel()
 
 	spec := RunClaudeCodeSpec{
-		Prompt:           "Fix auth.py's nil panic",
 		Model:            "sonnet",
-		WorkingDirectory: "/tmp/repo",
+		WorkingDirectory: "/tmp/workspace",
+		Steps: []ClaudeCodeStep{
+			{Name: "Clone repo", Type: claudeStepBash, Command: strPtr("git clone https://github.com/acme/widgets.git repo")},
+			{Name: "Fix panic", Type: claudeStepPrompt, Prompt: strPtr("Fix auth.py's nil panic")},
+			{Name: "Fix tests", Type: claudeStepPrompt, Prompt: strPtr("Run the tests and fix failures")},
+			{Name: "Push", Type: claudeStepBash, Command: strPtr("git push")},
+		},
 	}
 
 	script := buildClaudeCodeScript(spec)
-	assert.Contains(t, script, "command -v claude")
-	assert.Contains(t, script, "--bare -p --output-format json")
-	assert.Contains(t, script, "--permission-mode 'acceptEdits'")
-	assert.Contains(t, script, "--model 'sonnet'")
-	assert.Contains(t, script, "--allowedTools 'Bash,Read,Edit,Write'")
-	assert.Contains(t, script, "cd '/tmp/repo'")
-	assert.Contains(t, script, "SUPERPLANE_RESULT_FILE")
-	assert.Contains(t, script, base64.StdEncoding.EncodeToString([]byte(spec.Prompt)))
-	assert.NotContains(t, script, "git push")
-}
-
-func TestBuildClaudeCodeScriptIncludesAfterCommands(t *testing.T) {
-	t.Parallel()
-
-	script := buildClaudeCodeScript(RunClaudeCodeSpec{
-		Prompt:              "ship it",
-		EnableAfterCommands: true,
-		AfterCommands:       "git push\ngh pr create --fill",
-	})
-	assert.Contains(t, script, "claude")
+	assert.Contains(t, script, "cd '/tmp/workspace'")
+	assert.Contains(t, script, "==> Step 1: bash (Clone repo)")
+	assert.Contains(t, script, "git clone https://github.com/acme/widgets.git repo")
+	assert.Contains(t, script, "==> Step 2: prompt (Fix panic)")
+	assert.Contains(t, script, "==> Step 3: prompt (Fix tests)")
+	assert.Contains(t, script, "==> Step 4: bash (Push)")
 	assert.Contains(t, script, "git push")
-	assert.Contains(t, script, "gh pr create --fill")
-	assert.Greater(t, strings.Index(script, "git push"), strings.Index(script, "SUPERPLANE_RESULT_FILE"))
+	assert.Contains(t, script, "--continue")
+	assert.Contains(t, script, "--output-format stream-json")
+	assert.Contains(t, script, "--verbose")
+	assert.Contains(t, script, "--include-partial-messages")
+	assert.Contains(t, script, "python3 -u")
+	assert.Contains(t, script, "write_claude_result")
+	assert.Contains(t, script, base64.StdEncoding.EncodeToString([]byte("Fix auth.py's nil panic")))
 }
 
 func TestShellSingleQuote(t *testing.T) {

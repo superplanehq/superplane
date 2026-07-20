@@ -14,10 +14,6 @@ const (
 	RunClaudeCodeFinishedEventType = "runnerClaudeCode.finished"
 )
 
-var afterCommandsEnabledOnly = []configuration.VisibilityCondition{
-	{Field: "enable_after_commands", Values: []string{"true"}},
-}
-
 func init() {
 	registry.RegisterAction(RunClaudeCodeComponentName, &RunClaudeCode{})
 }
@@ -63,29 +59,33 @@ func (c *RunClaudeCode) Documentation() string {
 - The ` + "`claude`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + `.
 - An Anthropic API key stored as a SuperPlane secret (passed as ` + "`ANTHROPIC_API_KEY`" + `).
 
-## Execution
-Runs on the **host** (the runner machine), in this order:
+## Steps
+Configure an ordered list of **bash** and **prompt** steps. They run top-to-bottom in one shell session:
 
-1. **Setup commands** (optional) — prepare the workspace (clone, checkout, install).
-2. **Prompt** — ` + "`claude --bare -p --output-format json …`" + ` so the session does not load local hooks, plugins, or MCP servers from the machine profile.
-3. **After commands** (optional) — run after Claude succeeds (push, notify, cleanup).
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — a Claude Code headless turn (` + "`claude --bare -p`" + `). After the first prompt, later prompts use ` + "`--continue`" + ` so they share the same Claude session.
+
+Example:
+
+1. bash — ` + "`git clone … && cd repo`" + `
+2. prompt — implement the feature
+3. prompt — run tests and fix failures
+4. bash — ` + "`git push`" + `
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Prompt**: Task for Claude Code (supports expressions).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
-- **Working directory**: Optional directory Claude Code runs in.
-- **Setup commands**: Optional shell commands run before Claude.
-- **After commands**: Optional shell commands run after Claude succeeds.
+- **Working directory**: Optional directory the script starts in before the first step.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
 ## Output
-Stdout from Claude (` + "`--output-format json`" + `) is emitted as **result** on the finished event. Stderr and command output stream to **View logs**.
+Prompt steps stream readable agent activity to **View logs** (Claude text, tool calls, and truncated tool results). The final stream ` + "`result`" + ` event is emitted as **result** on the finished event.
 
 ## Output channels
 - **Passed**: The script finished with exit code **0**.
-- **Failed**: Claude or a command exited with a non-zero code.
+- **Failed**: A bash or prompt step failed (non-zero exit).
 `
 }
 
@@ -99,63 +99,6 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: machineTypeSelectOptions,
-				},
-			},
-		},
-		{
-			Name:        "enable_setup_commands",
-			Label:       "Run setup commands",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     false,
-			Description: "Run shell commands before invoking Claude Code (for example git clone).",
-		},
-		{
-			Name:                 "setup_commands",
-			Label:                "Setup commands",
-			Type:                 configuration.FieldTypeText,
-			Required:             false,
-			Placeholder:          "git clone https://github.com/org/repo.git /tmp/repo\ncd /tmp/repo && git checkout main",
-			Description:          "One shell command per line. Runs before Claude with the same environment variables.",
-			VisibilityConditions: setupCommandsEnabledOnly,
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "enable_setup_commands", Values: []string{"true"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Text: &configuration.TextTypeOptions{
-					Language: "shell",
-				},
-			},
-		},
-		{
-			Name:        "prompt",
-			Label:       "Prompt",
-			Type:        configuration.FieldTypeText,
-			Required:    true,
-			Placeholder: "Fix the failing tests and commit the changes.",
-		},
-		{
-			Name:        "enable_after_commands",
-			Label:       "Run after commands",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     false,
-			Description: "Run shell commands after Claude Code finishes successfully (for example git push).",
-		},
-		{
-			Name:                 "after_commands",
-			Label:                "After commands",
-			Type:                 configuration.FieldTypeText,
-			Required:             false,
-			Placeholder:          "git push -u origin HEAD\ngh pr create --fill",
-			Description:          "One shell command per line. Runs after Claude succeeds, in the same working directory.",
-			VisibilityConditions: afterCommandsEnabledOnly,
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "enable_after_commands", Values: []string{"true"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Text: &configuration.TextTypeOptions{
-					Language: "shell",
 				},
 			},
 		},
@@ -175,11 +118,84 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Placeholder: "sonnet",
 		},
 		{
+			Name:        "steps",
+			Label:       "Steps",
+			Type:        configuration.FieldTypeList,
+			Required:    true,
+			Default:     defaultClaudeCodeSteps(),
+			Description: "Ordered bash commands and Claude Code prompts. Add, reorder, and mix freely.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:   "Step",
+					Accordion:   true,
+					Reorderable: true,
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "name",
+								Label:       "Name",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
+								Placeholder: "e.g. Clone repo",
+							},
+							{
+								Name:     "type",
+								Label:    "Type",
+								Type:     configuration.FieldTypeSelect,
+								Required: true,
+								Default:  claudeStepPrompt,
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{Label: "Prompt", Value: claudeStepPrompt, Description: "Run a Claude Code headless turn"},
+											{Label: "Bash", Value: claudeStepBash, Description: "Run shell commands on the runner"},
+										},
+									},
+								},
+							},
+							{
+								Name:        "prompt",
+								Label:       "Prompt",
+								Type:        configuration.FieldTypeText,
+								Required:    false,
+								Placeholder: "Fix the failing tests and commit the changes.",
+								VisibilityConditions: []configuration.VisibilityCondition{
+									{Field: "type", Values: []string{claudeStepPrompt}},
+								},
+								RequiredConditions: []configuration.RequiredCondition{
+									{Field: "type", Values: []string{claudeStepPrompt}},
+								},
+							},
+							{
+								Name:        "command",
+								Label:       "Command",
+								Type:        configuration.FieldTypeText,
+								Required:    false,
+								Placeholder: "git clone https://github.com/org/repo.git /tmp/repo",
+								VisibilityConditions: []configuration.VisibilityCondition{
+									{Field: "type", Values: []string{claudeStepBash}},
+								},
+								RequiredConditions: []configuration.RequiredCondition{
+									{Field: "type", Values: []string{claudeStepBash}},
+								},
+								TypeOptions: &configuration.TypeOptions{
+									Text: &configuration.TextTypeOptions{
+										Language: "shell",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:        "workingDirectory",
 			Label:       "Working directory",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Directory Claude Code runs in. Use setup commands to clone or prepare the workspace first.",
+			Description: "Optional directory the script starts in. Prefer a bash step to clone or prepare the workspace.",
 			Placeholder: "/tmp/repo",
 		},
 		{
@@ -248,7 +264,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
 			Default:     DefaultExecutionTimeoutSeconds,
-			Description: "Hard time limit for the whole task, including setup, Claude Code, and after commands. Defaults to 3600 seconds (1 hour).",
+			Description: "Hard time limit for the whole task, including all steps. Defaults to 3600 seconds (1 hour).",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(0),
@@ -319,17 +335,11 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	var setupCommands []string
-	if spec.EnableSetupCommands {
-		setupCommands = normalizeCommands(spec.SetupCommands)
-	}
-
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
 		RunMode:        RunModeBash,
 		Script:         buildClaudeCodeScript(spec),
 		MessageChain:   messageChain,
-		SetupCommands:  setupCommands,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  ExecutionModeHost,

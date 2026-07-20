@@ -28,13 +28,18 @@ func TestRunClaudeCodeExecuteSendsBashTaskToBroker(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"prompt":       "Fix the failing tests",
 			"model":        "sonnet",
+			"steps": []map[string]any{
+				{"name": "Clone", "type": "bash", "command": "git clone https://github.com/acme/widgets.git /tmp/repo"},
+				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
+				{"name": "Open PR", "type": "prompt", "prompt": "Open a pull request"},
+				{"name": "Status", "type": "bash", "command": "git -C /tmp/repo status"},
+			},
 			"anthropicApiKey": map[string]any{
 				"secret": "anthropic",
 				"key":    "api_key",
 			},
-			"workingDirectory": "/tmp/repo",
+			"workingDirectory": "/tmp",
 		},
 		HTTP: httpContext,
 		Secrets: &contexts.SecretsContext{
@@ -63,9 +68,15 @@ func TestRunClaudeCodeExecuteSendsBashTaskToBroker(t *testing.T) {
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, RunModeBash, req.RunMode)
 	assert.Equal(t, ExecutionModeHost, req.ExecutionMode)
+	assert.Empty(t, req.SetupCommands)
 	assert.Contains(t, req.Script, "claude")
-	assert.Contains(t, req.Script, "--bare -p --output-format json")
-	assert.Contains(t, req.Script, "cd '/tmp/repo'")
+	assert.Contains(t, req.Script, "--output-format stream-json")
+	assert.Contains(t, req.Script, "--verbose")
+	assert.Contains(t, req.Script, "--include-partial-messages")
+	assert.Contains(t, req.Script, "cd '/tmp'")
+	assert.Contains(t, req.Script, "git clone https://github.com/acme/widgets.git /tmp/repo")
+	assert.Contains(t, req.Script, "--continue")
+	assert.Contains(t, req.Script, "git -C /tmp/repo status")
 	assert.Empty(t, req.DockerImage)
 	require.Len(t, req.Environment, 1)
 	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
@@ -74,13 +85,13 @@ func TestRunClaudeCodeExecuteSendsBashTaskToBroker(t *testing.T) {
 	assert.Contains(t, string(req.MessageChain), "Issue")
 }
 
-func TestRunClaudeCodeExecuteSendsSetupAndAfterCommands(t *testing.T) {
+func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-setup-1"}`))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-legacy-1"}`))},
 		},
 	}
 
@@ -92,7 +103,7 @@ func TestRunClaudeCodeExecuteSendsSetupAndAfterCommands(t *testing.T) {
 			"enable_setup_commands": true,
 			"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",
 			"enable_after_commands": true,
-			"after_commands":        "git push\ngh pr create --fill",
+			"after_commands":        "git push",
 			"anthropicApiKey": map[string]any{
 				"secret": "anthropic",
 				"key":    "api_key",
@@ -110,17 +121,16 @@ func TestRunClaudeCodeExecuteSendsSetupAndAfterCommands(t *testing.T) {
 		Expressions:    &stubMessageChainBuilder{chain: map[string]any{}},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
 
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
 
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-
-	assert.Equal(t, []string{"git clone https://github.com/acme/widgets.git /tmp/repo"}, req.SetupCommands)
+	assert.Empty(t, req.SetupCommands)
+	assert.Contains(t, req.Script, "git clone https://github.com/acme/widgets.git /tmp/repo")
+	assert.Contains(t, req.Script, "claude")
 	assert.Contains(t, req.Script, "git push")
-	assert.Contains(t, req.Script, "gh pr create --fill")
 }
 
 func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
@@ -131,7 +141,9 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"prompt":       "hello",
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
 			"anthropicApiKey": map[string]any{
 				"secret": "anthropic",
 				"key":    "api_key",
