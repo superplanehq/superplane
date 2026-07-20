@@ -272,7 +272,7 @@ func TestUnclaimTask(t *testing.T) {
 		Status:     models.StatusQueued,
 		CreatedAt:  time.Now().UTC(),
 		WebhookURL: "https://example.com/hook",
-		Commands:   []string{"echo hi"},
+		Commands:   models.CommandList{{Command: "echo hi"}},
 	}
 	if err := st.CreateTask(ctx, task); err != nil {
 		t.Fatal(err)
@@ -506,7 +506,7 @@ func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.Postgres
 		Status:          models.StatusQueued,
 		CreatedAt:       now,
 		WebhookURL:      "https://example.com/hook",
-		Commands:        []string{"echo hi"},
+		Commands:        models.CommandList{{Command: "echo hi"}},
 		Environment:     []models.EnvironmentVariable{{Name: "BASE_URL", Value: "http://example.test"}},
 		InfraRetryCount: infraRetryCount,
 	}); err != nil {

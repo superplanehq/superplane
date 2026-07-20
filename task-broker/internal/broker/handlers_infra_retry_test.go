@@ -29,7 +29,7 @@ func TestCompleteTaskRequeuesInfraFailureOverHTTP(t *testing.T) {
 		Status:     models.StatusQueued,
 		CreatedAt:  time.Now().UTC(),
 		WebhookURL: "https://example.com/hook",
-		Commands:   []string{"echo hi"},
+		Commands:   models.CommandList{{Command: "echo hi"}},
 	}))
 	claimed, err := st.ClaimTask(ctx, "runner-http", "fleet-http-retry", 5*time.Minute)
 	require.NoError(t, err)

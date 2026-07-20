@@ -79,7 +79,7 @@ func TestBrokerRoutesTaskAndWebhook(t *testing.T) {
 
 	createReq := api.BrokerCreateTaskRequest{
 		CreateTaskRequest: api.CreateTaskRequest{
-			Commands:   []string{`echo 'hello world'`, `echo second`},
+			Commands:   models.CommandList{{Command: `echo 'hello world'`}, {Command: `echo second`}},
 			WebhookURL: whSrv.URL,
 		},
 		FleetID: stack.FleetID,

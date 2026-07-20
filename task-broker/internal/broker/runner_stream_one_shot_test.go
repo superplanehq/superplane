@@ -28,7 +28,7 @@ func queueTask(t *testing.T, ctx context.Context, st interface {
 	require.NoError(t, st.CreateTask(ctx, &models.Task{
 		ID:        uuid.NewString(),
 		FleetID:   fleetID,
-		Commands:  []string{cmd},
+		Commands:  models.CommandList{{Command: cmd}},
 		Status:    models.StatusQueued,
 		CreatedAt: time.Now().UTC(),
 	}))
