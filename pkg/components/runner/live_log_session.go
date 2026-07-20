@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	gojwt "github.com/golang-jwt/jwt/v4"
@@ -12,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
+
+var extraRunnerComponents sync.Map
 
 const (
 	LiveLogStreamTokenPurpose  = "runner_live_logs"
@@ -48,12 +51,23 @@ type LiveLogAccessContext struct {
 }
 
 func IsRunnerComponent(name string) bool {
-	switch strings.TrimSpace(name) {
-	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName, RunClaudeCodeComponentName:
+	name = strings.TrimSpace(name)
+	switch name {
+	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
 		return true
 	default:
-		return false
+		_, ok := extraRunnerComponents.Load(name)
+		return ok
 	}
+}
+
+// RegisterRunnerComponent marks a runner subpackage component as eligible for live logs.
+func RegisterRunnerComponent(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	extraRunnerComponents.Store(name, struct{}{})
 }
 
 func BrokerTaskIDFromExecutionMetadata(meta map[string]any) string {

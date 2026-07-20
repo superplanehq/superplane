@@ -1,33 +1,35 @@
-package runner
+package claude
 
 import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const (
-	RunClaudeCodeComponentName     = "runnerClaudeCode"
-	RunClaudeCodeFinishedEventType = "runnerClaudeCode.finished"
+	ComponentName     = "runnerClaudeCode"
+	FinishedEventType = "runnerClaudeCode.finished"
 )
 
 func init() {
-	registry.RegisterAction(RunClaudeCodeComponentName, &RunClaudeCode{})
+	registry.RegisterAction(ComponentName, &RunClaudeCode{})
+	runner.RegisterRunnerComponent(ComponentName)
 }
 
 type RunClaudeCode struct{}
 
-func (c *RunClaudeCode) Name() string  { return RunClaudeCodeComponentName }
+func (c *RunClaudeCode) Name() string  { return ComponentName }
 func (c *RunClaudeCode) Label() string { return "Run Claude Code" }
 func (c *RunClaudeCode) Icon() string  { return "code" }
 func (c *RunClaudeCode) Color() string { return "#C9784D" }
 
 func (c *RunClaudeCode) ExampleOutput() map[string]any {
 	return map[string]any{
-		"type":      RunClaudeCodeFinishedEventType,
+		"type":      FinishedEventType,
 		"timestamp": "2026-01-16T17:56:16.680755501Z",
 		"data": []any{map[string]any{
 			"status":    "succeeded",
@@ -43,8 +45,8 @@ func (c *RunClaudeCode) ExampleOutput() map[string]any {
 
 func (c *RunClaudeCode) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
-		{Name: PassedOutputChannel, Label: "Passed"},
-		{Name: FailedOutputChannel, Label: "Failed"},
+		{Name: runner.PassedOutputChannel, Label: "Passed"},
+		{Name: runner.FailedOutputChannel, Label: "Failed"},
 	}
 }
 
@@ -67,7 +69,7 @@ Configure an ordered list of **bash** and **prompt** steps. Each step runs as it
 
 Example:
 
-1. bash — ` + "`git clone … && cd repo`" + `
+1. bash — ` + "`git clone …`" + ` then ` + "`cd repo`" + ` (directory carries to later steps)
 2. prompt — implement the feature
 3. prompt — run tests and fix failures
 4. bash — ` + "`git push`" + `
@@ -77,7 +79,7 @@ Example:
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
-- **Working directory**: Optional directory each step starts in.
+- **Working directory**: Optional starting directory. Bash steps also persist their ending ` + "`cd`" + ` for following steps.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
 ## Output
@@ -92,13 +94,13 @@ Prompt steps stream readable agent activity to **View logs** (Claude text, tool 
 func (c *RunClaudeCode) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     configurationFieldMachineType,
+			Name:     runner.MachineTypeFieldName,
 			Label:    "Machine type",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
+					Options: runner.MachineTypeOptions(),
 				},
 			},
 		},
@@ -195,7 +197,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Label:       "Working directory",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional directory the script starts in. Prefer a bash step to clone or prepare the workspace.",
+			Description: "Optional starting directory. Bash steps persist their ending directory for later steps.",
 			Placeholder: "/tmp/repo",
 		},
 		{
@@ -224,12 +226,12 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeSelect,
 								Description: "Where this variable value comes from",
 								Required:    true,
-								Default:     EnvironmentValueSourceLiteral,
+								Default:     runner.EnvironmentValueSourceLiteral,
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
 										Options: []configuration.FieldOption{
-											{Label: "Literal value", Value: EnvironmentValueSourceLiteral},
-											{Label: "Secret key", Value: EnvironmentValueSourceSecret},
+											{Label: "Literal value", Value: runner.EnvironmentValueSourceLiteral},
+											{Label: "Secret key", Value: runner.EnvironmentValueSourceSecret},
 										},
 									},
 								},
@@ -241,8 +243,8 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 								Description:          "Literal value. Supports expressions such as {{ previous().data.author.email }}",
 								Placeholder:          "e.g. production",
 								Required:             false,
-								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceLiteral}}},
-								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceLiteral}}},
+								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{runner.EnvironmentValueSourceLiteral}}},
+								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{runner.EnvironmentValueSourceLiteral}}},
 							},
 							{
 								Name:                 "secret",
@@ -250,8 +252,8 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 								Type:                 configuration.FieldTypeSecretKey,
 								Description:          "Stored credential key to use as the variable value",
 								Required:             false,
-								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceSecret}}},
-								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceSecret}}},
+								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{runner.EnvironmentValueSourceSecret}}},
+								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{runner.EnvironmentValueSourceSecret}}},
 							},
 						},
 					},
@@ -263,12 +265,12 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Default:     DefaultExecutionTimeoutSeconds,
+			Default:     runner.DefaultExecutionTimeoutSeconds,
 			Description: "Hard time limit for the whole task, including all steps. Defaults to 3600 seconds (1 hour).",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
-					Min: intPtr(0),
-					Max: intPtr(maxExecutionTimeoutSecondsRequest),
+					Min: runner.IntPtr(0),
+					Max: runner.IntPtr(runner.MaxExecutionTimeoutSecondsRequest),
 				},
 			},
 		},
@@ -303,7 +305,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -315,7 +317,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("resolve anthropic API key: %w", err)
 	}
-	environment = append(environment, BrokerEnvironmentVariable{
+	environment = append(environment, runner.BrokerEnvironmentVariable{
 		Name:  envAnthropicAPIKey,
 		Value: string(apiKey),
 	})
@@ -325,19 +327,19 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	broker, err := runner.NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
 	// command_list tasks only accept commands (no message_chain / script fields).
 	task := buildClaudeCodeBrokerTask(spec)
-	params := CreateTaskParams{
+	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
-		ExecutionMode:  ExecutionModeHost,
+		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
 	}
 
@@ -346,28 +348,28 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *RunClaudeCode) Hooks() []core.Hook {
-	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
+	return []core.Hook{{Name: runner.HookPoll, Type: core.HookTypeInternal}}
 }
 
 func (c *RunClaudeCode) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
-	case hookActionPoll:
-		return pollBrokerTask(ctx, RunClaudeCodeFinishedEventType)
+	case runner.HookPoll:
+		return runner.PollBrokerTask(ctx, FinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *RunClaudeCode) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunClaudeCodeFinishedEventType)
+	return runner.HandleBrokerWebhook(ctx, FinishedEventType)
 }
 
 func (c *RunClaudeCode) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return runner.CancelBrokerTask(ctx)
 }
 
 func (c *RunClaudeCode) Cleanup(ctx core.SetupContext) error { return nil }

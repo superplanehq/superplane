@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { coalesceLiveLogLines } from "./coalesceLiveLogLines";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 
@@ -107,7 +108,7 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
 
   return (
     <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200 dark:text-gray-200 dark:bg-gray-900 dark:border-gray-800">
-      {section.lines.filter((line) => line.trim() !== "").join("\n")}
+      {coalesceLiveLogLines(section.lines).join("\n")}
     </pre>
   );
 }

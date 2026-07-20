@@ -1,4 +1,4 @@
-package runner
+package claude
 
 import (
 	"os"
@@ -14,13 +14,13 @@ import (
 func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 	t.Parallel()
 
-	python3, err := exec.LookPath("python3")
+	node, err := exec.LookPath("node")
 	if err != nil {
-		t.Skip("python3 not available")
+		t.Skip("node not available")
 	}
 
-	script := filepath.Join(t.TempDir(), "claude_stream_format.py")
-	require.NoError(t, os.WriteFile(script, []byte(claudeStreamFormatPython), 0o600))
+	script := filepath.Join(t.TempDir(), "claude_stream_format.js")
+	require.NoError(t, os.WriteFile(script, []byte(streamFormatJS), 0o600))
 
 	input := strings.Join([]string{
 		`{"type":"system","subtype":"init","model":"sonnet","cwd":"/tmp/repo"}`,
@@ -33,21 +33,51 @@ func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 		"",
 	}, "\n")
 
-	cmd := exec.Command(python3, "-u", script)
+	cmd := exec.Command(node, script)
 	cmd.Stdin = strings.NewReader(input)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "formatter output: %s", out)
 
 	got := string(out)
 	assert.Contains(t, got, "Claude Code started · model=sonnet · cwd=/tmp/repo")
-	assert.Contains(t, got, "Claude")
 	assert.Contains(t, got, "Looking around.")
-	assert.Contains(t, got, "→ Bash")
-	assert.Contains(t, got, "ls -la")
-	assert.Contains(t, got, "← tool result")
-	assert.Contains(t, got, "README.md")
+	assert.Contains(t, got, `-> [Bash] ls -la`)
+	assert.Contains(t, got, "     README.md")
+	assert.Contains(t, got, "     src")
+	assert.NotContains(t, got, "← tool result")
+	assert.NotRegexp(t, `(?m)^Claude$`, got)
 	assert.Contains(t, got, "✓ done · 2 turns · $0.0123 · 12.3s")
 	assert.NotContains(t, got, `"type":"assistant"`)
+}
+
+func TestClaudeStreamFormatCoalescesPartialTextDeltas(t *testing.T) {
+	t.Parallel()
+
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not available")
+	}
+
+	script := filepath.Join(t.TempDir(), "claude_stream_format.js")
+	require.NoError(t, os.WriteFile(script, []byte(streamFormatJS), 0o600))
+
+	input := strings.Join([]string{
+		`{"type":"stream_event","event":{"type":"content_block_start","content_block":{"type":"text","text":""}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Ther"}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"e's a 'superplane' directory."}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_stop"}}`,
+		"",
+	}, "\n")
+
+	cmd := exec.Command(node, script)
+	cmd.Stdin = strings.NewReader(input)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "formatter output: %s", out)
+
+	got := string(out)
+	assert.Contains(t, got, "There's a 'superplane' directory.")
+	assert.NotContains(t, got, "Ther\n")
+	assert.Equal(t, 1, strings.Count(got, "There's a 'superplane' directory."))
 }
 
 func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
@@ -60,9 +90,9 @@ func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
 	})
 	require.Len(t, task.Commands, 2)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
-	assert.Contains(t, task.Commands[0].Command, "python3 not found on PATH")
-	assert.Contains(t, task.Commands[0].Command, "format.py")
+	assert.Contains(t, task.Commands[0].Command, "node not found on PATH")
+	assert.Contains(t, task.Commands[0].Command, "format.js")
 	promptScript := buildClaudePromptStepScript("do it", "")
-	assert.Contains(t, promptScript, "python3 -u")
+	assert.Contains(t, promptScript, `node "$SP/format.js"`)
 	assert.Contains(t, promptScript, "tee -a")
 }

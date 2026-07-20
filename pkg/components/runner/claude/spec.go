@@ -1,4 +1,4 @@
-package runner
+package claude
 
 import (
 	"encoding/base64"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
@@ -18,6 +19,11 @@ const (
 	claudeStepBash              = "bash"
 	defaultClaudeAllowedTools   = "Bash,Read,Edit,Write"
 	envAnthropicAPIKey          = "ANTHROPIC_API_KEY"
+
+	// Prefer plain terminal text in live logs (no Markdown chrome).
+	claudeTerminalOutputSystemPrompt = "Write all assistant messages as plain terminal text. " +
+		"Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
+		"Prefer plain paths, shell commands, and simple indentation."
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -32,13 +38,13 @@ type ClaudeCodeStep struct {
 
 // RunClaudeCodeSpec is persisted runnerClaudeCode node configuration.
 type RunClaudeCodeSpec struct {
-	MachineType             string                     `mapstructure:"machine_type"`
-	Steps                   []ClaudeCodeStep           `mapstructure:"steps"`
-	AnthropicAPIKey         configuration.SecretKeyRef `mapstructure:"anthropicApiKey"`
-	Model                   string                     `mapstructure:"model"`
-	WorkingDirectory        string                     `mapstructure:"workingDirectory"`
-	Environment             []EnvironmentVariable      `mapstructure:"environment"`
-	ExecutionTimeoutSeconds int                        `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
+	MachineType             string                       `mapstructure:"machine_type"`
+	Steps                   []ClaudeCodeStep             `mapstructure:"steps"`
+	AnthropicAPIKey         configuration.SecretKeyRef   `mapstructure:"anthropicApiKey"`
+	Model                   string                       `mapstructure:"model"`
+	WorkingDirectory        string                       `mapstructure:"workingDirectory"`
+	Environment             []runner.EnvironmentVariable `mapstructure:"environment"`
+	ExecutionTimeoutSeconds int                          `mapstructure:"execution_timeout_seconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
 
 	// Legacy fields — migrated into Steps when Steps is empty.
 	Prompt              string `mapstructure:"prompt"`
@@ -51,7 +57,7 @@ type RunClaudeCodeSpec struct {
 // ClaudeCodeBrokerTask is the ordered broker commands for a Run Claude Code run.
 // The first command prepares shared state; each following command is one user step.
 type ClaudeCodeBrokerTask struct {
-	Commands []BrokerCommand
+	Commands []runner.BrokerCommand
 }
 
 func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
@@ -72,7 +78,7 @@ func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
 
 func applyRunClaudeCodeSpecDefaults(spec *RunClaudeCodeSpec) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
-		spec.ExecutionTimeoutSeconds = DefaultExecutionTimeoutSeconds
+		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
 	migrateLegacyClaudeCodeSteps(spec)
 }
@@ -118,7 +124,7 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if !spec.AnthropicAPIKey.IsSet() {
 		return fmt.Errorf("anthropic API key is required")
 	}
-	if err := validateEnvironment(spec.Environment); err != nil {
+	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
 	for i, variable := range spec.Environment {
@@ -127,8 +133,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 		}
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
-		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > maxExecutionTimeoutSecondsRequest {
-			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", maxExecutionTimeoutSecondsRequest, DefaultExecutionTimeoutSeconds)
+		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
+			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
 	return nil
@@ -177,12 +183,12 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	prepare.WriteString("  echo \"claude CLI not found on PATH; install Claude Code on the runner\" >&2\n")
 	prepare.WriteString("  exit 127\n")
 	prepare.WriteString("fi\n")
-	prepare.WriteString("if ! command -v python3 >/dev/null 2>&1; then\n")
-	prepare.WriteString("  echo \"python3 not found on PATH; required to format Claude Code live logs\" >&2\n")
+	prepare.WriteString("if ! command -v node >/dev/null 2>&1; then\n")
+	prepare.WriteString("  echo \"node not found on PATH; required to format Claude Code live logs\" >&2\n")
 	prepare.WriteString("  exit 127\n")
 	prepare.WriteString("fi\n")
-	formatterB64 := base64.StdEncoding.EncodeToString([]byte(claudeStreamFormatPython))
-	fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/format.py\"\n", shellSingleQuote(formatterB64))
+	formatterB64 := base64.StdEncoding.EncodeToString([]byte(streamFormatJS))
+	fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/format.js\"\n", shellSingleQuote(formatterB64))
 	writeResultB64 := base64.StdEncoding.EncodeToString([]byte(claudeWriteResultScript()))
 	fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/write-result.sh\"\n", shellSingleQuote(writeResultB64))
 	prepare.WriteString("chmod +x \"$SP/write-result.sh\"\n")
@@ -194,7 +200,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 		prepare.WriteString("rm -f \"$SP/workdir\"\n")
 	}
 
-	stepCommands := make([]BrokerCommand, 0, len(spec.Steps))
+	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
 		scriptName := claudeStepScriptName(i+1, step.Name)
 		var stepScript string
@@ -218,12 +224,12 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 		stepCommands = append(stepCommands, claudeStepBrokerCommand(step.Name, scriptName))
 	}
 
-	prepareCommand := BrokerCommand{
+	prepareCommand := runner.BrokerCommand{
 		Name:    "Prepare Claude Code",
 		Command: "bash -c " + shellSingleQuote(prepare.String()),
 	}
 	return ClaudeCodeBrokerTask{
-		Commands: append([]BrokerCommand{prepareCommand}, stepCommands...),
+		Commands: append([]runner.BrokerCommand{prepareCommand}, stepCommands...),
 	}
 }
 
@@ -260,7 +266,11 @@ func buildClaudeBashStepScript(command string) string {
 	b.WriteString("if [[ -f \"$SP/workdir\" ]]; then\n")
 	b.WriteString("  cd \"$(cat \"$SP/workdir\")\"\n")
 	b.WriteString("fi\n")
-	fmt.Fprintf(&b, "bash -c %s\n", shellSingleQuote(command))
+	// Run in this shell (not a nested bash -c) so cd persists, then share
+	// the ending directory with later steps via $SP/workdir.
+	b.WriteString(strings.TrimRight(command, "\n"))
+	b.WriteString("\n")
+	b.WriteString("pwd -P >\"$SP/workdir\"\n")
 	return b.String()
 }
 
@@ -283,6 +293,7 @@ func buildClaudePromptStepScript(prompt, model string) string {
 
 	b.WriteString("claude_args=(--bare -p --output-format stream-json --verbose --include-partial-messages)\n")
 	fmt.Fprintf(&b, "claude_args+=(--permission-mode %s)\n", shellSingleQuote(claudePermissionAcceptEdits))
+	fmt.Fprintf(&b, "claude_args+=(--append-system-prompt %s)\n", shellSingleQuote(claudeTerminalOutputSystemPrompt))
 	if model != "" {
 		fmt.Fprintf(&b, "claude_args+=(--model %s)\n", shellSingleQuote(model))
 	}
@@ -292,7 +303,7 @@ func buildClaudePromptStepScript(prompt, model string) string {
 	b.WriteString("fi\n")
 	b.WriteString("\"${claude_bin[@]}\" \"${claude_args[@]}\" -- \"$PROMPT\" \\\n")
 	b.WriteString("  | tee -a \"$SP/stream.jsonl\" \\\n")
-	b.WriteString("  | python3 -u \"$SP/format.py\"\n")
+	b.WriteString("  | node \"$SP/format.js\"\n")
 	b.WriteString("printf '%s\\n' \"$(($(cat \"$SP/prompt_count\") + 1))\" >\"$SP/prompt_count\"\n")
 	b.WriteString("bash \"$SP/write-result.sh\" \"$SP/stream.jsonl\" \"$SUPERPLANE_RESULT_FILE\"\n")
 	return b.String()
@@ -302,12 +313,12 @@ func claudeCodeStateDirAssignment() string {
 	return "SP=\"$(dirname \"$SUPERPLANE_RESULT_FILE\")/claude-code\"\n"
 }
 
-func claudeStepBrokerCommand(stepName, scriptName string) BrokerCommand {
+func claudeStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 	label := strings.TrimSpace(stepName)
 	if label == "" {
 		label = scriptName
 	}
-	return BrokerCommand{
+	return runner.BrokerCommand{
 		Name: label,
 		Command: fmt.Sprintf(
 			`bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/%s"`,

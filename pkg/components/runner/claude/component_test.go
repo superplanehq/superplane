@@ -1,4 +1,4 @@
-package runner
+package claude
 
 import (
 	"encoding/base64"
@@ -11,9 +11,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+const testRunnerMachineType = runner.MachineTypeE1LargeAMD64
+
+type createTaskRequest struct {
+	FleetID       string                             `json:"fleet_id"`
+	RunMode       string                             `json:"run_mode,omitempty"`
+	Script        string                             `json:"script,omitempty"`
+	MessageChain  json.RawMessage                    `json:"message_chain,omitempty"`
+	Commands      []runner.BrokerCommand             `json:"commands,omitempty"`
+	SetupCommands []string                           `json:"setup_commands,omitempty"`
+	Environment   []runner.BrokerEnvironmentVariable `json:"environment,omitempty"`
+	ExecutionMode string                             `json:"execution_mode,omitempty"`
+	DockerImage   string                             `json:"docker_image,omitempty"`
+}
 
 func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
@@ -58,7 +73,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
 
-	var req brokerCreateTaskRequest
+	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
@@ -66,16 +81,16 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Empty(t, req.Script)
 	assert.Empty(t, req.SetupCommands)
 	assert.Empty(t, req.MessageChain)
-	assert.Equal(t, ExecutionModeHost, req.ExecutionMode)
+	assert.Equal(t, runner.ExecutionModeHost, req.ExecutionMode)
 	require.Len(t, req.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.True(t, strings.HasPrefix(req.Commands[0].Command, "bash -c "))
 	assert.Contains(t, req.Commands[0].Command, "claude CLI not found")
 	assert.Contains(t, req.Commands[0].Command, "/tmp")
-	assert.Equal(t, BrokerCommand{Name: "Clone", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-clone.sh"`}, req.Commands[1])
-	assert.Equal(t, BrokerCommand{Name: "Fix tests", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-fix-tests.sh"`}, req.Commands[2])
-	assert.Equal(t, BrokerCommand{Name: "Open PR", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-open-pr.sh"`}, req.Commands[3])
-	assert.Equal(t, BrokerCommand{Name: "Status", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/04-status.sh"`}, req.Commands[4])
+	assert.Equal(t, runner.BrokerCommand{Name: "Clone", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-clone.sh"`}, req.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-fix-tests.sh"`}, req.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{Name: "Open PR", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-open-pr.sh"`}, req.Commands[3])
+	assert.Equal(t, runner.BrokerCommand{Name: "Status", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/04-status.sh"`}, req.Commands[4])
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git clone https://github.com/acme/widgets.git /tmp/repo"))
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudePromptStep("Fix the failing tests", "sonnet"))
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git -C /tmp/repo status"))
@@ -126,16 +141,16 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
 
-	var req brokerCreateTaskRequest
+	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 	assert.Empty(t, req.SetupCommands)
 	assert.Empty(t, req.MessageChain)
 	require.Len(t, req.Commands, 4)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.True(t, strings.HasPrefix(req.Commands[0].Command, "bash -c "))
-	assert.Equal(t, BrokerCommand{Name: "Setup", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-setup.sh"`}, req.Commands[1])
-	assert.Equal(t, BrokerCommand{Name: "Prompt", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-prompt.sh"`}, req.Commands[2])
-	assert.Equal(t, BrokerCommand{Name: "After", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-after.sh"`}, req.Commands[3])
+	assert.Equal(t, runner.BrokerCommand{Name: "Setup", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-setup.sh"`}, req.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Prompt", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-prompt.sh"`}, req.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{Name: "After", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-after.sh"`}, req.Commands[3])
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git clone https://github.com/acme/widgets.git /tmp/repo"))
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudePromptStep("implement the issue", ""))
 	assert.Contains(t, req.Commands[0].Command, base64OfClaudeBashStep("git push"))
@@ -170,7 +185,6 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 		Webhook:        &contexts.NodeWebhookContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Requests:       &contexts.RequestContext{},
-		Expressions:    &stubMessageChainBuilder{chain: map[string]any{}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "anthropic API key")
@@ -181,14 +195,14 @@ func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &Task{
+	task := &runner.Task{
 		Status:   "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"result":"done","session_id":"abc"}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunClaudeCodeFinishedEventType))
-	require.Equal(t, PassedOutputChannel, state.Channel)
+	require.NoError(t, runner.ProcessBrokerTaskStatus(state, task, FinishedEventType))
+	require.Equal(t, runner.PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
-	assert.Equal(t, RunClaudeCodeFinishedEventType, wrapped["type"])
+	assert.Equal(t, FinishedEventType, wrapped["type"])
 }
