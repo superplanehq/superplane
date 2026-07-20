@@ -81,6 +81,42 @@ func Test__LockNodeRequest__OnlyLocksDuePendingRequests(t *testing.T) {
 	})
 }
 
+func Test__DeleteExpiredCompletedNodeRequests(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "schedule-trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+			},
+		},
+		nil,
+	)
+
+	olderThan := time.Now().AddDate(0, 0, -7)
+	expired := createCanvasNodeRequest(t, canvas.ID, "schedule-trigger", models.NodeExecutionRequestStateCompleted, time.Now())
+	require.NoError(t, database.Conn().Model(expired).Update("updated_at", olderThan.Add(-time.Hour)).Error)
+
+	pending := createCanvasNodeRequest(t, canvas.ID, "schedule-trigger", models.NodeExecutionRequestStatePending, time.Now())
+	require.NoError(t, database.Conn().Model(pending).Update("updated_at", olderThan.Add(-time.Hour)).Error)
+
+	deleted, err := models.DeleteExpiredCompletedNodeRequests(database.Conn(), olderThan, 100)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), deleted)
+
+	var expiredCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeRequest{}).Where("id = ?", expired.ID).Count(&expiredCount).Error)
+	assert.Equal(t, int64(0), expiredCount)
+
+	var pendingCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeRequest{}).Where("id = ?", pending.ID).Count(&pendingCount).Error)
+	assert.Equal(t, int64(1), pendingCount)
+}
+
 func createCanvasNodeRequest(t *testing.T, workflowID uuid.UUID, nodeID, state string, runAt time.Time) *models.CanvasNodeRequest {
 	t.Helper()
 
