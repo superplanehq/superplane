@@ -129,6 +129,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
+| `board` | Render rows as kanban lanes grouped by a scalar field | `title?`, `dataSource`, `render.kind: "board"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
 | `number` | Render one aggregate KPI, or several KPIs side-by-side via `metrics[]` | `title?`, (`dataSource` + `render.kind: "number"`) or `metrics[]` |
 
@@ -425,6 +426,55 @@ Note that `field: finishedAt - createdAt` does **not** work directly because bot
 - `field: '{{ epochMs(finishedAt) - epochMs(createdAt) }}', format: duration` — gives you a numeric ms value the column formatter can render and downstream filters can compare against.
 
 Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
+
+## Board Panels
+
+Board panels render the same row shape as the table panel — memory, executions, or runs — as a kanban board grouped by a scalar field. This is a read-only view for surfacing pipeline / workflow state; lane membership is owned by the workflow's data, not by drag-and-drop.
+
+```yaml
+type: board
+content:
+  title: Pipeline
+  dataSource: { kind: memory, namespace: factory_tasks }
+  render:
+    kind: board
+    groupBy: status
+    lanes:
+      - { value: Planning }
+      - { value: In Review, label: Review, color: yellow }
+      - { value: Merged, label: Done, color: green }
+    otherLane: false
+    card:
+      titleField: title
+      fields:
+        - { field: pr_url, format: link, label: PR }
+        - { field: updatedAt, format: relative }
+    where: []
+    sort: { field: updatedAt, order: desc }
+    rowActions: []
+```
+
+### Fields
+
+| Field | Notes |
+| --- | --- |
+| `groupBy` | Required. Row field (dot path or `{{ expr }}`) used to place each row into a lane. Values are matched case-insensitively and trimmed. |
+| `lanes` | Required, at least one entry. Each lane has `value` (required, non-empty), optional `label` (defaults to `value`), and optional `color` from the shared palette: `neutral`, `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`. |
+| `otherLane` | Optional boolean. When `true`, rows whose `groupBy` value does not match any configured lane render in a trailing **Other** lane instead of being hidden. Defaults to hiding unmatched rows. |
+| `card.titleField` | Required. Row field rendered as the card title. Falls back to the `groupBy` value (or row `id`) when the field resolves to an empty value. |
+| `card.fields` | Optional list. Each entry reuses `WidgetTableColumn` semantics (`field`, `label?`, `format?`, `show?`, `href?`) and renders as a compact meta line under the title. Unlabelled fields render the value alone. |
+| `where` | Optional list of structured filters. Same operators as the table panel (`eq`, `neq`, `contains`, `not_contains`, `gt`, `lt`, `exists`, `not_exists`). |
+| `sort` | Optional widget-level sort applied inside each lane. Same shape as the table sort. |
+| `rowActions` | Optional list of trigger actions rendered as compact buttons on each card. Same rules as the table row actions — manual-run gating, per-row `show`, confirm dialogs, and lock accounting via the shared per-widget action lock. |
+| `emptyMessage` | Optional string rendered when no rows match the current filters. |
+
+### Renderer behavior
+
+- Rows first pass through `where` filters and `sort`, then are grouped by the normalized `groupBy` value.
+- Lanes render in configured order with a count badge in the header and a colored left strip so lanes remain readable when the panel scrolls horizontally.
+- Cards show the title in bold on the first line and card fields underneath. Row actions render at the bottom-right of each card; trigger-node visibility, permission gating, and per-row `show` expressions match the table panel exactly.
+- Horizontal scroll kicks in when lanes overflow the panel width; each lane has its own vertical scroll. An empty lane shows a subtle placeholder row.
+- Live updates come free from `useWidgetData` invalidations — the same memory / run websocket signals that drive the table refresh the board.
 
 ## Chart Panels
 

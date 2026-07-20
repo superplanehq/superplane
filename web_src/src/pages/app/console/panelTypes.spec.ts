@@ -11,8 +11,18 @@ import {
 } from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
-  it("includes the eight supported types", () => {
-    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"]);
+  it("includes the nine supported types", () => {
+    expect(PANEL_TYPES).toEqual([
+      "markdown",
+      "html",
+      "node",
+      "nodes",
+      "table",
+      "board",
+      "chart",
+      "number",
+      "scorecard",
+    ]);
   });
 
   it("isPanelType narrows to the union", () => {
@@ -20,6 +30,7 @@ describe("PANEL_TYPES", () => {
     expect(isPanelType("html")).toBe(true);
     expect(isPanelType("node")).toBe(true);
     expect(isPanelType("nodes")).toBe(true);
+    expect(isPanelType("board")).toBe(true);
     expect(isPanelType("scorecard")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
     expect(isPanelType(42)).toBe(false);
