@@ -1,0 +1,56 @@
+{
+  "data": {
+    "action": "create",
+    "type": "Issue",
+    "actor": {
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "type": "user",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "url": "https://linear.app/acme/profiles/john"
+    },
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "data": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "createdAt": "2026-03-26T19:29:35.841Z",
+      "updatedAt": "2026-03-26T19:29:35.841Z",
+      "number": 142,
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "description": "The deploy job fails when retried after a timeout.",
+      "priority": 2,
+      "priorityLabel": "High",
+      "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "projectId": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "stateId": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "assigneeId": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "parentId": null,
+      "previousIdentifiers": [],
+      "subscriberIds": ["b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba"],
+      "labelIds": ["3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5"],
+      "state": {
+        "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+        "name": "Todo",
+        "type": "unstarted"
+      },
+      "team": {
+        "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+        "key": "ENG",
+        "name": "Engineering"
+      },
+      "labels": [
+        {
+          "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+          "name": "bug"
+        }
+      ]
+    },
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "webhookTimestamp": 1774553375841,
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
