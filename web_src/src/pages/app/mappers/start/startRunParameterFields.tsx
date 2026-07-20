@@ -3,6 +3,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/ui/checkbox";
 
 import {
@@ -71,6 +72,22 @@ export function StartRunParameterFields({
                     ))}
                   </SelectContent>
                 </Select>
+              </>
+            ) : param.type === "text" ? (
+              <>
+                <Label htmlFor={id}>{label}</Label>
+                <Textarea
+                  id={id}
+                  placeholder={parameterInputPlaceholder(param, label)}
+                  value={String(parameterValues[param.name] ?? "")}
+                  rows={5}
+                  onChange={(e) =>
+                    onParameterValuesChange((prev) => ({
+                      ...prev,
+                      [param.name]: e.target.value,
+                    }))
+                  }
+                />
               </>
             ) : (
               <>
