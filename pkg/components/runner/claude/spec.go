@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,16 +13,9 @@ import (
 )
 
 const (
-	claudePermissionAcceptEdits = "acceptEdits"
-	claudeStepPrompt            = "prompt"
-	claudeStepBash              = "bash"
-	defaultClaudeAllowedTools   = "Bash,Read,Edit,Write"
-	envAnthropicAPIKey          = "ANTHROPIC_API_KEY"
-
-	// Prefer plain terminal text in live logs (no Markdown chrome).
-	claudeTerminalOutputSystemPrompt = "Write all assistant messages as plain terminal text. " +
-		"Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
-		"Prefer plain paths, shell commands, and simple indentation."
+	claudeStepPrompt   = "prompt"
+	claudeStepBash     = "bash"
+	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -179,33 +171,39 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 
 	files := []runner.BrokerTaskFile{
 		{Path: "format.js", Content: streamFormatJS, Mode: "0644"},
+		{Path: "prompt_step.sh", Content: promptStepScript, Mode: "0755"},
 		{Path: "write-result.sh", Content: claudeWriteResultScript(), Mode: "0755"},
 	}
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		scriptName := claudeStepScriptName(i+1, step.Name)
-		var stepScript string
+		stepSlug := claudeStepSlug(i+1, step.Name)
 		switch normalizeClaudeStepType(step.Type) {
 		case claudeStepBash:
 			command := ""
 			if step.Command != nil {
 				command = *step.Command
 			}
-			stepScript = buildClaudeBashStepScript(command)
+			scriptName := stepSlug + ".sh"
+			files = append(files, runner.BrokerTaskFile{
+				Path:    "steps/" + scriptName,
+				Content: buildClaudeBashStepScript(command),
+				Mode:    "0755",
+			})
+			stepCommands = append(stepCommands, claudeBashStepBrokerCommand(step.Name, scriptName))
 		case claudeStepPrompt:
 			prompt := ""
 			if step.Prompt != nil {
 				prompt = *step.Prompt
 			}
-			stepScript = buildClaudePromptStepScript(prompt, model)
+			promptName := stepSlug + ".txt"
+			files = append(files, runner.BrokerTaskFile{
+				Path:    "prompts/" + promptName,
+				Content: prompt,
+				Mode:    "0644",
+			})
+			stepCommands = append(stepCommands, claudePromptStepBrokerCommand(step.Name, promptName, model))
 		}
-		files = append(files, runner.BrokerTaskFile{
-			Path:    "steps/" + scriptName,
-			Content: stepScript,
-			Mode:    "0755",
-		})
-		stepCommands = append(stepCommands, claudeStepBrokerCommand(step.Name, scriptName))
 	}
 
 	prepareCommand := runner.BrokerCommand{
@@ -281,46 +279,11 @@ func buildClaudeBashStepScript(command string) string {
 	return b.String()
 }
 
-func buildClaudePromptStepScript(prompt, model string) string {
-	var b strings.Builder
-	b.WriteString("#!/usr/bin/env bash\n")
-	b.WriteString("set -euo pipefail\n")
-	b.WriteString(claudeCodeStateDirAssignment())
-	b.WriteString("if [[ -f \"$SP/workdir\" ]]; then\n")
-	b.WriteString("  cd \"$(cat \"$SP/workdir\")\"\n")
-	b.WriteString("fi\n")
-
-	promptB64 := base64.StdEncoding.EncodeToString([]byte(prompt))
-	fmt.Fprintf(&b, "PROMPT=$(printf '%%s' %s | base64 -d)\n", shellSingleQuote(promptB64))
-
-	b.WriteString("claude_bin=(claude)\n")
-	b.WriteString("if command -v stdbuf >/dev/null 2>&1; then\n")
-	b.WriteString("  claude_bin=(stdbuf -oL -eL claude)\n")
-	b.WriteString("fi\n")
-
-	b.WriteString("claude_args=(--bare -p --output-format stream-json --verbose --include-partial-messages)\n")
-	fmt.Fprintf(&b, "claude_args+=(--permission-mode %s)\n", shellSingleQuote(claudePermissionAcceptEdits))
-	fmt.Fprintf(&b, "claude_args+=(--append-system-prompt %s)\n", shellSingleQuote(claudeTerminalOutputSystemPrompt))
-	if model != "" {
-		fmt.Fprintf(&b, "claude_args+=(--model %s)\n", shellSingleQuote(model))
-	}
-	fmt.Fprintf(&b, "claude_args+=(--allowedTools %s)\n", shellSingleQuote(defaultClaudeAllowedTools))
-	b.WriteString("if [[ \"$(cat \"$SP/prompt_count\")\" -gt 0 ]]; then\n")
-	b.WriteString("  claude_args+=(--continue)\n")
-	b.WriteString("fi\n")
-	b.WriteString("\"${claude_bin[@]}\" \"${claude_args[@]}\" -- \"$PROMPT\" \\\n")
-	b.WriteString("  | tee -a \"$SP/stream.jsonl\" \\\n")
-	b.WriteString("  | node \"$SP/format.js\"\n")
-	b.WriteString("printf '%s\\n' \"$(($(cat \"$SP/prompt_count\") + 1))\" >\"$SP/prompt_count\"\n")
-	b.WriteString("bash \"$SP/write-result.sh\" \"$SP/stream.jsonl\" \"$SUPERPLANE_RESULT_FILE\"\n")
-	return b.String()
-}
-
 func claudeCodeStateDirAssignment() string {
 	return ": \"${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}\"\nSP=\"$SUPERPLANE_TASK_DIR\"\n"
 }
 
-func claudeStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
+func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 	label := strings.TrimSpace(stepName)
 	if label == "" {
 		label = scriptName
@@ -331,12 +294,31 @@ func claudeStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 	}
 }
 
-func claudeStepScriptName(stepNumber int, name string) string {
+func claudePromptStepBrokerCommand(stepName, promptName, model string) runner.BrokerCommand {
+	label := strings.TrimSpace(stepName)
+	if label == "" {
+		label = promptName
+	}
+	return runner.BrokerCommand{
+		Name: label,
+		Command: fmt.Sprintf(
+			`bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
+			promptName,
+			shellSingleQuote(model),
+		),
+	}
+}
+
+func claudeStepSlug(stepNumber int, name string) string {
 	slug := slugifyClaudeStepName(name)
 	if slug == "" {
 		slug = "step"
 	}
-	return fmt.Sprintf("%02d-%s.sh", stepNumber, slug)
+	return fmt.Sprintf("%02d-%s", stepNumber, slug)
+}
+
+func claudeStepScriptName(stepNumber int, name string) string {
+	return claudeStepSlug(stepNumber, name) + ".sh"
 }
 
 func slugifyClaudeStepName(name string) string {

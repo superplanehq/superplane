@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
 func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
@@ -92,7 +94,12 @@ func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Contains(t, task.Commands[0].Command, "node not found on PATH")
 	assert.Equal(t, streamFormatJS, requireTaskFile(t, task.Files, "format.js").Content)
-	promptScript := requireTaskFile(t, task.Files, "steps/01-do-it.sh").Content
-	assert.Contains(t, promptScript, `node "$SP/format.js"`)
-	assert.Contains(t, promptScript, "tee -a")
+	assert.Equal(t, promptStepScript, requireTaskFile(t, task.Files, "prompt_step.sh").Content)
+	assert.Equal(t, "do it", requireTaskFile(t, task.Files, "prompts/01-do-it.txt").Content)
+	assert.Contains(t, promptStepScript, `node "$SP/format.js"`)
+	assert.Contains(t, promptStepScript, "tee -a")
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Do it",
+		Command: `bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/01-do-it.txt" ''`,
+	}, task.Commands[1])
 }
