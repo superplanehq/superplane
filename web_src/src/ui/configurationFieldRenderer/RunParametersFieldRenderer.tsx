@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { AuthorizationDomainType, ConfigurationField, SuperplaneComponentsNode } from "@/api-client";
+import type { ConfigurationField, SuperplaneComponentsNode } from "@/api-client";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { toTestId } from "@/lib/testID";
 import { ConfigurationFieldRenderer } from "./index";
@@ -8,9 +8,7 @@ import type { FieldRendererProps, ValidationError } from "./types";
 import { normalizeRunParameterDefinitions } from "./runParameters";
 
 interface RunParametersFieldRendererProps extends FieldRendererProps {
-  domainId?: string;
-  domainType?: AuthorizationDomainType;
-  organizationId?: string;
+  organizationId: string;
   allowExpressions?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
@@ -50,8 +48,6 @@ export function RunParametersFieldRenderer({
   value,
   onChange,
   allValues,
-  domainId,
-  domainType,
   organizationId,
   allowExpressions = false,
   autocompleteExampleObj,
@@ -66,8 +62,8 @@ export function RunParametersFieldRenderer({
     data: canvas,
     isLoading,
     error,
-  } = useCanvas(organizationId ?? "", appId ?? "", {
-    enabled: Boolean(organizationId && appId),
+  } = useCanvas(organizationId, appId ?? "", {
+    enabled: Boolean(appId),
   });
 
   const parameterDefinitions = useMemo(() => {
@@ -95,12 +91,6 @@ export function RunParametersFieldRenderer({
   );
 
   const baseFieldPath = fieldPath || field.name || "parameters";
-
-  if (!organizationId) {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">Run parameters field requires organization context.</div>
-    );
-  }
 
   if (!appId || !nodeId) {
     return (
@@ -136,8 +126,6 @@ export function RunParametersFieldRenderer({
           value={value}
           onChange={onChange}
           allValues={allValues}
-          domainId={domainId}
-          domainType={domainType}
           organizationId={organizationId}
           allowExpressions={allowExpressions}
           autocompleteExampleObj={autocompleteExampleObj}
@@ -166,8 +154,6 @@ export function RunParametersFieldRenderer({
               });
             }}
             allValues={allValues}
-            domainId={domainId}
-            domainType={domainType}
             organizationId={organizationId}
             allowExpressions={allowExpressions}
             autocompleteExampleObj={autocompleteExampleObj}

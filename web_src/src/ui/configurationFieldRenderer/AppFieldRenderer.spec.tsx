@@ -90,10 +90,4 @@ describe("AppFieldRenderer", () => {
 
     expect(screen.getByTestId("current-value")).toHaveTextContent("canvas_billing");
   });
-
-  it("requires organization context", () => {
-    render(<AppFieldRenderer field={appField()} value={undefined} onChange={vi.fn()} />);
-
-    expect(screen.getByText("App field requires organization context.")).toBeInTheDocument();
-  });
 });

@@ -8,7 +8,8 @@ import { flattenObject } from "@/lib/utils";
 import { getExecutionDetails, getTriggerRenderer } from "@/pages/app/mappers";
 import { buildEventInfo } from "@/pages/app/utils";
 import { hasObjectValue, normalizeExecutionOutputsForDisplay } from "./runNodeDetailOutputs";
-import { workflowComponentName, type RunNodeDetailTabData } from "./runNodeDetailModel";
+import { workflowComponentName } from "./runNodeDetailModel";
+import type { RunNodeDetailTabData } from "./types";
 
 export function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,

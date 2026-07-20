@@ -4,7 +4,6 @@ import { Switch } from "@/ui/switch";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
-import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
 import { ReadonlyConfigurationField } from "./ReadonlyFieldRenderer";
@@ -16,8 +15,6 @@ const REQUIRED_FIELD_BADGE_CLASS =
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
-  domainId?: string;
-  domainType?: AuthorizationDomainType;
   integrationId?: string;
   organizationId?: string;
   hasError?: boolean;
@@ -106,8 +103,6 @@ export const ConfigurationFieldRenderer = ({
   value,
   onChange,
   allValues = {},
-  domainId,
-  domainType,
   integrationId,
   organizationId,
   hasError = false,
@@ -316,8 +311,6 @@ export const ConfigurationFieldRenderer = ({
   const renderField = () => (
     <ConfigurationFieldInput
       commonProps={commonProps}
-      domainId={domainId}
-      domainType={domainType}
       integrationId={integrationId}
       organizationId={organizationId}
       allowExpressions={allowExpressions}

@@ -108,7 +108,7 @@ export const runAppMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     const nodeMetadata = context.node.metadata as RunAppMetadata | undefined;
     const metadata = context.execution.metadata as RunAppExecutionMetadata | undefined;
-    const childRun = resolveChildRun(context.execution.runs, nodeMetadata?.app?.id);
+    const childRun = resolveChildRun(context.execution.runs, nodeMetadata);
     const app = nodeMetadata?.app;
 
     if (app?.name) {
@@ -120,11 +120,15 @@ export const runAppMapper: ComponentBaseMapper = {
       details["Run"] = appRunPath(organizationId, childRun.canvasId, childRun.id);
     }
 
-    if (metadata?.run?.result) {
+    if (!metadata) {
+      return details;
+    }
+
+    if (metadata.run?.result) {
       details["Result"] = metadata.run.result;
     }
 
-    if (metadata?.run?.error) {
+    if (metadata.run?.error) {
       details["Error"] = metadata.run.error;
     }
 
@@ -134,12 +138,17 @@ export const runAppMapper: ComponentBaseMapper = {
 
 function resolveChildRun(
   runs: CanvasesCanvasRunRef[] | undefined,
-  configuredAppId?: string,
+  nodeMetadata: RunAppMetadata | undefined,
 ): CanvasesCanvasRunRef | undefined {
   if (!runs?.length) {
     return undefined;
   }
 
+  if (!nodeMetadata) {
+    return undefined;
+  }
+
+  const configuredAppId = nodeMetadata.app?.id;
   if (configuredAppId) {
     const match = runs.find((run) => run.canvasId === configuredAppId);
     if (match) {

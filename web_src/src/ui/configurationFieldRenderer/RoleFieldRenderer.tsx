@@ -6,7 +6,7 @@ interface RoleFieldRendererProps {
   field: ConfigurationField;
   value: string;
   onChange: (value: string | undefined) => void;
-  domainId: string;
+  organizationId: string;
   allValues?: Record<string, unknown>;
   readOnly?: boolean;
 }
@@ -14,12 +14,12 @@ interface RoleFieldRendererProps {
 export const RoleFieldRenderer = ({
   value,
   onChange,
-  domainId,
+  organizationId,
   allValues,
   readOnly = false,
 }: RoleFieldRendererProps) => {
   // Fetch roles from the organization
-  const { data: roles, isLoading, error } = useOrganizationRoles(domainId);
+  const { data: roles, isLoading, error } = useOrganizationRoles(organizationId);
   const approvalContext = getApprovalListContext(allValues);
   const usedRoles = new Set<string>();
 
@@ -31,10 +31,6 @@ export const RoleFieldRenderer = ({
         usedRoles.add(record.role);
       }
     });
-  }
-
-  if (!domainId || domainId.trim() === "") {
-    return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>;
   }
 
   if (error) {

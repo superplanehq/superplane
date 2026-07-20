@@ -8,7 +8,7 @@ describe("onRunTriggerRenderer", () => {
     expect(onRunTitle(undefined)).toBe("App run");
   });
 
-  it("maps root event values from app and payload", () => {
+  it("maps root event values from app and parameters", () => {
     expect(
       onRunTriggerRenderer.getRootEventValues({
         event: {
@@ -18,7 +18,7 @@ describe("onRunTriggerRenderer", () => {
           type: "app.invocation",
           data: {
             app: { name: "Billing" },
-            payload: {
+            parameters: {
               message: "hello",
               count: 2,
             },

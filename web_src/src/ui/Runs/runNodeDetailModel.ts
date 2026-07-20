@@ -2,10 +2,8 @@ import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
-  CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   ComponentsEdge,
-  ConfigurationField,
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
@@ -21,21 +19,13 @@ import {
   buildNodeActions,
   buildOutputSections,
   buildTriggerOutputSections,
-  getExecutionErrorMessage,
   normalizeExecutionOutputsForDisplay,
 } from "./runNodeDetailOutputs";
 import { buildExecutionTabData, buildTriggerTabData } from "./runNodeDetailTabs";
 import { buildQueuedNodeSections } from "./runQueuedNodeSections";
+import type { RunInspectorErrorSummary, RunInspectorNodeSection, RunInspectorUpstreamSection, RunNodeDetailTabKey, RunNodeDetailTabAvailability } from "./types";
 export { hasObjectValue } from "./runNodeDetailOutputs";
 export { buildExecutionTabData, buildTriggerTabData, isErrorValue } from "./runNodeDetailTabs";
-
-export type RunNodeDetailTabKey = "details" | "payload" | "configuration";
-
-export type RunNodeDetailTabAvailability = {
-  hasDetailsSection: boolean;
-  hasPayload: boolean;
-  hasConfig: boolean;
-};
 
 let lastRunNodeDetailTab: RunNodeDetailTabKey = "details";
 
@@ -66,86 +56,6 @@ export function resolveRunNodeDetailTab(
   if (availability.hasConfig) return "configuration";
   return preferred;
 }
-
-export type RunNodeDetailTabData = {
-  details?: Record<string, unknown>;
-  payload?: unknown;
-  configuration?: unknown;
-};
-
-export type RunInspectorOutputSection = {
-  channel: string;
-  value: unknown;
-  sizeKb: string;
-};
-
-export type RunInspectorCurrentUser = {
-  id: string;
-  email: string;
-  roles?: string[];
-  groups?: string[];
-};
-
-export type RunInspectorApprovalRecord = {
-  index: number;
-  state?: string;
-  type?: string;
-  user?: {
-    id?: string;
-    email?: string;
-    name?: string;
-  };
-  roleRef?: {
-    name?: string;
-    displayName?: string;
-  };
-  groupRef?: {
-    name?: string;
-    displayName?: string;
-  };
-};
-
-export type RunInspectorNodeActions = {
-  canStop: boolean;
-  canPushThrough: boolean;
-  approvalRecords: RunInspectorApprovalRecord[];
-};
-
-export type RunInspectorUpstreamSection = {
-  nodeId: string;
-  nodeName: string;
-  workflowNode?: ComponentsNode;
-  badge: { badgeColor: string; label: string } | null;
-  output: unknown;
-};
-
-export type RunInspectorNodeSection = {
-  sectionValue: string;
-  nodeId: string;
-  nodeName: string;
-  workflowNode?: ComponentsNode;
-  execution?: CanvasesCanvasNodeExecution;
-  executionRef?: CanvasesCanvasNodeExecutionRef;
-  queueItem?: CanvasesCanvasNodeQueueItem;
-  isTrigger: boolean;
-  isQueued: boolean;
-  createdAt?: string;
-  durationMs?: number;
-  badge: { badgeColor: string; label: string } | null;
-  tabData: RunNodeDetailTabData | null;
-  upstreamSections: RunInspectorUpstreamSection[];
-  primaryInputNodeId?: string;
-  outputSections: RunInspectorOutputSection[];
-  errorMessage?: string;
-  actions: RunInspectorNodeActions;
-  configurationFields: ConfigurationField[];
-};
-
-export type RunInspectorErrorSummary = {
-  nodeId: string;
-  nodeName: string;
-  message: string;
-};
 
 export function workflowComponentName(node: ComponentsNode | undefined): string {
   if (node?.type === "TYPE_ACTION" && node.component) return node.component;
@@ -225,6 +135,57 @@ export function getAdjacentRunNodeId(
   return chain[nextIndex] ?? null;
 }
 
+function getExecutionDuration(
+  execution: CanvasesCanvasNodeExecution | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef | undefined,
+): number | undefined {
+  if (execution) {
+    return calculateExecutionDuration(execution);
+  }
+
+  if (executionRef) {
+    return calculateExecutionRefDuration(executionRef);
+  }
+
+  return undefined;
+}
+
+function getBadgeForExecution(
+  isTrigger: boolean,
+  workflowNode: ComponentsNode | undefined,
+  execution: CanvasesCanvasNodeExecution | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef | undefined,
+): { badgeColor: string; label: string } | null {
+  if (isTrigger) {
+    return eventBadgeForTriggeredTrigger(workflowNode);
+  }
+
+  if (execution) {
+    return eventBadgeForExecution(workflowNode, execution);
+  }
+
+  if (executionRef) {
+    return eventBadgeForExecutionRef(workflowNode, executionRef);
+  }
+
+  return null;
+}
+
+function getExecutionCreationTimestamp(
+  execution: CanvasesCanvasNodeExecution | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef | undefined,
+): string | undefined {
+  if (execution) {
+    return execution.createdAt;
+  }
+
+  if (executionRef) {
+    return executionRef.createdAt;
+  }
+
+  return undefined;
+}
+
 export function buildRunInspectorNodeSections({
   run,
   executions,
@@ -250,7 +211,6 @@ export function buildRunInspectorNodeSections({
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
     const execution = executions.find((item) => item.nodeId === nodeId);
     const executionRef = run.executions?.find((item) => item.nodeId === nodeId) ?? execution;
-    const errorSource = execution ?? executionRef;
     const isTrigger = nodeId === triggerNodeId;
     const tabData = isTrigger
       ? buildTriggerTabData(run, workflowNode)
@@ -279,19 +239,9 @@ export function buildRunInspectorNodeSections({
       executionRef,
       isTrigger,
       isQueued: false,
-      createdAt: isTrigger ? run.rootEvent?.createdAt : (execution?.createdAt ?? executionRef?.createdAt),
-      durationMs: execution
-        ? calculateExecutionDuration(execution)
-        : executionRef
-          ? calculateExecutionRefDuration(executionRef)
-          : undefined,
-      badge: isTrigger
-        ? eventBadgeForTriggeredTrigger(workflowNode)
-        : execution
-          ? eventBadgeForExecution(workflowNode, execution)
-          : executionRef
-            ? eventBadgeForExecutionRef(workflowNode, executionRef)
-            : null,
+      createdAt: isTrigger ? run.rootEvent?.createdAt : getExecutionCreationTimestamp(execution, executionRef),
+      durationMs: getExecutionDuration(execution, executionRef),
+      badge: getBadgeForExecution(isTrigger, workflowNode, execution, executionRef),
       tabData,
       upstreamSections,
       primaryInputNodeId: isTrigger
@@ -310,7 +260,7 @@ export function buildRunInspectorNodeSections({
         : execution
           ? buildOutputSections(execution.outputs)
           : [],
-      errorMessage: errorSource ? getExecutionErrorMessage(errorSource) : undefined,
+      errorMessage: getExecutionErrorMessage(execution, executionRef),
       actions: buildNodeActions(workflowNode, execution),
       configurationFields: resolveConfigurationFields({
         workflowNode,
@@ -321,6 +271,21 @@ export function buildRunInspectorNodeSections({
   });
 
   return [...executionSections, ...buildQueuedNodeSections({ run, workflowNodes })];
+}
+
+function getExecutionErrorMessage(
+  execution: CanvasesCanvasNodeExecution | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef | undefined,
+): string | undefined {
+  if (execution) {
+    return execution.resultMessage || execution.resultReason;
+  }
+
+  if (executionRef) {
+    return executionRef.resultMessage || executionRef.resultReason;
+  }
+
+  return undefined;
 }
 
 export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {

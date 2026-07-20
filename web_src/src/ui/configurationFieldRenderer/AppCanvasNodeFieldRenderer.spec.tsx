@@ -8,6 +8,7 @@ import { useCanvas } from "@/hooks/useCanvasData";
 
 import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
 import { filterAppCanvasNodes, resolveAppCanvasId } from "./appCanvasNodeField";
+import { ConfigurationFieldInput } from "./ConfigurationFieldInput";
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: vi.fn(),
@@ -144,14 +145,20 @@ describe("AppCanvasNodeFieldRenderer", () => {
 
   it("requires organization context", () => {
     render(
-      <AppCanvasNodeFieldRenderer
-        field={nodeField()}
-        value={undefined}
-        onChange={vi.fn()}
-        allValues={{ app: "canvas_target" }}
+      <ConfigurationFieldInput
+        commonProps={{
+          field: nodeField(),
+          value: undefined,
+          onChange: vi.fn(),
+          allValues: { app: "canvas_target" },
+        }}
+        allowExpressions={false}
+        isRequired={false}
+        labelRightRef={{ current: null }}
+        labelRightReady={false}
       />,
     );
 
-    expect(screen.getByText("App canvas node field requires organization context.")).toBeInTheDocument();
+    expect(screen.getByText("This field requires organization context.")).toBeInTheDocument();
   });
 });

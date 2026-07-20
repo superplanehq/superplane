@@ -11,7 +11,7 @@ interface AppCanvasNodeFieldRendererProps {
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   allValues?: Record<string, unknown>;
-  organizationId?: string;
+  organizationId: string;
   readOnly?: boolean;
 }
 
@@ -24,25 +24,28 @@ export function AppCanvasNodeFieldRenderer({
   readOnly = false,
 }: AppCanvasNodeFieldRendererProps) {
   const typeOptions = field.typeOptions?.appCanvasNode;
-  const appCanvasId = useMemo(
-    () => resolveAppCanvasId(typeOptions?.parameters, allValues),
-    [allValues, typeOptions?.parameters],
-  );
+  const appCanvasId = useMemo(() => {
+    if (!typeOptions) {
+      return undefined;
+    }
+
+    return resolveAppCanvasId(typeOptions.parameters, allValues);
+  }, [allValues, typeOptions]);
 
   const {
     data: canvas,
     isLoading,
     error,
-  } = useCanvas(organizationId ?? "", appCanvasId ?? "", {
-    enabled: Boolean(organizationId && appCanvasId),
+  } = useCanvas(organizationId, appCanvasId ?? "", {
+    enabled: Boolean(appCanvasId),
   });
 
   const options: AutoCompleteOption[] = useMemo(() => {
-    const matchingNodes = filterAppCanvasNodes(
-      canvas?.spec?.nodes,
-      typeOptions?.nodeTypes,
-      typeOptions?.componentTypes,
-    );
+    if (!typeOptions) {
+      return [];
+    }
+
+    const matchingNodes = filterAppCanvasNodes(canvas?.spec?.nodes, typeOptions.nodeTypes, typeOptions.componentTypes);
 
     return matchingNodes
       .map((node) => ({
@@ -50,7 +53,7 @@ export function AppCanvasNodeFieldRenderer({
         label: node.name?.trim() || node.id!,
       }))
       .sort((left, right) => left.label.localeCompare(right.label));
-  }, [canvas?.spec?.nodes, typeOptions?.componentTypes, typeOptions?.nodeTypes]);
+  }, [canvas?.spec?.nodes, typeOptions]);
 
   const selectedValue = useMemo(() => {
     if (!value) {
@@ -72,10 +75,8 @@ export function AppCanvasNodeFieldRenderer({
     }
   }, [appCanvasId, onChange, options, value]);
 
-  if (!organizationId) {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">App canvas node field requires organization context.</div>
-    );
+  if (!typeOptions) {
+    return <div className="text-sm text-red-500 dark:text-red-400">App canvas node field is misconfigured.</div>;
   }
 
   if (!appCanvasId) {
