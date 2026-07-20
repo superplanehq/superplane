@@ -115,7 +115,7 @@ describe("runAppMapper.props metadata", () => {
     expect(props.metadata).toEqual([
       { icon: "layout-grid", label: "Child App" },
       { icon: "workflow", label: "On Run" },
-      { icon: "clock", label: "1h" },
+      { icon: "clock", label: "Timeout: 1h" },
     ]);
   });
 
@@ -144,6 +144,6 @@ describe("runAppMapper.props metadata", () => {
       lastExecutions: [],
     });
 
-    expect(props.metadata?.at(-1)).toEqual({ icon: "clock", label: "2m" });
+    expect(props.metadata?.at(-1)).toEqual({ icon: "clock", label: "Timeout: 2m" });
   });
 });

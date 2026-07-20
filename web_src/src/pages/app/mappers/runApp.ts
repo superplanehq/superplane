@@ -193,7 +193,7 @@ function runAppMetadataList(node: NodeInfo): MetadataItem[] {
   if (timeout && timeout > 0) {
     metadataList.push({
       icon: "clock",
-      label: formatDuration(timeout * 1000) || `${timeout}s`,
+      label: `Timeout: ${formatDuration(timeout * 1000) || `${timeout}s`}`,
     });
   }
 
