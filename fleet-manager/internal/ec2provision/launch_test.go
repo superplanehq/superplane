@@ -1,10 +1,16 @@
 package ec2provision
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
 
 func TestConfigFromEnvArchitecture(t *testing.T) {
@@ -137,12 +143,12 @@ func TestRunInstancesInputTagsRunnerArchitecture(t *testing.T) {
 		AMI:                "ami-1234567890abcdef0",
 		InstanceType:       "t4g.micro",
 		Arch:               "arm64",
-		SubnetID:           "subnet-1234567890abcdef0",
+		SubnetIDs:          []string{"subnet-1234567890abcdef0"},
 		SecurityGroupIDs:   []string{"sg-1234567890abcdef0"},
 		RunnersIAMProfName: "superplane-runner-profile",
 	}}
 
-	in := l.runInstancesInput(2, "encoded-user-data")
+	in := l.runInstancesInput(2, "encoded-user-data", "subnet-1234567890abcdef0")
 	if aws.ToString(in.UserData) != "encoded-user-data" {
 		t.Fatalf("user data: got %q", aws.ToString(in.UserData))
 	}
@@ -210,12 +216,12 @@ func TestRunInstancesInputTagsFleetID(t *testing.T) {
 		InstanceType:       "t4g.micro",
 		Arch:               "arm64",
 		FleetID:            "arm64-fleet-prod",
-		SubnetID:           "subnet-1234567890abcdef0",
+		SubnetIDs:          []string{"subnet-1234567890abcdef0"},
 		SecurityGroupIDs:   []string{"sg-1234567890abcdef0"},
 		RunnersIAMProfName: "superplane-runner-profile",
 	}}
 
-	in := l.runInstancesInput(1, "encoded-user-data")
+	in := l.runInstancesInput(1, "encoded-user-data", "subnet-1234567890abcdef0")
 	for _, spec := range in.TagSpecifications {
 		for _, tag := range spec.Tags {
 			if aws.ToString(tag.Key) == TagKeyFleetID {
@@ -254,4 +260,54 @@ func setRequiredProvisionEnv(t *testing.T) {
 	t.Setenv(envRunnerIAMProf, "superplane-runner-profile")
 	t.Setenv("AWS_REGION", "us-east-1")
 	t.Setenv(envFleetID, "test-fleet")
+}
+
+func TestIsInsufficientInstanceCapacity(t *testing.T) {
+	if !isInsufficientInstanceCapacity(&smithy.GenericAPIError{Code: "InsufficientInstanceCapacity"}) {
+		t.Fatal("expected true for InsufficientInstanceCapacity")
+	}
+	if isInsufficientInstanceCapacity(errors.New("boom")) {
+		t.Fatal("expected false for generic error")
+	}
+}
+
+func TestLaunch_RetriesNextSubnetOnInsufficientCapacity(t *testing.T) {
+	var tried []string
+	l := &Launcher{
+		Config: Config{
+			AMI:                    "ami-test",
+			InstanceType:           "t3.micro",
+			SubnetIDs:              []string{"subnet-a", "subnet-b"},
+			SecurityGroupIDs:       []string{"sg-test"},
+			RunnerS3URI:            "s3://bucket/runner-linux-amd64",
+			RunnerInstallAWSRegion: "us-east-1",
+			TaskBrokerURL:          "http://broker:8081",
+			RunnerFleetID:          "fleet-a",
+			FleetID:                "fleet-a",
+			RunnersIAMProfName:     "profile",
+			VolumeSizeGB:           30,
+		},
+		pending: make(map[string]time.Time),
+		runInstancesHook: func(_ context.Context, in *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error) {
+			subnet := aws.ToString(in.SubnetId)
+			tried = append(tried, subnet)
+			if subnet == "subnet-a" {
+				return nil, &smithy.GenericAPIError{Code: "InsufficientInstanceCapacity"}
+			}
+			return &ec2.RunInstancesOutput{
+				Instances: []types.Instance{{InstanceId: aws.String("i-new")}},
+			}, nil
+		},
+	}
+
+	ids, err := l.Launch(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "i-new" {
+		t.Fatalf("ids = %v", ids)
+	}
+	if len(tried) != 2 || tried[0] != "subnet-a" || tried[1] != "subnet-b" {
+		t.Fatalf("subnet try order = %v", tried)
+	}
 }

@@ -169,7 +169,7 @@ func TestRegisterFleet_OK(t *testing.T) {
 
 	c := New(ts.URL, "tok")
 	out, err := c.RegisterFleet(context.Background(), api.RegisterFleetRequest{
-		ID:          "aws-standard-amd64",
+		ID:          "e1-tiny-amd64",
 		Provisioner: "aws",
 		Arch:        "amd64",
 		Size:        "t3.micro",
@@ -183,10 +183,10 @@ func TestRegisterFleet_OK(t *testing.T) {
 	if gotAuth != "Bearer tok" {
 		t.Fatalf("auth: %q", gotAuth)
 	}
-	if gotBody.ID != "aws-standard-amd64" || gotBody.Provisioner != "aws" || gotBody.Arch != "amd64" || gotBody.Size != "t3.micro" {
+	if gotBody.ID != "e1-tiny-amd64" || gotBody.Provisioner != "aws" || gotBody.Arch != "amd64" || gotBody.Size != "t3.micro" {
 		t.Fatalf("body: %#v", gotBody)
 	}
-	if out.ID != "aws-standard-amd64" || out.Size != "t3.micro" || out.CreatedAt != 1710000000 {
+	if out.ID != "e1-tiny-amd64" || out.Size != "t3.micro" || out.CreatedAt != 1710000000 {
 		t.Fatalf("out: %#v", out)
 	}
 }

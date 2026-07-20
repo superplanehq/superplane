@@ -35,12 +35,16 @@ func usePipeShell() bool {
 }
 
 func runHostShellDirectives(ctx context.Context, maxOut int, workDir string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+	return runHostShellDirectiveList(ctx, maxOut, workDir, directivesFromStrings(scripts), env, live, resultHostPath)
+}
+
+func runHostShellDirectiveList(ctx context.Context, maxOut int, workDir string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
 	bash, err := resolveBash()
 	if err != nil {
 		return 1, "", err
 	}
 	if usePipeShell() {
-		return runHostShellDirectivesPipe(ctx, maxOut, workDir, bash, scripts, env, live, resultHostPath)
+		return runHostShellDirectivesPipe(ctx, maxOut, workDir, bash, directives, env, live, resultHostPath)
 	}
 	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
 	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
@@ -52,7 +56,7 @@ func runHostShellDirectives(ctx context.Context, maxOut int, workDir string, scr
 	if env != nil {
 		cmd.Env = env
 	}
-	return runShellPTYSession(ctx, maxOut, cmd, scripts, live, resultHostPath)
+	return runShellPTYSession(ctx, maxOut, cmd, directives, live, resultHostPath)
 }
 
 type cappedShellWriter struct {
@@ -97,10 +101,13 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
-func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
-	parts := normalizeDirectiveLines(scripts)
-	if len(parts) == 0 {
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+	if len(directives) == 0 {
 		return 1, "", errEmptyCommands()
+	}
+	parts := make([]string, 0, len(directives))
+	for _, d := range directives {
+		parts = append(parts, d.Shell)
 	}
 	tmpRoot, err := os.MkdirTemp("", "runner-sh-*")
 	if err != nil {
@@ -241,9 +248,8 @@ func killShellProcess(shellCmd *exec.Cmd) {
 	_ = shellCmd.Process.Kill()
 }
 
-func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []string, live io.Writer, resultHostPath string) (_ int, out string, err error) {
-	parts := normalizeDirectiveLines(directives)
-	if len(parts) == 0 {
+func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []shellDirective, live io.Writer, resultHostPath string) (_ int, out string, err error) {
+	if len(directives) == 0 {
 		return 1, "", errEmptyCommands()
 	}
 
@@ -341,13 +347,13 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		}
 	}()
 
-	for i, dir := range parts {
+	for i, dir := range directives {
 		dPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
-		if err := os.WriteFile(dPath, []byte(dir+"\n"), 0600); err != nil {
+		if err := os.WriteFile(dPath, []byte(dir.Shell+"\n"), 0600); err != nil {
 			return 1, truncateString(sess.out.String(), max), err
 		}
 		commandStart := time.Now()
-		writeLiveLogCommandStart(sess.live, i, dir, commandStart)
+		writeLiveLogCommandStart(sess.live, i, dir.Text, commandStart)
 		start := randomMark("s")
 		end := randomMark("e")
 		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').

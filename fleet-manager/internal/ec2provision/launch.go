@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 
 	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
 	"github.com/superplane/runner/shared/api"
@@ -44,6 +45,9 @@ type Launcher struct {
 
 	pendingMu sync.Mutex
 	pending   map[string]time.Time // instance id -> RunInstances request time
+
+	// runInstancesHook, when set, replaces Client.RunInstances (tests only).
+	runInstancesHook func(context.Context, *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error)
 }
 
 // FleetID returns the broker fleet id this launcher manages (the partition key used in
@@ -67,8 +71,9 @@ type Config struct {
 	// fleet-managers in the same AWS account. Defaults to hostname via ConfigFromEnv.
 	// In the JSON config path, set equal to RunnerFleetID.
 	FleetID string
-	// SubnetID is the VPC subnet runner VMs launch into.
-	SubnetID string
+	// SubnetIDs are VPC subnets runner VMs may launch into. On InsufficientInstanceCapacity
+	// the launcher tries the next subnet (each subnet is pinned to one AZ).
+	SubnetIDs []string
 	// SecurityGroupIDs are attached to runner VMs.
 	SecurityGroupIDs []string
 	// RunnerS3URI is s3://bucket/key for the runner binary (requires instance profile with s3:GetObject).
@@ -123,7 +128,8 @@ const (
 	// Describe results by this tag so they don't reconcile each other's instances.
 	TagKeyFleetID = "superplane_fleet_id"
 
-	maxLaunch = 50
+	maxLaunch          = 50
+	defaultLaunchBatch = 5
 )
 
 // managedRunInstancesTags returns the tags applied at launch to every managed runner instance.
@@ -179,6 +185,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Launcher, error) {
 }
 
 // Launch creates `count` on-demand Ubuntu hosts that install the runner from S3 and connect to TaskBrokerURL.
+// When multiple SubnetIDs are configured, InsufficientInstanceCapacity in one AZ triggers a retry in the next subnet.
 func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("count must be at least 1")
@@ -186,14 +193,48 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count > maxLaunch {
 		return nil, fmt.Errorf("count exceeds maximum of %d", maxLaunch)
 	}
+	subnets := l.Config.SubnetIDs
+	if len(subnets) == 0 {
+		return nil, fmt.Errorf("no subnet ids configured")
+	}
+
 	n := int32(count)
 	requestedAt := time.Now().UTC()
 	userdata, err := userDataScript(l.Config, requestedAt.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("user-data script: %w", err)
 	}
-	in := l.runInstancesInput(n, base64.StdEncoding.EncodeToString([]byte(userdata)))
-	out, err := l.Client.RunInstances(ctx, in)
+	encodedUserData := base64.StdEncoding.EncodeToString([]byte(userdata))
+
+	var lastErr error
+	for _, subnetID := range subnets {
+		ids, err := l.launchInSubnet(ctx, n, encodedUserData, subnetID, requestedAt)
+		if err == nil {
+			return ids, nil
+		}
+		lastErr = err
+		if !isInsufficientInstanceCapacity(err) {
+			return nil, err
+		}
+		if l.Log != nil {
+			l.Log.Info("ec2 RunInstances capacity exhausted, trying next subnet",
+				slog.String("subnet_id", subnetID),
+				slog.Int("count", count),
+				slog.Any("err", err))
+		}
+	}
+	return nil, lastErr
+}
+
+func (l *Launcher) launchInSubnet(ctx context.Context, count int32, encodedUserData, subnetID string, requestedAt time.Time) ([]string, error) {
+	in := l.runInstancesInput(count, encodedUserData, subnetID)
+	var out *ec2.RunInstancesOutput
+	var err error
+	if l.runInstancesHook != nil {
+		out, err = l.runInstancesHook(ctx, in)
+	} else {
+		out, err = l.Client.RunInstances(ctx, in)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -205,20 +246,28 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	}
 	l.trackPendingLaunches(ids, requestedAt)
 	if l.Log != nil {
-		l.Log.Info("ec2 RunInstances launched", slog.Int("count", count), slog.Any("instance_ids", ids))
+		l.Log.Info("ec2 RunInstances launched",
+			slog.Int("count", int(count)),
+			slog.String("subnet_id", subnetID),
+			slog.Any("instance_ids", ids))
 	}
 	return ids, nil
 }
 
-// runInstancesInput builds the RunInstancesInput for launching count runner VMs.
-func (l *Launcher) runInstancesInput(count int32, encodedUserData string) *ec2.RunInstancesInput {
+func isInsufficientInstanceCapacity(err error) bool {
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "InsufficientInstanceCapacity"
+}
+
+// runInstancesInput builds the RunInstancesInput for launching count runner VMs in subnetID.
+func (l *Launcher) runInstancesInput(count int32, encodedUserData, subnetID string) *ec2.RunInstancesInput {
 	in := &ec2.RunInstancesInput{
 		ImageId:          aws.String(l.Config.AMI),
 		InstanceType:     types.InstanceType(l.Config.InstanceType),
 		MinCount:         aws.Int32(count),
 		MaxCount:         aws.Int32(count),
 		UserData:         aws.String(encodedUserData),
-		SubnetId:         aws.String(l.Config.SubnetID),
+		SubnetId:         aws.String(subnetID),
 		SecurityGroupIds: l.Config.SecurityGroupIDs,
 		BlockDeviceMappings: []types.BlockDeviceMapping{
 			{
@@ -287,6 +336,7 @@ const (
 	envArch                = "EC2_PROVISION_ARCH"
 	envFleetID             = "EC2_PROVISION_FLEET_ID"
 	envSubnet              = "EC2_PROVISION_SUBNET_ID"
+	envSubnets             = "EC2_PROVISION_SUBNET_IDS"
 	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
 	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
 	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
@@ -327,12 +377,15 @@ func ConfigFromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("%s must be a non-negative integer", envHotCount)
 	}
 	ami := strings.TrimSpace(os.Getenv(envAMI))
-	sub := strings.TrimSpace(os.Getenv(envSubnet))
+	subnets, err := subnetIDsFromEnv()
+	if err != nil {
+		return Config{}, err
+	}
 	sgs := strings.TrimSpace(os.Getenv(envSecurityGroups))
 	url := strings.TrimSpace(os.Getenv(envTaskBrokerURL))
 	runnerFleetID := strings.TrimSpace(os.Getenv(envRunnerFleetID))
-	if ami == "" || sub == "" || sgs == "" || url == "" || runnerFleetID == "" {
-		return Config{}, fmt.Errorf("set %s, %s, %s, %s, and %s", envAMI, envSubnet, envSecurityGroups, envTaskBrokerURL, envRunnerFleetID)
+	if ami == "" || len(subnets) == 0 || sgs == "" || url == "" || runnerFleetID == "" {
+		return Config{}, fmt.Errorf("set %s, %s (or %s), %s, %s, and %s", envAMI, envSubnet, envSubnets, envSecurityGroups, envTaskBrokerURL, envRunnerFleetID)
 	}
 	var sgIDs []string
 	for _, p := range strings.Split(sgs, ",") {
@@ -423,7 +476,7 @@ func ConfigFromEnv() (Config, error) {
 		Arch:                            arch,
 		FleetID:                         fleetID,
 		RunnerFleetID:                   runnerFleetID,
-		SubnetID:                        sub,
+		SubnetIDs:                       subnets,
 		SecurityGroupIDs:                sgIDs,
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
@@ -442,4 +495,25 @@ func ConfigFromEnv() (Config, error) {
 		RunnerHealthPort:                healthPort,
 		Headroom:                        headroom,
 	}, nil
+}
+
+func subnetIDsFromEnv() ([]string, error) {
+	raw := strings.TrimSpace(os.Getenv(envSubnets))
+	if raw != "" {
+		var ids []string
+		for _, part := range strings.Split(raw, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				ids = append(ids, part)
+			}
+		}
+		if len(ids) == 0 {
+			return nil, fmt.Errorf("%s must list at least one subnet id", envSubnets)
+		}
+		return ids, nil
+	}
+	sub := strings.TrimSpace(os.Getenv(envSubnet))
+	if sub == "" {
+		return nil, nil
+	}
+	return []string{sub}, nil
 }

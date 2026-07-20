@@ -223,7 +223,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	normalizedCmds := api.NormalizeCommandLines(req.Commands)
+	normalizedCmds := api.NormalizeCommands(req.Commands)
 	script := strings.TrimSpace(req.Script)
 	kind := api.EffectiveRunMode(&req.CreateTaskRequest)
 
@@ -589,7 +589,7 @@ func (s *Server) taskLogForTask(taskID string) *api.TaskLogSink {
 func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 	kind := api.EffectiveRunMode(req)
 	hasArgv := len(req.Command) > 0
-	hasCmds := len(api.NormalizeCommandLines(req.Commands)) > 0
+	hasCmds := len(api.NormalizeCommands(req.Commands)) > 0
 	hasSetup := len(api.NormalizeCommandLines(req.SetupCommands)) > 0
 	script := strings.TrimSpace(req.Script)
 	hasScript := script != ""

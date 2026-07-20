@@ -3,7 +3,7 @@
 Metrics are exported via OpenTelemetry to Dash0.
 
 Pool-scoped metrics carry a `fleet_id` attribute so data can be filtered and
-grouped per pool (e.g. `aws-standard-1` vs `aws-arm64-1`).
+grouped per pool (e.g. `e1-tiny-amd64` vs `e1-tiny-arm64`).
 
 ## Export configuration
 

@@ -160,15 +160,25 @@ func (l *Launcher) reconcile(ctx context.Context, want int, claimedRunnerIDs []s
 }
 
 func (l *Launcher) launchAdditional(ctx context.Context, delta int) error {
-	for delta > 0 {
-		count := delta
-		if count > maxLaunch {
-			count = maxLaunch
+	return launchAdditional(ctx, delta, defaultLaunchBatch, l.Launch)
+}
+
+// launchAdditional scales up in batches. On InsufficientInstanceCapacity it retries one
+// instance at a time so partial AZ capacity can still be used.
+func launchAdditional(ctx context.Context, delta, batchSize int, launch func(context.Context, int) ([]string, error)) error {
+	remaining := delta
+	for remaining > 0 {
+		count := remaining
+		if count > batchSize {
+			count = batchSize
 		}
-		if _, err := l.Launch(ctx, count); err != nil {
+		if _, err := launch(ctx, count); err != nil {
+			if isInsufficientInstanceCapacity(err) && count > 1 {
+				return launchAdditional(ctx, remaining, 1, launch)
+			}
 			return fmt.Errorf("launch: %w", err)
 		}
-		delta -= count
+		remaining -= count
 	}
 	return nil
 }

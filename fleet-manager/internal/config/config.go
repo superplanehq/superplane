@@ -37,7 +37,9 @@ type File struct {
 	ReconcileIntervalSec int    `json:"reconcile_interval_sec"`
 
 	// --- global VM defaults (shared across pools for now; per-pool override is a future move) ---
+	// SubnetID is a single launch subnet (legacy). Prefer SubnetIDs for multi-AZ capacity fallback.
 	SubnetID                     string     `json:"subnet_id"`
+	SubnetIDs                    []string   `json:"subnet_ids,omitempty"`
 	SecurityGroupIDs             []string   `json:"security_group_ids"`
 	IAMInstanceProfile           string     `json:"iam_instance_profile"`
 	KeyName                      string     `json:"key_name"`
@@ -146,8 +148,8 @@ func (f *File) validate() error {
 	if strings.TrimSpace(f.TaskBrokerURL) == "" {
 		return fmt.Errorf("task_broker_url is required")
 	}
-	if strings.TrimSpace(f.SubnetID) == "" {
-		return fmt.Errorf("subnet_id is required")
+	if len(f.resolvedSubnetIDs()) == 0 {
+		return fmt.Errorf("subnet_id or subnet_ids is required")
 	}
 	if strings.TrimSpace(f.IAMInstanceProfile) == "" {
 		return fmt.Errorf("iam_instance_profile is required (runners need IAM credentials to read S3)")
@@ -211,6 +213,24 @@ func (f *File) validate() error {
 	return nil
 }
 
+// resolvedSubnetIDs returns the non-empty subnet list used for EC2 launches.
+// subnet_ids takes precedence; subnet_id is accepted for backward compatibility.
+func (f *File) resolvedSubnetIDs() []string {
+	ids := make([]string, 0, len(f.SubnetIDs)+1)
+	for _, subnet := range f.SubnetIDs {
+		if subnet = strings.TrimSpace(subnet); subnet != "" {
+			ids = append(ids, subnet)
+		}
+	}
+	if len(ids) > 0 {
+		return ids
+	}
+	if subnet := strings.TrimSpace(f.SubnetID); subnet != "" {
+		return []string{subnet}
+	}
+	return nil
+}
+
 // ToPoolConfig produces the ec2provision.Config for one pool by merging globals into it.
 // Field-by-field: pool-scoped values come from p, everything else from the global section.
 func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
@@ -223,7 +243,7 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 		InstanceType:                    p.InstanceType,
 		Arch:                            p.Arch,
 		FleetID:                         p.FleetID,
-		SubnetID:                        f.SubnetID,
+		SubnetIDs:                       f.resolvedSubnetIDs(),
 		SecurityGroupIDs:                f.SecurityGroupIDs,
 		RunnerS3URI:                     p.RunnerS3URI,
 		RunnerInstallAWSRegion:          f.AWSRegion,

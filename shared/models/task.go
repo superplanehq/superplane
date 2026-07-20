@@ -34,7 +34,7 @@ type Task struct {
 	// Command is argv for a single process when Commands is empty (legacy).
 	Command []string
 	// Commands are shell directives when non-empty (Bash+PTY sourcing per line on workers).
-	Commands []string
+	Commands CommandList
 	// SetupCommands are optional shell directives run before script tasks.
 	SetupCommands []string
 	// Environment is a task-scoped process environment sent only to runners.

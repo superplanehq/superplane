@@ -34,7 +34,6 @@ func buildJavaScriptProgram(userScript string, messageChain json.RawMessage) ([]
 
 	var buf bytes.Buffer
 	buf.WriteString("'use strict';\n")
-	buf.WriteString("const fs = require('fs');\n")
 	buf.WriteString("globalThis.$ = ")
 	buf.Write(chain)
 	buf.WriteString(";\n\n")
@@ -42,7 +41,7 @@ func buildJavaScriptProgram(userScript string, messageChain json.RawMessage) ([]
 	buf.WriteString("\n\n")
 	buf.WriteString(`Promise.resolve(typeof main === 'function' ? main() : (() => { throw new Error('main() is required'); })())
   .then(result => {
-    fs.writeFileSync(process.env.SUPERPLANE_RESULT_FILE, JSON.stringify(result ?? null));
+    require('fs').writeFileSync(process.env.SUPERPLANE_RESULT_FILE, JSON.stringify(result ?? null));
   })
   .catch(err => {
     console.error(err && err.stack ? err.stack : err);

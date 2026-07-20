@@ -122,7 +122,7 @@ func TestLoad_RequiredGlobalsMissing(t *testing.T) {
 		}, "task_broker_url"},
 		{"subnet_id", func(s string) string {
 			return strings.Replace(s, `"subnet_id": "subnet-abc",`, `"subnet_id": "",`, 1)
-		}, "subnet_id"},
+		}, "subnet_id or subnet_ids"},
 		{"iam_instance_profile", func(s string) string {
 			return strings.Replace(s, `"iam_instance_profile": "superplane-runner",`, `"iam_instance_profile": "",`, 1)
 		}, "iam_instance_profile"},
@@ -334,8 +334,8 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	if cfg.TaskBrokerURL != "http://broker.internal:8081" {
 		t.Errorf("TaskBrokerURL = %q", cfg.TaskBrokerURL)
 	}
-	if cfg.SubnetID != "subnet-abc" {
-		t.Errorf("SubnetID = %q", cfg.SubnetID)
+	if cfg.SubnetIDs[0] != "subnet-abc" || len(cfg.SubnetIDs) != 1 {
+		t.Errorf("SubnetIDs = %v", cfg.SubnetIDs)
 	}
 	if len(cfg.SecurityGroupIDs) != 1 || cfg.SecurityGroupIDs[0] != "sg-abc" {
 		t.Errorf("SecurityGroupIDs = %v", cfg.SecurityGroupIDs)
@@ -380,5 +380,34 @@ func TestToPoolConfig_TerminateFalsePropagated(t *testing.T) {
 	cfg := f.ToPoolConfig(f.Pools[0])
 	if cfg.RunnerTerminateAfterEachTask {
 		t.Errorf("RunnerTerminateAfterEachTask should be false")
+	}
+}
+
+func TestLoad_SubnetIDsPreferredOverSubnetID(t *testing.T) {
+	body := strings.Replace(validConfigJSON(),
+		`"subnet_id": "subnet-abc",`,
+		`"subnet_id": "subnet-legacy",
+		"subnet_ids": ["subnet-a", "subnet-c"],`, 1)
+	f, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := f.resolvedSubnetIDs()
+	if len(got) != 2 || got[0] != "subnet-a" || got[1] != "subnet-c" {
+		t.Fatalf("resolvedSubnetIDs = %v", got)
+	}
+}
+
+func TestLoad_SubnetIDsOnly(t *testing.T) {
+	body := strings.Replace(validConfigJSON(),
+		`"subnet_id": "subnet-abc",`,
+		`"subnet_ids": ["subnet-a", "subnet-b"],`, 1)
+	f, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := f.resolvedSubnetIDs()
+	if len(got) != 2 || got[0] != "subnet-a" || got[1] != "subnet-b" {
+		t.Fatalf("resolvedSubnetIDs = %v", got)
 	}
 }

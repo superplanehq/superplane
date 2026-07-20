@@ -85,7 +85,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	if err := json.Unmarshal([]byte(row.CommandJSON), &cmd); err != nil {
 		return nil, fmt.Errorf("command_json: %w", err)
 	}
-	var cmds []string
+	var cmds models.CommandList
 	if strings.TrimSpace(row.CommandsJSON) != "" {
 		if err := json.Unmarshal([]byte(row.CommandsJSON), &cmds); err != nil {
 			return nil, fmt.Errorf("commands_json: %w", err)

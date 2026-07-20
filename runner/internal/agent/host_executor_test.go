@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 )
 
 func TestHostExecutorArgvUsesTaskEnvironmentWithResultFile(t *testing.T) {
@@ -68,8 +69,8 @@ func TestHostExecutorCommandsUseTaskEnvironment(t *testing.T) {
 	t.Setenv("RUNNER_SHELL_USE_PIPE", "1")
 	task := &api.TaskPayload{
 		ID: "task-env-commands",
-		Commands: []string{
-			`printf "%s" "$RUNNER_TEST_ENV"`,
+		Commands: models.CommandList{
+			{Command: `printf "%s" "$RUNNER_TEST_ENV"`},
 		},
 		Environment: []api.EnvironmentVariable{{Name: "RUNNER_TEST_ENV", Value: "task-command-value"}},
 	}
@@ -93,8 +94,8 @@ func TestHostExecutorCommandsUseTaskEnvironmentWithResultFile(t *testing.T) {
 	t.Setenv("RUNNER_SHELL_USE_PIPE", "1")
 	task := &api.TaskPayload{
 		ID: "task-env-pipe-result",
-		Commands: []string{
-			`printf "%s" "$RUNNER_TEST_ENV"`,
+		Commands: models.CommandList{
+			{Command: `printf "%s" "$RUNNER_TEST_ENV"`},
 		},
 		Environment: []api.EnvironmentVariable{{Name: "RUNNER_TEST_ENV", Value: "pipe-result-value"}},
 	}
@@ -123,8 +124,8 @@ func TestHostExecutorPTYCommandsUseTaskEnvironmentWithResultFile(t *testing.T) {
 
 	task := &api.TaskPayload{
 		ID: "task-env-pty",
-		Commands: []string{
-			`printf "%s" "$RUNNER_TEST_ENV"`,
+		Commands: models.CommandList{
+			{Command: `printf "%s" "$RUNNER_TEST_ENV"`},
 		},
 		Environment: []api.EnvironmentVariable{{Name: "RUNNER_TEST_ENV", Value: "pty-task-value"}},
 	}

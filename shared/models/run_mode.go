@@ -17,7 +17,7 @@ const (
 )
 
 // InferRunMode maps legacy task fields when RunMode is unset.
-func InferRunMode(commands []string, command []string, script string) RunMode {
+func InferRunMode(commands CommandList, command []string, script string) RunMode {
 	if len(commands) > 0 {
 		return RunModeCommandList
 	}

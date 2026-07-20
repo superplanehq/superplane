@@ -211,6 +211,10 @@ func dockerExecJavaScript(ctx context.Context, name string, task *api.TaskPayloa
 }
 
 func dockerExecShellDirectives(ctx context.Context, name string, task *api.TaskPayload, directives []string, live io.Writer) (int, string, error) {
+	return dockerExecShellDirectiveList(ctx, name, task, directivesFromStrings(directives), live)
+}
+
+func dockerExecShellDirectiveList(ctx context.Context, name string, task *api.TaskPayload, directives []shellDirective, live io.Writer) (int, string, error) {
 	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
 	if err != nil {
 		return 1, "", err
@@ -344,7 +348,7 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 	var args []string
 	switch {
 	case len(task.Commands) > 0:
-		directives := normalizeDirectiveLines(task.Commands)
+		directives := directivesFromCommands(task.Commands)
 		if len(directives) == 0 {
 			return nil, errEmptyCommands()
 		}
@@ -368,7 +372,7 @@ func dockerSingleCommandText(task *api.TaskPayload) (string, bool) {
 	return strings.TrimSpace(strings.Join(task.Command, " ")), true
 }
 
-func dockerCommandsScript(directives []string) string {
+func dockerCommandsScript(directives []shellDirective) string {
 	var script strings.Builder
 	script.WriteString("set -e\n")
 	script.WriteString("sp_now_ms() {\n")
@@ -380,7 +384,7 @@ func dockerCommandsScript(directives []string) string {
 	script.WriteString("}\n")
 
 	for i, directive := range directives {
-		textJSON, _ := json.Marshal(directive)
+		textJSON, _ := json.Marshal(directive.Text)
 		script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
 		script.WriteString(`printf '{"type":"cmd_start","index":`)
 		script.WriteString(strconv.Itoa(i))
@@ -389,7 +393,7 @@ func dockerCommandsScript(directives []string) string {
 		script.WriteString(`,"started_at":%s}\n' "$__sp_cmd_start"`)
 		script.WriteString("\n")
 		script.WriteString("if {\n")
-		script.WriteString(directive)
+		script.WriteString(directive.Shell)
 		script.WriteString("\n}; then\n")
 		script.WriteString("  __sp_cmd_exit=0\n")
 		script.WriteString("else\n")
@@ -399,6 +403,8 @@ func dockerCommandsScript(directives []string) string {
 		script.WriteString("__sp_cmd_duration=$((__sp_cmd_end - __sp_cmd_start))\n")
 		script.WriteString("if [ \"$__sp_cmd_duration\" -lt 0 ]; then __sp_cmd_duration=0; fi\n")
 		script.WriteString("if [ \"$__sp_cmd_exit\" -eq 0 ]; then __sp_cmd_status=passed; else __sp_cmd_status=failed; fi\n")
+		// Force a newline so cmd_end JSON is not glued to stdout that omitted one.
+		script.WriteString("printf '\\n'\n")
 		script.WriteString(`printf '{"type":"cmd_end","index":`)
 		script.WriteString(strconv.Itoa(i))
 		script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")

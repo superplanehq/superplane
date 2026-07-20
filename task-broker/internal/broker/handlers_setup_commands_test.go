@@ -50,7 +50,7 @@ func TestValidateCreateTaskPayload_setupCommands(t *testing.T) {
 	t.Run("command_list rejects setup_commands", func(t *testing.T) {
 		req := &api.CreateTaskRequest{
 			RunMode:       string(models.RunModeCommandList),
-			Commands:      []string{"echo hi"},
+			Commands:      models.CommandList{{Command: "echo hi"}},
 			SetupCommands: []string{"npm ci"},
 			WebhookURL:    "https://x/h",
 			ExecutionMode: "host",

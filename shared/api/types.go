@@ -36,10 +36,11 @@ type CreateTaskRequest struct {
 	MessageChain json.RawMessage `json:"message_chain,omitempty"`
 	// Command is argv for one process. Omit when using Commands or Script.
 	Command []string `json:"command,omitempty"`
-	// Commands are shell directives (non-empty trimmed lines). The runner uses Bash on
-	// a PTY and sources each directive from a tempfile, stopping at the first failing
-	// directive ($? after source). Omit when using Command.
-	Commands []string `json:"commands,omitempty"`
+	// Commands are shell directives. Each entry may be a plain string or
+	// {"name","command"}. The runner uses Bash on a PTY and sources each directive
+	// from a tempfile, stopping at the first failing directive ($? after source).
+	// Omit when using Command.
+	Commands models.CommandList `json:"commands,omitempty"`
 	// SetupCommands are optional shell directives run before script execution.
 	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
@@ -79,7 +80,7 @@ type TaskPayload struct {
 	Script        string                `json:"script,omitempty"`
 	MessageChain  json.RawMessage       `json:"message_chain,omitempty"`
 	Command       []string              `json:"command,omitempty"`
-	Commands      []string              `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
+	Commands      models.CommandList    `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
 	SetupCommands []string              `json:"setup_commands,omitempty"`
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
 	ExecutionMode string                `json:"execution_mode"`
@@ -231,7 +232,7 @@ func EffectiveRunMode(req *CreateTaskRequest) models.RunMode {
 	if k := models.RunMode(strings.ToLower(strings.TrimSpace(req.RunMode))); k != "" {
 		return k
 	}
-	return models.InferRunMode(NormalizeCommandLines(req.Commands), req.Command, strings.TrimSpace(req.Script))
+	return models.InferRunMode(NormalizeCommands(req.Commands), req.Command, strings.TrimSpace(req.Script))
 }
 
 // RunModeForTask returns the effective run mode on a claimed task payload.
@@ -245,7 +246,27 @@ func RunModeForTask(task *TaskPayload) models.RunMode {
 	return models.InferRunMode(task.Commands, task.Command, strings.TrimSpace(task.Script))
 }
 
-// NormalizeCommandLines trims and drops blank command-list lines.
+// NormalizeCommands drops blank command-list entries and trims fields.
+func NormalizeCommands(commands models.CommandList) models.CommandList {
+	if len(commands) == 0 {
+		return nil
+	}
+	out := make(models.CommandList, 0, len(commands))
+	for _, spec := range commands {
+		spec.Name = strings.TrimSpace(spec.Name)
+		spec.Command = strings.TrimSpace(spec.Command)
+		if spec.Command == "" {
+			continue
+		}
+		out = append(out, spec)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// NormalizeCommandLines trims and drops blank setup/command string lines.
 func NormalizeCommandLines(commands []string) []string {
 	var out []string
 	for _, c := range commands {
@@ -253,6 +274,19 @@ func NormalizeCommandLines(commands []string) []string {
 		if c != "" {
 			out = append(out, c)
 		}
+	}
+	return out
+}
+
+// CommandSpecsFromLines adapts plain shell lines into CommandSpec values (no names).
+func CommandSpecsFromLines(lines []string) models.CommandList {
+	normalized := NormalizeCommandLines(lines)
+	if len(normalized) == 0 {
+		return nil
+	}
+	out := make(models.CommandList, 0, len(normalized))
+	for _, line := range normalized {
+		out = append(out, models.CommandSpec{Command: line})
 	}
 	return out
 }

@@ -13,7 +13,7 @@ blocks:
   - name: Build AMIs (amd64 + arm64)
     task:
       secrets:
-        - name: aws-credentials
+        - name: aws-prod-ami-builder
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1

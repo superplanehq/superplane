@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 )
 
 func TestResolveTaskWorkDirUsesHome(t *testing.T) {
@@ -63,7 +64,7 @@ func TestHostExecutorUsesTaskWorkDirCommands(t *testing.T) {
 	t.Setenv("RUNNER_SHELL_USE_PIPE", "1")
 	task := &api.TaskPayload{
 		ID:       "task-workdir-commands",
-		Commands: []string{`pwd`},
+		Commands: models.CommandList{{Command: `pwd`}},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
