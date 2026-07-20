@@ -228,6 +228,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_NODE_REQUEST_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Node Request Cleanup Worker")
+
+		w := workers.NewNodeRequestCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
 		log.Println("Starting Repository Provisioner")
 		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
