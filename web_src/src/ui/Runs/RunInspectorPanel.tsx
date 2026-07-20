@@ -17,11 +17,7 @@ import { RunInspectorHeader } from "./RunInspectorHeader";
 import { ResizeHandle } from "./RunInspectorResize";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
 import { buildNodeMap, buildRunPresentation, type RUN_STATUS_META } from "./runPresentation";
-import type {
-  RunInspectorCurrentUser,
-  RunInspectorErrorSummary,
-  RunInspectorNodeSection,
-} from "./types";
+import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 import { useRunInspectorActions } from "./useRunInspectorActions";
 import { buildRunInspectorNodeSections, findRunInspectorErrorSummaries } from "./runNodeDetailModel";

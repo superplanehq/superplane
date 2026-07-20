@@ -3,11 +3,7 @@ import type {
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
-import type {
-  RunInspectorApprovalRecord,
-  RunInspectorNodeActions,
-  RunInspectorOutputSection,
-} from "./types";
+import type { RunInspectorApprovalRecord, RunInspectorNodeActions, RunInspectorOutputSection } from "./types";
 
 export function buildTriggerOutputSections(run: CanvasesCanvasRun): RunInspectorOutputSection[] {
   if (!hasObjectValue(run.rootEvent?.data)) return [];

@@ -23,7 +23,13 @@ import {
 } from "./runNodeDetailOutputs";
 import { buildExecutionTabData, buildTriggerTabData } from "./runNodeDetailTabs";
 import { buildQueuedNodeSections } from "./runQueuedNodeSections";
-import type { RunInspectorErrorSummary, RunInspectorNodeSection, RunInspectorUpstreamSection, RunNodeDetailTabKey, RunNodeDetailTabAvailability } from "./types";
+import type {
+  RunInspectorErrorSummary,
+  RunInspectorNodeSection,
+  RunInspectorUpstreamSection,
+  RunNodeDetailTabKey,
+  RunNodeDetailTabAvailability,
+} from "./types";
 export { hasObjectValue } from "./runNodeDetailOutputs";
 export { buildExecutionTabData, buildTriggerTabData, isErrorValue } from "./runNodeDetailTabs";
 
@@ -277,12 +283,12 @@ function getExecutionErrorMessage(
   execution: CanvasesCanvasNodeExecution | undefined,
   executionRef: CanvasesCanvasNodeExecutionRef | undefined,
 ): string | undefined {
-  if (execution) {
-    return execution.resultMessage || execution.resultReason;
+  if (execution && execution.result === "RESULT_FAILED") {
+    return execution.resultMessage || execution.resultReason || undefined;
   }
 
-  if (executionRef) {
-    return executionRef.resultMessage || executionRef.resultReason;
+  if (executionRef && executionRef.result === "RESULT_FAILED") {
+    return executionRef.resultMessage || executionRef.resultReason || undefined;
   }
 
   return undefined;
