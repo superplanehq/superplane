@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { ArrowLeft, ArrowRight, Eye, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, MessageSquare, Plus, Terminal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppDetailModal, LeadIcon, type AppEntry } from "../AppDetailModal";
@@ -38,8 +39,195 @@ const SETUP_STEPS = [
     title: "Coding agent",
     detail: "Pick a harness. Agents run in the SuperPlane sandbox; you provide the API key.",
   },
-  { title: "Preview and tweak", detail: "Adjust prompts, SSH commands, and other settings." },
+  {
+    title: "Agent settings",
+    detail: "Tune the planning, implementation, and PR review components the factory will run.",
+  },
+  {
+    title: "Preview",
+    detail: "Confirm your setup before creating the Software Factory.",
+  },
 ] as const;
+
+type AgentStepKind = "prompt" | "bash";
+
+type AgentPipelineStep = {
+  id: string;
+  kind: AgentStepKind;
+  title: string;
+  body: string;
+};
+
+type AgentComponentId = "planning" | "implementation" | "pr-loop";
+
+type AgentComponentConfig = {
+  id: AgentComponentId;
+  title: string;
+  purpose: string;
+  modelId: string;
+  machineType: string;
+  /** PR review loop only. */
+  maxRetries?: number;
+  steps: AgentPipelineStep[];
+};
+
+function newAgentStepId(): string {
+  return `step-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createAgentStep(kind: AgentStepKind, title: string, body: string): AgentPipelineStep {
+  return { id: newAgentStepId(), kind, title, body };
+}
+
+/** Storybook fixture machine sizes (mirrors SuperPlane runner fleets). */
+const AGENT_MACHINE_OPTIONS: AutoCompleteOption[] = [
+  { value: "e1-tiny-amd64", label: "Tiny · AMD64 · 2 vCPU / 4 GB" },
+  { value: "e1-tiny-arm64", label: "Tiny · ARM64 · 2 vCPU / 4 GB" },
+  { value: "e1-large-amd64", label: "Large · AMD64 · 8 vCPU / 16 GB" },
+  { value: "e1-large-arm64", label: "Large · ARM64 · 8 vCPU / 16 GB" },
+];
+
+const DEFAULT_AGENT_MACHINE = "e1-large-amd64";
+const DEFAULT_PR_LOOP_MAX_RETRIES = 5;
+
+const FIXTURE_MODELS_BY_PROVIDER: Record<string, AutoCompleteOption[]> = {
+  claude: [
+    { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+    { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  ],
+  openai: [
+    { value: "gpt-5.2", label: "GPT-5.2" },
+    { value: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+    { value: "o3-mini", label: "o3-mini" },
+  ],
+  cursor: [
+    { value: "auto", label: "Auto (recommended)" },
+    { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+    { value: "gpt-5.2", label: "GPT-5.2" },
+  ],
+  gemini: [
+    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  ],
+  openrouter: [
+    { value: "openrouter/auto", label: "OpenRouter Auto" },
+    { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
+    { value: "openai/gpt-5.2", label: "GPT-5.2" },
+  ],
+  deepseek: [
+    { value: "deepseek-chat", label: "DeepSeek Chat" },
+    { value: "deepseek-reasoner", label: "DeepSeek Reasoner" },
+  ],
+  groq: [
+    { value: "llama-3.3-70b", label: "Llama 3.3 70B" },
+    { value: "qwen-qwq-32b", label: "Qwen QwQ 32B" },
+  ],
+  mistral: [
+    { value: "mistral-large-latest", label: "Mistral Large" },
+    { value: "codestral-latest", label: "Codestral" },
+  ],
+  zen: [
+    { value: "big-pickle", label: "Big Pickle (free)" },
+    { value: "deepseek-v4-flash-free", label: "DeepSeek V4 Flash Free" },
+    { value: "mimo-v2.5-free", label: "MiMo-V2.5 Free" },
+  ],
+  ollama: [
+    { value: "qwen2.5-coder", label: "Qwen 2.5 Coder" },
+    { value: "llama3.1", label: "Llama 3.1" },
+    { value: "deepseek-coder-v2", label: "DeepSeek Coder V2" },
+  ],
+};
+
+function modelProviderKeyForHarness(
+  harness: AgentHarnessId | null,
+  openCodeProvider: OpenCodeProviderId | null,
+): string {
+  if (harness === "claude-code") return "claude";
+  if (harness === "codex") return "openai";
+  if (harness === "cursor") return "cursor";
+  if (harness === "open-code") {
+    if (openCodeProvider === "anthropic") return "claude";
+    if (openCodeProvider === "openai") return "openai";
+    return openCodeProvider ?? "zen";
+  }
+  return "claude";
+}
+
+function fixtureModelsForHarness(
+  harness: AgentHarnessId | null,
+  openCodeProvider: OpenCodeProviderId | null,
+): AutoCompleteOption[] {
+  const key = modelProviderKeyForHarness(harness, openCodeProvider);
+  return FIXTURE_MODELS_BY_PROVIDER[key] ?? FIXTURE_MODELS_BY_PROVIDER.claude;
+}
+
+function defaultModelForHarness(harness: AgentHarnessId | null, openCodeProvider: OpenCodeProviderId | null): string {
+  return fixtureModelsForHarness(harness, openCodeProvider)[0]?.value ?? "claude-sonnet-4-6";
+}
+
+function cloneDefaultAgentComponents(
+  harness: AgentHarnessId | null = "claude-code",
+  openCodeProvider: OpenCodeProviderId | null = null,
+): AgentComponentConfig[] {
+  const modelId = defaultModelForHarness(harness, openCodeProvider);
+  return [
+    {
+      id: "planning",
+      title: "Planning",
+      purpose: "Turns the trigger into a short implementation plan before coding starts.",
+      modelId,
+      machineType: DEFAULT_AGENT_MACHINE,
+      steps: [
+        createAgentStep(
+          "prompt",
+          "Create plan",
+          "Analyze the issue or prompt and produce a short implementation plan. List files to touch, risks, and a clear definition of done.",
+        ),
+      ],
+    },
+    {
+      id: "implementation",
+      title: "Implementation",
+      purpose: "Applies the plan in the repo, runs checks, and opens a pull or merge request.",
+      modelId,
+      machineType: DEFAULT_AGENT_MACHINE,
+      steps: [
+        createAgentStep(
+          "prompt",
+          "Implement",
+          "Implement the plan with minimal changes. Prefer small, reviewable diffs and update tests when needed.",
+        ),
+        createAgentStep("bash", "Format and test", "npm test || go test ./... || yarn test || echo 'Tests completed'"),
+        createAgentStep(
+          "prompt",
+          "Open pull request",
+          "Open a pull or merge request that summarizes the change, root cause, and test results.",
+        ),
+      ],
+    },
+    {
+      id: "pr-loop",
+      title: "PR review loop",
+      purpose: "Watches checks and review comments, then addresses feedback until the PR is mergeable.",
+      modelId,
+      machineType: DEFAULT_AGENT_MACHINE,
+      maxRetries: DEFAULT_PR_LOOP_MAX_RETRIES,
+      steps: [
+        createAgentStep(
+          "prompt",
+          "Respond to feedback",
+          "Watch CI checks and review comments. Fix failures and address feedback with minimal follow-up commits.",
+        ),
+        createAgentStep(
+          "prompt",
+          "Re-verify",
+          "Confirm checks are green and the latest feedback is addressed. Summarize what changed since the last update.",
+        ),
+      ],
+    },
+  ];
+}
 
 const OUTCOME_STEPS: {
   title: string;
@@ -497,6 +685,7 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
   const [agentHarness, setAgentHarness] = useState<AgentHarnessId | null>(null);
   const [openCodeProvider, setOpenCodeProvider] = useState<OpenCodeProviderId | null>(null);
   const [agentApiKey, setAgentApiKey] = useState("");
+  const [agentComponents, setAgentComponents] = useState<AgentComponentConfig[]>(() => cloneDefaultAgentComponents());
   const [connectedTools, setConnectedTools] = useState<Set<string>>(new Set());
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
@@ -505,6 +694,7 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
   const isTriggerStep = stepIndex === 0;
   const isVcsStep = stepIndex === 1;
   const isAgentStep = stepIndex === 2;
+  const isSettingsStep = stepIndex === 3;
   const isFinalStep = stepIndex >= SETUP_STEPS.length - 1;
   const issueSelected = triggerSources.has("issue");
   const prMrSelected = triggerSources.has("prOrMrTag");
@@ -529,15 +719,19 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
     openCodeProvider,
   );
   const openCodeKeyReady = !needsOpenCodeApiKey || agentApiKey.trim().length > 0;
-  const allRequiredConnected = requiredIntegrations.every((item) => connectedTools.has(item.key)) && openCodeKeyReady;
-  const emphasizeRequiredIntegrations = isFinalStep && !allRequiredConnected;
+  const defaultRepoReady = !vcsHost || (defaultRepoId !== null && defaultRepoId.length > 0);
+  const setupReady =
+    requiredIntegrations.every((item) => connectedTools.has(item.key)) && openCodeKeyReady && defaultRepoReady;
+  const emphasizeRequiredIntegrations = isFinalStep && !setupReady;
   const canContinue = isTriggerStep
     ? triggerChoicesReady
     : isVcsStep
       ? vcsChoicesReady
       : isAgentStep
         ? agentChoicesReady
-        : !isFinalStep || allRequiredConnected;
+        : isSettingsStep
+          ? true
+          : setupReady;
 
   useEffect(() => {
     if (!isVcsStep) {
@@ -602,15 +796,28 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
     setDefaultRepoId(null);
   };
 
+  const rematchComponentModels = (harness: AgentHarnessId | null, provider: OpenCodeProviderId | null) => {
+    const models = fixtureModelsForHarness(harness, provider);
+    const fallback = models[0]?.value ?? defaultModelForHarness(harness, provider);
+    setAgentComponents((prev) =>
+      prev.map((component) => ({
+        ...component,
+        modelId: models.some((model) => model.value === component.modelId) ? component.modelId : fallback,
+      })),
+    );
+  };
+
   const selectAgentHarness = (id: AgentHarnessId) => {
     setAgentHarness(id);
     setOpenCodeProvider(null);
     setAgentApiKey("");
+    rematchComponentModels(id, null);
   };
 
   const selectOpenCodeProvider = (id: OpenCodeProviderId) => {
     setOpenCodeProvider(id);
     setAgentApiKey("");
+    rematchComponentModels(agentHarness, id);
   };
 
   const handleBack = () => {
@@ -669,9 +876,16 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
               onSelectHarness={selectAgentHarness}
               onSelectOpenCodeProvider={selectOpenCodeProvider}
             />
+          ) : isSettingsStep ? (
+            <AgentSettingsStepContent
+              components={agentComponents}
+              onChange={setAgentComponents}
+              agentHarness={agentHarness}
+              openCodeProvider={openCodeProvider}
+            />
           ) : (
             <p className="mt-8 rounded-xl bg-white px-4 py-6 text-sm text-gray-500 outline outline-slate-950/10 dark:bg-gray-900 dark:text-gray-400 dark:outline-gray-700/60">
-              Placeholder for the {step.title.toLowerCase()} step. We will fill this in next.
+              Placeholder for the preview step. We will fill this in next.
             </p>
           )}
 
@@ -717,6 +931,7 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
                 }
               : undefined
           }
+          defaultRepoEmphasize={isFinalStep && !defaultRepoReady}
         />
       </div>
 
@@ -960,6 +1175,201 @@ function CodingAgentStepContent({
   );
 }
 
+function AgentSettingsStepContent({
+  components,
+  onChange,
+  agentHarness,
+  openCodeProvider,
+}: {
+  components: AgentComponentConfig[];
+  onChange: (next: AgentComponentConfig[]) => void;
+  agentHarness: AgentHarnessId | null;
+  openCodeProvider: OpenCodeProviderId | null;
+}) {
+  const modelOptions = useMemo(
+    () => fixtureModelsForHarness(agentHarness, openCodeProvider),
+    [agentHarness, openCodeProvider],
+  );
+
+  const updateComponent = (
+    componentId: AgentComponentId,
+    updater: (component: AgentComponentConfig) => AgentComponentConfig,
+  ) => {
+    onChange(components.map((component) => (component.id === componentId ? updater(component) : component)));
+  };
+
+  const updateStep = (
+    componentId: AgentComponentId,
+    stepId: string,
+    patch: Partial<Pick<AgentPipelineStep, "title" | "body" | "kind">>,
+  ) => {
+    updateComponent(componentId, (component) => ({
+      ...component,
+      steps: component.steps.map((step) => (step.id === stepId ? { ...step, ...patch } : step)),
+    }));
+  };
+
+  const removeStep = (componentId: AgentComponentId, stepId: string) => {
+    updateComponent(componentId, (component) => ({
+      ...component,
+      steps: component.steps.filter((step) => step.id !== stepId),
+    }));
+  };
+
+  const addStep = (componentId: AgentComponentId, kind: AgentStepKind) => {
+    updateComponent(componentId, (component) => ({
+      ...component,
+      steps: [
+        ...component.steps,
+        createAgentStep(
+          kind,
+          kind === "prompt" ? "New prompt" : "New bash step",
+          kind === "prompt" ? "Describe what the agent should do in this step." : "echo 'Add your command here'",
+        ),
+      ],
+    }));
+  };
+
+  return (
+    <div className="mt-8 space-y-8" aria-label="Agent component settings">
+      {components.map((component) => (
+        <section key={component.id} aria-labelledby={`agent-component-${component.id}`}>
+          <h3
+            id={`agent-component-${component.id}`}
+            className="text-sm font-semibold text-slate-900 dark:text-gray-100"
+          >
+            {component.title}
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{component.purpose}</p>
+
+          <div className={cn("mt-3 grid gap-3", component.id === "pr-loop" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+            <div>
+              <Label
+                htmlFor={`agent-model-${component.id}`}
+                className="text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Model
+              </Label>
+              <div className="mt-1.5" id={`agent-model-${component.id}`}>
+                <AutoCompleteSelect
+                  options={modelOptions}
+                  value={component.modelId}
+                  onChange={(value) => updateComponent(component.id, (current) => ({ ...current, modelId: value }))}
+                  placeholder="Select model"
+                />
+              </div>
+            </div>
+            <div>
+              <Label
+                htmlFor={`agent-machine-${component.id}`}
+                className="text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Machine
+              </Label>
+              <div className="mt-1.5" id={`agent-machine-${component.id}`}>
+                <AutoCompleteSelect
+                  options={AGENT_MACHINE_OPTIONS}
+                  value={component.machineType}
+                  onChange={(value) => updateComponent(component.id, (current) => ({ ...current, machineType: value }))}
+                  placeholder="Select machine"
+                />
+              </div>
+            </div>
+            {component.id === "pr-loop" ? (
+              <div>
+                <Label
+                  htmlFor="agent-pr-loop-max-retries"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Max retries
+                </Label>
+                <Input
+                  id="agent-pr-loop-max-retries"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={component.maxRetries ?? DEFAULT_PR_LOOP_MAX_RETRIES}
+                  onChange={(event) => {
+                    const next = Number.parseInt(event.target.value, 10);
+                    updateComponent(component.id, (current) => ({
+                      ...current,
+                      maxRetries: Number.isFinite(next) ? Math.min(20, Math.max(1, next)) : DEFAULT_PR_LOOP_MAX_RETRIES,
+                    }));
+                  }}
+                  className="mt-1.5"
+                  aria-label="PR review loop max retries"
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {component.steps.map((step, index) => (
+              <div
+                key={step.id}
+                className="rounded-xl bg-white px-4 py-3.5 outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                      step.kind === "prompt"
+                        ? "bg-sky-50 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                        : "bg-orange-50 text-orange-800 dark:bg-orange-950/40 dark:text-orange-200",
+                    )}
+                  >
+                    {step.kind === "prompt" ? (
+                      <MessageSquare className="h-3 w-3" aria-hidden />
+                    ) : (
+                      <Terminal className="h-3 w-3" aria-hidden />
+                    )}
+                    {step.kind === "prompt" ? "Prompt" : "Bash"}
+                  </span>
+                  <Input
+                    aria-label={`${component.title} step ${index + 1} title`}
+                    value={step.title}
+                    onChange={(event) => updateStep(component.id, step.id, { title: event.target.value })}
+                    className="h-8 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Remove ${step.title || "step"}`}
+                    onClick={() => removeStep(component.id, step.id)}
+                    disabled={component.steps.length <= 1}
+                    className="shrink-0 text-gray-400 hover:text-slate-900 dark:hover:text-gray-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <Textarea
+                  aria-label={`${component.title} step ${index + 1} body`}
+                  value={step.body}
+                  onChange={(event) => updateStep(component.id, step.id, { body: event.target.value })}
+                  rows={step.kind === "bash" ? 2 : 3}
+                  className="mt-2 resize-y text-sm"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "prompt")}>
+              <Plus className="h-3.5 w-3.5" />
+              Add prompt
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "bash")}>
+              <Terminal className="h-3.5 w-3.5" />
+              Add bash
+            </Button>
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function RequiredIntegrationsPanel({
   requiredIntegrations,
   connectedTools,
@@ -967,6 +1377,7 @@ function RequiredIntegrationsPanel({
   emptyHint,
   emphasize = false,
   defaultRepoPicker,
+  defaultRepoEmphasize = false,
   agentKeyPicker,
 }: {
   requiredIntegrations: RequiredIntegration[];
@@ -979,6 +1390,7 @@ function RequiredIntegrationsPanel({
     value: string;
     onChange: (value: string) => void;
   };
+  defaultRepoEmphasize?: boolean;
   agentKeyPicker?: {
     providerLabel: string;
     iconName: string;
@@ -1046,7 +1458,12 @@ function RequiredIntegrationsPanel({
       )}
 
       {defaultRepoPicker ? (
-        <div className="mt-6 border-t border-slate-200 pt-5 dark:border-gray-700">
+        <div
+          className={cn(
+            "mt-6 border-t pt-5",
+            defaultRepoEmphasize ? "border-amber-400 dark:border-amber-400" : "border-slate-200 dark:border-gray-700",
+          )}
+        >
           <Label
             htmlFor="factory-default-repository"
             className="text-sm font-semibold text-slate-900 dark:text-gray-100"
@@ -1054,7 +1471,9 @@ function RequiredIntegrationsPanel({
             Default repository
           </Label>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Where the factory checks out code and opens pull or merge requests.
+            {defaultRepoEmphasize
+              ? "Select a repository before finishing setup."
+              : "Where the factory checks out code and opens pull or merge requests."}
           </p>
           <div className="mt-3" id="factory-default-repository">
             {defaultRepoPicker.host ? (

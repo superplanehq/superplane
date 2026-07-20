@@ -55,16 +55,32 @@ async function completeCodingAgentStep(user: ReturnType<typeof userEvent.setup>)
   const panel = screen.getByRole("complementary");
   expect(within(panel).getByText("Claude", { exact: true })).toBeInTheDocument();
   expect(within(panel).queryByLabelText(/API key/i)).not.toBeInTheDocument();
-  expect(within(panel).getByPlaceholderText("Select repository")).toBeInTheDocument();
+  expect(within(panel).getByText("Default repository")).toBeInTheDocument();
 
+  await user.click(continueButton);
+}
+
+async function completeAgentSettingsStep(user: ReturnType<typeof userEvent.setup>) {
+  expect(screen.getByRole("heading", { name: "Agent settings" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Planning" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Implementation" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "PR review loop" })).toBeInTheDocument();
+  expect(screen.getAllByText("Model").length).toBeGreaterThanOrEqual(3);
+  expect(screen.getAllByText("Machine").length).toBeGreaterThanOrEqual(3);
+  expect(screen.getByLabelText(/PR review loop max retries/i)).toHaveValue(5);
+
+  const continueButton = screen.getByRole("button", { name: /^Continue$/i });
+  expect(continueButton).toBeEnabled();
   await user.click(continueButton);
 }
 
 async function advanceFromTriggersToFinalStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /^Continue$/i }));
+  await selectDefaultRepository(user, "acme/web");
   await completeVersionControlStep(user);
   await completeCodingAgentStep(user);
-  expect(screen.getByText(/Step 4 of 4/i)).toBeInTheDocument();
+  await completeAgentSettingsStep(user);
+  expect(screen.getByText(/Step 5 of 5/i)).toBeInTheDocument();
 }
 
 describe("FreshOrgLanding story smoke", () => {
@@ -226,7 +242,7 @@ describe("FreshOrgLanding story smoke", () => {
     expect(continueButton).toBeEnabled();
   });
 
-  it("allows continuing without connecting, and only blocks Done on the final step", async () => {
+  it("shows editable agent components on settings and only blocks Done on preview", async () => {
     const user = userEvent.setup();
     render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/welcome" />);
 
@@ -241,6 +257,7 @@ describe("FreshOrgLanding story smoke", () => {
 
     await advanceFromTriggersToFinalStep(user);
 
+    expect(screen.getByRole("heading", { name: "Preview" })).toBeInTheDocument();
     const doneButton = screen.getByRole("button", { name: /^Done$/i });
     expect(doneButton).toBeDisabled();
 
@@ -255,5 +272,40 @@ describe("FreshOrgLanding story smoke", () => {
     expect(within(panel).getAllByText("Connected", { exact: true }).length).toBeGreaterThan(0);
     expect(doneButton).toBeEnabled();
     expect(panel).not.toHaveAttribute("data-emphasize", "true");
+  });
+
+  it("lets users edit component settings and agent steps", async () => {
+    const user = userEvent.setup();
+    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/welcome" />);
+
+    await startFactorySetup(user);
+    await user.click(screen.getByRole("button", { name: /Manual prompt/i }));
+    await user.click(screen.getByRole("button", { name: /^Continue$/i }));
+    await user.click(screen.getByRole("button", { name: /^GitHub$/i }));
+    await completeVersionControlStep(user);
+    await completeCodingAgentStep(user);
+
+    expect(screen.getByRole("heading", { name: "Agent settings" })).toBeInTheDocument();
+    expect(screen.getAllByText("Claude Sonnet 4.6").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText(/Large · AMD64 · 8 vCPU \/ 16 GB/i).length).toBeGreaterThanOrEqual(3);
+
+    const maxRetries = screen.getByLabelText(/PR review loop max retries/i);
+    await user.tripleClick(maxRetries);
+    await user.keyboard("3");
+    expect(maxRetries).toHaveValue(3);
+
+    const planBody = screen.getByLabelText(/Planning step 1 body/i);
+    await user.clear(planBody);
+    await user.type(planBody, "Write a concise plan for the assigned issue.");
+    expect(planBody).toHaveValue("Write a concise plan for the assigned issue.");
+
+    const planningAddButtons = screen.getAllByRole("button", { name: /Add prompt/i });
+    await user.click(planningAddButtons[0]!);
+    expect(screen.getByLabelText(/Planning step 2 title/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Remove New prompt/i }));
+    expect(screen.queryByLabelText(/Planning step 2 title/i)).not.toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: /^Continue$/i })).toBeEnabled();
   });
 });
