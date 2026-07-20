@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -117,36 +116,40 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[0].Command, "SUPERPLANE_TASK_DIR")
 	assert.Contains(t, task.Commands[0].Command, "/tmp/workspace")
 	assert.NotContains(t, task.Commands[0].Command, "base64 -d")
-	assert.NotContains(t, task.Commands[0].Command, "format.js")
 
 	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `bash "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`}, task.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{Name: "Fix panic", Command: `bash "$SUPERPLANE_TASK_DIR/steps/02-fix-panic.sh"`}, task.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$SUPERPLANE_TASK_DIR/steps/03-fix-tests.sh"`}, task.Commands[3])
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Fix panic",
+		Command: `bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`,
+	}, task.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Fix tests",
+		Command: `bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`,
+	}, task.Commands[3])
 	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `bash "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`}, task.Commands[4])
 
-	require.Len(t, task.Files, 6)
+	require.Len(t, task.Files, 7)
 	assert.Equal(t, streamFormatJS, requireTaskFile(t, task.Files, "format.js").Content)
-	assert.Equal(t, "0644", requireTaskFile(t, task.Files, "format.js").Mode)
+	assert.Equal(t, promptStepScript, requireTaskFile(t, task.Files, "prompt_step.sh").Content)
+	assert.Equal(t, "0755", requireTaskFile(t, task.Files, "prompt_step.sh").Mode)
 	assert.Equal(t, claudeWriteResultScript(), requireTaskFile(t, task.Files, "write-result.sh").Content)
-	assert.Equal(t, "0755", requireTaskFile(t, task.Files, "write-result.sh").Mode)
 
 	cloneScript := requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content
 	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo"), cloneScript)
 	assert.Contains(t, cloneScript, "git clone https://github.com/acme/widgets.git repo\n")
 	assert.Contains(t, cloneScript, `pwd -P >"$SP/workdir"`)
 	assert.Contains(t, cloneScript, "SUPERPLANE_TASK_DIR")
-	assert.NotContains(t, cloneScript, "bash -c ")
 
-	promptScript := requireTaskFile(t, task.Files, "steps/02-fix-panic.sh").Content
-	assert.Equal(t, buildClaudePromptStepScript("Fix auth.py's nil panic", "sonnet"), promptScript)
-	assert.Contains(t, promptScript, "--output-format stream-json")
-	assert.Contains(t, promptScript, "--append-system-prompt")
-	assert.Contains(t, promptScript, "plain terminal text")
-	assert.Contains(t, promptScript, "--continue")
-	assert.Contains(t, promptScript, `node "$SP/format.js"`)
-	assert.Contains(t, promptScript, base64.StdEncoding.EncodeToString([]byte("Fix auth.py's nil panic")))
-	assert.Contains(t, promptScript, "--model 'sonnet'")
-	assert.Contains(t, promptScript, "write-result.sh")
+	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
+	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
+
+	assert.Contains(t, promptStepScript, "--output-format stream-json")
+	assert.Contains(t, promptStepScript, "--append-system-prompt")
+	assert.Contains(t, promptStepScript, "plain terminal text")
+	assert.Contains(t, promptStepScript, "--continue")
+	assert.Contains(t, promptStepScript, `node "$SP/format.js"`)
+	assert.Contains(t, promptStepScript, "write-result.sh")
+	assert.Contains(t, promptStepScript, `PROMPT=$(cat "$prompt_file")`)
 }
 
 func TestClaudeStepScriptName(t *testing.T) {
