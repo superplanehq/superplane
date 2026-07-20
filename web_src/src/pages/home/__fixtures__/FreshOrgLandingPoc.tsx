@@ -2,17 +2,32 @@ import { Button } from "@/components/ui/button";
 import { RequirePermission } from "@/components/PermissionGate";
 import { useAvailableIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
+import { appPath } from "@/lib/appPaths";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { cn } from "@/lib/utils";
+import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { ArrowLeft, ArrowRight, Eye, MessageSquare, Plus, Terminal, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  GitPullRequest,
+  ListTodo,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  Terminal,
+  Trash2,
+  UserRound,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { AppDetailModal, LeadIcon, type AppEntry } from "../AppDetailModal";
 import { APP_CATALOG } from "../appCatalog";
@@ -671,7 +686,33 @@ function requiredIntegrationsForSetup(
   }));
 }
 
+const LIVE_CANVAS_STORYBOOK_PATH = "/?path=/story/pages-apppage--live-canvas";
+
+/** Prefer switching the Storybook story; fall back to in-harness AppPage navigation. */
+function goToLiveCanvas(navigate: ReturnType<typeof useNavigate>, organizationId: string) {
+  try {
+    if (window.top && window.top !== window) {
+      const origin = window.top.location.origin;
+      window.top.location.assign(`${origin}${LIVE_CANVAS_STORYBOOK_PATH}`);
+      return;
+    }
+  } catch {
+    // Cross-origin parent (or restricted top access) — use in-app navigation.
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    (window.location.port === "6006" || window.location.search.includes("path=/story"))
+  ) {
+    window.location.assign(LIVE_CANVAS_STORYBOOK_PATH);
+    return;
+  }
+
+  navigate(appPath(organizationId || canvasAppIds.organizationId, canvasAppIds.canvasId));
+}
+
 function FactorySetupWizard({ onExit }: { onExit: () => void }) {
+  const navigate = useNavigate();
   const organizationId = useOrganizationId() ?? "";
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
@@ -831,7 +872,7 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
   const handleContinue = () => {
     if (!canContinue) return;
     if (isFinalStep) {
-      onExit();
+      goToLiveCanvas(navigate, organizationId);
       return;
     }
     setStepIndex((index) => index + 1);
@@ -884,9 +925,16 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
               openCodeProvider={openCodeProvider}
             />
           ) : (
-            <p className="mt-8 rounded-xl bg-white px-4 py-6 text-sm text-gray-500 outline outline-slate-950/10 dark:bg-gray-900 dark:text-gray-400 dark:outline-gray-700/60">
-              Placeholder for the preview step. We will fill this in next.
-            </p>
+            <PreviewStepContent
+              triggerSources={triggerSources}
+              issueTracker={issueTracker}
+              prMrProvider={prMrProvider}
+              vcsHost={vcsHost}
+              defaultRepoId={defaultRepoId}
+              agentHarness={agentHarness}
+              openCodeProvider={openCodeProvider}
+              agentComponents={agentComponents}
+            />
           )}
 
           <div className="mt-10 flex items-center gap-3">
@@ -901,38 +949,49 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
           </div>
         </div>
 
-        <RequiredIntegrationsPanel
-          requiredIntegrations={requiredIntegrations}
-          connectedTools={connectedTools}
-          onConnect={openConnectDialog}
-          emphasize={emphasizeRequiredIntegrations}
-          emptyHint={
-            isTriggerStep
-              ? "Select triggers on the left. Matching integrations show up here."
-              : "Integrations from earlier steps stay listed here as you continue setup."
-          }
-          defaultRepoPicker={
-            vcsHost
-              ? {
-                  host: vcsHost,
-                  value: defaultRepoId ?? "",
-                  onChange: setDefaultRepoId,
-                }
-              : undefined
-          }
-          agentKeyPicker={
-            needsOpenCodeApiKey && selectedOpenCodeProvider
-              ? {
-                  providerLabel: selectedOpenCodeProvider.label,
-                  iconName: selectedOpenCodeProvider.iconName,
-                  value: agentApiKey,
-                  onChange: setAgentApiKey,
-                  emphasize: isFinalStep && !openCodeKeyReady,
-                }
-              : undefined
-          }
-          defaultRepoEmphasize={isFinalStep && !defaultRepoReady}
-        />
+        <div className="sticky top-8 space-y-3">
+          <RequiredIntegrationsPanel
+            requiredIntegrations={requiredIntegrations}
+            connectedTools={connectedTools}
+            onConnect={openConnectDialog}
+            emphasize={emphasizeRequiredIntegrations}
+            sticky={false}
+            emptyHint={
+              isTriggerStep
+                ? "Select triggers on the left. Matching integrations show up here."
+                : "Integrations from earlier steps stay listed here as you continue setup."
+            }
+            defaultRepoPicker={
+              vcsHost
+                ? {
+                    host: vcsHost,
+                    value: defaultRepoId ?? "",
+                    onChange: setDefaultRepoId,
+                  }
+                : undefined
+            }
+            agentKeyPicker={
+              needsOpenCodeApiKey && selectedOpenCodeProvider
+                ? {
+                    providerLabel: selectedOpenCodeProvider.label,
+                    iconName: selectedOpenCodeProvider.iconName,
+                    value: agentApiKey,
+                    onChange: setAgentApiKey,
+                    emphasize: isFinalStep && !openCodeKeyReady,
+                  }
+                : undefined
+            }
+            defaultRepoEmphasize={isFinalStep && !defaultRepoReady}
+          />
+          {emphasizeRequiredIntegrations ? (
+            <p
+              role="status"
+              className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 outline outline-amber-500/40 dark:bg-amber-950/40 dark:text-amber-50 dark:outline-amber-400/40"
+            >
+              Hey, make sure you connect all the required tools.
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <IntegrationCreateDialog
@@ -1175,6 +1234,270 @@ function CodingAgentStepContent({
   );
 }
 
+function labelForChoice(choices: IntegrationChoice[], id: string | null): string | null {
+  if (!id) return null;
+  return choices.find((choice) => choice.id === id)?.label ?? id;
+}
+
+function labelForOption(options: AutoCompleteOption[], value: string): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
+type PreviewTriggerNode = {
+  id: TriggerSourceId;
+  title: string;
+  detail: string;
+  integrationName?: string;
+};
+
+function previewTriggerNodes(
+  triggerSources: Set<TriggerSourceId>,
+  issueTracker: string | null,
+  prMrProvider: string | null,
+): PreviewTriggerNode[] {
+  const nodes: PreviewTriggerNode[] = [];
+  if (triggerSources.has("manual")) {
+    nodes.push({ id: "manual", title: "Manual", detail: "Prompt in SuperPlane" });
+  }
+  if (triggerSources.has("issue")) {
+    const tracker = ISSUE_TRACKERS.find((choice) => choice.id === issueTracker);
+    nodes.push({
+      id: "issue",
+      title: tracker?.label ?? "Issue",
+      detail: issueTriggerAssignHint(issueTracker),
+      integrationName: tracker?.integrationName,
+    });
+  }
+  if (triggerSources.has("prOrMrTag")) {
+    const provider = PR_MR_PROVIDERS.find((choice) => choice.id === prMrProvider);
+    nodes.push({
+      id: "prOrMrTag",
+      title: vcsHostLabelForPr(prMrProvider),
+      detail: prMrTriggerMentionHint(prMrProvider),
+      integrationName: provider?.integrationName,
+    });
+  }
+  return nodes;
+}
+
+function vcsHostLabelForPr(prMrProvider: string | null): string {
+  if (prMrProvider === "gitlab") return "MR";
+  return "PR";
+}
+
+function issueTriggerAssignHint(issueTracker: string | null): string {
+  if (issueTracker === "linear") return "Assign @superplane on the Linear issue";
+  if (issueTracker === "jira") return "Assign @superplane on the Jira issue";
+  if (issueTracker === "gitlab") return "Assign @superplane on the GitLab issue";
+  if (issueTracker === "github") return "Assign @superplane on the GitHub issue";
+  return "Assign @superplane on the issue";
+}
+
+function prMrTriggerMentionHint(prMrProvider: string | null): string {
+  if (prMrProvider === "gitlab") return "Mention @superplane on the merge request";
+  if (prMrProvider === "github") return "Mention @superplane on the pull request";
+  return "Mention @superplane on the PR or MR";
+}
+
+function shortMachineLabel(machineType: string): string {
+  const label = labelForOption(AGENT_MACHINE_OPTIONS, machineType);
+  const head = label.split("·")[0]?.trim();
+  return head || label;
+}
+
+function WorkflowConnector({ fanIn = false }: { fanIn?: boolean }) {
+  if (fanIn) {
+    return (
+      <div className="relative mx-auto h-7 w-full max-w-sm" aria-hidden>
+        <div className="absolute inset-x-[16%] top-0 h-3 rounded-b-xl border-x border-b border-slate-300 dark:border-gray-600" />
+        <div className="absolute left-1/2 top-3 h-4 w-px -translate-x-1/2 bg-slate-300 dark:bg-gray-600" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-center py-1" aria-hidden>
+      <div className="h-5 w-px bg-gradient-to-b from-slate-300 to-slate-400 dark:from-gray-600 dark:to-gray-500" />
+    </div>
+  );
+}
+
+function PreviewStepContent({
+  triggerSources,
+  issueTracker,
+  prMrProvider,
+  vcsHost,
+  defaultRepoId,
+  agentHarness,
+  openCodeProvider,
+  agentComponents,
+}: {
+  triggerSources: Set<TriggerSourceId>;
+  issueTracker: string | null;
+  prMrProvider: string | null;
+  vcsHost: VcsHostId | null;
+  defaultRepoId: string | null;
+  agentHarness: AgentHarnessId | null;
+  openCodeProvider: OpenCodeProviderId | null;
+  agentComponents: AgentComponentConfig[];
+}) {
+  const harness = AGENT_HARNESSES.find((choice) => choice.id === agentHarness);
+  const harnessLabel = harness?.label ?? "Not selected";
+  const openCodeLabel = openCodeProviderById(openCodeProvider)?.label;
+  const codingAgentDetail =
+    agentHarness === "open-code" && openCodeLabel ? `${harnessLabel} · ${openCodeLabel}` : harnessLabel;
+  const modelOptions = fixtureModelsForHarness(agentHarness, openCodeProvider);
+  const planning = agentComponents.find((component) => component.id === "planning");
+  const implementation = agentComponents.find((component) => component.id === "implementation");
+  const prLoop = agentComponents.find((component) => component.id === "pr-loop");
+  const prNoun = vcsHost === "gitlab" ? "merge request" : "pull request";
+  const triggers = previewTriggerNodes(triggerSources, issueTracker, prMrProvider);
+  const triggerColumns = triggers.length <= 1 ? "grid-cols-1" : triggers.length === 2 ? "grid-cols-2" : "grid-cols-3";
+
+  const stages: {
+    id: string;
+    title: string;
+    detail: string;
+    accent: string;
+    icon: ReactNode;
+  }[] = [
+    {
+      id: "planning",
+      title: "Planning",
+      detail: planning
+        ? `${labelForOption(modelOptions, planning.modelId)} · ${shortMachineLabel(planning.machineType)}`
+        : "Create an implementation plan",
+      accent: "from-sky-500/15 to-transparent",
+      icon: <ListTodo className="h-4 w-4" aria-hidden />,
+    },
+    {
+      id: "implementation",
+      title: "Implementation",
+      detail: implementation
+        ? `${labelForOption(modelOptions, implementation.modelId)} · ${implementation.steps.length} steps · opens ${prNoun}`
+        : `Codes and opens a ${prNoun}`,
+      accent: "from-slate-500/20 to-transparent",
+      icon: <Terminal className="h-4 w-4" aria-hidden />,
+    },
+    {
+      id: "pr-loop",
+      title: "Review loop",
+      detail: prLoop
+        ? `${labelForOption(modelOptions, prLoop.modelId)} · max ${prLoop.maxRetries ?? DEFAULT_PR_LOOP_MAX_RETRIES} retries`
+        : "Addresses checks and comments",
+      accent: "from-orange-500/20 to-transparent",
+      icon: <RefreshCw className="h-4 w-4" aria-hidden />,
+    },
+  ];
+
+  return (
+    <div className="mt-8 space-y-4" aria-label="Factory preview">
+      <div className="flex flex-wrap gap-2">
+        {defaultRepoId ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 outline outline-slate-950/10 dark:bg-gray-900 dark:text-gray-200 dark:outline-gray-700/70">
+            {vcsHost ? <IntegrationIcon integrationName={vcsHost} className="h-3.5 w-3.5" size={14} /> : null}
+            {defaultRepoId}
+          </span>
+        ) : null}
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 outline outline-slate-950/10 dark:bg-gray-900 dark:text-gray-200 dark:outline-gray-700/70">
+          {harness ? (
+            <IntegrationIcon integrationName={harness.integrationName} className="h-3.5 w-3.5" size={14} />
+          ) : null}
+          {codingAgentDetail}
+        </span>
+      </div>
+
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-2xl px-4 py-5 outline outline-slate-950/10",
+          "bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]",
+          "dark:bg-[radial-gradient(circle_at_top,_rgba(71,85,105,0.35),_transparent_55%),linear-gradient(180deg,#0f172a_0%,#020617_100%)]",
+          "dark:outline-gray-700/60",
+        )}
+      >
+        <p className="text-center text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-gray-400">
+          Factory workflow
+        </p>
+
+        <div className="mt-4">
+          {triggers.length === 0 ? (
+            <div className="rounded-xl bg-white/80 px-4 py-3 text-center text-sm text-gray-500 outline outline-slate-950/10 dark:bg-gray-900/80 dark:text-gray-400 dark:outline-gray-700/60">
+              No triggers selected
+            </div>
+          ) : (
+            <div className={cn("mx-auto grid max-w-md gap-2", triggerColumns)}>
+              {triggers.map((trigger) => (
+                <div
+                  key={trigger.id}
+                  className="rounded-xl bg-white/90 px-3 py-3 shadow-sm outline outline-slate-950/10 backdrop-blur-sm dark:bg-gray-900/90 dark:outline-gray-700/70"
+                >
+                  <div className="flex items-center gap-2">
+                    {trigger.integrationName ? (
+                      <IntegrationIcon integrationName={trigger.integrationName} className="h-4 w-4" size={16} />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 text-slate-500" aria-hidden />
+                    )}
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">{trigger.title}</p>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{trigger.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {triggers.length > 1 ? <WorkflowConnector fanIn /> : <WorkflowConnector />}
+
+        <div className="mx-auto flex max-w-sm flex-col">
+          {stages.map((stage, index) => (
+            <div key={stage.id}>
+              {index > 0 ? <WorkflowConnector /> : null}
+              <div
+                className={cn(
+                  "relative overflow-hidden rounded-xl bg-white shadow-sm outline outline-slate-950/10",
+                  "dark:bg-gray-900 dark:outline-gray-700/70",
+                )}
+              >
+                <div
+                  className={cn("pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b", stage.accent)}
+                />
+                <div className="flex items-start gap-3 px-4 py-3.5 pl-4">
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-gray-100 dark:text-slate-900">
+                    {stage.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{stage.title}</p>
+                    <p className="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">{stage.detail}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <WorkflowConnector />
+
+          <div className="relative overflow-hidden rounded-xl bg-emerald-50 shadow-sm outline outline-emerald-600/20 dark:bg-emerald-950/40 dark:outline-emerald-400/30">
+            <div className="flex items-start gap-3 px-4 py-3.5">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white dark:bg-emerald-400 dark:text-emerald-950">
+                {vcsHost === "gitlab" ? (
+                  <GitPullRequest className="h-4 w-4" aria-hidden />
+                ) : (
+                  <UserRound className="h-4 w-4" aria-hidden />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">You review and merge</p>
+                <p className="mt-0.5 text-xs leading-snug text-emerald-900/70 dark:text-emerald-100/70">
+                  Stay in the loop until the {prNoun} is mergeable.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgentSettingsStepContent({
   components,
   onChange,
@@ -1376,6 +1699,7 @@ function RequiredIntegrationsPanel({
   onConnect,
   emptyHint,
   emphasize = false,
+  sticky = true,
   defaultRepoPicker,
   defaultRepoEmphasize = false,
   agentKeyPicker,
@@ -1385,6 +1709,7 @@ function RequiredIntegrationsPanel({
   onConnect: (item: RequiredIntegration) => void;
   emptyHint: string;
   emphasize?: boolean;
+  sticky?: boolean;
   defaultRepoPicker?: {
     host: VcsHostId | null;
     value: string;
@@ -1403,7 +1728,8 @@ function RequiredIntegrationsPanel({
     <aside
       data-emphasize={emphasize ? "true" : undefined}
       className={cn(
-        "sticky top-8 rounded-xl bg-slate-50 px-5 py-5 outline transition-[outline-color,box-shadow]",
+        "rounded-xl bg-slate-50 px-5 py-5 outline transition-[outline-color,box-shadow]",
+        sticky && "sticky top-8",
         emphasize
           ? "outline-2 outline-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.15)] dark:outline-amber-400"
           : "outline-slate-950/10 dark:outline-gray-700/60",

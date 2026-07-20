@@ -86,6 +86,29 @@ async function advanceFromTriggersToFinalStep(user: ReturnType<typeof userEvent.
 describe("FreshOrgLanding story smoke", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+
+    // Some vitest/jsdom runs ship a broken localStorage (--localstorage-file without a path).
+    // AppPage reads sidebar prefs on mount when Done navigates to the live canvas.
+    if (typeof window.localStorage?.getItem !== "function") {
+      const store = new Map<string, string>();
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: (key: string) => store.get(key) ?? null,
+          setItem: (key: string, value: string) => {
+            store.set(key, String(value));
+          },
+          removeItem: (key: string) => {
+            store.delete(key);
+          },
+          clear: () => store.clear(),
+          key: (index: number) => [...store.keys()][index] ?? null,
+          get length() {
+            return store.size;
+          },
+        },
+      });
+    }
   });
 
   it("renders densified split landing with outcome timeline and setup steps", async () => {
@@ -258,12 +281,23 @@ describe("FreshOrgLanding story smoke", () => {
     await advanceFromTriggersToFinalStep(user);
 
     expect(screen.getByRole("heading", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByText("Factory workflow")).toBeInTheDocument();
+    expect(screen.getByText("GitHub Issues")).toBeInTheDocument();
+    expect(screen.getByText(/Assign @superplane on the GitHub issue/i)).toBeInTheDocument();
+    expect(screen.getAllByText("acme/web").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Claude Code")).toBeInTheDocument();
+    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.getByText("Review loop")).toBeInTheDocument();
+    expect(screen.getByText(/You review and merge/i)).toBeInTheDocument();
+
     const doneButton = screen.getByRole("button", { name: /^Done$/i });
     expect(doneButton).toBeDisabled();
 
     const panel = screen.getByRole("complementary");
     expect(panel).toHaveAttribute("data-emphasize", "true");
     expect(within(panel).getAllByText("Not connected").length).toBeGreaterThan(0);
+    expect(screen.getByRole("status")).toHaveTextContent(/Hey, make sure you connect all the required tools/i);
 
     // Connect GitHub, then Claude (two required integrations for this path).
     await connectRequiredIntegration(user, "GitHub", "github-connection");
@@ -272,6 +306,11 @@ describe("FreshOrgLanding story smoke", () => {
     expect(within(panel).getAllByText("Connected", { exact: true }).length).toBeGreaterThan(0);
     expect(doneButton).toBeEnabled();
     expect(panel).not.toHaveAttribute("data-emphasize", "true");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await user.click(doneButton);
+    expect(await screen.findByText("Software Factory", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Preview" })).not.toBeInTheDocument();
   });
 
   it("lets users edit component settings and agent steps", async () => {
