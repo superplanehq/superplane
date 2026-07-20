@@ -92,7 +92,7 @@ describe("getSuggestions", () => {
     const suggestions = getSuggestions("run().", "run().".length, {
       __run: {
         id: "abc",
-        url: "https://app.superplane.com/org/apps/canvas?view=runs&run=abc",
+        url: "https://app.superplane.com/org/apps/canvas?run=abc",
         started_at: "2026-01-01T00:00:00Z",
       },
     });

@@ -130,8 +130,9 @@ func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
 
 		assert.Equal(t, run.ID.String(), payload["id"])
 
-		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s?view=runs&run=%s", canvas.OrganizationID.String(), canvas.ID.String(), run.ID.String())
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s?run=%s", canvas.OrganizationID.String(), canvas.ID.String(), run.ID.String())
 		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "view=runs")
 
 		startedAt, ok := payload["started_at"].(time.Time)
 		require.True(t, ok)
@@ -147,7 +148,8 @@ func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, run.ID.String(), result["runID"])
 		assert.Contains(t, result["runURL"], run.ID.String())
-		assert.Contains(t, result["runURL"], "view=runs")
+		assert.Contains(t, result["runURL"], "?run=")
+		assert.NotContains(t, result["runURL"], "view=runs")
 	})
 }
 

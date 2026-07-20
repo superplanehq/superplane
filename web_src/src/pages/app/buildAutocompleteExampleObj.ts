@@ -25,7 +25,7 @@ function buildRunExample(): Record<string, unknown> {
   if (typeof window !== "undefined") {
     const { origin, pathname } = window.location;
     const appPath = pathname.match(/^\/[^/]+\/apps\/[^/]+/)?.[0] ?? pathname;
-    url = `${origin}${appPath}?view=runs&run=${EXAMPLE_RUN_ID}`;
+    url = `${origin}${appPath}?run=${EXAMPLE_RUN_ID}`;
   }
 
   return {

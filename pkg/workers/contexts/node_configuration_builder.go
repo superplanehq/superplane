@@ -820,7 +820,7 @@ func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, e
 	}
 
 	return fmt.Sprintf(
-		"%s/%s/apps/%s?view=runs&run=%s",
+		"%s/%s/apps/%s?run=%s",
 		runBaseURL(),
 		canvas.OrganizationID.String(),
 		b.workflowID.String(),
