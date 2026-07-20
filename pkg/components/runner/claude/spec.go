@@ -170,9 +170,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
 	files := []runner.BrokerTaskFile{
-		{Path: "format.js", Content: streamFormatJS, Mode: "0644"},
-		{Path: "prompt_step.sh", Content: promptStepScript, Mode: "0755"},
-		{Path: "write-result.sh", Content: claudeWriteResultScript(), Mode: "0755"},
+		{Path: "run.js", Content: runScript, Mode: "0644"},
 	}
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
@@ -238,31 +236,6 @@ func claudePrepareScript(workdir string) string {
 	return prepare.String()
 }
 
-func claudeWriteResultScript() string {
-	var b strings.Builder
-	b.WriteString("#!/usr/bin/env bash\n")
-	b.WriteString("set -euo pipefail\n")
-	b.WriteString("stream=$1\n")
-	b.WriteString("out=$2\n")
-	b.WriteString("last=\"\"\n")
-	b.WriteString("found=\"\"\n")
-	b.WriteString("while IFS= read -r line || [[ -n \"$line\" ]]; do\n")
-	b.WriteString("  [[ -z \"$line\" ]] && continue\n")
-	b.WriteString("  last=$line\n")
-	b.WriteString("  case \"$line\" in\n")
-	b.WriteString("    *'\"type\":\"result\"'*|*'\"type\": \"result\"'*) found=$line ;;\n")
-	b.WriteString("  esac\n")
-	b.WriteString("done <\"$stream\"\n")
-	b.WriteString("if [[ -n \"$found\" ]]; then\n")
-	b.WriteString("  printf '%s\\n' \"$found\" >\"$out\"\n")
-	b.WriteString("elif [[ -n \"$last\" ]]; then\n")
-	b.WriteString("  printf '%s\\n' \"$last\" >\"$out\"\n")
-	b.WriteString("else\n")
-	b.WriteString("  printf '%s\\n' '{}' >\"$out\"\n")
-	b.WriteString("fi\n")
-	return b.String()
-}
-
 func buildClaudeBashStepScript(command string) string {
 	var b strings.Builder
 	b.WriteString("#!/usr/bin/env bash\n")
@@ -302,7 +275,7 @@ func claudePromptStepBrokerCommand(stepName, promptName, model string) runner.Br
 	return runner.BrokerCommand{
 		Name: label,
 		Command: fmt.Sprintf(
-			`bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
+			`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
 			promptName,
 			shellSingleQuote(model),
 		),

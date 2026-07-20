@@ -6,7 +6,7 @@ cmd = "go build -o ./tmp/superplane cmd/server/main.go"
 bin = "tmp/superplane"
 # Debounce rebuilds when many files change at once (avoids racing builds / missing binary).
 delay = 500
-# Include js so go:embed sources (e.g. claude_stream_format.js) trigger rebuilds.
+# Include js so go:embed sources (e.g. pkg/components/runner/claude/run.js) trigger rebuilds.
 include_ext = ["go", "yaml", "yml", "js"]
 exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules"]
 stop_on_error = true

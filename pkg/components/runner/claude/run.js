@@ -2,80 +2,218 @@
 "use strict";
 
 /**
- * Format Claude Code stream-json NDJSON into readable live logs.
+ * Run Claude Code and format stream-json into readable live logs.
+ *
+ *   node run.js <prompt-file> [model]
+ *   node run.js --format   # format NDJSON from stdin (tests / debug)
  */
 
+const fs = require("fs");
+const path = require("path");
 const readline = require("readline");
+const { spawn, spawnSync } = require("child_process");
 
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 
+const SYSTEM_PROMPT =
+  "Write all assistant messages as plain terminal text. " +
+  "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
+  "Prefer plain paths, shell commands, and simple indentation.";
+
 function main() {
+  const args = process.argv.slice(2);
+  if (args[0] === "--format") {
+    formatStdin();
+    return;
+  }
+  if (args.length < 1) {
+    console.error("usage: node run.js <prompt-file> [model]");
+    process.exit(2);
+  }
+  runPrompt(args[0], args[1] || "")
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      console.error(err && err.message ? err.message : err);
+      process.exit(1);
+    });
+}
+
+function formatStdin() {
+  const formatter = createFormatter();
+  const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+  rl.on("line", (raw) => formatter.handleLine(raw));
+  rl.on("close", () => formatter.flush());
+}
+
+async function runPrompt(promptFile, model) {
+  const sp = process.env.SUPERPLANE_TASK_DIR;
+  if (!sp) {
+    throw new Error("SUPERPLANE_TASK_DIR is required");
+  }
+  const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+  if (!resultFile) {
+    throw new Error("SUPERPLANE_RESULT_FILE is required");
+  }
+
+  const workdirFile = path.join(sp, "workdir");
+  if (fs.existsSync(workdirFile)) {
+    const dir = fs.readFileSync(workdirFile, "utf8").trim();
+    if (dir) {
+      process.chdir(dir);
+    }
+  }
+
+  const prompt = fs.readFileSync(promptFile, "utf8");
+  const promptCountPath = path.join(sp, "prompt_count");
+  const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
+
+  const claudeArgs = [
+    "--bare",
+    "-p",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--include-partial-messages",
+    "--permission-mode",
+    "acceptEdits",
+    "--append-system-prompt",
+    SYSTEM_PROMPT,
+  ];
+  if (model) {
+    claudeArgs.push("--model", model);
+  }
+  claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write");
+  if (promptCount > 0) {
+    claudeArgs.push("--continue");
+  }
+  claudeArgs.push("--", prompt);
+
+  let command = "claude";
+  let args = claudeArgs;
+  if (commandExists("stdbuf")) {
+    command = "stdbuf";
+    args = ["-oL", "-eL", "claude", ...claudeArgs];
+  }
+
+  const streamPath = path.join(sp, "stream.jsonl");
+  const streamFd = fs.openSync(streamPath, "a");
+  const formatter = createFormatter();
+
+  try {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    child.stderr.pipe(process.stderr);
+
+    const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+    rl.on("line", (raw) => {
+      fs.writeSync(streamFd, `${raw}\n`);
+      formatter.handleLine(raw);
+    });
+
+    const exitCode = await Promise.all([
+      new Promise((resolve, reject) => {
+        child.on("error", reject);
+        child.on("close", (code) => resolve(code == null ? 1 : code));
+      }),
+      new Promise((resolve) => rl.on("close", resolve)),
+    ]).then(([code]) => code);
+
+    formatter.flush();
+    fs.writeFileSync(resultFile, `${formatter.resultJSON()}\n`);
+    fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+    return exitCode;
+  } finally {
+    fs.closeSync(streamFd);
+  }
+}
+
+function commandExists(name) {
+  const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
+  return result.status === 0;
+}
+
+function createFormatter() {
   let streamedText = false;
   let inText = false;
   let textBuf = "";
+  let lastLine = "";
+  let resultLine = "";
 
-  const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-
-  rl.on("line", (raw) => {
-    const line = raw.trim();
-    if (!line) {
-      return;
-    }
-
-    let event;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      println(line);
-      return;
-    }
-    if (!event || typeof event !== "object" || Array.isArray(event)) {
-      return;
-    }
-
-    switch (event.type) {
-      case "system":
-        formatSystem(event);
-        break;
-      case "stream_event": {
-        const next = formatStreamEvent(event, streamedText, inText, textBuf);
-        streamedText = next.streamedText;
-        inText = next.inText;
-        textBuf = next.textBuf;
-        break;
+  return {
+    handleLine(raw) {
+      const line = raw.trim();
+      if (!line) {
+        return;
       }
-      case "assistant": {
-        const ended = endTextStream(inText, textBuf);
-        inText = ended.inText;
-        textBuf = ended.textBuf;
-        formatAssistant(event, streamedText);
-        streamedText = false;
-        break;
-      }
-      case "user": {
-        const ended = endTextStream(inText, textBuf);
-        inText = ended.inText;
-        textBuf = ended.textBuf;
-        formatUser(event);
-        break;
-      }
-      case "result": {
-        const ended = endTextStream(inText, textBuf);
-        inText = ended.inText;
-        textBuf = ended.textBuf;
-        formatResult(event);
-        break;
-      }
-      case "rate_limit_event":
-        println("Rate limit notice — waiting to continue…");
-        break;
-    }
-  });
+      lastLine = line;
 
-  rl.on("close", () => {
-    endTextStream(inText, textBuf);
-  });
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        println(line);
+        return;
+      }
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return;
+      }
+
+      switch (event.type) {
+        case "system":
+          formatSystem(event);
+          break;
+        case "stream_event": {
+          const next = formatStreamEvent(event, streamedText, inText, textBuf);
+          streamedText = next.streamedText;
+          inText = next.inText;
+          textBuf = next.textBuf;
+          break;
+        }
+        case "assistant": {
+          const ended = endTextStream(inText, textBuf);
+          inText = ended.inText;
+          textBuf = ended.textBuf;
+          formatAssistant(event, streamedText);
+          streamedText = false;
+          break;
+        }
+        case "user": {
+          const ended = endTextStream(inText, textBuf);
+          inText = ended.inText;
+          textBuf = ended.textBuf;
+          formatUser(event);
+          break;
+        }
+        case "result": {
+          const ended = endTextStream(inText, textBuf);
+          inText = ended.inText;
+          textBuf = ended.textBuf;
+          resultLine = line;
+          formatResult(event);
+          break;
+        }
+        case "rate_limit_event":
+          println("Rate limit notice — waiting to continue…");
+          break;
+      }
+    },
+    flush() {
+      const ended = endTextStream(inText, textBuf);
+      inText = ended.inText;
+      textBuf = ended.textBuf;
+    },
+    resultJSON() {
+      if (resultLine) {
+        return resultLine;
+      }
+      if (lastLine) {
+        return lastLine;
+      }
+      return "{}";
+    },
+  };
 }
 
 function println(text = "") {

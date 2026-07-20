@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
-func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
+func TestClaudeRunFormatRendersReadableActivity(t *testing.T) {
 	t.Parallel()
 
 	node, err := exec.LookPath("node")
@@ -21,8 +21,8 @@ func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 		t.Skip("node not available")
 	}
 
-	script := filepath.Join(t.TempDir(), "claude_stream_format.js")
-	require.NoError(t, os.WriteFile(script, []byte(streamFormatJS), 0o600))
+	script := filepath.Join(t.TempDir(), "run.js")
+	require.NoError(t, os.WriteFile(script, []byte(runScript), 0o600))
 
 	input := strings.Join([]string{
 		`{"type":"system","subtype":"init","model":"sonnet","cwd":"/tmp/repo"}`,
@@ -35,7 +35,7 @@ func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 		"",
 	}, "\n")
 
-	cmd := exec.Command(node, script)
+	cmd := exec.Command(node, script, "--format")
 	cmd.Stdin = strings.NewReader(input)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "formatter output: %s", out)
@@ -52,7 +52,7 @@ func TestClaudeStreamFormatRendersReadableActivity(t *testing.T) {
 	assert.NotContains(t, got, `"type":"assistant"`)
 }
 
-func TestClaudeStreamFormatCoalescesPartialTextDeltas(t *testing.T) {
+func TestClaudeRunFormatCoalescesPartialTextDeltas(t *testing.T) {
 	t.Parallel()
 
 	node, err := exec.LookPath("node")
@@ -60,8 +60,8 @@ func TestClaudeStreamFormatCoalescesPartialTextDeltas(t *testing.T) {
 		t.Skip("node not available")
 	}
 
-	script := filepath.Join(t.TempDir(), "claude_stream_format.js")
-	require.NoError(t, os.WriteFile(script, []byte(streamFormatJS), 0o600))
+	script := filepath.Join(t.TempDir(), "run.js")
+	require.NoError(t, os.WriteFile(script, []byte(runScript), 0o600))
 
 	input := strings.Join([]string{
 		`{"type":"stream_event","event":{"type":"content_block_start","content_block":{"type":"text","text":""}}}`,
@@ -71,7 +71,7 @@ func TestClaudeStreamFormatCoalescesPartialTextDeltas(t *testing.T) {
 		"",
 	}, "\n")
 
-	cmd := exec.Command(node, script)
+	cmd := exec.Command(node, script, "--format")
 	cmd.Stdin = strings.NewReader(input)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "formatter output: %s", out)
@@ -82,7 +82,7 @@ func TestClaudeStreamFormatCoalescesPartialTextDeltas(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(got, "There's a 'superplane' directory."))
 }
 
-func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
+func TestBuildClaudeCodeBrokerTaskUsesRunWrapper(t *testing.T) {
 	t.Parallel()
 
 	task := buildClaudeCodeBrokerTask(RunClaudeCodeSpec{
@@ -93,13 +93,12 @@ func TestBuildClaudeCodeBrokerTaskUsesReadableFormatter(t *testing.T) {
 	require.Len(t, task.Commands, 2)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Contains(t, task.Commands[0].Command, "node not found on PATH")
-	assert.Equal(t, streamFormatJS, requireTaskFile(t, task.Files, "format.js").Content)
-	assert.Equal(t, promptStepScript, requireTaskFile(t, task.Files, "prompt_step.sh").Content)
+	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, "do it", requireTaskFile(t, task.Files, "prompts/01-do-it.txt").Content)
-	assert.Contains(t, promptStepScript, `node "$SP/format.js"`)
-	assert.Contains(t, promptStepScript, "tee -a")
+	assert.Contains(t, runScript, "stream-json")
+	assert.Contains(t, runScript, "plain terminal text")
 	assert.Equal(t, runner.BrokerCommand{
 		Name:    "Do it",
-		Command: `bash "$SUPERPLANE_TASK_DIR/prompt_step.sh" "$SUPERPLANE_TASK_DIR/prompts/01-do-it.txt" ''`,
+		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-do-it.txt" ''`,
 	}, task.Commands[1])
 }
