@@ -1,127 +1,67 @@
-export type ShouldReactToCanvasVersionUpdatedInput = {
-  versionId?: string;
-  activeCanvasVersionId: string;
-  isEditing: boolean;
-  editSessionActive: boolean;
-};
-
-// Other tabs on the same canvas only need version-list/detail refreshes when
-// they are editing, previewing that version, or have the versions UI open.
-// Live-view tabs can ignore remote draft churn; publish still flows through
-// canvas_updated, and the agent sidebar listens to canvas:version-updated.
-export function shouldReactToCanvasVersionUpdated({
-  versionId,
-  activeCanvasVersionId,
-  isEditing,
-  editSessionActive,
-}: ShouldReactToCanvasVersionUpdatedInput): boolean {
-  if (!versionId) {
-    return editSessionActive;
-  }
-
-  if (isEditing && activeCanvasVersionId === versionId) {
-    return true;
-  }
-
-  if (activeCanvasVersionId === versionId) {
-    return true;
-  }
-
-  return editSessionActive;
-}
-
 export type ProcessCanvasLifecycleEventInput = {
-  payload: { canvasId: string; versionId?: string };
+  payload: { canvasId: string };
   eventName: string;
   canvasId?: string;
-  activeCanvasVersionId: string;
-  isEditing: boolean;
   editSessionActive: boolean;
   hasLocalSaveActivity: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
-  consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
-  invalidateCanvasVersionData: (targetCanvasId: string, targetVersionId?: string) => void;
-  resyncDraftToCommitted: (versionId: string) => void;
+  invalidateCanvasStaging: (targetCanvasId: string) => void;
+  invalidateLiveVersionData: (targetCanvasId: string) => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
 
-export function processCanvasLifecycleEvent({
-  payload,
-  eventName,
+function handleCanvasUpdatedLifecycle({
   canvasId,
-  activeCanvasVersionId,
-  isEditing,
   editSessionActive,
   hasLocalSaveActivity,
-  consumeIgnoredCanvasUpdatedEcho,
-  consumeIgnoredCreateDraftEcho,
-  consumeIgnoredCanvasVersionUpdatedEcho,
-  invalidateCanvasVersionData,
-  resyncDraftToCommitted,
-  setCanvasDeletedRemotely,
+  invalidateCanvasStaging,
+  invalidateLiveVersionData,
   setRemoteCanvasUpdatePending,
-}: ProcessCanvasLifecycleEventInput): boolean {
-  if (eventName === "canvas_deleted") {
-    setCanvasDeletedRemotely(true);
-    return true;
-  }
-
-  if (eventName === "canvas_updated" && consumeIgnoredCanvasUpdatedEcho()) {
-    return false;
-  }
-
-  if (eventName === "canvas_version_updated") {
-    const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId, payload.versionId);
-    const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
-    if (consumedCreateDraftEcho || consumedVersionEcho) {
-      return false;
-    }
+}: Pick<
+  ProcessCanvasLifecycleEventInput,
+  | "canvasId"
+  | "editSessionActive"
+  | "hasLocalSaveActivity"
+  | "invalidateCanvasStaging"
+  | "invalidateLiveVersionData"
+  | "setRemoteCanvasUpdatePending"
+>): boolean {
+  if (hasLocalSaveActivity) {
+    setRemoteCanvasUpdatePending(true);
   }
 
   if (!canvasId) {
     return true;
   }
 
-  if (eventName === "canvas_version_updated") {
-    window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
-
-    if (
-      !shouldReactToCanvasVersionUpdated({
-        versionId: payload.versionId,
-        activeCanvasVersionId,
-        isEditing,
-        editSessionActive,
-      })
-    ) {
-      return false;
-    }
-
-    if (!payload.versionId) {
-      invalidateCanvasVersionData(canvasId);
-      return true;
-    }
-
-    if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
-      setRemoteCanvasUpdatePending(true);
-      return true;
-    }
-
-    invalidateCanvasVersionData(canvasId, payload.versionId);
-    resyncDraftToCommitted(payload.versionId);
+  if (editSessionActive) {
+    // While editing, only refresh staging metadata. Version-scoped repository
+    // and console queries may still reference a version id that is no longer live
+    // (e.g. immediately after a commit in this tab).
+    invalidateCanvasStaging(canvasId);
     return true;
   }
 
-  if (eventName !== "canvas_updated") {
-    return true;
-  }
-
-  if (hasLocalSaveActivity) {
-    setRemoteCanvasUpdatePending(true);
-    return true;
-  }
-
-  invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
+  invalidateLiveVersionData(canvasId);
   return true;
+}
+
+export function processCanvasLifecycleEvent(input: ProcessCanvasLifecycleEventInput): boolean {
+  const { eventName, canvasId } = input;
+
+  if (eventName === "canvas_deleted") {
+    input.setCanvasDeletedRemotely(true);
+    return true;
+  }
+
+  if (eventName === "canvas_updated" && input.consumeIgnoredCanvasUpdatedEcho()) {
+    return false;
+  }
+
+  if (!canvasId || eventName !== "canvas_updated") {
+    return true;
+  }
+
+  return handleCanvasUpdatedLifecycle(input);
 }

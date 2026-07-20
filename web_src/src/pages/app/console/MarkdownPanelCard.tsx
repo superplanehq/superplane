@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 
 import { useConsoleContext } from "./ConsoleContext";
+import { CONSOLE_PANEL_BODY_SURFACE, CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import {
   interpolateMarkdownTemplate,
@@ -22,7 +23,12 @@ import {
 } from "./markdownInterpolation";
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
-import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+import {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  validateMarkdownVariables,
+  type MarkdownVariable,
+} from "./panelTypes";
 
 /**
  * Stable empty list passed to `useMarkdownVariables` while the panel is being
@@ -66,7 +72,7 @@ function useMarkdownDisplay({
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId ?? "";
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     isEditing ? EMPTY_VARIABLES : variables,
     isEditing ? "" : textForSideload,
@@ -80,8 +86,8 @@ function useMarkdownDisplay({
   // side-load as part of initial loading, and hold a loading state instead.
   // Gating is per-text and per-phase: text that doesn't reference a run node
   // resolves without the execution side-load, so it isn't held on that phase.
-  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
-  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading, searchingNames);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading, searchingNames);
 
   const displayTitle = useMemo(() => {
     // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
@@ -269,7 +275,12 @@ function MarkdownPanelView({
 }) {
   return (
     <>
-      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
+      <div
+        className={cn(
+          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70",
+          CONSOLE_PANEL_SHELL_SURFACE,
+        )}
+      >
         <MarkdownPanelHeader
           displayTitle={displayTitle}
           readOnly={readOnly}
@@ -278,7 +289,7 @@ function MarkdownPanelView({
         />
         {body.trim() ? (
           <div
-            className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3"
+            className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}
             onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="console-markdown-view"
           >
@@ -289,7 +300,10 @@ function MarkdownPanelView({
             type="button"
             onClick={readOnly ? undefined : onEditBody}
             disabled={readOnly}
-            className="console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500"
+            className={cn(
+              "console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400",
+              CONSOLE_PANEL_BODY_SURFACE,
+            )}
             data-testid="console-markdown-empty"
           >
             <Pencil className="size-4" />
@@ -321,7 +335,7 @@ function MarkdownPanelHeader({
       )}
       onDoubleClick={readOnly ? undefined : onEditTitle}
     >
-      <span className="truncate text-[13px] font-medium text-slate-700" title={displayTitle}>
+      <span className="truncate text-[13px] font-medium text-slate-700 dark:text-gray-300" title={displayTitle}>
         {displayTitle}
       </span>
       {!readOnly ? (
@@ -341,7 +355,7 @@ function MarkdownPanelHeader({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Edit panel"
-            className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700"
+            className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
             data-testid="console-edit-panel"
           >
             <Pencil className="size-3.5" />
@@ -357,7 +371,7 @@ function MarkdownPanelHeader({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Delete panel"
-            className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+            className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
             data-testid="console-delete-panel"
           >
             <Trash2 className="size-3.5" />
@@ -426,7 +440,14 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
       ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
-  return { kind: "run", select: source.select };
+  const statuses = normalizeRunStatuses(source.statuses);
+  const triggers = normalizeRunTriggers(source.triggers);
+  return {
+    kind: "run",
+    select: source.select,
+    ...(statuses ? { statuses } : {}),
+    ...(triggers ? { triggers } : {}),
+  };
 }
 
 /**
@@ -449,7 +470,7 @@ function DeleteConfirmDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
-      <DialogContent>
+      <DialogContent className="dark:border-gray-700/70 dark:bg-gray-900">
         <DialogHeader>
           <DialogTitle>Delete this panel?</DialogTitle>
           <DialogDescription>

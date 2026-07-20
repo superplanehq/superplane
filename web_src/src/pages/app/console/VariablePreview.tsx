@@ -2,6 +2,9 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+import { CONSOLE_LINK_CLASSES } from "./consoleLinkStyles";
 
 /**
  * Show the resolved value for a variable as a compact field/value list with a
@@ -22,7 +25,9 @@ export function VariablePreview({
   onInsertSnippet: (snippet: string) => void;
 }) {
   if (!name.trim()) {
-    return <p className="text-[11px] text-slate-400">Give this variable a name to enable the preview.</p>;
+    return (
+      <p className="text-[11px] text-slate-400 dark:text-gray-500">Give this variable a name to enable the preview.</p>
+    );
   }
 
   // `useMarkdownVariables` resolves in-flight variables to `null` (not
@@ -30,19 +35,19 @@ export function VariablePreview({
   // both. A non-null value during a background refetch still renders its fields
   // (stale-while-revalidate) instead of flashing the loading text.
   if (loading && value == null) {
-    return <p className="text-[11px] text-slate-400">Loading preview…</p>;
+    return <p className="text-[11px] text-slate-400 dark:text-gray-500">Loading preview…</p>;
   }
 
   if (error) {
     return (
-      <p className="text-[11px] text-amber-600" data-testid="markdown-variable-preview-error">
+      <p className="text-[11px] text-amber-600 dark:text-amber-400" data-testid="markdown-variable-preview-error">
         {error}
       </p>
     );
   }
 
   if (value == null) {
-    return <p className="text-[11px] text-slate-400">No data resolved yet.</p>;
+    return <p className="text-[11px] text-slate-400 dark:text-gray-500">No data resolved yet.</p>;
   }
 
   // List-mode memory variables resolve to an array. Render a dedicated block
@@ -61,8 +66,8 @@ export function VariablePreview({
  * Preview block for a list-mode variable. Shows the item count, the fields of
  * the first row (so authors know what each element looks like), and insert
  * snippets that wrap the list in `join(name.map(item, …), ", ")` — the
- * canonical way to render a list since cel-js can't chain `.method()` after a
- * function call and a bare `{{ name }}` would dump raw JSON.
+ * canonical way to render a list, since a bare `{{ name }}` would dump raw
+ * JSON.
  */
 function ListVariablePreviewBlock({
   name,
@@ -78,19 +83,19 @@ function ListVariablePreviewBlock({
   const countSnippet = `{{ size(${name}) }}`;
 
   return (
-    <div className="min-w-0 space-y-1 rounded border border-slate-100 bg-slate-50 p-2">
-      <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-500">
+    <div className="min-w-0 space-y-1 rounded border border-slate-100 bg-slate-50 p-2 dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-500 dark:text-gray-400">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
           aria-expanded={!collapsed}
-          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-200/60"
+          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-200/60 dark:hover:bg-gray-700/60"
           data-testid="markdown-variable-preview-toggle"
         >
           {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
           <span className="font-semibold uppercase tracking-wide">Preview</span>
         </button>
-        <span className="rounded bg-slate-200/70 px-1 text-[10px] font-medium text-slate-600">
+        <span className="rounded bg-slate-200/70 px-1 text-[10px] font-medium text-slate-600 dark:bg-gray-700 dark:text-gray-300">
           List · {items.length} {items.length === 1 ? "item" : "items"}
         </span>
         <span className="min-w-0 flex-1" />
@@ -124,7 +129,11 @@ function ListVariablePreviewBody({
   onInsertSnippet: (snippet: string) => void;
 }) {
   if (items.length === 0) {
-    return <p className="text-[11px] text-slate-500">No rows matched yet. The list resolves to an empty array.</p>;
+    return (
+      <p className="text-[11px] text-slate-500 dark:text-gray-400">
+        No rows matched yet. The list resolves to an empty array.
+      </p>
+    );
   }
   // Scalar lists (strings, numbers) have no fields to map over, so offer a
   // direct join of the whole list.
@@ -132,13 +141,13 @@ function ListVariablePreviewBody({
     const joinSnippet = `{{ join(${name}, ", ") }}`;
     return (
       <div className="space-y-1">
-        <p className="text-[11px] text-slate-500" title={shortPreviewString(items[0])}>
+        <p className="text-[11px] text-slate-500 dark:text-gray-400" title={shortPreviewString(items[0])}>
           e.g. {shortPreviewString(items[0])}
         </p>
         <button
           type="button"
           onClick={() => onInsertSnippet(joinSnippet)}
-          className="truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
+          className={cn("truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
           title={`Insert ${joinSnippet}`}
         >
           {joinSnippet}
@@ -156,12 +165,15 @@ function ListVariablePreviewBody({
             <button
               type="button"
               onClick={() => onInsertSnippet(snippet)}
-              className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
+              className={cn("max-w-[55%] shrink-0 truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
               title={`Insert ${snippet}`}
             >
               {key}
             </button>
-            <span className="min-w-0 flex-1 truncate text-[11px] text-slate-600" title={shortPreviewString(first[key])}>
+            <span
+              className="min-w-0 flex-1 truncate text-[11px] text-slate-600 dark:text-gray-400"
+              title={shortPreviewString(first[key])}
+            >
               {shortPreviewString(first[key])}
             </span>
           </li>
@@ -206,13 +218,13 @@ function VariablePreviewBlock({
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-w-0 space-y-1 rounded border border-slate-100 bg-slate-50 p-2">
-      <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-500">
+    <div className="min-w-0 space-y-1 rounded border border-slate-100 bg-slate-50 p-2 dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-500 dark:text-gray-400">
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
           aria-expanded={!collapsed}
-          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-200/60"
+          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-200/60 dark:hover:bg-gray-700/60"
           data-testid="markdown-variable-preview-toggle"
         >
           {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
@@ -232,7 +244,7 @@ function VariablePreviewBlock({
       </div>
       {!collapsed ? (
         fields.length === 0 ? (
-          <p className="text-[11px] text-slate-500">Resolved value has no readable fields.</p>
+          <p className="text-[11px] text-slate-500 dark:text-gray-400">Resolved value has no readable fields.</p>
         ) : (
           // The list can grow taller than the card on rich objects (memory
           // rows, runs with many `$["Node"]` accessors). Cap its height so
@@ -245,12 +257,15 @@ function VariablePreviewBlock({
                 <button
                   type="button"
                   onClick={() => onInsertSnippet(insertable(field.accessor))}
-                  className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
+                  className={cn("max-w-[55%] shrink-0 truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
                   title={`Insert ${insertable(field.accessor)}`}
                 >
                   {field.key}
                 </button>
-                <span className="min-w-0 flex-1 truncate text-[11px] text-slate-600" title={field.preview}>
+                <span
+                  className="min-w-0 flex-1 truncate text-[11px] text-slate-600 dark:text-gray-400"
+                  title={field.preview}
+                >
                   {field.preview}
                 </span>
               </li>

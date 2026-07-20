@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { buildNodeMap, buildRunPresentation, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { runMatchesStatusTriggerFilters } from "@/ui/Runs/runStatusTriggerFilter";
 import { loadPersistedFilters, savePersistedFilters } from "./filterPersistence";
 import type { TriggerOption } from "./RunFiltersPopover";
 
@@ -15,6 +16,7 @@ interface UseRunFiltersParams {
 export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
 
@@ -48,18 +50,25 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   const decoratedRuns = useMemo(() => runs.map((run) => buildRunPresentation(run, nodeMap)), [runs, nodeMap]);
 
+  const statusTriggerFilters = useMemo(
+    () => ({
+      statuses: selectedStatuses.size > 0 ? Array.from(selectedStatuses) : undefined,
+      triggers: selectedTriggerIds.size > 0 ? Array.from(selectedTriggerIds) : undefined,
+    }),
+    [selectedStatuses, selectedTriggerIds],
+  );
+
   const filteredRuns = useMemo(() => {
-    return decoratedRuns.filter(({ run, status }) => {
-      if (selectedStatuses.size > 0 && (status === "unknown" || !selectedStatuses.has(status))) return false;
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
-      if (selectedTriggerIds.size > 0) {
-        const triggerNodeId = run.rootEvent?.nodeId;
-        if (!triggerNodeId || !selectedTriggerIds.has(triggerNodeId)) return false;
-      }
-
+    return decoratedRuns.filter(({ run, haystack }) => {
+      // Shared matcher with console run datasources — keeps status/trigger
+      // semantics identical across the sidebar and widget surfaces.
+      if (!runMatchesStatusTriggerFilters(run, statusTriggerFilters)) return false;
+      if (normalizedSearchQuery && !haystack.includes(normalizedSearchQuery)) return false;
       return true;
     });
-  }, [decoratedRuns, selectedStatuses, selectedTriggerIds]);
+  }, [decoratedRuns, searchQuery, statusTriggerFilters]);
 
   const orderedRuns = useMemo(
     () => ({
@@ -69,11 +78,13 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     [filteredRuns],
   );
 
-  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0;
+  const hasSearchFilter = searchQuery.trim().length > 0;
+  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0 || hasSearchFilter;
 
   const clearFilters = useCallback(() => {
     setSelectedStatuses(new Set());
     setSelectedTriggerIds(new Set());
+    setSearchQuery("");
   }, []);
 
   const toggleStatus = useCallback((status: RunStatusFilter) => {
@@ -97,10 +108,13 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   return {
     selectedStatuses,
     selectedTriggerIds,
+    searchQuery,
     triggerOptions,
     filteredRuns,
     orderedRuns,
+    hasSearchFilter,
     hasAnyFilter,
+    setSearchQuery,
     clearFilters,
     toggleStatus,
     toggleTrigger,
@@ -108,3 +122,5 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     clearTriggers: () => setSelectedTriggerIds(new Set()),
   };
 }
+
+export type RunFiltersState = ReturnType<typeof useRunFilters>;

@@ -36,6 +36,7 @@ var errNoChangesToPublish = fmt.Errorf("no changes between live and draft versio
 type CanvasPublisher struct {
 	tx         *gorm.DB
 	options    CanvasPublisherOptions
+	canvas     *models.Canvas
 	live       *models.CanvasVersion
 	draft      *models.CanvasVersion
 	changeset  *CanvasChangeset
@@ -49,6 +50,14 @@ type CanvasPublisher struct {
 	// not conflict with deleted nodes.
 	//
 	allNodes map[string]models.CanvasNode
+
+	cancelledExecutionIDs []uuid.UUID
+	deletedQueueItems     []models.CanvasNodeQueueItem
+}
+
+type CanvasPublishResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	DeletedQueueItems     []models.CanvasNodeQueueItem
 }
 
 type CanvasPublisherOptions struct {
@@ -84,7 +93,7 @@ func (o *CanvasPublisherOptions) Validate() error {
 	return nil
 }
 
-func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
+func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -120,6 +129,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	return &CanvasPublisher{
 		tx:         tx,
 		options:    options,
+		canvas:     canvas,
 		live:       liveVersion,
 		finalNodes: finalNodes,
 		draft:      draft,
@@ -148,6 +158,13 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) Result() CanvasPublishResult {
+	return CanvasPublishResult{
+		CancelledExecutionIDs: append([]uuid.UUID(nil), p.cancelledExecutionIDs...),
+		DeletedQueueItems:     append([]models.CanvasNodeQueueItem(nil), p.deletedQueueItems...),
+	}
 }
 
 func (p *CanvasPublisher) edgesWithRenamedNodeIDs(edges []models.Edge) []models.Edge {
@@ -287,16 +304,26 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error {
 	updatedNode := p.finalNodes[change.Node.ID]
 
-	//
-	// Widgets are not saved as workflow_nodes records in the database.
-	//
 	if updatedNode.Type == models.NodeTypeWidget {
+		liveNode, exists := p.findLiveNode(updatedNode.ID)
+		if !exists {
+			return fmt.Errorf("node %s not found", updatedNode.ID)
+		}
+
+		if nodeImplementationChanged(liveNode, updatedNode) {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
+		}
+
 		return nil
 	}
 
 	existingNode, exists := p.allNodes[updatedNode.ID]
 	if !exists {
 		return fmt.Errorf("node %s not found", updatedNode.ID)
+	}
+
+	if canvasNodeImplementationChanged(existingNode, updatedNode) {
+		return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
 	}
 
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
@@ -363,7 +390,14 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 	}
 
 	delete(p.allNodes, existingNode.NodeID)
-	return models.DeleteCanvasNode(p.tx, existingNode)
+	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
+	if err != nil {
+		return err
+	}
+
+	p.cancelledExecutionIDs = append(p.cancelledExecutionIDs, result.CancelledExecutionIDs...)
+	p.deletedQueueItems = append(p.deletedQueueItems, result.DeletedQueueItems...)
+	return nil
 }
 
 func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, error) {
@@ -390,6 +424,52 @@ func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, er
 	}
 
 	return &id, nil
+}
+
+func (p *CanvasPublisher) findLiveNode(nodeID string) (models.Node, bool) {
+	for _, node := range p.live.Nodes {
+		if node.ID == nodeID {
+			return node, true
+		}
+	}
+
+	return models.Node{}, false
+}
+
+func canvasNodeImplementationChanged(existingNode models.CanvasNode, updatedNode models.Node) bool {
+	return nodeImplementationChanged(nodeFromCanvasNode(existingNode), updatedNode)
+}
+
+func nodeImplementationChanged(existingNode models.Node, updatedNode models.Node) bool {
+	if existingNode.Type != updatedNode.Type {
+		return true
+	}
+
+	existingImplementation := nodeImplementationName(existingNode)
+	return existingImplementation != "" && existingImplementation != nodeImplementationName(updatedNode)
+}
+
+func nodeFromCanvasNode(node models.CanvasNode) models.Node {
+	return models.Node{
+		Type: node.Type,
+		Ref:  node.Ref.Data(),
+	}
+}
+
+func nodeImplementationName(node models.Node) string {
+	if node.Ref.Component != nil {
+		return strings.TrimSpace(node.Ref.Component.Name)
+	}
+
+	if node.Ref.Trigger != nil {
+		return strings.TrimSpace(node.Ref.Trigger.Name)
+	}
+
+	if node.Ref.Widget != nil {
+		return strings.TrimSpace(node.Ref.Widget.Name)
+	}
+
+	return ""
 }
 
 func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode) error {
@@ -420,6 +500,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Events:        contexts.NewEventContext(p.tx, node, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {
@@ -460,6 +541,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
 		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {

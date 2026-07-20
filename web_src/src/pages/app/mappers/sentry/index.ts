@@ -6,6 +6,7 @@ import { createReleaseMapper } from "./create_release";
 import { deleteAlertMapper } from "./delete_alert";
 import { getAlertMapper } from "./get_alert";
 import { getIssueMapper } from "./get_issue";
+import { linkGitHubIssueMapper } from "./link_github_issue";
 import { listAlertsMapper } from "./list_alerts";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { updateAlertMapper } from "./update_alert";
@@ -18,6 +19,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteAlert: deleteAlertMapper,
   getAlert: getAlertMapper,
   getIssue: getIssueMapper,
+  linkGitHubIssue: linkGitHubIssueMapper,
   listAlerts: listAlertsMapper,
   updateAlert: updateAlertMapper,
   updateIssue: updateIssueMapper,
@@ -34,6 +36,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteAlert: buildActionStateRegistry("deleted"),
   getAlert: buildActionStateRegistry("retrieved"),
   getIssue: buildActionStateRegistry("retrieved"),
+  linkGitHubIssue: buildActionStateRegistry("linked"),
   listAlerts: buildActionStateRegistry("listed"),
   updateAlert: buildActionStateRegistry("updated"),
   updateIssue: buildActionStateRegistry("updated"),

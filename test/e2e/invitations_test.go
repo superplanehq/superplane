@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -84,7 +85,7 @@ func (s *invitationSteps) startLoggedOut() {
 }
 
 func (s *invitationSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(s.session.OrgID.String())
+	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
 	if err == nil {
 		return inviteLink.Token.String()
 	}
@@ -92,7 +93,7 @@ func (s *invitationSteps) createInviteLink() string {
 		require.NoError(s.t, err)
 	}
 
-	inviteLink, err = models.CreateInviteLink(s.session.OrgID)
+	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
 	require.NoError(s.t, err)
 	return inviteLink.Token.String()
 }
@@ -165,10 +166,11 @@ func (s *invitationSteps) submitSignup() {
 }
 
 func (s *invitationSteps) disableInviteLink(token string) {
-	inviteLink, err := models.FindInviteLinkByToken(token)
+	tx := database.DB(s.t.Context())
+	inviteLink, err := models.FindInviteLinkByToken(tx, token)
 	require.NoError(s.t, err)
 	inviteLink.Enabled = false
-	require.NoError(s.t, models.SaveInviteLink(inviteLink))
+	require.NoError(s.t, models.SaveInviteLink(tx, inviteLink))
 }
 
 func (s *invitationSteps) assertInviteLinkDisabled() {

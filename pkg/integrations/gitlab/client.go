@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -32,10 +34,7 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	baseURLBytes, _ := ctx.GetConfig("baseUrl")
 	baseURL := normalizeBaseURL(string(baseURLBytes))
 
-	groupIDBytes, err := ctx.GetConfig("groupId")
-	if err != nil || len(groupIDBytes) == 0 {
-		return nil, fmt.Errorf("groupId is required")
-	}
+	groupIDBytes, _ := ctx.GetConfig("groupId")
 	groupID := string(groupIDBytes)
 
 	token, err := getAuthToken(ctx, authType)
@@ -113,9 +112,13 @@ type Project struct {
 	WebURL            string `json:"web_url"`
 }
 
-func (c *Client) listProjects() ([]Project, error) {
+// listProjects lists the group's projects when a group is configured,
+// and the user's personal projects otherwise.
+func (c *Client) listProjects(user *User) ([]Project, error) {
 	if c.groupID == "" {
-		return nil, fmt.Errorf("groupID is missing")
+		return fetchAllResources[Project](c, func(page int) string {
+			return fmt.Sprintf("%s/api/%s/users/%d/projects?per_page=100&page=%d", c.baseURL, apiVersion, user.ID, page)
+		})
 	}
 
 	return fetchAllResources[Project](c, func(page int) string {
@@ -192,6 +195,111 @@ func (c *Client) CreateIssue(ctx context.Context, projectID string, req *IssueRe
 	return &issue, nil
 }
 
+func (c *Client) GetIssue(ctx context.Context, projectID, issueIID string) (*Issue, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get issue: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var issue Issue
+	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+		return nil, fmt.Errorf("failed to decode issue: %v", err)
+	}
+
+	return &issue, nil
+}
+
+// UpdateIssueRequest mirrors GitLab's PUT /projects/:id/issues/:issue_iid body.
+// Fields are pointers so a nil field is omitted (not changed) while a non-nil
+// field is always sent, even if it points to a zero value - e.g. a non-nil
+// pointer to "" clears the description, and a non-nil pointer to an empty
+// slice clears the assignees. Callers must leave a field nil to skip it.
+type UpdateIssueRequest struct {
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	StateEvent  *string `json:"state_event,omitempty"`
+	Labels      *string `json:"labels,omitempty"`
+	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
+	MilestoneID *int    `json:"milestone_id,omitempty"`
+	DueDate     *string `json:"due_date,omitempty"`
+}
+
+func (c *Client) UpdateIssue(ctx context.Context, projectID, issueIID string, req *UpdateIssueRequest) (*Issue, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update issue: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var issue Issue
+	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+		return nil, fmt.Errorf("failed to decode issue: %v", err)
+	}
+
+	return &issue, nil
+}
+
+func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string, req *CreateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s/notes", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
 type Milestone struct {
 	ID    int    `json:"id"`
 	IID   int    `json:"iid"`
@@ -202,6 +310,23 @@ type Milestone struct {
 func (c *Client) ListMilestones(projectID string) ([]Milestone, error) {
 	return fetchAllResources[Milestone](c, func(page int) string {
 		return fmt.Sprintf("%s/api/%s/projects/%s/milestones?per_page=100&page=%d&state=active", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
+type Environment struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug,omitempty"`
+	ExternalURL string `json:"external_url,omitempty"`
+	State       string `json:"state,omitempty"`
+	Tier        string `json:"tier,omitempty"`
+}
+
+// ListEnvironments lists the available environments for a project. Only
+// available environments are returned so users pick a live deployment target.
+func (c *Client) ListEnvironments(projectID string) ([]Environment, error) {
+	return fetchAllResources[Environment](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/environments?per_page=100&page=%d&states=available", c.baseURL, apiVersion, url.PathEscape(projectID), page)
 	})
 }
 
@@ -236,13 +361,20 @@ func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
 	})
 }
 
+// ListProjectMembers lists all members of a project, including inherited ones.
+func (c *Client) ListProjectMembers(projectID string) ([]User, error) {
+	return fetchAllResources[User](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/members/all?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {
 	user, err := c.getCurrentUser()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current user: %v", err)
 	}
 
-	projects, err := c.listProjects()
+	projects, err := c.listProjects(user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list projects: %v", err)
 	}
@@ -444,6 +576,440 @@ func (c *Client) ListPipelines(projectID string) ([]Pipeline, error) {
 	return fetchAllResources[Pipeline](c, func(page int) string {
 		return fmt.Sprintf("%s/api/%s/projects/%s/pipelines?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
 	})
+}
+
+type Note struct {
+	ID           int    `json:"id"`
+	Body         string `json:"body"`
+	Author       User   `json:"author"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	System       bool   `json:"system"`
+	NoteableID   int    `json:"noteable_id,omitempty"`
+	NoteableIID  int    `json:"noteable_iid,omitempty"`
+	NoteableType string `json:"noteable_type,omitempty"`
+}
+
+type CreateNoteRequest struct {
+	Body string `json:"body"`
+}
+
+func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeRequestIID string, req *CreateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
+type MergeRequest struct {
+	ID                       int        `json:"id"`
+	IID                      int        `json:"iid"`
+	ProjectID                int        `json:"project_id"`
+	Title                    string     `json:"title"`
+	Description              string     `json:"description"`
+	State                    string     `json:"state"`
+	CreatedAt                string     `json:"created_at"`
+	UpdatedAt                string     `json:"updated_at"`
+	MergedAt                 *string    `json:"merged_at"`
+	MergeUser                *User      `json:"merge_user"`
+	ClosedAt                 *string    `json:"closed_at"`
+	ClosedBy                 *User      `json:"closed_by"`
+	SourceBranch             string     `json:"source_branch"`
+	TargetBranch             string     `json:"target_branch"`
+	Author                   User       `json:"author"`
+	Assignees                []User     `json:"assignees"`
+	Reviewers                []User     `json:"reviewers"`
+	Labels                   []string   `json:"labels"`
+	Milestone                *Milestone `json:"milestone"`
+	Draft                    bool       `json:"draft"`
+	DetailedMergeStatus      string     `json:"detailed_merge_status"`
+	MergeError               *string    `json:"merge_error"`
+	SHA                      string     `json:"sha"`
+	MergeCommitSHA           *string    `json:"merge_commit_sha"`
+	SquashCommitSHA          *string    `json:"squash_commit_sha"`
+	Squash                   bool       `json:"squash"`
+	ShouldRemoveSourceBranch bool       `json:"should_remove_source_branch"`
+	WebURL                   string     `json:"web_url"`
+}
+
+type AcceptMergeRequestRequest struct {
+	MergeCommitMessage       string `json:"merge_commit_message,omitempty"`
+	SquashCommitMessage      string `json:"squash_commit_message,omitempty"`
+	Squash                   *bool  `json:"squash,omitempty"`
+	ShouldRemoveSourceBranch *bool  `json:"should_remove_source_branch,omitempty"`
+	SHA                      string `json:"sha,omitempty"`
+}
+
+// AcceptMergeRequest merges an open merge request.
+// See https://docs.gitlab.com/api/merge_requests/#merge-a-merge-request
+func (c *Client) AcceptMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *AcceptMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/merge", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("user does not have permission to accept this merge request")
+	case http.StatusMethodNotAllowed:
+		return nil, fmt.Errorf("merge request cannot be merged (it may be a draft, closed, already merged, or blocked): %s", parseGitlabErrorMessage(readResponseBody(resp)))
+	case http.StatusConflict:
+		return nil, errors.New(mergeRequestConflictMessage(resp))
+	case http.StatusUnprocessableEntity:
+		return nil, fmt.Errorf("branch cannot be merged: %s", parseGitlabErrorMessage(readResponseBody(resp)))
+	default:
+		return nil, fmt.Errorf("failed to accept merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+type MergeRequestApprover struct {
+	User       User   `json:"user"`
+	ApprovedAt string `json:"approved_at"`
+}
+
+type MergeRequestApproval struct {
+	ID                int                    `json:"id"`
+	IID               int                    `json:"iid"`
+	ProjectID         int                    `json:"project_id"`
+	Title             string                 `json:"title"`
+	Description       string                 `json:"description"`
+	State             string                 `json:"state"`
+	CreatedAt         string                 `json:"created_at"`
+	UpdatedAt         string                 `json:"updated_at"`
+	MergeStatus       string                 `json:"merge_status"`
+	ApprovalsRequired int                    `json:"approvals_required"`
+	ApprovalsLeft     int                    `json:"approvals_left"`
+	ApprovedBy        []MergeRequestApprover `json:"approved_by"`
+}
+
+type ApproveMergeRequestRequest struct {
+	SHA string `json:"sha,omitempty"`
+}
+
+// ApproveMergeRequest approves a merge request as the authenticated user.
+// See https://docs.gitlab.com/api/merge_request_approvals/#approve-merge-request
+func (c *Client) ApproveMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *ApproveMergeRequestRequest) (*MergeRequestApproval, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/approve", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated:
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("user is not allowed to approve this merge request")
+	case http.StatusConflict:
+		return nil, errors.New(mergeRequestConflictMessage(resp))
+	default:
+		return nil, fmt.Errorf("failed to approve merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var approval MergeRequestApproval
+	if err := json.NewDecoder(resp.Body).Decode(&approval); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request approval: %v", err)
+	}
+
+	return &approval, nil
+}
+
+type AwardEmoji struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	User        User   `json:"user"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+	AwardableID int    `json:"awardable_id,omitempty"`
+}
+
+type CreateAwardEmojiRequest struct {
+	Name string `json:"name"`
+}
+
+// errAwardEmojiAlreadyExists is returned when the authenticated user has already
+// awarded the given emoji to the target - GitLab reports this as a 404 with an
+// "Award Emoji Name has already been taken" message rather than a 409 Conflict.
+var errAwardEmojiAlreadyExists = errors.New("award emoji already exists")
+
+// CreateMergeRequestAwardEmoji adds an award emoji to the merge request itself.
+// If the authenticated user has already awarded this emoji, it returns the
+// existing award emoji instead of failing, making the operation idempotent.
+func (c *Client) CreateMergeRequestAwardEmoji(ctx context.Context, projectID, mergeRequestIID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+	awardEmoji, err := c.createAwardEmoji(ctx, apiURL, req)
+	if errors.Is(err, errAwardEmojiAlreadyExists) {
+		return c.findExistingAwardEmoji(req.Name, func() ([]AwardEmoji, error) {
+			return c.ListMergeRequestAwardEmoji(projectID, mergeRequestIID)
+		})
+	}
+	return awardEmoji, err
+}
+
+// CreateMergeRequestNoteAwardEmoji adds an award emoji to a note on a merge request.
+// If the authenticated user has already awarded this emoji, it returns the
+// existing award emoji instead of failing, making the operation idempotent.
+func (c *Client) CreateMergeRequestNoteAwardEmoji(ctx context.Context, projectID, mergeRequestIID, noteID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), url.PathEscape(noteID))
+	awardEmoji, err := c.createAwardEmoji(ctx, apiURL, req)
+	if errors.Is(err, errAwardEmojiAlreadyExists) {
+		return c.findExistingAwardEmoji(req.Name, func() ([]AwardEmoji, error) {
+			return c.ListMergeRequestNoteAwardEmoji(projectID, mergeRequestIID, noteID)
+		})
+	}
+	return awardEmoji, err
+}
+
+// ListMergeRequestAwardEmoji lists the award emoji on a merge request.
+func (c *Client) ListMergeRequestAwardEmoji(projectID, mergeRequestIID string) ([]AwardEmoji, error) {
+	return fetchAllResources[AwardEmoji](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/award_emoji?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), page)
+	})
+}
+
+// ListMergeRequestNoteAwardEmoji lists the award emoji on a note of a merge request.
+func (c *Client) ListMergeRequestNoteAwardEmoji(projectID, mergeRequestIID, noteID string) ([]AwardEmoji, error) {
+	return fetchAllResources[AwardEmoji](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes/%s/award_emoji?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), url.PathEscape(noteID), page)
+	})
+}
+
+// findExistingAwardEmoji locates the authenticated user's award emoji with the given
+// name among the results of listFn, used to recover from errAwardEmojiAlreadyExists.
+func (c *Client) findExistingAwardEmoji(name string, listFn func() ([]AwardEmoji, error)) (*AwardEmoji, error) {
+	user, err := c.getCurrentUser()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %v", err)
+	}
+
+	awardEmoji, err := listFn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list existing award emoji: %v", err)
+	}
+
+	for _, e := range awardEmoji {
+		if e.Name == name && e.User.ID == user.ID {
+			return &e, nil
+		}
+	}
+
+	return nil, fmt.Errorf("award emoji %q reported as already existing but could not be found", name)
+}
+
+func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		responseBody := readResponseBody(resp)
+		if resp.StatusCode == http.StatusNotFound && strings.Contains(parseGitlabErrorMessage(responseBody), "already been taken") {
+			return nil, errAwardEmojiAlreadyExists
+		}
+		return nil, fmt.Errorf("failed to create award emoji: status %d, response: %s", resp.StatusCode, responseBody)
+	}
+
+	var awardEmoji AwardEmoji
+	if err := json.NewDecoder(resp.Body).Decode(&awardEmoji); err != nil {
+		return nil, fmt.Errorf("failed to decode award emoji: %v", err)
+	}
+
+	return &awardEmoji, nil
+}
+
+type DeploymentEnvironment struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	ExternalURL string `json:"external_url,omitempty"`
+}
+
+type Deployment struct {
+	ID          int                    `json:"id"`
+	IID         int                    `json:"iid"`
+	Ref         string                 `json:"ref"`
+	SHA         string                 `json:"sha"`
+	Status      string                 `json:"status"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at,omitempty"`
+	User        *User                  `json:"user,omitempty"`
+	Environment *DeploymentEnvironment `json:"environment,omitempty"`
+	Deployable  map[string]any         `json:"deployable,omitempty"`
+}
+
+type CreateDeploymentRequest struct {
+	Environment string `json:"environment"`
+	Ref         string `json:"ref"`
+	SHA         string `json:"sha"`
+	Tag         bool   `json:"tag"`
+	Status      string `json:"status"`
+}
+
+type UpdateDeploymentRequest struct {
+	Status string `json:"status"`
+}
+
+// CreateDeployment creates a deployment for a project environment.
+// GitLab creates the environment automatically if it does not yet exist.
+func (c *Client) CreateDeployment(ctx context.Context, projectID string, req *CreateDeploymentRequest) (*Deployment, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/deployments", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create deployment: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var deployment Deployment
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return nil, fmt.Errorf("failed to decode deployment: %v", err)
+	}
+
+	return &deployment, nil
+}
+
+// UpdateDeployment updates the status of an existing deployment.
+func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploymentID int, req *UpdateDeploymentRequest) (*Deployment, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/deployments/%d", c.baseURL, apiVersion, url.PathEscape(projectID), deploymentID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update deployment: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var deployment Deployment
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return nil, fmt.Errorf("failed to decode deployment: %v", err)
+	}
+
+	return &deployment, nil
+}
+
+// mergeRequestConflictMessage extracts GitLab's error message from a 409
+// response to a merge request accept/approve call. GitLab returns 409 not only
+// for a sha guard mismatch but also e.g. when the merge request is locked or
+// another merge is in progress, so surface the server's reason and only fall
+// back to the documented SHA-mismatch message when the body is empty.
+func mergeRequestConflictMessage(resp *http.Response) string {
+	if message := parseGitlabErrorMessage(readResponseBody(resp)); message != "" {
+		return message
+	}
+	return "SHA does not match HEAD of source branch"
+}
+
+// parseGitlabErrorMessage extracts the "message" field from a GitLab JSON error
+// body (e.g. {"message":"404 Award Emoji Name has already been taken"}),
+// falling back to the raw body if it isn't in that shape.
+func parseGitlabErrorMessage(body string) string {
+	var errResp struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(body), &errResp); err == nil && errResp.Message != "" {
+		return errResp.Message
+	}
+	return body
 }
 
 func readResponseBody(resp *http.Response) string {

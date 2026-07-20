@@ -18,6 +18,9 @@ import { createElement, Fragment } from "react";
 import { getComponentBaseMapper, getExecutionDetails, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
+const logEntryLinkClassName =
+  "text-blue-600 underline hover:text-blue-700 dark:text-indigo-300 dark:hover:text-indigo-200";
+
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
   const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -128,6 +131,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
     kind: "trigger",
     nodeId: node.id,
     originalEvent: event,
+    runId: event.runId,
   };
 }
 
@@ -176,6 +180,7 @@ export function mapExecutionsToSidebarEvents(
       nodeId: execution?.nodeId,
       originalExecution: execution,
       triggerEventId: execution.rootEvent?.id,
+      runId: execution.runId || execution.rootEvent?.runId,
     };
   });
 }
@@ -236,6 +241,10 @@ export function getSidebarEventExecutionId(event: SidebarEvent): string | undefi
 }
 
 export function findRunIdForSidebarEvent(runs: CanvasesCanvasRun[], event: SidebarEvent): string | null {
+  if (event.runId) {
+    return event.runId;
+  }
+
   const executionId = getSidebarEventExecutionId(event);
   if (executionId) {
     const run = runs.find((candidate) => candidate.executions?.some((execution) => execution.id === executionId));
@@ -273,7 +282,7 @@ export function mapCanvasNodesToLogEntries(options: {
           "button",
           {
             type: "button",
-            className: "text-blue-600 underline hover:text-blue-700",
+            className: logEntryLinkClassName,
             onClick: () => onNodeSelect(node.id || ""),
           },
           node.id,
@@ -303,7 +312,7 @@ export function mapCanvasNodesToLogEntries(options: {
           "button",
           {
             type: "button",
-            className: "text-blue-600 underline hover:text-blue-700",
+            className: logEntryLinkClassName,
             onClick: () => onNodeSelect(node.id || ""),
           },
           node.name || node.id,

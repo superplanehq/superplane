@@ -41,6 +41,9 @@ import { deleteImageMapper } from "./delete_image";
 import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 import { createLoadBalancerMapper } from "./create_load_balancer";
 import { deleteLoadBalancerMapper } from "./delete_load_balancer";
+import { createFirewallRuleMapper } from "./create_firewall_rule";
+import { updateFirewallRuleMapper } from "./update_firewall_rule";
+import { deleteFirewallRuleMapper } from "./delete_firewall_rule";
 import {
   createDatabaseMapper,
   getDatabaseMapper,
@@ -52,6 +55,14 @@ import {
   CLOUDSQL_FETCHED_STATE_REGISTRY,
   CLOUDSQL_DELETED_STATE_REGISTRY,
 } from "./cloudsql_mapper";
+import {
+  createBucketMapper,
+  getBucketMapper,
+  deleteBucketMapper,
+  STORAGE_CREATED_STATE_REGISTRY,
+  STORAGE_FETCHED_STATE_REGISTRY,
+  STORAGE_DELETED_STATE_REGISTRY,
+} from "./storage_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: computeBaseMapper,
@@ -91,12 +102,18 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "compute.manageStaticIP": manageStaticIPMapper,
   "compute.createLoadBalancer": createLoadBalancerMapper,
   "compute.deleteLoadBalancer": deleteLoadBalancerMapper,
+  "compute.createFirewallRule": createFirewallRuleMapper,
+  "compute.updateFirewallRule": updateFirewallRuleMapper,
+  "compute.deleteFirewallRule": deleteFirewallRuleMapper,
   "cloudsql.createDatabase": createDatabaseMapper,
   "cloudsql.getDatabase": getDatabaseMapper,
   "cloudsql.deleteDatabase": deleteDatabaseMapper,
   "cloudsql.createInstance": createInstanceMapper,
   "cloudsql.getInstance": getInstanceMapper,
   "cloudsql.deleteInstance": deleteInstanceMapper,
+  "storage.createBucket": createBucketMapper,
+  "storage.getBucket": getBucketMapper,
+  "storage.deleteBucket": deleteBucketMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -146,12 +163,18 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
   "compute.createLoadBalancer": buildActionStateRegistry("created"),
   "compute.deleteLoadBalancer": buildActionStateRegistry("deleted"),
+  "compute.createFirewallRule": buildActionStateRegistry("created"),
+  "compute.updateFirewallRule": buildActionStateRegistry("updated"),
+  "compute.deleteFirewallRule": buildActionStateRegistry("deleted"),
   "cloudsql.createDatabase": CLOUDSQL_CREATED_STATE_REGISTRY,
   "cloudsql.getDatabase": CLOUDSQL_FETCHED_STATE_REGISTRY,
   "cloudsql.deleteDatabase": CLOUDSQL_DELETED_STATE_REGISTRY,
   "cloudsql.createInstance": CLOUDSQL_CREATED_STATE_REGISTRY,
   "cloudsql.getInstance": CLOUDSQL_FETCHED_STATE_REGISTRY,
   "cloudsql.deleteInstance": CLOUDSQL_DELETED_STATE_REGISTRY,
+  "storage.createBucket": STORAGE_CREATED_STATE_REGISTRY,
+  "storage.getBucket": STORAGE_FETCHED_STATE_REGISTRY,
+  "storage.deleteBucket": STORAGE_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

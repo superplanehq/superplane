@@ -50,6 +50,7 @@ blocks:
             - make check.components.docs
             - make check.format.go
             - make check.example.payloads
+            - make check.proto.field.numbers
             - make check.configuration.fields
             - make check.grpc.actions.status
             - make check.models.tx.debt
@@ -72,6 +73,10 @@ blocks:
         - name: Check Build
           commands:
             - make check.build.ui
+
+        - name: Storybook Build
+          commands:
+            - make check.build.storybook
 
         - name: Unit Tests
           parallelism: 4

@@ -219,6 +219,19 @@ CREATE TABLE public.app_installations (
 
 
 --
+-- Name: app_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    canvas_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    payload jsonb NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -230,7 +243,7 @@ CREATE TABLE public.canvas_folders (
     sort_order bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'yellow'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
+    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
 );
 
 
@@ -246,6 +259,17 @@ CREATE TABLE public.canvas_memories (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     source text DEFAULT 'node'::text NOT NULL
+);
+
+
+--
+-- Name: canvas_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_subscriptions (
+    source_canvas_id uuid NOT NULL,
+    target_canvas_id uuid NOT NULL,
+    target_node_id character varying(128) NOT NULL
 );
 
 
@@ -467,6 +491,20 @@ CREATE TABLE public.secrets (
 
 
 --
+-- Name: user_canvas_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_canvas_preferences (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    starred_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -482,7 +520,9 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid
+    created_by uuid,
+    api_key_expires_at timestamp without time zone,
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -558,7 +598,8 @@ CREATE TABLE public.workflow_node_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     cancelled_by uuid,
-    run_id uuid NOT NULL
+    run_id uuid NOT NULL,
+    cancelled_at timestamp without time zone
 );
 
 
@@ -631,7 +672,10 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid,
+    node_id character varying(128)
 );
 
 
@@ -641,14 +685,14 @@ CREATE TABLE public.workflow_runs (
 
 CREATE TABLE public.workflow_staged_files (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    version_id uuid NOT NULL,
+    base_version_id uuid NOT NULL,
     organization_id uuid NOT NULL,
     path text NOT NULL,
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
-    updated_by uuid,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    base_head_sha character varying(40) NOT NULL
+    user_id uuid NOT NULL,
+    workflow_id uuid NOT NULL
 );
 
 
@@ -660,21 +704,14 @@ CREATE TABLE public.workflow_versions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
-    published_at timestamp without time zone,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) NOT NULL,
-    name character varying(128) DEFAULT ''::character varying NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
-    display_name text DEFAULT ''::text NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    git_branch text NOT NULL,
-    materialization_status character varying(32) NOT NULL,
-    materialization_error text NOT NULL
+    commit_message text DEFAULT ''::text NOT NULL
 );
 
 
@@ -692,7 +729,7 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     folder_id uuid,
-    next_draft_display_number integer DEFAULT 1 NOT NULL
+    description text DEFAULT ''::text NOT NULL
 );
 
 
@@ -824,6 +861,14 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: app_messages app_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -845,6 +890,14 @@ ALTER TABLE ONLY public.canvas_folders
 
 ALTER TABLE ONLY public.canvas_memories
     ADD CONSTRAINT canvas_memories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_pkey PRIMARY KEY (source_canvas_id, target_canvas_id, target_node_id);
 
 
 --
@@ -1024,6 +1077,14 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
+-- Name: user_canvas_preferences user_canvas_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_pkey PRIMARY KEY (organization_id, user_id, canvas_id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1104,11 +1165,11 @@ ALTER TABLE ONLY public.workflow_staged_files
 
 
 --
--- Name: workflow_staged_files workflow_staged_files_version_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_workflow_user_path_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_version_id_path_key UNIQUE (version_id, path);
+    ADD CONSTRAINT workflow_staged_files_workflow_user_path_key UNIQUE (workflow_id, user_id, path);
 
 
 --
@@ -1269,6 +1330,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 
 
 --
+-- Name: idx_app_messages_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_messages_created_at ON public.app_messages USING btree (created_at);
+
+
+--
 -- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1280,6 +1348,13 @@ CREATE INDEX idx_canvas_folders_organization_id_title ON public.canvas_folders U
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
+
+
+--
+-- Name: idx_canvas_subscriptions_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_subscriptions_target ON public.canvas_subscriptions USING btree (target_canvas_id, target_node_id);
 
 
 --
@@ -1357,6 +1432,13 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_user_canvas_preferences_user_starred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_canvas_preferences_user_starred ON public.user_canvas_preferences USING btree (organization_id, user_id, starred_at DESC) WHERE (starred_at IS NOT NULL);
 
 
 --
@@ -1500,6 +1582,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_cancelling; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1514,6 +1603,13 @@ CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING
 
 
 --
+-- Name: idx_workflow_runs_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_node_id ON public.workflow_runs USING btree (workflow_id, node_id);
+
+
+--
 -- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1521,10 +1617,10 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
--- Name: idx_workflow_staged_files_version_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_staged_files_workflow_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_files USING btree (version_id);
+CREATE INDEX idx_workflow_staged_files_workflow_user ON public.workflow_staged_files USING btree (workflow_id, user_id);
 
 
 --
@@ -1532,20 +1628,6 @@ CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_file
 --
 
 CREATE INDEX idx_workflow_versions_commit_sha ON public.workflow_versions USING btree (workflow_id, commit_sha) WHERE ((commit_sha)::text <> ''::text);
-
-
---
--- Name: idx_workflow_versions_draft_git_branch; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_workflow_versions_draft_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch) WHERE ((state)::text = 'draft'::text);
-
-
---
--- Name: idx_workflow_versions_git_branch; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_versions_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch);
 
 
 --
@@ -1591,17 +1673,17 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'api_key'::text);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
-
-
---
--- Name: unique_service_account_in_organization; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_service_account_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'service_account'::text);
 
 
 --
@@ -1685,6 +1767,22 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: app_messages app_messages_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_messages app_messages_canvas_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_canvas_id_node_id_fkey FOREIGN KEY (canvas_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1698,6 +1796,30 @@ ALTER TABLE ONLY public.canvas_folders
 
 ALTER TABLE ONLY public.canvas_memories
     ADD CONSTRAINT canvas_memories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_source_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_source_canvas_id_fkey FOREIGN KEY (source_canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_target_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_target_canvas_id_fkey FOREIGN KEY (target_canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_target_canvas_id_target_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -1749,6 +1871,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
+-- Name: workflow_runs fk_workflow_runs_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT fk_workflow_runs_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1786,6 +1916,30 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repository_seed_files
     ADD CONSTRAINT repository_seed_files_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_canvas_preferences user_canvas_preferences_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_canvas_preferences user_canvas_preferences_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_canvas_preferences user_canvas_preferences_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1965,6 +2119,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.users(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1989,11 +2151,11 @@ ALTER TABLE ONLY public.workflow_staged_files
 
 
 --
--- Name: workflow_staged_files workflow_staged_files_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflow_staged_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -2001,7 +2163,15 @@ ALTER TABLE ONLY public.workflow_staged_files
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (base_version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -2068,7 +2238,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260624035629	f
+20260718092719	f
 \.
 
 
@@ -2104,7 +2274,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260417035041	f
+20260709012138	f
 \.
 
 

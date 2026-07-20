@@ -476,6 +476,30 @@ func TestSSHCommand_Execute_FileMode(t *testing.T) {
 	})
 }
 
+func TestLoadCommandFile_NormalizesLineEndings(t *testing.T) {
+	t.Run("normalizes Windows CRLF line endings", func(t *testing.T) {
+		files := &fakeFilesContext{
+			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\r\nprintf ok\r\n"},
+		}
+
+		body, err := loadCommandFile(files, "scripts/deploy.sh")
+		require.NoError(t, err)
+		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
+		assert.NotContains(t, body, "\r")
+	})
+
+	t.Run("normalizes lone carriage returns", func(t *testing.T) {
+		files := &fakeFilesContext{
+			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\rprintf ok\r"},
+		}
+
+		body, err := loadCommandFile(files, "scripts/deploy.sh")
+		require.NoError(t, err)
+		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
+		assert.NotContains(t, body, "\r")
+	})
+}
+
 func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	c := &SSHCommand{}
 	metadata := &testMetadataContext{}
@@ -594,6 +618,18 @@ func TestBuildCombinedCommands(t *testing.T) {
 		assert.Equal(t, "echo 1 && echo 2", combined)
 	})
 
+	t.Run("normalizes CRLF input before joining lines", func(t *testing.T) {
+		combined := buildCombinedCommands("set -eo pipefail\r\necho ok\r\n")
+		assert.Equal(t, "set -eo pipefail && echo ok", combined)
+		assert.NotContains(t, combined, "\r")
+	})
+
+	t.Run("normalizes lone carriage returns before joining lines", func(t *testing.T) {
+		combined := buildCombinedCommands("set -eo pipefail\recho ok\r")
+		assert.Equal(t, "set -eo pipefail && echo ok", combined)
+		assert.NotContains(t, combined, "\r")
+	})
+
 	t.Run("empty input yields empty string", func(t *testing.T) {
 		combined := buildCombinedCommands("\n \n")
 		assert.Equal(t, "", combined)
@@ -638,6 +674,13 @@ func TestSSHCommand_BuildScriptCommand(t *testing.T) {
 		assert.Equal(t, script, payload)
 	})
 
+	t.Run("normalizes CRLF scripts before streaming", func(t *testing.T) {
+		command, payload := c.buildScriptCommand("", nil, "set -eo pipefail\r\necho ok\r\n")
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "set -eo pipefail\necho ok\n", payload)
+		assert.NotContains(t, payload, "\r")
+	})
+
 	// Regression: a bash script with embedded `{{ ... }}` template syntax
 	// (Docker inspect, Helm, kubectl jsonpath) must reach the remote host
 	// untouched so it runs the same way it would when pasted into an
@@ -660,15 +703,94 @@ fi`
 func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 	c := &SSHCommand{}
 
-	t.Run("inline mode joins lines, uses sh, and has no stdin payload", func(t *testing.T) {
+	t.Run("inline mode streams multi-line commands with errexit", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceInline,
 			Commands:      "echo 1\necho 2",
 		}
 		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
+		assert.Equal(t, "bash -e -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "echo 1\necho 2", string(body))
+	})
+
+	t.Run("inline mode keeps single-line commands on the command line", func(t *testing.T) {
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      "echo 1 && echo 2",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
 		assert.Equal(t, "echo 1 && echo 2", command)
 		assert.Nil(t, stdin)
+	})
+
+	t.Run("inline mode streams customer bash scripts instead of flattening them", func(t *testing.T) {
+		script := strings.Join([]string{
+			"#!/bin/bash",
+			"set -euo pipefail",
+			"cd ~/preview-sso.teams.novp.com",
+			`sed -i -E "s#([a-z0-9\-]+\.teams\.novp\.com)#${APP_HOST_PREFIX}-\1#g" .env`,
+			"docker compose down --remove-orphans && docker compose up -d",
+			"docker compose run --rm php php artisan migrate",
+		}, "\r\n")
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      script,
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -e -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, strings.ReplaceAll(script, "\r\n", "\n"), string(body))
+		assert.NotContains(t, string(body), "\r")
+		assert.Contains(t, string(body), `\1`)
+	})
+
+	t.Run("inline mode streams shell blocks that require real newlines", func(t *testing.T) {
+		script := strings.Join([]string{
+			"if [ -n \"$APP_BRANCH_NAME\" ]; then",
+			"  git switch \"$APP_BRANCH_NAME\"",
+			"fi",
+		}, "\n")
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      script,
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -e -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, script, string(body))
+	})
+
+	t.Run("inline mode preserves fail-fast behavior when streaming line lists", func(t *testing.T) {
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      "false\necho should-not-run",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -e -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "false\necho should-not-run", string(body))
 	})
 
 	t.Run("inline mode rejects empty commands", func(t *testing.T) {
@@ -697,6 +819,24 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 		body, readErr := io.ReadAll(stdin)
 		require.NoError(t, readErr)
 		assert.Equal(t, script, string(body))
+	})
+
+	t.Run("file mode normalizes CRLF before streaming stdin", func(t *testing.T) {
+		script := "set -eo pipefail\r\necho hi\r\n"
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceFile,
+			CommandFile:   "scripts/deploy.sh",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, script)
+		require.NoError(t, err)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "set -eo pipefail\necho hi\n", string(body))
+		assert.NotContains(t, string(body), "\r")
 	})
 
 	t.Run("file mode prepends working directory to the streamed script", func(t *testing.T) {

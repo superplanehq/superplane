@@ -11,7 +11,12 @@ export type MermaidSegment = { type: "mermaid"; content: string };
 export type StepsSegment = { type: "steps"; items: StepItem[] };
 export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
-export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
+export type DraftActionsSegment = {
+  type: "draft-actions" | "staging-actions";
+  canvasId: string;
+  versionId?: string;
+  message?: string;
+};
 export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
 export type RubricCategory = { heading: string; criteria: { text: string }[]; body?: string };
 export type RubricSegment = {
@@ -175,7 +180,8 @@ function parseBlock(type: string, meta: string, raw: string): Segment | null {
     case "rubric":
       return parseRubric(meta, raw);
     case "draft-actions":
-      return parseDraftActions(raw, meta);
+    case "staging-actions":
+      return parseStagingActions(type, raw, meta);
     default:
       return { type: "markdown", content: `:::${type} ${meta}\n${raw}\n:::` };
   }
@@ -242,22 +248,26 @@ function parseSteps(raw: string): StepsSegment {
   return { type: "steps", items };
 }
 
-function parseDraftActions(raw: string, meta: string): DraftActionsSegment {
-  // Try YAML body first
+function parseStagingActions(type: string, raw: string, meta: string): DraftActionsSegment {
+  const blockType = type === "draft-actions" ? "draft-actions" : "staging-actions";
   try {
     const parsed = YAML.load(raw) as Record<string, unknown>;
     if (parsed && typeof parsed === "object") {
+      const canvasId = String(
+        parsed.canvasId ?? parsed.canvas_id ?? parsed.versionId ?? parsed.version_id ?? meta.trim(),
+      );
+      const versionId = parsed.versionId ?? parsed.version_id;
       return {
-        type: "draft-actions",
-        versionId: String(parsed.versionId ?? parsed.version_id ?? meta.trim()),
+        type: blockType,
+        canvasId,
+        versionId: versionId ? String(versionId) : undefined,
         message: parsed.message ? String(parsed.message) : undefined,
       };
     }
   } catch {
     // fall through
   }
-  // Fallback: version ID from meta or raw content
-  return { type: "draft-actions", versionId: (meta || raw).trim(), message: undefined };
+  return { type: blockType, canvasId: (meta || raw).trim(), message: undefined };
 }
 
 function parseSurvey(raw: string): SurveySegment {
@@ -265,6 +275,17 @@ function parseSurvey(raw: string): SurveySegment {
   let currentPrompt = "";
   let currentOptions: string[] = [];
   let hasInput = false;
+
+  const flushCurrentQuestion = () => {
+    if (!currentPrompt || (!currentOptions.length && !hasInput)) return;
+
+    if (shouldSplitOptionsIntoQuestions(currentPrompt, currentOptions, hasInput)) {
+      questions.push(...currentOptions.map((prompt) => ({ prompt, options: [], hasInput: true })));
+      return;
+    }
+
+    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+  };
 
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
@@ -279,20 +300,37 @@ function parseSurvey(raw: string): SurveySegment {
       }
     } else {
       // New question - flush previous
-      if (currentPrompt && (currentOptions.length || hasInput)) {
-        questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-      }
+      flushCurrentQuestion();
       currentPrompt = trimmed;
       currentOptions = [];
       hasInput = false;
     }
   }
   // Flush last question
-  if (currentPrompt && (currentOptions.length || hasInput)) {
-    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-  }
+  flushCurrentQuestion();
 
   return { type: "survey", questions };
+}
+
+function shouldSplitOptionsIntoQuestions(prompt: string, options: string[], hasInput: boolean): boolean {
+  if (hasInput || options.length < 2) return false;
+
+  return isContextPrompt(prompt) && options.every(isQuestionOption);
+}
+
+function isContextPrompt(prompt: string): boolean {
+  const text = stripMarkdownEmphasis(prompt).trim();
+  if (!text.endsWith(":") || text.includes("?")) return false;
+
+  return !/^(choose|pick|select)\b/i.test(text);
+}
+
+function isQuestionOption(option: string): boolean {
+  return stripMarkdownEmphasis(option).trim().endsWith("?");
+}
+
+function stripMarkdownEmphasis(value: string): string {
+  return value.replace(/[*_]+/g, "");
 }
 
 function parseRubric(meta: string, raw: string): RubricSegment {

@@ -5,12 +5,10 @@ p,/roles/org_viewer,/org/*,roles,read
 p,/roles/org_viewer,/org/*,groups,read
 p,/roles/org_viewer,/org/*,members,read
 p,/roles/org_viewer,/org/*,canvases,read
-p,/roles/org_viewer,/org/*,service_accounts,read
+p,/roles/org_viewer,/org/*,api_keys,read
 p,/roles/org_viewer,/org/*,agents,read
 p,/roles/org_admin,/org/*,canvases,create
 p,/roles/org_admin,/org/*,canvases,update
-p,/roles/org_admin,/org/*,canvases,update_version
-p,/roles/org_admin,/org/*,canvases,publish
 p,/roles/org_admin,/org/*,canvases,delete
 p,/roles/org_admin,/org/*,members,create
 p,/roles/org_admin,/org/*,members,update
@@ -29,9 +27,9 @@ p,/roles/org_admin,/org/*,secrets,delete
 p,/roles/org_admin,/org/*,roles,create
 p,/roles/org_admin,/org/*,roles,update
 p,/roles/org_admin,/org/*,roles,delete
-p,/roles/org_admin,/org/*,service_accounts,create
-p,/roles/org_admin,/org/*,service_accounts,update
-p,/roles/org_admin,/org/*,service_accounts,delete
+p,/roles/org_admin,/org/*,api_keys,create
+p,/roles/org_admin,/org/*,api_keys,update
+p,/roles/org_admin,/org/*,api_keys,delete
 p,/roles/org_admin,/org/*,agents,create
 p,/roles/org_admin,/org/*,agents,delete
 p,/roles/org_owner,/org/*,integrations,delete

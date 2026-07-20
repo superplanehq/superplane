@@ -39,7 +39,7 @@ export function CapabilitySection({
 
   return (
     <div
-      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600"
       role={section.label ? "group" : undefined}
       aria-label={section.label ? `${section.label} capabilities` : undefined}
     >

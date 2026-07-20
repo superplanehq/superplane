@@ -126,7 +126,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
@@ -141,7 +141,7 @@ Table, chart, and number panels share these data sources:
 ```ts
 { kind: "memory", namespace: string, fieldPath?: string }
 { kind: "executions", node?: string, limit?: number }
-{ kind: "runs", limit?: number }
+{ kind: "runs", limit?: number, statuses?: RunStatusFilter[], triggers?: string[] }
 ```
 
 | Source | Query | Result rows |
@@ -151,6 +151,15 @@ Table, chart, and number panels share these data sources:
 | `runs` | `useInfiniteCanvasRuns` (+ `useEventExecutionsBatch` for `$`) | Raw run objects plus derived `status`, `nodeName` (the node that initiated the run, resolved from `rootEvent.nodeId`), `payload` (alias for `rootEvent.data`, the initial payload that triggered the run), `durationMs` (created-to-finished elapsed time in milliseconds — pair with `format: duration`), and `$` (a map keyed by node display name with each node's full execution including `outputs` — see [Addressing per-node outputs](#addressing-per-node-outputs)). Number widgets can use API `totalCount` for count KPIs. |
 
 Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
+
+### Runs data source filters
+
+The `runs` data source accepts optional `statuses` and `triggers` arrays that scope the widget to a subset of canvas runs. Empty (or omitted) means "all", matching the runs sidebar Clear behavior. Both arrays are optional and can be edited together in the collapsible **Filters** panel of the data source editor.
+
+- `statuses` — any subset of `"running" | "passed" | "failed" | "cancelled"`. Applied client-side after each fetched page. When either filter dimension is set, the widget eagerly loads more pages (up to the shared page cap) until it has `limit` **matching** rows or the source is exhausted — so a tight filter still fills the panel when matches exist beyond the first page. Without filters, `limit` bounds the unfiltered fetch as before.
+- `triggers` — each entry references a trigger node by id or by name. References are resolved against the current canvas nodes so renaming a trigger keeps existing widgets working when the YAML uses the id. Fully unresolved (stale) trigger lists match nothing and skip eager pagination.
+
+When either filter dimension carries a selection, number panels stop using the server-reported `totalCount` for `aggregation: "count"` and switch to the filtered row count so the KPI reflects the visible subset rather than the whole canvas.
 
 ## Table Panels
 
@@ -218,7 +227,7 @@ Run rows expose a `$` map keyed by **node display name** so authors can address 
 | `$["deploy-prod"].data` | Convenience shortcut for the **last** event of the `default` channel (or the first available channel) with one `data` envelope unwrapped — matches what canvas-side `$['Node'].data` resolves to. |
 | `$["deploy-prod"].state`, `$["deploy-prod"].result` | Per-node state and result fields, useful for row styling. |
 
-The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (cel-js doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
+The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (CEL doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
 
 **Missing nodes resolve to `undefined`** — when a given node didn't run for that run (e.g. the workflow forked and only one branch executed, or the execution hasn't reached that node yet), `$["other-node"].outputs` returns `undefined` and the widget cell renders as `-`. This is intentional and matches how missing dot paths behave elsewhere.
 
@@ -231,11 +240,106 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, `avatar`, `progress`, or `trend`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `date`, `datetime`, and `relative` render through the shared `Timestamp` component, so every timestamp cell has an identical hover card exposing Local, UTC, Relative, and raw ISO with a copy button (see [Timestamp hover](#timestamp-hover) below). `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. `progress` renders a horizontal bar that fills to `field / progressTarget`; see the row below. `trend` compares the row's numeric value against **the row directly below it** (after filter + sort) and renders a diagonal arrow colored by whether the change is "better" or "worse"; see the trend section below. |
 | `show` | Row expression controlling whether the cell is visible. |
-| `href` | Link template for `link` columns. |
+| `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
+| `progressTarget` | Target (100%) for `format: progress`. Required for progress columns. Accepts a numeric literal (`"10"`, `"100.5"`), a row field path (`total`, `payload.goal`), or a full `{{ CEL }}` expression (`{{ base * 2 }}`). Resolved with the same helper as `field`. |
+| `progressLabel` | Text rendered next to the progress bar: `none`, `number` (`5/10`), or `percent` (`50%`). Defaults to `percent`. The bar itself clamps at `[0, 100]%`, but the label and hover tooltip always show the real percentage, so overshoots (`120%`, `12/10`) stay visible. |
+| `trendBetter` | For `format: trend` or numeric columns with `showTrend: true`. `up` (default) treats an increase as better (green), `down` treats a decrease as better. |
+| `trendDisplay` | For `format: trend` or numeric columns with `showTrend: true`. `percent` (default) prints a signed percent change, `value` prints a signed absolute delta, `none` renders arrow only. |
+| `showTrend` | When `true` on `number`, `percent`, or `duration`, renders the formatted value plus a trend chip in the same cell (same row-below semantics as `format: trend`). Ignored on other formats. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
+
+#### Trend columns
+
+`format: trend` turns a numeric column into a **trend-only** row-to-row comparison. The cell resolves the column's `field` (path or `{{ CEL }}`) on both the current row and the row directly below it, then renders one of the following:
+
+| Case | Cell |
+| --- | --- |
+| Both values finite and different | Diagonal arrow (`↗` up / `↘` down) in green when the change is "better" and red when "worse", plus the signed magnitude according to `trendDisplay`. |
+| Delta is exactly `0` | Gray `- 0` (no change). |
+| Current or previous value isn't a finite number | Gray `-` (incomparable). |
+| Percent mode with a previous value of `0` | Gray `-` (percent undefined). |
+| Last visible row while the previous entry has not been fetched yet | Gray `...` (pending). Not used when the next row is already loaded but still hidden behind the progressive display window — that case compares against the hidden row. |
+| Last row with no more data expected | Gray `- 0` (no baseline). |
+
+The tooltip always shows both the percent change and the absolute delta when both are meaningful (e.g. `+12.5% · +4`).
+
+Notes:
+
+- **"Previous" is always the row directly below** in the current filter + sort order, so authors control what "previous" means by choosing the sort. For chronological trends, sort by `createdAt`.
+- On progressive tables, when more rows are already loaded but still hidden behind the display window, the last visible trend cell compares against that first hidden row instead of showing pending `...`. Pending is reserved for baselines that have not been fetched yet.
+- Percent math is `(current - previous) / |previous| * 100`, rounded to one decimal, capped at ±999% (values beyond the cap render as `>+999%` / `<-999%`).
+- `trend` cells never carry a link/href — combine with a separate `link` column when both are needed.
+- Prefer **`showTrend: true`** on `number` / `percent` / `duration` when you want the formatted value and the trend in one column (e.g. `4.5s  ↘ -10%`). Keep `format: trend` when you want a dedicated delta column.
+
+Example — duration and pass rate with value + trend in one column:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+      showTrend: true
+      trendBetter: down
+      trendDisplay: percent
+    - field: passRate
+      label: Pass rate
+      format: percent
+      showTrend: true
+      trendBetter: up
+```
+
+Example — standalone trend column where a shorter run is a win:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+    - field: durationMs
+      label: Trend
+      format: trend
+      trendBetter: down
+      trendDisplay: percent
+```
+
+### Timestamp hover
+
+Every timestamp-formatted surface across the console renders through the shared `Timestamp` component (`web_src/src/components/Timestamp/`), the same component used by the runs sidebar. Hovering a timestamp reveals a card with four representations of the same instant:
+
+- **Local** — locale-aware absolute time in the viewer's timezone, e.g. `10 Jul 2026, 15:46:53 CEST`
+- **UTC** — the same instant rendered in UTC without a timezone suffix
+- **Relative** — verbose live text, e.g. `5 minutes ago` / `in 3 hours`
+- **Timestamp** — the raw full-precision ISO string with a copy button
+
+The visible cell/panel label matches the column `format`:
+
+- `format: date` — locale calendar day (no time-of-day)
+- `format: datetime` — locale absolute timestamp with timezone
+- `format: relative` — compact live-updating text without an "ago" suffix (e.g. `5m`, `2h`)
+
+The presentational details block is exported as `TimestampDetails` (`@/components/Timestamp`) so tooltips that can't host a Radix hover card render an identical grid. Chart tooltips use it: whenever `xFormat` is `date`, `datetime`, or `relative`, hovering a chart point surfaces the same Local / UTC / Relative / ISO details block. Chart X-axis ticks stay short (`Jul 6` / `May 26 4:10 PM`) so densely-binned buckets keep readable.
+
+Number panels follow the same rule: setting `render.format` to `date`, `datetime`, or `relative` wraps the aggregated value in `Timestamp`, so `max(updatedAt)`-style "last event" KPIs get the same hover details as tables.
+
+Formatters and coercion live in `web_src/src/pages/app/console/widget/widgetFormat.ts` (`formatValue`, `coerceWidgetTimestamp`) and delegate to `@/lib/datetime` (`formatAbsolute`, `formatDate`, `formatRelative`, `formatISO`, `formatUTC`) plus `@/lib/date` (`formatTimeAgo`). Do not add ad-hoc `toLocale*` timestamp formatting in widget code — extend the shared helpers instead.
+
 
 ### Structured Filters
 
@@ -253,6 +357,8 @@ Filters are validated in both `panelTypes.ts` and `canvas_dashboard_yml.go`.
 ### Row Actions
 
 Row actions invoke a trigger node on the canvas through `InvokeNodeTriggerHook`. They do not call HTTP Request nodes directly. Downstream steps run because the trigger fires, just like a normal manual run.
+
+Only triggers that expose a user-invokable `run` hook (`core.HookTypeUser`) can be fired manually. In practice this is the built-in **`start`** and **`schedule`** triggers, so the console UI filters on `node.component` against a hardcoded allowlist (`web_src/src/pages/app/console/manualRunTriggers.ts`). `WidgetTable` **hides** row actions whose target node is an event-driven trigger (for example `github.onPullRequest`) — the backend would reject the invoke anyway, so a disabled button would just clutter the row. `TablePanelForm`'s trigger node dropdown filters to the same set so authors cannot configure a row action against an event trigger in the first place. Backend authorization in `InvokeNodeTriggerHook` remains the source of truth; adding a new manual-run trigger requires updating the frontend allowlist alongside the trigger implementation.
 
 Supported action fields:
 
@@ -281,37 +387,36 @@ Runtime flow:
 
 Console widgets support two related expression styles:
 
-- `{{ CEL }}` templates use CEL through `cel-js`. The row environment contains row fields and `now` as Unix seconds.
+- `{{ CEL }}` templates use CEL through [`@marcbachmann/cel-js`](https://github.com/marcbachmann/cel-js). The row environment contains row fields and `now` as Unix seconds.
 - Legacy expressions such as `status == "running"` are supported in `show` and some filters.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
 
 ### CEL builtins
 
-In addition to the standard CEL functions cel-js ships with, the dashboard exposes these helpers in every expression's environment:
+In addition to the standard CEL functions the library ships with, the dashboard exposes these helpers in every expression's environment:
 
 | Builtin | Description |
 | --- | --- |
-| `int(v)`, `float(v)`, `string(v)` | Type coercions, with sensible fallbacks for nullish input. |
+| `int(v)`, `float(v)`, `string(v)` | Type coercions. `float(v)` is a dashboard fail-soft dyn conversion (unparseable → `0`). `int(v)` is rewritten to a dashboard fail-soft handler (unparseable → `0`) because the library's `int(string)` throws. `string(v)` uses the library for scalars and dashboard overloads for maps/lists that JSON-serialize (so `{{ string(payload) }}` keeps working). |
 | `contains(s, sub)`, `startsWith(s, p)`, `endsWith(s, p)`, `matches(s, regex)` | String / regex predicates. |
 | `lower(s)`, `upper(s)` | Case conversions. |
-| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. |
-| `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
+| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. Accepts `int` or `double` seconds. Golang-style string inputs like `duration("5m")` (library protobuf Duration) are normalized to the same human string. Prefer `formatDate(...)` for ISO-formatted timestamps; use `timestamp(seconds)` when you need an ISO-8601 string (dashboard normalizes the library `Date` result). |
 | `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
 | `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
-| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. Useful as a wholesale value (`{{ parseJson(blob) }}`), wrapped in another function (`size(parseJson(tags))`), or for equality checks (`parseJson(value) == null`). |
+| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. You can dot-access or index the result directly (`parseJson(blob).items[0].id`), wrap it in another function (`size(parseJson(tags))`), or compare it (`parseJson(value) == null`). |
 | `join(list, sep)` | Concatenate the elements of a list into a single string with an explicit separator. Non-array `list` returns `""`; non-string `sep` collapses to `""`; `null`/`undefined` elements render as `""`. Required to splice a mapped list into the output — a bare array value renders as JSON (`["a","b"]`) so it stays inspectable. Use `join(list, "")` for seamless fragment concatenation or any other separator for delimited output. Pairs with the `.map`/`.filter` macros on list-mode memory variables (`join(rows.map(r, "- " + r.name), "\n")`) — see [List mode](#list-mode). |
 | `firstLine(s)` | Text before the first line break in `s`. Treats `\r\n` and bare `\r` the same as `\n`. Returns `""` for `null`/`undefined`. Use it to keep multi-line run outputs from blowing up table cells: `{{ firstLine(payload.message) }}`. |
 | `substring(s, start, end?)` | Slice of `s` from `start` (inclusive) to `end` (exclusive). When `end` is omitted, returns everything from `start` onward. Negative `start` counts from the end (`-3` = last 3). Indices are clamped to the string length, and `end <= start` returns `""`. Non-string input is coerced via `String(value)`; `null`/`undefined` returns `""`. |
 | `truncate(s, n, suffix?)` | First `n` characters of `s`, with `suffix` appended only when truncation actually happened. Inputs shorter than `n`, non-numeric `n`, and negative `n` return `s` unchanged. Use it for "show first 80 chars with `…`" cells: `{{ truncate(payload.message, 80, "…") }}`. |
-| `splitIndex(s, sep, i)` | Nth segment of `split(s, sep)` returned as a scalar (cel-js can't index a function-call result inline). Negative `i` counts from the end (`-1` = last). Returns `""` for out-of-range / non-numeric `i`; an empty separator returns `s` unchanged. The separator is unescaped (`\n`, `\r`, `\t`, `\\`) because cel-js's lexer copies string literals verbatim, so `splitIndex(value, "\n", 0)` and `splitIndex(value, "|", 0)` both work as you'd expect. A `"\n"` separator also matches `\r\n` and bare `\r`, so it agrees with `firstLine` on Windows line endings. |
+| `splitIndex(s, sep, i)` | Nth segment of `split(s, sep)` returned as a scalar. Negative `i` counts from the end (`-1` = last). Returns `""` for out-of-range / non-numeric `i`; an empty separator returns `s` unchanged. String escapes (`\n`, `\t`, `\\`) are interpreted at CEL parse time — write `splitIndex(value, "\n", 0)` for newline splitting. A `"\n"` separator also matches `\r\n` and bare `\r`, so it agrees with `firstLine` on Windows line endings. For a literal backslash separator prefer a raw string (`r"\?"`); legacy `"\?"` forms are still rewritten for ChromeGG compatibility. |
 | `trim(s, chars?)` | Strip leading / trailing whitespace, or — when `chars` is supplied — strip leading / trailing characters that appear in `chars`. |
 | `replace(s, old, new)` | Replace every occurrence of `old` in `s` with `new`. Empty `old` returns `s` unchanged. |
 | `indexOf(s, sub)` | First index of `sub` in `s`, or `-1` when missing. Useful inside `where` filters / boolean expressions. |
 
-`parseJson` has a real limitation: **cel-js does not support postfix `.field` / `[i]` / `.method(...)` after a function call result.** That means expressions like `parseJson(blob).items[0].id` or `parseJson(tags).map(t, t)` will fail to parse. To iterate or dot-access parsed data, either shape it as a real list/map upstream (canvas memory values are JSON-typed, so storing `{"tags": ["a","b"]}` lets you write `tags.map(t, t)` natively) or compose with macros that take the parsed value as an argument (`size`, `string`, etc.).
+Postfix `.field` / `[i]` / `.method(...)` after a function-call result work as expected — `parseJson(blob).items[0].id` and `parseJson(tags).map(t, t)` both parse cleanly. The string-trimming helpers (`firstLine`, `substring`, `truncate`, `splitIndex`) still exist as scalar-returning convenience helpers so authors don't need to combine `split(...)` with an indexing chain, and they remain the recommended way to trim long values that come straight from the `runs` data source (raw run outputs, error messages, etc.). Equivalent expressions like `value[:80]` work in expr-lang at node-config / write time but **not** in widget cells.
 
-The string-trimming helpers (`firstLine`, `substring`, `truncate`, `splitIndex`) all return scalars **for the same reason** — authors can't write `split(s, "\n")[0]` or `s.substring(0, 80)` against cel-js. The single-call form (`firstLine(s)`, `substring(s, 0, 80)`) sidesteps the parser limitation. They are the recommended way to trim long values that come straight from the `runs` data source (raw run outputs, error messages, etc.); equivalent expressions like `value[:80]` work in expr-lang at node-config / write time but **not** in widget cells.
+**Numeric coercion:** the underlying library represents CEL `int` values as `BigInt`, so integer arithmetic (`value / 2`, `value % 3`, `value > 5`) requires the operand to be an integer. The dashboard adapter automatically upgrades safe-integer JS numbers in the row context (and, on retry, integer-looking strings like `"10"`) so `{{ value / 2 }}` "just works" on typical memory rows. Integer results are converted back to plain JS `number` on the way out so downstream formatters, aggregators, and `JSON.stringify` keep working. Non-numeric strings stay as strings, so `name == "42"` retains its usual string-equality semantics.
 
 Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
 
@@ -388,7 +493,7 @@ Tooltips show the category in the header and one row per series with `label — 
 
 Cartesian charts (`bar`, `stacked-bar`, `line`, `area`) expose three optional axis fields:
 
-- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`.
+- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`. Timestamp formats (`date`, `datetime`, `relative`) replace the tooltip header with the shared `TimestampDetails` block (Local / UTC / Relative / ISO with copy) so hovering a point exposes the exact instant — see [Timestamp hover](#timestamp-hover).
 - `yLabel` — Y-axis title rendered alongside the ticks (for example `USD`, `Errors / day`). Omitted by default.
 - `yFormat` — display format applied to Y-axis tick labels (`number`, `percent`, `duration`). Falls back to a locale-aware numeric default with thousands separators above 1k. The `format` declared on a series only affects tooltip values; configure `yFormat` to match it on the axis itself.
 
@@ -424,6 +529,8 @@ Number panels aggregate rows into a single KPI. Supported aggregations are:
 - `last`
 
 Aggregations other than `count` require a non-empty `field`.
+
+`render.format` accepts the same vocabulary as table columns. Numeric formats (`number`, `percent`, `duration`) render the raw aggregate; setting the format to `date`, `datetime`, or `relative` treats the aggregate as an epoch (ms or seconds) and wraps the visible label in the shared `Timestamp` component — this is the recommended way to build "last update" / "next run" KPIs. See [Timestamp hover](#timestamp-hover) for the shared hover behavior.
 
 ### Display Symbols
 
@@ -470,6 +577,90 @@ Rules:
 - Sparklines are only available for the single-source mode in this iteration.
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
+
+## Scorecard Panels
+
+Scorecard panels are a single-KPI variant of the number panel with three extra affordances baked in:
+
+- **Change chip** comparing the current aggregated value to the immediately previous value in the series (`sparklineField`, or the primary `field` as a fallback).
+- **Target** (literal number or `{{ CEL }}`) that drives an optional progress bar and — when the change is incomputable — a fallback status color.
+- **Status direction** (`better: "up" | "down"`) that colors the value change, the sparkline, and the vs-target polarity.
+
+Multi-KPI and composite-memory shapes are intentionally not supported on scorecards. Use the standard `number` panel when you need those.
+
+```yaml
+type: scorecard
+content:
+  title: Open UX papercuts
+  dataSource:
+    kind: memory
+    namespace: ux_papercuts
+  render:
+    kind: scorecard
+    aggregation: first
+    field: openCount
+    format: number
+    label: Open UX papercuts
+    better: down
+    target: "80"
+    showProgress: true
+    sparklineField: openCount
+    showChange: both
+    changeCaption: vs previous
+```
+
+### Value pipeline
+
+Value resolution is the single-source number pipeline: `dataSource` (`memory` | `executions` | `runs`) + `aggregation` + `field` (when needed) + `format` / `label` / `prefix` / `suffix`. Aggregations follow the standard number vocabulary (`count`, `sum`, `avg`, `min`, `max`, `first`, `last`). Aggregations other than `count` require a non-empty `field`.
+
+`runs`, `executions`, and `memory` all return newest-first (`created_at DESC`). The scorecard form relabels the two directional aggregations accordingly (`first` → `Latest`, `last` → `Earliest`), but the persisted YAML always uses `first` / `last`. Pick the aggregation that anchors the current value to the record you care about — typically `first` for the latest KPI.
+
+### Change vs the previous record
+
+The scorecard extracts a numeric series from the filtered rows using `sparklineField`; when it isn't set, the change chip falls back to the primary `field`. The chip compares the current value against the immediately previous value in that series, using the same math as the table trend chip (`computeTrend`). The pair is picked by aggregation:
+
+- `last` → current = last point in the series, previous = second-to-last point.
+- `first` → current = first point, previous = second point.
+- `sum` / `avg` / `min` / `max` / `count` → the chip is hidden. Combining aggregations don't point at a single record, so there is no coherent "previous" to compare against.
+
+The `better` direction controls the polarity:
+
+- `better: up` → an increase is good (green), a decrease is bad (red).
+- `better: down` → a decrease is good (green), an increase is bad (red).
+
+`render.showChange` controls the change chip's magnitude label:
+
+- `percent` — `-22.8%`.
+- `number` — `-29`.
+- `both` (default) — `-29 (-22.8%)`.
+- `none` — arrow only.
+
+`render.changeCaption` (optional) prints a short caption next to the chip (e.g. `vs previous`). When the series has fewer than two finite points, the chip is hidden entirely.
+
+The sparkline is fully independent from the chip: it only draws when `sparklineField` is set. A scorecard can render a change chip without a sparkline (rely on the `field` fallback) and a sparkline without a chip (pick a non-directional aggregation).
+
+### Target and progress
+
+`render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the newest filtered row (index 0 — all widget data sources are newest-first) plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
+
+When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value.
+
+The bar always fills to `clamp(current / target, 0, 100%)` — the fraction of the target the current value covers. The percentage label under the bar uses the raw ratio so authors see overshoot values above 100%. Only `met` (and therefore the bar color) depends on direction:
+
+- `better: up` — met when `current >= target`.
+- `better: down` — met when `current <= target`.
+
+This keeps the label honest for budget-style metrics: `429 vs 500` with `better: down` reads as `85.8% of 500` and colors green (still under the ceiling), rather than misleadingly reporting `100% of 500`.
+
+### Status color priority
+
+The colored value change, sparkline, and progress bar all read from the same status polarity, resolved in priority order:
+
+1. If the change chip is computable, use its polarity (`better` → green, `worse` → red, `flat` → slate).
+2. Otherwise, if the target resolves, use target-based status (`met` → green, otherwise red).
+3. Otherwise, neutral slate.
+
+This keeps the widget legible when only one signal is available (e.g. a `count` scorecard with no `sparklineField` still colors correctly via its target).
 
 ### Multi-Number Mode
 
@@ -576,6 +767,8 @@ Two source kinds are supported:
   - `nodeName`, `payload`, `durationMs` — convenience fields mirroring what the table widget exposes.
   - `$` — a map of node-execution outputs keyed by node display name. Use it as `{{ run.$["Node Name"].data.field }}` for run-level output references.
 
+  Optional `statuses` and `triggers` arrays scope the selection to a subset of runs (same vocabulary and semantics as the [runs data source filters](#runs-data-source-filters)). When set, the hook scans loaded pages for a match and eagerly fetches more pages (up to the shared widget page cap) so `select: latest_passed` combined with `triggers: [deploy]` can find a match beyond the first page. Empty or omitted arrays mean "all", matching today's behavior.
+
 Variables resolve to `null` when no row matches (or `[]` in list mode); CEL access on `null` renders as an empty string, so a partial template never throws. The in-card editor surfaces a per-variable preview with one-click "insert" buttons, plus a live rendered preview that mirrors what the saved panel will display.
 
 #### List mode
@@ -594,7 +787,7 @@ variables:
       limit: 20
 ```
 
-cel-js doesn't allow `.method()` postfix after a function-call result, so chain macros directly off the bound variable (`deploys.filter(...).map(...)`).
+Chain the macros directly off the bound variable — `deploys.filter(...).map(...)` — which reads naturally alongside standard list operations. Postfix `.method()` after a function call also works, so patterns like `parseJson(blob).items.map(...)` are supported.
 
 When an interpolated expression resolves to an array, the renderer falls back to JSON (e.g. `["a","b"]`) so a stray `{{ deploys }}` or `{{ rows }}` reference stays inspectable instead of silently flattening. To splice a mapped list of HTML/Markdown fragments into the output, wrap it in the `join(list, sep)` builtin — use `""` for seamless concatenation:
 
@@ -679,13 +872,21 @@ The example uses Tailwind classes for layout and color, a scoped `<style>` block
 
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button. The optional `label` field overrides the displayed name (falling back to the resolved canvas node name), mirroring the per-entry `label` on the Key Nodes panel.
+Node panels display one or more pinned canvas nodes in a single card. The single and multi-node widgets share one implementation — `NodesPanelCard` — that renders the compact centered layout when the panel holds exactly one entry and a row list otherwise. Each entry resolves its `node` reference by id or name and can optionally show a manual Run button, with an optional `label` overriding the resolved canvas node name.
 
-`showRun` only exposes the button, and only for **trigger nodes** (`type: TYPE_TRIGGER`). Non-trigger nodes can still be pinned for status, but the Run button is suppressed at render time and the editor hides the Show-Run / trigger-template controls when a non-trigger node is selected. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+`showRun` only exposes the button, and only for **manual-run triggers** — the built-in `start` and `schedule` triggers whose component declares a user-invokable `run` hook. The UI filters on `node.component` against the hardcoded allowlist in `web_src/src/pages/app/console/manualRunTriggers.ts`; event triggers (for example `github.onPullRequest`) can still be pinned for status, but the Run button and the editor's Show-Run / trigger-template controls are hidden when a non-manual node is selected. The actual click still requires `canRunNodes`, and the backend authorization in `InvokeNodeTriggerHook` remains the source of truth.
 
-## Multi-Node Panels
+`promptConfirmation` (default `false`) controls whether a Run click pops the confirmation dialog. Templates that declare input fields (`parameters`) always open the dialog so the operator can fill them in. Templates with no input fields fire immediately on click unless `promptConfirmation` is `true`, in which case a bare "Run X?" confirmation is shown first.
 
-The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+Every Run button — whether in the node panel or in a table row action — is disabled while its target trigger has an active canvas run in `STATE_STARTED`, so operators cannot enqueue duplicate runs while a pipeline is still executing. The shared `useConsoleTriggerLock` combines websocket-driven in-flight signals with a short submission-grace window; the tooltip switches to "A run for this trigger is already in progress." while the lock is engaged. Each Nodes panel holds a single lock instance shared by all of its entries, with submissions keyed by trigger node id — so two entries pointing at the same trigger lock together the moment either one fires, closing the window between the invoke call and the websocket-driven `STATE_STARTED` refresh.
+
+> **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Nodes entry) to restore the confirm-first behavior.
+
+### Panel Types And Backward Compatibility
+
+The Add Panel picker offers a single "Nodes" option (`type: nodes`) that covers both single- and multi-entry cases. The legacy `type: node` shape stays valid on the backend (`canvas_dashboard_yml.go`) and in YAML import so existing dashboards keep working; `NodesPanelCard` folds a `node` panel into a one-entry list at render time. When an author saves a legacy panel through the editor, the shape migrates to `type: nodes` on the fly (see `useConsolePanelState.migratedPanelType`), so once touched the panel adopts the modern list layout.
+
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow):
 
 ```yaml
 type: nodes
@@ -711,8 +912,9 @@ Per-entry fields:
 | `node` | Required. Canvas node id or name. |
 | `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
 | `description` | Optional short purpose line shown under the row name. |
-| `showRun` | When true and the resolved node is a trigger (`TYPE_TRIGGER`), surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `showRun` | When true and the resolved node is a manual-run trigger (see [Node Panels](#node-panels)), surface a manual "Run" button. Still gated by `canRunNodes` and the shared in-flight lock. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
+| `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
 

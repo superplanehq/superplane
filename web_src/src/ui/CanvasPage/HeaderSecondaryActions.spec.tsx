@@ -68,6 +68,28 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.getByText("+1")).toBeInTheDocument();
   });
 
+  it("keeps the commit controls pending while staging indicators still show changes", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        commitStagingPending
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
+  });
+
   it("keeps the commit controls pending while a commit settles after staging clears", () => {
     render(
       <SecondaryHeaderActions
@@ -90,7 +112,7 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
 
-  it("keeps the publish button visible while publish is pending", () => {
+  it("shows disabled staging controls when there is nothing to commit and no action is pending", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
@@ -98,19 +120,34 @@ describe("SecondaryHeaderActions", () => {
         isEditing
         hasStagingChanges={false}
         commitStagingPending={false}
-        publishVersionDisabled
-        publishVersionLabel="Publish"
         onCommitStaging={vi.fn()}
         onResetStaging={vi.fn()}
-        onPublishVersion={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
     );
 
-    expect(screen.getByTestId("canvas-publish-version-button")).toBeDisabled();
-    expect(screen.getByTestId("canvas-publish-version-button")).toHaveTextContent("Publish");
+    expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
+  });
+
+  it("shows reset without commit when committing is not allowed", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        onResetStaging={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeEnabled();
     expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
   });
 

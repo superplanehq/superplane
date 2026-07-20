@@ -1,13 +1,8 @@
-import type {
-  CanvasesCanvasVersion,
-  CanvasesCanvasRun,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
-import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import type { CanvasesCanvasVersion, CanvasesCanvasRun } from "@/api-client";
+import { RunsTabPanelContent } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import type { RunFiltersState } from "@/components/CanvasToolSidebar/useRunFilters";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
-import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import type { ReactNode } from "react";
-import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
 export interface CanvasRunsSidebarPanelConfig {
   isOpen: boolean;
@@ -17,7 +12,6 @@ export interface CanvasRunsSidebarPanelConfig {
   selectedRun?: CanvasesCanvasRun | null;
   isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
-  onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
@@ -30,9 +24,8 @@ export interface CanvasRunsSidebarPanelConfig {
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
-  workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  filterState: RunFiltersState;
 }
 
 export interface CanvasVersionsSidebarPanelConfig {
@@ -42,30 +35,22 @@ export interface CanvasVersionsSidebarPanelConfig {
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
-  canUpdateCanvas: boolean;
+  canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
-  draftBranches?: CanvasesCanvasVersion[];
-  activeDraftBranch?: string | null;
-  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
-  onOpenDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
-  onDeleteDraftBranch?: (versionId: string) => void;
-  deleteDraftBranchPending?: boolean;
 }
 
 export function renderCanvasRunsSidebarPanel(config: CanvasRunsSidebarPanelConfig): ReactNode {
   if (!config.isOpen) return null;
   const { isOpen: _isOpen, ...props } = config;
-  return <RunsTabPanel {...props} />;
+  return <RunsTabPanelContent {...props} />;
 }
 
 export function renderCanvasVersionsSidebarPanel(config: CanvasVersionsSidebarPanelConfig): ReactNode {
   if (!config.isOpen) return null;
-  const { isOpen: _isOpen, ...props } = config;
-  return <VersionsTabPanel {...props} />;
+  const { isOpen: _isOpen, canEditCanvasVersion, ...props } = config;
+  return <VersionsTabPanel {...props} canEditCanvasVersion={canEditCanvasVersion} />;
 }

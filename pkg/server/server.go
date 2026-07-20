@@ -148,7 +148,14 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EXECUTION_TERMINATOR") == "yes" {
+		log.Println("Starting Execution Terminator")
+
+		w := workers.NewExecutionTerminator(rabbitMQURL, authService, encryptor, registry)
 		go w.Start(context.Background())
 	}
 
@@ -157,6 +164,13 @@ func startWorkers(
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_APP_MESSAGE_WORKER") == "yes" {
+		log.Println("Starting App Message Worker")
+
+		w := workers.NewAppMessageWorker(registry)
 		go w.Start(context.Background())
 	}
 

@@ -7,9 +7,12 @@ import {
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeRunsDataSourceLoading,
+  computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
   shouldFetchNextWidgetPage,
+  splitDisplayRowsWithTrendPeek,
 } from "./useWidgetData";
 
 describe("computeEffectiveLimit", () => {
@@ -53,6 +56,37 @@ describe("computeDisplaySlice", () => {
   });
 });
 
+describe("computeTrendCollectLimit", () => {
+  it("collects every already-loaded row so filter+sort can see hidden baselines", () => {
+    expect(computeTrendCollectLimit(100, 125)).toBe(125);
+  });
+
+  it("matches the display window when nothing is hidden", () => {
+    expect(computeTrendCollectLimit(100, 100)).toBe(100);
+    expect(computeTrendCollectLimit(100, 80)).toBe(100);
+  });
+
+  it("caps at the configured effective limit", () => {
+    expect(computeTrendCollectLimit(50, 200, 120)).toBe(120);
+  });
+});
+
+describe("splitDisplayRowsWithTrendPeek", () => {
+  it("returns the full list with no peek when nothing is hidden", () => {
+    const rows = [{ id: 1 }, { id: 2 }];
+    expect(splitDisplayRowsWithTrendPeek(rows, 10)).toEqual({ rows, nextLoadedRow: undefined });
+    expect(splitDisplayRowsWithTrendPeek(rows, 2)).toEqual({ rows, nextLoadedRow: undefined });
+  });
+
+  it("splits the first hidden row out as nextLoadedRow", () => {
+    const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    expect(splitDisplayRowsWithTrendPeek(rows, 2)).toEqual({
+      rows: [{ id: 1 }, { id: 2 }],
+      nextLoadedRow: { id: 3 },
+    });
+  });
+});
+
 describe("computeWidgetHasMore", () => {
   const baseInput = {
     progressive: true,
@@ -87,6 +121,12 @@ describe("computeWidgetHasMore", () => {
 
   it("treats hasNextPage===undefined the same as false", () => {
     expect(computeWidgetHasMore({ ...baseInput, hasNextPage: undefined })).toBe(false);
+  });
+
+  it("returns false when callers suppress hasNextPage for unmatchable trigger filters", () => {
+    // useRunsDataSourceResult passes hasNextPage: false when triggersMatchable
+    // is false so Load more is hidden for stale trigger YAML.
+    expect(computeWidgetHasMore({ ...baseInput, hasNextPage: false, loadedRowCount: 0 })).toBe(false);
   });
 });
 
@@ -125,6 +165,11 @@ describe("shouldFetchNextWidgetPage", () => {
   it("does not fetch beyond the page budget", () => {
     expect(shouldFetchNextWidgetPage({ ...baseInput, pageCount: WIDGET_MAX_EAGER_PAGES })).toBe(false);
   });
+
+  it("does not fetch after a page failure", () => {
+    expect(shouldFetchNextWidgetPage({ ...baseInput, isFetchNextPageError: true })).toBe(false);
+    expect(shouldFetchNextWidgetPage({ ...baseInput, isError: true })).toBe(false);
+  });
 });
 
 describe("isWidgetQueryLoading", () => {
@@ -157,5 +202,41 @@ describe("isWidgetQueryLoading", () => {
 
   it("respects the eager-page budget", () => {
     expect(isWidgetQueryLoading({ ...baseInput, pageCount: WIDGET_MAX_EAGER_PAGES })).toBe(false);
+  });
+});
+
+describe("computeRunsDataSourceLoading", () => {
+  const baseInput = {
+    query: {
+      isLoading: false,
+      hasNextPage: true as boolean | undefined,
+      isFetchingNextPage: false,
+      isFetching: false,
+      isError: false,
+      isFetchNextPageError: false,
+    },
+    enabled: true,
+    fillRowCount: 0,
+    initialFillTarget: 100,
+    pageCount: 1,
+    filtersActive: true,
+    triggersMatchable: true,
+    progressive: false,
+    runExecutionsLoading: false,
+  };
+
+  it("keeps filtered widgets loading while more matching rows may still arrive", () => {
+    expect(computeRunsDataSourceLoading(baseInput)).toBe(true);
+  });
+
+  it("stops filtered loading after a fetchNextPage failure", () => {
+    // Regression: hasNextPage stays true when pageCount does not advance —
+    // without the failure guard the widget spins forever.
+    expect(
+      computeRunsDataSourceLoading({
+        ...baseInput,
+        query: { ...baseInput.query, isFetchNextPageError: true },
+      }),
+    ).toBe(false);
   });
 });

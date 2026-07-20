@@ -7,6 +7,8 @@ export interface CanvasCardData {
   description?: string;
   createdAt: string;
   canvasFolderId?: string;
+  isStarred?: boolean;
+  starredAt?: string;
   createdBy: { name: string };
   nodes?: SuperplaneComponentsNode[];
   edges?: ComponentsEdge[];

@@ -6,7 +6,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -51,12 +50,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
 
-	var allowed bool
-	err := telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
-		var checkErr error
-		allowed, checkErr = checkOrganizationPermission(ctx, a.auth, userID, organizationID, rule.Resource, rule.Action)
-		return checkErr
-	})
+	allowed, err := checkOrganizationRulePermission(ctx, a.auth, userID, organizationID, rule)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +94,28 @@ func withAuthorizedContext(ctx context.Context, pathParams map[string]string, or
 	ctx = context.WithValue(ctx, DomainTypeContextKey, models.DomainTypeOrganization)
 	ctx = context.WithValue(ctx, DomainIdContextKey, organizationID)
 	return ctx
+}
+
+func checkOrganizationRulePermission(
+	ctx context.Context,
+	auth organizationPermissionChecker,
+	userID string,
+	organizationID string,
+	rule AuthorizationRule,
+) (bool, error) {
+	allowed, err := checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, rule.Action)
+	if err != nil || allowed {
+		return allowed, err
+	}
+
+	for _, action := range rule.LegacyActions {
+		allowed, err = checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, action)
+		if err != nil || allowed {
+			return allowed, err
+		}
+	}
+
+	return false, nil
 }
 
 func firstHTTPHeader(r *http.Request, key string) string {

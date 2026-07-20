@@ -41,13 +41,13 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	actionSchema := schema.Properties["action"]
 	resourceSchema := schema.Properties["resource"]
 
-	assert.Contains(t, actionSchema.Enum, "create_draft")
 	assert.Contains(t, actionSchema.Enum, "read_runtime")
 	assert.Contains(t, actionSchema.Enum, "list_files")
 	assert.Contains(t, actionSchema.Enum, "read_file")
 	assert.Contains(t, actionSchema.Enum, "write_file")
 	assert.Contains(t, actionSchema.Enum, "delete_file")
-	assert.Contains(t, actionSchema.Enum, "commit_files")
+	assert.NotContains(t, actionSchema.Enum, "create_draft")
+	assert.NotContains(t, actionSchema.Enum, "commit_files")
 	assert.ElementsMatch(t, []string{
 		"memory",
 		"runs",
@@ -55,45 +55,54 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 		"node_executions",
 		"node_queue_items",
 		"node_events",
+		"runner_logs",
 	}, resourceSchema.Enum)
 	assert.Contains(t, schema.Properties, "namespace")
 	assert.Contains(t, schema.Properties, "node_id")
 	assert.Contains(t, schema.Properties, "event_id")
 	assert.Contains(t, schema.Properties, "execution_id")
+	assert.Contains(t, schema.Properties, "run_id")
 	assert.Contains(t, schema.Properties, "path")
 	assert.Contains(t, schema.Properties, "paths")
 	assert.Contains(t, schema.Properties, "content")
-	assert.Contains(t, schema.Properties, "message")
 	assert.Contains(t, schema.Properties, "query")
+	assert.Contains(t, schema.Properties, "include_canvas_yaml")
+	assert.NotContains(t, schema.Properties, "use_draft")
+	assert.NotContains(t, schema.Properties, "display_name")
+	assert.NotContains(t, schema.Properties, "message")
 	assert.Contains(t, schema.Properties["path"].Description, "AGENTS.md")
 	assert.Contains(t, schema.Properties["content"].Description, "write_file")
-	assert.Contains(t, schema.Properties["message"].Description, "commit_files")
+	assert.Contains(t, schema.Properties["run_id"].Description, "runner_logs")
+	assert.Contains(t, schema.Properties["include_canvas_yaml"].Description, "Defaults to false")
 }
 
-func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {
+func TestAppAgentToolSchemaUsesPatchStagingForStagingUpdates(t *testing.T) {
 	tool := NewAppAgentTool(AppAgentToolOptions{})
 
 	schema := tool.InputSchema()
-	canvasYAMLSchema := schema.Properties["canvas_yaml"]
+	actionSchema := schema.Properties["action"]
 
-	assert.Contains(t, canvasYAMLSchema.Description, "canonical live canvas.yaml")
-	assert.Contains(t, canvasYAMLSchema.Description, "Unknown fields are rejected")
-	assert.Contains(t, canvasYAMLSchema.Description, "metadata.isTemplate")
+	assert.Contains(t, actionSchema.Enum, "patch_staging")
+	assert.NotContains(t, schema.Properties, "canvas_yaml")
+	assert.Contains(t, schema.Properties, "console_yaml")
+	assert.Contains(t, schema.Properties["console_yaml"].Description, "For patch_staging")
+	assert.Contains(t, schema.Properties["auto_layout"].Description, "enabled false")
+	assert.Contains(t, schema.Properties["auto_layout"].Properties, "enabled")
+
+	operationSchema := schema.Properties["patch_operations"].Items
+	require.NotNil(t, operationSchema)
+	assert.Contains(t, operationSchema.Properties, "position")
 }
 
-func TestAppAgentToolSchemaIncludesDraftVersionIDForUpdates(t *testing.T) {
+func TestAppAgentToolSchemaIncludesOptionalVersionID(t *testing.T) {
 	tool := NewAppAgentTool(AppAgentToolOptions{})
 
 	schema := tool.InputSchema()
 
 	assert.Contains(t, schema.Properties, "version_id")
 	assert.Contains(t, schema.Properties, "draft_version_id")
-	assert.Contains(t, schema.Properties, "display_name")
-	assert.Contains(t, schema.Properties["version_id"].Description, "For read, read_file")
+	assert.Contains(t, schema.Properties["version_id"].Description, "Optional live version ID")
 	assert.Contains(t, schema.Properties["draft_version_id"].Description, "Alias")
-	assert.Contains(t, schema.Properties["version_id"].Description, "read")
-	assert.Contains(t, schema.Properties["version_id"].Description, "read returns source live")
-	assert.Contains(t, schema.Properties["display_name"].Description, "For create_draft")
 }
 
 func TestComponentSchemaAgentTool_ReturnsCoreComponentSchema(t *testing.T) {

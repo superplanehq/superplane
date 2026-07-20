@@ -144,9 +144,14 @@ func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
-	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
+	node, err := models.FindUnscopedCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return fmt.Errorf("failed to find node: %w", err)
+	}
+
+	if node.DeletedAt.Valid {
+		logger.Infof("Node %s deleted - completing request", request.NodeID)
+		return request.Complete(tx)
 	}
 
 	switch node.Type {
@@ -301,6 +306,11 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
+	if execution.State == models.CanvasNodeExecutionStateFinished || execution.State == models.CanvasNodeExecutionStateCancelling {
+		logger.Infof("Execution %s already finished or cancelling - completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents)
 }
 
@@ -311,9 +321,21 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 ) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return fmt.Errorf("failed to find node: %w", err)
+	}
+
+	//
+	// If node was deleted, we cancel the execution before completing the request.
+	//
+	if node.DeletedAt.Valid {
+		logger.Infof("Node %s deleted - requesting execution cancellation and completing request", execution.NodeID)
+		if err := w.cancelExecutionForDeletedNode(logger, tx, execution); err != nil {
+			return err
+		}
+
+		return request.Complete(tx)
 	}
 
 	spec := request.Spec.Data()
@@ -364,6 +386,16 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	}
 
 	logger.Infof("Component execution hook completed")
+	finished, err := execution.IsFinished(tx)
+	if err != nil {
+		return err
+	}
+
+	if finished {
+		logger.Infof("Execution %s already finished after hook - completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	err = tx.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
@@ -371,4 +403,13 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Request completed")
 	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) cancelExecutionForDeletedNode(logger *log.Entry, tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+	if execution.State == models.CanvasNodeExecutionStateFinished || execution.State == models.CanvasNodeExecutionStateCancelling {
+		return nil
+	}
+
+	logger.Infof("Requesting cancellation for execution %s", execution.ID)
+	return execution.RequestCancellation(tx, nil)
 }

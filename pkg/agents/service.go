@@ -20,6 +20,7 @@ import (
 )
 
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
+var errProviderSessionRefreshFailed = errors.New("provider session refresh failed")
 
 type Service struct {
 	provider Provider
@@ -47,13 +48,115 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 	if existing != nil {
-		refreshed, err := s.refreshStaleProviderSession(ctx, existing)
-		if errors.Is(err, ErrSessionBusy) {
-			return existing, nil
-		}
-		return refreshed, err
+		return s.refreshStaleProviderSessionOrExisting(ctx, existing, true)
 	}
 	return s.provisionSession(ctx, organizationID, userID, canvasID)
+}
+
+// ResetSession replaces the user's canvas session with a fresh one, used by the
+// `/clear` UX to give the user a new chat with no rewind.
+func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanvasSessionNotStreaming(organizationID, userID, canvasID); err != nil {
+		return nil, err
+	}
+
+	session, oldProviderSession, err := s.swapCanvasSession(ctx, organizationID, userID, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("reset session: %w", err)
+	}
+
+	s.retireProviderSession(ctx, oldProviderSession)
+	return session, nil
+}
+
+// ensureCanvasSessionNotStreaming is a cheap pre-check so a busy session fails
+// fast; swapCanvasSession re-checks under the advisory lock.
+func (s *Service) ensureCanvasSessionNotStreaming(organizationID, userID, canvasID uuid.UUID) error {
+	existing, err := findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+	if err != nil {
+		return err
+	}
+	if existing != nil && existing.Status == models.AgentSessionStatusStreaming {
+		return ErrSessionBusy
+	}
+	return nil
+}
+
+// swapCanvasSession atomically deletes the current session (if any) and inserts a
+// fresh replacement, returning the retired provider session id. The provider
+// session is created inside the advisory lock (like provisionSession) so a
+// concurrent EnsureSession can't return a session this reset then deletes. It
+// refuses to delete a session whose turn is still streaming.
+func (s *Service) swapCanvasSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, string, error) {
+	var (
+		session            *models.AgentSession
+		oldProviderSession string
+		newProviderSession string
+	)
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+			return err
+		}
+
+		locked, err := findCanvasSession(tx, organizationID, userID, canvasID)
+		if err != nil {
+			return err
+		}
+		if locked != nil {
+			if locked.Status == models.AgentSessionStatusStreaming {
+				return ErrSessionBusy
+			}
+			oldProviderSession = locked.ProviderSessionID
+			if err := models.DeleteAgentSessionForUserCanvas(tx, organizationID, userID, canvasID); err != nil {
+				return err
+			}
+		}
+
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: sessionTitle(organizationID, canvasID)})
+		if err != nil {
+			return fmt.Errorf("create provider session: %w", err)
+		}
+		newProviderSession = upstream.ProviderSessionID
+
+		session = s.newCanvasSession(organizationID, userID, canvasID, upstream.ProviderSessionID)
+		return models.CreateAgentSessionInTransaction(tx, session)
+	})
+	if err != nil {
+		// The provider session outlives a rolled-back transaction; clean it up.
+		if newProviderSession != "" {
+			s.cleanupProviderSession(ctx, newProviderSession)
+		}
+		return nil, "", err
+	}
+	return session, oldProviderSession, nil
+}
+
+// retireProviderSession best-effort stops and archives a replaced provider session.
+func (s *Service) retireProviderSession(ctx context.Context, providerSessionID string) {
+	if strings.TrimSpace(providerSessionID) == "" {
+		return
+	}
+	_ = s.provider.InterruptSession(ctx, providerSessionID)
+	s.archiveProviderSession(ctx, providerSessionID)
+}
+
+// newCanvasSession builds a fresh idle session. ContextReplayedAt is set so new
+// sessions never trigger the rewind path.
+func (s *Service) newCanvasSession(organizationID, userID, canvasID uuid.UUID, providerSessionID string) *models.AgentSession {
+	now := time.Now()
+	return &models.AgentSession{
+		OrganizationID:          organizationID,
+		UserID:                  userID,
+		CanvasID:                canvasID,
+		Provider:                s.provider.Name(),
+		ProviderSessionID:       providerSessionID,
+		AgentToolSchemaRevision: s.currentToolSchemaRevision(),
+		Status:                  models.AgentSessionStatusIdle,
+		ContextReplayedAt:       &now,
+	}
 }
 
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
@@ -78,17 +181,7 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 			return fmt.Errorf("create provider session: %w", err)
 		}
 
-		now := time.Now()
-		session = &models.AgentSession{
-			OrganizationID:          organizationID,
-			UserID:                  userID,
-			CanvasID:                canvasID,
-			Provider:                s.provider.Name(),
-			ProviderSessionID:       upstream.ProviderSessionID,
-			AgentToolSchemaRevision: s.currentToolSchemaRevision(),
-			Status:                  models.AgentSessionStatusIdle,
-			ContextReplayedAt:       &now,
-		}
+		session = s.newCanvasSession(organizationID, userID, canvasID, upstream.ProviderSessionID)
 		return models.CreateAgentSessionInTransaction(tx, session)
 	})
 	if err != nil {
@@ -190,7 +283,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
 
-	session, err = s.refreshStaleProviderSession(ctx, session)
+	session, err = s.refreshStaleProviderSessionOrExisting(ctx, session, false)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return s.handleBusySession(sessionID, organizationID, userID)
@@ -249,12 +342,12 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
-		ContextPreamble: s.buildPreamble(session, ModeBuilder),
+		ContextPreamble: s.buildPreamble(session, ModeBuilder, false),
 	})
 	return contextReplayed, err
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, mode ...string) (*models.AgentSessionMessage, error) {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, options ...SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 	if content == "" && len(images) == 0 {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -264,12 +357,9 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	agentMode := ModeOperator
-	if len(mode) > 0 {
-		agentMode = NormalizeMode(mode[0])
-	}
+	messageOptions := resolveSendMessageRequestOptions(options)
 
-	session, err = s.refreshStaleProviderSession(ctx, session)
+	session, err = s.refreshStaleProviderSessionOrExisting(ctx, session, false)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -277,10 +367,13 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, agentMode)
+	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, messageOptions)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
+		}
+		if errors.Is(err, ErrInvalidRequest) {
+			return nil, fmt.Errorf("forward to provider: %w", err)
 		}
 		if errors.Is(err, ErrProviderSessionUnavailable) {
 			recovered, recoverErr := s.recoverProviderSession(ctx, session)
@@ -290,7 +383,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 				}
 				return nil, recoverErr
 			}
-			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, agentMode)
+			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, messageOptions)
 			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -341,14 +434,24 @@ func toSessionImages(images []MessageImage) datatypes.JSONSlice[models.AgentSess
 	return out
 }
 
-func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, mode Mode) (bool, error) {
+func resolveSendMessageRequestOptions(options []SendMessageRequestOptions) SendMessageRequestOptions {
+	if len(options) == 0 {
+		return SendMessageRequestOptions{Mode: string(ModeOperator)}
+	}
+
+	resolved := options[0]
+	resolved.Mode = string(NormalizeMode(resolved.Mode))
+	return resolved
+}
+
+func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, options SendMessageRequestOptions) (bool, error) {
 	message, contextReplayed, err := s.messageWithRewind(session, content)
 	if err != nil {
 		return false, err
 	}
 
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
-		ContextPreamble: s.buildPreamble(session, mode),
+		ContextPreamble: s.buildPreamble(session, NormalizeMode(options.Mode), options.AutoLayoutOnUpdateEnabled),
 		Images:          images,
 	})
 	return contextReplayed, err
@@ -386,6 +489,23 @@ func (s *Service) refreshStaleProviderSession(ctx context.Context, session *mode
 	return recovered, nil
 }
 
+func (s *Service) refreshStaleProviderSessionOrExisting(ctx context.Context, session *models.AgentSession, fallbackWhenBusy bool) (*models.AgentSession, error) {
+	refreshed, err := s.refreshStaleProviderSession(ctx, session)
+	if err == nil {
+		return refreshed, nil
+	}
+	if fallbackWhenBusy && errors.Is(err, ErrSessionBusy) {
+		return session, nil
+	}
+	if errors.Is(err, errProviderSessionRefreshFailed) {
+		log.WithError(err).
+			WithField("session_id", session.ID).
+			Warn("failed to refresh stale provider session, using existing session")
+		return session, nil
+	}
+	return nil, err
+}
+
 func (s *Service) recoverProviderSession(ctx context.Context, stale *models.AgentSession) (*models.AgentSession, error) {
 	recovered, _, _, err := s.replaceProviderSession(ctx, stale, false)
 	if err != nil {
@@ -414,7 +534,7 @@ func (s *Service) replaceProviderSession(ctx context.Context, stale *models.Agen
 		Title: sessionTitle(target.organizationID, target.canvasID),
 	})
 	if err != nil {
-		return nil, "", false, fmt.Errorf("create provider session: %w", err)
+		return nil, "", false, fmt.Errorf("%w: create provider session: %w", errProviderSessionRefreshFailed, err)
 	}
 
 	recovered, err := s.installRecoveredProviderSession(stale, upstream.ProviderSessionID, requireStaleToolSchema)
@@ -539,17 +659,17 @@ func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID 
 	}
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
+func (s *Service) buildPreamble(session *models.AgentSession, mode Mode, autoLayoutOnUpdateEnabled bool) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
+		fmt.Sprintf("%t", autoLayoutOnUpdateEnabled),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
 	canvasSnapshot := buildCanvasSnapshot(session)
-	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus
+	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode)
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -623,147 +743,6 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
-}
-
-func getDraftStatus(canvasID uuid.UUID) string {
-	drafts, err := models.ListDraftCanvasVersions(canvasID)
-	if err != nil {
-		log.WithError(err).Warn("failed to list draft canvas versions")
-		return "[Draft Status]\nUnable to determine draft status."
-	}
-
-	if len(drafts) > 0 {
-		result := "[Draft Status]\n"
-		for _, draft := range drafts {
-			result += fmt.Sprintf(
-				"- Existing draft: version %s (created %s)\n",
-				draft.ID.String(),
-				draftCreatedAt(draft),
-			)
-		}
-		result += "These drafts may belong to other sessions or users. To continue a known draft branch, pass its version_id to 'superplane_app' actions 'read' and 'update_draft'. update_draft always requires version_id. Use 'create_draft' when read returned live/no version_id, or when the user explicitly wants another draft branch. Do not assume an unrelated draft is yours.\n"
-		return result
-	}
-
-	latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
-	if err != nil {
-		return noActiveDraftStatus
-	}
-	if !wasRecentlyPublished(latestPublished.PublishedAt) {
-		return noActiveDraftStatus
-	}
-
-	return fmt.Sprintf(
-		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
-		latestPublished.ID.String(),
-		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
-	)
-}
-
-func buildCanvasSnapshot(session *models.AgentSession) string {
-	canvas, err := models.FindCanvas(session.OrganizationID, session.CanvasID)
-	if err != nil {
-		log.WithError(err).Warn("failed to load canvas for agent snapshot")
-		return "[Canvas Snapshot]\nUnable to load current canvas snapshot."
-	}
-
-	var builder strings.Builder
-	builder.WriteString("[Canvas Snapshot]\n")
-	builder.WriteString(fmt.Sprintf("canvas_id: %s\n", canvas.ID.String()))
-	builder.WriteString(fmt.Sprintf("name: %s\n", canvas.Name))
-
-	if canvas.LiveVersionID != nil {
-		builder.WriteString(fmt.Sprintf("live_version_id: %s\n", canvas.LiveVersionID.String()))
-	}
-
-	draft, draftErr := ownedDraftVersion(session.CanvasID, session.UserID)
-	if draftErr != nil {
-		log.WithError(draftErr).Warn("failed to load owned draft for agent snapshot")
-	}
-
-	snapshotSource, snapshotAvailable := appendDraftSnapshotStatus(&builder, draft, draftErr)
-	if !snapshotAvailable {
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	version, err := selectedVersion(canvas, draft, snapshotSource)
-	if err != nil {
-		log.WithError(err).Warn("failed to load canvas version for agent snapshot")
-		builder.WriteString("snapshot_source: unavailable\n")
-		builder.WriteString("nodes: unavailable\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	if version == nil {
-		builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
-		builder.WriteString("nodes: unavailable\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
-	builder.WriteString(fmt.Sprintf("node_count: %d\n", len(version.Nodes)))
-	builder.WriteString(fmt.Sprintf("edge_count: %d\n", len(version.Edges)))
-
-	nodes := summarizeNodes(version.Nodes, 12)
-	if len(nodes) == 0 {
-		builder.WriteString("node_summaries: []\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	builder.WriteString("node_summaries:\n")
-	for _, node := range nodes {
-		component := node.Component
-		if component == "" {
-			component = "unknown"
-		}
-		name := node.Name
-		if name == "" {
-			name = node.ID
-		}
-		line := fmt.Sprintf("  - id=%s name=%q type=%s component=%s", node.ID, name, node.Type, component)
-		if node.Issue != "" {
-			line += fmt.Sprintf(" issue=%q", node.Issue)
-		}
-		builder.WriteString(line + "\n")
-	}
-
-	if len(version.Nodes) > len(nodes) {
-		builder.WriteString(fmt.Sprintf("  - ... %d more nodes omitted\n", len(version.Nodes)-len(nodes)))
-	}
-
-	return strings.TrimRight(builder.String(), "\n")
-}
-
-func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVersion, err error) (string, bool) {
-	if err != nil {
-		builder.WriteString("owned_draft: unavailable\n")
-		builder.WriteString("snapshot_source: unavailable\n")
-		builder.WriteString("nodes: unavailable\n")
-		return "", false
-	}
-
-	if draft == nil {
-		builder.WriteString("owned_draft: none\n")
-		return "live", true
-	}
-
-	builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
-	builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
-	return "draft", true
-}
-
-const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you need to edit the app, call 'superplane_app' action 'create_draft' first, then pass the returned version_id to 'update_draft'. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
-
-func draftCreatedAt(draft models.CanvasVersion) string {
-	if draft.CreatedAt == nil {
-		return "unknown"
-	}
-
-	return draft.CreatedAt.UTC().Format(time.RFC3339)
-}
-
-func wasRecentlyPublished(publishedAt *time.Time) bool {
-	return publishedAt != nil && time.Since(*publishedAt) < 10*time.Minute
 }
 
 func sessionTitle(organizationID, canvasID uuid.UUID) string {

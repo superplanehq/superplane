@@ -50,7 +50,6 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	query := tx.
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
-		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
 		Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "workflow_node_requests"},
@@ -58,8 +57,7 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 		}).
 		Where("workflow_node_requests.id = ?", id).
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now).
-		Where("workflow_nodes.deleted_at IS NULL")
+		Where("workflow_node_requests.run_at <= ?", now)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		First(&request).
@@ -79,10 +77,8 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	query := database.Conn().
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
-		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now).
-		Where("workflow_nodes.deleted_at IS NULL")
+		Where("workflow_node_requests.run_at <= ?", now)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		Find(&requests).
@@ -117,6 +113,31 @@ func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", NodeExecutionRequestStateCompleted).
 		Update("updated_at", time.Now()).
+		Error
+}
+
+func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) error {
+	var ids []uuid.UUID
+	err := tx.Model(&CanvasNodeRequest{}).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("execution_id = ?", executionID).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Pluck("id", &ids).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(ids) == 0 {
+		return nil
+	}
+
+	return tx.Model(&CanvasNodeRequest{}).
+		Where("id IN ?", ids).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).
 		Error
 }
 

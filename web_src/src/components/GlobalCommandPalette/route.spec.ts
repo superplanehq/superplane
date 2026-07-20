@@ -29,4 +29,21 @@ describe("getRouteContext", () => {
       canvasId: "canvas-1",
     });
   });
+
+  it("does not treat public top-level routes as organization context", () => {
+    const publicPaths = [
+      "/",
+      "/admin",
+      "/create",
+      "/invite/token-1",
+      "/install",
+      "/login",
+      "/setup",
+      "/signup",
+      "/welcome",
+    ];
+    for (const path of publicPaths) {
+      expect(getRouteContext(path)).toEqual({ organizationId: null, canvasId: null });
+    }
+  });
 });

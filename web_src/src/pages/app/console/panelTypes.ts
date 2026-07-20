@@ -1,40 +1,69 @@
 /**
  * Typed panel content schemas, templates, and validators.
- *
- * Each panel kind owns its own JSON-shape under `panel.content`. Validation is
- * shared between three callers:
- *  - `dashboardYaml.ts` — validates content during YAML import / round-trip
- *  - `useConsolePanelState` — seeds new panels via `templateForPanelType`
- *  - Per-type form editors — validate the in-memory draft before commit
- *
- * Keep the backend Go validator (`pkg/models/canvas_dashboard_yml.go`) in
- * lockstep with the shapes declared here.
+ * Keep the backend Go validator (`pkg/models/console_yml.go`) in lockstep.
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 import type {
   WidgetChartRender,
   WidgetNumberAggregation,
   WidgetNumberRender,
   WidgetRowAction,
+  WidgetScorecardRender,
   WidgetTableColumn,
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
-import type { WidgetSort, WidgetSortOrder } from "./widget/types";
+import {
+  normalizeRowAction,
+  WIDGET_FILTER_OPS,
+  WIDGET_PROGRESS_LABELS,
+  WIDGET_SORT_ORDERS,
+  WIDGET_TREND_BETTER,
+  WIDGET_TREND_DISPLAYS,
+} from "./widget/types";
+import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
-import { validateNumberDataSource } from "./numberDataSourceValidation";
-import { validateNumberMetrics } from "./numberMetricsValidation";
+import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+import {
+  normalizeTableDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
+import { validateScorecardContent } from "./scorecardRenderValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
 
+// Re-export runs filter schema helpers so existing import paths keep working.
+export {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  normalizeRunsDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
+
+// Re-export the shared object narrow so downstream validators
+// (e.g. `chartRenderValidation.ts`) keep their existing import path.
+export { asObject };
+
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
+
+/**
+ * Panel types offered in the Add Panel picker. `node` is intentionally
+ * excluded — the merged {@link NodesPanelCard} renders both legacy `node`
+ * and modern `nodes` panels, so authors always start from the plural
+ * shape. The legacy `node` panel type remains in {@link PANEL_TYPES} for
+ * validation and YAML import compatibility.
+ */
+export const CREATABLE_PANEL_TYPES = PANEL_TYPES.filter((t) => t !== "node") as readonly Exclude<PanelType, "node">[];
 
 export interface PanelTypeMeta {
   type: PanelType;
@@ -65,8 +94,8 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
   },
   nodes: {
     type: "nodes",
-    label: "Key Nodes",
-    description: "Multiple canvas nodes in one card with live status and optional descriptions.",
+    label: "Nodes",
+    description: "One or more canvas nodes with live status and optional manual-run buttons.",
   },
   table: {
     type: "table",
@@ -82,6 +111,11 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "number",
     label: "Number",
     description: "A single aggregated KPI value with optional sparkline.",
+  },
+  scorecard: {
+    type: "scorecard",
+    label: "Scorecard",
+    description: "A KPI with target, change vs the previous value, and a status-colored sparkline.",
   },
 };
 
@@ -118,6 +152,12 @@ export interface NodePanelContent {
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
   triggerName?: string;
+  /**
+   * When true, clicking Run always opens the confirm dialog — even for
+   * templates with no input fields. When false (default), a parameter-less
+   * template fires immediately; templates with input fields always prompt.
+   */
+  promptConfirmation?: boolean;
 }
 
 export interface TablePanelContent {
@@ -143,13 +183,16 @@ export interface NumberPanelContent {
 }
 
 /**
- * One number inside a multi-number panel. Each metric has its own data
- * source and aggregation; metrics render side-by-side in a wrapping row.
- *
- * Multi-number mode is disjoint from the composite-combine mode: each
- * metric uses a simple (single-namespace) data source, not a composite
- * memory source.
+ * Content shape for the `scorecard` panel. Single-KPI only — use `number`
+ * for composite memory / multi-KPI.
  */
+export interface ScorecardPanelContent {
+  title?: string;
+  dataSource: TablePanelDataSource;
+  render: WidgetScorecardRender;
+}
+
+/** One number inside a multi-number panel (own data source + aggregation). */
 export interface NumberMetric {
   dataSource: TablePanelDataSource;
   render: WidgetNumberRender;
@@ -158,7 +201,14 @@ export interface NumberMetric {
 export type TablePanelDataSource =
   | { kind: "memory"; namespace: string; fieldPath?: string }
   | { kind: "executions"; node?: string; limit?: number }
-  | { kind: "runs"; limit?: number };
+  | {
+      kind: "runs";
+      limit?: number;
+      /** See {@link WidgetRunsDataSource.statuses}. */
+      statuses?: RunStatusFilter[];
+      /** See {@link WidgetRunsDataSource.triggers}. */
+      triggers?: string[];
+    };
 export type ChartPanelDataSource = TablePanelDataSource;
 
 /** How partial aggregates from a composite memory data source are combined into a single value. */
@@ -166,9 +216,8 @@ export type WidgetNumberCombine = "sum" | "min" | "max" | "avg";
 export const WIDGET_NUMBER_COMBINE_OPS: WidgetNumberCombine[] = ["sum", "min", "max", "avg"];
 
 /**
- * Single source of truth for the aggregations a number render accepts. Reused
- * by every number validator (single, composite, multi-number) and the form
- * controls so the allowed set cannot silently drift between paths.
+ * Aggregations accepted by number / scorecard renders. Shared by validators
+ * and form controls so the allowed set cannot drift.
  */
 export const WIDGET_NUMBER_AGGREGATIONS: WidgetNumberAggregation[] = [
   "count",
@@ -249,11 +298,17 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
   label: "Runs",
 };
 
-/**
- * Default content for a newly-added panel of the given kind. The default node
- * reference is left blank; the form editor pre-selects the first canvas node
- * when one is available.
- */
+// `count` needs no field, so a fresh scorecard validates before the author
+// picks a data source or switches to a field-backed aggregation.
+const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
+  kind: "scorecard",
+  aggregation: "count",
+  better: "up",
+  showChange: "both",
+  changeCaption: "vs previous",
+};
+
+/** Default content for a newly-added panel of the given kind. */
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
   switch (type) {
     case "markdown":
@@ -281,6 +336,12 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
         dataSource: { kind: "runs", limit: 100 },
         render: DEFAULT_NUMBER_RENDER,
       } satisfies NumberPanelContent;
+    case "scorecard":
+      return {
+        title: defaultTitle ?? "",
+        dataSource: { kind: "memory", namespace: "" },
+        render: DEFAULT_SCORECARD_RENDER,
+      } satisfies ScorecardPanelContent;
   }
 }
 
@@ -310,12 +371,9 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateChartContent(content);
     case "number":
       return validateNumberContent(content);
+    case "scorecard":
+      return validateScorecardContent(content);
   }
-}
-
-export function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }
 
 function validateNodeContent(content: unknown): string | null {
@@ -327,19 +385,13 @@ function validateNodeContent(content: unknown): string | null {
   if (typeof obj.node !== "string") {
     return "content.node must be a string (canvas node id or name).";
   }
-  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
-    return "content.title must be a string.";
-  }
-  if (obj.label !== undefined && obj.label !== null && typeof obj.label !== "string") {
-    return "content.label must be a string.";
-  }
-  if (obj.showRun !== undefined && typeof obj.showRun !== "boolean") {
-    return "content.showRun must be a boolean.";
-  }
-  if (obj.triggerName !== undefined && obj.triggerName !== null && typeof obj.triggerName !== "string") {
-    return "content.triggerName must be a string.";
-  }
-  return null;
+  return (
+    optionalStringError("content.title", obj.title) ??
+    optionalStringError("content.label", obj.label) ??
+    optionalBooleanError("content.showRun", obj.showRun) ??
+    optionalStringError("content.triggerName", obj.triggerName) ??
+    optionalBooleanError("content.promptConfirmation", obj.promptConfirmation)
+  );
 }
 
 export function validateDataSource(value: unknown): string | null {
@@ -347,7 +399,7 @@ export function validateDataSource(value: unknown): string | null {
   if (!obj) return "dataSource must be an object.";
   if (obj.kind === "memory") return validateMemoryDataSource(obj);
   if (obj.kind === "executions") return validateExecutionsDataSource(obj);
-  if (obj.kind === "runs") return validateLimit(obj);
+  if (obj.kind === "runs") return validateRunsDataSource(obj);
   return 'dataSource.kind must be "memory", "executions", or "runs".';
 }
 
@@ -366,6 +418,14 @@ function validateLimit(obj: Record<string, unknown>): string | null {
     return "dataSource.limit must be a number.";
   }
   return null;
+}
+
+function validateRunsDataSource(obj: Record<string, unknown>): string | null {
+  const limitError = validateLimit(obj);
+  if (limitError) return limitError;
+  const statusesError = validateRunStatusesArray(obj.statuses, "dataSource.statuses");
+  if (statusesError) return statusesError;
+  return validateRunTriggersArray(obj.triggers, "dataSource.triggers");
 }
 
 function validateExecutionsDataSource(obj: Record<string, unknown>): string | null {
@@ -457,8 +517,18 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       format: typeof c.format === "string" ? (c.format as WidgetTableColumn["format"]) : undefined,
       show: typeof c.show === "string" ? c.show : undefined,
       href: typeof c.href === "string" ? c.href : undefined,
+      avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
+      progressTarget: typeof c.progressTarget === "string" ? c.progressTarget : undefined,
+      progressLabel: optionalEnum(c.progressLabel, WIDGET_PROGRESS_LABELS),
+      showTrend: c.showTrend === true ? true : undefined,
+      trendBetter: optionalEnum(c.trendBetter, WIDGET_TREND_BETTER),
+      trendDisplay: optionalEnum(c.trendDisplay, WIDGET_TREND_DISPLAYS),
     };
   });
+}
+
+function optionalEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === "string" && allowed.includes(value as T) ? (value as T) : undefined;
 }
 
 function normalizeTableRowActions(raw: unknown): WidgetRowAction[] | undefined {
@@ -473,40 +543,9 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
     const op = typeof item.op === "string" ? item.op : "eq";
     const field = typeof item.field === "string" ? item.field : "";
     if (!field.trim() || !WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
-    return [{ field, op: op as WidgetTableFilter["op"], value: stringOrUndefined(item.value) }];
+    const value = typeof item.value === "string" ? item.value : undefined;
+    return [{ field, op: op as WidgetTableFilter["op"], value }];
   });
-}
-
-function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
-  const ds = asObject(raw);
-  if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return { kind: "runs", limit: optionalNumber(ds.limit) };
-  if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
-  return { kind: "memory", namespace: "" };
-}
-
-function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "executions",
-    node: stringOrUndefined(ds.node),
-    limit: optionalNumber(ds.limit),
-  };
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "memory",
-    namespace: typeof ds.namespace === "string" ? ds.namespace : "",
-    fieldPath: stringOrUndefined(ds.fieldPath),
-  };
-}
-
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }
 
 function validateTableColumns(columns: unknown): string | null {
@@ -516,6 +555,25 @@ function validateTableColumns(columns: unknown): string | null {
     if (!col) return `render.columns[${i}] must be an object.`;
     if (typeof col.field !== "string" || col.field.trim() === "") {
       return `render.columns[${i}].field must be a non-empty string.`;
+    }
+    const progressError = validateProgressColumnFields(i, col);
+    if (progressError) return progressError;
+  }
+  return null;
+}
+
+function validateProgressColumnFields(index: number, col: Record<string, unknown>): string | null {
+  if (col.progressLabel !== undefined && col.progressLabel !== null) {
+    if (
+      typeof col.progressLabel !== "string" ||
+      !WIDGET_PROGRESS_LABELS.includes(col.progressLabel as WidgetProgressLabel)
+    ) {
+      return `render.columns[${index}].progressLabel must be one of ${WIDGET_PROGRESS_LABELS.join(", ")}.`;
+    }
+  }
+  if (col.format === "progress") {
+    if (typeof col.progressTarget !== "string" || col.progressTarget.trim() === "") {
+      return `render.columns[${index}].progressTarget must be a non-empty string for progress columns.`;
     }
   }
   return null;
@@ -553,48 +611,6 @@ export function validateSort(sort: unknown): string | null {
     if (typeof obj.order !== "string" || !WIDGET_SORT_ORDERS.includes(obj.order as WidgetSortOrder)) {
       return `render.sort.order must be one of ${WIDGET_SORT_ORDERS.join(", ")}.`;
     }
-  }
-  return null;
-}
-
-function validateNumberContent(content: unknown): string | null {
-  const obj = asObject(content);
-  if (!obj) return "content must be an object.";
-  // Match the backend: presence of `metrics` selects the multi-number path,
-  // and `validateNumberMetrics` reports a clear error when it is not an array.
-  if ("metrics" in obj) {
-    return validateNumberMetrics(obj.metrics);
-  }
-  const dsError = validateNumberDataSource(obj.dataSource);
-  if (dsError) return dsError;
-  const render = asObject(obj.render);
-  if (!render) return "render must be an object.";
-  if (render.kind !== "number") return 'render.kind must be "number".';
-  const symbolError = validateNumberRenderSymbols(render);
-  if (symbolError) return symbolError;
-  const dataSource = asObject(obj.dataSource);
-  if (dataSource && hasCompositeMemorySourcesKey(dataSource)) {
-    return validateCompositeNumberRenderExclusions(render);
-  }
-  return validateSimpleNumberRender(render);
-}
-
-function validateCompositeNumberRenderExclusions(render: Record<string, unknown>): string | null {
-  if (render.aggregation !== undefined) {
-    return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
-  }
-  if (render.field !== undefined) {
-    return "render.field must not be set when dataSource.sources is used (each source defines its own field).";
-  }
-  return null;
-}
-
-function validateSimpleNumberRender(render: Record<string, unknown>): string | null {
-  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
-    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
-  }
-  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
-    return `render.field is required when aggregation is "${render.aggregation}".`;
   }
   return null;
 }

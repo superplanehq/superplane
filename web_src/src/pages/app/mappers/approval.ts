@@ -107,6 +107,10 @@ export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): 
     return "cancelled";
   }
 
+  if (execution.state === "STATE_CANCELLING") {
+    return "cancelling";
+  }
+
   // Error state - component could not evaluate or apply approval logic
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
     return "error";
@@ -398,12 +402,13 @@ function getApprovalEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
 
 function getComponentSubtitle(execution: ExecutionInfo): string | React.ReactNode {
   const metadata = execution.metadata as ExecutionMetadata | undefined;
-  if (!metadata) return "";
+  if (!metadata || !metadata.records) return "";
+  const records = metadata.records;
 
   // Show progress for in-progress approvals
   if (execution.state === "STATE_STARTED") {
-    const approvalsCount = metadata.records.length || 0;
-    const approvalsApprovedCount = metadata.records.filter((record) => record.state === "approved").length || 0;
+    const approvalsCount = records.length || 0;
+    const approvalsApprovedCount = records.filter((record) => record.state === "approved").length || 0;
     const subtitle = `${approvalsApprovedCount}/${approvalsCount} approved`;
     if (execution.createdAt) {
       return renderWithTimeAgo(subtitle, new Date(execution.createdAt));

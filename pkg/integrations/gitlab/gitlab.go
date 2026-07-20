@@ -94,14 +94,24 @@ func (g *GitLab) Description() string {
 
 func (g *GitLab) Instructions() string {
 	return fmt.Sprintf(`
-When connecting using App OAuth:
-- Leave **Client ID** and **Secret** empty to start the setup wizard.
+**Setup steps:**
+1. Optionally enter a **Group ID** to work with a group's projects: in GitLab, open your group's page and select **Actions (⋮) → Copy Group ID**. The group path (e.g. `+"`my-org/my-subgroup`"+`) also works. Leave it empty to use your personal projects.
+2. Choose an **Auth Type** and connect:
 
-When connecting using Personal Access Token:
-- Go to Preferences → Personal Access Token → Add New token
-- Use **Scopes**: %s
-- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
-`, strings.Join(scopeList, ", "))
+To connect with **App OAuth**:
+1. Leave **Client ID** and **Client Secret** empty and click **Save** to start the setup wizard. It guides you through creating a GitLab OAuth application and authorizing SuperPlane.
+
+To connect with a **Personal Access Token**:
+1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) — the link prefills the name and scopes (%s), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
+2. Paste the token into the **Access Token** field and click **Save**.
+
+**Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
+
+**Component permissions:** components act as the connected user, so that user needs the matching project role:
+- **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
+- **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
+- **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
+`, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
 func (g *GitLab) Configuration() []configuration.Field {
@@ -117,8 +127,7 @@ func (g *GitLab) Configuration() []configuration.Field {
 			Name:        "groupId",
 			Label:       "Group ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Group ID",
-			Required:    true,
+			Description: "Group ID or full path (e.g. my-org/my-subgroup). Leave empty to use your personal projects (projects you own).",
 		},
 		{
 			Name:     "authType",
@@ -173,15 +182,27 @@ func (g *GitLab) Actions() []core.Action {
 		&GetPipeline{},
 		&GetLatestPipeline{},
 		&GetTestReportSummary{},
+		&CreateMergeComment{},
+		&AddReaction{},
+		&AcceptMergeRequest{},
+		&ApproveMergeRequest{},
+		&CreateDeployment{},
+		&CreateDeploymentStatus{},
+		&GetIssue{},
+		&UpdateIssue{},
+		&CreateIssueComment{},
 	}
 }
 
 func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&OnBranchCreated{},
 		&OnIssue{},
+		&OnMergeComment{},
 		&OnMergeRequest{},
 		&OnMilestone{},
 		&OnPipeline{},
+		&OnPush{},
 		&OnRelease{},
 		&OnTag{},
 		&OnVulnerability{},

@@ -1,10 +1,10 @@
-import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/ui/CopyButton";
+import { extractCodeBlock, extractTextFromNode } from "@/lib/markdownCode";
 
 const INSTRUCTIONS_V2_CLASSES =
   "text-sm text-gray-800 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
@@ -20,47 +20,6 @@ export interface InstructionsProps {
   description?: string | null;
   onContinue?: () => void;
   className?: string;
-}
-
-function extractTextFromNode(node: React.ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") {
-    return String(node);
-  }
-
-  if (Array.isArray(node)) {
-    return node.map(extractTextFromNode).join("");
-  }
-
-  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
-    return extractTextFromNode(node.props.children);
-  }
-
-  return "";
-}
-
-function extractCodeBlock(children: React.ReactNode): { code: string; language?: string } {
-  const childArray = React.Children.toArray(children);
-
-  const codeElement = childArray.find(
-    (
-      child,
-    ): child is React.ReactElement<{
-      className?: string;
-      children?: React.ReactNode;
-    }> => React.isValidElement(child) && child.type === "code",
-  );
-
-  if (!codeElement) {
-    return { code: extractTextFromNode(children).replace(/\n$/, "") };
-  }
-
-  const className = codeElement.props.className;
-  const language = className?.startsWith("language-") ? className.slice("language-".length) : undefined;
-
-  return {
-    code: extractTextFromNode(codeElement.props.children).replace(/\n$/, ""),
-    language,
-  };
 }
 
 export function Instructions({ description, onContinue, className = "" }: InstructionsProps) {
@@ -92,7 +51,7 @@ export function Instructions({ description, onContinue, className = "" }: Instru
                 );
               },
               blockquote: ({ children }) => (
-                <blockquote className="mb-2 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm last:mb-0 dark:border-gray-700 dark:bg-gray-900/60">
+                <blockquote className="mb-2 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm last:mb-0 dark:border-gray-600 dark:bg-gray-900/60">
                   {children}
                 </blockquote>
               ),
@@ -134,13 +93,13 @@ export function Instructions({ description, onContinue, className = "" }: Instru
               em: ({ children }) => <em className="italic">{children}</em>,
               table: ({ children }) => (
                 <div
-                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
+                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
                 >
                   <table className="w-full min-w-max border-collapse text-left text-sm">{children}</table>
                 </div>
               ),
               thead: ({ children }) => (
-                <thead className="border-b border-gray-200 dark:border-gray-700">{children}</thead>
+                <thead className="border-b border-gray-200 dark:border-gray-600">{children}</thead>
               ),
               tbody: ({ children }) => (
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">{children}</tbody>

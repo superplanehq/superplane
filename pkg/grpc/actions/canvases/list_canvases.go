@@ -16,14 +16,29 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListCanvasesResponse, error) {
+func ListCanvases(
+	ctx context.Context,
+	registry *registry.Registry,
+	organizationID string,
+	userID string,
+) (*pb.ListCanvasesResponse, error) {
+	organizationUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid user id")
+	}
+
 	canvases, err := models.ListCanvases(organizationID)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
 		return nil, grpcerrors.Internal(err, "failed to list canvases")
 	}
 
-	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), canvases)
+	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), organizationUUID, userUUID, canvases)
 	if err != nil {
 		log.Errorf("failed to serialize canvases for organization %s: %v", organizationID, err)
 		return nil, grpcerrors.Internal(err, "failed to serialize canvases")
@@ -34,7 +49,12 @@ func ListCanvases(ctx context.Context, registry *registry.Registry, organization
 	}, nil
 }
 
-func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.CanvasSummary, error) {
+func serializeCanvasSummaries(
+	db *gorm.DB,
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+	canvases []models.Canvas,
+) ([]*pb.CanvasSummary, error) {
 	//
 	// Get all users with a single query, to avoid N+1 queries.
 	//
@@ -55,6 +75,21 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 		usersByID[user.ID.String()] = user
 	}
 
+	canvasIDs := make([]uuid.UUID, len(canvases))
+	for i, canvas := range canvases {
+		canvasIDs[i] = canvas.ID
+	}
+
+	liveSpecs, err := models.FindLiveCanvasSpecsByCanvasIDs(db, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	preferencesByCanvasID, err := models.FindUserCanvasPreferencesForCanvases(db, organizationID, userID, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	//
 	// Serialize all canvases now
 	//
@@ -66,21 +101,29 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 			user = &u
 		}
 
+		liveSpec := liveSpecs[canvas.ID]
+		preference := preferencesByCanvasID[canvas.ID]
+
 		protoCanvases[i] = &pb.CanvasSummary{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
 			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
-			Edges:       actions.EdgesToProto(canvas.Edges),
+			Edges:       actions.EdgesToProto(liveSpec.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
+			Starred:     preference.StarredAt != nil,
+		}
+
+		if preference.StarredAt != nil {
+			protoCanvases[i].StarredAt = timestamppb.New(*preference.StarredAt)
 		}
 
 		if user != nil {
 			protoCanvases[i].CreatedBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 		}
 
-		for _, node := range canvas.Nodes {
+		for _, node := range liveSpec.Nodes {
 			protoCanvases[i].Nodes = append(protoCanvases[i].Nodes, &pb.CanvasSummary_Node{
 				Id:       node.ID,
 				Position: &componentpb.Position{X: int32(node.Position.X), Y: int32(node.Position.Y)},

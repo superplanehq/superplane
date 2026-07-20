@@ -1,6 +1,5 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import type { HeaderProps } from "./Header";
@@ -20,18 +19,14 @@ export function SecondaryHeaderActions({
   draftConsoleDiff,
   onToggleVisualDiff,
   filesHeaderActionsSlotId,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
   hasStagingChanges,
+  stagingStale,
   onCommitStaging,
   commitStagingPending,
   resetStagingPending,
   onResetStaging,
+  onDiscardStaleStaging,
+  discardStaleStagingPending,
 }: HeaderProps) {
   const onCanvasTab = isCanvasTabHeaderMode(mode);
   const onConsoleTab = mode === "console";
@@ -63,19 +58,15 @@ export function SecondaryHeaderActions({
               onShowConsoleDiff={onShowConsoleDiff}
             />
           ) : null}
-          <EditModePublishDiscardActions
-            onDiscardVersion={onDiscardVersion}
-            discardVersionDisabled={discardVersionDisabled}
-            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-            onPublishVersion={onPublishVersion}
-            publishVersionLabel={publishVersionLabel}
-            publishVersionDisabled={publishVersionDisabled}
-            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          <EditModeStagingActions
+            stagingStale={stagingStale}
             hasStagingChanges={hasStagingChanges}
             onCommitStaging={onCommitStaging}
             commitStagingPending={commitStagingPending}
             resetStagingPending={resetStagingPending}
             onResetStaging={onResetStaging}
+            onDiscardStaleStaging={onDiscardStaleStaging}
+            discardStaleStagingPending={discardStaleStagingPending}
           />
         </>
       ) : null}
@@ -117,71 +108,58 @@ function FilesHeaderActionsSlot({
   return <div id={slotId} className="flex shrink-0 items-center gap-2" />;
 }
 
-function EditModePublishDiscardActions({
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
+function EditModeStagingActions({
+  stagingStale,
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
   resetStagingPending,
   onResetStaging,
+  onDiscardStaleStaging,
+  discardStaleStagingPending,
 }: Pick<
   HeaderProps,
-  | "onDiscardVersion"
-  | "discardVersionDisabled"
-  | "discardVersionDisabledTooltip"
-  | "onPublishVersion"
-  | "publishVersionLabel"
-  | "publishVersionDisabled"
-  | "publishVersionDisabledTooltip"
+  | "stagingStale"
   | "hasStagingChanges"
   | "onCommitStaging"
   | "commitStagingPending"
   | "resetStagingPending"
   | "onResetStaging"
+  | "onDiscardStaleStaging"
+  | "discardStaleStagingPending"
 >) {
-  const stagingActionPending = !!commitStagingPending || !!resetStagingPending;
+  const stagingActionPending = !!commitStagingPending || !!resetStagingPending || !!discardStaleStagingPending;
 
-  // Keep showing the staging controls while a staging action is in flight even
-  // after `hasStagingChanges` optimistically flips false, so the header never
-  // flashes enabled Reset/Commit controls or premature Discard/Publish actions.
-  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || stagingActionPending);
-
-  // Staging and committed states are mutually exclusive: while there are staged
-  // edits the user can only Reset/Commit them; once everything is committed they
-  // can Discard the draft or Publish it.
-  if (showStagingActions) {
+  if (stagingStale) {
     return (
-      <div className="flex items-center gap-1.5">
-        {onResetStaging ? (
-          <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionPending} />
-        ) : null}
-        <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionPending} />
+      <div className="flex max-w-md items-center gap-2">
+        <p className="text-xs text-amber-800">
+          Main branch has been updated since you last edited. Discard your changes and start again.
+        </p>
+        <DiscardStaleStagingButton
+          onDiscard={() => onDiscardStaleStaging?.()}
+          disabled={!!discardStaleStagingPending}
+        />
       </div>
     );
   }
 
+  const showStagingActions =
+    (!!onCommitStaging || !!onResetStaging) && (!!onCommitStaging || !!hasStagingChanges || stagingActionPending);
+  if (!showStagingActions) {
+    return null;
+  }
+
+  const stagingActionsDisabled = stagingActionPending || !hasStagingChanges;
+
   return (
     <div className="flex items-center gap-1.5">
-      {onDiscardVersion ? (
-        <DiscardDraftButton
-          onDiscard={() => onDiscardVersion()}
-          disabled={!!discardVersionDisabled}
-          disabledTooltip={discardVersionDisabledTooltip}
-        />
+      {onResetStaging ? (
+        <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionsDisabled} />
       ) : null}
-      <PublishVersionButton
-        onPublish={() => onPublishVersion?.()}
-        label={publishVersionLabel || "Publish"}
-        disabled={publishVersionDisabled || !onPublishVersion}
-        publishVersionDisabled={!!publishVersionDisabled}
-        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-      />
+      {onCommitStaging ? (
+        <CommitStagingButton onCommit={() => onCommitStaging()} disabled={stagingActionsDisabled} />
+      ) : null}
     </div>
   );
 }
@@ -206,21 +184,25 @@ function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabl
   );
 }
 
-// The label stays fixed (no "Committing…") so the button keeps a constant
-// width while a commit is in flight; the button is disabled instead to signal
-// the in-flight commit.
 function CommitStagingButton({ onCommit, disabled }: { onCommit: () => void; disabled: boolean }) {
   return (
     <UIButton
       type="button"
       variant="default"
       size="sm"
-      className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
       onClick={onCommit}
       disabled={disabled}
       data-testid="canvas-commit-staging-button"
     >
       Commit
+    </UIButton>
+  );
+}
+
+function DiscardStaleStagingButton({ onDiscard, disabled }: { onDiscard: () => void; disabled: boolean }) {
+  return (
+    <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
+      Discard
     </UIButton>
   );
 }
@@ -310,18 +292,19 @@ function ExitEditButton({
   disabledTooltip?: string;
 }) {
   const button = (
-    <UIButton
+    <button
       type="button"
-      variant="ghost"
-      size="icon"
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-exit-edit-button"
-      aria-label="Exit edit"
-      className="-mr-0.5 size-8 shrink-0 p-0 text-slate-950 hover:bg-transparent hover:text-slate-900"
+      aria-label="Finish editing"
+      className="group flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <X className="size-5 stroke-[2] text-slate-950 opacity-65" aria-hidden />
-    </UIButton>
+      <span className="text-[13px] font-medium text-slate-600 dark:text-gray-400">Finish Editing</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-950 transition-colors group-hover:bg-slate-950/5 dark:text-gray-100 dark:group-hover:bg-gray-800/50">
+        <X className="h-4 w-4" aria-hidden />
+      </span>
+    </button>
   );
 
   if (disabled && disabledTooltip) {
@@ -331,82 +314,6 @@ function ExitEditButton({
           <div className="inline-flex">{button}</div>
         </TooltipTrigger>
         <TooltipContent side="top">{disabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return button;
-}
-
-function DiscardDraftButton({
-  onDiscard,
-  disabled,
-  disabledTooltip,
-}: {
-  onDiscard: () => void;
-  disabled: boolean;
-  disabledTooltip?: string;
-}) {
-  if (disabled && disabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-              Discard
-            </UIButton>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-      Discard
-    </UIButton>
-  );
-}
-
-function publishVersionButtonClassName(): string {
-  return "bg-blue-500 text-white hover:bg-blue-600 hover:opacity-95 focus-visible:ring-blue-500/40";
-}
-
-function PublishVersionButton({
-  onPublish,
-  label,
-  disabled,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-}: {
-  onPublish: () => void;
-  label: string;
-  disabled: boolean;
-  publishVersionDisabled: boolean;
-  publishVersionDisabledTooltip?: string;
-}) {
-  const button = (
-    <UIButton
-      type="button"
-      variant="default"
-      size="sm"
-      className={cn(publishVersionButtonClassName())}
-      onClick={onPublish}
-      disabled={disabled}
-      data-testid="canvas-publish-version-button"
-    >
-      {label}
-    </UIButton>
-  );
-
-  if (publishVersionDisabled && publishVersionDisabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">{button}</div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
       </Tooltip>
     );
   }

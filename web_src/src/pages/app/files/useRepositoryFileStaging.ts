@@ -95,8 +95,8 @@ export function useRepositoryFileStaging({
   pendingChanges,
   onFlushReady,
 }: UseRepositoryFileStagingOptions) {
-  const stageFiles = useStageRepositoryFiles(canvasId ?? "", versionId ?? "");
-  const discardPaths = useDiscardRepositoryFilePaths(canvasId ?? "", versionId ?? "");
+  const stageFiles = useStageRepositoryFiles(canvasId ?? "");
+  const discardPaths = useDiscardRepositoryFilePaths(canvasId ?? "");
   const stageFilesRef = useRef(stageFiles);
   stageFilesRef.current = stageFiles;
   const discardPathsRef = useRef(discardPaths);
@@ -130,6 +130,17 @@ export function useRepositoryFileStaging({
   useEffect(() => {
     stagedPathsRef.current = new Set();
   }, [versionId]);
+
+  // Leaving edit mode clears in-memory pendingChanges but keeps server staging.
+  // Drop local bookkeeping so re-entry does not treat persisted staged paths as
+  // reverted edits and DELETE them from staging.
+  useEffect(() => {
+    if (enabled) {
+      return;
+    }
+
+    stagedPathsRef.current = new Set();
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled || !canvasId || !versionId) {

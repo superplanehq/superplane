@@ -75,6 +75,7 @@ import {
   GitCommit,
   GitCommitHorizontal,
   GitMerge,
+  GitPullRequest,
   Github,
   Globe,
   Group,
@@ -120,6 +121,7 @@ import {
   RotateCw,
   Route,
   Rabbit,
+  Rss,
   ScrollText,
   Search,
   Send,
@@ -153,6 +155,7 @@ import {
   XCircle,
   Zap,
   type LucideIcon,
+  LayoutGrid,
 } from "lucide-react";
 
 const ICONS = {
@@ -233,6 +236,7 @@ const ICONS = {
   "git-commit": GitCommit,
   "git-commit-horizontal": GitCommitHorizontal,
   "git-merge": GitMerge,
+  "git-pull-request": GitPullRequest,
   github: Github,
   globe: Globe,
   group: Group,
@@ -245,6 +249,7 @@ const ICONS = {
   "key-round": KeyRound,
   layers: Layers,
   "layout-dashboard": LayoutDashboard,
+  "layout-grid": LayoutGrid,
   link: Link,
   list: List,
   "list-filter": ListFilter,
@@ -298,6 +303,7 @@ const ICONS = {
   tag: Tag,
   terminal: Terminal,
   text: Text,
+  rss: Rss,
   "scroll-text": ScrollText,
   trash: Trash,
   "trash-2": Trash2,

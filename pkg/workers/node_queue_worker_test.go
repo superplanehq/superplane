@@ -10,12 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 )
@@ -165,6 +168,17 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
+}
+
+func Test__NodeQueueWorker_SkipsMissingNode(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+
+	err := worker.tryProcessReadyNode(uuid.New(), "deleted-node", time.Now())
+	require.NoError(t, err)
 }
 
 func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
@@ -615,4 +629,243 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
+}
+
+func Test__NodeQueueWorker_DeferredQueueItemDoesNotPublishConsumed(t *testing.T) {
+	componentName := "defer_queue_item_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		ProcessQueueFunc: func(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+			if err := ctx.DeferQueueItem(); err != nil {
+				return nil, err
+			}
+			return nil, core.ErrQueueItemDeferred
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	queueItem := support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
+	require.NoError(t, err)
+
+	storedQueueItem, err := models.FindNodeQueueItem(canvas.ID, queueItem.ID)
+	require.NoError(t, err)
+	assert.Equal(t, queueItem.ID, storedQueueItem.ID)
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
+}
+
+func Test__NodeQueueWorker_SkipsQueueItemForCancellingRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
+	queueDeletedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemDeletedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	queueDeletedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+	defer queueDeletedConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	now := time.Now()
+	queueItem := models.CanvasNodeQueueItem{
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		RootEventID: rootEvent.ID,
+		RunID:       run.ID,
+		EventID:     rootEvent.ID,
+		CreatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(&queueItem).Error)
+
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+	}).Error)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
+	require.NoError(t, err)
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	var queueItemCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeQueueItem{}).Where("id = ?", queueItem.ID).Count(&queueItemCount).Error)
+	assert.Zero(t, queueItemCount)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
+	assert.True(t, queueDeletedConsumer.HasReceivedMessage())
+}
+
+func Test__NodeQueueWorker_SkipsConfigurationErrorQueueItemForCancellingRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	executionFinishedConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionFinishedRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
+	queueDeletedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemDeletedRoutingKey)
+	executionFinishedConsumer.Start()
+	queueConsumedConsumer.Start()
+	queueDeletedConsumer.Start()
+	defer executionFinishedConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+	defer queueDeletedConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"field": "{{ $[\"nonexistent-node\"].data }}",
+				}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	now := time.Now()
+	queueItem := models.CanvasNodeQueueItem{
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		RootEventID: rootEvent.ID,
+		RunID:       run.ID,
+		EventID:     rootEvent.ID,
+		CreatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(&queueItem).Error)
+
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateCancelling,
+		"cancelled_at": now,
+		"cancelled_by": r.User,
+	}).Error)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
+	require.NoError(t, err)
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	var queueItemCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeQueueItem{}).Where("id = ?", queueItem.ID).Count(&queueItemCount).Error)
+	assert.Zero(t, queueItemCount)
+
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
+
+	assert.False(t, executionFinishedConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
+	assert.True(t, queueDeletedConsumer.HasReceivedMessage())
 }

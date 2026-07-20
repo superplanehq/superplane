@@ -2,7 +2,11 @@ import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSide
 import { Button as UIButton } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PanelLeft, PanelLeftDashed } from "lucide-react";
+import { History } from "lucide-react";
+import {
+  canvasSidebarToggleActiveClassName,
+  canvasSidebarToggleInactiveClassName,
+} from "./canvasSidebarToggleClassNames";
 
 export type CanvasVersionsSidebarTriggerProps = {
   versionsSidebarState: CanvasVersionsSidebarState;
@@ -25,20 +29,14 @@ export function CanvasVersionsSidebarTrigger({ versionsSidebarState }: CanvasVer
           size="icon-xs"
           className={cn(
             "size-7 rounded-full border-0 shadow-none transition-colors",
-            isVersionsSidebarOpen
-              ? "bg-slate-200 text-foreground hover:bg-slate-200 focus-visible:bg-slate-200"
-              : "bg-slate-100 text-slate-500 hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100",
+            isVersionsSidebarOpen ? canvasSidebarToggleActiveClassName : canvasSidebarToggleInactiveClassName,
           )}
           aria-label={label}
           aria-pressed={isVersionsSidebarOpen}
           data-testid="canvas-versions-sidebar-toggle"
           onClick={handleVersionsSidebarToggle}
         >
-          {isVersionsSidebarOpen ? (
-            <PanelLeft className="size-3.5 shrink-0" />
-          ) : (
-            <PanelLeftDashed className="size-3.5 shrink-0" />
-          )}
+          <History className="size-4 shrink-0" />
         </UIButton>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={2}>

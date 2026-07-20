@@ -6,26 +6,37 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type User struct {
-	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	OrganizationID uuid.UUID
-	AccountID      *uuid.UUID
-	Email          *string
-	Name           string
-	Type           string
-	Description    *string
-	CreatedBy      *uuid.UUID
-	TokenHash      string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      gorm.DeletedAt
+	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID  uuid.UUID
+	AccountID       *uuid.UUID
+	Email           *string
+	Name            string
+	Type            string
+	Description     *string
+	CreatedBy       *uuid.UUID
+	TokenHash       string
+	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
+	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       gorm.DeletedAt
 }
 
-func (u *User) IsServiceAccount() bool {
-	return u.Type == UserTypeServiceAccount
+func (u *User) IsAPIKey() bool {
+	return u.Type == UserTypeAPIKey
+}
+
+func (u *User) IsExpiredAPIKey() bool {
+	return u.IsAPIKey() && u.APIKeyExpiresAt != nil && !time.Now().Before(*u.APIKeyExpiresAt)
+}
+
+func (u *User) HasAPIKeyCanvasScope() bool {
+	return u.IsAPIKey() && len(u.APIKeyCanvasIDs) > 0
 }
 
 func (u *User) GetEmail() string {
@@ -98,13 +109,15 @@ func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, nam
 	return user, nil
 }
 
-func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID) (*User, error) {
+func CreateAPIKey(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID, expiresAt *time.Time, canvasIDs []string) (*User, error) {
 	user := &User{
-		OrganizationID: orgID,
-		Name:           name,
-		Type:           UserTypeServiceAccount,
-		Description:    description,
-		CreatedBy:      &createdBy,
+		OrganizationID:  orgID,
+		Name:            name,
+		Type:            UserTypeAPIKey,
+		Description:     description,
+		CreatedBy:       &createdBy,
+		APIKeyExpiresAt: expiresAt,
+		APIKeyCanvasIDs: datatypes.NewJSONSlice(canvasIDs),
 	}
 
 	err := tx.Create(user).Error
@@ -115,33 +128,25 @@ func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description
 	return user, nil
 }
 
-func FindServiceAccountsByOrganization(orgID string) ([]User, error) {
-	return FindServiceAccountsByOrganizationInTransaction(database.Conn(), orgID)
-}
-
-func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) ([]User, error) {
+func FindAPIKeysByOrganization(db *gorm.DB, orgID string) ([]User, error) {
 	var users []User
 
-	err := tx.
+	err := db.
 		Where("organization_id = ?", orgID).
-		Where("type = ?", UserTypeServiceAccount).
+		Where("type = ?", UserTypeAPIKey).
 		Find(&users).
 		Error
 
 	return users, err
 }
 
-func FindUsersByIDsInOrganization(orgID string, ids []string) ([]User, error) {
-	return FindUsersByIDsInOrganizationInTransaction(database.Conn(), orgID, ids)
-}
-
-func FindUsersByIDsInOrganizationInTransaction(tx *gorm.DB, orgID string, ids []string) ([]User, error) {
+func FindUsersByIDsInOrganization(db *gorm.DB, orgID string, ids []string) ([]User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	var users []User
-	err := tx.Unscoped().
+	err := db.Unscoped().
 		Where("organization_id = ?", orgID).
 		Where("id IN ?", ids).
 		Find(&users).

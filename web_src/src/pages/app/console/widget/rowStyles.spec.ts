@@ -48,4 +48,12 @@ describe("makeRowStyleResolver", () => {
     expect(resolveMissing({})).toBe(ROW_STYLE_CLASS.dimmed);
     expect(resolveMissing({ deployedAt: "x" })).toBeUndefined();
   });
+
+  it("maps soft tones to lighter backgrounds than full tones", () => {
+    expect(ROW_STYLE_CLASS["red-soft"]).toBe("bg-red-50 dark:bg-red-950/30");
+    expect(ROW_STYLE_CLASS.red).toBe("bg-red-100 dark:bg-red-950/50");
+    expect(ROW_STYLE_CLASS["red-soft"]).not.toBe(ROW_STYLE_CLASS.red);
+    expect(ROW_STYLE_CLASS.green).toContain("dark:bg-emerald-950/50");
+    expect(ROW_STYLE_CLASS.green).not.toContain("dark:bg-gray-700");
+  });
 });

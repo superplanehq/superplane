@@ -59,10 +59,12 @@ Use this skill when working on **per-canvas dashboards**: the workflow v2 overla
 | --- | --- | --- |
 | `markdown` | GFM body with `{{ name.field }}` interpolation | `title?`, `body?`, `variables?` |
 | `html` | Sanitized HTML body with `{{ name.field }}` interpolation, scoped `<style>`, Tailwind via safelist | `title?`, `body?`, `variables?` |
-| `node` | Status chip + optional Run | `node`, `showRun?`, `triggerName?` |
+| `nodes` | Adaptive card: one entry uses the compact single-node layout; multiple entries render as a row list. Optional per-entry Run button (manual-run triggers only). | `title?`, `nodes[]` with `node`, `label?`, `description?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
+| `node` *(legacy)* | Same renderer as `nodes` — the merged card folds legacy single-node content into a one-entry list. Kept for import compatibility; migrates to `nodes` on first save. | `node`, `showRun?`, `triggerName?` |
 | `table` | `WidgetTable` | `dataSource`, `render.kind: "table"` |
 | `chart` | `WidgetChart` (SVG) | `dataSource`, `render.kind: "chart"` |
 | `number` | `WidgetNumber` | `dataSource`, `render.kind: "number"` |
+| `scorecard` | `WidgetScorecard` — single KPI only (no multi-KPI or composite memory); adds change vs the immediately previous value in the series, direction-aware target/progress, and a status-colored sparkline via the shared `Sparkline` | `dataSource`, `render.kind: "scorecard"` with `aggregation`, optional `field`, `better`, `target`, `showProgress`, `sparklineField`, `showChange`, `changeCaption` |
 
 New panels: `templateForPanelType` in `panelTypes.ts`. Draft states (e.g. empty memory namespace) should stay valid where possible.
 
@@ -90,7 +92,7 @@ Execution rows get `status`, `nodeName`, `durationMs`. Status vocabulary: `passe
 
 ### Columns
 
-Non-empty `field`; optional `label`, `format` (`text`, `number`, `status`, `relative`, `link`, …), `show`, `href`.
+Non-empty `field`; optional `label`, `format` (`text`, `number`, `status`, `relative`, `link`, `trend`, …), `show`, `href`. `format: trend` also accepts `trendBetter` (`up`/`down`, default `up`) and `trendDisplay` (`percent`/`value`/`none`, default `percent`); the cell compares against the row directly below in the filtered/sorted table (or the first already-loaded row still hidden by the progressive display window).
 
 ### Filters
 
@@ -104,9 +106,11 @@ Runtime flow: `WidgetTable` → `mergeTriggerPayload` → `onTriggerNode` → `u
 
 Legacy fields normalized in FE: `target` → `node`, `triggerName` → `template`.
 
+Manual-run gate: only the built-in `start` and `schedule` triggers expose a user-invokable `run` hook. The UI filters on `node.component` against the hardcoded allowlist in `web_src/src/pages/app/console/manualRunTriggers.ts` — `TablePanelForm` hides non-manual triggers from the dropdown, `WidgetTable` hides their row actions, and `NodesPanelCard`/`NodesPanelForm` hide the Run affordance. Backend authorization stays in `InvokeNodeTriggerHook`; adding a new manual-run trigger requires a matching entry in the frontend allowlist.
+
 ### Expressions
 
-- **`{{ CEL }}`** — `cel-js` via `widget/celExpr.ts`; row env + `now` (Unix seconds).
+- **`{{ CEL }}`** — `@marcbachmann/cel-js` via `widget/celExpr.ts`; row env + `now` (Unix seconds). The adapter upfront-coerces safe-integer JS numbers (and, on retry, numeric strings) to `BigInt` for int arithmetic, and normalizes safe-integer BigInt results back to plain `number` on the way out.
 - **Legacy** `show` — e.g. `status == "running"` (`showExpression.ts`, `rowVisibility.ts`).
 - Prefer structured `where` for simple validated filters.
 
@@ -135,6 +139,15 @@ Editor memory hints: `MemoryDiscoveryPanel.tsx`, `useMemoryCatalog.ts` (suggesti
 **Chart** `render.type`: `bar`, `stacked-bar`, `line`, `area`, `donut`. `xField` + `series[]`; omit `series[].field` to count rows per bucket.
 
 **Number** aggregations: `count`, `sum`, `avg`, `min`, `max`, `first`, `last` — non-`count` requires `field`.
+
+**Scorecard** shares the number aggregation vocabulary but is single-KPI only (no multi-KPI / composite memory). Comparison model:
+
+- **Change** = current value vs the immediately previous value in the series. The series is derived from `sparklineField` when set, or the primary `field` as a fallback. Only `first` / `last` aggregations expose a natural "previous" (adjacent anchor via `pickChangeAnchors`); combining aggregations (`sum` / `avg` / `min` / `max` / `count`) hide the chip. Reuses `computeTrend` (`widgetTrend.ts`) for percent/absolute math.
+- **Target** = literal number or `{{ CEL }}` (evaluated against the newest filtered row + `now`), used for optional `showProgress` and fallback status color.
+- `better: "up" | "down"` controls the polarity for the value change, the sparkline, and the vs-target status.
+- The form relabels the two directional aggregations as `Latest` / `Earliest` because all data sources are newest-first (`first` → Latest, `last` → Earliest). Persisted YAML still uses `first` / `last`.
+
+Helpers live in `widget/scorecardMath.ts` (`extractScorecardSeries`, `pickChangeAnchors`, `resolveScorecardTarget`, `computeScorecardProgress`, `computeScorecardChange`, `resolveScorecardStatus`, `formatScorecardChangeLabel`). Rendering is in `widget/WidgetScorecard.tsx`; the sparkline itself comes from the shared `widget/Sparkline.tsx` (shared with `WidgetNumber`) with a `className` prop for status coloring.
 
 ---
 
@@ -233,6 +246,6 @@ go test ./pkg/grpc/actions/canvases -run CanvasDashboard
 | Table CEL / filters / actions | `WidgetTable.tsx`, `celExpr.ts`, `evalTableWhere.ts`, `mergeTriggerPayload.ts` |
 | Table editor | `TablePanelForm.tsx`, `TablePanelFormRows.tsx` |
 | Trigger from dashboard | `useDashboardTriggerNode.ts`, `dashboardTriggerParameters.ts` |
-| Node status chip | `NodePanelCard.tsx`, `deriveNodeStatuses.ts` |
+| Node status chip / Run button | `NodesPanelCard.tsx`, `useConsoleRunTrigger.ts`, `useConsoleTriggerLock.ts`, `deriveNodeStatuses.ts` |
 | Header dashboard actions | `dashboardHeaderActions.ts`, `useDashboardModeActions.ts` |
 | API hooks | `web_src/src/hooks/useCanvasData.ts` — `useCanvasDashboard`, `useUpdateCanvasDashboard` |

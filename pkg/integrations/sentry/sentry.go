@@ -22,13 +22,14 @@ import (
 const (
 	DefaultBaseURL = "https://sentry.io"
 
-	ResourceTypeProject     = "project"
-	ResourceTypeTeam        = "team"
-	ResourceTypeIssue       = "issue"
-	ResourceTypeAssignee    = "assignee"
-	ResourceTypeAlert       = "alert"
-	ResourceTypeAlertTarget = "alert-target"
-	ResourceTypeRelease     = "release"
+	ResourceTypeProject           = "project"
+	ResourceTypeTeam              = "team"
+	ResourceTypeIssue             = "issue"
+	ResourceTypeAssignee          = "assignee"
+	ResourceTypeAlert             = "alert"
+	ResourceTypeAlertTarget       = "alert-target"
+	ResourceTypeRelease           = "release"
+	ResourceTypeGitHubIntegration = "github-integration"
 
 	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
 )
@@ -209,6 +210,7 @@ func (s *Sentry) Actions() []core.Action {
 		&CreateRelease{},
 		&CreateDeploy{},
 		&UpdateIssue{},
+		&LinkGitHubIssue{},
 	}
 }
 
@@ -799,6 +801,34 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 				Type: ResourceTypeRelease,
 				ID:   version,
 				Name: version,
+			})
+		}
+
+		return resources, nil
+
+	case ResourceTypeGitHubIntegration:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		integrations, err := client.ListOrganizationIntegrations("github")
+		if err != nil {
+			return nil, fmt.Errorf("failed to list github integrations: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(integrations))
+		for _, integration := range integrations {
+			id := strings.TrimSpace(integration.ID)
+			name := strings.TrimSpace(integration.Name)
+			if id == "" || name == "" {
+				continue
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeGitHubIntegration,
+				ID:   id,
+				Name: name,
 			})
 		}
 

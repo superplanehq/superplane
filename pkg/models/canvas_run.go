@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,8 +12,9 @@ import (
 )
 
 const (
-	CanvasRunStateStarted  = "started"
-	CanvasRunStateFinished = "finished"
+	CanvasRunStateStarted    = "started"
+	CanvasRunStateCancelling = "cancelling"
+	CanvasRunStateFinished   = "finished"
 
 	CanvasRunResultPassed    = "passed"
 	CanvasRunResultFailed    = "failed"
@@ -24,14 +26,30 @@ const (
 )
 
 type CanvasRun struct {
-	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	WorkflowID uuid.UUID
-	VersionID  uuid.UUID
-	State      string
-	Result     string
-	CreatedAt  *time.Time
-	UpdatedAt  *time.Time
-	FinishedAt *time.Time
+	ID          uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	WorkflowID  uuid.UUID
+	NodeID      string
+	VersionID   uuid.UUID
+	State       string
+	Result      string
+	CancelledAt *time.Time
+	CancelledBy *uuid.UUID
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	FinishedAt  *time.Time
+}
+
+type RunDeletionSummary struct {
+	Runs             int64
+	Events           int64
+	NodeExecutions   int64
+	NodeRequests     int64
+	NodeExecutionKVs int64
+	NodeQueueItems   int64
+}
+
+func (s *RunDeletionSummary) TotalRecords() int64 {
+	return s.Runs + s.Events + s.NodeExecutions + s.NodeRequests + s.NodeExecutionKVs + s.NodeQueueItems
 }
 
 func (r *CanvasRun) TableName() string {
@@ -68,11 +86,24 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
 	if rootEvent.RunID != uuid.Nil {
-		return FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
+		run, err := FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := ensureCanvasRunNodeID(tx, run, rootEvent.NodeID); err != nil {
+			return nil, err
+		}
+
+		return run, nil
 	}
 
 	run, err := FindCanvasRunByRootEventInTransaction(tx, rootEvent.ID)
 	if err == nil {
+		if err := ensureCanvasRunNodeID(tx, run, rootEvent.NodeID); err != nil {
+			return nil, err
+		}
+
 		return run, nil
 	}
 
@@ -80,7 +111,7 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
-	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, CanvasRunStateStarted, "")
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.NodeID, CanvasRunStateStarted, "")
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +124,24 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 	return run, nil
 }
 
-func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+func ensureCanvasRunNodeID(tx *gorm.DB, run *CanvasRun, nodeID string) error {
+	if run.NodeID != "" || nodeID == "" {
+		return nil
+	}
+
+	if err := tx.Model(run).Update("node_id", nodeID).Error; err != nil {
+		return err
+	}
+
+	run.NodeID = nodeID
+	return nil
+}
+
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, state, result string) (*CanvasRun, error) {
+	if nodeID == "" {
+		return nil, fmt.Errorf("node id is required")
+	}
+
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
@@ -102,6 +150,7 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	now := time.Now()
 	run := &CanvasRun{
 		WorkflowID: workflowID,
+		NodeID:     nodeID,
 		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
@@ -120,13 +169,9 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	return run, nil
 }
 
-func ListStartedCanvasRuns(limit int) ([]CanvasRun, error) {
-	return ListStartedCanvasRunsInTransaction(database.Conn(), limit)
-}
-
-func ListStartedCanvasRunsInTransaction(tx *gorm.DB, limit int) ([]CanvasRun, error) {
+func ListStartedCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 	var runs []CanvasRun
-	err := tx.
+	err := db.
 		Where("state = ?", CanvasRunStateStarted).
 		Order("updated_at ASC").
 		Limit(limit).
@@ -137,6 +182,250 @@ func ListStartedCanvasRunsInTransaction(tx *gorm.DB, limit int) ([]CanvasRun, er
 	}
 
 	return runs, nil
+}
+
+func ListCancellingCanvasRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := db.
+		Where("state = ?", CanvasRunStateCancelling).
+		Order("cancelled_at DESC").
+		Limit(limit).
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := expiredFinishedRunsQuery(db, referenceTime).
+		Scopes(
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+			oldestCanvasRunsFirst,
+		)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+
+	err := expiredFinishedRunsQuery(db, referenceTime).
+		Scopes(
+			lockCanvasRunsForUpdate,
+			withoutRunQueueItems,
+			withoutActiveRunExecutions,
+			withoutPendingRunRequests,
+		).
+		Where("workflow_runs.id = ?", runID).
+		First(&run).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := db.
+		Model(&CanvasRun{}).
+		Where("workflow_id = ?", c.ID).
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+
+	err := db.
+		Scopes(lockCanvasRunsForUpdate).
+		Where("workflow_id = ?", workflowID).
+		Where("id = ?", runID).
+		First(&run).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
+	summary := &RunDeletionSummary{}
+
+	var executionIDs []uuid.UUID
+	err := db.
+		Model(&CanvasNodeExecution{}).
+		Where("run_id = ?", r.ID).
+		Pluck("id", &executionIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executionIDs) > 0 {
+		count, err := deleteRows(db, &CanvasNodeRequest{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
+		}
+		summary.NodeRequests = count
+
+		count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
+		}
+		summary.NodeExecutionKVs = count
+
+		count, err = deleteRows(db, &CanvasEvent{}, "execution_id IN ?", executionIDs)
+		if err != nil {
+			return nil, err
+		}
+		summary.Events += count
+
+		count, err = deleteRows(db, &CanvasNodeExecution{}, "run_id = ?", r.ID)
+		if err != nil {
+			return nil, err
+		}
+		summary.NodeExecutions = count
+	}
+
+	count, err := deleteRows(db, &CanvasNodeQueueItem{}, "run_id = ?", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.NodeQueueItems = count
+
+	count, err = deleteRows(db, &CanvasEvent{}, "run_id = ?", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.Events += count
+
+	count, err = deleteRows(db, &CanvasRun{}, "id = ?", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.Runs = count
+
+	return summary, nil
+}
+
+func deleteRows(db *gorm.DB, model any, query string, args ...any) (int64, error) {
+	result := db.Where(query, args...).Delete(model)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
+func deleteRowsLimited(db *gorm.DB, model any, limit int, query string, args ...any) (int64, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	// PostgreSQL does not support DELETE ... LIMIT; select matching IDs first.
+	subQuery := db.Model(model).Select("id").Where(query, args...).Limit(limit)
+	result := db.Where("id IN (?)", subQuery).Delete(model)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
+func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+	return tx.
+		Table("workflow_runs").
+		Select("workflow_runs.*").
+		Joins("JOIN workflows ON workflow_runs.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflow_runs.state = ?", CanvasRunStateFinished).
+		Where("workflow_runs.finished_at IS NOT NULL").
+		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+}
+
+func lockCanvasRunsForUpdate(tx *gorm.DB) *gorm.DB {
+	return tx.Clauses(clause.Locking{
+		Strength: "UPDATE",
+		Table:    clause.Table{Name: "workflow_runs"},
+		Options:  "SKIP LOCKED",
+	})
+}
+
+func withoutRunQueueItems(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_queue_items
+			WHERE workflow_node_queue_items.run_id = workflow_runs.id
+		)
+	`)
+}
+
+func withoutActiveRunExecutions(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_executions
+			WHERE workflow_node_executions.run_id = workflow_runs.id
+			AND workflow_node_executions.state IN ?
+		)
+	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted, CanvasNodeExecutionStateCancelling})
+}
+
+func withoutPendingRunRequests(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_requests
+			INNER JOIN workflow_node_executions ON workflow_node_requests.execution_id = workflow_node_executions.id
+			WHERE workflow_node_executions.run_id = workflow_runs.id
+			AND workflow_node_requests.state = ?
+		)
+	`, NodeExecutionRequestStatePending)
+}
+
+func oldestCanvasRunsFirst(tx *gorm.DB) *gorm.DB {
+	return tx.Order("workflow_runs.finished_at ASC")
 }
 
 type CanvasRunFilters struct {
@@ -248,7 +537,7 @@ type OpenCanvasRunWork struct {
 	HasPendingEvents    bool
 }
 
-func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanvasRunWork, error) {
+func (r *CanvasRun) FindOpenWork(tx *gorm.DB) (*OpenCanvasRunWork, error) {
 	var result OpenCanvasRunWork
 	err := tx.Raw(`
 		SELECT
@@ -256,7 +545,7 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 				SELECT 1
 				FROM workflow_node_executions
 				WHERE run_id = ?
-				AND state IN (?, ?)
+				AND state IN (?, ?, ?)
 			) AS has_active_executions,
 			EXISTS (
 				SELECT 1
@@ -270,11 +559,12 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 				AND state = ?
 			) AS has_pending_events
 	`,
-		runID,
+		r.ID,
 		CanvasNodeExecutionStatePending,
 		CanvasNodeExecutionStateStarted,
-		runID,
-		runID,
+		CanvasNodeExecutionStateCancelling,
+		r.ID,
+		r.ID,
 		CanvasEventStatePending,
 	).Scan(&result).Error
 	if err != nil {
@@ -284,7 +574,11 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 	return &result, nil
 }
 
-func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
+func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
+	if r.State == CanvasRunStateCancelling {
+		return CanvasRunResultCancelled, nil
+	}
+
 	var result struct {
 		HasFailed    bool
 		HasCancelled bool
@@ -305,9 +599,9 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 				AND result = ?
 			) AS has_cancelled
 	`,
-		runID,
+		r.ID,
 		CanvasNodeExecutionResultFailed,
-		runID,
+		r.ID,
 		CanvasNodeExecutionResultCancelled,
 	).Scan(&result).Error
 	if err != nil {
@@ -323,4 +617,113 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 	}
 
 	return CanvasRunResultPassed, nil
+}
+
+type RunCancellationDrainResult struct {
+	RequestedExecutionIDs []uuid.UUID
+	DeletedQueueItems     []CanvasNodeQueueItem
+	SupersededEvents      []CanvasEvent
+}
+
+func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
+	executions, err := r.ListExecutionsInStates(tx, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
+	if err != nil {
+		return nil, err
+	}
+
+	requestedExecutionIDs, err := cancelNodeExecutions(tx, executions, cancelledBy)
+	if err != nil {
+		return nil, err
+	}
+
+	deletedQueueItems, err := r.DeleteQueueItems(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	supersededEvents, err := r.SupersedePendingEvents(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RunCancellationDrainResult{
+		RequestedExecutionIDs: requestedExecutionIDs,
+		DeletedQueueItems:     deletedQueueItems,
+		SupersededEvents:      supersededEvents,
+	}, nil
+}
+
+func (r *CanvasRun) SupersedePendingEvents(tx *gorm.DB) ([]CanvasEvent, error) {
+	var events []CanvasEvent
+	err := tx.
+		Where("run_id = ?", r.ID).
+		Where("state = ?", CanvasEventStatePending).
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(events) == 0 {
+		return events, nil
+	}
+
+	err = tx.
+		Model(&CanvasEvent{}).
+		Where("run_id = ?", r.ID).
+		Where("state = ?", CanvasEventStatePending).
+		Update("state", CanvasEventStateRouted).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func (r *CanvasRun) ListExecutionsInStates(tx *gorm.DB, states []string) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("workflow_id = ?", r.WorkflowID).
+		Where("run_id = ?", r.ID).
+		Where("state IN ?", states).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func (r *CanvasRun) DeleteQueueItems(tx *gorm.DB) ([]CanvasNodeQueueItem, error) {
+	var deletedQueueItems []CanvasNodeQueueItem
+	err := tx.
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
+		Where("workflow_id = ?", r.WorkflowID).
+		Where("run_id = ?", r.ID).
+		Delete(&deletedQueueItems).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return deletedQueueItems, nil
+}
+
+func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error {
+	now := time.Now()
+	r.State = CanvasRunStateCancelling
+	r.CancelledAt = &now
+	r.CancelledBy = cancelledBy
+	r.UpdatedAt = &now
+
+	return tx.Model(r).
+		Updates(map[string]any{
+			"state":        CanvasRunStateCancelling,
+			"cancelled_at": &now,
+			"cancelled_by": cancelledBy,
+			"updated_at":   &now,
+		}).
+		Error
 }

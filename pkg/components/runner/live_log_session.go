@@ -25,6 +25,7 @@ var (
 	ErrLiveLogNodeNotFound      = errors.New("node not found")
 	ErrLiveLogNotRunner         = errors.New("not a runner component")
 	ErrLiveLogBrokerTaskMissing = errors.New("broker task id missing")
+	ErrLiveLogNotConfigured     = errors.New("live logs not configured")
 )
 
 // LiveLogStreamTokenClaims is the JWT payload SuperPlane mints for browser → task-broker streaming.
@@ -46,7 +47,7 @@ type LiveLogAccessContext struct {
 	BrokerTaskID string
 }
 
-func isRunnerComponent(name string) bool {
+func IsRunnerComponent(name string) bool {
 	switch strings.TrimSpace(name) {
 	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
 		return true
@@ -85,7 +86,7 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 	}
 
 	ref := node.Ref.Data()
-	if ref.Component == nil || !isRunnerComponent(ref.Component.Name) {
+	if ref.Component == nil || !IsRunnerComponent(ref.Component.Name) {
 		return nil, ErrLiveLogNotRunner
 	}
 
@@ -100,7 +101,7 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 func taskBrokerBaseURL() (string, error) {
 	base := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
 	if base == "" {
-		return "", fmt.Errorf("TASK_BROKER_BASE_URL is not set")
+		return "", fmt.Errorf("%w: TASK_BROKER_BASE_URL is not set", ErrLiveLogNotConfigured)
 	}
 	return base, nil
 }
@@ -120,7 +121,7 @@ func LiveLogStreamURL(brokerTaskID string) (string, error) {
 func taskBrokerAuthToken() (string, error) {
 	token := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
 	if token == "" {
-		return "", fmt.Errorf("TASK_BROKER_AUTH_TOKEN is not set")
+		return "", fmt.Errorf("%w: TASK_BROKER_AUTH_TOKEN is not set", ErrLiveLogNotConfigured)
 	}
 	return token, nil
 }

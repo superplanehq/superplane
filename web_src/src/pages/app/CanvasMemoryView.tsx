@@ -49,7 +49,7 @@ export function CanvasMemoryView(props: CanvasMemoryViewProps) {
 
   return (
     <div
-      className="absolute bottom-0 top-[5rem] z-10 flex flex-col overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 flex flex-col overflow-hidden bg-slate-50 dark:bg-gray-900"
       style={{ left: leftOffset, right: 0 }}
       data-testid="memory-overlay"
     >
@@ -137,7 +137,7 @@ function CanvasMemoryViewBody({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-[13px] text-gray-500">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-[13px] text-gray-500 dark:text-gray-400">
         Loading memory entries…
       </div>
     );
@@ -155,9 +155,10 @@ function CanvasMemoryViewBody({
   return (
     <>
       {showCreateButton ? (
-        <div className="flex items-center justify-end gap-2 border-b border-slate-950/10 bg-white px-4 py-2">
+        <div className="flex items-center justify-end gap-2 border-b border-slate-950/10 bg-white px-4 py-2 dark:border-gray-700/70 dark:bg-gray-900">
           <Button
             type="button"
+            variant="outline"
             size="sm"
             onClick={handleCreateNamespaceClick}
             data-testid="memory-create-namespace-button"
@@ -224,23 +225,23 @@ function NamespaceSection({
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="group/section m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
+      className="group/section m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900"
       data-testid={`memory-namespace-section-${namespace}`}
     >
-      <div className="flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 group-data-[state=closed]/section:border-b-0">
+      <div className="flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 group-data-[state=closed]/section:border-b-0 dark:border-gray-700/70 dark:text-gray-400">
         <CollapsibleTrigger
-          className="group flex flex-1 items-center gap-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="group flex flex-1 items-center gap-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-gray-900"
           data-testid={`memory-namespace-toggle-${namespace}`}
           aria-label={`Toggle ${namespace} namespace`}
         >
           <ChevronDown
             aria-hidden="true"
-            className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90"
+            className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90 dark:text-gray-400"
           />
           <span className="flex-1 truncate text-left">Namespace: {namespace}</span>
         </CollapsibleTrigger>
         <SourceBadge source={source} />
-        <span className="shrink-0 font-sans text-[13px] font-medium text-gray-500">
+        <span className="shrink-0 font-sans text-[13px] font-medium text-gray-500 dark:text-gray-400">
           {entries.length} {entries.length === 1 ? "item" : "items"}
         </span>
         {showEdit ? (
@@ -249,7 +250,7 @@ function NamespaceSection({
             variant="ghost"
             size="icon-sm"
             onClick={onEditNamespace}
-            className="text-gray-500 hover:text-gray-900"
+            className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             title="Edit memory namespace"
             data-testid={`memory-namespace-edit-${namespace}`}
           >
@@ -265,14 +266,14 @@ function NamespaceSection({
 function SourceBadge({ source }: { source: CanvasMemoryEntrySource }) {
   if (source === "manual") {
     return (
-      <span className="rounded-full bg-blue-50 px-2 py-0.5 font-sans text-[11px] font-medium text-blue-700">
+      <span className="rounded-full bg-blue-50 px-2 py-0.5 font-sans text-[11px] font-medium text-blue-700 dark:bg-gray-800 dark:text-gray-300">
         Manual
       </span>
     );
   }
   if (source === "node") {
     return (
-      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-sans text-[11px] font-medium text-slate-600">
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-sans text-[11px] font-medium text-slate-600 dark:bg-gray-800 dark:text-gray-400">
         Node-managed
       </span>
     );
@@ -286,15 +287,22 @@ function ZeroState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () =
       role="status"
       className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center sm:px-10"
     >
-      <p className="text-base font-medium text-gray-900">No canvas memory yet</p>
-      <p className="max-w-lg text-pretty text-sm leading-relaxed text-gray-500">
-        Use memory components on your canvas—for example <span className="font-medium text-gray-700">Add Memory</span>,{" "}
-        <span className="font-medium text-gray-700">Read Memory</span>, or{" "}
-        <span className="font-medium text-gray-700">Upsert Memory</span>. After a run writes to canvas memory, entries
-        will show up here.
+      <p className="text-base font-medium text-gray-900 dark:text-gray-100">No canvas memory yet</p>
+      <p className="max-w-lg text-pretty text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        Use memory components on your canvas—for example{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-300">Add Memory</span>,{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-300">Read Memory</span>, or{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-300">Upsert Memory</span>. After a run writes to
+        canvas memory, entries will show up here.
       </p>
       {canCreate ? (
-        <Button type="button" size="sm" onClick={onCreate} data-testid="memory-create-namespace-empty-button">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCreate}
+          data-testid="memory-create-namespace-empty-button"
+        >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Create memory namespace
         </Button>
@@ -333,7 +341,7 @@ function renderNamespaceTable(
   deletingId?: string,
 ) {
   if (values.length === 0) {
-    return <div className="px-3 py-2 text-xs text-gray-500">No items</div>;
+    return <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">No items</div>;
   }
 
   const showActions = !!onDeleteEntry;
@@ -344,17 +352,17 @@ function renderNamespaceTable(
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-950/15 bg-slate-50">
+            <tr className="border-b border-slate-950/15 bg-slate-50 dark:border-gray-700/70 dark:bg-gray-900">
               {columns.map((column) => (
                 <th
                   key={column}
-                  className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                  className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
                 >
                   {column}
                 </th>
               ))}
               {showActions ? (
-                <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"></th>
+                <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"></th>
               ) : null}
             </tr>
           </thead>
@@ -362,9 +370,15 @@ function renderNamespaceTable(
             {values.map((entry, index) => {
               const item = objectValues[index];
               return (
-                <tr key={entry.id || index} className="border-b border-slate-950/15 last:border-b-0">
+                <tr
+                  key={entry.id || index}
+                  className="border-b border-slate-950/15 last:border-b-0 dark:border-gray-700/70"
+                >
                   {columns.map((column) => (
-                    <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
+                    <td
+                      key={`${index}-${column}`}
+                      className="px-3 py-2 align-middle font-mono text-xs text-gray-700 dark:text-gray-100"
+                    >
                       {formatValue(item[column])}
                     </td>
                   ))}
@@ -378,7 +392,7 @@ function renderNamespaceTable(
                         onClick={() => {
                           if (entry.id) onDeleteEntry?.(entry.id);
                         }}
-                        className="text-gray-500 hover:text-red-600"
+                        className="text-gray-500 hover:text-red-600 dark:text-gray-400"
                         title="Delete entry"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -398,19 +412,24 @@ function renderNamespaceTable(
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-950/15 bg-slate-50">
-            <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+          <tr className="border-b border-slate-950/15 bg-slate-50 dark:border-gray-700/70 dark:bg-gray-900">
+            <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Value
             </th>
             {showActions ? (
-              <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"></th>
+              <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"></th>
             ) : null}
           </tr>
         </thead>
         <tbody>
           {values.map((entry, index) => (
-            <tr key={entry.id || index} className="border-b border-slate-950/15 last:border-b-0">
-              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
+            <tr
+              key={entry.id || index}
+              className="border-b border-slate-950/15 last:border-b-0 dark:border-gray-700/70"
+            >
+              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700 dark:text-gray-100">
+                {formatValue(entry.values)}
+              </td>
               {showActions ? (
                 <td className="px-3 py-2 text-right align-middle">
                   <Button
@@ -421,7 +440,7 @@ function renderNamespaceTable(
                     onClick={() => {
                       if (entry.id) onDeleteEntry?.(entry.id);
                     }}
-                    className="text-gray-500 hover:text-red-600"
+                    className="text-gray-500 hover:text-red-600 dark:text-gray-400"
                     title="Delete entry"
                   >
                     <Trash2 className="h-4 w-4" />

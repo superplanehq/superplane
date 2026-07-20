@@ -23,13 +23,21 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.1}"
 
+# shellcheck source=../lib/image-build-prerequisites.sh
+source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
+
 cd "${REPO_ROOT}"
 
-if [ ! -f "pkg/protos/me/me.pb.go" ] || [ ! -f "pkg/protos/me/me.pb.gw.go" ]; then
-  echo "Generating protobuf files"
+require_release_image_build_prerequisites
+
+if generated_release_build_inputs_missing; then
+  echo "Generating release build artifacts"
   make dev.up
   make pb.gen.models
   make pb.gen.gateway
+  make openapi.spec.gen
+  make dev.setup.npm
+  make openapi.web.client.gen
 fi
 
 bash "${SCRIPT_DIR}/download-supergit.sh" "${SUPERGIT_VERSION}" "${ARCH}"

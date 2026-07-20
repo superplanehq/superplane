@@ -234,6 +234,14 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "GET with maximum timeout",
+			config: map[string]any{
+				"method":         "GET",
+				"url":            "https://api.example.com",
+				"timeoutSeconds": int(MaxTimeout.Seconds()),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -261,6 +269,24 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			name:      "missing method",
 			config:    map[string]any{"url": "https://api.example.com"},
 			expectErr: "method is required",
+		},
+		{
+			name: "timeout below minimum",
+			config: map[string]any{
+				"method":         "GET",
+				"url":            "https://api.example.com",
+				"timeoutSeconds": 0,
+			},
+			expectErr: "timeout seconds must be greater than or equal to 1",
+		},
+		{
+			name: "timeout above maximum",
+			config: map[string]any{
+				"method":         "GET",
+				"url":            "https://api.example.com",
+				"timeoutSeconds": int(MaxTimeout.Seconds()) + 1,
+			},
+			expectErr: "timeout seconds must be less than or equal to 300",
 		},
 		{
 			name: "JSON contentType without json field",

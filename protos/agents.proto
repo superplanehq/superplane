@@ -36,6 +36,17 @@ service Agents {
     };
   }
 
+  rpc ResetCanvasAgentChat(ResetCanvasAgentChatRequest) returns (ResetCanvasAgentChatResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/canvases/{canvas_id}/chat/reset"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reset the user's chat for a canvas";
+      description: "Deletes the current chat session and messages, then provisions a brand-new session. Used by the `/clear` command.";
+      tags: "Agent";
+    };
+  }
+
   rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/agents/chats/{chat_id}/messages"
@@ -98,6 +109,14 @@ message GetCanvasAgentChatResponse {
   AgentChatInfo chat = 1;
 }
 
+message ResetCanvasAgentChatRequest {
+  string canvas_id = 1;
+}
+
+message ResetCanvasAgentChatResponse {
+  AgentChatInfo chat = 1;
+}
+
 message ListAgentChatMessagesRequest {
   string chat_id = 1;
   string before_id = 2;
@@ -114,6 +133,7 @@ message SendAgentChatMessageRequest {
   string content = 2;
   AgentMode mode = 3;
   repeated AgentChatImage images = 4;
+  bool auto_layout_on_update_enabled = 5;
 }
 
 enum AgentChatImageMediaType {
@@ -177,4 +197,6 @@ message AgentRunFinishedMessage {
   int64 total_tokens = 6;
   int64 cache_read_tokens = 7;
   int64 cache_write_tokens = 8;
+  string idempotency_key = 9;
+  string session_id = 10;
 }

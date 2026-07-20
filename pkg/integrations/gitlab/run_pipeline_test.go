@@ -11,6 +11,37 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func Test__RunPipeline__Setup(t *testing.T) {
+	r := &RunPipeline{}
+
+	t.Run("expression project is rejected", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project": "{{ $['On Merge Request'].data.project.id }}",
+				"ref":     "main",
+			},
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+		}
+		err := r.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "project does not support expressions")
+	})
+
+	t.Run("missing project", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"ref": "main",
+			},
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+		}
+		err := r.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "project is required")
+	})
+}
+
 func Test__RunPipeline__Execute(t *testing.T) {
 	component := &RunPipeline{}
 	metadataCtx := &contexts.MetadataContext{}

@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { Code2, FileCode, FilePlus, Plus } from "lucide-react";
+import { FileCode, FilePlus, Plus } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
@@ -15,7 +16,6 @@ export type RightSideControlsProps = {
 
   onSidebarOpen?: () => void;
   onAddNote?: () => void | Promise<void>;
-  onYamlOpen?: () => void;
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
   consoleYamlReadOnly?: boolean;
@@ -24,10 +24,11 @@ export type RightSideControlsProps = {
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
   if (props.mode === "live") return null;
 
-  const railClassName =
-    props.layout === "embedded"
-      ? "flex w-9 shrink-0 flex-col items-center gap-1.5 border-l border-slate-950/15 bg-slate-100 py-2"
-      : "absolute inset-y-0 right-0 z-10 flex w-9 flex-col items-center gap-1.5 border-l border-slate-950/15 bg-slate-100 py-2";
+  const railClassName = cn(
+    "flex w-9 flex-col items-center gap-1.5 border-l bg-slate-100 py-2 dark:bg-gray-900",
+    appDarkModeClasses.sidebarEdge,
+    props.layout === "embedded" ? "shrink-0" : "absolute inset-y-0 right-0 z-10",
+  );
 
   return (
     <div className={railClassName}>
@@ -41,7 +42,6 @@ function EditModeButtons({
   consoleEditControls,
   onSidebarOpen,
   onAddNote,
-  onYamlOpen,
   onConsoleAddPanel,
   onConsoleOpenYaml,
   consoleYamlReadOnly,
@@ -81,15 +81,6 @@ function EditModeButtons({
           testId="canvas-add-component-button"
           icon={<Plus className="h-3.5 w-3.5" />}
         />
-        {onYamlOpen ? (
-          <ControlButton
-            tooltip="View, copy, download, or import this canvas as YAML"
-            onClick={onYamlOpen}
-            testId="canvas-yaml-button"
-            ariaLabel="View / Import YAML"
-            icon={<FileCode className="h-3.5 w-3.5" />}
-          />
-        ) : null}
         <ControlButton
           tooltip="Add Note"
           onClick={() => onAddNote?.()}
@@ -114,14 +105,6 @@ function EditModeButtons({
         testId="add-note-button"
         icon={<FilePlus className="h-3.5 w-3.5" />}
       />
-      {onYamlOpen ? (
-        <ControlButton
-          tooltip="YAML"
-          onClick={onYamlOpen}
-          testId="open-yaml-modal-button"
-          icon={<Code2 className="h-3.5 w-3.5" />}
-        />
-      ) : null}
     </>
   );
 }
@@ -146,7 +129,7 @@ function ControlButton({ tooltip, onClick, testId, icon, ariaLabel }: ControlBut
           aria-label={ariaLabel ?? tooltip}
           data-testid={testId}
           className={cn(
-            "h-7 w-7 shrink-0 rounded-md border-0 shadow-none text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+            "h-7 w-7 shrink-0 rounded-md border-0 shadow-none text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
           )}
         >
           {icon}

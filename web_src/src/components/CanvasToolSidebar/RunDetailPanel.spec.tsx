@@ -20,11 +20,6 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
-vi.mock("@/components/TimeAgo", () => ({
-  TimeAgo: () => <span>time ago</span>,
-  renderTimeAgo: () => "time ago",
-}));
-
 vi.mock("sonner", () => ({
   toast: { success: vi.fn() },
 }));

@@ -63,7 +63,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read, create drafts, update the current SuperPlane app canvas, and manage app repository files. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft and file write actions require version_id and update that selected draft branch."
+	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas/Console/repository file changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -73,39 +73,47 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, update_draft to save canvas_yaml and/or console_yaml to a selected draft, and list_integrations for connected integration IDs.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current effective staged YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, write_file/delete_file to stage normal file changes, patch_staging to apply graph edits, Console updates, or auto-layout without sending full canvas YAML, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
 			},
 			"canvas_id": {
 				Type:        "string",
 				Description: "Optional safety check. If provided, it must match the current session canvas_id from the preamble.",
 			},
-			"use_draft": {
-				Type:        "boolean",
-				Description: "For read. Defaults to true: return the current user's draft when exactly one exists, otherwise live. If multiple owned drafts exist, pass version_id or set use_draft=false.",
-			},
 			"version_id": {
 				Type:        "string",
-				Description: "For read, read_file, write_file, delete_file, commit_files, and update_draft. Draft version ID returned by read, create_draft, or a previous update_draft. Required for update_draft and file write/commit actions. If read returns source live with no version_id, call create_draft before updating. For read/read_file, use it to select a specific draft when multiple owned drafts exist. The backend validates that it belongs to the current user and canvas and is still a registered draft branch.",
+				Description: "Optional live version ID returned by read or a previous staging action. When provided, it must match the canvas live version. Most staging actions work without it.",
 			},
 			"draft_version_id": {
 				Type:        "string",
-				Description: "Alias for version_id for read, read_file, write_file, delete_file, commit_files, and update_draft. Use only one of version_id or draft_version_id.",
-			},
-			"display_name": {
-				Type:        "string",
-				Description: "For create_draft. Optional user-facing draft display name. If omitted, the backend assigns the next Draft #N name.",
+				Description: "Alias for version_id. Use only one of version_id or draft_version_id.",
 			},
 			"include_console": {
 				Type:        "boolean",
 				Description: "For read. Include console.yaml in the response.",
 			},
+			"include_canvas_yaml": {
+				Type:        "boolean",
+				Description: "For read. Defaults to false so read stays compact; set true only when you need the complete canvas.yaml text. Compact reads still return summary, version_id, canvas_yaml_bytes, and canvas_yaml_omitted.",
+			},
 			"include_integrations": {
 				Type:        "boolean",
 				Description: "For read. Include connected integration IDs, names, vendors, and state.",
 			},
+			"integration_id": {
+				Type:        "string",
+				Description: "For list_resources. Connected integration ID returned by list_integrations or read with include_integrations.",
+			},
+			"resource_type": {
+				Type:        "string",
+				Description: "For list_resources. Integration resource type to list, for example repository, model, project, workflow, service, or application. Use the resource type requested by the component schema field.",
+			},
+			"parameters": {
+				Type:        "object",
+				Description: "For list_resources. Optional provider-specific string parameters. The backend also receives resource_type as parameter type.",
+			},
 			"path": {
 				Type:        "string",
-				Description: "For read_file, write_file, and delete_file. Repository-relative app file path, such as AGENTS.md, README.md, or scripts/runner.py. Paths under .superplane and unsafe paths are rejected. Use update_draft for canvas.yaml and console.yaml.",
+				Description: "For read_file, write_file, and delete_file. Repository-relative app file path, such as AGENTS.md, README.md, or scripts/runner.py. Paths under .superplane and unsafe paths are rejected. Use patch_staging for canvas.yaml and console.yaml.",
 			},
 			"paths": {
 				Type:        "array",
@@ -114,28 +122,25 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"content": {
 				Type:        "string",
-				Description: "For write_file. Complete file content to stage on the selected draft version.",
-			},
-			"message": {
-				Type:        "string",
-				Description: "For commit_files. Optional commit message for staged repository file changes; defaults to Update files.",
+				Description: "For write_file. Complete file content to stage.",
 			},
 			"query": {
 				Type:        "string",
 				Description: "For list_files. Optional case-insensitive path filter, for example AGENTS.md or README.",
 			},
-			"canvas_yaml": {
-				Type:        "string",
-				Description: "For update_draft. Complete canonical live canvas.yaml content to save. Unknown fields are rejected; do not include template-only or UI-only fields such as metadata.isTemplate.",
-			},
 			"console_yaml": {
 				Type:        "string",
-				Description: "For update_draft. Complete canonical console.yaml content to save.",
+				Description: "For patch_staging. Complete canonical console.yaml content to stage alongside graph patch operations or by itself.",
 			},
+			"patch_operations": patchOperationsSchema(),
 			"auto_layout": {
 				Type:        "object",
-				Description: "Optional auto-layout settings for canvas_yaml updates. If omitted for a canvas_yaml update, the backend applies horizontal full-canvas auto-layout by default. Omit this for console-only updates.",
+				Description: "Optional patch_staging auto-layout settings. If omitted for graph patch operations, the backend applies horizontal connected-component layout seeded by affected nodes and edge endpoints. Pass enabled false to preserve existing positions, scope full_canvas to re-layout the whole graph, or connected_component with node_ids to choose seeds. Passing enabled true without patch_operations applies layout only.",
 				Properties: map[string]agents.CustomToolInputSchema{
+					"enabled": {
+						Type:        "boolean",
+						Description: "Set false to disable auto-layout for this patch and preserve explicit/current node positions.",
+					},
 					"scope": {
 						Type: "string",
 						Enum: []string{"full_canvas", "connected_component"},
@@ -148,8 +153,8 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"resource": {
 				Type:        "string",
-				Enum:        []string{"memory", "runs", "event_executions", "node_executions", "node_queue_items", "node_events"},
-				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read.",
+				Enum:        []string{"memory", "runs", "event_executions", "node_executions", "node_queue_items", "node_events", "runner_logs"},
+				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read. Use runner_logs to fetch bounded logs for a runner execution, run, or latest node execution.",
 			},
 			"namespace": {
 				Type:        "string",
@@ -165,11 +170,15 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"execution_id": {
 				Type:        "string",
-				Description: "Reserved for future runtime resources that target a specific execution.",
+				Description: "For read_runtime resource runner_logs. Fetch logs for a specific node execution.",
+			},
+			"run_id": {
+				Type:        "string",
+				Description: "For read_runtime resource runner_logs. Fetch logs for runner executions in a run; combine with node_id to target one node in that run.",
 			},
 			"limit": {
 				Type:        "integer",
-				Description: "For read_runtime paginated resources. Backend defaults apply when omitted.",
+				Description: "For read_runtime paginated resources, runner_logs, and list_resources. Backend defaults apply when omitted; list_resources and runner_logs cap results to keep responses concise.",
 			},
 			"before": {
 				Type:        "string",
@@ -187,6 +196,99 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 		},
 		Required: []string{"action"},
+	}
+}
+
+func patchOperationsSchema() agents.CustomToolInputSchema {
+	return agents.CustomToolInputSchema{
+		Type:        "array",
+		Description: "For patch_staging. Ordered graph edits applied without sending full canvas YAML. Supported op values: add_node, update_node, delete_node, add_edge, delete_edge. Aliases replace_node/remove_node/remove_edge are accepted. update_node can change name, configuration, position, and is_collapsed; it can assign the first component to a placeholder node that has no component yet. Use delete_node plus add_node for all other component/integration replacements.",
+		Items: &agents.CustomToolInputSchema{
+			Type: "object",
+			Properties: map[string]agents.CustomToolInputSchema{
+				"op": {
+					Type:        "string",
+					Enum:        []string{"add_node", "update_node", "delete_node", "add_edge", "delete_edge", "replace_node", "remove_node", "remove_edge"},
+					Description: "Patch operation to apply.",
+				},
+				"node_id": {
+					Type:        "string",
+					Description: "For delete_node, or as an ID fallback for update_node and top-level position updates.",
+				},
+				"node": patchNodeSchema(),
+				"position": {
+					Type:        "object",
+					Description: "For add_node or update_node. Agent-friendly alias for node.position; node.position takes effect when this field is omitted.",
+					Properties: map[string]agents.CustomToolInputSchema{
+						"x": {Type: "integer"},
+						"y": {Type: "integer"},
+					},
+				},
+				"edge": patchEdgeSchema(),
+			},
+			Required: []string{"op"},
+		},
+	}
+}
+
+func patchNodeSchema() agents.CustomToolInputSchema {
+	return agents.CustomToolInputSchema{
+		Type:        "object",
+		Description: "Node payload for add_node or update_node.",
+		Properties: map[string]agents.CustomToolInputSchema{
+			"id": {
+				Type:        "string",
+				Description: "Stable node ID.",
+			},
+			"name": {
+				Type:        "string",
+				Description: "Human-readable node name.",
+			},
+			"component": {
+				Type:        "string",
+				Description: "Component, trigger, or widget block name for add_node, for example http, noop, or github.createIssue. update_node ignores component.",
+			},
+			"configuration": {
+				Type:        "object",
+				Description: "Node configuration object. For update_node, this replaces the existing configuration when provided.",
+			},
+			"integration_id": {
+				Type:        "string",
+				Description: "Connected integration ID required for non-core blocks on add_node. update_node ignores integration_id.",
+			},
+			"position": {
+				Type: "object",
+				Properties: map[string]agents.CustomToolInputSchema{
+					"x": {Type: "integer"},
+					"y": {Type: "integer"},
+				},
+			},
+			"is_collapsed": {
+				Type:        "boolean",
+				Description: "Whether the node is collapsed in the editor.",
+			},
+		},
+	}
+}
+
+func patchEdgeSchema() agents.CustomToolInputSchema {
+	return agents.CustomToolInputSchema{
+		Type:        "object",
+		Description: "Edge payload for add_edge or delete_edge. channel defaults to default when omitted.",
+		Properties: map[string]agents.CustomToolInputSchema{
+			"source_id": {
+				Type:        "string",
+				Description: "Source node ID.",
+			},
+			"target_id": {
+				Type:        "string",
+				Description: "Target node ID.",
+			},
+			"channel": {
+				Type:        "string",
+				Description: "Source output channel. Defaults to default.",
+			},
+		},
 	}
 }
 

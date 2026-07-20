@@ -80,7 +80,6 @@ function SettingsTabPlayground() {
       onOpenConfigureIntegrationDialog={(integrationId) =>
         console.log("Open integration configuration dialog", integrationId)
       }
-      configurationSaveMode="manual"
     />
   );
 }
@@ -117,7 +116,6 @@ function ReadOnlyConfigurationPlayground() {
         icon: "github",
       }}
       autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
-      configurationSaveMode="manual"
       readOnly={true}
     />
   );

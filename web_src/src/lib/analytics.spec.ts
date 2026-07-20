@@ -95,19 +95,6 @@ describe("analytics", () => {
     });
   });
 
-  it("captures yaml export", () => {
-    analytics.yamlExport("canvas-123", "org-123");
-    expect(capture).toHaveBeenCalledWith("canvas:yaml_export", {
-      canvas_id: "canvas-123",
-      organization_id: "org-123",
-    });
-  });
-
-  it("captures yaml import", () => {
-    analytics.yamlImport();
-    expect(capture).toHaveBeenCalledWith("canvas:yaml_import", {});
-  });
-
   it("captures node add action", () => {
     analytics.nodeAdd("action", "github", "github.create_issue", "org-123");
     expect(capture).toHaveBeenCalledWith("canvas:node_add", {

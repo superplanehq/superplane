@@ -6,21 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDefaultAgentPromptWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {
+func TestAgentPromptIncludesPatchStagingGuidance(t *testing.T) {
 	prompt := DefaultAgentPrompt()
 
-	assert.Contains(t, prompt, "canonical live Canvas YAML")
-	assert.Contains(t, prompt, "metadata.isTemplate")
-	assert.Contains(t, prompt, "unknown field")
-}
-
-func TestDefaultAgentPromptGuidesRepositoryFileContextDiscovery(t *testing.T) {
-	prompt := DefaultAgentPrompt()
-
-	assert.Contains(t, prompt, "list_files")
-	assert.Contains(t, prompt, "AGENTS.md")
-	assert.Contains(t, prompt, "read_file")
-	assert.Contains(t, prompt, "write_file")
-	assert.Contains(t, prompt, "commit_files")
-	assert.Contains(t, prompt, "Use `update_draft`, not `write_file`, for `canvas.yaml` and `console.yaml`")
+	assert.Contains(t, prompt, "Use `patch_staging` operations")
+	assert.NotContains(t, prompt, "commit_files")
+	assert.Contains(t, prompt, "Use `patch_staging`, not `write_file`, for `canvas.yaml` and `console.yaml`")
+	assert.Contains(t, prompt, `auto_layout: {"enabled": false}`)
+	assert.Contains(t, prompt, "Do not change an existing node's implementation in place")
+	assert.Contains(t, prompt, "assigning its first implementation is allowed")
+	assert.Contains(t, prompt, "stage `delete_node` for the old node and `add_node` for the new one")
+	assert.Contains(t, prompt, ":::staging-actions")
 }

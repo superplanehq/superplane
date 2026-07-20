@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -21,8 +22,9 @@ type RunStateWebsocketEvent struct {
 }
 
 const (
-	RunStartedEvent  = "run_started"
-	RunFinishedEvent = "run_finished"
+	RunStartedEvent    = "run_started"
+	RunCancellingEvent = "run_cancelling"
+	RunFinishedEvent   = "run_finished"
 )
 
 func HandleCanvasRun(messageBody []byte, wsHub *ws.Hub) error {
@@ -40,6 +42,8 @@ func runStateToWsEvent(runState string) string {
 	switch runState {
 	case models.CanvasRunStateStarted:
 		return RunStartedEvent
+	case models.CanvasRunStateCancelling:
+		return RunCancellingEvent
 	case models.CanvasRunStateFinished:
 		return RunFinishedEvent
 	default:
@@ -58,7 +62,8 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to parse run id: %w", err)
 	}
 
-	run, err := models.FindCanvasRunInTransaction(database.Conn(), workflowUUID, runUUID)
+	db := database.Conn()
+	run, err := models.FindCanvasRunInTransaction(db, workflowUUID, runUUID)
 	if err != nil {
 		return fmt.Errorf("failed to find run: %w", err)
 	}
@@ -68,28 +73,55 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 		return fmt.Errorf("unknown run state: %s", run.State)
 	}
 
-	executions, err := models.ListExecutionsForRunsInTransaction(database.Conn(), workflowUUID, []uuid.UUID{runUUID})
-	if err != nil {
-		return fmt.Errorf("failed to find run executions: %w", err)
-	}
-
+	var executions []models.CanvasNodeExecution
+	var queueItems []models.CanvasNodeQueueItem
 	var rootEvent models.CanvasEvent
-	err = database.Conn().
-		Where("workflow_id = ?", workflowUUID).
-		Where("run_id = ?", runUUID).
-		Where("execution_id IS NULL").
-		First(&rootEvent).
-		Error
-	if err != nil {
-		return fmt.Errorf("failed to find run root event: %w", err)
+
+	var g errgroup.Group
+	g.Go(func() error {
+		var err error
+		executions, err = models.ListExecutionsForRunsInTransaction(database.Conn(), workflowUUID, []uuid.UUID{runUUID})
+		if err != nil {
+			return fmt.Errorf("failed to find run executions: %w", err)
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		queueItems, err = models.ListNodeQueueItemsForRuns(database.Conn(), workflowUUID, []uuid.UUID{runUUID})
+		if err != nil {
+			return fmt.Errorf("failed to find run queue items: %w", err)
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		err := database.Conn().
+			Where("workflow_id = ?", workflowUUID).
+			Where("run_id = ?", runUUID).
+			Where("execution_id IS NULL").
+			First(&rootEvent).
+			Error
+		if err != nil {
+			return fmt.Errorf("failed to find run root event: %w", err)
+		}
+
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
-	serializedRun, err := canvases.SerializeCanvasRun(*run, rootEvent, executions)
+	serializedRun, err := canvases.SerializeCanvasRun(db, *run, rootEvent, executions, queueItems)
 	if err != nil {
 		return fmt.Errorf("failed to serialize run: %w", err)
 	}
 
-	serializedRunJSON, err := protojson.Marshal(serializedRun)
+	serializedRunJSON, err := marshalCanvasRunJSON(serializedRun)
 	if err != nil {
 		return fmt.Errorf("failed to marshal run: %w", err)
 	}
@@ -106,4 +138,8 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
 	return nil
+}
+
+func marshalCanvasRunJSON(run *pb.CanvasRun) ([]byte, error) {
+	return protojson.MarshalOptions{EmitUnpopulated: true}.Marshal(run)
 }

@@ -212,14 +212,12 @@ func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
 		}
 
 		return tx.Create(&CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  canvas.ID,
-			State:       CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]Node{}),
-			Edges:       datatypes.NewJSONSlice([]Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			Nodes:      datatypes.NewJSONSlice([]Node{}),
+			Edges:      datatypes.NewJSONSlice([]Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 }
@@ -254,7 +252,7 @@ func TestListActiveUsersByOrganization(t *testing.T) {
 		assert.Equal(t, "Test User", users[0].Name)
 	})
 
-	t.Run("excludes service accounts", func(t *testing.T) {
+	t.Run("excludes API keys", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
 		org, err := CreateOrganization("SA Test Org", "")
@@ -271,7 +269,7 @@ func TestListActiveUsersByOrganization(t *testing.T) {
 			OrganizationID: org.ID,
 			Email:          &saEmail,
 			Name:           "Bot",
-			Type:           UserTypeServiceAccount,
+			Type:           UserTypeAPIKey,
 		}
 		err = database.Conn().Create(sa).Error
 		require.NoError(t, err)

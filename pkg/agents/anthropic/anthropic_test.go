@@ -429,6 +429,50 @@ func TestSendMessage_MapsDeletedSessionBadRequestToUnavailableSession(t *testing
 	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
 }
 
+func TestSendMessage_MapsPayloadTooLargeToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"request payload is too large"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_MapsImageSizeLimitErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image content exceeds the model limit"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_DoesNotMapUnrelatedImageErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image service temporarily unavailable"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrInvalidRequest)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
 func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -580,7 +624,7 @@ func TestToolSchemaRevision_ReturnsStableRevision(t *testing.T) {
 	second := p.ToolSchemaRevision()
 
 	assert.Equal(t, first, second)
-	assert.Contains(t, first, "agent-tools-v1:")
+	assert.Contains(t, first, "agent-tools-v1.2.0:")
 }
 
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {
@@ -791,6 +835,47 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
 	assert.Equal(t, agents.ProviderEventAssistantMessage, received[2].Type)
 	assert.Equal(t, "after pause", received[2].Text)
+}
+
+func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *testing.T) {
+	consoleYAML := strings.Repeat("x", 70*1024)
+	input := map[string]any{
+		"action":       "patch_staging",
+		"version_id":   "draft-version",
+		"console_yaml": consoleYAML,
+	}
+	event := map[string]any{
+		"id":    "evt_custom",
+		"type":  "agent.custom_tool_use",
+		"name":  "superplane_app",
+		"input": input,
+	}
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	require.Greater(t, len(payload), 64*1024)
+
+	sse := "data: " + string(payload) + "\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Contains(t, received[0].CustomToolUse.Input, consoleYAML)
+	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
 }
 
 func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {

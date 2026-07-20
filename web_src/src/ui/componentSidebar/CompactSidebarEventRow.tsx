@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSidebarRowLayout";
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
@@ -12,9 +12,10 @@ import { SidebarEventActionsMenu } from "./SidebarEventItem/SidebarEventActionsM
 
 interface CompactSidebarEventRowProps {
   event: SidebarEvent;
+  selectionNodeId?: string;
   runId?: string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
@@ -30,6 +31,7 @@ function isRunNavigableEvent(event: SidebarEvent): boolean {
 
 export function CompactSidebarEventRow({
   event,
+  selectionNodeId,
   runId,
   fetchRunId,
   onSelectRun,
@@ -71,6 +73,16 @@ export function CompactSidebarEventRow({
   const showActionsMenu = showCancel || showReEmit;
   const isSelectable = Boolean(onSelectRun && isRunNavigableEvent(event) && (runId || fetchRunId));
   const runHref = organizationId && appId && runId ? appPath(organizationId, appId, `?run=${runId}`) : null;
+  const runSelectionNodeId = event.nodeId || selectionNodeId;
+
+  const selectResolvedRun = (selectedRunId: string) => {
+    if (runSelectionNodeId) {
+      onSelectRun?.(selectedRunId, { nodeId: runSelectionNodeId });
+      return;
+    }
+
+    onSelectRun?.(selectedRunId);
+  };
 
   const selectRun = async () => {
     if (!onSelectRun || isResolvingRef.current) {
@@ -80,7 +92,7 @@ export function CompactSidebarEventRow({
     isResolvingRef.current = true;
     try {
       if (runId) {
-        onSelectRun(runId);
+        selectResolvedRun(runId);
         return;
       }
 
@@ -90,7 +102,7 @@ export function CompactSidebarEventRow({
 
       const resolvedRunId = await fetchRunId(event);
       if (resolvedRunId) {
-        onSelectRun(resolvedRunId);
+        selectResolvedRun(resolvedRunId);
       }
     } finally {
       isResolvingRef.current = false;
@@ -106,6 +118,19 @@ export function CompactSidebarEventRow({
     clickEvent.stopPropagation();
     void selectRun();
   };
+  const handleTimestampClick = (clickEvent: MouseEvent<HTMLSpanElement>) => {
+    if (isNormalClick(clickEvent)) {
+      clickEvent.preventDefault();
+      clickEvent.stopPropagation();
+      void selectRun();
+      return;
+    }
+
+    clickEvent.stopPropagation();
+    if (runHref) {
+      window.open(runHref, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <div
@@ -115,7 +140,7 @@ export function CompactSidebarEventRow({
       className={cn(
         RUNS_SIDEBAR_ROW_CLASS,
         "group relative w-full transition-colors",
-        isSelectable ? "cursor-pointer hover:bg-gray-50" : "cursor-default",
+        isSelectable ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800" : "cursor-default",
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -148,7 +173,9 @@ export function CompactSidebarEventRow({
           title={eventStateStyle.label || event.state || "neutral"}
           className={cn("inline-block h-2 w-2 shrink-0 rounded-full", eventStateStyle.badgeColor)}
         />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{event.title}</span>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-gray-100">
+          {event.title}
+        </span>
       </span>
       {showActionsMenu && (isHovered || isDropdownOpen) ? (
         <div className="relative z-10 shrink-0" onClick={(clickEvent) => clickEvent.stopPropagation()}>
@@ -168,8 +195,12 @@ export function CompactSidebarEventRow({
         </div>
       ) : null}
       {event.receivedAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
-          <TimeAgo date={event.receivedAt} includeAgo={false} />
+        <span
+          className="relative z-20 shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400"
+          onClick={handleTimestampClick}
+          onAuxClick={handleTimestampClick}
+        >
+          <Timestamp date={event.receivedAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
     </div>

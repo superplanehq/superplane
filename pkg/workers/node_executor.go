@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -37,6 +38,7 @@ type NodeExecutor struct {
 	registry       *registry.Registry
 	gitProvider    gitprovider.Provider
 	authService    authorization.Authorization
+	oidcProvider   oidc.Provider
 	baseURL        string
 	webhookBaseURL string
 	semaphore      *semaphore.Weighted
@@ -46,11 +48,12 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, oidcProvider oidc.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
 		gitProvider:    gitProvider,
+		oidcProvider:   oidcProvider,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
@@ -352,6 +355,8 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
 		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
+		OIDC:        w.oidcProvider,
+		Apps:        contexts.NewAppExecutionContext(tx, workflow, node),
 	}
 
 	if node.AppInstallationID != nil {

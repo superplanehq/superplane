@@ -15,17 +15,45 @@ export type InfiniteRunsPage = {
   lastTimestamp?: string;
 };
 
+/**
+ * Returns a cached infinite-runs page for `pageParam` when it is still valid
+ * against page 1's `totalCount`. Used during full refetches so tail pages are
+ * not re-fetched when the canvas total is unchanged.
+ */
+export function reuseCachedInfiniteRunsPage(
+  cached: InfiniteData<InfiniteRunsPage> | undefined,
+  pageParam: string,
+  authoritativeTotal: number | undefined,
+): InfiniteRunsPage | undefined {
+  if (!cached) return undefined;
+
+  const index = cached.pageParams.findIndex((p) => p === pageParam);
+  if (index < 0) return undefined;
+
+  const cachedPage = cached.pages[index];
+  if (cachedPage === undefined) return undefined;
+
+  if (authoritativeTotal !== undefined && cachedPage.totalCount !== authoritativeTotal) {
+    return undefined;
+  }
+
+  if (authoritativeTotal === undefined) return cachedPage;
+  return { ...cachedPage, totalCount: authoritativeTotal };
+}
+
 const RUN_STATE_ORDER: Record<CanvasesCanvasRunState, number> = {
   STATE_UNKNOWN: 0,
   STATE_STARTED: 1,
-  STATE_FINISHED: 2,
+  STATE_CANCELLING: 2,
+  STATE_FINISHED: 3,
 };
 
 const EXECUTION_STATE_ORDER: Record<string, number> = {
   STATE_UNKNOWN: 0,
   STATE_PENDING: 1,
   STATE_STARTED: 2,
-  STATE_FINISHED: 3,
+  STATE_CANCELLING: 3,
+  STATE_FINISHED: 4,
 };
 
 export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): CanvasRunsFilters {
@@ -86,8 +114,8 @@ function parseTimestamp(value: string | undefined): number {
 }
 
 function shouldAcceptRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): boolean {
-  const existingUpdatedAt = parseTimestamp(existing.updatedAt);
-  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
+  const existingUpdatedAt = getRunUpdateTimestamp(existing);
+  const incomingUpdatedAt = getRunUpdateTimestamp(incoming);
 
   if (incomingUpdatedAt < existingUpdatedAt) {
     return false;
@@ -100,6 +128,30 @@ function shouldAcceptRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCa
   const existingState = RUN_STATE_ORDER[existing.state ?? "STATE_UNKNOWN"] ?? 0;
   const incomingState = RUN_STATE_ORDER[incoming.state ?? "STATE_UNKNOWN"] ?? 0;
   return incomingState >= existingState;
+}
+
+function getRunUpdateTimestamp(run: CanvasesCanvasRun): number {
+  return parseTimestamp(run.updatedAt) || parseTimestamp(run.finishedAt) || parseTimestamp(run.createdAt);
+}
+
+function getRunSortTimestamp(run: CanvasesCanvasRun): number {
+  return parseTimestamp(run.createdAt) || parseTimestamp(run.updatedAt);
+}
+
+function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+  return {
+    id: incoming.id ?? existing.id,
+    canvasId: incoming.canvasId ?? existing.canvasId,
+    rootEvent: incoming.rootEvent ?? existing.rootEvent,
+    state: incoming.state ?? existing.state,
+    result: incoming.result ?? existing.result,
+    executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),
+    queueItems: incoming.queueItems !== undefined ? incoming.queueItems : existing.queueItems,
+    createdAt: incoming.createdAt ?? existing.createdAt,
+    updatedAt: incoming.updatedAt ?? existing.updatedAt,
+    finishedAt: incoming.finishedAt ?? existing.finishedAt,
+    versionId: incoming.versionId ?? existing.versionId,
+  };
 }
 
 function bumpTotalCountOnAllPages<T extends { totalCount?: number }>(pages: T[], delta: number): void {
@@ -120,8 +172,8 @@ function findRunLocation(pages: InfiniteRunsPage[], runId: string): { pageIndex:
 }
 
 function insertRunSorted(runs: CanvasesCanvasRun[], run: CanvasesCanvasRun): CanvasesCanvasRun[] {
-  const runCreatedAt = parseTimestamp(run.createdAt);
-  const insertIndex = runs.findIndex((existingRun) => parseTimestamp(existingRun.createdAt) < runCreatedAt);
+  const runTimestamp = getRunSortTimestamp(run);
+  const insertIndex = runs.findIndex((existingRun) => getRunSortTimestamp(existingRun) < runTimestamp);
   if (insertIndex === -1) {
     return [...runs, run];
   }
@@ -143,19 +195,25 @@ export function upsertRunIntoInfiniteData(
     runs: page.runs ? [...page.runs] : [],
   }));
   const location = findRunLocation(pages, run.id ?? "");
-  const matches = runMatchesFilters(run, filters);
 
-  if (matches) {
-    if (location) {
-      const existing = pages[location.pageIndex].runs![location.runIndex];
-      if (!shouldAcceptRunUpdate(existing, run)) {
-        return old;
-      }
+  if (location) {
+    const existing = pages[location.pageIndex].runs![location.runIndex];
+    if (!shouldAcceptRunUpdate(existing, run)) {
+      return old;
+    }
 
-      pages[location.pageIndex].runs![location.runIndex] = run;
+    const nextRun = mergeRunUpdate(existing, run);
+    if (runMatchesFilters(nextRun, filters)) {
+      pages[location.pageIndex].runs![location.runIndex] = nextRun;
       return { ...old, pages };
     }
 
+    pages[location.pageIndex].runs!.splice(location.runIndex, 1);
+    bumpTotalCountOnAllPages(pages, -1);
+    return { ...old, pages };
+  }
+
+  if (runMatchesFilters(run, filters)) {
     if (pages.length === 0) {
       return {
         ...old,
@@ -168,13 +226,7 @@ export function upsertRunIntoInfiniteData(
     return { ...old, pages };
   }
 
-  if (!location) {
-    return old;
-  }
-
-  pages[location.pageIndex].runs!.splice(location.runIndex, 1);
-  bumpTotalCountOnAllPages(pages, -1);
-  return { ...old, pages };
+  return old;
 }
 
 export function executionToRef(execution: CanvasesCanvasNodeExecution): CanvasesCanvasNodeExecutionRef {
@@ -190,9 +242,12 @@ export function executionToRef(execution: CanvasesCanvasNodeExecution): Canvases
   };
 }
 
-function shouldAcceptExecutionRefUpdate(
-  existing: CanvasesCanvasNodeExecutionRef,
-  incoming: CanvasesCanvasNodeExecutionRef,
+// Execution events can arrive out of order, so only accept an update that is at
+// least as recent as what we have — otherwise a finished node gets stuck
+// "running" until reload.
+export function shouldAcceptExecutionUpdate(
+  existing: { state?: string; updatedAt?: string },
+  incoming: { state?: string; updatedAt?: string },
 ): boolean {
   const existingUpdatedAt = parseTimestamp(existing.updatedAt);
   const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
@@ -208,6 +263,13 @@ function shouldAcceptExecutionRefUpdate(
   const existingState = EXECUTION_STATE_ORDER[existing.state ?? "STATE_UNKNOWN"] ?? 0;
   const incomingState = EXECUTION_STATE_ORDER[incoming.state ?? "STATE_UNKNOWN"] ?? 0;
   return incomingState >= existingState;
+}
+
+function shouldAcceptExecutionRefUpdate(
+  existing: CanvasesCanvasNodeExecutionRef,
+  incoming: CanvasesCanvasNodeExecutionRef,
+): boolean {
+  return shouldAcceptExecutionUpdate(existing, incoming);
 }
 
 export function upsertExecutionRef(
@@ -285,5 +347,5 @@ export function upsertRunIntoDescribeRunData(
     return current;
   }
 
-  return { ...current, run: incoming };
+  return { ...current, run: mergeRunUpdate(current.run, incoming) };
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -39,6 +41,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
+	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -47,7 +50,6 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
-	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -64,12 +66,14 @@ import (
 )
 
 const (
-	// Event payload can be up to 64k in size
-	MaxEventSize = 64 * 1024
+	// Event payload can be up to 512k in size
+	MaxEventSize = config.MaxWebhookPayloadSize
 
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
 )
+
+var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
 	httpServer            *http.Server
@@ -273,7 +277,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
-			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+			grpc.GatewayAuthorizationMiddleware(authorizer),
 		),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
@@ -352,7 +356,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
-	err = pbServiceAccounts.RegisterServiceAccountsHandlerServer(ctx, grpcGatewayMux, services.ServiceAccounts)
+	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
 	}
@@ -409,7 +413,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/actions").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
@@ -456,9 +460,25 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 				return
 			}
 			r2.Header.Set("x-Token-Scopes", string(scopes))
+		} else if user.HasAPIKeyCanvasScope() {
+			scopes, err := json.Marshal(apiKeyCanvasScopes(user.APIKeyCanvasIDs))
+			if err != nil {
+				http.Error(w, "Failed to encode API key scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+	})
+}
+
+func apiKeyCanvasScopes(canvasIDs []string) []string {
+	return jwt.ScopesFromPermissions([]jwt.Permission{
+		{ResourceType: "canvases", Action: "read", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update_version", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "delete", Resources: canvasIDs},
 	})
 }
 
@@ -795,7 +815,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		// the full error chain here.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to load organization creation status")
-		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to load organization creation status", err)
 		return
 	}
 
@@ -864,6 +884,10 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 		return response, nil
 	}
 
+	if isTransientUsageServiceError(err) {
+		return nil, fmt.Errorf("%w: check account limits: %w", errUsageServiceUnavailable, err)
+	}
+
 	if status.Code(err) != codes.NotFound {
 		return nil, err
 	}
@@ -882,10 +906,31 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 			WithField("account_id", accountID).
 			WithField("grpc_code", status.Code(err).String()).
 			Error("failed to check account limits after lazy provisioning")
+		if isTransientUsageServiceError(err) {
+			return nil, fmt.Errorf("%w: check account limits after lazy provisioning: %w", errUsageServiceUnavailable, err)
+		}
 		return nil, err
 	}
 
 	return response, nil
+}
+
+func isTransientUsageServiceError(err error) bool {
+	switch status.Code(err) {
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+func writeOrganizationCreationStatusError(w http.ResponseWriter, fallbackMessage string, err error) {
+	if errors.Is(err, errUsageServiceUnavailable) {
+		http.Error(w, "Usage service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	http.Error(w, fallbackMessage, http.StatusInternalServerError)
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -919,7 +964,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		// error with stage-specific structured fields.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to check organization creation status before creating organization")
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to create organization", err)
 		return
 	}
 
@@ -1175,10 +1220,15 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		newEvents = append(newEvents, events...)
 	}
 
+	touchedExecutions := map[uuid.UUID]uuid.UUID{}
+	recordExecution := func(workflowID, executionID uuid.UUID) {
+		touchedExecutions[executionID] = workflowID
+	}
+
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
@@ -1193,6 +1243,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	for executionID, workflowID := range touchedExecutions {
+		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
+			log.Errorf("error publishing execution state for %s: %v", executionID, err)
+		}
+	}
+
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1204,12 +1260,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, headers, node, onNewEvents, recordExecution)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
@@ -1247,7 +1303,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1285,6 +1341,10 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				return nil, err
 			}
 
+			if recordExecution != nil {
+				recordExecution(execution.WorkflowID, execution.ID)
+			}
+
 			return &core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
@@ -1292,6 +1352,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           s.registry.HTTPContext(),
+				Integration:    integrationCtx,
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),

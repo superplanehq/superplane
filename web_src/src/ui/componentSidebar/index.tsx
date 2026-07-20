@@ -1,6 +1,7 @@
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { cn, resolveIcon } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { Check, Copy, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -55,8 +56,10 @@ function BottomInspectorTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "mb-[-1px] flex items-center gap-1 self-stretch border-b px-2.5 text-[13px] font-medium",
-        active ? "border-gray-800 text-gray-800" : "border-transparent text-gray-500 hover:text-gray-800",
+        "mb-[-1px] flex items-center gap-1 self-stretch border-b px-2.5 text-[13px] font-medium transition-colors",
+        active
+          ? "border-gray-700 text-gray-800 dark:border-indigo-300 dark:text-indigo-300"
+          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
       )}
     >
       {React.createElement(resolveIcon(icon), { size: RUN_NODE_ICON_SIZE, className: "h-3.5 w-3.5 shrink-0" })}
@@ -147,14 +150,13 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
-  configurationSaveMode?: "manual" | "auto";
 
   workflowNodes?: ComponentsNode[];
   readOnly?: boolean;
   layout?: "sidebar" | "bottom";
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 }
 
 export const ComponentSidebar = ({
@@ -209,7 +211,6 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
-  configurationSaveMode = "manual",
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
@@ -497,8 +498,8 @@ export const ComponentSidebar = ({
         >
           <div
             aria-hidden
-            className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 ${
-              isResizing ? "bg-slate-950/50" : ""
+            className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50 ${
+              isResizing ? "bg-slate-950/50 dark:bg-gray-500/50" : ""
             }`}
           />
         </div>
@@ -506,14 +507,17 @@ export const ComponentSidebar = ({
       <div
         className={
           isBottomLayout
-            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white"
-            : "border-l-1 border-border h-full overflow-hidden bg-white flex flex-col"
+            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-900"
+            : cn(
+                "border-l h-full overflow-hidden bg-white flex flex-col dark:bg-gray-900",
+                appDarkModeClasses.sidebarEdge,
+              )
         }
       >
         <div
           className={
             isBottomLayout
-              ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3"
+              ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3 dark:border-gray-800/70"
               : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
           }
         >
@@ -526,9 +530,9 @@ export const ComponentSidebar = ({
                   iconSlug={iconSlug}
                   alt={nodeName}
                   size={RUN_NODE_ICON_SIZE}
-                  className="h-3.5 w-3.5 shrink-0 text-gray-800"
+                  className="h-3.5 w-3.5 shrink-0 text-gray-800 dark:text-gray-100"
                 />
-                <h3 className="truncate text-[13px] font-medium text-gray-900">{nodeName}</h3>
+                <h3 className="truncate text-[13px] font-medium text-gray-900 dark:text-gray-100">{nodeName}</h3>
               </div>
               <div className="flex shrink-0 items-stretch">
                 <div className="flex items-center px-1">
@@ -554,10 +558,10 @@ export const ComponentSidebar = ({
                   </div>
                   {nodeId && !hideNodeId && (
                     <div className="flex items-center gap-2">
-                      <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
+                      <span className="text-[13px] text-gray-500 font-mono dark:text-gray-400">{nodeId}</span>
                       <button
                         onClick={handleCopyNodeId}
-                        className={"text-gray-500 hover:text-gray-800"}
+                        className={"text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}
                         title={justCopied ? "Copied!" : "Copy Node ID"}
                       >
                         {justCopied ? <Check size={14} /> : <Copy size={14} />}
@@ -569,7 +573,7 @@ export const ComponentSidebar = ({
               </div>
               <div
                 onClick={() => onClose?.()}
-                className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+                className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded-full flex items-center justify-center cursor-pointer leading-none dark:hover:bg-gray-800/50"
               >
                 <X size={16} />
               </div>
@@ -578,7 +582,7 @@ export const ComponentSidebar = ({
         </div>
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <div
-            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
               isDetailView ? "-translate-x-full" : "translate-x-0"
             } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
           >
@@ -589,7 +593,12 @@ export const ComponentSidebar = ({
             >
               {showSettingsTab &&
                 (isBottomLayout ? (
-                  <div className="relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b border-slate-200 px-2">
+                  <div
+                    className={cn(
+                      "relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b px-2",
+                      appDarkModeClasses.sidebarEdge,
+                    )}
+                  >
                     {shouldShowRunsTab ? (
                       <BottomInspectorTabButton
                         active={activeTab === "latest"}
@@ -617,14 +626,14 @@ export const ComponentSidebar = ({
                     ) : null}
                   </div>
                 ) : (
-                  <div className="border-b border-slate-950/15">
+                  <div className="border-b border-slate-950/15 dark:border-gray-800/70">
                     <div className="flex px-4">
                       {shouldShowRunsTab && (
                         <button
                           onClick={() => onTabChange?.("latest")}
                           className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
                             activeTab === "latest"
-                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              ? "border-gray-700 text-gray-800 dark:text-indigo-300 dark:border-indigo-300"
                               : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                           }`}
                         >
@@ -635,7 +644,7 @@ export const ComponentSidebar = ({
                         onClick={() => onTabChange?.("settings")}
                         className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
                           activeTab === "settings"
-                            ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                            ? "border-gray-700 text-gray-800 dark:text-indigo-300 dark:border-indigo-300"
                             : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         }`}
                       >
@@ -647,7 +656,7 @@ export const ComponentSidebar = ({
                           onClick={() => onTabChange?.("docs")}
                           className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
                             activeTab === "docs"
-                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              ? "border-gray-700 text-gray-800 dark:text-indigo-300 dark:border-indigo-300"
                               : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                           }`}
                         >
@@ -686,6 +695,7 @@ export const ComponentSidebar = ({
                     onReEmit={onReEmit}
                     getExecutionState={getExecutionState}
                     compact={isBottomLayout}
+                    selectionNodeId={nodeId}
                     resolveRunId={resolveRunId}
                     fetchRunId={fetchRunId}
                     onSelectRun={onSelectRun}
@@ -721,7 +731,6 @@ export const ComponentSidebar = ({
                     autocompleteExampleObj={resolvedAutocompleteExampleObj}
                     onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                     onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
-                    configurationSaveMode={configurationSaveMode}
                   />
                 </TabsContent>
               )}
@@ -745,12 +754,12 @@ export const ComponentSidebar = ({
           </div>
 
           <div
-            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
               isDetailView ? "translate-x-0" : "translate-x-full"
             } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
           >
             {page !== "overview" && (
-              <div className="flex flex-col flex-1 min-h-0 bg-white">
+              <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
                 <PageHeader onBackToOverview={handleBackToOverview} compact={isBottomLayout} />
                 <HistoryQueuePage
                   page={page}
@@ -759,6 +768,7 @@ export const ComponentSidebar = ({
                   onToggleOpen={handleToggleOpen}
                   onEventClick={onEventClick}
                   compact={isBottomLayout}
+                  selectionNodeId={nodeId}
                   resolveRunId={resolveRunId}
                   fetchRunId={fetchRunId}
                   onSelectRun={onSelectRun}

@@ -10,6 +10,7 @@ import {
 import {
   agentsGetCanvasAgentChat,
   agentsListAgentChatMessages,
+  agentsResetCanvasAgentChat,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
@@ -100,11 +101,13 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       content,
       mode,
       images,
+      autoLayoutOnUpdateEnabled,
     }: {
       chatId: string;
       content: string;
       mode?: AgentMode;
       images?: AgentOutgoingImage[];
+      autoLayoutOnUpdateEnabled?: boolean;
     }) => {
       const response = await agentsSendAgentChatMessage(
         withOrganizationHeader({
@@ -113,6 +116,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
           body: {
             content,
             mode: mode ? agentModeToApiMode[mode] : undefined,
+            autoLayoutOnUpdateEnabled,
             images: images && images.length > 0 ? images : undefined,
           },
         }),
@@ -228,6 +232,34 @@ export function useInterruptAgentChat(organizationId: string | undefined) {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`Interrupt failed: ${res.status}`);
+    },
+  });
+}
+
+export function useResetCanvasAgentChat(organizationId: string | undefined, canvasId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!canvasId) throw new Error("Canvas is required");
+      if (!organizationId) throw new Error("Organization is required");
+
+      const response = await agentsResetCanvasAgentChat(
+        withOrganizationHeader({
+          organizationId,
+          path: { canvasId },
+          body: {},
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      return fromApiChat(response.data?.chat);
+    },
+    onSuccess: (nextChat) => {
+      if (!canvasId) return;
+      const previousChat = queryClient.getQueryData<AgentChat | null>(agentChatKeys.forCanvas(canvasId));
+      queryClient.setQueryData(agentChatKeys.forCanvas(canvasId), nextChat);
+
+      if (previousChat?.id) queryClient.removeQueries({ queryKey: agentChatKeys.messages(previousChat.id) });
+      if (nextChat?.id) queryClient.removeQueries({ queryKey: agentChatKeys.messages(nextChat.id) });
     },
   });
 }

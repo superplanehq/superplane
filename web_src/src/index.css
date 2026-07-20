@@ -29,6 +29,11 @@ button {
   --xy-background-color-default: #f4f5f8;
 }
 
+.react-flow.dark {
+  --xy-background-pattern-dots-color-default: #374151;
+  --xy-background-color-default: #111827;
+}
+
 div.monaco-editor {
   --vscode-focusBorder: transparent;
   --vscode-editorLineHighlightBackground: rgb(248 250 252);
@@ -54,6 +59,37 @@ div.monaco-editor .view-overlays .current-line {
 
 .workflow-file-editor-monaco .monaco-editor .sticky-widget {
   box-shadow: 0 3px 0 rgb(2 6 23 / 0.1) !important;
+}
+
+.dark div.monaco-editor {
+  --vscode-focusBorder: transparent;
+  --vscode-editor-background: rgb(31 41 55);
+  --vscode-editorGutter-background: rgb(31 41 55);
+  --vscode-editor-foreground: rgb(243 244 246);
+  --vscode-editorLineHighlightBackground: rgb(31 41 55);
+  --vscode-editorLineHighlightBorder: transparent;
+}
+
+.dark div.monaco-editor .margin,
+.dark div.monaco-editor .monaco-editor-background {
+  background-color: rgb(31 41 55) !important;
+}
+
+.dark div.monaco-editor .margin-view-overlays .current-line,
+.dark div.monaco-editor .view-overlays .current-line {
+  background-color: rgb(31 41 55) !important;
+}
+
+.dark .workflow-file-editor-monaco .monaco-editor {
+  --vscode-scrollbarSlider-background: rgb(156 163 175 / 0.25);
+  --vscode-scrollbarSlider-hoverBackground: rgb(156 163 175 / 0.4);
+  --vscode-scrollbarSlider-activeBackground: rgb(156 163 175 / 0.5);
+  --vscode-editorStickyScroll-shadow: rgb(0 0 0 / 0.2);
+  --vscode-editorStickyScroll-border: rgb(75 85 99 / 0.5);
+}
+
+.dark .workflow-file-editor-monaco .monaco-editor .sticky-widget {
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.2) !important;
 }
 
 .canvas-conflict-current-line {

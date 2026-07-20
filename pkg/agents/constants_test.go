@@ -13,6 +13,14 @@ func TestAgentTokenScopes(t *testing.T) {
 		"org:read",
 		"integrations:read",
 		"canvases:read:" + canvasID,
-		"canvases:update_version:" + canvasID,
+		"canvases:update:" + canvasID,
 	}, AgentTokenScopes(canvasID))
+}
+
+func TestBuilderModeInstructionsIncludeNodeReplacementGuidance(t *testing.T) {
+	instructions := modeInstructions(ModeBuilder)
+
+	assert.Contains(t, instructions, "Do not change an existing node's implementation with update_node")
+	assert.Contains(t, instructions, "assigning its first implementation is allowed")
+	assert.Contains(t, instructions, "component/trigger/widget/integration replacements must be delete_node plus add_node")
 }

@@ -2,12 +2,17 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { agentsListAgentChatMessages, agentsSendAgentChatMessage } from "@/api-client/sdk.gen";
+import {
+  agentsListAgentChatMessages,
+  agentsResetCanvasAgentChat,
+  agentsSendAgentChatMessage,
+} from "@/api-client/sdk.gen";
 import type { AgentMessagesPage } from "./useAgentChats";
-import { agentChatKeys, useAgentChatMessages, useSendAgentChatMessage } from "./useAgentChats";
+import { agentChatKeys, useAgentChatMessages, useResetCanvasAgentChat, useSendAgentChatMessage } from "./useAgentChats";
 
 vi.mock("@/api-client/sdk.gen", () => ({
   agentsListAgentChatMessages: vi.fn(),
+  agentsResetCanvasAgentChat: vi.fn(),
   agentsSendAgentChatMessage: vi.fn(),
 }));
 
@@ -37,7 +42,22 @@ describe("useSendAgentChatMessage", () => {
       wrapper: wrapper(queryClient),
     });
 
-    const sendPromise = result.current.mutateAsync({ chatId: "chat-1", content: "Build this", mode: "builder" });
+    const sendPromise = result.current.mutateAsync({
+      chatId: "chat-1",
+      content: "Build this",
+      mode: "builder",
+      autoLayoutOnUpdateEnabled: false,
+    });
+
+    await waitFor(() => {
+      expect(agentsSendAgentChatMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            autoLayoutOnUpdateEnabled: false,
+          }),
+        }),
+      );
+    });
 
     await waitFor(() => {
       const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
@@ -351,5 +371,54 @@ describe("useAgentChatMessages", () => {
         "optimistic-message-2",
       ]);
     });
+  });
+});
+
+describe("useResetCanvasAgentChat", () => {
+  it("replaces the canvas chat and clears message caches", async () => {
+    type ResetCanvasAgentChatResult = Awaited<ReturnType<typeof agentsResetCanvasAgentChat>>;
+    vi.mocked(agentsResetCanvasAgentChat).mockResolvedValue({
+      data: {
+        chat: {
+          id: "chat-new",
+          canvasId: "canvas-1",
+          provider: "anthropic",
+          status: "idle",
+        },
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as ResetCanvasAgentChatResult);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(agentChatKeys.forCanvas("canvas-1"), {
+      id: "chat-old",
+      canvasId: "canvas-1",
+      provider: "anthropic",
+      status: "idle",
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-old"), {
+      pages: [
+        {
+          messages: [
+            { id: "m1", role: "user", content: "hi", toolName: "", toolCallId: "", toolStatus: "", createdAt: null },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [""],
+    });
+
+    const { result } = renderHook(() => useResetCanvasAgentChat("org-1", "canvas-1"), {
+      wrapper: wrapper(queryClient),
+    });
+    await result.current.mutateAsync();
+
+    const nextChat = queryClient.getQueryData<{ id?: string } | null>(agentChatKeys.forCanvas("canvas-1"));
+    expect(nextChat?.id).toBe("chat-new");
+    expect(queryClient.getQueryData(agentChatKeys.messages("chat-old"))).toBeUndefined();
   });
 });

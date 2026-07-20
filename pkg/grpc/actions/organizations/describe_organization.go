@@ -15,19 +15,14 @@ import (
 )
 
 func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrganizationResponse, error) {
-	var organization *models.Organization
-	err := telemetry.RunSpan(ctx, "organizations.load", func(ctx context.Context) error {
-		var loadErr error
-		organization, loadErr = models.FindOrganizationByIDInTransaction(database.DB(ctx), orgID)
-		return loadErr
-	})
+	organization, err := loadOrganization(ctx, orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "organization not found")
 		}
 
 		log.Errorf("Error describing organization %s: %v", orgID, err)
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to describe organization")
 	}
 
 	response := &pb.DescribeOrganizationResponse{
@@ -46,4 +41,11 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 	}
 
 	return response, nil
+}
+
+func loadOrganization(ctx context.Context, orgID string) (organization *models.Organization, err error) {
+	ctx, done := telemetry.Span(ctx, "organizations.load")
+	defer done(&err)
+
+	return models.FindOrganizationByIDInTransaction(database.DB(ctx), orgID)
 }

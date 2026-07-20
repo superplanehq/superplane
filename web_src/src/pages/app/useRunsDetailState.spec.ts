@@ -1,16 +1,31 @@
-import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { useRunsDetailState } from "./useRunsDetailState";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { isRunDetailDismissed, runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
 
 function makeSearchParams(params: Record<string, string> = {}) {
   return new URLSearchParams(params);
 }
 
 describe("useRunsDetailState", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("opens run detail on mount when run is in the URL", () => {
     const { result } = renderHook(() => useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1"));
 
     expect(result.current.openRunDetailOnMount).toBe(true);
+  });
+
+  it("respects persisted closed detail on mount when run is in the URL", () => {
+    window.localStorage.setItem(runInspectorAutoOpenStorageKey("canvas-1"), "false");
+
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
+    );
+
+    expect(result.current.openRunDetailOnMount).toBe(false);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(true);
   });
 
   it("restores the selected run node on mount when the URL points at the detail pane", () => {
@@ -225,7 +240,7 @@ describe("useRunsDetailState", () => {
     const onBackToRunList = vi.fn();
     const { result, rerender } = renderHook(
       ({ isRunInspectionMode, searchParams, selectedRunId }) =>
-        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, undefined, onBackToRunList),
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, undefined, { onBackToRunList }),
       {
         initialProps: {
           isRunInspectionMode: true,
@@ -255,5 +270,88 @@ describe("useRunsDetailState", () => {
 
     expect(result.current.openRunDetailOnMount).toBe(false);
     expect(onBackToRunList).toHaveBeenCalledOnce();
+  });
+
+  it("lets URL state reopen run detail for a run that was dismissed locally", async () => {
+    const onBackToRunList = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ searchParams }) =>
+        useRunsDetailState(searchParams, true, "run-1", undefined, {
+          onBackToRunList,
+        }),
+      {
+        initialProps: {
+          searchParams: new URLSearchParams("run=run-1"),
+        },
+      },
+    );
+
+    act(() => {
+      result.current.handleBackToRunList();
+    });
+
+    expect(result.current.detailDismissedForRunId).toBe("run-1");
+    expect(result.current.runDetailNodeId).toBeNull();
+    expect(onBackToRunList).toHaveBeenCalledOnce();
+
+    rerender({
+      searchParams: new URLSearchParams("run=run-1&sidebar=1&node=node-1"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.detailDismissedForRunId).toBeNull();
+    });
+    expect(result.current.runDetailNodeId).toBe("node-1");
+  });
+
+  it("opens run detail for run row selection by default", () => {
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
+    );
+
+    act(() => {
+      result.current.maybeOpenRunDetailForRun("run-1");
+    });
+
+    expect(result.current.detailDismissedForRunId).toBeNull();
+  });
+
+  it("reopens run detail when a run row is selected after dismissal", () => {
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
+    );
+
+    act(() => {
+      result.current.handleBackToRunList();
+    });
+
+    expect(window.localStorage.getItem(runInspectorAutoOpenStorageKey("canvas-1"))).toBe("false");
+
+    act(() => {
+      result.current.clearDismissedRunDetail({ persistAutoOpen: true });
+    });
+
+    expect(window.localStorage.getItem(runInspectorAutoOpenStorageKey("canvas-1"))).toBe("true");
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(false);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-2")).toBe(false);
+  });
+
+  it("persists auto-open again when a node opens run detail", () => {
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
+    );
+
+    act(() => {
+      result.current.handleBackToRunList();
+    });
+    act(() => {
+      result.current.clearDismissedRunDetail({ persistAutoOpen: true });
+    });
+    act(() => {
+      result.current.maybeOpenRunDetailForRun("run-2");
+    });
+
+    expect(window.localStorage.getItem(runInspectorAutoOpenStorageKey("canvas-1"))).toBe("true");
+    expect(result.current.detailDismissedForRunId).toBeNull();
   });
 });

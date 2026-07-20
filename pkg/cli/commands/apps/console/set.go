@@ -7,11 +7,12 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type setCommand struct {
 	file    *string
-	draftID *string
+	message *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -32,18 +33,19 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		flagValue = strings.TrimSpace(*c.file)
 	}
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
+
+	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
+	if err != nil {
+		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
 	}
-	draftOnly := draftID != ""
 
 	yamlBytes, source, err := resolveYAMLSource(ctx.Cmd.InOrStdin(), flagValue, positional)
 	if err != nil {
 		return err
 	}
 
-	if _, err := ParseConsoleYAML(yamlBytes); err != nil {
+	_, err = yaml.ConsoleFromYML(yamlBytes)
+	if err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
@@ -52,35 +54,32 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	var versionID string
-	if draftOnly {
-		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
-	} else {
-		versionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
-	}
-	if err != nil {
-		return err
-	}
-
-	if err := common.CommitRepositorySpecFile(
+	if err := common.StageRepositorySpecFile(
 		ctx,
 		canvasID,
-		versionID,
 		common.ConsoleYAMLRepositoryPath,
 		yamlBytes,
-		"Update console.yaml",
-		nil,
-		false,
 	); err != nil {
 		return err
 	}
 
-	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, commitMessage)
 	if err != nil {
-		return fmt.Errorf("console draft updated but failed to read console.yaml: %w", err)
+		return fmt.Errorf("console was staged but commit failed: %w", err)
 	}
 
-	updatedResource, err := ParseConsoleYAML(updatedYAML)
+	version := commitResponse.GetVersion()
+	if version.Metadata == nil {
+		return fmt.Errorf("committed version metadata is missing")
+	}
+	versionID := strings.TrimSpace(version.Metadata.GetId())
+
+	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	if err != nil {
+		return fmt.Errorf("console updated but failed to read console.yaml: %w", err)
+	}
+
+	updatedResource, err := yaml.ConsoleFromYML(updatedYAML)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}
@@ -90,11 +89,17 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Console updated for app %s\n", canvasID)
+		_, _ = fmt.Fprintf(stdout, "Version: %s\n", versionID)
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
-		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
-		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft-id) to publish a draft that includes this console.")
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
 		return err
 	})
+}
+
+func messageValue(message *string) string {
+	if message == nil {
+		return ""
+	}
+	return *message
 }

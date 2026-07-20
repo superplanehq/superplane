@@ -1,6 +1,8 @@
 import { AlertCircle } from "lucide-react";
 import { EmptyState } from "@/ui/emptyState";
 import { Button } from "@/components/ui/button";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 export function ErrorPage() {
   const handleTryAgain = () => {
@@ -12,7 +14,9 @@ export function ErrorPage() {
   };
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-gray-50">
+    <div
+      className={cn("flex min-h-screen flex-col items-center justify-center bg-gray-50", appDarkModeClasses.surface)}
+    >
       <EmptyState icon={AlertCircle} title="Something went wrong" description="We encountered an unexpected error." />
       <div className="flex gap-2 mt-6">
         <Button onClick={handleTryAgain}>Try Again</Button>

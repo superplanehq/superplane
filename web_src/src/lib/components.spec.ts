@@ -119,6 +119,8 @@ describe("components visibility helpers", () => {
 describe("components value parsing and validation", () => {
   it("validates cron and number submission values", () => {
     expect(validateFieldForSubmission(buildField({ type: "cron" }), "bad")).toEqual(["Cron expression too short"]);
+    expect(validateFieldForSubmission(buildField({ type: "cron" }), "0 9 31 * *")).toEqual([]);
+    expect(validateFieldForSubmission(buildField({ type: "cron" }), "0 24 * * *")).toEqual(["Invalid hour value"]);
     expect(
       validateFieldForSubmission(
         buildField({

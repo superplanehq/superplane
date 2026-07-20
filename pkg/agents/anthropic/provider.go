@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -130,6 +131,9 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		if isProviderSessionUnavailable(err) {
 			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
 		}
+		if isRequestSizeLimitError(err) {
+			return fmt.Errorf("%w: %w", agents.ErrInvalidRequest, err)
+		}
 		return fmt.Errorf("anthropic: send message: %w", err)
 	}
 	return nil
@@ -209,10 +213,38 @@ func (p *Provider) SendCustomToolResults(ctx context.Context, providerSessionID 
 	}
 
 	body := map[string]any{"events": events}
+	fields := customToolResultsRequestLogFields(providerSessionID, results)
+	log.WithFields(fields).Info("anthropic: sending custom tool results")
+	startedAt := time.Now()
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		fields["elapsed_ms"] = time.Since(startedAt).Milliseconds()
+		log.WithError(err).WithFields(fields).Warn("anthropic: failed to send custom tool results")
 		return fmt.Errorf("anthropic: send custom tool results: %w", err)
 	}
+	fields["elapsed_ms"] = time.Since(startedAt).Milliseconds()
+	log.WithFields(fields).Info("anthropic: sent custom tool results")
 	return nil
+}
+
+func customToolResultsRequestLogFields(providerSessionID string, results []agents.CustomToolResult) log.Fields {
+	errorCount := 0
+	contentBytes := 0
+	resultIDs := make([]string, 0, len(results))
+	for _, result := range results {
+		contentBytes += len(result.Content)
+		resultIDs = append(resultIDs, result.CustomToolUseID)
+		if result.IsError {
+			errorCount++
+		}
+	}
+
+	return log.Fields{
+		"provider_session_id":       providerSessionID,
+		"custom_tool_result_count":  len(results),
+		"custom_tool_result_ids":    resultIDs,
+		"custom_tool_error_count":   errorCount,
+		"custom_tool_content_bytes": contentBytes,
+	}
 }
 
 func isSessionAwaitingToolResults(err error) bool {
@@ -253,6 +285,28 @@ func isProviderSessionUnavailable(err error) bool {
 		strings.Contains(message, "session was deleted") ||
 		strings.Contains(message, "session has been archived") ||
 		strings.Contains(message, "session was archived")
+}
+
+func isRequestSizeLimitError(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.StatusCode == http.StatusRequestEntityTooLarge {
+		return true
+	}
+	if apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	message := strings.ToLower(apiErr.Message)
+	return strings.Contains(message, "too large") ||
+		strings.Contains(message, "request payload") ||
+		strings.Contains(message, "request body") ||
+		strings.Contains(message, "body size") ||
+		strings.Contains(message, "size limit") ||
+		strings.Contains(message, "exceeds the model limit") ||
+		strings.Contains(message, "exceeds maximum")
 }
 
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {

@@ -49,4 +49,22 @@ describe("SpecsTooltip", () => {
     expect(screen.getByText("workflow_input")).toBeInTheDocument();
     expect(screen.queryByText("undefined")).not.toBeInTheDocument();
   });
+
+  it("includes dark-mode surface classes for metadata tooltips", () => {
+    render(
+      <SpecsTooltip
+        specTitle="input"
+        specValues={[
+          {
+            badges: [{ label: "workflow_input", bgColor: "bg-gray-100", textColor: "text-gray-800" }],
+          },
+        ]}
+      >
+        <span>trigger</span>
+      </SpecsTooltip>,
+    );
+
+    expect(screen.getByText("1 input").parentElement?.parentElement?.className).toContain("dark:bg-gray-900");
+    expect(screen.getByText("1 input").className).toContain("dark:text-gray-400");
+  });
 });

@@ -46,10 +46,10 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
+	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -115,7 +115,7 @@ dev.setup.npm:
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
 
 dev.setup.go:
-	@$(COMPOSE) exec app go mod download
+	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
 
 dev.setup.no.cache:
@@ -167,6 +167,9 @@ dev.pr.clean.checkout:
 check.example.payloads:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
 
+check.proto.field.numbers:
+	bash ./scripts/check_proto_field_numbers.sh
+
 check.configuration.fields:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
 
@@ -191,6 +194,9 @@ check.db.migrations:
 
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
+
+check.build.storybook:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
 
 check.test.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
@@ -309,8 +315,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents,usage
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models

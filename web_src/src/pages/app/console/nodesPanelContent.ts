@@ -9,6 +9,8 @@
  * `pkg/models/canvas_dashboard_yml.go`.
  */
 
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+
 /**
  * One entry in a {@link NodesPanelContent} list. The minimum required field
  * is `node` (canvas node id or name); the optional `label` overrides the
@@ -26,6 +28,12 @@ export interface NodesPanelNode {
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
   triggerName?: string;
+  /**
+   * When true, clicking Run always opens the confirm dialog — even for
+   * templates with no input fields. When false (default), a parameter-less
+   * template fires immediately; templates with input fields always prompt.
+   */
+  promptConfirmation?: boolean;
 }
 
 export interface NodesPanelContent {
@@ -41,6 +49,36 @@ export interface NodesPanelContent {
 /** Default content for a newly added `nodes` panel. */
 export function templateForNodesPanel(defaultTitle?: string): NodesPanelContent {
   return { title: defaultTitle ?? "", nodes: [] };
+}
+
+/**
+ * Fold a legacy single-node panel body into a one-entry `nodes` panel. Used
+ * by the panel router so both the `node` and `nodes` panel types share the
+ * merged renderer, and by the panel state on first edit so the persisted
+ * panel migrates to `type: nodes` (see `useConsolePanelState`).
+ *
+ * The reverse (unfolding a one-entry `nodes` panel back into a `node`) is
+ * intentionally not provided: the compact single-node layout falls out of
+ * the `nodes.length === 1` render branch, so both shapes look identical
+ * once merged.
+ */
+export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | undefined): NodesPanelContent {
+  const obj = asObject(raw) ?? {};
+  const node = typeof obj.node === "string" ? obj.node : "";
+  const entry: NodesPanelNode = {
+    node,
+    label: typeof obj.label === "string" ? obj.label : undefined,
+    showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
+    triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
+    promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
+  };
+  // Always fold into exactly one entry — even when the legacy node is
+  // unset — so the merged renderer keeps the compact single-node layout
+  // and its "pick a node" empty state, matching the pre-merge card.
+  return {
+    title: typeof obj.title === "string" ? obj.title : "",
+    nodes: [entry],
+  };
 }
 
 /** Validate the persisted `nodes` content. Returns null when valid. */
@@ -66,22 +104,12 @@ function validateNodesEntry(raw: unknown, index: number): string | null {
   if (typeof entry.node !== "string" || entry.node.trim() === "") {
     return `content.nodes[${index}].node must be a non-empty string (canvas node id or name).`;
   }
-  if (entry.label !== undefined && entry.label !== null && typeof entry.label !== "string") {
-    return `content.nodes[${index}].label must be a string.`;
-  }
-  if (entry.description !== undefined && entry.description !== null && typeof entry.description !== "string") {
-    return `content.nodes[${index}].description must be a string.`;
-  }
-  if (entry.showRun !== undefined && typeof entry.showRun !== "boolean") {
-    return `content.nodes[${index}].showRun must be a boolean.`;
-  }
-  if (entry.triggerName !== undefined && entry.triggerName !== null && typeof entry.triggerName !== "string") {
-    return `content.nodes[${index}].triggerName must be a string.`;
-  }
-  return null;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  const prefix = `content.nodes[${index}]`;
+  return (
+    optionalStringError(`${prefix}.label`, entry.label) ??
+    optionalStringError(`${prefix}.description`, entry.description) ??
+    optionalBooleanError(`${prefix}.showRun`, entry.showRun) ??
+    optionalStringError(`${prefix}.triggerName`, entry.triggerName) ??
+    optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation)
+  );
 }

@@ -341,6 +341,33 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 						}
 					}`)),
 				},
+				// On success the merged component also fetches the conversation.
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"messages": [
+							{"id": "msg_1", "type": "user_message", "text": "Fix the bug"},
+							{"id": "msg_2", "type": "assistant_message", "text": "Fixed the bug in login.go"}
+						]
+					}`)),
+				},
+				// ...and lists artifacts, attaching a download link for each.
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"items": [
+							{"path": "artifacts/report.md", "sizeBytes": 1024, "updatedAt": "2026-07-07T10:00:00Z"}
+						]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"url": "https://storage.example.com/report.md?sig=abc",
+						"expiresAt": "2026-07-07T11:00:00Z"
+					}`)),
+				},
 			},
 		}
 		integrationCtx := &contexts.IntegrationContext{
@@ -385,8 +412,11 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 4)
 		assert.Equal(t, "https://api.cursor.com/v0/agents/agent-123", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://api.cursor.com/v0/agents/agent-123/conversation", httpContext.Requests[1].URL.String())
+		assert.Equal(t, "https://api.cursor.com/v1/agents/agent-123/artifacts", httpContext.Requests[2].URL.String())
+		assert.Contains(t, httpContext.Requests[3].URL.String(), "/v1/agents/agent-123/artifacts/download")
 
 		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
 		assert.Equal(t, "Fixed the bug", updatedMetadata.Agent.Summary)
@@ -398,6 +428,19 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "https://github.com/org/repo/pull/42", payloadData.PrURL)
 		assert.Equal(t, "Fixed the bug", payloadData.Summary)
 		assert.Equal(t, "cursor/agent-abc123", payloadData.BranchName)
+
+		// The conversation is merged into the single component's output.
+		require.Len(t, payloadData.Messages, 2)
+		require.NotNil(t, payloadData.LastMessage)
+		assert.Equal(t, "assistant_message", payloadData.LastMessage.Type)
+		assert.Equal(t, "Fixed the bug in login.go", payloadData.LastMessage.Text)
+
+		// The produced artifacts are attached with their download links.
+		require.Len(t, payloadData.Artifacts, 1)
+		assert.Equal(t, "artifacts/report.md", payloadData.Artifacts[0].Path)
+		assert.Equal(t, int64(1024), payloadData.Artifacts[0].SizeBytes)
+		assert.Equal(t, "https://storage.example.com/report.md?sig=abc", payloadData.Artifacts[0].URL)
+		assert.Equal(t, "2026-07-07T11:00:00Z", payloadData.Artifacts[0].ExpiresAt)
 	})
 
 	t.Run("missing agent ID -> bad request", func(t *testing.T) {

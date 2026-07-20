@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
 
@@ -50,7 +50,7 @@ function baseProps(
   const componentName = context.componentDefinition.name ?? "gcp";
 
   return {
-    iconSrc: gcpIcon,
+    iconSrc: gcpMonitoringIcon,
     iconSlug: context.componentDefinition?.icon ?? iconSlug,
     collapsedBackground: "bg-white",
     collapsed: context.node.isCollapsed,

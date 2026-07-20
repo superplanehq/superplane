@@ -60,6 +60,29 @@ type ExprFunction = {
   example: string;
 };
 
+const MEMORY_NAMESPACE_SUGGESTION: Suggestion = {
+  label: "memory",
+  kind: "variable",
+  insertText: "memory.",
+  detail: "namespace",
+  description: "Access canvas memory records by namespace and field matches.",
+};
+
+const MEMORY_METHODS: readonly ExprFunction[] = [
+  {
+    name: "find",
+    snippet: "find()",
+    description: "Returns all canvas memory records matching the namespace and match object.",
+    example: 'memory.find("machines", {"sandbox_id": "12121"})',
+  },
+  {
+    name: "findFirst",
+    snippet: "findFirst()",
+    description: "Returns the first canvas memory record matching the namespace and match object, or nil.",
+    example: 'memory.findFirst("machines", {"creator": "igor"}).sandbox_id',
+  },
+];
+
 /** Built-in functions (from expr-lang docs categories). */
 export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
@@ -626,6 +649,23 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     const { baseExpr, memberPrefix, operator, isFunctionCall } = dotCtx;
     const mp = (memberPrefix ?? "").toLowerCase();
 
+    if (!isFunctionCall && extractTailPathExpression(baseExpr) === "memory") {
+      if (MEMORY_METHODS.some((m) => m.name.toLowerCase() === mp)) {
+        return [];
+      }
+
+      return MEMORY_METHODS.filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
+        .slice(0, limit)
+        .map((m) => ({
+          label: m.name,
+          kind: "function" as const,
+          insertText: m.snippet ?? `${m.name}()`,
+          detail: "function",
+          description: m.description,
+          example: m.example,
+        }));
+    }
+
     // Handle function call method suggestions (e.g., now().Year())
     if (isFunctionCall) {
       const methods = getFunctionReturnMethods(baseExpr);
@@ -690,9 +730,14 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
-        description: "Root selector for accessing payload data from all connected components.",
+        description:
+          'Access event data emitted by connected components in a run, keyed by component name (e.g. $["Component Name"]).',
         nodeCount,
       });
+    }
+
+    if (!prefix || MEMORY_NAMESPACE_SUGGESTION.label.startsWith(prefix)) {
+      out.push(MEMORY_NAMESPACE_SUGGESTION);
     }
 
     if (includeTopLevelGlobals) {

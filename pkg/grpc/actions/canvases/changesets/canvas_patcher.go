@@ -3,12 +3,11 @@ package changesets
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
@@ -56,19 +55,14 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 	return p.finalVersion
 }
 
-func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
+func (p *CanvasPatcher) buildFinalVersion() (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
 		ID:            p.originalVersion.ID,
 		WorkflowID:    p.originalVersion.WorkflowID,
 		OwnerID:       p.originalVersion.OwnerID,
-		State:         p.originalVersion.State,
-		Name:          p.originalVersion.Name,
-		Description:   p.originalVersion.Description,
-		PublishedAt:   p.originalVersion.PublishedAt,
+		CommitMessage: p.originalVersion.CommitMessage,
 		ConsolePanels: p.originalVersion.ConsolePanels,
 		ConsoleLayout: p.originalVersion.ConsoleLayout,
-		GitBranch:     p.originalVersion.GitBranch,
-		DisplayName:   p.originalVersion.DisplayName,
 		CreatedAt:     p.originalVersion.CreatedAt,
 		UpdatedAt:     p.originalVersion.UpdatedAt,
 	}
@@ -95,21 +89,10 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
-	if autoLayout == nil {
-		return v, nil
-	}
-
-	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
-	if err != nil {
-		return nil, err
-	}
-
-	v.Nodes = nodes
-	v.Edges = edges
 	return v, nil
 }
 
-func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
+func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
 		return fmt.Errorf("changeset is required")
 	}
@@ -120,7 +103,7 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset, autoLayout *p
 		}
 	}
 
-	finalVersion, err := p.buildFinalVersion(autoLayout)
+	finalVersion, err := p.buildFinalVersion()
 	if err != nil {
 		return err
 	}
@@ -325,6 +308,40 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 		currentNode.IsCollapsed = *node.IsCollapsed
 	}
 
+	if node.Block != "" {
+		existingImplementation := nodeImplementationName(currentNode)
+		if existingImplementation != "" && existingImplementation != strings.TrimSpace(node.Block) {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", currentNode.ID)
+		}
+
+		nodeType, nodeRef, err := p.findBlock(node)
+		if err != nil {
+			return fmt.Errorf("failed to find block: %v", err)
+		}
+
+		if nodeType != currentNode.Type {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", currentNode.ID)
+		}
+
+		currentNode.Type = nodeType
+		currentNode.Ref = *nodeRef
+
+		if existingImplementation == "" {
+			integrationID, err := p.validateIntegration(node)
+			if err != nil {
+				errorMessage := err.Error()
+				currentNode.ErrorMessage = &errorMessage
+				if node.Configuration != nil {
+					currentNode.Configuration = node.Configuration.AsMap()
+				}
+				p.nodes[nodeID] = currentNode
+				return nil
+			}
+
+			currentNode.IntegrationID = integrationID
+		}
+	}
+
 	//
 	// From here on out, we don't return errors,
 	// we save the error message alongside the new invalid configuration.
@@ -332,26 +349,30 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 	// node will be in an error state.
 	//
 
-	if node.Configuration != nil {
+	if node.Configuration != nil || node.Block != "" {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.Configuration.AsMap()
+			if node.Configuration != nil {
+				currentNode.Configuration = node.Configuration.AsMap()
+			}
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		err = configuration.ValidateConfiguration(schema, node.Configuration.AsMap())
+		if node.Configuration != nil {
+			currentNode.Configuration = node.Configuration.AsMap()
+		}
+
+		err = configuration.ValidateConfiguration(schema, currentNode.Configuration)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.Configuration.AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		currentNode.Configuration = node.Configuration.AsMap()
 		currentNode.ErrorMessage = nil
 	}
 

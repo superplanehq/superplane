@@ -46,7 +46,6 @@ type UseCanvasConsoleVersionDiffArgs = {
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
   stageActiveConsole: boolean;
-  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
   getConsoleMutationGeneration?: () => number;
 };
 
@@ -57,31 +56,21 @@ export function useCanvasConsoleVersionDiff({
   suppressUnpublishedDraftDiscard,
   enabled,
   stageActiveConsole,
-  registerIgnoredCanvasVersionUpdatedEcho,
   getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  // The active console drives the editor. Staged reads (stage=true) apply only
-  // while editing a draft; published version previews use committed content.
   const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, stageActiveConsole);
   const draftDiffVersionId = versionIds.active || versionIds.draft;
-  // Committed draft console (stage=false) is the publish basis: only committed
-  // changes get promoted to live, so the publishable indicators below diff this
-  // against live.
   const draftConsoleQuery = useCanvasConsole(
     canvasId,
     draftDiffVersionId || undefined,
     enabled && !!draftDiffVersionId,
   );
-  const liveConsoleQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
+  const liveConsoleQuery = useCanvasConsole(canvasId, undefined, enabled && (!!versionIds.live || !versionIds.active));
   const hasDraftConsoleDiffVersusLive = useMemo(
     () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleQuery.data),
     [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],
   );
 
-  // The on-canvas diff surfaces (X-ray panel badges, the diff summary, and the
-  // "Show diff" modal) mirror the canvas tab, which diffs the *effective* draft
-  // against live. Prefer the staged console; fall back to the committed draft
-  // while it loads or when no version is actively being edited.
   const effectiveConsoleData = consoleQuery.data ?? draftConsoleQuery.data;
   const hasEffectiveConsoleDiffVersusLive = useMemo(
     () => hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, effectiveConsoleData),
@@ -121,7 +110,6 @@ export function useCanvasConsoleVersionDiff({
     hasDraftDiffVersusLive,
   });
   const updateConsoleMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
-    registerIgnoredCanvasVersionUpdatedEcho,
     getMutationGeneration: getConsoleMutationGeneration,
   });
 

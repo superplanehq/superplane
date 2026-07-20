@@ -9,10 +9,14 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
+import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 
 export const invokeFunctionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseMapper.props(context);
+    return {
+      ...baseMapper.props(context),
+      iconSrc: gcpCloudRunIcon,
+    };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {

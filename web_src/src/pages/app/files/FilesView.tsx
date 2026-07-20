@@ -13,6 +13,7 @@ const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default
 
 export function FilesView({
   canvasId,
+  organizationId,
   versionId,
   isEditing,
   canWrite,
@@ -25,6 +26,7 @@ export function FilesView({
   onFlushRepositoryFileStagingReady,
 }: {
   canvasId?: string;
+  organizationId?: string;
   versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
@@ -52,13 +54,13 @@ export function FilesView({
 
   return (
     <div
-      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50 dark:bg-gray-900"
       style={{ left: editor.leftOffset, right: 0 }}
       data-testid="files-overlay"
     >
-      <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
+      <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
         {editor.canManageRepositoryFiles ? (
-          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
+          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2 dark:border-gray-800/70">
             <div className="ml-auto flex shrink-0 items-center">
               <IconButton label="New file" onClick={editor.startNewFile} className="size-6 hover:bg-transparent">
                 <FilePlus2 className="h-3.5 w-3.5" />
@@ -95,6 +97,8 @@ export function FilesView({
         <FileEditor
           path={editor.selectedPath}
           content={editor.selectedContent}
+          canvasId={canvasId}
+          organizationId={organizationId}
           deleted={editor.selectedIsDeleted}
           language={editor.selectedGeneratedFile?.language}
           loading={editor.editorLoading}

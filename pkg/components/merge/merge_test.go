@@ -123,7 +123,7 @@ func Test_Merge_StopIfExpressionEvaluationError(t *testing.T) {
 
 	steps.ProcessFirstEventExpectFinish(m)
 	steps.AssertNodeExecutionCount(1)
-	steps.AssertExecutionFailedWithError("node name missing-node not found in execution chain")
+	steps.AssertExecutionFailedWithErrorContaining("expression evaluation failed")
 	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	steps.ProcessSecondEventExpectNoFinish(m)
@@ -304,14 +304,12 @@ func (s *MergeTestSteps) CreateWorkflow() {
 		}
 
 		return tx.Create(&models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  wf.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(nodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: wf.ID,
+			Nodes:      datatypes.NewJSONSlice(nodes),
+			Edges:      datatypes.NewJSONSlice(edges),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 
@@ -386,14 +384,12 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 		}
 
 		return tx.Create(&models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  wf.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(nodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: wf.ID,
+			Nodes:      datatypes.NewJSONSlice(nodes),
+			Edges:      datatypes.NewJSONSlice(edges),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 
@@ -587,6 +583,15 @@ func (s *MergeTestSteps) AssertExecutionFailedWithError(errorMessage string) {
 	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
 	assert.Equal(s.t, "error", execution.ResultReason)
 	assert.Equal(s.t, errorMessage, execution.ResultMessage)
+}
+
+func (s *MergeTestSteps) AssertExecutionFailedWithErrorContaining(errorMessage string) {
+	var execution models.CanvasNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(s.t, "error", execution.ResultReason)
+	assert.Contains(s.t, execution.ResultMessage, errorMessage)
 }
 
 // AssertExecutionFailed checks that the execution finished and emitted to the fail channel.

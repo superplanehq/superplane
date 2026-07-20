@@ -85,7 +85,7 @@ export function collectExecutionRows(
  *   shortcut for the latest output event). Lets authors write
  *   `$["deploy-prod"].outputs.url` in literal field paths and the same
  *   syntax in `{{ }}` CEL templates (the CEL compiler rewrites `$` to
- *   `__runNodes__` since cel-js doesn't accept `$` as an identifier).
+ *   `__runNodes__` since CEL doesn't accept `$` as an identifier).
  *
  * The raw `rootEvent`, `executions`, timestamps, etc. remain reachable via
  * dot paths (`getValueAtPath`) because we spread the full run into the row.
@@ -207,7 +207,7 @@ export function buildNodeNameMap(nodes: SuperplaneComponentsNode[] | undefined):
  * Collapse the API `state` / `result` enum pair into the lowercase status
  * vocabulary the rest of the dashboard speaks: `passed`, `failed`,
  * `cancelled`, `running`, `pending`, `unknown`. Matches the lookup tables in
- * `WidgetTable` (`STATUS_PILL_CLASS`) and `NodePanelCard` (`STATUS_CLASS`).
+ * `WidgetTable` (`consoleBadgeStyles`) and `NodePanelCard` (`STATUS_CLASS`).
  */
 function deriveExecutionStatus(
   state: string | undefined,

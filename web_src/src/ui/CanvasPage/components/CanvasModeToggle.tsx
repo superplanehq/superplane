@@ -1,9 +1,8 @@
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
-
-import type { DraftEditTabTone } from "@/pages/app/lib/draft-branch-edit-status";
 
 import { DraftChangeDots } from "./DraftChangeDots";
 
@@ -22,21 +21,12 @@ interface CanvasModeToggleProps {
   hasConsoleCommitted?: boolean;
   hasFilesUncommitted?: boolean;
   hasFilesCommitted?: boolean;
-  /** Edit-mode tab bar color aligned with draft status badges. */
-  editTabTone?: DraftEditTabTone;
 }
 
 const CANVAS_TAB = "canvas";
 const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
-
-const BASE_TAB_CLASSES =
-  "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
-
-const ACTIVE_CLASSES = "bg-background text-foreground shadow-sm";
-const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
-const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
@@ -56,30 +46,31 @@ function modeToTab(mode: string): string {
   return MODE_TO_TAB[mode] ?? CANVAS_TAB;
 }
 
-/** Edit-mode nav background tinted to match the draft status badges. */
-function editingNavClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted") return "bg-orange-50";
-  if (tone === "ready") return "bg-blue-50";
-  return "bg-slate-100";
+/** Edit-mode nav background tinted to match edit-session chrome. */
+function editingNavClassName(): string {
+  return "bg-orange-200";
 }
 
-/** Edit-mode inactive tab text tinted to match the draft status badges. */
-function editingInactiveClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted") return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none";
-  if (tone === "ready") return "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none";
-  return "bg-transparent text-slate-600 hover:text-slate-900 transition-none";
+/** Edit-mode inactive tab text on the orange nav track. */
+function editingInactiveClassName(): string {
+  return "bg-transparent text-orange-950/80 hover:text-orange-950 transition-none";
 }
 
-function tabClasses(selected: string, value: string, editing: boolean, tone: DraftEditTabTone) {
+/** Active edit tab — white pill on the orange nav track in light mode. */
+function editingActiveClassName(): string {
+  return "rounded-full bg-white text-gray-800 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:shadow-none";
+}
+
+function tabClasses(selected: string, value: string, editing: boolean) {
   const isActive = selected === value;
-  const stateClass = isActive
-    ? editing
-      ? EDITING_ACTIVE_CLASSES
-      : ACTIVE_CLASSES
-    : editing
-      ? editingInactiveClassName(tone)
-      : INACTIVE_CLASSES;
-  return cn(BASE_TAB_CLASSES, stateClass);
+  if (!editing) {
+    return segmentedNavTabClassName(isActive);
+  }
+
+  return segmentedNavTabClassName(isActive, {
+    activeClasses: editingActiveClassName(),
+    inactiveClasses: editingInactiveClassName(),
+  });
 }
 
 export function CanvasModeToggle({
@@ -95,7 +86,6 @@ export function CanvasModeToggle({
   hasConsoleCommitted = false,
   hasFilesUncommitted = false,
   hasFilesCommitted = false,
-  editTabTone = "neutral",
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
@@ -110,13 +100,13 @@ export function CanvasModeToggle({
       aria-label="Canvas view"
       className={cn(
         "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
-        editing ? editingNavClassName(editTabTone) : "bg-slate-100",
+        editing ? editingNavClassName() : "bg-slate-100 dark:bg-gray-800",
       )}
     >
       <Link
         to={tabHref()}
         onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
-        className={tabClasses(selected, CANVAS_TAB, editing, editTabTone)}
+        className={tabClasses(selected, CANVAS_TAB, editing)}
         data-testid="canvas-view-mode-live"
         aria-label={editing ? "Canvas (editing)" : "Canvas"}
         aria-current={selected === CANVAS_TAB ? "page" : undefined}
@@ -134,7 +124,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("console")}
           onClick={(e) => handleTabClick(e, selected === CONSOLE_TAB, () => void onSelectConsole?.())}
-          className={tabClasses(selected, CONSOLE_TAB, editing, editTabTone)}
+          className={tabClasses(selected, CONSOLE_TAB, editing)}
           data-testid="canvas-view-mode-console"
           aria-label="Console"
           aria-current={selected === CONSOLE_TAB ? "page" : undefined}
@@ -153,7 +143,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("memory")}
           onClick={(e) => handleTabClick(e, selected === MEMORY_TAB, () => void onSelectMemory?.())}
-          className={tabClasses(selected, MEMORY_TAB, editing, editTabTone)}
+          className={tabClasses(selected, MEMORY_TAB, editing)}
           data-testid="canvas-view-mode-memory"
           aria-label="Memory"
           aria-current={selected === MEMORY_TAB ? "page" : undefined}
@@ -165,7 +155,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("files")}
           onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
-          className={tabClasses(selected, FILES_TAB, editing, editTabTone)}
+          className={tabClasses(selected, FILES_TAB, editing)}
           data-testid="canvas-view-mode-files"
           aria-label="Files"
           aria-current={selected === FILES_TAB ? "page" : undefined}
