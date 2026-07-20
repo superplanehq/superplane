@@ -133,9 +133,28 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		defer os.RemoveAll(scriptWorkDir)
 	}
 
+	filesHostDir := ""
+	if len(api.NormalizeFiles(task.Files)) > 0 {
+		dir, ferr := os.MkdirTemp("", "superplane-task-files-"+task.ID+"-*")
+		if ferr != nil {
+			return 1, "", ferr
+		}
+		defer os.RemoveAll(dir)
+		if _, ferr = materializeTaskFiles(dir, task.Files); ferr != nil {
+			return 1, "", ferr
+		}
+		filesHostDir = dir
+	}
+
 	runArgs := []string{"run", "-d", "--name", name}
 	if scriptWorkDir != "" {
 		runArgs = append(runArgs, "-v", scriptWorkDir+":"+dockerScriptWorkMount+":ro")
+	}
+	if filesHostDir != "" {
+		runArgs = append(runArgs,
+			"-e", envSuperplaneTaskDir+"="+dockerTaskDirMount,
+			"-v", filesHostDir+":"+dockerTaskDirMount,
+		)
 	}
 	if rp := strings.TrimSpace(resultHostPath); rp != "" {
 		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)

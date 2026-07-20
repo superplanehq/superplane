@@ -38,7 +38,9 @@ type Task struct {
 	// SetupCommands are optional shell directives run before script tasks.
 	SetupCommands []string
 	// Environment is a task-scoped process environment sent only to runners.
-	Environment   []EnvironmentVariable
+	Environment []EnvironmentVariable
+	// Files are materialized under SUPERPLANE_TASK_DIR before execution.
+	Files         []TaskFile
 	WebhookURL    string
 	Status        TaskStatus
 	CreatedAt     time.Time
