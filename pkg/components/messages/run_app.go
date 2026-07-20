@@ -2,6 +2,7 @@ package messages
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -10,8 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const PassedOutputChannel = "passed"
-const FailedOutputChannel = "failed"
+const (
+	PassedOutputChannel         = "passed"
+	FailedOutputChannel         = "failed"
+	ActionRunTimeout            = "onRunTimeout"
+	defaultRunAppTimeoutSeconds = 3600
+)
 
 type RunApp struct{}
 
@@ -23,6 +28,7 @@ type RunAppConfiguration struct {
 	App        string         `json:"app" mapstructure:"app"`
 	Node       string         `json:"node" mapstructure:"node"`
 	Parameters map[string]any `json:"parameters" mapstructure:"parameters"`
+	Timeout    *int           `json:"timeout,omitempty" mapstructure:"timeout,omitempty"`
 }
 
 type runAppExecutionMetadata struct {
@@ -67,7 +73,14 @@ func (c *RunApp) Icon() string {
 }
 
 func (c *RunApp) Documentation() string {
-	return "Run another SuperPlane app and wait for its run to finish"
+	return `Run another SuperPlane app and wait for its run to finish.
+
+## Configuration
+
+- **App**: The SuperPlane app to invoke
+- **Node**: The On Run trigger in the target app
+- **Parameters**: Values passed to the target app's On Run trigger
+- **Timeout**: Maximum wait time in seconds for the child run (default 3600). When the timeout expires before the child run finishes, the child run is cancelled and the parent continues through the Failed output channel.`
 }
 
 func (c *RunApp) Description() string {
@@ -139,6 +152,19 @@ func (c *RunApp) Configuration() []configuration.Field {
 			Description: "The run parameters to pass to the target app",
 			Type:        configuration.FieldTypeRunParameters,
 			Required:    true,
+		},
+		{
+			Name:        "timeout",
+			Label:       "Timeout",
+			Type:        configuration.FieldTypeNumber,
+			Description: "Maximum time to wait for the child run in seconds (default 3600)",
+			Required:    false,
+			Default:     "3600",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 1; return &min }(),
+				},
+			},
 		},
 	}
 }
@@ -234,16 +260,24 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("run app: create run: %w", err)
 	}
 
-	return ctx.Metadata.Set(runAppExecutionMetadata{
+	executionMetadata := runAppExecutionMetadata{
 		Run: &RunMetadata{
 			ID: run.ID.String(),
 		},
-	})
+	}
+
+	timeoutSeconds := runAppTimeoutSeconds(config.Timeout)
+	if err := ctx.Requests.ScheduleActionCall(ActionRunTimeout, map[string]any{}, time.Duration(timeoutSeconds)*time.Second); err != nil {
+		return fmt.Errorf("run app: schedule timeout: %w", err)
+	}
+
+	return ctx.Metadata.Set(executionMetadata)
 }
 
 func (c *RunApp) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "onRunFinished", Type: core.HookTypeInternal},
+		{Name: ActionRunTimeout, Type: core.HookTypeInternal},
 	}
 }
 
@@ -251,21 +285,29 @@ func (c *RunApp) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "onRunFinished":
 		return c.handleRunFinished(ctx)
+	case ActionRunTimeout:
+		return c.handleRunTimeout(ctx)
 	default:
 		return fmt.Errorf("run app: unknown hook %s", ctx.Name)
 	}
 }
 
+func (c *RunApp) handleRunTimeout(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	return ctx.Runs.Cancel()
+}
+
 func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
 	callback, err := core.DecodeRunFinishedCallback(ctx.Parameters)
 	if err != nil {
 		return fmt.Errorf("run app: decode run finished callback: %w", err)
-	}
-
-	executionMetadata := runAppExecutionMetadata{}
-	err = mapstructure.Decode(ctx.Metadata.Get(), &executionMetadata)
-	if err != nil {
-		return fmt.Errorf("run app: decode execution metadata: %w", err)
 	}
 
 	if callback.Run.Result == core.RunResultPassed {
@@ -290,10 +332,7 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 		})
 	}
 
-	errMessage := ""
-	if callback.Run.Error != nil {
-		errMessage = *callback.Run.Error
-	}
+	errMessage := runAppFailureMessage(ctx.Configuration, callback.Run.Result, callback.Run.Error)
 
 	err = ctx.Metadata.Set(runAppExecutionMetadata{
 		Run: &RunMetadata{
@@ -328,4 +367,29 @@ func (c *RunApp) Cancel(ctx core.ExecutionContext) error {
 
 func (c *RunApp) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func runAppFailureMessage(configuration any, runResult string, runError *string) string {
+	if runResult == core.RunResultCancelled {
+		config := RunAppConfiguration{}
+		if err := mapstructure.Decode(configuration, &config); err != nil {
+			return "timed out"
+		}
+
+		return fmt.Sprintf("timed out after %ds", runAppTimeoutSeconds(config.Timeout))
+	}
+
+	if runError != nil {
+		return *runError
+	}
+
+	return ""
+}
+
+func runAppTimeoutSeconds(timeout *int) int {
+	if timeout == nil || *timeout <= 0 {
+		return defaultRunAppTimeoutSeconds
+	}
+
+	return *timeout
 }

@@ -244,6 +244,11 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		return fmt.Errorf("get action: %w", err)
 	}
 
+	parentCanvas, err := models.FindCanvasWithoutOrgScopeInTransaction(d.tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("find parent canvas: %w", err)
+	}
+
 	err = action.HandleHook(core.ActionHookContext{
 		Name:           callback.Hook,
 		Logger:         logging.ForNode(*node),
@@ -252,6 +257,7 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		Metadata:       contexts.NewExecutionMetadataContext(d.tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(d.tx, execution, d.eventCollector),
 		Requests:       contexts.NewExecutionRequestContext(d.tx, execution),
+		Runs:           contexts.NewRunExecutionContext(d.tx, parentCanvas, node, execution),
 		Parameters:     params,
 	})
 	if err != nil {

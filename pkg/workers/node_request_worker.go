@@ -99,10 +99,12 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		newEvents = append(newEvents, events...)
 	}
 
+	runCancellations := &RunCancellationNotifier{}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err == nil {
-			return w.processRequest(logger, tx, r, onNewEvents)
+			return w.processRequest(logger, tx, r, onNewEvents, runCancellations)
 		}
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -123,24 +125,26 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	runCancellations.Publish()
+
 	return nil
 }
 
-func (w *NodeRequestWorker) processRequest(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) processRequest(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeHook(logger, tx, request, onNewEvents)
+		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
 	if request.ExecutionID == nil {
 		return w.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentHook(logger, tx, request, onNewEvents)
+	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations)
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
@@ -296,7 +300,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
 	}
@@ -311,7 +315,7 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return request.Complete(tx)
 	}
 
-	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents)
+	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations)
 }
 
 func (w *NodeRequestWorker) invokeExecutionComponentHook(
@@ -320,6 +324,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	request *models.CanvasNodeRequest,
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -365,6 +370,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
+		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 	}
 
 	if node.AppInstallationID != nil {
