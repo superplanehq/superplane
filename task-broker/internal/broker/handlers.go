@@ -248,6 +248,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		ExecutionMode: mode,
 		DockerImage:   req.DockerImage,
 		Environment:   api.CloneEnvironment(req.Environment),
+		Files:         api.NormalizeFiles(req.Files),
 	}
 	switch kind {
 	case models.RunModeJavaScript, models.RunModePython, models.RunModeBash:
@@ -660,6 +661,9 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		return msg
 	}
 	if msg := api.ValidateEnvironment(req.Environment); msg != "" {
+		return msg
+	}
+	if msg := api.ValidateFiles(req.Files); msg != "" {
 		return msg
 	}
 	return ""

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -29,6 +30,14 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	env, err := processEnvironment(task.Environment)
 	if err != nil {
 		return 1, "", err
+	}
+	taskDir, err := materializeTaskFiles(hostTaskFilesRoot(h.TaskWorkDir, task.ID), task.Files)
+	if err != nil {
+		return 1, "", err
+	}
+	if taskDir != "" {
+		defer os.RemoveAll(taskDir)
+		env = withTaskDirEnv(env, taskDir)
 	}
 	switch api.RunModeForTask(task) {
 	case models.RunModeJavaScript:

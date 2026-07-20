@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,38 @@ import (
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
 )
+
+func TestHostExecutorMaterializesTaskFiles(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skipf("sh not on PATH: %v", err)
+	}
+	workDir := t.TempDir()
+	task := &api.TaskPayload{
+		ID:      "task-files-1",
+		Command: []string{sh, "-c", `printf "%s|%s" "$SUPERPLANE_TASK_DIR" "$(cat "$SUPERPLANE_TASK_DIR/hello.txt")"`},
+		Files: []api.TaskFile{
+			{Path: "hello.txt", Content: "from-files"},
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	exit, output, err := (&HostExecutor{TaskWorkDir: workDir}).Execute(ctx, task, nil, "")
+	if err != nil || exit != 0 {
+		t.Fatalf("host files: exit=%d err=%v output=%q", exit, err, output)
+	}
+	wantDir := hostTaskFilesRoot(workDir, task.ID)
+	if !strings.Contains(output, wantDir) {
+		t.Fatalf("output = %q, want SUPERPLANE_TASK_DIR=%q", output, wantDir)
+	}
+	if !strings.Contains(output, "from-files") {
+		t.Fatalf("output = %q, want file content", output)
+	}
+	if _, err := os.Stat(wantDir); !os.IsNotExist(err) {
+		t.Fatalf("expected task dir cleaned up, stat err=%v", err)
+	}
+}
 
 func TestHostExecutorArgvUsesTaskEnvironmentWithResultFile(t *testing.T) {
 	sh, err := exec.LookPath("sh")
