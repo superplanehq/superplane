@@ -64,17 +64,17 @@ func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
 	return p.client.deleteRepo(ctx, repoID)
 }
 
-func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, error) {
-	return p.client.listFiles(ctx, repoID, p.defaultBranch)
+func (p *Provider) ListFiles(ctx context.Context, repoID, ref string) ([]string, error) {
+	return p.client.listFiles(ctx, repoID, provider.RefOrDefault(ref, p.defaultBranch))
 }
 
-func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error) {
+func (p *Provider) GetFile(ctx context.Context, repoID, path, ref string) (io.ReadCloser, error) {
 	filePath, err := provider.NormalizePath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	return p.client.getFile(ctx, repoID, filePath, p.defaultBranch)
+	return p.client.getFile(ctx, repoID, filePath, provider.RefOrDefault(ref, p.defaultBranch))
 }
 
 func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (string, error) {
@@ -107,11 +107,42 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	return result.Commit.CommitSHA, nil
 }
 
-func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
-	commit, err := p.client.getCommit(ctx, repoID, p.defaultBranch)
+func (p *Provider) Head(ctx context.Context, repoID, ref string) (string, error) {
+	commit, err := p.client.getCommit(ctx, repoID, provider.RefOrDefault(ref, p.defaultBranch))
 	if err != nil {
 		return "", err
 	}
 
 	return commit.CommitSHA, nil
+}
+
+func (p *Provider) ListBranches(ctx context.Context, repoID, prefix string) ([]string, error) {
+	return p.client.listBranches(ctx, repoID, prefix)
+}
+
+func (p *Provider) CreateBranch(ctx context.Context, repoID, branch, fromRef string) error {
+	return p.client.createBranch(ctx, repoID, CreateBranchRequest{
+		Branch:  strings.TrimSpace(branch),
+		FromRef: provider.RefOrDefault(fromRef, p.defaultBranch),
+	})
+}
+
+func (p *Provider) MergeBranch(ctx context.Context, repoID, sourceBranch, targetBranch, message string, author provider.CommitAuthor) (string, error) {
+	if err := provider.ValidateCommitMetadata(message, author); err != nil {
+		return "", err
+	}
+
+	req := MergeBranchRequest{
+		SourceBranch: strings.TrimSpace(sourceBranch),
+		TargetBranch: provider.RefOrDefault(targetBranch, p.defaultBranch),
+		Message:      strings.TrimSpace(message),
+	}
+	req.Author.Name = strings.TrimSpace(author.Name)
+	req.Author.Email = strings.TrimSpace(author.Email)
+
+	return p.client.mergeBranch(ctx, repoID, req)
+}
+
+func (p *Provider) DeleteBranch(ctx context.Context, repoID, branch string) error {
+	return p.client.deleteBranch(ctx, repoID, strings.TrimSpace(branch))
 }

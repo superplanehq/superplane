@@ -3,10 +3,10 @@ package apps
 import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/changes"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/memory"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/staging"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -28,9 +28,7 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 		Short: "List apps",
 		Args:  cobra.NoArgs,
 	}
-	var listFull bool
-	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
-	core.Bind(listCmd, &listCommand{full: &listFull}, options)
+	core.Bind(listCmd, &listCommand{}, options)
 
 	activeCmd := &cobra.Command{
 		Use:   "active [app-id]",
@@ -44,7 +42,7 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 	root.AddCommand(activeCmd)
 	root.AddCommand(NewCreateCommand(options))
 	root.AddCommand(NewDeleteCommand(options))
-	root.AddCommand(changes.NewCommand(options))
+	root.AddCommand(staging.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))

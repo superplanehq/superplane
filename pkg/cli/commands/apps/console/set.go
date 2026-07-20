@@ -7,12 +7,12 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type setCommand struct {
-	file      *string
-	draftOnly *bool
+	file    *string
+	message *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -33,14 +33,19 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		flagValue = strings.TrimSpace(*c.file)
 	}
-	draftOnly := c.draftOnly != nil && *c.draftOnly
+
+	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
+	if err != nil {
+		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
+	}
 
 	yamlBytes, source, err := resolveYAMLSource(ctx.Cmd.InOrStdin(), flagValue, positional)
 	if err != nil {
 		return err
 	}
 
-	if _, err := ParseConsoleYAML(yamlBytes); err != nil {
+	_, err = yaml.ConsoleFromYML(yamlBytes)
+	if err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
@@ -49,49 +54,34 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	if err := common.CommitRepositorySpecFile(
+	if err := common.StageRepositorySpecFile(
 		ctx,
 		canvasID,
-		versionID,
 		common.ConsoleYAMLRepositoryPath,
 		yamlBytes,
-		"Update console.yaml",
-		nil,
-		false,
 	); err != nil {
 		return err
 	}
 
+	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, commitMessage)
+	if err != nil {
+		return fmt.Errorf("console was staged but commit failed: %w", err)
+	}
+
+	version := commitResponse.GetVersion()
+	if version.Metadata == nil {
+		return fmt.Errorf("committed version metadata is missing")
+	}
+	versionID := strings.TrimSpace(version.Metadata.GetId())
+
 	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
 	if err != nil {
-		return fmt.Errorf("console draft updated but failed to read console.yaml: %w", err)
+		return fmt.Errorf("console updated but failed to read console.yaml: %w", err)
 	}
 
-	updatedResource, err := ParseConsoleYAML(updatedYAML)
+	updatedResource, err := yaml.ConsoleFromYML(updatedYAML)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
-	}
-
-	// When change management is enabled, drafts are not visible from the
-	// UI on their own; the user can only see/approve them via a change
-	// request. Auto-create one so the operator sees the result of the
-	// command in the UI without a follow-up call. Pass --draft to skip.
-	var createdChangeRequestID string
-	if changeManagementEnabled && !draftOnly {
-		createdChangeRequestID, err = createChangeRequestForDraft(ctx, canvasID, versionID)
-		if err != nil {
-			return fmt.Errorf("console draft updated but failed to create change request: %w", err)
-		}
 	}
 
 	if !ctx.Renderer.IsText() {
@@ -99,40 +89,17 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Console updated for app %s\n", canvasID)
+		_, _ = fmt.Fprintf(stdout, "Version: %s\n", versionID)
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
-		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
-		if createdChangeRequestID != "" {
-			_, err := fmt.Fprintf(stdout, "Change request: %s (open)\n", createdChangeRequestID)
-			return err
-		}
-		if changeManagementEnabled {
-			_, err := fmt.Fprintln(stdout, "Run `superplane apps change-requests create` to open a change request for this draft.")
-			return err
-		}
-		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft) to publish a draft that includes this console.")
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
 		return err
 	})
 }
 
-// createChangeRequestForDraft opens a change request for the supplied
-// draft version. It returns the change request id (or empty when the API
-// does not echo one back).
-func createChangeRequestForDraft(ctx core.CommandContext, canvasID string, versionID string) (string, error) {
-	body := openapi_client.CanvasesCreateCanvasChangeRequestBody{}
-	body.SetVersionId(versionID)
-
-	response, _, err := ctx.API.CanvasChangeRequestAPI.
-		CanvasesCreateCanvasChangeRequest(ctx.Context, canvasID).
-		Body(body).
-		Execute()
-	if err != nil {
-		return "", err
+func messageValue(message *string) string {
+	if message == nil {
+		return ""
 	}
-	if response.ChangeRequest == nil || response.ChangeRequest.Metadata == nil {
-		return "", nil
-	}
-
-	return strings.TrimSpace(response.ChangeRequest.Metadata.GetId()), nil
+	return *message
 }

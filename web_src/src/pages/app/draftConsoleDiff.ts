@@ -28,6 +28,35 @@ export type DraftConsoleDiffSummary = {
   removedCount: number;
 };
 
+/**
+ * Recursively sort object keys so structurally-identical values produce
+ * identical JSON regardless of key insertion order. The committed console is
+ * serialized by the backend (Go `json.Marshal` emits map keys alphabetically)
+ * while the staged/effective console keeps the editor's insertion order. A
+ * plain `JSON.stringify` would treat those two as different and leave the
+ * "UNCOMMITTED CHANGES" badge stuck after a commit, so every comparison below
+ * canonicalizes through this helper first.
+ */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+  if (value && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    return Object.keys(source)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = canonicalize(source[key]);
+        return acc;
+      }, {});
+  }
+  return value;
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
 function comparablePanels(panels: ConsolePanel[] | undefined): unknown[] {
   return (panels ?? [])
     .map((panel) => ({
@@ -53,7 +82,7 @@ function comparableLayout(layout: ConsoleLayoutItem[] | undefined): unknown[] {
 }
 
 function comparableConsoleSnapshot(consoleData?: ConsoleSnapshot): string {
-  return JSON.stringify({
+  return stableStringify({
     panels: comparablePanels(consoleData?.panels),
     layout: comparableLayout(consoleData?.layout),
   });
@@ -65,7 +94,7 @@ export function hasDraftVersusLiveConsoleDiff(liveConsole?: ConsoleSnapshot, dra
 }
 
 function panelSnapshot(panel: ConsolePanel | undefined): string {
-  return JSON.stringify({
+  return stableStringify({
     type: panel?.type ?? "",
     content: panel?.content ?? {},
   });
@@ -185,7 +214,7 @@ function buildUpdatedPanelLines(
   ];
 
   (["type", "content", "layout"] as const).forEach((key) => {
-    if (JSON.stringify(previousFields[key]) === JSON.stringify(currentFields[key])) {
+    if (stableStringify(previousFields[key]) === stableStringify(currentFields[key])) {
       return;
     }
 

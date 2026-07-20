@@ -65,15 +65,16 @@ func Test__Client__NewClient(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get authType")
 	})
 
-	t.Run("missing groupId", func(t *testing.T) {
+	t.Run("missing groupId is allowed", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType": AuthTypePersonalAccessToken,
+				"authType":    AuthTypePersonalAccessToken,
+				"accessToken": "pat-123",
 			},
 		}
-		_, err := NewClient(mockClient, ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "groupId is required")
+		client, err := NewClient(mockClient, ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "", client.groupID)
 	})
 
 	t.Run("missing personal access token", func(t *testing.T) {
@@ -124,6 +125,36 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 		assert.Equal(t, "group/project1", projects[0].PathWithNamespace)
 	})
 
+	t.Run("personal projects when no group is configured", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 7, "username": "solo"}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "solo/project1", "web_url": "https://gitlab.com/solo/project1"}]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "",
+			httpClient: mockClient,
+		}
+
+		user, projects, err := client.FetchIntegrationData()
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/users/7/projects?per_page=100&page=1", mockClient.Requests[1].URL.String())
+
+		require.NotNil(t, user)
+		assert.Equal(t, 7, user.ID)
+
+		require.Len(t, projects, 1)
+		assert.Equal(t, "solo/project1", projects[0].PathWithNamespace)
+	})
+
 	t.Run("pagination", func(t *testing.T) {
 		resp1 := GitlabMockResponse(http.StatusOK, `[{"id": 1}]`)
 		resp1.Header.Set("X-Next-Page", "2")
@@ -157,6 +188,27 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 		require.Len(t, projects, 2)
 		assert.Equal(t, 1, projects[0].ID)
 		assert.Equal(t, 2, projects[1].ID)
+	})
+
+	t.Run("current user fetch fails when no group is configured", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusUnauthorized, `{"message": "401 Unauthorized"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "",
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.FetchIntegrationData()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get current user")
+		require.Len(t, mockClient.Requests, 1)
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
@@ -578,5 +630,642 @@ func Test__Client__ListPipelines(t *testing.T) {
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/pipelines?per_page=100&page=1", mockClient.Requests[0].URL.String())
+	})
+}
+
+func Test__Client__CreateMergeRequestAwardEmoji(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 25, "name": "eyes", "user": {"id": 42}}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.NoError(t, err)
+		assert.Equal(t, 25, result.ID)
+		assert.Equal(t, "eyes", result.Name)
+
+		require.Len(t, mockClient.Requests, 1)
+	})
+
+	t.Run("already exists - returns the existing award emoji", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Award Emoji Name has already been taken"}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 42}`),
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 24, "name": "eyes", "user": {"id": 7}},
+					{"id": 25, "name": "eyes", "user": {"id": 42}},
+					{"id": 26, "name": "rocket", "user": {"id": 42}}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.NoError(t, err)
+		assert.Equal(t, 25, result.ID)
+		assert.Equal(t, "eyes", result.Name)
+		assert.Equal(t, 42, result.User.ID)
+
+		require.Len(t, mockClient.Requests, 3)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[1].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[1].URL.String())
+		assert.Equal(t, http.MethodGet, mockClient.Requests[2].Method)
+	})
+
+	t.Run("already exists but not found in listing - returns an error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Award Emoji Name has already been taken"}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 42}`),
+				GitlabMockResponse(http.StatusOK, `[]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "reported as already existing but could not be found")
+	})
+
+	t.Run("other error - not treated as already-exists", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Project Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create award emoji")
+
+		require.Len(t, mockClient.Requests, 1)
+	})
+}
+
+func Test__Client__AcceptMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"id": 1,
+					"iid": 42,
+					"project_id": 456,
+					"title": "feat: add login page",
+					"state": "merged",
+					"merged_at": "2026-02-13T11:16:17.520Z",
+					"source_branch": "feature/login-page",
+					"target_branch": "main",
+					"merge_commit_sha": "9999999999999999999999999999999999999999",
+					"web_url": "https://gitlab.com/group/project/-/merge_requests/42"
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		squash := true
+		removeSourceBranch := true
+		mergeRequest, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{
+			MergeCommitMessage:       "Merge login page",
+			Squash:                   &squash,
+			SquashCommitMessage:      "feat: add login page",
+			ShouldRemoveSourceBranch: &removeSourceBranch,
+			SHA:                      "8888888888888888888888888888888888888888",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, mergeRequest)
+		assert.Equal(t, 42, mergeRequest.IID)
+		assert.Equal(t, "merged", mergeRequest.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42/merge", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.True(t, strings.Contains(bodyString, `"merge_commit_message":"Merge login page"`))
+		assert.True(t, strings.Contains(bodyString, `"squash":true`))
+		assert.True(t, strings.Contains(bodyString, `"squash_commit_message":"feat: add login page"`))
+		assert.True(t, strings.Contains(bodyString, `"should_remove_source_branch":true`))
+		assert.True(t, strings.Contains(bodyString, `"sha":"8888888888888888888888888888888888888888"`))
+	})
+
+	t.Run("omits optional fields when unset", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "iid": 42, "state": "merged"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Equal(t, "{}", string(body))
+	})
+
+	t.Run("conflict surfaces GitLab's message", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, `{"message": "Merge request is not mergeable"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Merge request is not mergeable")
+	})
+
+	t.Run("conflict with empty body falls back to SHA mismatch message", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, ``),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHA does not match HEAD of source branch")
+	})
+}
+
+func Test__Client__ApproveMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 1,
+					"iid": 42,
+					"project_id": 456,
+					"title": "feat: add login page",
+					"state": "opened",
+					"approvals_required": 2,
+					"approvals_left": 1,
+					"approved_by": [
+						{
+							"user": {"id": 1, "name": "Administrator", "username": "root"},
+							"approved_at": "2026-02-13T10:15:30.000Z"
+						}
+					]
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		approval, err := client.ApproveMergeRequest(context.Background(), "456", "42", &ApproveMergeRequestRequest{
+			SHA: "8888888888888888888888888888888888888888",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, approval)
+		assert.Equal(t, 42, approval.IID)
+		assert.Equal(t, 1, approval.ApprovalsLeft)
+		require.Len(t, approval.ApprovedBy, 1)
+		assert.Equal(t, "root", approval.ApprovedBy[0].User.Username)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42/approve", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.True(t, strings.Contains(string(body), `"sha":"8888888888888888888888888888888888888888"`))
+	})
+
+	t.Run("SHA mismatch", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, `{"message": "SHA does not match HEAD of source branch"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.ApproveMergeRequest(context.Background(), "456", "42", &ApproveMergeRequestRequest{
+			SHA: "0000000000000000000000000000000000000000",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHA does not match HEAD of source branch")
+	})
+}
+
+func Test__Client__ListEnvironments(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 1, "name": "production", "slug": "production", "external_url": "https://prod.example.com", "state": "available", "tier": "production"},
+					{"id": 2, "name": "staging", "slug": "staging", "external_url": "https://staging.example.com", "state": "available", "tier": "staging"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		environments, err := client.ListEnvironments("456")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/environments?per_page=100&page=1&states=available", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		require.Len(t, environments, 2)
+		assert.Equal(t, "production", environments[0].Name)
+		assert.Equal(t, "https://prod.example.com", environments[0].ExternalURL)
+		assert.Equal(t, "staging", environments[1].Name)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"error": "not found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.ListEnvironments("456")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "status 404")
+	})
+}
+
+func Test__Client__CreateDeployment(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 42,
+					"iid": 2,
+					"ref": "main",
+					"sha": "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+					"created_at": "2016-08-11T11:32:35.444Z",
+					"status": "running",
+					"environment": {"id": 9, "name": "production", "external_url": "https://prod.example.com"},
+					"deployable": null
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		deployment, err := client.CreateDeployment(context.Background(), "456", &CreateDeploymentRequest{
+			Environment: "production",
+			Ref:         "main",
+			SHA:         "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+			Tag:         false,
+			Status:      "running",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, deployment)
+		assert.Equal(t, 42, deployment.ID)
+		assert.Equal(t, "running", deployment.Status)
+		require.NotNil(t, deployment.Environment)
+		assert.Equal(t, "production", deployment.Environment.Name)
+		assert.Equal(t, "https://prod.example.com", deployment.Environment.ExternalURL)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/deployments", mockClient.Requests[0].URL.String())
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, `"environment":"production"`)
+		assert.Contains(t, bodyString, `"ref":"main"`)
+		assert.Contains(t, bodyString, `"tag":false`)
+		assert.Contains(t, bodyString, `"status":"running"`)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "sha is invalid"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateDeployment(context.Background(), "456", &CreateDeploymentRequest{
+			Environment: "production",
+			Ref:         "main",
+			SHA:         "bad",
+			Status:      "running",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create deployment")
+	})
+}
+
+func Test__Client__UpdateDeployment(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"id": 42,
+					"iid": 2,
+					"ref": "main",
+					"sha": "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+					"created_at": "2016-08-11T11:32:35.444Z",
+					"updated_at": "2016-08-11T11:34:00.000Z",
+					"status": "success",
+					"environment": {"id": 9, "name": "production", "external_url": "https://prod.example.com"}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		deployment, err := client.UpdateDeployment(context.Background(), "456", 42, &UpdateDeploymentRequest{
+			Status: "success",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, deployment)
+		assert.Equal(t, 42, deployment.ID)
+		assert.Equal(t, "success", deployment.Status)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/deployments/42", mockClient.Requests[0].URL.String())
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), `"status":"success"`)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Deployment Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.UpdateDeployment(context.Background(), "456", 99, &UpdateDeploymentRequest{Status: "failed"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update deployment")
+	})
+}
+
+func Test__Client__GetIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 101, "iid": 1, "title": "Test Issue", "state": "opened"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetIssue(context.Background(), "1", "1")
+		require.NoError(t, err)
+		assert.Equal(t, 101, result.ID)
+		assert.Equal(t, "Test Issue", result.Title)
+		assert.Equal(t, "opened", result.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/1", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Issue Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetIssue(context.Background(), "1", "999")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get issue")
+	})
+}
+
+func Test__Client__UpdateIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 101, "iid": 1, "title": "Updated Title", "state": "closed"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		title, stateEvent := "Updated Title", "close"
+		req := &UpdateIssueRequest{Title: &title, StateEvent: &stateEvent}
+		result, err := client.UpdateIssue(context.Background(), "1", "1", req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "Updated Title", result.Title)
+		assert.Equal(t, "closed", result.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/1", mockClient.Requests[0].URL.String())
+
+		body, _ := io.ReadAll(mockClient.Requests[0].Body)
+		assert.True(t, strings.Contains(string(body), `"state_event":"close"`))
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "400 Bad Request"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		title := "x"
+		_, err := client.UpdateIssue(context.Background(), "1", "1", &UpdateIssueRequest{Title: &title})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update issue")
+	})
+}
+
+func Test__Client__CreateIssueNote(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 55, "body": "Great work!", "noteable_type": "Issue"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "Great work!"})
+
+		require.NoError(t, err)
+		assert.Equal(t, 55, result.ID)
+		assert.Equal(t, "Great work!", result.Body)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/5/notes", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Issue Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateIssueNote(context.Background(), "1", "999", &CreateNoteRequest{Body: "x"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create issue note")
 	})
 }

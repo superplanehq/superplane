@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { shouldPreserveDraftSpec } from "./draft-canvas-sync";
+import {
+  shouldApplyPreservedDraftSpec,
+  shouldPreserveDraftSpec,
+  shouldSkipDraftSpecSyncFromLoadedVersion,
+} from "./draft-canvas-sync";
 
 describe("shouldPreserveDraftSpec", () => {
   const liveVersionSpec = {
@@ -67,5 +71,51 @@ describe("shouldPreserveDraftSpec", () => {
         liveVersionSpec,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldApplyPreservedDraftSpec", () => {
+  const committedSpec = {
+    nodes: [{ id: "live-node" }],
+    edges: [],
+  };
+  const stagedSpec = {
+    nodes: [{ id: "staged-node" }],
+    edges: [],
+  };
+
+  it("uses preserved draft spec when no staged version has loaded yet", () => {
+    expect(shouldApplyPreservedDraftSpec(committedSpec, null)).toBe(true);
+  });
+
+  it("replaces stale committed cache once staged content arrives", () => {
+    expect(shouldApplyPreservedDraftSpec(committedSpec, stagedSpec)).toBe(false);
+  });
+
+  it("keeps preserved draft spec when it already matches the staged version", () => {
+    expect(shouldApplyPreservedDraftSpec(stagedSpec, stagedSpec)).toBe(true);
+  });
+});
+
+describe("shouldSkipDraftSpecSyncFromLoadedVersion", () => {
+  const localDraftSpec = {
+    nodes: [{ id: "local-node" }],
+    edges: [],
+  };
+  const loadedDraftSpec = {
+    nodes: [{ id: "loaded-node" }],
+    edges: [],
+  };
+
+  it("skips sync when local draft is ahead of the loaded version", () => {
+    expect(shouldSkipDraftSpecSyncFromLoadedVersion(localDraftSpec, loadedDraftSpec)).toBe(true);
+  });
+
+  it("allows sync when local draft is not seeded yet", () => {
+    expect(shouldSkipDraftSpecSyncFromLoadedVersion(null, loadedDraftSpec)).toBe(false);
+  });
+
+  it("allows sync when local draft already matches the loaded version", () => {
+    expect(shouldSkipDraftSpecSyncFromLoadedVersion(localDraftSpec, localDraftSpec)).toBe(false);
   });
 });

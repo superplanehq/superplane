@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
+  <LinkCard title="Add Pull Request Reviewers" href="#add-pull-request-reviewers" description="Add reviewers to a GitHub pull request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a GitHub deployment for a ref and environment (enables the PR deployment UI)" />
   <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitHub deployment (success, failure, inactive, etc.)" />
@@ -43,12 +44,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="Mark Pull Request Ready for Review" href="#mark-pull-request-ready-for-review" description="Take a draft pull request out of the draft state in a GitHub repository" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
@@ -1947,6 +1950,78 @@ Returns the full list of labels currently on the issue after the addition.
 }
 ```
 
+<a id="add-pull-request-reviewers"></a>
+
+## Add Pull Request Reviewers
+
+**Component key:** `github.addPullRequestReviewers`
+
+The Add Pull Request Reviewers component adds individual users and/or teams as reviewers on a GitHub pull request.
+
+### Use Cases
+
+- **Automated reviewer assignment**: Request review from the relevant team when a pull request is opened
+- **Escalation workflows**: Add additional reviewers when a pull request needs attention
+- **On-call routing**: Request review from the current on-call engineer after checks pass
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to add reviewers to. Expressions are supported.
+- **Reviewers**: GitHub usernames to request as reviewers
+- **Team Reviewers**: Team slugs to request as team reviewers (optional)
+
+At least one reviewer or team reviewer is required.
+
+### Output
+
+Returns the updated pull request object with the current requested reviewers.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "requested_reviewers": [
+      {
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      }
+    ],
+    "requested_teams": [
+      {
+        "html_url": "https://github.com/orgs/acme/teams/justice-league",
+        "id": 1,
+        "slug": "justice-league"
+      }
+    ],
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
+}
+```
+
 <a id="add-reaction"></a>
 
 ## Add Reaction
@@ -2827,6 +2902,68 @@ Returns GitHub's check run list response, including total_count and check_runs. 
 }
 ```
 
+<a id="mark-pull-request-ready-for-review"></a>
+
+## Mark Pull Request Ready for Review
+
+**Component key:** `github.markPullRequestReadyForReview`
+
+The Mark Pull Request Ready for Review component takes a draft pull request out of the draft state, the same as clicking "Ready for review" on GitHub.
+
+### Use Cases
+
+- **Promote drafts automatically**: Mark a draft pull request ready once CI checks pass
+- **Release trains**: Open drafts early and promote them for review when the branch is ready
+- **Bot workflows**: Let an automation open work as a draft and hand it to reviewers when complete
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to mark ready for review. Expressions are supported.
+
+### Behavior
+
+This component is idempotent: if the pull request is already out of the draft state, it succeeds without calling GitHub again and emits the pull request as it is.
+
+### Permissions
+
+GitHub only exposes this operation through its GraphQL API, so the integration needs the **Pull Requests: Read & Write** permission.
+
+### Output
+
+Returns the pull request object after it has been marked ready for review.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
+}
+```
+
 <a id="merge-pull-request"></a>
 
 ## Merge Pull Request
@@ -3097,6 +3234,78 @@ Returns the updated issue object with all current information.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `github.updateIssueComment`
+
+The **Update Issue Comment** component edits an existing comment on a GitHub issue or pull request.
+
+### Use Cases
+
+- **Status updates**: Update a summary comment on a PR instead of posting new comments on every run
+- **Living reports**: Keep a single comment with the latest test results, coverage, or review status
+- **Avoid spam**: Update one comment instead of flooding a PR with repeated bot comments
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Comment ID**: The numeric ID of the comment to update (supports expressions)
+- **Body**: The new comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the updated comment object including comment ID, URL, body, and timestamps.
+
+### Notes
+
+- The comment ID is returned in the output of `github.createIssueComment` as `id`
+- You can store the comment ID in canvas memory on first run, then use it for subsequent updates
+- The authenticated user must have permission to edit the comment (must be the comment author or have admin access)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author_association": "NONE",
+    "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal refactors with no user-facing impact.",
+    "created_at": "2026-01-16T17:56:16Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+    "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "node_id": "IC_kwDOExample",
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890/reactions"
+    },
+    "updated_at": "2026-01-16T18:30:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "html_url": "https://github.com/apps/superplane-app",
+      "id": 12345678,
+      "login": "superplane-app[bot]",
+      "node_id": "BOT_kwExample",
+      "site_admin": false,
+      "type": "Bot",
+      "url": "https://api.github.com/users/superplane-app[bot]"
+    }
+  },
+  "timestamp": "2026-01-16T18:30:00.680755501Z",
+  "type": "github.issueComment"
 }
 ```
 

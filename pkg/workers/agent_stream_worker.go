@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	rabbit "github.com/rabbitmq/amqp091-go"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -18,32 +20,76 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"gorm.io/gorm"
 )
 
 const (
-	agentStreamTimeout   = 15 * time.Minute
-	maxConcurrentStreams = 10
-	// stuckStreamGrace pads the per-turn timeout before the cleanup loop
-	// considers a "streaming" row leaked. A turn that legitimately ran for
-	// the full timeout should have been transitioned to idle or failed by
-	// then; anything still streaming past 2× is stuck.
-	stuckStreamGrace    = 2 * agentStreamTimeout
-	stuckCleanupCadence = 5 * time.Minute
+	agentStreamTimeout         = 15 * time.Minute
+	maxConcurrentStreams       = 10
+	maxLockedStreamReschedules = 10
+	agentStreamService         = "superplane.agent-stream-worker"
+	streamHeartbeatInterval    = 30 * time.Second
+	agentTokenUsagePublishWait = 30 * time.Second
+	stuckHeartbeatGrace        = 5 * time.Minute
+	// Must stay above agentStreamTimeout so long-but-healthy turns
+	// without a heartbeat yet aren't force-failed mid-flight.
+	stuckLegacyGrace    = 2 * agentStreamTimeout
+	stuckCleanupCadence = 1 * time.Minute
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
+var errSessionAlreadyReset = errors.New("agent session no longer streaming")
+
+var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
+	return messages.NewAgentRunFinishedMessage(
+		session.OrganizationID.String(),
+		session.ID.String(),
+		evt.Model,
+		idempotencyKey,
+		session.ID.String(),
+		evt.Usage.InputTokens,
+		evt.Usage.OutputTokens,
+		evt.Usage.TotalTokens,
+		evt.Usage.CacheReadTokens,
+		evt.Usage.CacheWriteTokens,
+	).Publish()
+}
+
+var publishAgentTokenUsageAsync = func(
+	ctx context.Context,
+	usageService usage.Service,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+	idempotencyKey string,
+) {
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+		publishPreparedAgentTokenUsage(publishCtx, usageService, session, evt, idempotencyKey)
+	}()
+}
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider           agents.Provider
 	customToolExecutor agents.CustomToolExecutor
+	usageService       usage.Service
 	rabbitMQURL        string
 	slots              chan struct{}
 }
 
 func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customToolExecutor ...agents.CustomToolExecutor) *AgentStreamWorker {
+	return NewAgentStreamWorkerWithUsageService(provider, rabbitMQURL, nil, customToolExecutor...)
+}
+
+func NewAgentStreamWorkerWithUsageService(
+	provider agents.Provider,
+	rabbitMQURL string,
+	usageService usage.Service,
+	customToolExecutor ...agents.CustomToolExecutor,
+) *AgentStreamWorker {
 	executor := agents.CustomToolExecutor(unsupportedCustomToolExecutor{})
 	if len(customToolExecutor) > 0 && customToolExecutor[0] != nil {
 		executor = customToolExecutor[0]
@@ -51,6 +97,7 @@ func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customTo
 	return &AgentStreamWorker{
 		provider:           provider,
 		customToolExecutor: executor,
+		usageService:       usageService,
 		rabbitMQURL:        rabbitMQURL,
 		slots:              make(chan struct{}, maxConcurrentStreams),
 	}
@@ -85,7 +132,7 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 		err := consumer.Start(&tackle.Options{
 			URL:            w.rabbitMQURL,
 			RemoteExchange: messages.CanvasExchange,
-			Service:        "superplane.agent-stream-worker",
+			Service:        agentStreamService,
 			RoutingKey:     messages.AgentStreamRequestedRoutingKey,
 		}, func(delivery tackle.Delivery) error {
 			return w.dispatch(ctx, delivery.Body())
@@ -103,28 +150,39 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 	}
 }
 
-// dispatch acquires a concurrency slot and the per-session stream lock before
-// ACKing the queue message. If another worker already owns the session lock,
-// it returns an error so the message can be retried instead of dropped.
+// dispatch acquires a concurrency slot before ACKing the queue message. If
+// another worker already owns the session lock, it durably reschedules the
+// message for the retry queue instead of dropping the follow-up turn. The
+// heartbeat starts before the slot wait so a backed-up queue can't let
+// the cleanup cutoff elapse before the worker claims the session.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
+	stopHeartbeat := startDispatchHeartbeat(ctx, body)
+
 	select {
 	case w.slots <- struct{}{}:
 	case <-ctx.Done():
+		stopHeartbeat()
 		return ctx.Err()
 	}
 
 	request, err := prepareAgentStreamRequest(ctx, body)
 	if err != nil {
 		<-w.slots
+		stopHeartbeat()
+		if errors.Is(err, errAgentStreamAlreadyLocked) {
+			return w.rescheduleLockedRequest(ctx, body)
+		}
 		return err
 	}
 	if request == nil {
 		<-w.slots
+		stopHeartbeat()
 		return nil
 	}
 
 	go func() {
 		defer func() {
+			stopHeartbeat()
 			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
@@ -136,6 +194,22 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 		}
 	}()
 	return nil
+}
+
+// startDispatchHeartbeat returns a no-op stopper when the body is
+// unparseable so dispatch's return paths can call stop() unconditionally.
+func startDispatchHeartbeat(ctx context.Context, body []byte) func() {
+	var req messages.AgentStreamRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return func() {}
+	}
+	sessionID, err := uuid.Parse(req.SessionID)
+	if err != nil {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go runStreamHeartbeat(heartbeatCtx, sessionID)
+	return cancel
 }
 
 func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
@@ -164,8 +238,10 @@ func (w *AgentStreamWorker) cleanupTickSafely() {
 }
 
 func (w *AgentStreamWorker) cleanupStuckSessions() {
-	cutoff := time.Now().Add(-stuckStreamGrace)
-	closed, err := models.FailStuckStreamingSessions(cutoff)
+	now := time.Now()
+	heartbeatCutoff := now.Add(-stuckHeartbeatGrace)
+	legacyCutoff := now.Add(-stuckLegacyGrace)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
 	if err != nil {
 		log.WithError(err).Warn("agent stream cleanup: query failed")
 		return
@@ -219,7 +295,7 @@ func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedA
 		return nil, fmt.Errorf("agent stream: acquire session lock: %w", err)
 	}
 	if !locked {
-		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, retrying request later")
+		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, scheduling retry")
 		return nil, errAgentStreamAlreadyLocked
 	}
 
@@ -228,6 +304,51 @@ func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedA
 		sessionID: sessionID,
 		unlock:    unlock,
 	}, nil
+}
+
+func (w *AgentStreamWorker) rescheduleLockedRequest(ctx context.Context, body []byte) error {
+	retryBody, err := lockedStreamRetryBody(body)
+	if err != nil {
+		return err
+	}
+
+	publisher, err := tackle.NewPublisher(w.rabbitMQURL, tackle.PublisherOptions{})
+	if err != nil {
+		return fmt.Errorf("agent stream: create retry publisher: %w", err)
+	}
+	defer publisher.Close()
+
+	queueName := (&tackle.Options{
+		Service:    agentStreamService,
+		RoutingKey: messages.AgentStreamRequestedRoutingKey,
+	}).GetDelayQueueName()
+
+	if err := publisher.PublishWithContext(ctx, &tackle.PublishParams{
+		Body:       retryBody,
+		Headers:    rabbit.Table{},
+		Exchange:   "",
+		RoutingKey: queueName,
+	}); err != nil {
+		return fmt.Errorf("agent stream: schedule locked request retry: %w", err)
+	}
+	return nil
+}
+
+func lockedStreamRetryBody(body []byte) ([]byte, error) {
+	var req messages.AgentStreamRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("agent stream: decode locked request retry: %w", err)
+	}
+	if req.LockRetryCount >= maxLockedStreamReschedules {
+		return nil, errAgentStreamAlreadyLocked
+	}
+
+	req.LockRetryCount++
+	retryBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("agent stream: encode locked request retry: %w", err)
+	}
+	return retryBody, nil
 }
 
 func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages.AgentStreamRequest, sessionID uuid.UUID) error {
@@ -244,9 +365,13 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		}).Warn("agent stream: provider mismatch, dropping")
 		return nil
 	}
-
-	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
-	defer cancel()
+	if session.Status != models.AgentSessionStatusStreaming {
+		log.WithFields(log.Fields{
+			"session_id": sessionID,
+			"status":     session.Status,
+		}).Info("agent stream: session is no longer streaming, dropping request")
+		return nil
+	}
 
 	publish := func(event messages.AgentSessionEventMessage) {
 		event.SessionID = sessionID.String()
@@ -255,72 +380,134 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		}
 	}
 
-	publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
+	for {
+		turnStartedAt := session.UpdatedAt
+		publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
+
+		streamErr := w.streamProviderTurn(parentCtx, session, publish)
+		closeOpenTools(sessionID, publish)
+
+		if streamErr != nil {
+			// Conditional on turnStartedAt so a stream that errors out
+			// after the user already hit Stop (InterruptSession bumps
+			// updated_at when it resets to idle) can't flip the row from
+			// idle back to failed and spook the UI.
+			markedFailed, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusFailed, turnStartedAt)
+			if err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: failed to mark session failed")
+				return nil
+			}
+			if markedFailed {
+				publish(messages.AgentSessionEventMessage{
+					Event:  "session_failed",
+					Status: models.AgentSessionStatusFailed,
+					Error:  streamErr.Error(),
+				})
+				log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			} else {
+				log.WithError(streamErr).WithField("session_id", sessionID).Info("agent stream: stream errored but session was already reset; dropping failed event")
+			}
+			return nil
+		}
+
+		markedIdle, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusIdle, turnStartedAt)
+		if err != nil {
+			log.WithError(err).Warn("agent stream: failed to mark session idle")
+			return nil
+		}
+		if markedIdle {
+			return nil
+		}
+
+		session, err = models.FindAgentSession(sessionID)
+		if err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: session not found after turn, stopping")
+			return nil
+		}
+		if session.Status != models.AgentSessionStatusStreaming {
+			log.WithFields(log.Fields{
+				"session_id": sessionID,
+				"status":     session.Status,
+			}).Info("agent stream: session changed after turn, stopping")
+			return nil
+		}
+		log.WithField("session_id", sessionID).Info("agent stream: follow-up request arrived while stream was locked, continuing")
+	}
+}
+
+func (w *AgentStreamWorker) streamProviderTurn(
+	parentCtx context.Context,
+	session *models.AgentSession,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
+	defer cancel()
 
 	var streamErr error
 	customTools := newCustomToolTurnState()
+	usageRetriever, _ := w.provider.(agents.ProviderSessionUsageRetriever)
 
 	for {
 		customTools.clearRequirement()
-		err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(sessionID, evt, publish, &streamErr, customTools)
+		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
+			return handleProviderEvent(ctx, w.usageService, usageRetriever, session, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
 			err = nil
 		}
+		if errors.Is(err, errSessionAlreadyReset) {
+			return nil
+		}
 		if streamErr == nil && err != nil && !isContextCancel(err) {
 			streamErr = err
 		}
 		if streamErr != nil || !customTools.resultsRequired {
-			break
+			return streamErr
 		}
 
 		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
-			streamErr = err
-			break
+			return err
 		}
 	}
-
-	closeOpenTools(sessionID, publish)
-
-	if streamErr != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		publish(messages.AgentSessionEventMessage{
-			Event:  "session_failed",
-			Status: models.AgentSessionStatusFailed,
-			Error:  streamErr.Error(),
-		})
-		log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
-		return nil
-	}
-
-	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle); err != nil {
-		log.WithError(err).Warn("agent stream: failed to mark session idle")
-	}
-	return nil
 }
 
 func handleProviderEvent(
-	sessionID uuid.UUID,
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
+	// Drop late events from a turn the user has already stopped — closes
+	// the race between InterruptSession's commit and provider SSE bytes
+	// already in flight.
+	streaming, err := models.IsAgentSessionStreaming(session.ID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", session.ID).Warn("agent stream: status check failed; processing event anyway")
+	} else if !streaming {
+		if evt.Type == agents.ProviderEventTurnCompleted {
+			publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		}
+		return errSessionAlreadyReset
+	}
+
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
-		return persistAssistantEvent(sessionID, evt, publish)
+		return persistAssistantEvent(session.ID, evt, publish)
 	case agents.ProviderEventToolUseStarted:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventToolUseFinished:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
 	case agents.ProviderEventCustomToolUseStarted:
 		customTools.remember(evt)
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventCustomToolResultsRequired:
 		customTools.require(evt.CustomToolEventIDs)
-		if err := customTools.resolvePersisted(sessionID); err != nil {
+		if err := customTools.resolvePersisted(session.ID); err != nil {
 			return err
 		}
 		if customTools.resultsRequired {
@@ -328,20 +515,181 @@ func handleProviderEvent(
 		}
 	case agents.ProviderEventTurnCompleted:
 		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
+		publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
 	case agents.ProviderEventOutcomeEvaluationStart:
 		publishOutcomeEvaluationStart(evt, publish)
 	case agents.ProviderEventOutcomeEvaluation:
 		publishOutcomeEvaluationEnd(evt, publish)
 	case agents.ProviderEventThreadMessageSent:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusStarted, "tool_started", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusStarted, "tool_started", publish)
 	case agents.ProviderEventThreadMessageReceived:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+	case agents.ProviderEventSessionNotice:
+		// Ephemeral notice: no status change, no DB row, stream continues.
+		publish(messages.AgentSessionEventMessage{Event: "session_notice", Error: evt.ErrorMessage})
 	case agents.ProviderEventSessionFailed:
 		// Don't publish here — the post-loop block owns
 		// session_failed broadcasting so it stays single-source.
 		*streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
 	}
 	return nil
+}
+
+func publishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if evt.Usage == nil {
+		retrieveAndPublishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		return
+	}
+
+	if !evt.Usage.HasUsage() {
+		return
+	}
+
+	cumulativeUsage := agentSessionTokenUsage(evt.Usage)
+	deltaUsage, initialized, err := models.CalculateAgentSessionTokenUsageDelta(session.ID, cumulativeUsage)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to calculate agent token usage delta")
+		return
+	}
+	if !initialized {
+		if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"session_id":      session.ID,
+				"organization_id": session.OrganizationID,
+			}).Warn("agent stream: failed to initialize agent token usage watermark")
+		}
+		return
+	}
+	if !deltaUsage.HasUsage() {
+		return
+	}
+
+	if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to mark agent token usage tracked")
+		return
+	}
+
+	publishEvent := evt
+	publishEvent.Usage = providerTokenUsage(deltaUsage)
+	publishAgentTokenUsageAsync(ctx, usageService, session, publishEvent, agentTokenUsageIdempotencyKey(session.ID, cumulativeUsage))
+}
+
+func retrieveAndPublishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if usageRetriever == nil {
+		return
+	}
+
+	go func() {
+		retrieveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+
+		usage, err := usageRetriever.RetrieveSessionUsage(retrieveCtx, session.ProviderSessionID)
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"session_id":          session.ID,
+				"organization_id":     session.OrganizationID,
+				"provider_session_id": session.ProviderSessionID,
+			}).Warn("agent stream: failed to retrieve completed session usage")
+			return
+		}
+
+		evt.Usage = usage
+		publishAgentTokenUsage(retrieveCtx, usageService, nil, session, evt)
+	}()
+}
+
+func publishPreparedAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+	idempotencyKey string,
+) {
+	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
+	}
+
+	log.WithFields(log.Fields{
+		"session_id":         session.ID,
+		"organization_id":    session.OrganizationID,
+		"idempotency_key":    idempotencyKey,
+		"model":              evt.Model,
+		"input_tokens":       evt.Usage.InputTokens,
+		"output_tokens":      evt.Usage.OutputTokens,
+		"total_tokens":       evt.Usage.TotalTokens,
+		"cache_read_tokens":  evt.Usage.CacheReadTokens,
+		"cache_write_tokens": evt.Usage.CacheWriteTokens,
+	}).Info("agent stream: publishing agent token usage")
+
+	if err := publishAgentRunFinished(session, evt, idempotencyKey); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+			"idempotency_key": idempotencyKey,
+		}).Warn("agent stream: failed to publish agent token usage")
+		return
+	}
+}
+
+func agentTokenUsageIdempotencyKey(sessionID uuid.UUID, cumulativeUsage models.AgentSessionTokenUsage) string {
+	return fmt.Sprintf(
+		"%s:%d:%d:%d:%d:%d",
+		sessionID,
+		cumulativeUsage.InputTokens,
+		cumulativeUsage.OutputTokens,
+		cumulativeUsage.CacheReadTokens,
+		cumulativeUsage.CacheWriteTokens,
+		cumulativeUsage.TotalTokens,
+	)
+}
+
+func agentSessionTokenUsage(usage *agents.TokenUsage) models.AgentSessionTokenUsage {
+	return models.AgentSessionTokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func providerTokenUsage(usage models.AgentSessionTokenUsage) *agents.TokenUsage {
+	return &agents.TokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func syncAgentTokenUsageOrganization(ctx context.Context, usageService usage.Service, organizationID string) error {
+	if usageService == nil || !usageService.Enabled() {
+		return nil
+	}
+
+	return usage.SyncOrganization(ctx, usageService, organizationID)
 }
 
 func (w *AgentStreamWorker) executeAndSendCustomToolResults(
@@ -369,13 +717,22 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 		}
 		toolUses[id] = toolUse
 
+		logCustomToolExecutionStarted(session, toolUse)
+		startedAt := time.Now()
 		result := w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)
+		logCustomToolExecutionFinished(session, toolUse, result, time.Since(startedAt))
 		results = append(results, result)
 	}
 
+	logCustomToolResultsSendStarted(session, results)
+	startedAt := time.Now()
 	if err := sender.SendCustomToolResults(ctx, session.ProviderSessionID, results); err != nil {
+		log.WithError(err).WithFields(customToolResultsLogFields(session, results, time.Since(startedAt))).
+			Warn("agent stream: failed to send custom tool results")
 		return err
 	}
+	log.WithFields(customToolResultsLogFields(session, results, time.Since(startedAt))).
+		Info("agent stream: sent custom tool results")
 
 	for _, result := range results {
 		toolUse := toolUses[result.CustomToolUseID]
@@ -396,6 +753,86 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 
 	customTools.markResolved()
 	return nil
+}
+
+func logCustomToolExecutionStarted(session *models.AgentSession, toolUse agents.CustomToolUse) {
+	log.WithFields(customToolUseLogFields(session, toolUse)).
+		Info("agent stream: executing custom tool")
+}
+
+func logCustomToolExecutionFinished(session *models.AgentSession, toolUse agents.CustomToolUse, result agents.CustomToolResult, elapsed time.Duration) {
+	fields := customToolUseLogFields(session, toolUse)
+	fields["elapsed_ms"] = elapsed.Milliseconds()
+	fields["result_content_bytes"] = len(result.Content)
+	fields["is_error"] = result.IsError
+	log.WithFields(fields).Info("agent stream: custom tool execution finished")
+}
+
+func logCustomToolResultsSendStarted(session *models.AgentSession, results []agents.CustomToolResult) {
+	fields := customToolResultsLogFields(session, results, 0)
+	delete(fields, "elapsed_ms")
+	log.WithFields(fields).Info("agent stream: sending custom tool results")
+}
+
+func customToolUseLogFields(session *models.AgentSession, toolUse agents.CustomToolUse) log.Fields {
+	fields := log.Fields{
+		"session_id":            session.ID,
+		"provider_session_id":   session.ProviderSessionID,
+		"organization_id":       session.OrganizationID,
+		"custom_tool_use_id":    toolUse.ID,
+		"custom_tool_name":      toolUse.Name,
+		"tool_input_bytes":      len(toolUse.Input),
+		"tool_input_json_valid": json.Valid([]byte(toolUse.Input)),
+	}
+
+	for key, value := range customToolInputSummary(toolUse.Input) {
+		fields[key] = value
+	}
+
+	return fields
+}
+
+func customToolInputSummary(input string) log.Fields {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(input), &payload); err != nil {
+		return nil
+	}
+
+	fields := log.Fields{}
+	if action, ok := payload["action"].(string); ok && strings.TrimSpace(action) != "" {
+		fields["tool_action"] = strings.TrimSpace(action)
+	}
+	if consoleYAML, ok := payload["console_yaml"].(string); ok {
+		fields["console_yaml_bytes"] = len(consoleYAML)
+	}
+	if patchOperations, ok := payload["patch_operations"].([]any); ok {
+		fields["patch_operations_count"] = len(patchOperations)
+	}
+	return fields
+}
+
+func customToolResultsLogFields(session *models.AgentSession, results []agents.CustomToolResult, elapsed time.Duration) log.Fields {
+	errorCount := 0
+	contentBytes := 0
+	resultIDs := make([]string, 0, len(results))
+	for _, result := range results {
+		contentBytes += len(result.Content)
+		resultIDs = append(resultIDs, result.CustomToolUseID)
+		if result.IsError {
+			errorCount++
+		}
+	}
+
+	return log.Fields{
+		"session_id":                session.ID,
+		"provider_session_id":       session.ProviderSessionID,
+		"organization_id":           session.OrganizationID,
+		"custom_tool_result_count":  len(results),
+		"custom_tool_result_ids":    resultIDs,
+		"custom_tool_error_count":   errorCount,
+		"custom_tool_content_bytes": contentBytes,
+		"elapsed_ms":                elapsed.Milliseconds(),
+	}
 }
 
 func agentSessionContext(session *models.AgentSession) agents.AgentSessionContext {
@@ -666,6 +1103,26 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 		ToolName:   m.ToolName,
 		ToolStatus: m.ToolStatus,
 		CreatedAt:  m.CreatedAt,
+	}
+}
+
+// runStreamHeartbeat writes once up front so cleanup can't race the first
+// tick, then ticks until the caller cancels.
+func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
+	if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: initial heartbeat failed")
+	}
+	ticker := time.NewTicker(streamHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: heartbeat failed")
+			}
+		}
 	}
 }
 

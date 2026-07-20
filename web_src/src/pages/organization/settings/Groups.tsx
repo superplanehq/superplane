@@ -1,7 +1,8 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { Timestamp } from "@/components/Timestamp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
@@ -16,7 +17,17 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
+import {
+  settingsEmptyStateIconClassName,
+  settingsEmptyStateTitleClassName,
+  settingsErrorClassName,
+  settingsRowActionClassName,
+  settingsRowMenuClassName,
+  settingsTableCardClassName,
+  settingsTableLinkClassName,
+} from "./settingsPageStyles";
 
 interface GroupsProps {
   organizationId: string;
@@ -46,6 +57,10 @@ export function Groups({ organizationId }: GroupsProps) {
   const canDeleteGroups = canAct("groups", "delete");
 
   const error = groupsError || rolesError;
+
+  useReportPageReady(!loadingGroups && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleCreateGroup = () => {
     if (!canCreateGroups) return;
@@ -143,12 +158,12 @@ export function Groups({ organizationId }: GroupsProps) {
   return (
     <div className="space-y-6 pt-6">
       {error && (
-        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+        <div className={settingsErrorClassName}>
           <p>{error instanceof Error ? error.message : "Failed to fetch data"}</p>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className={settingsTableCardClassName}>
         {filteredAndSortedGroups.length > 0 && (
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
             <PermissionTooltip
@@ -169,10 +184,10 @@ export function Groups({ organizationId }: GroupsProps) {
             </div>
           ) : filteredAndSortedGroups.length === 0 ? (
             <div className="flex min-h-96 flex-col items-center justify-center text-center">
-              <div className="flex items-center justify-center text-gray-800">
+              <div className={settingsEmptyStateIconClassName}>
                 <Icon name="users" size="xl" />
               </div>
-              <p className="mt-3 text-sm text-gray-800">Create your first group</p>
+              <p className={settingsEmptyStateTitleClassName}>Create your first group</p>
               <PermissionTooltip
                 allowed={canCreateGroups || permissionsLoading}
                 message="You don't have permission to create groups."
@@ -193,7 +208,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Team name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -202,7 +217,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Created
-                      <Icon name={getSortIcon("created")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("created")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -211,7 +226,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Members
-                      <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("members")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -220,7 +235,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -231,10 +246,10 @@ export function Groups({ organizationId }: GroupsProps) {
                   <TableRow key={index} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Icon name="users" size="sm" className="text-gray-800" />
+                        <Icon name="users" size="sm" className="text-gray-800 dark:text-gray-100" />
                         <Link
                           href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
-                          className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          className={settingsTableLinkClassName}
                         >
                           {group.spec?.displayName}
                         </Link>
@@ -242,9 +257,12 @@ export function Groups({ organizationId }: GroupsProps) {
                     </TableCell>
 
                     <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatRelativeTime(group.metadata?.createdAt)}
-                      </span>
+                      <Timestamp
+                        date={group.metadata?.createdAt}
+                        display="relative"
+                        className="text-sm text-gray-500 dark:text-gray-400"
+                        fallback={<span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>}
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -259,7 +277,10 @@ export function Groups({ organizationId }: GroupsProps) {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="flex items-center gap-2 text-sm justify-between"
+                              className={cn(
+                                "flex items-center justify-between gap-2 text-sm",
+                                settingsRowMenuClassName,
+                              )}
                               disabled={updateGroupMutation.isPending || !canUpdateGroups}
                             >
                               {updateGroupMutation.isPending
@@ -298,7 +319,7 @@ export function Groups({ organizationId }: GroupsProps) {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                  className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
+                                  className={settingsRowActionClassName}
                                   aria-label="Delete group"
                                   disabled={deleteGroupMutation.isPending || !canDeleteGroups}
                                 >

@@ -11,9 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
@@ -36,9 +36,10 @@ var errNoChangesToPublish = fmt.Errorf("no changes between live and draft versio
 type CanvasPublisher struct {
 	tx         *gorm.DB
 	options    CanvasPublisherOptions
+	canvas     *models.Canvas
 	live       *models.CanvasVersion
 	draft      *models.CanvasVersion
-	changeset  *pb.CanvasChangeset
+	changeset  *CanvasChangeset
 	finalNodes map[string]models.Node
 	renamedIDs map[string]string
 
@@ -49,10 +50,19 @@ type CanvasPublisher struct {
 	// not conflict with deleted nodes.
 	//
 	allNodes map[string]models.CanvasNode
+
+	cancelledExecutionIDs []uuid.UUID
+	deletedQueueItems     []models.CanvasNodeQueueItem
+}
+
+type CanvasPublishResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	DeletedQueueItems     []models.CanvasNodeQueueItem
 }
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
+	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -83,7 +93,7 @@ func (o *CanvasPublisherOptions) Validate() error {
 	return nil
 }
 
-func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
+func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -92,7 +102,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	if err != nil {
 		return nil, err
 	}
-	if len(changeset.GetChanges()) == 0 {
+	if len(changeset.Changes) == 0 {
 		return nil, errNoChangesToPublish
 	}
 
@@ -119,6 +129,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	return &CanvasPublisher{
 		tx:         tx,
 		options:    options,
+		canvas:     canvas,
 		live:       liveVersion,
 		finalNodes: finalNodes,
 		draft:      draft,
@@ -147,6 +158,13 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) Result() CanvasPublishResult {
+	return CanvasPublishResult{
+		CancelledExecutionIDs: append([]uuid.UUID(nil), p.cancelledExecutionIDs...),
+		DeletedQueueItems:     append([]models.CanvasNodeQueueItem(nil), p.deletedQueueItems...),
+	}
 }
 
 func (p *CanvasPublisher) edgesWithRenamedNodeIDs(edges []models.Edge) []models.Edge {
@@ -187,21 +205,21 @@ func (p *CanvasPublisher) filterEdgesForExistingNodes(edges []models.Edge) []mod
 	return filteredEdges
 }
 
-func (p *CanvasPublisher) processChange(ctx context.Context, change *pb.CanvasChangeset_Change) error {
+func (p *CanvasPublisher) processChange(ctx context.Context, change *Change) error {
 	switch change.Type {
-	case pb.CanvasChangeset_Change_ADD_NODE:
+	case ChangeTypeAddNode:
 		return p.addNode(ctx, change)
-	case pb.CanvasChangeset_Change_DELETE_NODE:
+	case ChangeTypeDeleteNode:
 		return p.deleteNode(change)
-	case pb.CanvasChangeset_Change_UPDATE_NODE:
+	case ChangeTypeUpdateNode:
 		return p.updateNode(ctx, change)
 	}
 
 	return nil
 }
 
-func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
-	node := p.finalNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
+	node := p.finalNodes[change.Node.ID]
 	nodeID := p.ensureNewNodeID(node)
 	node.ID = nodeID
 
@@ -212,9 +230,6 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		return nil
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
 	appInstallationID, err := p.getNodeIntegrationID(node)
 	if err != nil {
 		return err
@@ -286,13 +301,19 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	return p.tx.Save(&newNode).Error
 }
 
-func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
-	updatedNode := p.finalNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error {
+	updatedNode := p.finalNodes[change.Node.ID]
 
-	//
-	// Widgets are not saved as workflow_nodes records in the database.
-	//
 	if updatedNode.Type == models.NodeTypeWidget {
+		liveNode, exists := p.findLiveNode(updatedNode.ID)
+		if !exists {
+			return fmt.Errorf("node %s not found", updatedNode.ID)
+		}
+
+		if nodeImplementationChanged(liveNode, updatedNode) {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
+		}
+
 		return nil
 	}
 
@@ -301,9 +322,10 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 		return fmt.Errorf("node %s not found", updatedNode.ID)
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
+	if canvasNodeImplementationChanged(existingNode, updatedNode) {
+		return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
+	}
+
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
 	if err != nil {
 		return err
@@ -361,14 +383,21 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	return p.tx.Save(&existingNode).Error
 }
 
-func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {
-	existingNode, exists := p.allNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) deleteNode(change *Change) error {
+	existingNode, exists := p.allNodes[change.Node.ID]
 	if !exists {
 		return nil
 	}
 
 	delete(p.allNodes, existingNode.NodeID)
-	return models.DeleteCanvasNode(p.tx, existingNode)
+	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
+	if err != nil {
+		return err
+	}
+
+	p.cancelledExecutionIDs = append(p.cancelledExecutionIDs, result.CancelledExecutionIDs...)
+	p.deletedQueueItems = append(p.deletedQueueItems, result.DeletedQueueItems...)
+	return nil
 }
 
 func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, error) {
@@ -395,6 +424,52 @@ func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, er
 	}
 
 	return &id, nil
+}
+
+func (p *CanvasPublisher) findLiveNode(nodeID string) (models.Node, bool) {
+	for _, node := range p.live.Nodes {
+		if node.ID == nodeID {
+			return node, true
+		}
+	}
+
+	return models.Node{}, false
+}
+
+func canvasNodeImplementationChanged(existingNode models.CanvasNode, updatedNode models.Node) bool {
+	return nodeImplementationChanged(nodeFromCanvasNode(existingNode), updatedNode)
+}
+
+func nodeImplementationChanged(existingNode models.Node, updatedNode models.Node) bool {
+	if existingNode.Type != updatedNode.Type {
+		return true
+	}
+
+	existingImplementation := nodeImplementationName(existingNode)
+	return existingImplementation != "" && existingImplementation != nodeImplementationName(updatedNode)
+}
+
+func nodeFromCanvasNode(node models.CanvasNode) models.Node {
+	return models.Node{
+		Type: node.Type,
+		Ref:  node.Ref.Data(),
+	}
+}
+
+func nodeImplementationName(node models.Node) string {
+	if node.Ref.Component != nil {
+		return strings.TrimSpace(node.Ref.Component.Name)
+	}
+
+	if node.Ref.Trigger != nil {
+		return strings.TrimSpace(node.Ref.Trigger.Name)
+	}
+
+	if node.Ref.Widget != nil {
+		return strings.TrimSpace(node.Ref.Widget.Name)
+	}
+
+	return ""
 }
 
 func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode) error {
@@ -425,6 +500,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Events:        contexts.NewEventContext(p.tx, node, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {
@@ -442,6 +518,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
+		logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
 	}
 
 	triggerCtx.Logger = logger
@@ -463,6 +540,8 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
+		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {
@@ -480,6 +559,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 			p.options.Registry,
 			nil,
 		)
+		logger.WithField("source", "action_setup").Info("Integration operation may write secrets")
 	}
 
 	setupCtx.Logger = logger

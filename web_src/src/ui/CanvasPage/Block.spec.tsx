@@ -335,4 +335,28 @@ describe("Block fallback rendering", () => {
     expect(screen.queryByText("Ready to run...")).not.toBeInTheDocument();
     expect(container.firstChild).not.toHaveClass("opacity-30");
   });
+
+  it("keeps note content visible during runs-style participant dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="live"
+        data={{
+          label: "Run Context Note",
+          state: "pending",
+          type: "annotation",
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          _dimBodyBelowHeader: true,
+          annotation: {
+            title: "Run Context Note",
+            annotationText: "Important context for this workflow",
+            annotationColor: "yellow",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Important context for this workflow")).toBeInTheDocument();
+    expect(container.firstChild).not.toHaveClass("opacity-30");
+  });
 });

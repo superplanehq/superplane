@@ -30,7 +30,7 @@ func TestNormalizeExecutionMode(t *testing.T) {
 	}
 }
 
-const testRunnerMachineType = "aws-standard-1"
+const testRunnerMachineType = MachineTypeE1LargeAMD64
 
 func TestValidateRunnerSpec(t *testing.T) {
 	t.Parallel()

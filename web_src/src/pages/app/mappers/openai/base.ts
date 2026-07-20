@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,6 +26,7 @@ export const baseMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "OpenAI",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -68,4 +70,48 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventId: execution.rootEvent!.id!,
     },
   ];
+}
+
+type ResponseNodeMetadata = {
+  model?: string;
+  structuredOutput?: boolean;
+  codeInterpreter?: boolean;
+};
+
+type ResponseConfiguration = {
+  model?: string;
+  outputSchema?: string;
+  codeInterpreter?: boolean;
+};
+
+// metadataList surfaces the configured model and structured-output state on the
+// canvas node tile. The model prefers backend node metadata (set in Setup) and
+// falls back to the configuration so it shows before the first execution. The
+// structured-output badge is derived from the live configuration, since metadata
+// can go stale (autosave updates configuration only, not metadata).
+function metadataList(node: NodeInfo): MetadataItem[] {
+  const items: MetadataItem[] = [];
+  const meta = node.metadata as ResponseNodeMetadata | undefined;
+  const config = node.configuration as ResponseConfiguration | undefined;
+
+  const model = meta?.model || config?.model;
+  if (model) {
+    items.push({ icon: "sparkles", label: model });
+  }
+
+  const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
+  if (structured) {
+    items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  const codeInterpreter = config ? Boolean(config.codeInterpreter) : Boolean(meta?.codeInterpreter);
+  if (codeInterpreter) {
+    items.push({ icon: "terminal", label: "Code interpreter" });
+  }
+
+  return items;
+}
+
+function hasSchema(schema: unknown): boolean {
+  return typeof schema === "string" && schema.trim().length > 0;
 }

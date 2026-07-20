@@ -2,54 +2,72 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuperplaneComponentsNode } from "@/api-client";
+import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
 import type { ChartPanelDataSource } from "./panelTypes";
+import { RunDataSourceFiltersPanel } from "./RunDataSourceFiltersPanel";
 
 export function DataSourceRunsFields({
   value,
   hideLimit,
+  loadAllWhenBlank,
   onChange,
 }: {
   value: Extract<ChartPanelDataSource, { kind: "runs" }>;
   hideLimit?: boolean;
+  loadAllWhenBlank?: boolean;
   onChange: (next: ChartPanelDataSource) => void;
 }) {
-  if (hideLimit) return null;
+  const setStatuses = (statuses: RunStatusFilter[] | undefined) => {
+    const next = { ...value };
+    if (statuses && statuses.length > 0) next.statuses = statuses;
+    else delete next.statuses;
+    onChange(next);
+  };
+  const setTriggers = (triggers: string[] | undefined) => {
+    const next = { ...value };
+    if (triggers && triggers.length > 0) next.triggers = triggers;
+    else delete next.triggers;
+    onChange(next);
+  };
 
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Limit</Label>
-      <Input
-        type="number"
-        min={1}
-        value={value.limit ?? ""}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            limit: e.target.value === "" ? undefined : Number(e.target.value),
-          })
-        }
-        placeholder="100"
+    <>
+      {hideLimit ? null : (
+        <LimitField
+          value={value.limit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          defaultPlaceholder="100"
+          onChange={(limit) => onChange({ ...value, limit })}
+        />
+      )}
+      <RunDataSourceFiltersPanel
+        statuses={value.statuses}
+        triggers={value.triggers}
+        onStatusesChange={setStatuses}
+        onTriggersChange={setTriggers}
       />
-    </div>
+    </>
   );
 }
 
 export function DataSourceExecutionsFields({
   value,
   hideLimit,
+  loadAllWhenBlank,
   nodes,
   onChange,
 }: {
   value: Extract<ChartPanelDataSource, { kind: "executions" }>;
   hideLimit?: boolean;
+  loadAllWhenBlank?: boolean;
   nodes: SuperplaneComponentsNode[];
   onChange: (next: ChartPanelDataSource) => void;
 }) {
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Node (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Node (optional)</Label>
         <Select
           value={value.node ?? "__all__"}
           onValueChange={(v) =>
@@ -73,23 +91,47 @@ export function DataSourceExecutionsFields({
         </Select>
       </div>
       {hideLimit ? null : (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Limit</Label>
-          <Input
-            type="number"
-            min={1}
-            value={value.limit ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                limit: e.target.value === "" ? undefined : Number(e.target.value),
-              })
-            }
-            placeholder="50"
-          />
-        </div>
+        <LimitField
+          value={value.limit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          defaultPlaceholder="50"
+          onChange={(limit) => onChange({ ...value, limit })}
+        />
       )}
     </>
+  );
+}
+
+function LimitField({
+  value,
+  loadAllWhenBlank,
+  defaultPlaceholder,
+  onChange,
+}: {
+  value: number | undefined;
+  loadAllWhenBlank: boolean | undefined;
+  defaultPlaceholder: string;
+  onChange: (limit: number | undefined) => void;
+}) {
+  const placeholder = loadAllWhenBlank ? "On demand" : defaultPlaceholder;
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Limit</Label>
+      <Input
+        type="number"
+        min={1}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        placeholder={placeholder}
+        data-testid="data-source-limit"
+      />
+      {loadAllWhenBlank ? (
+        <p className="text-[11px] text-slate-500 dark:text-gray-400">
+          Leave blank to load rows on demand — scroll or use the "Load more" button to reveal more. Very long histories
+          are capped for performance; set a number to fix how many rows are fetched.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -111,7 +153,7 @@ export function DataSourceMemoryFields({
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Namespace</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Namespace</Label>
         <Input
           list={namespaces.length > 0 && namespaceListId ? namespaceListId : undefined}
           value={value.namespace}
@@ -128,7 +170,7 @@ export function DataSourceMemoryFields({
         ) : null}
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Field path (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Field path (optional)</Label>
         <Input
           list={fields.length > 0 && fieldPathListId ? fieldPathListId : undefined}
           value={value.fieldPath ?? ""}

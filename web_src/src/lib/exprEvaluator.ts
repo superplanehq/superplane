@@ -38,6 +38,7 @@ type ASTNode =
   | { type: "Identifier"; name: string }
   | { type: "MemberAccess"; object: ASTNode; property: string; optional: boolean }
   | { type: "IndexAccess"; object: ASTNode; index: ASTNode }
+  | { type: "SliceAccess"; object: ASTNode; start?: ASTNode; end?: ASTNode }
   | { type: "FunctionCall"; callee: ASTNode; args: ASTNode[] }
   | { type: "MethodCall"; object: ASTNode; method: string; args: ASTNode[] }
   | { type: "UnaryOp"; operator: string; operand: ASTNode }
@@ -388,12 +389,25 @@ class Parser {
         continue;
       }
 
-      // Bracket access: [index] or ["key"]
+      // Bracket access: [index], ["key"], [start:end], [:end], or [start:]
       if (this.current().type === "LBRACKET") {
         this.advance();
-        const index = this.parseExpression();
+
+        let start: ASTNode | undefined;
+        if (this.current().type !== "COLON") {
+          start = this.parseExpression();
+        }
+
+        if (this.current().type === "COLON") {
+          this.advance();
+          const end = this.current().type === "RBRACKET" ? undefined : this.parseExpression();
+          this.expect("RBRACKET");
+          node = { type: "SliceAccess", object: node, start, end };
+          continue;
+        }
+
         this.expect("RBRACKET");
-        node = { type: "IndexAccess", object: node, index };
+        node = { type: "IndexAccess", object: node, index: start! };
         continue;
       }
 
@@ -501,6 +515,19 @@ class Parser {
 // EVALUATOR
 // ============================================================================
 
+function resolveSliceIndex(value: unknown): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const index = Number(value);
+  if (!Number.isFinite(index)) {
+    return undefined;
+  }
+
+  return Math.trunc(index);
+}
+
 // Wrapper for Duration that provides expr-lang compatible methods
 class ExprDuration {
   constructor(private ms: number) {}
@@ -552,28 +579,28 @@ class ExprDate {
   constructor(private date: Date) {}
 
   Year(): number {
-    return this.date.getFullYear();
+    return this.date.getUTCFullYear();
   }
   Month(): number {
-    return this.date.getMonth() + 1; // 1-indexed like Go
+    return this.date.getUTCMonth() + 1; // 1-indexed like Go
   }
   Day(): number {
-    return this.date.getDate();
+    return this.date.getUTCDate();
   }
   Hour(): number {
-    return this.date.getHours();
+    return this.date.getUTCHours();
   }
   Minute(): number {
-    return this.date.getMinutes();
+    return this.date.getUTCMinutes();
   }
   Second(): number {
-    return this.date.getSeconds();
+    return this.date.getUTCSeconds();
   }
   Weekday(): number {
-    return this.date.getDay();
+    return this.date.getUTCDay();
   }
   YearDay(): number {
-    const start = new Date(this.date.getFullYear(), 0, 0);
+    const start = new Date(Date.UTC(this.date.getUTCFullYear(), 0, 0));
     const diff = this.date.getTime() - start.getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
@@ -594,13 +621,15 @@ class ExprDate {
     // Default to ISO-like format if no layout provided
     const fmt = layout ?? "2006-01-02 15:04:05";
     const pad = (n: number, width: number = 2) => String(n).padStart(width, "0");
-    return fmt
-      .replace("2006", String(this.date.getFullYear()))
-      .replace("01", pad(this.date.getMonth() + 1))
-      .replace("02", pad(this.date.getDate()))
-      .replace("15", pad(this.date.getHours()))
-      .replace("04", pad(this.date.getMinutes()))
-      .replace("05", pad(this.date.getSeconds()));
+    const replacements: Record<string, string> = {
+      "2006": String(this.date.getUTCFullYear()),
+      "01": pad(this.date.getUTCMonth() + 1),
+      "02": pad(this.date.getUTCDate()),
+      "15": pad(this.date.getUTCHours()),
+      "04": pad(this.date.getUTCMinutes()),
+      "05": pad(this.date.getUTCSeconds()),
+    };
+    return fmt.replace(/2006|01|02|15|04|05/g, (token) => replacements[token]);
   }
   Add(duration?: ExprDuration): ExprDate {
     if (!duration || !(duration instanceof ExprDuration)) {
@@ -668,6 +697,14 @@ class ExprDate {
   }
 }
 
+function parseDateString(value: string): ExprDate | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return new ExprDate(date);
+}
+
 // Built-in functions
 const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   // String functions
@@ -710,7 +747,7 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
 
   // Date functions
   now: () => new ExprDate(new Date()),
-  date: (str: unknown) => new ExprDate(new Date(String(str))),
+  date: (str: unknown) => parseDateString(String(str)),
   duration: (str: unknown) => {
     // Parse duration string like "1h", "30m", "1h30m", "2s", "500ms"
     const s = String(str);
@@ -920,6 +957,22 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
       return undefined;
     }
 
+    case "SliceAccess": {
+      const obj = evaluate(node.object, context);
+      const start = resolveSliceIndex(node.start ? evaluate(node.start, context) : undefined);
+      const end = resolveSliceIndex(node.end ? evaluate(node.end, context) : undefined);
+
+      if (typeof obj === "string") {
+        return obj.slice(start, end);
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.slice(start, end);
+      }
+
+      return undefined;
+    }
+
     case "FunctionCall": {
       const callee = evaluate(node.callee, context);
       if (typeof callee === "function") {
@@ -946,6 +999,13 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
 
       // Handle string methods
       if (typeof obj === "string") {
+        const date = parseDateString(obj);
+        const dateMethod = date?.[node.method as keyof ExprDate];
+        if (typeof dateMethod === "function") {
+          const args = node.args.map((arg) => evaluate(arg, context));
+          return (dateMethod as (...args: unknown[]) => unknown).apply(date, args);
+        }
+
         const strMethods: Record<string, (...args: unknown[]) => unknown> = {
           contains: (sub: unknown) => obj.includes(String(sub)),
           startsWith: (prefix: unknown) => obj.startsWith(String(prefix)),

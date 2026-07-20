@@ -43,6 +43,68 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
 
     expect(hasDraftVersusLiveConsoleDiff(console, console)).toBe(false);
   });
+
+  it("ignores content key ordering between committed and staged serializations", () => {
+    // The committed console is serialized by the backend, whose YAML encoder
+    // marshals panel `content` map keys alphabetically. The staged/effective
+    // console keeps the editor's insertion order. They are semantically
+    // identical, so the diff must be false — otherwise the "UNCOMMITTED
+    // CHANGES" badge sticks after a commit until a full refresh re-fetches
+    // both snapshots from the backend in matching order.
+    const committed = {
+      panels: [
+        { id: "fgfggd", type: "html", content: { body: "aaa", title: "fgfggd" } },
+        { id: "aaa", type: "node", content: { node: "start", showRun: false, title: "aaa" } },
+      ],
+      layout: [
+        { i: "fgfggd", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 },
+        { i: "aaa", x: 0, y: 6, w: 12, h: 6, minW: 2, minH: 2 },
+      ],
+    };
+    const staged = {
+      panels: [
+        { id: "fgfggd", type: "html", content: { title: "fgfggd", body: "aaa" } },
+        { id: "aaa", type: "node", content: { title: "aaa", node: "start", showRun: false } },
+      ],
+      layout: [
+        { i: "fgfggd", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 },
+        { i: "aaa", x: 0, y: 6, w: 12, h: 6, minW: 2, minH: 2 },
+      ],
+    };
+
+    expect(hasDraftVersusLiveConsoleDiff(committed, staged)).toBe(false);
+  });
+
+  it("ignores nested content key ordering (variable sources)", () => {
+    const committed = {
+      panels: [
+        {
+          id: "p1",
+          type: "markdown",
+          content: {
+            body: "{{ x }}",
+            variables: [{ name: "x", source: { kind: "memory", namespace: "ns" } }],
+          },
+        },
+      ],
+      layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
+    };
+    const staged = {
+      panels: [
+        {
+          id: "p1",
+          type: "markdown",
+          content: {
+            variables: [{ name: "x", source: { namespace: "ns", kind: "memory" } }],
+            body: "{{ x }}",
+          },
+        },
+      ],
+      layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
+    };
+
+    expect(hasDraftVersusLiveConsoleDiff(committed, staged)).toBe(false);
+  });
 });
 
 describe("getDraftConsoleDiffCounts", () => {

@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 func Test_ListUserPermissions(t *testing.T) {
@@ -34,7 +34,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	t.Run("no user in context", func(t *testing.T) {
 		_, err := GetUser(context.Background(), r.AuthService, false)
 		assert.Error(t, err)
-		assert.Equal(t, codes.Unauthenticated, status.Code(err))
+		assert.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
 	})
 
 	t.Run("permissions not included in response", func(t *testing.T) {
@@ -55,10 +55,18 @@ func Test_ListUserPermissions(t *testing.T) {
 			"groups",
 			"members",
 			"canvases",
-			"blueprints",
-			"service_accounts",
+			"api_keys",
 			"agents",
 		}))
+	})
+
+	t.Run("canceled context bubbles up for gateway sanitization", func(t *testing.T) {
+		canceledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		_, err := GetUser(canceledCtx, r.AuthService, false)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
 

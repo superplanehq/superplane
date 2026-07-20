@@ -1,6 +1,119 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { formatTimeAgo } from "@/lib/date";
+import { formatAbsolute, formatDate as formatDateOnly } from "@/lib/datetime";
 
 import type { WidgetColumnFormat } from "./types";
+
+/** Pure digit / decimal strings (epoch candidates); excludes ISO and other date text. */
+const PURE_NUMERIC_RE = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
+ * instances, and plausible epoch seconds/milliseconds — including numeric
+ * strings like `"1717390000"` that JSON/CEL often emit (using `>= 1e11` to
+ * disambiguate ms vs seconds). Returns `null` for anything that can't be
+ * parsed, so callers can fall back to the raw string.
+ *
+ * Short digit strings / small numbers (`"404"`, `12`) are rejected so status
+ * codes and categories never become early-1970 or year-404 dates.
+ *
+ * Shared by widget formatters and CEL builtins (`formatDate`, `epochMs`) so
+ * timestamp parsing stays consistent across the console package.
+ */
+export function coerceWidgetTimestamp(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    // Skip Date.parse for pure digits — it treats values like "404" as years.
+    if (PURE_NUMERIC_RE.test(trimmed)) {
+      return dateFromEpochNumber(Number(trimmed));
+    }
+    const parsed = Date.parse(trimmed);
+    if (Number.isFinite(parsed)) return new Date(parsed);
+    return null;
+  }
+  return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
+}
+
+/** Milliseconds from ~1973 onward; below this, values are treated as seconds. */
+const EPOCH_MS_MAGNITUDE = 1e11;
+
+function dateFromEpochNumber(n: number): Date | null {
+  if (!isPlausibleEpochNumber(n)) return null;
+  // Use magnitude so negative pre-1970 ms values (e.g. -1.5e12) are not
+  // mistaken for seconds and multiplied by 1000.
+  const ms = Math.abs(n) >= EPOCH_MS_MAGNITUDE ? n : n * 1000;
+  const date = new Date(ms);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/**
+ * Epoch seconds (~1e9–1e10) or milliseconds (~1e11–1e13). The bands meet at
+ * `1e11` so 1973–2001 ms epochs are accepted; status codes / hours stay out.
+ */
+function isPlausibleEpochNumber(n: number): boolean {
+  if (!Number.isFinite(n)) return false;
+  const abs = Math.abs(n);
+  return abs >= 1e9 && abs < 1e14;
+}
+
+/**
+ * Resolved progress values for a table cell.
+ *
+ * - `percent` is the raw ratio in percent points and may be < 0 or > 100 when
+ *   the current value under- or overshoots the target. UI code uses this for
+ *   the tooltip / percentage label so users still see the real overshoot.
+ * - `barPercent` is clamped to `[0, 100]` and drives the bar fill width.
+ * - `current` and `target` are the coerced numeric values (never null when
+ *   `computeProgress` returns a non-null result).
+ */
+export interface WidgetProgress {
+  current: number;
+  target: number;
+  percent: number;
+  barPercent: number;
+}
+
+/**
+ * Coerce a raw current/target pair into progress values for a bar cell.
+ *
+ * Returns `null` when either value can't be coerced to a finite number or the
+ * target is <= 0 — the caller renders the empty-state placeholder in that
+ * case. Both inputs are treated as absolute numbers; unlike `percent`
+ * formatting, `0.5` is not silently promoted to 50%.
+ */
+export function computeProgress(current: unknown, target: unknown): WidgetProgress | null {
+  const currentNum = toFiniteNumber(current);
+  const targetNum = toFiniteNumber(target);
+  if (currentNum === null || targetNum === null) return null;
+  if (targetNum <= 0) return null;
+  const percent = (currentNum / targetNum) * 100;
+  const barPercent = Math.max(0, Math.min(100, percent));
+  return { current: currentNum, target: targetNum, percent, barPercent };
+}
+
+/** Format a raw percentage number using the same rounding rules as `formatPercent`. */
+export function formatPercentageDisplay(percent: number): string {
+  return `${percent.toFixed(percent % 1 === 0 ? 0 : 1)}%`;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "bigint") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
 
 /**
  * Format a raw value for display, consistent with the format hints declared in
@@ -15,9 +128,9 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "percent":
       return formatPercent(value);
     case "date":
-      return formatDate(value, false);
+      return formatDate(value);
     case "datetime":
-      return formatDate(value, true);
+      return formatDatetime(value);
     case "relative":
       return formatRelative(value);
     case "duration":
@@ -28,9 +141,12 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "code":
     case "text":
     case "link":
+    case "avatar":
     case undefined:
       return String(value);
     default:
+      // `progress` falls through here — its ProgressCell renders bespoke UI
+      // instead of the formatted string, so there is nothing extra to do.
       return String(value);
   }
 }
@@ -50,25 +166,24 @@ function formatPercent(value: unknown): string {
 }
 
 function formatRelative(value: unknown): string {
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return formatRelativeTime(new Date(parsed).toISOString(), true);
-    }
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return String(value ?? "");
-  const ms = n > 1e12 ? n : n * 1000;
-  return formatRelativeTime(new Date(ms).toISOString(), true);
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value ?? "");
+  // Compact relative text without an "ago" suffix (e.g. "5m", "in 2h") so
+  // dense table cells stay short; the hover details always expose the verbose
+  // "5 minutes ago" / "in 3 hours" phrasing.
+  return formatTimeAgo(date, false);
 }
 
-function formatDate(value: unknown, includeTime: boolean): string {
-  if (typeof value !== "string" && typeof value !== "number") return String(value);
-  const ms = typeof value === "number" ? value : Date.parse(value);
-  if (!Number.isFinite(ms)) return String(value);
-  const date = new Date(ms);
-  if (includeTime) return date.toLocaleString();
-  return date.toLocaleDateString();
+function formatDate(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatDateOnly(date);
+}
+
+function formatDatetime(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatAbsolute(date);
 }
 
 /**

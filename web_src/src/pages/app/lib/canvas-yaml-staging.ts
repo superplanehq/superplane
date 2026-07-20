@@ -1,29 +1,31 @@
 import * as yaml from "js-yaml";
 import type { CanvasesCanvas } from "@/api-client";
-import type {
-  SuperplaneComponentsEdge as ComponentsEdge,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 
 type ParsedCanvasYaml = {
   apiVersion?: string;
   kind?: string;
   metadata?: {
+    id?: string;
     name?: string;
     description?: string;
   };
   spec?: {
     nodes?: ComponentsNode[];
     edges?: ComponentsEdge[];
-    changeManagement?: CanvasesCanvas["spec"] extends infer Spec
-      ? Spec extends { changeManagement?: infer ChangeManagement }
-        ? ChangeManagement
-        : never
-      : never;
   };
 };
 
-export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | null {
+export type ParsedCanvasYamlMetadata = {
+  id?: string;
+  name?: string;
+  description?: string;
+};
+
+// loadCanvasYamlDocument parses and validates that the text is a Canvas YAML
+// document, returning the parsed object or null. Shared by the spec and metadata
+// readers to keep their individual complexity low.
+function loadCanvasYamlDocument(text: string): ParsedCanvasYaml | null {
   const trimmed = text.trim();
   if (!trimmed) {
     return null;
@@ -44,29 +46,49 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
     return null;
   }
 
-  if (!parsed.spec || typeof parsed.spec !== "object") {
-    return null;
-  }
+  return parsed;
+}
 
-  if (parsed.spec.nodes !== undefined && !Array.isArray(parsed.spec.nodes)) {
+// parseCanvasYamlMetadata extracts the canvas-level metadata (id/name/description)
+// from a canvas.yaml document. Used so edit mode can source the canvas name from
+// the repository file instead of the DescribeCanvas response.
+export function parseCanvasYamlMetadata(text: string): ParsedCanvasYamlMetadata | null {
+  const parsed = loadCanvasYamlDocument(text);
+  const metadata = parsed?.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return null;
   }
 
   return {
-    nodes: (parsed.spec.nodes ?? []).map(normalizeCanvasYamlNode),
-    edges: (parsed.spec.edges ?? []).map(normalizeCanvasYamlEdge),
-    changeManagement: parsed.spec.changeManagement,
+    ...(typeof metadata.id === "string" ? { id: metadata.id } : {}),
+    ...(typeof metadata.name === "string" ? { name: metadata.name } : {}),
+    ...(typeof metadata.description === "string" ? { description: metadata.description } : {}),
   };
 }
 
-function normalizeCanvasYamlEdge(edge: ComponentsEdge): ComponentsEdge {
-  const raw = edge as ComponentsEdge & { source_id?: string; target_id?: string };
-  const { source_id: sourceIdSnake, target_id: targetIdSnake, ...rest } = raw;
+export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | null {
+  const parsed = loadCanvasYamlDocument(text);
+  if (!parsed) {
+    return null;
+  }
+
+  if (parsed.spec === undefined || (parsed.spec !== null && typeof parsed.spec !== "object")) {
+    return null;
+  }
+
+  const spec = parsed.spec ?? {};
+
+  if (spec.nodes !== undefined && !Array.isArray(spec.nodes)) {
+    return null;
+  }
+
+  if (spec.edges !== undefined && !Array.isArray(spec.edges)) {
+    return null;
+  }
+
   return {
-    ...rest,
-    sourceId: edge.sourceId || sourceIdSnake || "",
-    targetId: edge.targetId || targetIdSnake || "",
-    channel: edge.channel || "default",
+    nodes: (spec.nodes ?? []).map(normalizeCanvasYamlNode),
+    edges: spec.edges ?? [],
   };
 }
 
@@ -126,12 +148,10 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
       id: workflow.metadata?.id || "",
       name: workflow.metadata?.name || "Canvas",
       description: workflow.metadata?.description || "",
-      isTemplate: workflow.metadata?.isTemplate ?? false,
     },
     spec: {
       nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
-      edges: (workflow.spec?.edges ?? []).map(normalizeCanvasYamlEdge),
-      ...(workflow.spec?.changeManagement ? { changeManagement: workflow.spec.changeManagement } : {}),
+      edges: workflow.spec?.edges ?? [],
     },
   };
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -37,20 +37,18 @@ func (s *TestContext) Start() {
 	os.Setenv("DB_NAME", "superplane_test")
 	os.Setenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/superplane_test")
 	os.Setenv("START_PUBLIC_API", "yes")
-	os.Setenv("START_INTERNAL_API", "yes")
-	os.Setenv("INTERNAL_API_PORT", "50052")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
-	os.Setenv("START_GRPC_GATEWAY", "yes")
-	os.Setenv("GRPC_SERVER_ADDR", "127.0.0.1:50052")
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_EVENT_ROUTER", "yes")
+	os.Setenv("START_RUN_FINALIZER", "yes")
 	os.Setenv("START_NODE_EXECUTOR", "yes")
-	os.Setenv("START_BLUEPRINT_NODE_EXECUTOR", "yes")
+	os.Setenv("START_EXECUTION_TERMINATOR", "yes")
 	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
+	os.Setenv("START_APP_MESSAGE_WORKER", "yes")
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
 	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
 	os.Setenv("NO_ENCRYPTION", "yes")
@@ -66,7 +64,6 @@ func (s *TestContext) Start() {
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
-	os.Setenv("AGENT_ENABLED", "yes")
 
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()
@@ -248,11 +245,6 @@ func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())
-			if strings.Contains(resp.URL(), "/repository/commits") {
-				if body, err := resp.Text(); err == nil && body != "" {
-					t.Logf("[Browser Logs] response body: %s", body)
-				}
-			}
 		}
 	})
 

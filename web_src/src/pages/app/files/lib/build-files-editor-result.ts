@@ -4,7 +4,7 @@ import {
   getRepositoryFileListLoading,
   getSelectedFileViewState,
 } from "./files-view-state";
-import type { PendingFileChange, AppFile } from "../types";
+import type { PendingFileChange, StagedFileDiff, AppFile } from "../types";
 
 type EditorViewParams = {
   catalog: {
@@ -39,6 +39,9 @@ type EditorViewParams = {
     selectedFileQuery: Parameters<typeof getSelectedFileViewState>[0]["selectedFileQuery"];
   };
   loadedContentByPath: Record<string, string>;
+  committedContentByPath: Record<string, string>;
+  stagedDiffPaths: string[];
+  stagedFileDiffs: StagedFileDiff[];
   canManageRepositoryFiles: boolean;
   leftOffset: number;
   isDiffOpen: boolean;
@@ -54,6 +57,9 @@ export function buildFilesEditorResult({
   pendingChanges,
   selection,
   loadedContentByPath,
+  committedContentByPath,
+  stagedDiffPaths,
+  stagedFileDiffs,
   canManageRepositoryFiles,
   leftOffset,
   isDiffOpen,
@@ -83,11 +89,15 @@ export function buildFilesEditorResult({
     openTabs: tabs.openTabs,
     pendingChanges,
     pendingChangesByPath: pending.pendingChangesByPath,
+    specDraftByPath: pending.specDraftByPath,
     newFilePath: pending.newFilePath,
     isDiffOpen,
     setIsDiffOpen,
     headerActionsHost,
     loadedContentByPath,
+    committedContentByPath,
+    stagedDiffPaths,
+    stagedFileDiffs,
     selectedContent: editorView.selectedContent,
     selectedIsDeleted: editorView.selectedIsDeleted,
     selectedGeneratedFile: selection.selectedGeneratedFile,

@@ -1,7 +1,6 @@
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
-import { InstallPageHeader } from "./InstallPageHeader";
 import { InstallShell } from "./InstallShell";
 
 interface InstallErrorViewProps {
@@ -13,7 +12,7 @@ export function InstallErrorView({ loadError }: InstallErrorViewProps) {
 
   return (
     <InstallShell>
-      <InstallPageHeader title="Install App" description="Add a pre-built app from GitHub to your organization." />
+      <h2 className="mb-4 text-lg font-medium text-slate-900">Install App</h2>
       <div className="rounded-lg bg-white p-6 shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-800">
         {usageLimitNotice ? (
           <UsageLimitAlert notice={usageLimitNotice} />

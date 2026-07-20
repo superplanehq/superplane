@@ -7,7 +7,6 @@ import type {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -21,10 +20,15 @@ import {
   validateFieldForSubmission,
 } from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
+import { buildConfigurationDisplayModel } from "./configurationView/buildConfigurationDisplayModel";
+import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
+import { cn } from "@/lib/utils";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+
+const SETTINGS_TAB_DIVIDER_CLASS = "border-t border-slate-950/15 pt-6 dark:border-gray-700/70";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -53,8 +57,6 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
-  configurationSaveMode?: "manual" | "auto";
 }
 
 function buildAutosaveSnapshot(
@@ -96,11 +98,9 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
-  configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
-  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -109,7 +109,6 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
-  const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
@@ -259,6 +258,10 @@ export function SettingsTab({
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
+    if (isReadOnly) {
+      return;
+    }
+
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
         autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
@@ -285,7 +288,7 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -305,6 +308,7 @@ export function SettingsTab({
       "time",
       "cron",
       "git-ref",
+      "app",
     ].includes(fieldType);
   }, []);
 
@@ -313,20 +317,11 @@ export function SettingsTab({
     pendingAutosaveSnapshotRef.current = null;
   }, []);
 
-  const queuePendingAutosave = useCallback(
-    (snapshot: string) => {
-      if (configurationSaveMode === "auto") {
-        pendingAutosaveSnapshotRef.current = snapshot;
-      }
-    },
-    [configurationSaveMode],
-  );
+  const queuePendingAutosave = useCallback((snapshot: string) => {
+    pendingAutosaveSnapshotRef.current = snapshot;
+  }, []);
 
   const flushPendingAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
-
     const pendingSnapshot = pendingAutosaveSnapshotRef.current;
     if (!pendingSnapshot || pendingSnapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
@@ -337,7 +332,7 @@ export function SettingsTab({
     window.setTimeout(() => {
       void handleSaveRef.current();
     }, 0);
-  }, [configurationSaveMode]);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (isReadOnly) {
@@ -345,14 +340,13 @@ export function SettingsTab({
     }
 
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
-    if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
+    if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
     }
 
-    // Always run validation for UI feedback; only gate persistence in manual mode.
-    const isValid = validateNow();
-    if (currentNodeName.trim() === "" || (configurationSaveMode !== "auto" && !isValid)) {
+    validateNow();
+    if (currentNodeName.trim() === "") {
       return;
     }
 
@@ -368,13 +362,11 @@ export function SettingsTab({
     }
 
     savingRef.current = true;
-    setIsSaving(true);
     try {
       await result;
       updateAutosaveBaseline(snapshot);
     } finally {
       savingRef.current = false;
-      setIsSaving(false);
       flushPendingAutosave();
     }
   }, [
@@ -382,7 +374,6 @@ export function SettingsTab({
     validateNow,
     currentNodeName,
     selectedIntegration,
-    configurationSaveMode,
     nodeConfiguration,
     onSave,
     queuePendingAutosave,
@@ -394,7 +385,7 @@ export function SettingsTab({
   handleSaveRef.current = handleSave;
 
   const requestAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
 
@@ -405,21 +396,21 @@ export function SettingsTab({
       autosaveTimerRef.current = null;
       void handleSaveRef.current();
     }, 300);
-  }, [configurationSaveMode, isReadOnly]);
+  }, [isReadOnly]);
 
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
     return () => {
+      if (isReadOnly) {
+        return;
+      }
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
         autosaveTimerRef.current = null;
       }
       void handleSaveRef.current();
     };
-  }, [configurationSaveMode]);
+  }, [isReadOnly]);
 
   useEffect(() => {
     return () => {
@@ -430,7 +421,7 @@ export function SettingsTab({
   }, []);
 
   useEffect(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
@@ -449,16 +440,41 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+
+  const configurationDisplayModel = useMemo(
+    () =>
+      buildConfigurationDisplayModel({
+        configuration: nodeConfiguration,
+        configurationFields,
+        integrationName,
+        integrationRef,
+        integrations,
+        allowIntegrations,
+      }),
+    [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
+  );
+
+  if (isReadOnly) {
+    return (
+      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+        <div className="space-y-6">
+          <ConfigurationView model={configurationDisplayModel} />
+          {customField && shouldShowConfiguration && (
+            <div className={configurationFields && configurationFields.length > 0 ? "" : SETTINGS_TAB_DIVIDER_CLASS}>
+              {customField(nodeConfiguration)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
+      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
-        if (configurationSaveMode !== "auto" || isReadOnly) {
-          return;
-        }
         const target = event.target as HTMLElement | null;
         if (!target) {
           return;
@@ -471,7 +487,7 @@ export function SettingsTab({
     >
       <div className="space-y-6">
         {/* Node identification section — always visible */}
-        <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
+        <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
@@ -488,7 +504,6 @@ export function SettingsTab({
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
-            disabled={isReadOnly}
           />
         </div>
 
@@ -497,7 +512,7 @@ export function SettingsTab({
           const runTitleField = configurationFields?.find((f) => f.name === "customName");
           if (!runTitleField || !shouldShowConfiguration) return null;
           return (
-            <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
+            <div>
               <ConfigurationFieldRenderer
                 allowExpressions={true}
                 field={runTitleField}
@@ -525,9 +540,7 @@ export function SettingsTab({
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className={SETTINGS_TAB_DIVIDER_CLASS}>
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -550,7 +563,7 @@ export function SettingsTab({
                   size="sm"
                   onClick={onOpenCreateIntegrationDialog}
                   className="flex-shrink-0"
-                  disabled={isReadOnly || !allowCreateIntegrations}
+                  disabled={!allowCreateIntegrations}
                 >
                   Connect
                 </Button>
@@ -570,7 +583,7 @@ export function SettingsTab({
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
                       if (value === CONNECT_ANOTHER_INSTANCE_VALUE) {
-                        if (!isReadOnly && allowCreateIntegrations && onOpenCreateIntegrationDialog) {
+                        if (allowCreateIntegrations && onOpenCreateIntegrationDialog) {
                           onOpenCreateIntegrationDialog();
                         }
                         return;
@@ -584,7 +597,6 @@ export function SettingsTab({
                         requestAutosave();
                       }
                     }}
-                    disabled={isReadOnly}
                   >
                     <SelectTrigger className="w-full shadow-none">
                       <SelectValue placeholder="Select an installation" />
@@ -666,7 +678,7 @@ export function SettingsTab({
                                 size="sm"
                                 className="text-sm py-1.5"
                                 onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                                disabled={isReadOnly || !allowUpdateIntegrations}
+                                disabled={!allowUpdateIntegrations}
                               >
                                 Configure...
                               </Button>
@@ -697,9 +709,7 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
             {configurationFields.map((field) => {
               if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
@@ -710,6 +720,7 @@ export function SettingsTab({
                   field={field}
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
+                    const previousValue = nodeConfiguration[fieldName];
                     setNodeConfiguration((previousConfiguration) => {
                       const newConfig = {
                         ...previousConfiguration,
@@ -718,7 +729,12 @@ export function SettingsTab({
                       return filterVisibleFields(newConfig);
                     });
                     const fieldWasCleared = value === undefined || value === null || value === "";
-                    if (fieldWasCleared || shouldAutosaveOnChangeByFieldType(field.type)) {
+                    // Enabling a togglable field (null/undefined -> value) is a discrete action
+                    // and must persist immediately. Otherwise a save-on-blur field type (e.g. text
+                    // pre-filled with a default) would keep its value only in local state, so a run
+                    // or reload before the editor blurs would drop the enabled value.
+                    const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
+                    if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
                       requestAutosave();
                     }
                   }}
@@ -748,32 +764,11 @@ export function SettingsTab({
 
         {/* Custom field section */}
         {customField && shouldShowConfiguration && (
-          <div
-            className={
-              configurationFields && configurationFields.length > 0
-                ? ""
-                : "border-t border-gray-200 dark:border-gray-700 pt-6"
-            }
-          >
+          <div className={configurationFields && configurationFields.length > 0 ? "" : SETTINGS_TAB_DIVIDER_CLASS}>
             {customField(nodeConfiguration)}
           </div>
         )}
       </div>
-
-      {showManualSaveFooter ? (
-        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <LoadingButton
-            data-testid="save-node-button"
-            variant="default"
-            onClick={handleSave}
-            disabled={isReadOnly}
-            loading={isSaving}
-            loadingText="Saving..."
-          >
-            Save
-          </LoadingButton>
-        </div>
-      ) : null}
     </div>
   );
 }

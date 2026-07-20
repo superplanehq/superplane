@@ -20,5 +20,10 @@ export interface FieldRendererProps {
   fieldPath?: string;
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
+  readOnly?: boolean;
   excludedSuggestions?: string[];
+  valuePreviewLabel?: string;
+  expressionPreviewContext?: Record<string, unknown> | null;
+  expressionErrorMessage?: string;
+  expressionTemplateValue?: unknown;
 }

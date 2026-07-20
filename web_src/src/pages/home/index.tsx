@@ -1,5 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
@@ -11,10 +13,13 @@ import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
 import { HomePageShell } from "./HomePageShell";
+import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 export function HomePage() {
   usePageTitle(["Home"]);
@@ -37,10 +42,20 @@ export function HomePage() {
     organizationId,
     searchQuery,
   );
+  const updateCanvasPreference = useUpdateCanvasPreference(organizationId || "");
+  const preferredFilteredCanvases = applyCanvasAppPreferences(filteredCanvases);
+  const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  if (isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0)) {
+  const isHomePageLoading = isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0);
+  useReportPageReady(!isHomePageLoading && !!account && !!organizationId, {
+    canvas_count: canvases.length,
+    folder_count: canvasFolders.length,
+    failed: !!canvasError,
+  });
+
+  if (isHomePageLoading) {
     return <LoadingView />;
   }
 
@@ -48,7 +63,7 @@ export function HomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases) {
     return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 
@@ -62,16 +77,19 @@ export function HomePage() {
         </div>
 
         {canvasError ? (
-          <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+          <div className="rounded border border-red-300 bg-white px-4 py-2 text-red-500 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
             <Text>{canvasError}</Text>
           </div>
         ) : (
           <Content
             filteredCanvases={filteredCanvases}
+            preferredFilteredCanvases={preferredFilteredCanvases}
             canvasFolders={canvasFolders}
             organizationId={organizationId}
             searchQuery={searchQuery}
             onEditCanvas={openEdit}
+            onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
+            canCreateCanvases={canCreateCanvases}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -93,24 +111,35 @@ export function HomePage() {
 
 function Content({
   filteredCanvases,
+  preferredFilteredCanvases,
   canvasFolders,
   organizationId,
   searchQuery,
   onEditCanvas,
+  onToggleStar,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: {
   filteredCanvases: CanvasCardData[];
+  preferredFilteredCanvases: CanvasCardData[];
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onToggleStar: (canvasId: string, starred: boolean) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
-  const folderedLayout = buildFolderedLayout(filteredCanvases, canvasFolders, Boolean(searchQuery));
+  const folderedLayout = buildFolderedLayout(
+    preferredFilteredCanvases,
+    preferredFilteredCanvases,
+    canvasFolders,
+    Boolean(searchQuery),
+  );
 
   if (filteredCanvases.length === 0 && (searchQuery || canvasFolders.length === 0)) {
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
@@ -130,6 +159,8 @@ function Content({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEditCanvas={onEditCanvas}
+          onToggleStar={onToggleStar}
+          canCreateCanvases={canCreateCanvases}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
@@ -141,12 +172,13 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5`}>
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5 dark:bg-white/5`}>
           <CanvasCardsGrid
             canvases={folderedLayout.unfiledCanvases}
             canvasFolders={canvasFolders}
             organizationId={organizationId}
             onEditCanvas={onEditCanvas}
+            onToggleStar={onToggleStar}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -164,19 +196,22 @@ interface FolderedCanvasLayout {
 }
 
 function buildFolderedLayout(
-  filteredCanvases: CanvasCardData[],
+  sectionCanvases: CanvasCardData[],
+  matchingCanvases: CanvasCardData[],
   canvasFolders: CanvasFolderData[],
   hasSearchQuery: boolean,
 ): FolderedCanvasLayout {
   const folderIDs = new Set(canvasFolders.map((folder) => folder.id));
   const canvasesByFolderID = new Map<string, CanvasCardData[]>();
+  const matchingCanvasCountsByFolderID = new Map<string, number>();
   const unfiledCanvases: CanvasCardData[] = [];
 
   for (const folder of canvasFolders) {
     canvasesByFolderID.set(folder.id, []);
+    matchingCanvasCountsByFolderID.set(folder.id, 0);
   }
 
-  for (const canvas of filteredCanvases) {
+  for (const canvas of sectionCanvases) {
     if (canvas.canvasFolderId && folderIDs.has(canvas.canvasFolderId)) {
       canvasesByFolderID.get(canvas.canvasFolderId)?.push(canvas);
       continue;
@@ -185,9 +220,30 @@ function buildFolderedLayout(
     unfiledCanvases.push(canvas);
   }
 
-  const visibleFolders = hasSearchQuery
-    ? canvasFolders.filter((folder) => (canvasesByFolderID.get(folder.id) || []).length > 0)
-    : canvasFolders;
+  for (const canvas of matchingCanvases) {
+    if (!canvas.canvasFolderId || !folderIDs.has(canvas.canvasFolderId)) {
+      continue;
+    }
+
+    matchingCanvasCountsByFolderID.set(
+      canvas.canvasFolderId,
+      (matchingCanvasCountsByFolderID.get(canvas.canvasFolderId) || 0) + 1,
+    );
+  }
+
+  const visibleFolders = canvasFolders.filter((folder) => {
+    const visibleCanvasCount = (canvasesByFolderID.get(folder.id) || []).length;
+    const matchingCanvasCount = matchingCanvasCountsByFolderID.get(folder.id) || 0;
+    if (visibleCanvasCount > 0 || matchingCanvasCount > 0) {
+      return true;
+    }
+
+    if (hasSearchQuery) {
+      return false;
+    }
+
+    return true;
+  });
 
   return { canvasesByFolderID, unfiledCanvases, visibleFolders };
 }
@@ -219,17 +275,17 @@ function CanvasesEmptyState() {
 
 function LoadingView() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
-      <p className="ml-3 text-gray-500">Loading...</p>
+    <div className={cn("min-h-screen flex items-center justify-center bg-slate-100", appDarkModeClasses.surface)}>
+      <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600 dark:border-blue-400"></div>
+      <p className="ml-3 text-gray-500 dark:text-gray-400">Loading...</p>
     </div>
   );
 }
 
 function ErrorView() {
   return (
-    <div className="text-center py-8">
-      <p className="text-gray-500">Unable to load user information</p>
+    <div className={cn("py-8 text-center bg-slate-100 min-h-screen", appDarkModeClasses.surface)}>
+      <p className="text-gray-500 dark:text-gray-400">Unable to load user information</p>
     </div>
   );
 }

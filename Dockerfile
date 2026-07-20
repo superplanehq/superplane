@@ -1,6 +1,6 @@
 ARG UBUNTU_VERSION=22.04
 ARG GO_VERSION=1.26.2
-ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
+ARG PLAYWRIGHT_GO_VERSION=v0.6100.0
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
-ENV GOPROXY="https://proxy.golang.org,direct"
+ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN apt-get update && \
@@ -43,7 +43,7 @@ RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
   go install github.com/air-verse/air@latest && \
   go install github.com/mgechev/revive@v1.8.0 && \
   go install gotest.tools/gotestsum@v1.12.3 && \
-  go install github.com/playwright-community/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \
+  go install github.com/mxschmitt/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \
   rm -rf /tmp/go-mod /tmp/go-build /go/pkg/* /root/.cache/* /root/.config/go/telemetry
 
 WORKDIR /app

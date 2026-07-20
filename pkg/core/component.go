@@ -2,16 +2,19 @@ package core
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 var (
 	ErrSecretKeyNotFound   = errors.New("secret or key not found")
 	ErrExecutionKVNotFound = errors.New("execution kv not found")
+	ErrQueueItemDeferred   = errors.New("queue item deferred")
 )
 
 /*
@@ -37,11 +40,17 @@ type ExecutionContext struct {
 	Requests       RequestContext
 	Auth           AuthReader
 	Integration    IntegrationContext
-	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
+	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
+	OIDC           oidc.Provider
+	Apps           AppExecutionContext
+}
+
+type AppExecutionContext interface {
+	Broadcast(payload any) error
 }
 
 type ExpressionContext interface {
@@ -73,12 +82,19 @@ type SetupContext struct {
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
+	Files         RepositoryFilesContext
+	Apps          AppContext
 }
 
 type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
+}
+
+type RepositoryFilesContext interface {
+	List() ([]string, error)
+	Read(path string) (io.ReadCloser, error)
 }
 
 type CanvasMemoryRecord struct {
@@ -98,6 +114,11 @@ type ExecutionStateContext interface {
 	 * Pass the execution, emitting a payload to the specified channel.
 	 */
 	Emit(channel, payloadType string, payloads []any) error
+
+	/*
+	 * Emit a payload but keep the execution active for further work.
+	 */
+	EmitAndContinue(channel, payloadType string, payloads []any) error
 
 	/*
 	 * Pass the execution, without emitting any payloads from it.
@@ -143,6 +164,11 @@ type ProcessQueueContext struct {
 	DequeueItem func() error
 
 	//
+	// Defers the queue item by moving it to the back of the node queue.
+	//
+	DeferQueueItem func() error
+
+	//
 	// Updates the state of the node
 	//
 	UpdateNodeState func(state string) error
@@ -159,6 +185,12 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
+	// HasRunningExecutions reports whether this node currently has any
+	// unfinished (running) executions.
+	//
+	HasRunningExecutions func() (bool, error)
+
+	//
 	// DefaultProcessing performs the default processing for the queue item.
 	// Convenience method to avoid boilerplate in components that just want default behavior,
 	// where an execution is created and the item is dequeued.
@@ -171,17 +203,6 @@ type ProcessQueueContext struct {
 	// same source)
 	//
 	DistinctIncomingSources func() ([]Node, error)
-}
-
-type NotificationReceivers struct {
-	Emails []string
-	Groups []string
-	Roles  []string
-}
-
-type NotificationContext interface {
-	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
-	IsAvailable() bool
 }
 
 type SecretsContext interface {

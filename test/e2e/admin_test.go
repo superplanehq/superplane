@@ -184,7 +184,7 @@ func (s *adminSteps) saveInstallationSettings() {
 }
 
 func (s *adminSteps) assertPrivateNetworkAccessEnabled() {
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(s.t, err)
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess)
 }
@@ -250,9 +250,7 @@ func (s *adminSetupSteps) fillInOwnerDetailsAndSubmit() {
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), "User")
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), "Password1")
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), "Password1")
-	s.session.Click(q.Text("Next"))
-	s.session.Click(q.Text("Next"))
-	s.session.Click(q.Text("Do this later"))
+	s.session.Click(q.Text("Finish setup"))
 	s.waitForSetupToComplete()
 }
 

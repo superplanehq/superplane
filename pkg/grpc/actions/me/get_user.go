@@ -2,33 +2,36 @@ package me
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func GetUser(ctx context.Context, authService authorization.Authorization, includePermissions bool) (*pb.MeResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
 	if !orgIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	user, err := models.FindActiveUserByID(orgID, userID)
+	user, err := loadUser(ctx, orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		return nil, err
 	}
 
 	userProto := &pb.User{
@@ -49,9 +52,10 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		}, nil
 	}
 
-	roles, err := authService.GetUserRolesForOrg(userID, user.OrganizationID.String())
+	var roles []*authorization.RoleDefinition
+	roles, err = loadUserRoles(ctx, authService, userID, user.OrganizationID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user roles")
+		return nil, grpcerrors.Internal(err, "failed to get user roles")
 	}
 
 	//
@@ -62,7 +66,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	for _, role := range roles {
 		userProto.Roles = append(userProto.Roles, role.Name)
 		for _, permission := range role.Permissions {
-			key := fmt.Sprintf("%s:%s", permission.Resource, permission.Action)
+			key := permission.Resource + ":" + permission.Action
 			permissionSet[key] = &pbAuth.Permission{
 				Resource:   permission.Resource,
 				Action:     permission.Action,
@@ -78,12 +82,10 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 
 	userProto.Permissions = permissions
 
-	//
-	// Add information about the groups the user is a member of.
-	//
-	groups, err := authService.GetUserGroups(user.OrganizationID.String(), models.DomainTypeOrganization, userID)
+	var groups []string
+	groups, err = loadUserGroups(ctx, authService, userID, user.OrganizationID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user groups")
+		return nil, grpcerrors.Internal(err, "failed to get user groups")
 	}
 
 	userProto.Groups = groups
@@ -91,4 +93,34 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	return &pb.MeResponse{
 		User: userProto,
 	}, nil
+}
+
+func loadUser(ctx context.Context, orgID, userID string) (user *models.User, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user")
+	defer done(&err)
+
+	user, err = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, grpcerrors.NotFound(err, "user not found")
+		}
+
+		return nil, grpcerrors.Internal(err, "failed to load user")
+	}
+
+	return user, nil
+}
+
+func loadUserRoles(ctx context.Context, authService authorization.Authorization, userID string, organizationID uuid.UUID) (roles []*authorization.RoleDefinition, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user_roles")
+	defer done(&err)
+
+	return authService.GetUserRolesForOrg(ctx, userID, organizationID.String())
+}
+
+func loadUserGroups(ctx context.Context, authService authorization.Authorization, userID string, organizationID uuid.UUID) (groups []string, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user_groups")
+	defer done(&err)
+
+	return authService.GetUserGroups(ctx, organizationID.String(), models.DomainTypeOrganization, userID)
 }

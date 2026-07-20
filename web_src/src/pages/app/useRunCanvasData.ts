@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
-  SuperplaneActionsAction,
+  ActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
@@ -14,7 +14,7 @@ import { hydrateRunExecution, prepareData } from "./workflowPageHelpers";
 import { stripCanvasNodeSetupWarningsForRunsView } from "./lib/node-integrations";
 
 type UseRunCanvasDataParams = {
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   selectedRun: CanvasesCanvasRun | null;
   selectedRunCanvas?: CanvasesCanvas | null;
   canvasLoading: boolean;
@@ -22,7 +22,7 @@ type UseRunCanvasDataParams = {
   componentsLoading: boolean;
   isSelectedRunVersionLoading: boolean;
   allTriggers: TriggersTrigger[];
-  allComponents: SuperplaneActionsAction[];
+  allComponents: ActionsAction[];
   canvasId?: string;
   queryClient: QueryClient;
   me?: SuperplaneMeUser | null;
@@ -31,23 +31,72 @@ type UseRunCanvasDataParams = {
 };
 
 type UseRunCanvasPresentationParams = {
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   selectedRun: CanvasesCanvasRun | null;
   runCanvasData: RunCanvasData | null;
   liveNodes: CanvasNode[];
   liveEdges: CanvasEdge[];
+  isSelectedRunLoading: boolean;
   isSelectedRunVersionLoading: boolean;
   isSelectedRunExecutionsLoading: boolean;
 };
 
-type RunCanvasData = {
+export type RunCanvasData = {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   participantNodeIds: string[];
 };
 
+type RunExecutionRef = NonNullable<CanvasesCanvasRun["executions"]>[number];
+type OrderedRunExecution =
+  | { kind: "identified"; id: string }
+  | { kind: "anonymous"; execution: CanvasesCanvasNodeExecution };
+
+export function mergeRunExecutionsForCanvas(
+  runExecutions: RunExecutionRef[] = [],
+  fullExecutions: CanvasesCanvasNodeExecution[] = [],
+): CanvasesCanvasNodeExecution[] {
+  const identifiedExecutions = new Map<string, CanvasesCanvasNodeExecution>();
+  const orderedExecutions: OrderedRunExecution[] = [];
+
+  const appendExecution = (execution: RunExecutionRef | CanvasesCanvasNodeExecution): void => {
+    if (!execution.id) {
+      orderedExecutions.push({ kind: "anonymous", execution });
+      return;
+    }
+
+    if (!identifiedExecutions.has(execution.id)) {
+      identifiedExecutions.set(execution.id, execution);
+      orderedExecutions.push({ kind: "identified", id: execution.id });
+    }
+  };
+
+  runExecutions.forEach(appendExecution);
+
+  for (const execution of fullExecutions) {
+    if (!execution.id) {
+      orderedExecutions.push({ kind: "anonymous", execution });
+      continue;
+    }
+
+    const existing = identifiedExecutions.get(execution.id);
+    if (existing) {
+      identifiedExecutions.set(execution.id, { ...existing, ...execution });
+      continue;
+    }
+
+    identifiedExecutions.set(execution.id, execution);
+    orderedExecutions.push({ kind: "identified", id: execution.id });
+  }
+
+  return orderedExecutions.map((execution) => {
+    if (execution.kind === "anonymous") return execution.execution;
+    return identifiedExecutions.get(execution.id)!;
+  });
+}
+
 export function useRunCanvasData({
-  isRunsMode,
+  isRunInspectionMode,
   selectedRun,
   selectedRunCanvas,
   canvasLoading,
@@ -64,7 +113,7 @@ export function useRunCanvasData({
 }: UseRunCanvasDataParams): RunCanvasData | null {
   return useMemo(() => {
     if (
-      !isRunsMode ||
+      !isRunInspectionMode ||
       !selectedRunCanvas ||
       canvasLoading ||
       triggersLoading ||
@@ -79,11 +128,12 @@ export function useRunCanvasData({
     const runNodeIds = new Set<string>();
     const nodeEventsMap: Record<string, CanvasesCanvasEvent[]> = {};
     const nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
+    const runExecutions = mergeRunExecutionsForCanvas(selectedRun.executions, selectedRunFullExecutions);
     if (selectedRun.rootEvent?.nodeId) {
       runNodeIds.add(selectedRun.rootEvent.nodeId);
       nodeEventsMap[selectedRun.rootEvent.nodeId] = [selectedRun.rootEvent as CanvasesCanvasEvent];
     }
-    for (const execution of selectedRun.executions || []) {
+    for (const execution of runExecutions) {
       if (!execution.nodeId) continue;
       runNodeIds.add(execution.nodeId);
       if (!nodeExecutionsMap[execution.nodeId]) {
@@ -117,7 +167,7 @@ export function useRunCanvasData({
       participantNodeIds: Array.from(runNodeIds),
     };
   }, [
-    isRunsMode,
+    isRunInspectionMode,
     selectedRun,
     selectedRunCanvas,
     canvasLoading,
@@ -135,15 +185,16 @@ export function useRunCanvasData({
 }
 
 export function useRunCanvasPresentation({
-  isRunsMode,
+  isRunInspectionMode,
   selectedRun,
   runCanvasData,
   liveNodes,
   liveEdges,
+  isSelectedRunLoading,
   isSelectedRunVersionLoading,
   isSelectedRunExecutionsLoading,
 }: UseRunCanvasPresentationParams) {
-  if (!isRunsMode) {
+  if (!isRunInspectionMode) {
     return {
       nodes: liveNodes,
       edges: liveEdges,
@@ -154,6 +205,7 @@ export function useRunCanvasPresentation({
   return {
     nodes: runCanvasData?.nodes ?? [],
     edges: runCanvasData?.edges ?? [],
-    runCanvasLoading: !!selectedRun && (isSelectedRunVersionLoading || isSelectedRunExecutionsLoading),
+    runCanvasLoading:
+      isSelectedRunLoading || (!!selectedRun && (isSelectedRunVersionLoading || isSelectedRunExecutionsLoading)),
   };
 }

@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import useWebSocket from "react-use-websocket";
+import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { upsertAgentMessageInCache } from "./useAgentChats";
 import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/CanvasToolSidebar/types";
@@ -28,6 +28,9 @@ function dispatchAgentEvent(
     case "turn_completed":
     case "session_failed":
       handleStatusEvent(data, callbacks);
+      return;
+    case "session_notice":
+      callbacks.onNotice?.(data.error ?? "");
       return;
     case "outcome_evaluation_start":
     case "outcome_evaluation_end":
@@ -81,6 +84,8 @@ export type AgentStreamCallbacks = {
   onPersistedMessage?: (message: AgentMessage) => void;
   onStatusChange?: (status: string, error?: string) => void;
   onOutcomeEvent?: (event: "start" | "end", evaluation: OutcomeEvaluation) => void;
+  /** A recoverable, non-terminal provider notice (session.error). */
+  onNotice?: (message: string) => void;
 };
 
 export function useAgentSessionWebsocket(

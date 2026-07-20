@@ -20,7 +20,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	allowed, err := s.authService.CheckOrganizationPermission(
+	allowed, err := s.authService.CheckOrganizationPermission(r.Context(),
 		user.ID.String(),
 		user.OrganizationID.String(),
 		"canvases",
@@ -55,7 +55,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 
 	session, err := runneraction.NewLiveLogSession(access.BrokerTaskID, time.Now())
 	if err != nil {
-		if strings.Contains(err.Error(), "is not set") {
+		if errors.Is(err, runneraction.ErrLiveLogNotConfigured) {
 			http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
 			return
 		}

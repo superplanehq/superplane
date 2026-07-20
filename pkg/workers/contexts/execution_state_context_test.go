@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -45,10 +45,10 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 	t.Run("rejects large payload", func(t *testing.T) {
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
-		largePayload := strings.Repeat("a", DefaultMaxPayloadSize+100)
+		largePayload := strings.Repeat("a", config.MaxPayloadSize()+100)
 
 		err := ctx.Emit("default", "test.payload", []any{largePayload})
 		require.Error(t, err)
@@ -59,10 +59,10 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 	t.Run("rejects too many payloads", func(t *testing.T) {
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
-		payloads := make([]any, core.MaxEmitCount+1)
+		payloads := make([]any, config.MaxEmitCount()+1)
 		for i := range payloads {
 			payloads[i] = map[string]any{"n": i}
 		}
@@ -81,7 +81,7 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 		err := ctx.Emit("default", "test.payload", []any{map[string]any{"n": 1}})

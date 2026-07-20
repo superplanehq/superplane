@@ -2,6 +2,8 @@
  * Type definitions for dashboard widget renderers (table, chart, number).
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+
 export type WidgetDataSourceKind = "memory" | "executions" | "runs";
 
 export interface WidgetMemoryDataSource {
@@ -19,9 +21,56 @@ export interface WidgetExecutionsDataSource {
 export interface WidgetRunsDataSource {
   kind: "runs";
   limit?: number;
+  /**
+   * Optional status filter. Empty or omitted means "all statuses". Filtering
+   * happens client-side after runs are fetched, so `limit` still bounds
+   * what the fetch sees.
+   */
+  statuses?: RunStatusFilter[];
+  /**
+   * Optional trigger filter — each entry references a trigger node by id
+   * or name. Resolved through the console context at match time so
+   * renames don't silently drop rows. Empty or omitted means "all triggers".
+   */
+  triggers?: string[];
 }
 
 export type WidgetDataSource = WidgetMemoryDataSource | WidgetExecutionsDataSource | WidgetRunsDataSource;
+
+/**
+ * Uniform result from {@link useWidgetData} so renderers don't care which
+ * underlying query produced the rows.
+ */
+export interface WidgetDataResult {
+  rows: unknown[];
+  isLoading: boolean;
+  error?: string;
+  /** Server-reported total for sources that expose one (currently `runs`). */
+  totalCount?: number;
+  /**
+   * Whether more rows can be revealed by calling `loadMore()`. Only meaningful
+   * for progressive callers (the table widget). `false` for chart/number
+   * panels that always render against the full configured limit.
+   */
+  hasMore?: boolean;
+  /**
+   * `true` while a `loadMore()`-triggered (or scroll-triggered) fetch is in
+   * flight, distinct from the initial fill which is reported via `isLoading`.
+   */
+  isFetchingMore?: boolean;
+  /**
+   * Grow the per-widget display window by `LOAD_MORE_STEP` rows (capped at
+   * the configured limit, if any). No-op for non-progressive callers.
+   */
+  loadMore?: () => void;
+  /**
+   * Progressive display window size. When set, `rows` is the full loaded set
+   * (so filter/sort see every already-fetched row) and the table renders only
+   * the first `displayCount` rows after filter+sort. Trend neighbors can then
+   * resolve against loaded-but-not-yet-shown rows.
+   */
+  displayCount?: number;
+}
 
 export type WidgetColumnFormat =
   | "text"
@@ -34,7 +83,39 @@ export type WidgetColumnFormat =
   | "status"
   | "badge"
   | "code"
-  | "link";
+  | "link"
+  | "avatar"
+  | "progress"
+  | "trend";
+
+/** Text label rendered next to the bar for `format: progress`. */
+export type WidgetProgressLabel = "none" | "number" | "percent";
+
+export const WIDGET_PROGRESS_LABELS: WidgetProgressLabel[] = ["none", "number", "percent"];
+
+/**
+ * Direction that signals a "better" trend for trend columns / `showTrend`.
+ * `up` (default) → an increase is good (green), a decrease is bad (red).
+ * `down` → an increase is bad (red), a decrease is good (green).
+ */
+export type WidgetTrendBetter = "up" | "down";
+export const WIDGET_TREND_BETTER: WidgetTrendBetter[] = ["up", "down"];
+
+/**
+ * How a trend chip prints its magnitude alongside the arrow.
+ * `percent` (default) → signed percent change vs. the row below.
+ * `value` → signed absolute delta vs. the row below.
+ * `none` → arrow only (still shows `- 0` / `...` / `-` for edge states).
+ */
+export type WidgetTrendDisplay = "percent" | "value" | "none";
+export const WIDGET_TREND_DISPLAYS: WidgetTrendDisplay[] = ["percent", "value", "none"];
+
+/** Formats that can show a value + trend chip via `showTrend`. */
+export const WIDGET_SHOW_TREND_FORMATS: WidgetColumnFormat[] = ["number", "percent", "duration"];
+
+export function columnSupportsShowTrend(format: WidgetColumnFormat | undefined): boolean {
+  return format != null && WIDGET_SHOW_TREND_FORMATS.includes(format);
+}
 
 export interface WidgetTableColumn {
   field: string;
@@ -42,6 +123,25 @@ export interface WidgetTableColumn {
   format?: WidgetColumnFormat;
   show?: string;
   href?: string;
+  /** Secondary person map used for avatar initials when `format: avatar`. */
+  avatarCommitterField?: string;
+  /**
+   * Target (100%) reference for `format: progress`. Accepts a numeric literal,
+   * a dot path against the row, or a full `{{ CEL }}` expression — resolved
+   * with the same helper as `field` at render time.
+   */
+  progressTarget?: string;
+  /** Label style rendered next to the progress bar. Defaults to `"percent"`. */
+  progressLabel?: WidgetProgressLabel;
+  /**
+   * When true on `number` | `percent` | `duration`, render the formatted value
+   * plus a trend chip (same semantics as `format: trend`). Ignored otherwise.
+   */
+  showTrend?: boolean;
+  /** Which direction is "better" for trend / `showTrend`. Defaults to `up`. */
+  trendBetter?: WidgetTrendBetter;
+  /** What to show next to the trend arrow. Defaults to `percent`. */
+  trendDisplay?: WidgetTrendDisplay;
 }
 
 export type WidgetFilterOp = "eq" | "neq" | "contains" | "not_contains" | "gt" | "lt" | "exists" | "not_exists";
@@ -176,6 +276,22 @@ export interface WidgetChartRender {
    * values and ignores additional series entries.
    */
   seriesField?: string;
+  /**
+   * Optional display format applied to X-axis tick labels. Reuses the
+   * shared `WidgetColumnFormat` vocabulary so date / duration / number
+   * X-axes don't require a CEL wrapper around `xField`.
+   */
+  xFormat?: WidgetColumnFormat;
+  /**
+   * Optional Y-axis title rendered alongside the axis ticks (e.g. "USD",
+   * "Errors / day"). When omitted no axis label is drawn.
+   */
+  yLabel?: string;
+  /**
+   * Optional display format applied to Y-axis tick labels. When omitted
+   * the renderer falls back to its locale-aware numeric default.
+   */
+  yFormat?: WidgetColumnFormat;
 }
 
 /** Sort direction. Defaults to `"asc"` when omitted on a `WidgetSort`. */
@@ -212,7 +328,62 @@ export interface WidgetNumberRender {
   suffix?: string;
 }
 
-export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender;
+/**
+ * How the scorecard change chip prints its magnitude. `both` mirrors the
+ * screenshot pattern `-29 (-22.8%)`; `none` hides text and keeps just the
+ * directional arrow.
+ */
+export type WidgetScorecardShowChange = "percent" | "number" | "both" | "none";
+export const WIDGET_SCORECARD_SHOW_CHANGES: WidgetScorecardShowChange[] = ["percent", "number", "both", "none"];
+
+/**
+ * Scorecard render: single KPI value plus optional change vs the
+ * immediately-previous value in the series, direction-aware
+ * target/progress, and a status-colored sparkline. Composite memory and
+ * multi-KPI shapes are intentionally not supported — the dedicated
+ * `number` panel already covers those cases.
+ */
+export interface WidgetScorecardRender {
+  kind: "scorecard";
+  /** Same vocabulary as {@link WidgetNumberRender}. Required. */
+  aggregation: WidgetNumberAggregation;
+  /** Required when aggregation is not "count". */
+  field?: string;
+  /** Legacy show expressions applied to filter rows before aggregation / series extraction. */
+  filters?: string[];
+  format?: WidgetColumnFormat;
+  label?: string;
+  /** Optional display string rendered before the formatted value (e.g. "R$"). */
+  prefix?: string;
+  /** Optional display string rendered after the formatted value (e.g. " MWh"). */
+  suffix?: string;
+  /**
+   * Direction that signals "better". Colors the change chip, the sparkline,
+   * and the vs-target status. Defaults to `up`.
+   */
+  better?: WidgetTrendBetter;
+  /**
+   * Target value used for optional progress and (when the change is
+   * incomputable) status coloring. Accepts a numeric literal (`"50"`,
+   * `"100.5"`) or a full `{{ CEL }}` expression evaluated against the last
+   * filtered row plus `now`.
+   */
+  target?: string;
+  /** When true and the target resolves, render a direction-aware progress bar. */
+  showProgress?: boolean;
+  /**
+   * Field extracted from each filtered row (in order) to draw the
+   * sparkline. When omitted the sparkline is hidden — the change chip
+   * still renders using the primary `field` as its fallback series.
+   */
+  sparklineField?: string;
+  /** What the change chip prints alongside its arrow. Defaults to `both`. */
+  showChange?: WidgetScorecardShowChange;
+  /** Optional short caption rendered next to the change chip (e.g. "vs previous"). */
+  changeCaption?: string;
+}
+
+export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender | WidgetScorecardRender;
 
 export interface WidgetConfig {
   title?: string;

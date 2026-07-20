@@ -1,8 +1,8 @@
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
-  SuperplaneActionsAction,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ActionsAction,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
@@ -21,7 +21,7 @@ type UseDraftVisualDiffArgs = {
   preparedNodes: CanvasNode[];
   preparedEdges: CanvasEdge[];
   allTriggers: TriggersTrigger[];
-  allComponents: SuperplaneActionsAction[];
+  allComponents: ActionsAction[];
   canvasId?: string;
   queryClient: QueryClient;
 };

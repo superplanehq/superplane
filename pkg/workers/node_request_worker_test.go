@@ -1,27 +1,32 @@
 package workers
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
 func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -84,13 +89,75 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
+func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"type":         "days",
+					"daysInterval": 1,
+					"hour":         12,
+					"minute":       0,
+					"customName":   "Minute {{ root().data.calendar.minute }}",
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     triggerNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var event models.CanvasEvent
+	err = database.Conn().
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", triggerNode).
+		First(&event).Error
+	require.NoError(t, err)
+	require.NotNil(t, event.CustomName)
+	assert.Regexp(t, `^Minute \d{2}$`, *event.CustomName)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
 func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -136,7 +203,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -192,12 +259,12 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the request concurrently.
 	//
 	go func() {
-		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 		results <- worker1.LockAndProcessRequest(request)
 	}()
 
 	go func() {
-		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 		results <- worker2.LockAndProcessRequest(request)
 	}()
 
@@ -229,10 +296,10 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -286,10 +353,10 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -343,10 +410,10 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -399,10 +466,10 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -458,18 +525,16 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
+func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
-	//
-	// Create a simple canvas with a schedule trigger node.
-	//
 	triggerNode := "trigger-1"
 	canvas, canvasNodes := support.CreateCanvas(
 		t,
@@ -491,9 +556,6 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	//
-	// Create a node request for the trigger.
-	//
 	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
 		WorkflowID: canvas.ID,
@@ -509,18 +571,11 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	//
-	// Soft delete the workflow node.
-	//
 	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
-	//
-	// Verify that ListNodeRequests does not return the request for the deleted node.
-	//
 	requests, err := models.ListNodeRequests()
 	require.NoError(t, err)
 
-	// Check that our request is not in the list
 	found := false
 	for _, req := range requests {
 		if req.ID == request.ID {
@@ -528,9 +583,388 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 			break
 		}
 	}
-	assert.False(t, found, "Request for deleted node should not be returned by ListNodeRequests")
+	assert.True(t, found, "Request for deleted node should be returned by ListNodeRequests")
+
+	err = worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, canvasNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateStarted,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "noop",
+				Parameters: map[string]interface{}{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+	require.NoError(t, terminator.LockAndCancelExecution(updatedExecution))
+
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+}
+
+func Test__NodeRequestWorker_CompletesRequestForFinishedExecutionWithoutInvokingHook(t *testing.T) {
+	hookCalled := false
+	componentName := "finished_execution_request_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			hookCalled = true
+			return nil
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	finishedAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": finishedAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.False(t, hookCalled)
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second)
+}
+
+func Test__NodeRequestWorker_CompletesRequestForCancellingExecutionWithoutInvokingHook(t *testing.T) {
+	hookCalled := false
+	componentName := "cancelling_execution_request_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			hookCalled = true
+			return nil
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	cancellingAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateCancelling,
+		"updated_at": cancellingAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.False(t, hookCalled)
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, cancellingAt, *updatedExecution.UpdatedAt, time.Second)
+}
+
+func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionFinished(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentName := "stale_execution_after_hook_" + uuid.New().String()
+	var executionID uuid.UUID
+	finishedAt := time.Now().Add(-10 * time.Minute)
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			err := database.Conn().Model(&models.CanvasNodeExecution{}).
+				Where("id = ?", executionID).
+				Updates(map[string]any{
+					"state":      models.CanvasNodeExecutionStateFinished,
+					"result":     models.CanvasNodeExecutionResultPassed,
+					"updated_at": finishedAt,
+				}).Error
+			require.NoError(t, err)
+
+			return ctx.ExecutionState.Pass()
+		},
+	})
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+	executionID = execution.ID
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second)
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+}
+
+func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {
+	cancelCalled := false
+	componentName := "cancel_failing_" + uuid.New().String()
+
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		CancelFunc: func(ctx core.ExecutionContext) error {
+			cancelCalled = true
+			return errors.New("cancel failed")
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, canvasNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateStarted,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "noop",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.False(t, cancelCalled, "NodeRequestWorker should not invoke component Cancel directly")
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+	require.NoError(t, terminator.LockAndCancelExecution(updatedExecution))
+
+	assert.True(t, cancelCalled, "component Cancel should be invoked by ExecutionTerminator")
+
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
 func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
@@ -538,7 +972,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -613,11 +1047,11 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 	triggerNode := "trigger-1"
 	canvas, _ := support.CreateCanvas(
 		t,

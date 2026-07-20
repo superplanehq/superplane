@@ -1,6 +1,9 @@
+export type IntegrationSource = "node_configuration" | "integrations_page" | "install_wizard";
+
 import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
 import type { OrganizationsIntegration } from "@/api-client";
+import { getUtmEventProperties } from "@/lib/utmAttribution";
 // Tracks when a connect form was opened so duration_s can be computed on submit.
 // Keyed by integration name; last-write-wins for the same integration.
 const integrationConnectStartTimes = new Map<string, number>();
@@ -43,16 +46,8 @@ export const analytics = {
     });
   },
 
-  yamlExport: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
-  },
-
   integrationRequested: (organizationId: string) => {
     posthog.capture("request_integration_clicked", { organization_id: organizationId });
-  },
-
-  yamlImport: () => {
-    posthog.capture("canvas:yaml_import", {});
   },
 
   nodeAdd: (nodeType: string, integration: string | undefined, nodeRef: string | undefined, organizationId: string) => {
@@ -107,11 +102,53 @@ export const analytics = {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  integrationConnectStart: (
-    integration: string,
-    source: "node_configuration" | "integrations_page",
-    organizationId: string,
+  agentMessageSendSubmitted: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
   ) => {
+    posthog.capture("agent:message_send_submitted", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+    });
+  },
+
+  agentMessageSendAcknowledged: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
+    durationMs: number,
+  ) => {
+    posthog.capture("agent:message_send_acknowledged", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+      duration_ms: durationMs,
+    });
+  },
+
+  agentMessageSendFailed: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
+    durationMs: number,
+  ) => {
+    posthog.capture("agent:message_send_failed", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+      duration_ms: durationMs,
+    });
+  },
+
+  integrationConnectStart: (integration: string, source: IntegrationSource, organizationId: string) => {
     integrationConnectStartTimes.set(integration, Date.now());
     posthog.capture("integration:connect_start", {
       integration,
@@ -121,7 +158,10 @@ export const analytics = {
   },
 
   orgCreate: (organizationId: string) => {
-    posthog.capture("auth:org_create", { organization_id: organizationId });
+    posthog.capture("auth:org_create", {
+      organization_id: organizationId,
+      ...getUtmEventProperties(),
+    });
   },
 
   canvasRunItemOpen: (nodeRef: string | undefined, executionStatus: string, organizationId: string) => {
@@ -150,7 +190,7 @@ export const analytics = {
 
   integrationConnectSubmit: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: IntegrationSource,
     status: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -168,7 +208,7 @@ export const analytics = {
 
   integrationConfigureOpen: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: IntegrationSource,
     previousStatus: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -204,7 +244,7 @@ export const analytics = {
 export function useIntegrationConfigureOpen(
   integration: OrganizationsIntegration | undefined,
   integrationId: string | null | undefined,
-  source: "node_configuration" | "integrations_page",
+  source: IntegrationSource,
   organizationId: string | undefined,
 ) {
   const firedRef = useRef<string | null>(null);

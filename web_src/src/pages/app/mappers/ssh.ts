@@ -109,11 +109,15 @@ export const SSH_STATE_REGISTRY: EventStateRegistry = {
   getState: sshStateFunction,
 };
 
+type SSHCommandSource = "inline" | "file";
+
 type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
+  commandSource?: SSHCommandSource;
   commands?: string;
+  commandFile?: string;
   authMethod?: string;
 };
 
@@ -231,7 +235,27 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
       label: `${config.username || "user"}@${config.host}${port}`,
     });
   }
-  if (config?.commands) {
+
+  // A blank/unset commandSource is treated as "inline" for backward
+  // compatibility with nodes saved before the file source was introduced.
+  // Use an exact match (no trimming): the field's visibility/required
+  // conditions and the backend both compare this value exactly, so only a
+  // clean "file" runs in file mode. Anything else (including padded values)
+  // is treated as inline here so the chip preview matches what actually runs.
+  const source: SSHCommandSource = config?.commandSource === "file" ? "file" : "inline";
+
+  // Branch on the source first so file mode never falls back to the inline
+  // commands preview. The worker ignores `commands` when running in file mode,
+  // so showing them here (e.g. while `commandFile` is still empty during
+  // editing) would misrepresent what actually runs.
+  if (source === "file") {
+    if (config?.commandFile) {
+      metadata.push({
+        icon: "file-code",
+        label: config.commandFile,
+      });
+    }
+  } else if (typeof config?.commands === "string" && config.commands) {
     const oneline = config.commands
       .split("\n")
       .filter((l) => l.trim() !== "")

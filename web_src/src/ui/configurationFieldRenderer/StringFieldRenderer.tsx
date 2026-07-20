@@ -11,6 +11,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
   excludedSuggestions,
+  valuePreviewLabel,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
@@ -68,6 +69,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       suffix=" }}"
       inputSize="md"
       showValuePreview
+      valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}

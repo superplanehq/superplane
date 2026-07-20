@@ -2,23 +2,20 @@ package canvases
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
 const MaxCanvasVersionLimit = 50
-
-func ListCanvasVersions(ctx context.Context, organizationID string, canvasID string) (*pb.ListCanvasVersionsResponse, error) {
-	return ListCanvasVersionsPaginated(ctx, organizationID, canvasID, 0, nil, pb.CanvasVersion_STATE_UNSPECIFIED)
-}
 
 func ListCanvasVersionsPaginated(
 	ctx context.Context,
@@ -26,110 +23,42 @@ func ListCanvasVersionsPaginated(
 	canvasID string,
 	limit uint32,
 	before *timestamppb.Timestamp,
-	state pb.CanvasVersion_State,
 ) (*pb.ListCanvasVersionsResponse, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
-	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
+	_, err = loadCanvas(ctx, database.DB(ctx), orgUUID, canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(organizationID, canvas, uuid.MustParse(userID), limit, before)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
 
-	var publishedVersions []models.CanvasVersion
-	var publishedCount int64
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
-		if versionsErr != nil {
-			return versionsErr
-		}
-		publishedVersions = versions
-
-		count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvas.ID)
-		if countErr != nil {
-			return countErr
-		}
-		publishedCount = count
-
-		return nil
-	})
+	versions, count, err := listCanvasVersionHistory(ctx, canvasUUID, int(limit), beforeTime)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := make([]*pb.CanvasVersion, 0, len(publishedVersions))
-	for i := range publishedVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&publishedVersions[i], organizationID))
-	}
+	protoVersions := serializeCanvasVersions(ctx, versions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
-		TotalCount:    uint32(publishedCount),
-		HasNextPage:   hasNextPage(len(publishedVersions), int(limit), publishedCount),
-		LastTimestamp: getLastCanvasVersionTimestamp(publishedVersions),
-	}, nil
-}
-
-func listDraftCanvasVersions(
-	organizationID string,
-	canvas *models.Canvas,
-	ownerID uuid.UUID,
-	limit uint32,
-	before *timestamppb.Timestamp,
-) (*pb.ListCanvasVersionsResponse, error) {
-	limit = getCanvasVersionLimit(limit)
-	beforeTime := getBefore(before)
-
-	var draftVersions []models.CanvasVersion
-	var draftCount int64
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID, int(limit), beforeTime)
-		if versionsErr != nil {
-			return versionsErr
-		}
-		draftVersions = versions
-
-		count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID)
-		if countErr != nil {
-			return countErr
-		}
-		draftCount = count
-
-		return nil
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
-	}
-
-	protoVersions := make([]*pb.CanvasVersion, 0, len(draftVersions))
-	for i := range draftVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&draftVersions[i], organizationID))
-	}
-
-	return &pb.ListCanvasVersionsResponse{
-		Versions:      protoVersions,
-		TotalCount:    uint32(draftCount),
-		HasNextPage:   hasNextPage(len(draftVersions), int(limit), draftCount),
-		LastTimestamp: getLastDraftCanvasVersionTimestamp(draftVersions),
+		TotalCount:    uint32(count),
+		HasNextPage:   hasNextPage(len(versions), int(limit), count),
+		LastTimestamp: getLastCanvasVersionTimestamp(versions),
 	}, nil
 }
 
@@ -151,22 +80,27 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb
 	}
 
 	lastVersion := versions[len(versions)-1]
-	if lastVersion.PublishedAt == nil {
+	if lastVersion.CreatedAt == nil {
 		return nil
 	}
 
-	return timestamppb.New(*lastVersion.PublishedAt)
+	return timestamppb.New(*lastVersion.CreatedAt)
 }
 
-func getLastDraftCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb.Timestamp {
-	if len(versions) == 0 {
-		return nil
-	}
+func listCanvasVersionHistory(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.list_version_history")
+	defer done(&err)
 
-	lastVersion := versions[len(versions)-1]
-	if lastVersion.UpdatedAt == nil {
-		return nil
-	}
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		versions, txErr = models.ListCanvasVersionHistoryInTransaction(tx, canvasUUID, limit, beforeTime)
+		if txErr != nil {
+			return txErr
+		}
 
-	return timestamppb.New(*lastVersion.UpdatedAt)
+		count, txErr = models.CountCanvasVersionsInTransaction(tx, canvasUUID)
+		return txErr
+	})
+
+	return versions, count, err
 }

@@ -10,13 +10,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -24,27 +23,27 @@ import (
 func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, capabilities []*pb.Integration_CapabilityState) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid integration ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid integration ID")
 	}
 
 	integration, err := models.FindIntegration(org, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "integration not found")
+			return nil, grpcerrors.NotFound(err, "integration not found")
 		}
 
 		log.WithError(err).Error("failed to find integration")
-		return nil, status.Error(codes.Internal, "failed to find integration")
+		return nil, grpcerrors.Internal(err, "failed to find integration")
 	}
 
 	changes := findChanges(integration.Capabilities, capabilities)
 	if len(changes) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "no changes")
+		return nil, grpcerrors.InvalidArgument(nil, "no changes")
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -69,7 +68,7 @@ func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Regis
 
 	if err != nil {
 		log.WithError(err).Error("failed to update integration capabilities")
-		return nil, status.Error(codes.Internal, "failed to update integration capabilities")
+		return nil, grpcerrors.Internal(err, "failed to update integration capabilities")
 	}
 
 	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
@@ -215,6 +214,7 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 	}
 
 	capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
+	logging.ForIntegration(*integration).WithField("source", "capability_update").Info("Integration operation may write secrets")
 	nextStep, err := setupProvider.OnCapabilityUpdate(core.CapabilityUpdateContext{
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},

@@ -20,11 +20,6 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
-vi.mock("@/components/TimeAgo", () => ({
-  TimeAgo: () => <span>time ago</span>,
-  renderTimeAgo: () => "time ago",
-}));
-
 vi.mock("sonner", () => ({
   toast: { success: vi.fn() },
 }));
@@ -118,5 +113,54 @@ describe("RunDetailPanel", () => {
 
     fireEvent.click(screen.getByTestId("run-detail-back"));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("navigates to adjacent runs when the chevrons are clicked", async () => {
+    const user = userEvent.setup();
+    const onNavigateRun = vi.fn();
+
+    render(
+      <RunDetailPanel
+        canvasId="canvas-1"
+        run={makeRun()}
+        workflowNodes={workflowNodes}
+        componentIconMap={{}}
+        selectedNodeId={null}
+        onSelectNode={() => {}}
+        onBack={() => {}}
+        newerRunId="run-newer"
+        olderRunId="run-older"
+        canNavigateOlder
+        onNavigateRun={onNavigateRun}
+      />,
+    );
+
+    await user.click(screen.getByTestId("run-detail-newer"));
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onNavigateRun).toHaveBeenNthCalledWith(1, "run-newer");
+    expect(onNavigateRun).toHaveBeenNthCalledWith(2, "run-older");
+  });
+
+  it("loads more runs when navigating older at the paginated boundary", async () => {
+    const user = userEvent.setup();
+    const onNavigateOlder = vi.fn();
+
+    render(
+      <RunDetailPanel
+        canvasId="canvas-1"
+        run={makeRun()}
+        workflowNodes={workflowNodes}
+        componentIconMap={{}}
+        selectedNodeId={null}
+        onSelectNode={() => {}}
+        onBack={() => {}}
+        canNavigateOlder
+        onNavigateRun={() => {}}
+        onNavigateOlder={onNavigateOlder}
+      />,
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onNavigateOlder).toHaveBeenCalledTimes(1);
   });
 });

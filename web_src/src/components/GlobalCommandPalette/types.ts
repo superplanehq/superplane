@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import type { LucideIcon } from "lucide-react";
 
 export type CommandPage = "root" | "organization-settings" | "canvas-settings" | "open-canvas" | "admin";
@@ -24,7 +24,7 @@ export type PalettePageAction = Omit<PaletteAction, "onSelect"> & {
 };
 
 export type CanvasCommandListProps = {
-  canvases: CanvasesCanvas[];
+  canvases: CanvasesCanvasSummary[];
   canvasesLoading: boolean;
   organizationId: string | null;
   goTo: (href: string) => void;

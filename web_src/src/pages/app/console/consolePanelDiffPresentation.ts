@@ -5,19 +5,19 @@ import type { DraftDiffStatus } from "../draftNodeDiff";
 export const PANEL_DIFF_BADGE = {
   added: {
     label: "ADDED",
-    className: "bg-green-500 text-white",
+    colorClass: "bg-green-500",
     borderClassName: "border-green-500",
     Icon: Plus,
   },
   updated: {
     label: "EDITED",
-    className: "bg-sky-500 text-white",
+    colorClass: "bg-sky-500",
     borderClassName: "border-sky-500",
     Icon: Diff,
   },
   removed: {
     label: "REMOVED",
-    className: "bg-red-500 text-white",
+    colorClass: "bg-red-500",
     borderClassName: "border-red-500",
     Icon: Minus,
   },

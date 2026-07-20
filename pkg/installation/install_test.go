@@ -1,155 +1,154 @@
 package installation
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/test/support"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-func TestPersistInstalledConsoleNoopWhenNil(t *testing.T) {
-	support.Setup(t)
+func TestFetchRawCanvasFile(t *testing.T) {
+	t.Run("resolves main ref", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{
+			rawFileURL(repo, "main", canvasFileName): {
+				status: http.StatusOK,
+				body:   "apiVersion: v1\nkind: Canvas\nmetadata:\n  name: Test",
+			},
+		})
 
-	// A nil console must not require a valid canvas id — it short-circuits
-	// before any DB write.
-	err := persistInstalledConsole("not-a-uuid", nil)
-	require.NoError(t, err)
+		body, ref, err := fetchRawCanvasFile(repo)
+		require.NoError(t, err)
+		assert.Equal(t, "main", ref)
+		assert.Contains(t, string(body), "Test")
+	})
+
+	t.Run("falls back to master", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{
+			rawFileURL(repo, "master", canvasFileName): {
+				status: http.StatusOK,
+				body:   "apiVersion: v1\nkind: Canvas\nmetadata:\n  name: Master",
+			},
+		})
+
+		body, ref, err := fetchRawCanvasFile(repo)
+		require.NoError(t, err)
+		assert.Equal(t, "master", ref)
+		assert.Contains(t, string(body), "Master")
+	})
+
+	t.Run("returns error when not found on any ref", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{})
+
+		_, _, err := fetchRawCanvasFile(repo)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("stops on transient error instead of trying next ref", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{
+			rawFileURL(repo, "main", canvasFileName): {
+				status: http.StatusInternalServerError,
+				body:   "server error",
+			},
+			rawFileURL(repo, "master", canvasFileName): {
+				status: http.StatusOK,
+				body:   "apiVersion: v1\nkind: Canvas\nmetadata:\n  name: Fallback",
+			},
+		})
+
+		_, _, err := fetchRawCanvasFile(repo)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "500")
+	})
+
+	t.Run("uses explicit ref", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo", Ref: "v2"}
+		stubHTTP(t, map[string]stubResponse{
+			rawFileURL(repo, "v2", canvasFileName): {
+				status: http.StatusOK,
+				body:   "apiVersion: v1\nkind: Canvas\nmetadata:\n  name: V2",
+			},
+		})
+
+		body, ref, err := fetchRawCanvasFile(repo)
+		require.NoError(t, err)
+		assert.Equal(t, "v2", ref)
+		assert.Contains(t, string(body), "V2")
+	})
 }
 
-func TestPersistInstalledConsoleRejectsInvalidCanvasID(t *testing.T) {
-	support.Setup(t)
+func TestWireIntegrations(t *testing.T) {
 
-	console := &models.ConsoleYAML{
-		APIVersion: models.DashboardAPIVersion,
-		Kind:       models.ConsoleKind,
-		Spec: models.ConsoleYAMLSpec{
-			Panels: []models.ConsolePanel{
-				{ID: "p1", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "hi"}},
-			},
-		},
-	}
+	t.Run("skips nodes without component", func(t *testing.T) {
+		node := &componentpb.Node{Component: ""}
+		name := findIntegrationForComponent(node, nil)
+		assert.Empty(t, name)
+	})
 
-	err := persistInstalledConsole("not-a-uuid", console)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid canvas id")
+	t.Run("skips nil spec", func(t *testing.T) {
+		canvas := &yaml.Canvas{}
+		// Should not panic
+		wireIntegrations(canvas, map[string]IntegrationMapping{"test": {ID: "1", Name: "t"}}, nil)
+		assert.Nil(t, canvas.Spec)
+	})
 }
 
-func TestPersistInstalledConsoleWritesPanelsAndLayout(t *testing.T) {
-	r := support.Setup(t)
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-
-	minW := 2
-	console := &models.ConsoleYAML{
-		APIVersion: models.DashboardAPIVersion,
-		Kind:       models.ConsoleKind,
-		Spec: models.ConsoleYAMLSpec{
-			Panels: []models.ConsolePanel{
-				{
-					ID:      "notes",
-					Type:    models.ConsolePanelTypeMarkdown,
-					Content: map[string]any{"title": "Notes", "body": "hello from console.yaml"},
-				},
-			},
-			Layout: []models.ConsoleLayoutItem{
-				{I: "notes", X: 0, Y: 0, W: 4, H: 2, MinW: &minW},
-			},
-		},
+func TestDefaultParamValues(t *testing.T) {
+	schema := []InstallParam{
+		{Name: "repo", Default: "default-repo"},
+		{Name: "region", Placeholder: "us-east-1"},
+		{Name: "bare"},
+		// secret_picker without a default resolves to empty instead of the
+		// placeholder/param-name fallback, which are not real secret names.
+		{Name: "secret_placeholder", Type: ParamTypeSecretPicker, Placeholder: "my-secret"},
+		{Name: "secret_bare", Type: ParamTypeSecretPicker},
+		{Name: "secret_defaulted", Type: ParamTypeSecretPicker, Default: "prod-secret"},
 	}
 
-	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
-
-	canvasVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-	require.NoError(t, err)
-	panels := canvasVersion.ConsolePanels.Data()
-	layout := canvasVersion.ConsoleLayout.Data()
-
-	require.Len(t, panels, 1)
-	assert.Equal(t, "notes", panels[0].ID)
-	assert.Equal(t, models.ConsolePanelTypeMarkdown, panels[0].Type)
-	assert.Equal(t, "hello from console.yaml", panels[0].Content["body"])
-
-	require.Len(t, layout, 1)
-	assert.Equal(t, "notes", layout[0].I)
-	assert.Equal(t, 4, layout[0].W)
-	require.NotNil(t, layout[0].MinW)
-	assert.Equal(t, 2, *layout[0].MinW)
+	defaults := DefaultParamValues(schema)
+	assert.Equal(t, "default-repo", defaults["repo"])
+	assert.Equal(t, "us-east-1", defaults["region"])
+	assert.Equal(t, "bare", defaults["bare"])
+	assert.Equal(t, "", defaults["secret_placeholder"])
+	assert.Equal(t, "", defaults["secret_bare"])
+	assert.Equal(t, "prod-secret", defaults["secret_defaulted"])
 }
 
-func TestPersistInstalledConsoleIsReplaceAll(t *testing.T) {
-	r := support.Setup(t)
+func TestFetchParams(t *testing.T) {
+	t.Run("returns nil when file missing", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{})
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		params, err := FetchParams(repo, "main")
+		require.NoError(t, err)
+		assert.Nil(t, params)
+	})
 
-	// Seed the canvas with a different console first.
-	_, err := models.UpsertCanvasVersionConsole(
-		canvas.ID,
-		[]models.ConsolePanel{
-			{ID: "old", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "old"}},
-		},
-		[]models.ConsoleLayoutItem{
-			{I: "old", X: 0, Y: 0, W: 4, H: 2},
-		},
-	)
-	require.NoError(t, err)
-
-	console := &models.ConsoleYAML{
-		APIVersion: models.DashboardAPIVersion,
-		Kind:       models.ConsoleKind,
-		Spec: models.ConsoleYAMLSpec{
-			Panels: []models.ConsolePanel{
-				{ID: "new", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "new"}},
+	t.Run("parses valid params.json", func(t *testing.T) {
+		repo := &Repository{Owner: "acme", Name: "demo"}
+		stubHTTP(t, map[string]stubResponse{
+			rawFileURL(repo, "main", paramsFileName): {
+				status: http.StatusOK,
+				body:   `{"install_params": [{"name": "repo", "label": "Repo", "type": "string", "required": true}]}`,
 			},
-			Layout: []models.ConsoleLayoutItem{
-				{I: "new", X: 0, Y: 0, W: 6, H: 3},
-			},
-		},
-	}
+		})
 
-	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
+		params, err := FetchParams(repo, "main")
+		require.NoError(t, err)
+		require.NotNil(t, params)
+		assert.Len(t, params.InstallParams, 1)
+		assert.Equal(t, "repo", params.InstallParams[0].Name)
+	})
 
-	canvasVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-	require.NoError(t, err)
-	panels := canvasVersion.ConsolePanels.Data()
-	require.Len(t, panels, 1)
-	assert.Equal(t, "new", panels[0].ID)
-
-	// Sanity-check that calling persistInstalledConsole(nil) on the same
-	// canvas does not clobber an already-stored console.
-	require.NoError(t, persistInstalledConsole(canvas.ID.String(), nil))
-
-	canvasVersion, err = models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-	require.NoError(t, err)
-	require.Len(t, canvasVersion.ConsolePanels.Data(), 1)
-	assert.Equal(t, "new", canvasVersion.ConsolePanels.Data()[0].ID)
-}
-
-func TestPersistInstalledConsoleUsesUUIDAsPrimaryKey(t *testing.T) {
-	r := support.Setup(t)
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-
-	console := &models.ConsoleYAML{
-		APIVersion: models.DashboardAPIVersion,
-		Kind:       models.ConsoleKind,
-		Spec: models.ConsoleYAMLSpec{
-			Panels: []models.ConsolePanel{
-				{ID: "p", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{}},
-			},
-			Layout: []models.ConsoleLayoutItem{
-				{I: "p", X: 0, Y: 0, W: 4, H: 2},
-			},
-		},
-	}
-
-	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
-
-	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	unrelated, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), otherCanvas.ID)
-	require.NoError(t, err)
-	assert.Empty(t, unrelated.ConsolePanels.Data())
-	assert.Empty(t, unrelated.ConsoleLayout.Data())
+	t.Run("requires resolved ref", func(t *testing.T) {
+		_, err := FetchParams(&Repository{Owner: "acme", Name: "demo"}, "")
+		require.Error(t, err)
+	})
 }

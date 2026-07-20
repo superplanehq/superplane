@@ -352,6 +352,35 @@ func TestSendMessage_NoPreamble(t *testing.T) {
 	assert.Equal(t, "hi", text)
 }
 
+func TestSendMessage_IncludesImageContentBlocks(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_abc", "look at this", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.NoError(t, err)
+
+	events := capturedBody["events"].([]any)
+	content := events[0].(map[string]any)["content"].([]any)
+	require.Len(t, content, 2)
+	assert.Equal(t, "look at this", content[0].(map[string]any)["text"].(string))
+
+	imageBlock := content[1].(map[string]any)
+	assert.Equal(t, "image", imageBlock["type"].(string))
+	source := imageBlock["source"].(map[string]any)
+	assert.Equal(t, "base64", source["type"].(string))
+	assert.Equal(t, "image/png", source["media_type"].(string))
+	assert.Equal(t, "aGVsbG8=", source["data"].(string))
+}
+
 func TestSendMessage_RequiresSessionID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("server should not be hit")
@@ -359,6 +388,117 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	defer server.Close()
 	p := newTestProvider(t, server)
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
+}
+
+func TestSendMessage_MapsWaitingOnToolResultsToBusySession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Invalid user.message event at events[0]: waiting on responses to events [sevt_012]; only user.tool_result may be sent"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_abc", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrSessionBusy)
+}
+
+func TestSendMessage_MapsArchivedSessionToUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"not_found_error","message":"session has been archived"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_archived", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestSendMessage_MapsDeletedSessionBadRequestToUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Session sesn_deleted does not exist"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_deleted", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestSendMessage_MapsPayloadTooLargeToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"request payload is too large"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_MapsImageSizeLimitErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image content exceeds the model limit"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_DoesNotMapUnrelatedImageErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image service temporarily unavailable"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrInvalidRequest)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
+func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"tool target not found"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
+func TestSendMessage_DoesNotTreatUnrelatedSessionNotFoundMessageAsUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"validation failed: session variable not found"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+	assert.Contains(t, err.Error(), "anthropic: send message")
 }
 
 func TestDefineOutcome_PrependsPreambleToDescription(t *testing.T) {
@@ -443,6 +583,50 @@ func TestDeleteSession_PropagatesAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "409")
 }
 
+func TestArchiveSession_SendsCorrectRequest(t *testing.T) {
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/sessions/sesn_abc/archive", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	require.NoError(t, p.ArchiveSession(context.Background(), "sesn_abc"))
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestArchiveSession_MapsUnavailableProviderSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"message":"session has been archived"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.ArchiveSession(context.Background(), "sesn_abc")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestToolSchemaRevision_ReturnsStableRevision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("schema revision must not call provider API")
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	first := p.ToolSchemaRevision()
+	second := p.ToolSchemaRevision()
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, first, "agent-tools-v1.2.0:")
+}
+
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	const sse = "data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}\n\n" +
 		"data: {\"id\":\"e2\",\"type\":\"agent.tool_use\",\"name\":\"bash\",\"input\":{\"command\":\"ls -la\"}}\n\n" +
@@ -453,9 +637,16 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 		"data: {\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after idle\"}]}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/sessions/sesn_abc/events/stream", r.URL.Path)
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(w, sse)
+		switch r.URL.Path {
+		case "/sessions/sesn_abc/events/stream":
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, sse)
+		case "/sessions/sesn_abc":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle"}`)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
 	}))
 	defer server.Close()
 
@@ -522,7 +713,7 @@ func TestStreamEvents_IgnoresUnknownMidTurnEvents(t *testing.T) {
 }
 
 func TestStreamEvents_StopsWhenCallbackRequestsCustomToolHandling(t *testing.T) {
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
 		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
 
@@ -576,7 +767,7 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 func TestStreamEvents_KeysCustomToolUseByEventID(t *testing.T) {
 	// Managed Agents require user.custom_tool_result.custom_tool_use_id to
 	// reference the agent.custom_tool_use event id from requires_action.
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -620,7 +811,7 @@ func TestStreamEvents_MapsAlternateToolNameField(t *testing.T) {
 }
 
 func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
 		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
 
@@ -646,6 +837,47 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 	assert.Equal(t, "after pause", received[2].Text)
 }
 
+func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *testing.T) {
+	consoleYAML := strings.Repeat("x", 70*1024)
+	input := map[string]any{
+		"action":       "patch_staging",
+		"version_id":   "draft-version",
+		"console_yaml": consoleYAML,
+	}
+	event := map[string]any{
+		"id":    "evt_custom",
+		"type":  "agent.custom_tool_use",
+		"name":  "superplane_app",
+		"input": input,
+	}
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	require.Greater(t, len(payload), 64*1024)
+
+	sse := "data: " + string(payload) + "\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Contains(t, received[0].CustomToolUse.Input, consoleYAML)
+	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
+}
+
 func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
 	const sse = "data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
 
@@ -663,6 +895,83 @@ func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
 
 	require.Len(t, received, 1)
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+}
+
+func TestStreamEvents_MapsTokenUsageOnCompletedTurn(t *testing.T) {
+	const sse = "data: {\"type\":\"session.status_idle\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_read_input_tokens\":3,\"cache_creation_input_tokens\":2}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+	assert.Equal(t, "claude-sonnet-4-5", received[0].Model)
+	require.NotNil(t, received[0].Usage)
+	assert.Equal(t, int64(10), received[0].Usage.InputTokens)
+	assert.Equal(t, int64(5), received[0].Usage.OutputTokens)
+	assert.Equal(t, int64(3), received[0].Usage.CacheReadTokens)
+	assert.Equal(t, int64(2), received[0].Usage.CacheWriteTokens)
+	assert.Equal(t, int64(20), received[0].Usage.TotalTokens)
+}
+
+func TestStreamEvents_DoesNotFetchSessionUsageWhenIdleEventHasNoUsage(t *testing.T) {
+	var sessionFetched bool
+	const sse = "data: {\"type\":\"session.status_idle\",\"model\":\"claude-sonnet-4-5\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/sessions/sesn_abc/events/stream":
+			_, _ = io.WriteString(w, sse)
+		case r.Method == http.MethodGet && r.URL.Path == "/sessions/sesn_abc":
+			sessionFetched = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle","usage":{"input_tokens":6,"output_tokens":6,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":20,"ephemeral_1h_input_tokens":7}}}`)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.False(t, sessionFetched)
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+	assert.Nil(t, received[0].Usage)
+}
+
+func TestRetrieveSessionUsage_MapsCompletedSessionUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/sessions/sesn_abc", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle","usage":{"input_tokens":6,"output_tokens":6,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":20,"ephemeral_1h_input_tokens":7}}}`)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	usage, err := p.RetrieveSessionUsage(context.Background(), "sesn_abc")
+	require.NoError(t, err)
+	require.NotNil(t, usage)
+	assert.Equal(t, int64(6), usage.InputTokens)
+	assert.Equal(t, int64(6), usage.OutputTokens)
+	assert.Equal(t, int64(3), usage.CacheReadTokens)
+	assert.Equal(t, int64(27), usage.CacheWriteTokens)
+	assert.Equal(t, int64(42), usage.TotalTokens)
 }
 
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
@@ -785,10 +1094,14 @@ func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
 		return nil
 	}))
 
-	require.Len(t, received, 2)
-	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
-	assert.Equal(t, "Recovered", received[0].Text)
-	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
+	// session.error surfaces as a non-terminal notice; the stream keeps going
+	// and the recovered assistant message + turn completion still arrive.
+	require.Len(t, received, 3)
+	assert.Equal(t, agents.ProviderEventSessionNotice, received[0].Type)
+	assert.Equal(t, "An internal service error occurred", received[0].ErrorMessage)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[1].Type)
+	assert.Equal(t, "Recovered", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
 }
 
 func TestStreamEvents_SkipsMalformed(t *testing.T) {

@@ -184,22 +184,6 @@ func (a *Account) FindAccountProviderByID(provider, providerID string) (*Account
 	return &account, nil
 }
 
-func (a *Account) FindPendingInvitations() ([]OrganizationInvitation, error) {
-	invitations := []OrganizationInvitation{}
-
-	err := database.Conn().
-		Where("email = ?", a.Email).
-		Where("state = ?", InvitationStatePending).
-		Find(&invitations).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return invitations, nil
-}
-
 func FindAccountByProvider(provider, providerID string) (*Account, error) {
 	var accountProvider AccountProvider
 	err := database.Conn().

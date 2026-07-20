@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunsTabPanel } from "./RunsTabPanel";
 
@@ -22,6 +22,11 @@ vi.mock("@/components/TimeAgo", () => ({
 vi.mock("sonner", () => ({
   toast: { success: vi.fn() },
 }));
+
+afterEach(() => {
+  vi.useRealTimers();
+  localStorage.clear();
+});
 
 function makeRun(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun {
   return {
@@ -60,8 +65,22 @@ describe("RunsTabPanel", () => {
   const baseProps = {
     canvasId: "canvas-1",
     onSelectRun: () => {},
+    onSelectLiveCanvas: () => {},
     workflowNodes: nodes,
   };
+
+  it("shows the Live Canvas row and selects it when no run is active", () => {
+    const onSelectLiveCanvas = vi.fn();
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} onSelectLiveCanvas={onSelectLiveCanvas} />, {
+      wrapper: routerWrapper,
+    });
+
+    const liveCanvas = screen.getByTestId("runs-sidebar-live-canvas");
+    expect(liveCanvas).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(liveCanvas);
+    expect(onSelectLiveCanvas).toHaveBeenCalledTimes(1);
+  });
 
   it("shows an empty state when there are no runs", () => {
     render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />, { wrapper: routerWrapper });
@@ -92,6 +111,45 @@ describe("RunsTabPanel", () => {
     expect(within(rows[1]).getByText("Completed run")).toBeInTheDocument();
   });
 
+  it("selects a run when its timestamp is clicked", async () => {
+    const user = userEvent.setup();
+    const onSelectRun = vi.fn();
+
+    render(<RunsTabPanel runs={[makeRun()]} selectedRunId={null} {...baseProps} onSelectRun={onSelectRun} />, {
+      wrapper: routerWrapper,
+    });
+
+    const timestamp = document.querySelector('time[datetime="2026-05-01T12:00:00.000Z"]') as HTMLElement;
+    await user.click(timestamp);
+
+    expect(onSelectRun).toHaveBeenCalledTimes(1);
+    expect(onSelectRun).toHaveBeenCalledWith("run-1");
+  });
+
+  it("opens a run in a new tab when its timestamp is modified-clicked", () => {
+    const onSelectRun = vi.fn();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <MemoryRouter initialEntries={["/org-1/apps/app-1"]}>
+        <Routes>
+          <Route
+            path="/:organizationId/apps/:appId"
+            element={<RunsTabPanel runs={[makeRun()]} selectedRunId={null} {...baseProps} onSelectRun={onSelectRun} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const timestamp = document.querySelector('time[datetime="2026-05-01T12:00:00.000Z"]') as HTMLElement;
+    fireEvent.click(timestamp, { metaKey: true });
+
+    expect(onSelectRun).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledWith("/org-1/apps/app-1?run=run-1", "_blank", "noopener,noreferrer");
+
+    open.mockRestore();
+  });
+
   it("filters runs by status", () => {
     render(
       <RunsTabPanel
@@ -114,10 +172,11 @@ describe("RunsTabPanel", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Filter runs"));
-    expect(screen.getByText("Passed")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Failed"));
-    expect(screen.getByText("Cancelled")).toBeInTheDocument();
-    expect(screen.getByText("Running")).toBeInTheDocument();
+    const filters = screen.getByRole("dialog");
+    expect(within(filters).getByText("Passed")).toBeInTheDocument();
+    fireEvent.click(within(filters).getByText("Failed"));
+    expect(within(filters).getByText("Cancelled")).toBeInTheDocument();
+    expect(within(filters).getByText("Running")).toBeInTheDocument();
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
 
     expect(screen.getByText("Broken deploy")).toBeInTheDocument();
@@ -164,35 +223,36 @@ describe("RunsTabPanel", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it("opens run detail on initial deep link", () => {
+  it("keeps the runs list visible on initial deep link", () => {
     render(<RunsTabPanel runs={[makeRun()]} selectedRunId="run-1" initialOpenDetail {...baseProps} />, {
       wrapper: routerWrapper,
     });
 
-    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+    expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
 
-  it("returns to the run list when back is clicked", async () => {
-    const user = userEvent.setup();
-    const onBackToRunList = vi.fn();
+  it("keeps the runs list visible when the selected run is provided outside the loaded list", () => {
+    render(<RunsTabPanel runs={[]} selectedRunId="run-1" selectedRun={makeRun()} initialOpenDetail {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
 
-    render(
-      <RunsTabPanel
-        runs={[makeRun()]}
-        selectedRunId="run-1"
-        initialOpenDetail
-        onBackToRunList={onBackToRunList}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByTestId("run-detail-back"));
-    expect(onBackToRunList).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 
-  it("opens run detail when initialOpenDetail arrives after mount", () => {
+  it("does not replace the list with a loading detail while the selected run is resolving", () => {
+    render(<RunsTabPanel runs={[]} selectedRunId="run-1" initialOpenDetail isSelectedRunLoading {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
+
+    expect(screen.queryByText("Loading run…")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+  });
+
+  it("keeps the runs list visible when initialOpenDetail arrives after mount", () => {
     const runs = [makeRun()];
 
     const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />, {
@@ -202,10 +262,11 @@ describe("RunsTabPanel", () => {
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
 
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
     expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
 
-  it("opens run detail when the selected run changes from the URL", () => {
+  it("keeps the selected run highlighted when the selected run changes from the URL", () => {
     const runs = [
       makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
       makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
@@ -220,11 +281,11 @@ describe("RunsTabPanel", () => {
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
-    expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
     expect(screen.getByText("Second run")).toBeInTheDocument();
   });
 
-  it("stays on the list when URL navigation returns to a dismissed run", () => {
+  it("keeps the list visible when URL navigation returns to a dismissed run", () => {
     const runs = [
       makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
       makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
@@ -238,6 +299,7 @@ describe("RunsTabPanel", () => {
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
     expect(screen.getByText("Second run")).toBeInTheDocument();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);

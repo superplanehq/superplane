@@ -1,6 +1,7 @@
 import { Editor } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
+import { useTheme } from "@/contexts/useTheme";
 import { getFileMonacoLanguage } from "./lib/monaco-language";
 
 const fileEditorOptions = {
@@ -30,6 +31,8 @@ interface FileMonacoEditorProps {
 }
 
 export function FileMonacoEditor({ path, content, language, readOnly, onChange }: FileMonacoEditorProps) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const suppressNextChangeRef = useRef(false);
   const previousPathRef = useRef(path);
 
@@ -42,24 +45,30 @@ export function FileMonacoEditor({ path, content, language, readOnly, onChange }
 
   const handleChange = useCallback(
     (value: string | undefined) => {
+      const next = value ?? "";
       if (suppressNextChangeRef.current) {
         suppressNextChangeRef.current = false;
-        return;
+        // Monaco often does not emit an onChange when the controlled value is
+        // applied after a path switch, so the flag would otherwise swallow the
+        // user's first real edit. Only ignore echoes of the current value.
+        if (next === content) {
+          return;
+        }
       }
 
-      onChange(value ?? "");
+      onChange(next);
     },
-    [onChange],
+    [content, onChange],
   );
 
   return (
-    <div className="min-h-0 flex-1 bg-white" data-testid="file-editor">
+    <div className="min-h-0 flex-1 bg-white dark:bg-gray-900" data-testid="file-editor">
       <Editor
         key={path}
         height="100%"
         language={language ?? getFileMonacoLanguage(path)}
         value={content}
-        theme="vs"
+        theme={monacoTheme}
         onChange={handleChange}
         options={{
           ...fileEditorOptions,

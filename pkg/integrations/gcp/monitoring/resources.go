@@ -12,7 +12,16 @@ import (
 const (
 	ResourceTypeAlertPolicy         = "alertPolicy"
 	ResourceTypeNotificationChannel = "notificationChannel"
+	ResourceTypeSnooze              = "snooze"
 )
+
+type snoozeListResponse struct {
+	Snoozes []struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"displayName"`
+	} `json:"snoozes"`
+	NextPageToken string `json:"nextPageToken"`
+}
 
 type alertPolicyListResponse struct {
 	AlertPolicies []struct {
@@ -94,6 +103,40 @@ func ListNotificationChannelResources(ctx context.Context, c Client) ([]core.Int
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeNotificationChannel,
 				ID:   ch.Name,
+				Name: label,
+			})
+		}
+		return resp.NextPageToken, nil
+	})
+	return resources, err
+}
+
+// ListSnoozeResources lists the snoozes in the project so the Get/Expire
+// components can target one directly.
+func ListSnoozeResources(ctx context.Context, c Client) ([]core.IntegrationResource, error) {
+	project := c.ProjectID()
+	if project == "" {
+		return nil, nil
+	}
+	base := fmt.Sprintf("%s/projects/%s/snoozes?pageSize=500", monitoringBaseURL, project)
+
+	var resources []core.IntegrationResource
+	err := paginate(ctx, c, base, func(data []byte) (string, error) {
+		var resp snoozeListResponse
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return "", fmt.Errorf("failed to parse snoozes response: %w", err)
+		}
+		for _, s := range resp.Snoozes {
+			if s.Name == "" {
+				continue
+			}
+			label := s.DisplayName
+			if label == "" {
+				label = lastSegment(s.Name)
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeSnooze,
+				ID:   s.Name,
 				Name: label,
 			})
 		}

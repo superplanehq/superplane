@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__NextIntegrationSetupStep(t *testing.T) {
@@ -47,17 +47,17 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("integration not found -> not found", func(t *testing.T) {
 		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("submit advances step and completes flow", func(t *testing.T) {
@@ -131,10 +131,10 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 
 		_, err = NextIntegrationSetupStep(ctx4, r4.Registry, baseURL, baseURL, r4.Organization.ID.String(), resp.Integration.Metadata.Id, nil, []string{"invalid-capability"})
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid capability: invalid-capability", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "invalid capability: invalid-capability", msg)
 		assert.False(t, onStepSubmitCalled)
 	})
 

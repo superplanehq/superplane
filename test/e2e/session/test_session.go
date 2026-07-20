@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -120,6 +120,13 @@ func (s *TestSession) Sleep(ms int) {
 }
 
 func (s *TestSession) resetDatabase() {
+	// Guard against truncating a developer's database: the E2E bootstrap
+	// points DB_NAME at superplane_test, but if that ever regresses we want
+	// a loud failure here instead of silently wiping superplane_dev.
+	if err := database.VerifyTestDatabase(database.Conn()); err != nil {
+		s.t.Fatalf("reset database: %v", err)
+	}
+
 	sql := `DO $$
     DECLARE r RECORD;
     BEGIN

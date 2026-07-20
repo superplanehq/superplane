@@ -1,41 +1,44 @@
-import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
-import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES } from "../consoleTableStyles";
+import { isManualRunNode } from "../manualRunTriggers";
 import { applyTableWhere } from "./evalTableWhere";
-import { interpolate } from "./fieldPath";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
-import { resolveCellValue } from "./resolveCellValue";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
-import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
+import { WidgetTableCell } from "./WidgetTableCell";
 import type { WidgetRowAction, WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
   render: WidgetTableRender;
   rows: unknown[];
   isLoading: boolean;
+  /**
+   * Progressive-pagination affordances. When `hasMore` is true the footer
+   * shows a "Load more" button and the scrollable area auto-fetches as the
+   * user scrolls near the bottom. Wired only by the table panel; chart and
+   * number panels render the full configured limit at once.
+   */
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
+  /**
+   * Progressive display window. When set, `rows` is the full loaded set and
+   * only the first `displayCount` rows after filter+sort are rendered — so
+   * trend columns can compare against loaded-but-hidden neighbors.
+   */
+  displayCount?: number;
 }
-
-const STATUS_PILL_CLASS: Record<string, string> = {
-  passed: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  failed: "bg-red-100 text-red-700 ring-red-300",
-  cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
-  running: "bg-sky-100 text-sky-700 ring-sky-300",
-  pending: "bg-amber-100 text-amber-700 ring-amber-300",
-  ready: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  active: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  idle: "bg-slate-100 text-slate-600 ring-slate-300",
-};
 
 const ACTION_ICONS = {
   play: Play,
@@ -45,31 +48,75 @@ const ACTION_ICONS = {
   "external-link": ExternalLink,
 } as const;
 
-export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
+/** Distance from the bottom (px) at which scrolling auto-requests more rows. */
+const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
+
+export function WidgetTable({
+  render,
+  rows,
+  isLoading,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  displayCount,
+}: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
     [rows],
   );
 
-  const filtered = useMemo(() => {
+  const filteredAll = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
     const afterFilters = applyFilters(afterWhere, render.filters);
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
 
+  // Slice after filter+sort so progressive windows and trend baselines share
+  // the same ordered list. Without `displayCount`, render the full filtered set.
+  const filtered = useMemo(() => {
+    if (displayCount == null || displayCount >= filteredAll.length) return filteredAll;
+    return filteredAll.slice(0, displayCount);
+  }, [filteredAll, displayCount]);
+
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
-  // Collect the unique trigger node ids referenced by this table's row actions
-  // so the action lock can subscribe to the runs query only when needed.
+  // Row actions whose configured node isn't manually runnable are hidden
+  // downstream in `WidgetTableGrid`; unresolved actions still render with a
+  // "Node not found" tooltip. We only need the trigger id set here to scope
+  // the lock's runs subscription to the actual manual-runnable targets.
   const triggerNodeIds = useMemo(() => {
     const ids = new Set<string>();
     for (const action of render.rowActions ?? []) {
       const resolved = resolveConsoleNode(ctx, action.node);
-      if (resolved?.node.id && resolved.node.type === "TYPE_TRIGGER") ids.add(resolved.node.id);
+      if (resolved?.node.id && isManualRunNode(resolved.node)) ids.add(resolved.node.id);
     }
     return Array.from(ids);
   }, [render.rowActions, ctx]);
+
+  // Auto-load more rows as the user scrolls near the bottom. The table's
+  // `loadMore()` is dual-mode: it usually just widens the display window over
+  // rows already in the infinite-query cache (no network fetch), and only
+  // sometimes triggers an actual page fetch. So we can't rely on a fetching
+  // flag flipping to re-arm the guard (it would stay armed forever after a
+  // cache-only reveal). Instead we re-arm whenever the rendered row set grows
+  // or a fetch settles, which covers both modes.
+  const loadMoreRequestedRef = useRef(false);
+  useEffect(() => {
+    loadMoreRequestedRef.current = false;
+  }, [rows.length, isFetchingMore]);
+
+  const onScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget;
+      if (!hasMore || !onLoadMore || isFetchingMore || loadMoreRequestedRef.current) return;
+      const remainingScroll = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remainingScroll > AUTO_LOAD_SCROLL_THRESHOLD_PX) return;
+      loadMoreRequestedRef.current = true;
+      onLoadMore();
+    },
+    [hasMore, onLoadMore, isFetchingMore],
+  );
 
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
@@ -88,152 +135,179 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     );
   }
   if (filtered.length === 0) {
+    // The current pages produced no matching rows, but later server pages
+    // might — so keep the "Load more" affordance available instead of
+    // dead-ending on the empty message.
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
-        {render.emptyMessage ?? "No data to display."}
+      <div data-testid="widget-table-empty-wrap">
+        <div className="p-4 text-center text-xs text-slate-500 dark:text-gray-400" data-testid="widget-table-empty">
+          {render.emptyMessage ?? "No data to display."}
+        </div>
+        {hasMore && onLoadMore ? (
+          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
       </div>
     );
   }
 
   return (
     <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-      <div className="overflow-auto" data-testid="widget-table">
-        <table className="w-full border-collapse text-xs">
-          <thead className="bg-slate-50">
-            <tr>
-              {render.columns.map((col, i) => (
-                <th
-                  key={`${col.field}-${i}`}
-                  className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
-                >
-                  {col.label ?? col.field}
-                </th>
-              ))}
-              {render.rowActions && render.rowActions.length > 0 ? (
-                <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">
-                  Actions
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row, idx) => {
-              const rowKey = rowKeyForRow(row, idx);
-              const toneClass = resolveRowStyle?.(row);
-              return (
-                <tr
-                  key={rowKey}
-                  data-row-tone={toneClass ? "true" : undefined}
-                  className={cn(
-                    "border-b border-slate-100 last:border-0",
-                    // Drop the default hover wash when a tone is applied so the
-                    // tint isn't overridden — the row already has a deliberate
-                    // background and a hover bg would mask it.
-                    toneClass ? toneClass : "hover:bg-slate-50/60",
-                  )}
-                >
-                  {render.columns.map((col, ci) => (
-                    <Cell key={`${col.field}-${ci}`} col={col} row={row} />
-                  ))}
-                  {render.rowActions && render.rowActions.length > 0 ? (
-                    <td className="px-3 py-1.5 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        {render.rowActions
-                          .filter((action) => evaluateRowShow(action.show, row))
-                          .map((action, ai) => (
-                            <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
-                          ))}
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <WidgetTableGrid
+        render={render}
+        filtered={filtered}
+        filteredAll={filteredAll}
+        resolveRowStyle={resolveRowStyle}
+        hasMore={hasMore}
+        isFetchingMore={isFetchingMore}
+        onLoadMore={onLoadMore}
+        onScroll={onScroll}
+      />
     </WidgetTableActionLockProvider>
   );
 }
 
-function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Record<string, unknown> }) {
-  const visible = evaluateRowShow(col.show, row);
-  if (!visible) {
-    return <td className="px-3 py-1.5 text-slate-300">—</td>;
-  }
-  const value = resolveCellValue(col.field, row);
-  const formatted = formatValue(value, col.format);
-  // `badge` is an alias for `status`: both render the value as a colored
-  // pill so authors can pick whichever name reads more naturally for the
-  // column (e.g. "status" for run outcomes, "badge" for arbitrary tags).
-  if (col.format === "status" || col.format === "badge") {
-    const classes = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
-    return (
-      <td className="px-3 py-1.5">
-        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset", classes)}>
-          {formatted}
-        </span>
-      </td>
-    );
-  }
-  if (col.format === "relative") {
-    const title = formatAbsoluteTitle(value);
-    return (
-      <td className="px-3 py-1.5 text-slate-700" title={title}>
-        {formatted}
-      </td>
-    );
-  }
-  if (col.format === "link" || col.href) {
-    const href = col.href ? interpolate(col.href, row) : String(value ?? "");
-    return (
-      <td className="px-3 py-1.5">
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline underline-offset-2">
-          {formatted || href}
-        </a>
-      </td>
-    );
-  }
-  if (col.format === "code") {
-    return (
-      <td className="px-3 py-1.5">
-        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{formatted}</code>
-      </td>
-    );
-  }
-  return <td className="px-3 py-1.5 text-slate-700">{formatted}</td>;
+interface WidgetTableGridProps {
+  render: WidgetTableRender;
+  filtered: Record<string, unknown>[];
+  /** Full filter+sort result; may be longer than `filtered` when displayCount slices. */
+  filteredAll: Record<string, unknown>[];
+  resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
+  onScroll: (event: UIEvent<HTMLDivElement>) => void;
 }
 
-function formatAbsoluteTitle(value: unknown): string | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return formatTimestampInUserTimezone(new Date(parsed).toISOString());
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const ms = n > 1e12 ? n : n * 1000;
-  return formatTimestampInUserTimezone(new Date(ms).toISOString());
+function WidgetTableGrid({
+  render,
+  filtered,
+  filteredAll,
+  resolveRowStyle,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  onScroll,
+}: WidgetTableGridProps) {
+  const ctx = useConsoleContext();
+  const rowActions = (render.rowActions ?? []).filter((action) => {
+    const resolved = resolveConsoleNode(ctx, action.node);
+    return !resolved || isManualRunNode(resolved.node);
+  });
+  const hasActions = rowActions.length > 0;
+  const lastIdx = filtered.length - 1;
+  return (
+    <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
+          <tr>
+            {render.columns.map((col, i) => (
+              <th
+                key={`${col.field}-${i}`}
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-left")}
+              >
+                {col.label ?? col.field}
+              </th>
+            ))}
+            {hasActions ? (
+              <th
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-right")}
+              >
+                Actions
+              </th>
+            ) : null}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((row, idx) => {
+            const rowKey = rowKeyForRow(row, idx);
+            const toneClass = resolveRowStyle?.(row);
+            // Neighbor comes from the full ordered list so a progressive
+            // display window still compares against the next sorted row even
+            // when that row is loaded but not yet shown.
+            const nextRow = filteredAll[idx + 1] as Record<string, unknown> | undefined;
+            const hasMoreBelow = idx === lastIdx && !nextRow && Boolean(hasMore);
+            return (
+              <tr
+                key={rowKey}
+                data-row-tone={toneClass ? "true" : undefined}
+                className={cn(
+                  "border-b border-black/10 last:border-0 dark:border-gray-800",
+                  // Drop the default hover wash when a tone is applied so the
+                  // tint isn't overridden — the row already has a deliberate
+                  // background and a hover bg would mask it.
+                  toneClass ? toneClass : "hover:bg-slate-50/60 dark:hover:bg-gray-800/60",
+                )}
+              >
+                {render.columns.map((col, ci) => (
+                  <WidgetTableCell
+                    key={`${col.field}-${ci}`}
+                    col={col}
+                    row={row}
+                    nextRow={nextRow}
+                    hasMoreBelow={hasMoreBelow}
+                  />
+                ))}
+                {hasActions ? (
+                  <td className="px-3 py-1.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {rowActions
+                        .filter((action) => evaluateRowShow(action.show, row))
+                        .map((action, ai) => (
+                          <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                        ))}
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {hasMore && onLoadMore ? (
+        <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+      ) : null}
+    </div>
+  );
 }
 
-type ActionDisabledReason = "no-perm" | "no-node" | "not-trigger" | "run-in-flight" | "submitting" | null;
+function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
+  return (
+    <div
+      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/60"
+      data-testid="widget-table-load-more"
+    >
+      <Button
+        type="button"
+        size="xs"
+        variant="outline"
+        onClick={onLoadMore}
+        disabled={isFetchingMore}
+        className="gap-1"
+        data-testid="widget-table-load-more-button"
+      >
+        {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+        {isFetchingMore ? "Loading…" : "Load more"}
+      </Button>
+    </div>
+  );
+}
 
-function disabledReason({
-  canRun,
-  hasResolvedNode,
-  isTrigger,
-  runInFlight,
-  submitting,
-}: {
-  canRun: boolean;
-  hasResolvedNode: boolean;
-  isTrigger: boolean;
-  runInFlight: boolean;
-  submitting: boolean;
-}): ActionDisabledReason {
+type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;
+
+// `not-manual-run` is defense in depth: `WidgetTableGrid` already hides
+// non-manual-run actions upstream. This branch covers the transient case
+// before the trigger catalog resolves — the action then renders disabled
+// rather than as a button that would fail server-side.
+function disabledReason(
+  canRun: boolean,
+  hasResolvedNode: boolean,
+  isManualRun: boolean,
+  runInFlight: boolean,
+  submitting: boolean,
+): ActionDisabledReason {
   if (!canRun) return "no-perm";
   if (!hasResolvedNode) return "no-node";
-  if (!isTrigger) return "not-trigger";
+  if (!isManualRun) return "not-manual-run";
   if (runInFlight) return "run-in-flight";
   if (submitting) return "submitting";
   return null;
@@ -250,11 +324,16 @@ function rowKeyForRow(row: Record<string, unknown>, index: number): string {
   const id = row.id;
   if (typeof id === "string" && id.length > 0) return id;
   if (typeof id === "number") return String(id);
+  if (typeof id === "bigint") return id.toString();
   try {
-    return `row:${index}:${JSON.stringify(row)}`;
+    return `row:${index}:${JSON.stringify(row, jsonBigIntReplacer)}`;
   } catch {
     return `row:${index}`;
   }
+}
+
+function jsonBigIntReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? value.toString() : value;
 }
 
 function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
@@ -263,8 +342,8 @@ function disabledTooltip(reason: ActionDisabledReason, node: string): string | u
       return "You do not have permission to run actions in this canvas";
     case "no-node":
       return `Node "${node}" not found on this canvas`;
-    case "not-trigger":
-      return "Only trigger nodes can be run from the console. Pick the trigger that starts your flow.";
+    case "not-manual-run":
+      return "Only trigger nodes with a manual run can be fired from the console.";
     case "run-in-flight":
       return "A run for this trigger is already in progress.";
     case "submitting":
@@ -272,12 +351,6 @@ function disabledTooltip(reason: ActionDisabledReason, node: string): string | u
     default:
       return undefined;
   }
-}
-
-function actionVariantClass(variant: WidgetRowAction["variant"]): string | undefined {
-  if (variant === "danger") return "border-red-200 text-red-700 hover:bg-red-50";
-  if (variant === "primary") return "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100";
-  return undefined;
 }
 
 type ResolvedNode = NonNullable<ReturnType<typeof resolveConsoleNode>>;
@@ -337,7 +410,9 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const lock = useWidgetTableActionLock();
   const canRun = ctx?.canRunNodes ?? false;
   const resolved = resolveConsoleNode(ctx, action.node);
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  // WidgetTable hides non-manual actions upstream; at this level `true` is
+  // the normal case, unresolved nodes render disabled with a tooltip.
+  const isManualRun = isManualRunNode(resolved?.node);
   const triggerNodeId = resolved?.node.id;
   // Per-row locking: a row's button is disabled by `runInFlight` only when
   // its own submission produced the in-flight run (i.e. the mapping points
@@ -347,16 +422,10 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
     triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
   );
   const submitting = lock.pendingRowKeys.has(rowKey);
-  const reason = disabledReason({
-    canRun,
-    hasResolvedNode: Boolean(resolved),
-    isTrigger,
-    runInFlight,
-    submitting,
-  });
+  const reason = disabledReason(canRun, Boolean(resolved), isManualRun, runInFlight, submitting);
   return {
     resolved,
-    isTrigger,
+    isManualRun,
     disabled: reason !== null,
     reason,
     tooltip: disabledTooltip(reason, action.node),
@@ -374,11 +443,10 @@ function RowActionButton({
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
+  const { resolved, isManualRun, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
-  const variantClass = actionVariantClass(action.variant);
 
   const { fire, error, pending } = useRowActionFire({
     action,
@@ -405,13 +473,12 @@ function RowActionButton({
     <div className="inline-flex flex-col items-end gap-0.5">
       <Button
         type="button"
-        size="sm"
+        size="xs"
         variant="outline"
         onClick={handleClick}
         disabled={disabled || pending}
         aria-disabled={disabled}
         title={tooltip}
-        className={variantClass}
         data-testid={testId}
         data-variant={action.variant ?? "default"}
         data-disabled-reason={reason ?? undefined}
@@ -420,7 +487,10 @@ function RowActionButton({
         {label}
       </Button>
       {error ? (
-        <span className="max-w-48 text-right text-[10px] text-red-600" data-testid={`${testId}-error`}>
+        <span
+          className="max-w-48 text-right text-[10px] text-red-600 dark:text-red-400"
+          data-testid={`${testId}-error`}
+        >
           {error}
         </span>
       ) : null}
@@ -429,7 +499,7 @@ function RowActionButton({
           action={action}
           row={row}
           resolved={resolved}
-          isTrigger={isTrigger}
+          isManualRun={isManualRun}
           hookName={hookName}
           label={label}
           open={confirmOpen}
@@ -446,7 +516,7 @@ function RowActionButton({
 function WidgetSpinner() {
   return (
     <div className="flex h-full items-center justify-center p-4">
-      <Loader2 className="size-4 animate-spin text-slate-400" />
+      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
     </div>
   );
 }

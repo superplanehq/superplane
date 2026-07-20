@@ -8,16 +8,17 @@ import (
 const (
 	CanvasCreatedRoutingKey        = "canvas-created"
 	CanvasUpdatedRoutingKey        = "canvas-updated"
-	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
+	CanvasStagingUpdatedRoutingKey = "canvas-staging-updated"
 	CanvasDeletedRoutingKey        = "canvas-deleted"
+	CanvasMemoryUpdatedRoutingKey  = "canvas-memory-updated"
 )
 
 type CanvasMessage struct {
 	message *pb.CanvasMessage
 }
 
-type CanvasVersionMessage struct {
-	message *pb.CanvasVersionMessage
+type CanvasStagingMessage struct {
+	message *pb.CanvasStagingMessage
 }
 
 func NewCanvasCreatedMessage(canvasID string, organizationID string) CanvasMessage {
@@ -53,14 +54,28 @@ func NewCanvasDeletedMessage(canvasID string, organizationID string) CanvasMessa
 	}
 }
 
-func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVersionMessage {
-	return CanvasVersionMessage{
-		message: &pb.CanvasVersionMessage{
+func NewCanvasMemoryUpdatedMessage(canvasID string) CanvasMessage {
+	return CanvasMessage{
+		message: &pb.CanvasMessage{
+			Id:        canvasID,
 			CanvasId:  canvasID,
-			VersionId: versionID,
 			Timestamp: timestamppb.Now(),
 		},
 	}
+}
+
+func NewCanvasStagingMessage(canvasID string, userID string) CanvasStagingMessage {
+	return CanvasStagingMessage{
+		message: &pb.CanvasStagingMessage{
+			CanvasId:  canvasID,
+			UserId:    userID,
+			Timestamp: timestamppb.Now(),
+		},
+	}
+}
+
+func (m CanvasStagingMessage) Publish() error {
+	return Publish(CanvasExchange, CanvasStagingUpdatedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasMessage) PublishCreated() error {
@@ -75,6 +90,6 @@ func (m CanvasMessage) PublishDeleted() error {
 	return Publish(CanvasExchange, CanvasDeletedRoutingKey, toBytes(m.message))
 }
 
-func (m CanvasVersionMessage) PublishVersionUpdated() error {
-	return Publish(CanvasExchange, CanvasVersionUpdatedRoutingKey, toBytes(m.message))
+func (m CanvasMessage) PublishMemoryUpdated() error {
+	return Publish(CanvasExchange, CanvasMemoryUpdatedRoutingKey, toBytes(m.message))
 }

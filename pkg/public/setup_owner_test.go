@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
+func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	middleware.ResetOwnerSetupStateForTests()
 
 	r := support.Setup(t)
@@ -39,12 +39,20 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	body, err := json.Marshal(SetupOwnerRequest{
-		Email:                     "owner@example.com",
-		FirstName:                 "Owner",
-		LastName:                  "User",
-		Password:                  "Password1",
-		AllowPrivateNetworkAccess: true,
+	body, err := json.Marshal(map[string]any{
+		"email":                        "owner@example.com",
+		"first_name":                   "Owner",
+		"last_name":                    "User",
+		"password":                     "Password1",
+		"allow_private_network_access": true,
+		"smtp_enabled":                 true,
+		"smtp_host":                    "smtp.example.com",
+		"smtp_port":                    587,
+		"smtp_username":                "smtp-user",
+		"smtp_password":                "smtp-pass",
+		"smtp_from_name":               "SuperPlane",
+		"smtp_from_email":              "noreply@example.com",
+		"smtp_use_tls":                 true,
 	})
 	require.NoError(t, err)
 
@@ -57,7 +65,10 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(t, err)
-	assert.True(t, metadata.AllowPrivateNetworkAccess)
+	assert.False(t, metadata.AllowPrivateNetworkAccess)
+
+	_, err = models.FindEmailSettings(models.EmailProviderSMTP)
+	require.Error(t, err)
 }

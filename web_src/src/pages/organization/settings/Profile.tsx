@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
@@ -12,9 +13,11 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
+import { CopyButton } from "@/ui/CopyButton";
 import { useAccount } from "@/contexts/useAccount";
-import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+import { showErrorToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
+import { settingsCardClassName } from "./settingsPageStyles";
 
 export function Profile() {
   usePageTitle(["Profile"]);
@@ -31,6 +34,10 @@ export function Profile() {
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
 
+  useReportPageReady(!loading, {
+    failed: !!errorMessage,
+  });
+
   const handleRegenerateToken = async () => {
     try {
       setActionError(null);
@@ -43,17 +50,6 @@ export function Profile() {
       setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
       setRegeneratingToken(false);
-    }
-  };
-
-  const copyToken = async () => {
-    if (!token) return;
-
-    try {
-      await navigator.clipboard.writeText(token);
-      showSuccessToast("API token copied.");
-    } catch {
-      showErrorToast("Failed to copy API token.");
     }
   };
 
@@ -96,7 +92,7 @@ export function Profile() {
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className={settingsCardClassName}>
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -155,7 +151,7 @@ export function Profile() {
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className={settingsCardClassName}>
           <div className="space-y-4">
             {/* Token Status */}
             {!user.hasToken && (
@@ -200,10 +196,13 @@ export function Profile() {
                   >
                     <Icon name={tokenVisible ? "eye-closed" : "eye"} />
                   </Button>
-                  <Button variant="outline" onClick={copyToken} className="flex items-center gap-1">
-                    <Icon name="copy" />
+                  <CopyButton
+                    variant="button"
+                    text={token}
+                    onCopyError={() => showErrorToast("Failed to copy API token.")}
+                  >
                     Copy
-                  </Button>
+                  </CopyButton>
                 </div>
                 <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
                   <div className="flex items-start gap-2">

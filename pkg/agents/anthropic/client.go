@@ -90,6 +90,7 @@ func (c *Client) executeHTTP(ctx context.Context, method, path string, body any)
 	if resp.StatusCode >= 400 {
 		return nil, &apiError{
 			StatusCode: resp.StatusCode,
+			Path:       path,
 			Message:    truncate(string(data), 500),
 		}
 	}
@@ -114,6 +115,7 @@ func (c *Client) openStream(ctx context.Context, path string) (io.ReadCloser, er
 		resp.Body.Close()
 		return nil, &apiError{
 			StatusCode: resp.StatusCode,
+			Path:       path,
 			Message:    truncate(string(body), 500),
 		}
 	}
@@ -127,6 +129,7 @@ type fileMetadata struct {
 
 type apiError struct {
 	StatusCode int
+	Path       string
 	Message    string
 }
 

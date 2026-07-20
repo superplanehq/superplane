@@ -1,11 +1,25 @@
 import type { CSSProperties } from "react";
 
+import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
+import type { ResolvedTheme } from "@/lib/themePreference";
+
 export type AppFile = {
   path: string;
   content: string;
   language?: string;
   loading?: boolean;
   errorMessage?: string;
+};
+
+// Diff for a path whose edits live in the draft's staging layer rather than in
+// the in-session pending changes: the virtual spec files (canvas.yaml /
+// console.yaml), and repository files whose staged edits outlive a page refresh.
+// Computed from the committed (stage=false) vs effective (stage=true) server
+// reads.
+export type StagedFileDiff = {
+  path: string;
+  committedContent: string;
+  effectiveContent: string;
 };
 
 export type PendingFileChange =
@@ -24,16 +38,6 @@ export type PendingFileChange =
       path: string;
     };
 
-export type FilesHeaderActionsState = {
-  hasPendingChanges: boolean;
-  publishDisabled: boolean;
-  publishDisabledTooltip?: string;
-  discardDisabled: boolean;
-  publishPending: boolean;
-  onPublish: () => void | Promise<void>;
-  onDiscardAll: () => void;
-};
-
 export const repositoryFileTreeStyle = {
   height: "100%",
   colorScheme: "light",
@@ -51,3 +55,20 @@ export const repositoryFileTreeStyle = {
   "--trees-scrollbar-gutter-override": "0px",
   "--trees-action-lane-width-override": "0px",
 } as CSSProperties;
+
+const repositoryFileTreeStyleDark = {
+  ...repositoryFileTreeStyle,
+  colorScheme: "dark",
+  "--trees-bg-override": DARK_BASE_BG_HEX,
+  "--trees-bg-muted-override": "#1f2937",
+  "--trees-border-color-override": "rgba(55, 65, 81, 0.7)",
+  "--trees-fg-override": "#d1d5db",
+  "--trees-fg-muted-override": "#9ca3af",
+  "--trees-focus-ring-color-override": "#e5e7eb",
+  "--trees-selected-bg-override": "#374151",
+  "--trees-selected-fg-override": "#f3f4f6",
+} as CSSProperties;
+
+export function getRepositoryFileTreeStyle(resolvedTheme: ResolvedTheme): CSSProperties {
+  return resolvedTheme === "dark" ? repositoryFileTreeStyleDark : repositoryFileTreeStyle;
+}

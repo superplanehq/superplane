@@ -116,7 +116,7 @@ func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.
 	return session
 }
 
-func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
+func TestAgentStreamWorker_ContinuesWhenSessionChangesDuringStream(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -126,8 +126,14 @@ func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
 		name:        testProvider,
 		streamReady: make(chan struct{}),
 		release:     make(chan struct{}),
-		events: []agents.ProviderEvent{
-			{Type: agents.ProviderEventTurnCompleted},
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+			{
+				{ProviderEventID: "msg-follow-up", Type: agents.ProviderEventAssistantMessage, Text: "second turn"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
 		},
 	}
 
@@ -140,12 +146,16 @@ func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
 	}()
 	<-provider.streamReady
 
-	err := w.Handle(context.Background(), body)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already in progress")
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
 
 	close(provider.release)
 	require.NoError(t, <-firstDone)
+	assert.Equal(t, 2, provider.streamCalls)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	assert.Equal(t, "second turn", stored[0].Content)
 }
 
 func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
@@ -517,6 +527,84 @@ func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus, "open tool must be force-closed when the turn ends")
 }
 
+func TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Stream blocks on `release`, then returns an error — simulating
+	// "provider 500'd after the user already hit Stop". The interrupt
+	// path (UpdateAgentSessionStatus → idle) bumps updated_at, and the
+	// worker's failed-path must respect that and not flip the row from
+	// idle back to failed.
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+		err:         errors.New("provider blew up after interrupt"),
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	done := make(chan error, 1)
+	go func() { done <- w.Handle(context.Background(), body) }()
+
+	<-provider.streamReady
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	close(provider.release)
+	require.NoError(t, <-done)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"a stream error that arrives after Stop must not overwrite the user's interrupt")
+}
+
+func TestAgentStreamWorker_DropsAssistantEventsAfterInterrupt(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// The user reported seeing a new message appear in the transcript
+	// AFTER clicking Stop. This guards the race: InterruptSession flips
+	// the row to idle, then late events arrive from the still-open SSE
+	// (Anthropic flushing already-generated content). handleProviderEvent
+	// must check status per event and exit the stream without persisting
+	// or broadcasting anything to the UI.
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+		events: []agents.ProviderEvent{
+			{ProviderEventID: "msg-late", Type: agents.ProviderEventAssistantMessage, Text: "late content that must not appear"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	done := make(chan error, 1)
+	go func() { done <- w.Handle(context.Background(), body) }()
+
+	<-provider.streamReady
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	close(provider.release)
+	require.NoError(t, <-done)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	assert.Empty(t, stored, "no assistant rows must be persisted once the session has been reset; late SSE content must be discarded")
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"the worker must exit cleanly without overwriting the user's stop with an idle/failed transition of its own")
+}
+
 func TestAgentStreamWorker_MarksFailedOnSessionError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -567,13 +655,20 @@ func TestAgentStreamWorker_CleanupFailsStuckStreamingSessions(t *testing.T) {
 	staleCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	freshCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 
+	// Heartbeated row whose last heartbeat is past the tight cutoff:
+	// flag as leaked.
 	stale := mustCreateSession(t, r, staleCanvas.ID)
 	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
 		Where("id = ?", stale.ID).
-		Update("updated_at", time.Now().Add(-2*time.Hour)).Error)
+		UpdateColumn("heartbeat_at", time.Now().Add(-10*time.Minute)).Error)
 	fresh := mustCreateSession(t, r, freshCanvas.ID)
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", fresh.ID).
+		UpdateColumn("heartbeat_at", time.Now()).Error)
 
-	closed, err := models.FailStuckStreamingSessions(time.Now().Add(-30 * time.Minute))
+	heartbeatCutoff := time.Now().Add(-2 * time.Minute)
+	legacyCutoff := time.Now().Add(-30 * time.Minute)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
 	require.NoError(t, err)
 	require.Len(t, closed, 1)
 	assert.Equal(t, stale.ID, closed[0].ID)
@@ -585,6 +680,112 @@ func TestAgentStreamWorker_CleanupFailsStuckStreamingSessions(t *testing.T) {
 	freshAfter, err := models.FindAgentSession(fresh.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.AgentSessionStatusStreaming, freshAfter.Status)
+}
+
+func TestAgentStreamWorker_CleanupRespectsLegacyGraceForRowsWithoutHeartbeat(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	youngLegacyCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	oldLegacyCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	// A row without heartbeat_at is "legacy": owned by a binary that
+	// doesn't write heartbeats yet (e.g. mid-rolling-deploy). Cleanup
+	// must fall back to the loose updated_at cutoff so a healthy long
+	// turn isn't force-failed before the worker finishes.
+	young := mustCreateSession(t, r, youngLegacyCanvas.ID)
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", young.ID).
+		UpdateColumn("updated_at", time.Now().Add(-10*time.Minute)).Error)
+	old := mustCreateSession(t, r, oldLegacyCanvas.ID)
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", old.ID).
+		UpdateColumn("updated_at", time.Now().Add(-45*time.Minute)).Error)
+
+	heartbeatCutoff := time.Now().Add(-2 * time.Minute)
+	legacyCutoff := time.Now().Add(-30 * time.Minute)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
+	require.NoError(t, err)
+	require.Len(t, closed, 1, "only the row past the legacy cutoff should be flagged")
+	assert.Equal(t, old.ID, closed[0].ID)
+
+	youngAfter, err := models.FindAgentSession(young.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, youngAfter.Status,
+		"a 10-min legacy turn is within the loose cutoff and must survive — covers rolling-deploy safety")
+}
+
+func TestAgentStreamWorker_HeartbeatKeepsSessionAlive(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Pre-stamp heartbeat_at well past the heartbeat cutoff. A live
+	// heartbeat must bump it forward so cleanup no longer flags the
+	// row — without that, a healthy worker's session would be wrongly
+	// failed under load.
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", session.ID).
+		UpdateColumn("heartbeat_at", time.Now().Add(-10*time.Minute)).Error)
+
+	require.NoError(t, models.TouchAgentSessionHeartbeat(session.ID))
+
+	heartbeatCutoff := time.Now().Add(-2 * time.Minute)
+	legacyCutoff := time.Now().Add(-30 * time.Minute)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
+	require.NoError(t, err)
+	assert.Empty(t, closed, "a fresh heartbeat must lift the row out of the stuck-cleanup window")
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
+func TestAgentStreamWorker_StatusTransitionClearsHeartbeat(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Stale heartbeat lingering from a previous turn. Once the row goes
+	// idle and then back to streaming for a new turn, cleanup must NOT
+	// see the old heartbeat — otherwise a healthy queued turn gets
+	// failed before the worker's first heartbeat lands.
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", session.ID).
+		UpdateColumn("heartbeat_at", time.Now().Add(-10*time.Minute)).Error)
+
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Nil(t, refreshed.HeartbeatAt, "status transitions must clear heartbeat_at so a new turn starts in the legacy cutoff branch")
+
+	heartbeatCutoff := time.Now().Add(-2 * time.Minute)
+	legacyCutoff := time.Now().Add(-30 * time.Minute)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
+	require.NoError(t, err)
+	assert.Empty(t, closed, "a freshly-restarted streaming row must not be flagged on the strength of its previous turn's heartbeat")
+}
+
+func TestAgentStreamWorker_HeartbeatSkipsNonStreamingRows(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Once a session is no longer streaming (interrupted, failed, etc.),
+	// a goroutine that lived past the reset must not be able to plant a
+	// heartbeat_at on the new state.
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+
+	require.NoError(t, models.TouchAgentSessionHeartbeat(session.ID))
+
+	after, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Nil(t, after.HeartbeatAt,
+		"heartbeat must be a no-op when status != 'streaming' — the row has never been streamed by a heartbeat-aware worker")
 }
 
 func TestAgentStreamWorker_DropsUnknownSession(t *testing.T) {

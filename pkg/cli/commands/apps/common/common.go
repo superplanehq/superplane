@@ -36,34 +36,18 @@ func ResolveAppNameOrIDArg(ctx core.CommandContext, arg string) (string, error) 
 	return FindAppID(ctx, ctx.API, trimmed)
 }
 
-// ChangeManagementEnabled reports whether change management is enabled on
-// the app identified by `appID`.
-func ChangeManagementEnabled(ctx core.CommandContext, appID string) (bool, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, appID).Execute()
-	if err != nil {
-		return false, err
-	}
-	if response.Canvas == nil {
-		return false, fmt.Errorf("app %q not found", appID)
-	}
-
-	spec := response.Canvas.GetSpec()
-	cm := spec.GetChangeManagement()
-	return cm.GetEnabled(), nil
-}
-
 func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
 	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
 	if err != nil {
 		return "", err
 	}
 
-	var matches []openapi_client.CanvasesCanvas
+	var matches []openapi_client.CanvasesCanvasSummary
 	for _, canvas := range response.GetCanvases() {
-		if canvas.Metadata == nil || canvas.Metadata.Name == nil {
+		if canvas.Name == nil {
 			continue
 		}
-		if *canvas.Metadata.Name == name {
+		if *canvas.Name == name {
 			matches = append(matches, canvas)
 		}
 	}
@@ -76,116 +60,11 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 		return "", fmt.Errorf("multiple apps named %q found", name)
 	}
 
-	if matches[0].Metadata == nil || matches[0].Metadata.Id == nil {
+	if matches[0].Id == nil {
 		return "", fmt.Errorf("app %q is missing an id", name)
 	}
 
-	return *matches[0].Metadata.Id, nil
-}
-
-func listDraftVersions(ctx core.CommandContext, appID string) ([]openapi_client.CanvasesCanvasVersion, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesListCanvasVersions(ctx.Context, appID).
-		State("STATE_DRAFT").
-		Execute()
-	if err != nil {
-		return nil, err
-	}
-
-	return response.GetVersions(), nil
-}
-
-func draftVersionIDForOwner(versions []openapi_client.CanvasesCanvasVersion, userID string) string {
-	trimmedUserID := strings.TrimSpace(userID)
-	for _, version := range versions {
-		if trimmedUserID != "" {
-			ownerID := ""
-			if version.Metadata != nil && version.Metadata.Owner != nil {
-				ownerID = strings.TrimSpace(version.Metadata.Owner.GetId())
-			}
-			if ownerID == "" || !strings.EqualFold(ownerID, trimmedUserID) {
-				continue
-			}
-		}
-
-		versionID := ""
-		if version.Metadata != nil {
-			versionID = strings.TrimSpace(version.Metadata.GetId())
-		}
-		if versionID != "" {
-			return versionID
-		}
-	}
-
-	return ""
-}
-
-// FindCurrentUserDraftVersionID returns the version id of the first draft
-// branch owned by the current user, or an empty string if none exists.
-// It does not create a draft.
-func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versions, err := listDraftVersions(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-
-	return draftVersionIDForOwner(versions, currentUserID), nil
-}
-
-// EnsureCurrentUserDraftVersionID returns the version id of a draft branch
-// owned by the current user, creating one if it does not yet exist.
-func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-	if versionID != "" {
-		return versionID, nil
-	}
-
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCreateCanvasVersion(ctx.Context, appID).
-		Body(openapi_client.CanvasesCreateCanvasVersionBody{}).
-		Execute()
-	if err != nil {
-		return "", err
-	}
-	if response.Version == nil || response.Version.Metadata == nil {
-		return "", fmt.Errorf("draft version was not returned by the API")
-	}
-
-	versionID = strings.TrimSpace(response.Version.Metadata.GetId())
-	if versionID == "" {
-		return "", fmt.Errorf("draft version id was not returned by the API")
-	}
-
-	return versionID, nil
-}
-
-// FindOwnedDraftVersionID returns the version id of the first draft branch
-// owned by `userID`, or an empty string when none is found.
-func FindOwnedDraftVersionID(ctx core.CommandContext, appID string, userID string) (string, error) {
-	trimmedUserID := strings.TrimSpace(userID)
-	if trimmedUserID == "" {
-		return "", nil
-	}
-
-	versions, err := listDraftVersions(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-
-	return draftVersionIDForOwner(versions, trimmedUserID), nil
+	return *matches[0].Id, nil
 }
 
 // DescribeAppVersionByID loads a specific app version and errors when

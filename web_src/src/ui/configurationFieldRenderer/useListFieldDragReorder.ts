@@ -20,7 +20,7 @@ export function useListFieldDragReorder({
   allowReorder: boolean;
   useAccordion: boolean;
   onChange: (value: unknown) => void;
-  setOpenItem: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setOpenItem: React.Dispatch<React.SetStateAction<string>>;
   rowRefs: React.MutableRefObject<Array<HTMLDivElement | null>>;
 }) {
   const itemsRef = React.useRef(items);
@@ -84,7 +84,7 @@ export function useListFieldDragReorder({
     };
   }, [isDragging, onChange, setOpenItem, useAccordion, rowRefs]);
 
-  const startDrag = (event: React.MouseEvent, index: number, openItem: string | undefined) => {
+  const startDrag = (event: React.MouseEvent, index: number, openItem: string) => {
     if (!allowReorder || items.length < 2) return;
     if (event.button !== 0) return;
     event.preventDefault();
@@ -92,7 +92,7 @@ export function useListFieldDragReorder({
 
     const wasOpen = openItem === String(index);
     if (wasOpen) {
-      setOpenItem(undefined);
+      setOpenItem("");
     }
 
     setDragState({

@@ -6,15 +6,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, keyName string) (*pb.DeleteSecretKeyResponse, error) {
 	if keyName == "" {
-		return nil, status.Error(codes.InvalidArgument, "key name is required")
+		return nil, grpcerrors.InvalidArgument(nil, "key name is required")
 	}
 
 	err := actions.ValidateUUIDs(idOrName)
@@ -25,7 +24,7 @@ func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType
 		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	data, err := decryptSecretData(ctx, encryptor, *secret)
@@ -34,11 +33,11 @@ func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType
 	}
 
 	if _, ok := data[keyName]; !ok {
-		return nil, status.Error(codes.InvalidArgument, "key not found")
+		return nil, grpcerrors.InvalidArgument(nil, "key not found")
 	}
 	delete(data, keyName)
 	if len(data) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "secret must have at least one key")
+		return nil, grpcerrors.InvalidArgument(nil, "secret must have at least one key")
 	}
 
 	encrypted, err := encryptSecretData(ctx, encryptor, secret.Name, data)
@@ -48,7 +47,7 @@ func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType
 
 	updated, err := secret.UpdateData(encrypted)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcerrors.Internal(err, "failed to delete secret key")
 	}
 	updated.Data = encrypted
 

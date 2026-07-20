@@ -23,7 +23,7 @@ func TestProviderRepositoryLifecycle(t *testing.T) {
 	_, err := p.CreateRepository(ctx, repoID)
 	require.NoError(t, err)
 
-	headSHA, err := p.Head(ctx, repoID)
+	headSHA, err := p.Head(ctx, repoID, "")
 	require.NoError(t, err)
 
 	commitSHA, err := p.Commit(ctx, repoID, provider.CommitOptions{
@@ -40,11 +40,11 @@ func TestProviderRepositoryLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, commitSHA)
 
-	files, err := p.ListFiles(ctx, repoID)
+	files, err := p.ListFiles(ctx, repoID, "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"README.md", "docs/guide.md"}, files)
 
-	reader, err := p.GetFile(ctx, repoID, "docs/guide.md")
+	reader, err := p.GetFile(ctx, repoID, "docs/guide.md", "")
 	require.NoError(t, err)
 	content, err := io.ReadAll(reader)
 	require.NoError(t, err)
@@ -58,6 +58,6 @@ func TestProviderRepositoryLifecycle(t *testing.T) {
 	require.ErrorIs(t, err, provider.ErrExpectedHeadMismatch)
 
 	require.NoError(t, p.DeleteRepository(ctx, repoID))
-	_, err = p.Head(ctx, repoID)
+	_, err = p.Head(ctx, repoID, "")
 	require.ErrorIs(t, err, provider.ErrInvalidRepositoryID)
 }

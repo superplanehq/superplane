@@ -258,6 +258,17 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 						"target": {"prUrl": "https://github.com/org/repo/pull/42"}
 					}`)),
 				},
+				// On success the merged component also fetches the conversation.
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"messages": [
+							{"id": "msg_1", "type": "user_message", "text": "Do the task"},
+							{"id": "msg_2", "type": "assistant_message", "text": "Task done"}
+						]
+					}`)),
+				},
 			},
 		}
 
@@ -288,6 +299,12 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
 		assert.Equal(t, LaunchAgentPayloadType, executionStateCtx.Type)
+
+		require.Len(t, executionStateCtx.Payloads, 1)
+		emittedPayload := executionStateCtx.Payloads[0].(map[string]any)["data"].(LaunchAgentOutputPayload)
+		require.Len(t, emittedPayload.Messages, 2)
+		require.NotNil(t, emittedPayload.LastMessage)
+		assert.Equal(t, "Task done", emittedPayload.LastMessage.Text)
 	})
 
 	t.Run("terminal webhook payload without summary or pr url refreshes agent status", func(t *testing.T) {
@@ -315,6 +332,16 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 							"branchName": "cursor/agent-abc123",
 							"prUrl": "https://github.com/org/repo/pull/42"
 						}
+					}`)),
+				},
+				// On success the merged component also fetches the conversation.
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"messages": [
+							{"id": "msg_1", "type": "assistant_message", "text": "All done"}
+						]
 					}`)),
 				},
 			},
@@ -368,6 +395,9 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		assert.Equal(t, "FINISHED", emittedPayload.Status)
 		assert.Equal(t, "https://github.com/org/repo/pull/42", emittedPayload.PrURL)
 		assert.Equal(t, "Task completed", emittedPayload.Summary)
+		require.Len(t, emittedPayload.Messages, 1)
+		require.NotNil(t, emittedPayload.LastMessage)
+		assert.Equal(t, "All done", emittedPayload.LastMessage.Text)
 
 		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
 		assert.Equal(t, "Task completed", updatedMetadata.Agent.Summary)
@@ -563,4 +593,75 @@ func Test__LaunchAgent__Cleanup(t *testing.T) {
 		err := c.Cleanup(ctx)
 		require.NoError(t, err)
 	})
+}
+
+func Test__LastConversationMessage(t *testing.T) {
+	t.Run("prefers the final assistant message", func(t *testing.T) {
+		msgs := []ConversationMessage{
+			{ID: "1", Type: ConversationMessageTypeUser, Text: "do it"},
+			{ID: "2", Type: ConversationMessageTypeAssistant, Text: "done"},
+			{ID: "3", Type: ConversationMessageTypeUser, Text: "thanks"},
+		}
+		last := lastConversationMessage(msgs)
+		require.NotNil(t, last)
+		assert.Equal(t, "2", last.ID)
+		assert.Equal(t, ConversationMessageTypeAssistant, last.Type)
+	})
+
+	t.Run("falls back to the last message when there is no assistant message", func(t *testing.T) {
+		msgs := []ConversationMessage{
+			{ID: "1", Type: ConversationMessageTypeUser, Text: "a"},
+			{ID: "2", Type: ConversationMessageTypeUser, Text: "b"},
+		}
+		last := lastConversationMessage(msgs)
+		require.NotNil(t, last)
+		assert.Equal(t, "2", last.ID)
+	})
+}
+
+// Test__LaunchAgent__Poll__ConversationFetchBestEffort verifies that a failing
+// conversation fetch on successful completion does not drop the terminal output;
+// the payload is still emitted with the message fields unset.
+func Test__LaunchAgent__Poll__ConversationFetchBestEffort(t *testing.T) {
+	c := &LaunchAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"agent-123","status":"FINISHED","summary":"done"}`)),
+			},
+			// Conversation fetch fails; attachConversation must swallow it.
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"boom"}`)),
+			},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"launchAgentKey": "test-key"},
+	}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: LaunchAgentExecutionMetadata{
+			Agent:  &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
+			Target: &TargetMetadata{},
+		},
+	}
+	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	ctx := core.ActionHookContext{
+		Name:           "poll",
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionStateCtx,
+		Parameters:     map[string]any{"attempt": float64(1)},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, c.HandleHook(ctx))
+	require.Len(t, executionStateCtx.Payloads, 1)
+	payload := executionStateCtx.Payloads[0].(map[string]any)["data"].(LaunchAgentOutputPayload)
+	assert.Equal(t, "FINISHED", payload.Status)
+	assert.Nil(t, payload.Messages)
+	assert.Nil(t, payload.LastMessage)
 }

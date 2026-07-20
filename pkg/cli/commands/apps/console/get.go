@@ -7,11 +7,10 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-type getCommand struct {
-	draft *bool
-}
+type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 1 {
@@ -33,16 +32,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	useDraft := c.draft != nil && *c.draft
-	versionID := ""
-	if useDraft {
-		versionID, err = resolveCurrentUserDraftVersionID(ctx, canvasID)
-		if err != nil {
-			return err
-		}
-	}
-
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, "")
 	if err != nil {
 		return err
 	}
@@ -50,34 +40,26 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("app %q has no console", canvasID)
 	}
 
-	resource, err := ParseConsoleYAML(yamlBytes)
+	console, err := yaml.ConsoleFromYML(yamlBytes)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}
-	if strings.TrimSpace(resource.Metadata.Name) == "" {
-		resource.Metadata.Name = canvasName
+	if strings.TrimSpace(console.Metadata.Name) == "" {
+		console.Metadata.Name = canvasName
 	}
-	if strings.TrimSpace(resource.Metadata.CanvasID) == "" {
-		resource.Metadata.CanvasID = canvasID
+	if strings.TrimSpace(console.Metadata.CanvasID) == "" {
+		console.Metadata.CanvasID = canvasID
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(resource)
+		return ctx.Renderer.Render(console)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		source := "live"
-		if useDraft {
-			source = "draft"
-		}
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID != "" {
-			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
-		}
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(resource.Spec.Panels))
-		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(resource.Spec.Layout))
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.Spec.Panels))
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(console.Spec.Layout))
 		return err
 	})
 }
@@ -94,28 +76,4 @@ func lookupCanvasName(ctx core.CommandContext, canvasID string) (string, error) 
 		return "", fmt.Errorf("canvas %q not found", canvasID)
 	}
 	return response.Canvas.Metadata.GetName(), nil
-}
-
-// resolveCurrentUserDraftVersionID returns the id of the current user's
-// existing draft version. Unlike the canvas update flow we do not create
-// a draft on read: an absent draft is an error so users get an immediate
-// signal that there is nothing to read yet.
-func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", fmt.Errorf("draft version not found for current user")
-	}
-	return versionID, nil
 }

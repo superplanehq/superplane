@@ -1,4 +1,5 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +58,10 @@ export function GroupMembersPage() {
 
   const loading = loadingGroup || loadingMembers;
   const error = groupError || membersError;
+
+  useReportPageReady(!loading && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleBackToGroups = () => {
     navigate(`/${orgId}/settings/groups`);
@@ -262,7 +267,7 @@ export function GroupMembersPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{member.metadata?.email || "Service Account"}</TableCell>
+                    <TableCell>{member.metadata?.email || "API Key"}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <PermissionTooltip

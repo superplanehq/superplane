@@ -60,7 +60,7 @@ func Test_UpdateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := r.AuthService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
+		roleDef, err := r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.Len(t, roleDef.Permissions, 3)
@@ -86,7 +86,7 @@ func Test_UpdateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := r.AuthService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
+		roleDef, err := r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
@@ -123,7 +123,7 @@ func Test_UpdateRole(t *testing.T) {
 
 		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot update default role")
+		assert.Equal(t, "failed to update role", err.Error())
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {

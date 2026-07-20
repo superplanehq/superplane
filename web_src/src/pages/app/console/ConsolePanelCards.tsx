@@ -3,9 +3,9 @@ import type { ConsolePanel } from "@/hooks/useCanvasData";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { HtmlPanelCard } from "./HtmlPanelCard";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
-import { NodePanelCard } from "./NodePanelCard";
 import { NodesPanelCard } from "./NodesPanelCard";
 import { NumberPanelCard } from "./NumberPanelCard";
+import { ScorecardPanelCard } from "./ScorecardPanelCard";
 import { TablePanelCard } from "./TablePanelCard";
 
 export function PanelCardRouter({
@@ -23,16 +23,10 @@ export function PanelCardRouter({
 }) {
   switch (panel.type) {
     case "node":
-      return (
-        <NodePanelCard
-          panel={panel}
-          readOnly={readOnly}
-          onDelete={onDelete}
-          onChange={onChange}
-          onEditingChange={onEditingChange}
-        />
-      );
     case "nodes":
+      // Both the legacy `node` shape and the modern `nodes` list are rendered
+      // by the same merged card — it folds a single-entry list into the
+      // compact centered layout that the pre-merge single-node card used.
       return (
         <NodesPanelCard
           panel={panel}
@@ -65,6 +59,16 @@ export function PanelCardRouter({
     case "number":
       return (
         <NumberPanelCard
+          panel={panel}
+          readOnly={readOnly}
+          onDelete={onDelete}
+          onChange={onChange}
+          onEditingChange={onEditingChange}
+        />
+      );
+    case "scorecard":
+      return (
+        <ScorecardPanelCard
           panel={panel}
           readOnly={readOnly}
           onDelete={onDelete}

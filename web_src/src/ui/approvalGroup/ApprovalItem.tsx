@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { Check, Circle, MessageCircle, Paperclip, X } from "lucide-react";
 import { Button } from "../button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -71,9 +72,9 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 space-y-3 text-xs">
-                <p className="text-sm font-medium text-neutral-900">Artifacts</p>
+                <p className="text-sm font-medium text-neutral-900 dark:text-gray-100">Artifacts</p>
                 <div className="space-y-3">
-                  <p className="font-medium text-neutral-900">Comment</p>
+                  <p className="font-medium text-neutral-900 dark:text-gray-100">Comment</p>
                   <p className="text-muted-foreground">{approvalComment}</p>
                 </div>
               </HoverCardContent>
@@ -87,7 +88,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 text-xs">
-                <p className="text-sm font-medium text-neutral-900 mb-2">Rejection Reason</p>
+                <p className="text-sm font-medium text-neutral-900 mb-2 dark:text-gray-100">Rejection Reason</p>
                 <p className="text-muted-foreground">{rejectionReason}</p>
               </HoverCardContent>
             </HoverCard>
@@ -110,7 +111,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </Button>
           <LoadingButton
             variant="default"
-            className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+            className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
             loading={isApproving}
             loadingText="Approving..."
             onClick={async (e) => {
@@ -160,13 +161,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         </Item>
         {showRejectionForm && (
           <div
-            className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left"
+            className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left dark:border-gray-700/70 dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-800">
+                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                     Comment
                   </Label>
                 </div>
@@ -195,7 +196,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <LoadingButton
                   variant="default"
                   size="default"
-                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                  className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
                   loading={isRejecting}
                   loadingText="Rejecting..."
                   onClick={async (e) => {
@@ -219,14 +220,17 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         )}
         {showApprovalForm && (
           <div
-            className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left"
+            className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left dark:border-gray-700/70 dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <Label htmlFor="approval-comment" className="text-sm font-semibold text-neutral-900">
+                    <Label
+                      htmlFor="approval-comment"
+                      className="text-sm font-semibold text-neutral-900 dark:text-gray-100"
+                    >
                       Comment
                     </Label>
                   </div>
@@ -254,7 +258,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </Button>
                 <LoadingButton
                   variant="default"
-                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                  className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
                   loading={isApproving}
                   loadingText="Approving..."
                   onClick={async (e) => {

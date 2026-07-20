@@ -506,7 +506,7 @@
             <h1>Automate canvases, executions, and org workflows the same way the platform does.</h1>
             <p>
               Use the SuperPlane API to provision canvases, ship configuration-as-code updates, trigger runs,
-              inspect execution state, manage service accounts, and control organization-level settings from CI,
+              inspect execution state, manage API keys, and control organization-level settings from CI,
               internal tooling, or your own platform workflows.
             </p>
             <ul class="hero-list">
@@ -524,7 +524,7 @@
               </li>
               <li>
                 <strong>Automation identities</strong>
-                Use service account tokens for CI/CD and non-human access with scoped org permissions.
+                Use API keys for CI/CD and non-human access with scoped org or app permissions.
               </li>
             </ul>
           </div>
@@ -569,13 +569,13 @@
       </article>
 
       <article class="panel">
-        <div class="panel-eyebrow">Service accounts</div>
+        <div class="panel-eyebrow">API keys</div>
         <div class="panel-inner">
-          <h2>Create a service account token</h2>
+          <h2>Create an API key token</h2>
           <p>Use this for CI/CD, platform automation, and machine-to-machine access.</p>
           <ol>
-            <li>Open <span class="inline-code">Settings &gt; Service accounts</span>.</li>
-            <li>Create a service account and assign it the correct role.</li>
+            <li>Open <span class="inline-code">Settings &gt; API Keys</span>.</li>
+            <li>Create an API key and assign it the correct role, access scope, and optional expiration.</li>
             <li>Generate or regenerate its token and store it securely. It is shown only once.</li>
           </ol>
         </div>
@@ -630,11 +630,6 @@
           name: "Canvases",
           description: "Create, update, delete, and inspect canvases and canvas-level state.",
           order: 10
-        },
-        CanvasChangeRequest: {
-          name: "Canvas change requests",
-          description: "Review, approve, reject, and resolve canvas change requests.",
-          order: 30
         },
         CanvasEvent: {
           name: "Canvas events",
@@ -701,9 +696,9 @@
           description: "Manage secrets and sensitive configuration without returning raw secret values.",
           order: 65
         },
-        ServiceAccounts: {
-          name: "Service accounts",
-          description: "Create automation identities, assign roles, and rotate API tokens.",
+        ApiKeys: {
+          name: "API keys",
+          description: "Create automation credentials, assign roles and app scopes, set expirations, and rotate API tokens.",
           order: 58
         },
         Trigger: {
@@ -807,7 +802,7 @@
 
         spec.info = Object.assign({}, spec.info || {}, {
           title: "SuperPlane API",
-          description: "Programmatic access to canvases, executions, organization configuration, service accounts, integrations, and related SuperPlane resources."
+          description: "Programmatic access to canvases, executions, organization configuration, API keys, integrations, and related SuperPlane resources."
         });
 
         spec.securityDefinitions = Object.assign({}, spec.securityDefinitions || {}, {

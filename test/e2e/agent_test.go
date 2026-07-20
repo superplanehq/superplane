@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -29,10 +29,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("sends a message and renders the streamed assistant response", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return agentAssistantTurn("Agent ready for e2e"), nil
-			}
-
 			return agentAssistantTurn("E2E assistant response for: " + call.Message), nil
 		})
 
@@ -47,10 +43,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("switches to build mode before sending a message", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return agentAssistantTurn("Builder mode acknowledged"), nil
 		})
 
@@ -65,10 +57,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("renders tool activity from provider events", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return []agents.ProviderEvent{
 				agentToolStartedEvent("tool-1", "bash", "superplane apps canvas get"),
 				agentToolFinishedEvent("tool-1", "bash"),
@@ -89,10 +77,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("stops a running turn", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return nil, nil
 		})
 
@@ -102,18 +86,22 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertVisible(q.TestID("agent-stop-button"))
 		steps.stopAgent()
 		steps.assertInterruptSent()
-		steps.finishRunningTurnAsFailed("stopped by e2e")
-		steps.assertText("Last turn failed")
+		// InterruptSession resets the row to idle and broadcasts
+		// turn_completed/idle, so the composer flips back to "Ready" on
+		// the WS event — regardless of any late provider stream error.
+		// The "late session_failed must not overwrite idle" race is
+		// covered as a unit test in
+		// TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt;
+		// reproducing it here would race InterruptSession's DB commit
+		// (assertInterruptSent fires as soon as the provider call is
+		// recorded, mid-flight) and flake.
+		steps.assertText("Ready")
 		steps.assertHidden(q.TestID("agent-stop-button"))
 	})
 
 	t.Run("sends a follow-up message while a turn is still running", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return nil, nil
 		})
 
@@ -133,10 +121,6 @@ func TestAgentE2E(t *testing.T) {
 		var approvalReceived bool
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			if call.Message == "Specs approved. Start building." {
 				approvalReceived = true
 				return agentAssistantTurn("Building now."), nil
@@ -200,22 +184,25 @@ func (s *agentSteps) openAgent() {
 	s.waitForToolSidebarOpen()
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.clickAgentTab()
 	s.waitForAgentInput()
-	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
-		return isAgentSystemMessage(call.Message)
-	})
+
+	// Opening or refreshing a canvas must not invoke the agent: it no longer sends a
+	// boot message (see web_src/src/lib/agentBootContext.ts). Sync on the provisioned
+	// session instead of a boot round-trip, then assert nothing was auto-sent.
+	s.currentAgentSession()
+	s.assertNoBootMessageSent()
 }
 
-func (s *agentSteps) clickAgentTab() {
-	tab := q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`).Run(s.session)
-	require.Eventually(s.t, func() bool {
-		visible, err := tab.IsVisible()
-		if err != nil || !visible {
-			return false
+func (s *agentSteps) assertNoBootMessageSent() {
+	require.Never(s.t, func() bool {
+		for _, call := range ctx.AgentProvider.SendMessageCalls() {
+			if isAgentSystemMessage(call.Message) {
+				return true
+			}
 		}
-		return tab.Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)}) == nil
-	}, agentWaitTimeout, agentPollInterval)
+
+		return false
+	}, 2*time.Second, agentPollInterval, "agent must not auto-send a boot message on canvas open")
 }
 
 func (s *agentSteps) waitForAgentInput() {
@@ -290,15 +277,6 @@ func (s *agentSteps) stopAgent() {
 
 func (s *agentSteps) startBuildingFromRubric() {
 	s.session.Click(q.Locator(`button:has-text("Start Building")`))
-}
-
-func (s *agentSteps) finishRunningTurnAsFailed(message string) {
-	agentSession := s.currentAgentSession()
-	require.NoError(s.t, ctx.AgentProvider.QueueEvents(agentSession.ProviderSessionID, agents.ProviderEvent{
-		ProviderEventID: "session-failed-" + uuid.NewString(),
-		Type:            agents.ProviderEventSessionFailed,
-		ErrorMessage:    message,
-	}))
 }
 
 func (s *agentSteps) currentAgentSession() *models.AgentSession {

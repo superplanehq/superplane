@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -80,11 +81,13 @@ func TestForEachExecute(t *testing.T) {
 		assert.ErrorContains(t, err, "expression must evaluate to an array")
 	})
 
-	t.Run("returns error when array exceeds emit limit", func(t *testing.T) {
+	t.Run("returns error when array exceeds item limit", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_MAX_EMIT_COUNT", "")
+
 		component := &ForEach{}
 		execState := &contexts.ExecutionStateContext{}
 		execMetadata := &contexts.MetadataContext{}
-		items := make([]any, core.MaxEmitCount+1)
+		items := make([]any, config.MaxEmitCount()+1)
 		exprCtx := &contexts.ExpressionContext{Output: items}
 
 		err := component.Execute(core.ExecutionContext{
@@ -94,7 +97,7 @@ func TestForEachExecute(t *testing.T) {
 			Expressions:    exprCtx,
 		})
 
-		assert.ErrorContains(t, err, "supports at most")
+		assert.ErrorContains(t, err, "supports at most 100 items per execution")
 	})
 
 	t.Run("returns error when arrayExpression is missing", func(t *testing.T) {

@@ -52,6 +52,8 @@ export type ConsoleOverlayProps = {
   organizationId?: string;
   /** Canvas nodes used to resolve chip references by id or name. */
   canvasNodes?: SuperplaneComponentsNode[];
+  /** True while the canvas nodes are still being fetched. */
+  canvasNodesLoading?: boolean;
   /** Latest known node status per node id; powers the status chip. */
   nodeStatuses?: Record<string, ConsoleNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
@@ -64,6 +66,7 @@ export type ConsoleOverlayProps = {
     enabled: boolean;
     summary?: DraftConsoleDiffSummary;
   };
+  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
 };
 
 export function ConsoleOverlay({
@@ -80,6 +83,7 @@ export function ConsoleOverlay({
   canvasName,
   organizationId,
   canvasNodes,
+  canvasNodesLoading,
   nodeStatuses,
   onTriggerNode,
   showConsoleEditControls = false,
@@ -87,6 +91,7 @@ export function ConsoleOverlay({
   onConsoleOpenYaml,
   consoleYamlReadOnly,
   visualDiff,
+  onEffectiveConsoleChange,
 }: ConsoleOverlayProps) {
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
   updateConsoleMutationRef.current = updateConsoleMutation;
@@ -112,7 +117,7 @@ export function ConsoleOverlay({
   const overlayContent = (
     <>
       <div
-        className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100"
+        className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100 dark:bg-gray-900"
         style={{ left: leftOffset, right: 0 }}
         data-testid="console-overlay"
       >
@@ -124,6 +129,7 @@ export function ConsoleOverlay({
             errorMessage={consoleQuery.error ? String(consoleQuery.error) : undefined}
             readOnly={readOnly}
             onChange={handleChange}
+            onEffectiveChange={onEffectiveConsoleChange}
             addPanelDialogOpen={addPanelDialogOpen}
             onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
             visualDiff={visualDiff}
@@ -163,6 +169,7 @@ export function ConsoleOverlay({
       canvasId={canvasId}
       organizationId={organizationId}
       nodes={contextNodes}
+      nodesLoading={canvasNodesLoading}
       nodeStatuses={nodeStatuses}
       canRunNodes={canRunNodes}
       onTriggerNode={canRunNodes ? onTriggerNode : undefined}

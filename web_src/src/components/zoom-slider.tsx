@@ -1,7 +1,18 @@
 "use client";
 
 import React, { memo, useCallback, useEffect } from "react";
-import { Camera, CircleDot, CircleDotDashed, Eye, Minus, Plus } from "lucide-react";
+import {
+  Camera,
+  CircleDot,
+  CircleDotDashed,
+  Eye,
+  LayoutDashboard,
+  LayoutGrid,
+  Locate,
+  LocateOff,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -18,6 +29,56 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
+
+function hasPrimaryModifier(event: KeyboardEvent) {
+  return event.ctrlKey || event.metaKey;
+}
+
+function isZoomInShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && (event.key === "=" || event.key === "+");
+}
+
+function isZoomOutShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && event.key === "-";
+}
+
+function isResetZoomShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && event.key === "0";
+}
+
+function isFitViewShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && !event.shiftKey && event.key === "1";
+}
+
+function isScreenshotShortcut(event: KeyboardEvent, screenshotName?: string) {
+  return Boolean(screenshotName) && hasPrimaryModifier(event) && event.shiftKey && event.key === "s";
+}
+
+function AutoFocusToggleButton({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-7 w-7"
+          onClick={onToggle}
+          aria-pressed={enabled}
+          aria-label={enabled ? "Disable auto-focus on selection" : "Enable auto-focus on selection"}
+          data-testid="canvas-auto-focus-toggle"
+        >
+          {enabled ? <Locate className="h-3 w-3" /> : <LocateOff className="h-3 w-3" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {enabled
+          ? "Auto-focus is on. Selecting a run or step centers the canvas on it."
+          : "Auto-focus is off. Selecting a run or step keeps the current viewport."}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export const ZoomSlider = memo(function ZoomSlider({
   className,
@@ -27,6 +88,12 @@ export const ZoomSlider = memo(function ZoomSlider({
   screenshotName,
   isSnapToGridEnabled,
   onSnapToGridToggle,
+  isAutoLayoutOnUpdateEnabled,
+  onAutoLayoutOnUpdateToggle,
+  autoLayoutOnUpdateDisabled,
+  autoLayoutOnUpdateDisabledTooltip,
+  isAutoFocusEnabled,
+  onAutoFocusToggle,
   usePanel = true,
   ...props
 }: Omit<PanelProps, "children"> & {
@@ -36,6 +103,12 @@ export const ZoomSlider = memo(function ZoomSlider({
   screenshotName?: string;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onAutoLayoutOnUpdateToggle?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onAutoFocusToggle?: () => void;
   usePanel?: boolean;
 }) {
   const { zoom } = useViewport();
@@ -101,27 +174,27 @@ export const ZoomSlider = memo(function ZoomSlider({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Zoom in: Ctrl/Cmd + = or Ctrl/Cmd + Plus
-      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+      if (isZoomInShortcut(e)) {
         e.preventDefault();
         zoomIn({ duration: 300 });
       }
       // Zoom out: Ctrl/Cmd + - or Ctrl/Cmd + Minus
-      else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+      else if (isZoomOutShortcut(e)) {
         e.preventDefault();
         zoomOut({ duration: 300 });
       }
       // Reset zoom: Ctrl/Cmd + 0
-      else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+      else if (isResetZoomShortcut(e)) {
         e.preventDefault();
         zoomTo(1, { duration: 300 });
       }
       // Fit view: Ctrl/Cmd + 1
-      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "1") {
+      else if (isFitViewShortcut(e)) {
         e.preventDefault();
-        fitView({ duration: 300 });
+        fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS });
       }
       // Screenshot: Ctrl/Cmd + Shift + S
-      else if (screenshotName && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
+      else if (isScreenshotShortcut(e, screenshotName)) {
         e.preventDefault();
         handleScreenshot();
       }
@@ -133,9 +206,16 @@ export const ZoomSlider = memo(function ZoomSlider({
 
   const baseClassName = cn(
     "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-0.5 rounded-md p-0.5 h-7",
+    "dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700",
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
+  const isAutoLayoutToggleDisabled = !onAutoLayoutOnUpdateToggle || autoLayoutOnUpdateDisabled;
+  const autoLayoutTooltipMessage =
+    autoLayoutOnUpdateDisabledTooltip ||
+    (isAutoLayoutOnUpdateEnabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   const content = (
     <>
@@ -190,7 +270,12 @@ export const ZoomSlider = memo(function ZoomSlider({
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => fitView({ duration: 300 })}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7"
+            onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
+          >
             <Eye className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
@@ -216,6 +301,32 @@ export const ZoomSlider = memo(function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
         </Tooltip>
+      )}
+      {onAutoLayoutOnUpdateToggle && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-7 w-7"
+                onClick={onAutoLayoutOnUpdateToggle}
+                disabled={isAutoLayoutToggleDisabled}
+                aria-pressed={isAutoLayoutOnUpdateEnabled}
+              >
+                {isAutoLayoutOnUpdateEnabled ? (
+                  <LayoutGrid className="h-3 w-3" />
+                ) : (
+                  <LayoutDashboard className="h-3 w-3" />
+                )}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+        </Tooltip>
+      )}
+      {onAutoFocusToggle && (
+        <AutoFocusToggleButton enabled={Boolean(isAutoFocusEnabled)} onToggle={onAutoFocusToggle} />
       )}
       {children}
     </>

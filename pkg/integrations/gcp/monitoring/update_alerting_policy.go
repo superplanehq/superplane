@@ -20,6 +20,7 @@ type UpdateAlertingPolicy struct{}
 type UpdateAlertingPolicySpec struct {
 	AlertPolicy           string          `mapstructure:"alertPolicy"`
 	DisplayName           string          `mapstructure:"displayName"`
+	PromQL                PromQLSpec      `mapstructure:",squash"`
 	Conditions            []ConditionSpec `mapstructure:"conditions"`
 	Combiner              string          `mapstructure:"combiner"`
 	Severity              string          `mapstructure:"severity"`
@@ -56,7 +57,9 @@ func (u *UpdateAlertingPolicy) Documentation() string {
 ## Configuration
 
 - **Alerting Policy**: The policy to update (required, supports expressions)
-- **Conditions**: Provide to **replace** the policy's conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **Condition type**: Toggle to **replace** the policy's conditions with a metric threshold or a PromQL query (leave off to keep current conditions)
+- **Conditions** (threshold type): Provide to replace with threshold conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **PromQL query** (PromQL type): Provide to replace with a single PromQL condition (with optional For duration and evaluation interval)
 - **Combiner**: OR / AND / AND-with-matching-resource
 - **Severity**: Critical / Error / Warning
 - **Enabled**: Enable, disable, or leave unchanged
@@ -92,11 +95,25 @@ func (u *UpdateAlertingPolicy) OutputChannels(configuration any) []core.OutputCh
 func (u *UpdateAlertingPolicy) Configuration() []configuration.Field {
 	fields := []configuration.Field{alertPolicySelectorField()}
 
-	// Conditions are optional on update (provide to replace them).
+	// Conditions are optional on update (provide to replace them). The condition
+	// kind toggle and PromQL inputs are togglable too, so a PromQL query can
+	// replace the policy's conditions.
+	conditionKind := conditionKindField()
+	conditionKind.Togglable = true
+	conditionKind.Description = "Replace the policy's conditions with a metric threshold or a PromQL query (leave off to keep current conditions)."
+	fields = append(fields, conditionKind)
+
 	conditions := conditionsField()
 	conditions.Required = false
 	conditions.Togglable = true
+	conditions.VisibilityConditions = []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold}}}
 	fields = append(fields, conditions)
+
+	for _, f := range promqlConditionFields() {
+		f.Togglable = true
+		f.RequiredConditions = nil
+		fields = append(fields, f)
+	}
 
 	// Reuse the create option fields, but make combiner/enabled "unchanged"
 	// friendly: no combiner default, and enabled becomes a 3-way select.
@@ -143,8 +160,23 @@ func (u *UpdateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
 }
 
+// isPromQLConditionUpdate reports whether the spec asks to replace the policy's
+// conditions with a PromQL condition. A saved conditionKind of "promql" alone is
+// not enough — the query must also be present — so that an update toggled to
+// PromQL but left without a query does not block unrelated field updates (e.g.
+// severity or display name), mirroring how the threshold path only acts when its
+// "conditions" key is present.
+func isPromQLConditionUpdate(spec UpdateAlertingPolicySpec) bool {
+	return spec.PromQL.ConditionKind == conditionKindPromQL && strings.TrimSpace(spec.PromQL.Query) != ""
+}
+
 func validateUpdateFields(spec UpdateAlertingPolicySpec, cfg any) error {
-	if configHasKey(cfg, "conditions") {
+	switch {
+	case isPromQLConditionUpdate(spec):
+		if _, err := buildPromQLConditions(spec.PromQL); err != nil {
+			return err
+		}
+	case configHasKey(cfg, "conditions"):
 		if _, err := buildConditions(spec.Conditions); err != nil {
 			return err
 		}
@@ -182,6 +214,7 @@ func configHasKey(cfg any, key string) bool {
 func hasUpdates(spec UpdateAlertingPolicySpec, cfg any) bool {
 	return strings.TrimSpace(spec.DisplayName) != "" ||
 		configHasKey(cfg, "conditions") ||
+		isPromQLConditionUpdate(spec) ||
 		spec.Combiner != "" ||
 		spec.Severity != "" ||
 		spec.Enabled != "" ||
@@ -268,7 +301,15 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		policy["displayName"] = dn
 		mask = append(mask, "displayName")
 	}
-	if configHasKey(ctx.Configuration, "conditions") {
+	switch {
+	case isPromQLConditionUpdate(spec):
+		conditions, err := buildPromQLConditions(spec.PromQL)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", err.Error())
+		}
+		policy["conditions"] = conditions
+		mask = append(mask, "conditions")
+	case configHasKey(ctx.Configuration, "conditions"):
 		conditions, err := buildConditions(spec.Conditions)
 		if err != nil {
 			return ctx.ExecutionState.Fail("error", err.Error())

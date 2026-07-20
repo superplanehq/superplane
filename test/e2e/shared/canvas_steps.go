@@ -2,18 +2,20 @@ package shared
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/yaml"
 
 	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -34,52 +36,210 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-// EnterEditMode clicks the Edit button in the header to create or continue a draft version.
+// EnterEditMode clicks the Edit button in the header to start editing the live canvas.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
+	s.EnterEditModeWithoutStagingActionAssertions()
+	if s.userHasStaging() {
+		s.AssertStagingActionsVisibleAndEnabled()
+		return
+	}
+	s.AssertStagingActionsVisibleAndDisabled()
+}
+
+// EnterEditModeWithoutStagingActionAssertions enters edit mode without assuming
+// which staging actions the current user's permissions allow.
+func (s *CanvasSteps) EnterEditModeWithoutStagingActionAssertions() {
 	s.waitForEnabledEditButton()
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(400)
+	s.session.Sleep(500)
+	s.waitForEnabledExitEditButton()
+	s.AssertEditModeTabChrome()
+}
 
-	menu := q.TestID("start-editing-menu").Run(s.session)
-	if visible, _ := menu.IsVisible(); visible {
-		continueButton := q.TestID("start-editing-continue").Run(s.session)
-		require.NoError(s.t, continueButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+func (s *CanvasSteps) userHasStaging() bool {
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, s.sessionUserID())
+	return err == nil && hasStaging
+}
+
+// AssertEditModeTabChrome verifies the header tabs use edit-mode orange styling.
+func (s *CanvasSteps) AssertEditModeTabChrome() {
+	nav := q.Locator(`nav[aria-label="Canvas view"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		class, err := nav.GetAttribute("class")
+		if err != nil || class == "" {
+			return false
+		}
+		return strings.Contains(class, "bg-orange-200")
+	}, 15*time.Second, 200*time.Millisecond, "edit-mode tab bar should use orange styling")
+
+	activeTab := q.Locator(`nav[aria-label="Canvas view"] [aria-current="page"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		class, err := activeTab.GetAttribute("class")
+		if err != nil || class == "" {
+			return false
+		}
+		return strings.Contains(class, "bg-white") &&
+			strings.Contains(class, "shadow-sm") &&
+			strings.Contains(class, "font-medium") &&
+			!strings.Contains(class, "font-bold")
+	}, 15*time.Second, 200*time.Millisecond, "active edit-mode tab should use white pill styling")
+}
+
+// AssertStagingActionsVisibleAndDisabled verifies commit/reset stay visible but disabled with no staged changes.
+func (s *CanvasSteps) AssertStagingActionsVisibleAndDisabled() {
+	s.session.AssertVisible(q.TestID("canvas-commit-staging-button"))
+	s.session.AssertVisible(q.TestID("canvas-reset-staging-button"))
+	s.session.AssertDisabled(q.TestID("canvas-commit-staging-button"))
+	s.session.AssertDisabled(q.TestID("canvas-reset-staging-button"))
+}
+
+// AssertStagingActionsVisibleAndEnabled verifies commit/reset are visible and actionable once staging exists.
+func (s *CanvasSteps) AssertStagingActionsVisibleAndEnabled() {
+	s.assertStagingActionEnabled("canvas-commit-staging-button")
+	s.assertStagingActionEnabled("canvas-reset-staging-button")
+}
+
+func (s *CanvasSteps) assertStagingActionEnabled(testID string) {
+	button := q.TestID(testID).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := button.IsVisible()
+		if err != nil || !visible {
+			return false
+		}
+		disabled, err := button.IsDisabled()
+		return err == nil && !disabled
+	}, 15*time.Second, 200*time.Millisecond, "%s should be visible and enabled when staging exists", testID)
+}
+
+func (s *CanvasSteps) sessionUserID() uuid.UUID {
+	return s.UserIDForEmail(s.session.Account.Email)
+}
+
+// UserIDForEmail resolves the organization user id for an account email.
+func (s *CanvasSteps) UserIDForEmail(email string) uuid.UUID {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), email)
+	require.NoError(s.t, err)
+	return user.ID
+}
+
+// LoginAs switches the browser session to another account in the same organization.
+func (s *CanvasSteps) LoginAs(account *models.Account) {
+	s.session.Account = account
+	s.session.Login()
+}
+
+// ExitEditMode leaves edit mode and returns to the live canvas view.
+// Commit already ends the edit session in the UI; this is a no-op when live view is active.
+func (s *CanvasSteps) ExitEditMode() {
+	if s.isOnLiveView() {
+		return
 	}
 
-	s.session.Sleep(500)
-	s.waitForEnabledExitEditButton()
-}
+	require.Eventually(s.t, func() bool {
+		if s.isOnLiveView() {
+			return true
+		}
+		exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+		visible, visibleErr := exitEditButton.IsVisible()
+		if visibleErr != nil || !visible {
+			return false
+		}
+		disabled, err := exitEditButton.IsDisabled()
+		return err == nil && !disabled
+	}, 30*time.Second, 200*time.Millisecond)
 
-// CreateNewDraftFromEditMenu opens the Edit menu and creates an additional draft branch.
-func (s *CanvasSteps) CreateNewDraftFromEditMenu() {
-	s.waitForEnabledEditButton()
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("start-editing-menu"))
+	if s.isOnLiveView() {
+		return
+	}
 
-	createButton := q.TestID("start-editing-create").Run(s.session)
-	require.NoError(s.t, createButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(500)
-	s.waitForEnabledExitEditButton()
-}
-
-// ExitEditMode leaves the current draft and returns to the live canvas view.
-func (s *CanvasSteps) ExitEditMode() {
 	s.waitForEnabledExitEditButton()
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
 	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+	s.waitForEnabledEditButton()
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar opens the Versions tab in the canvas tool sidebar.
+func (s *CanvasSteps) isOnLiveView() bool {
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
+	visible, err := editButton.IsVisible()
+	if err != nil || !visible {
+		return false
+	}
+	disabled, err := editButton.IsDisabled()
+	return err == nil && !disabled
+}
+
+// OpenVersionsSidebar reveals the versions sidebar from the current canvas mode.
+// If the header toggle is not available yet, it enters edit mode first.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.waitForToolSidebarOpen()
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	if visible, _ := toggle.IsVisible(); !visible {
+		s.EnterEditMode()
+	}
+
+	s.ensureVersionsSidebarOpen()
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureEditMode() {
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+	if visible, _ := exitEditButton.IsVisible(); visible {
+		return
+	}
+
+	s.EnterEditMode()
+}
+
+func (s *CanvasSteps) ensureVersionsSidebarOpen() {
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	require.NoError(s.t, toggle.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}))
+
+	pressed, err := toggle.GetAttribute("aria-pressed", pw.LocatorGetAttributeOptions{Timeout: pw.Float(15000)})
+	require.NoError(s.t, err)
+	if pressed == "true" {
+		return
+	}
+
+	s.session.Click(q.TestID("canvas-versions-sidebar-toggle"))
+}
+
+// SelectVersionInHistorySidebar selects a commit in the versions sidebar history list.
+func (s *CanvasSteps) SelectVersionInHistorySidebar(versionLabel string) {
+	s.ensureEditMode()
+	s.OpenVersionsSidebar()
+	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-live-version-row"]:has-text("%s")`, versionLabel))
+	s.waitForVisible(selector, 15*time.Second)
+	s.session.Click(selector)
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) waitForVisible(query q.Query, timeout time.Duration) {
+	locator := query.Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, timeout, 200*time.Millisecond, "%s did not become visible", query.Describe())
+}
+
+// SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
+func (s *CanvasSteps) SelectRunInSidebar(runID string) {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID))
+		if visible, err := runLink.Run(s.session).IsVisible(); err == nil && visible {
+			s.session.Click(runLink)
+			s.session.Sleep(300)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.session.Click(q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)))
 }
 
 func (s *CanvasSteps) waitForToolSidebarOpen() {
@@ -109,42 +269,41 @@ func (s *CanvasSteps) waitForToolSidebarOpen() {
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
 }
 
-// OpenDraftBranchInSidebar selects a draft branch from the Versions sidebar by display name.
-func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
-	s.OpenVersionsSidebar()
-	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") button`, displayName))
-	s.session.Click(selector)
-	s.session.Sleep(500)
-	s.waitForEnabledExitEditButton()
-}
-
-// ListDraftVersions returns all draft versions for this canvas, newest first.
-func (s *CanvasSteps) ListDraftVersions() []models.CanvasVersion {
-	drafts, err := models.ListDraftCanvasVersions(s.WorkflowID)
-	require.NoError(s.t, err)
-	return drafts
-}
-
-// AssertDraftCount waits until the canvas has the expected number of draft branches.
-func (s *CanvasSteps) AssertDraftCount(expected int) {
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		if len(s.ListDraftVersions()) == expected {
+// WaitForRunsSidebar waits until the runs sidebar is visible on the canvas tab.
+func (s *CanvasSteps) WaitForRunsSidebar() {
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		sidebar := q.TestID("canvas-runs-sidebar").Run(s.session)
+		if visible, err := sidebar.IsVisible(); err == nil && visible {
 			return
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("expected %d draft branches, got %d", expected, len(s.ListDraftVersions()))
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
 }
 
-// AssertDraftBranchesInSidebar verifies draft branch labels appear in the Versions sidebar.
-func (s *CanvasSteps) AssertDraftBranchesInSidebar(displayNames ...string) {
+// ListDraftVersions is deprecated; editable state is per-user staging on the live canvas.
+func (s *CanvasSteps) ListDraftVersions() []models.CanvasVersion {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	if err != nil || live == nil {
+		return nil
+	}
+	return []models.CanvasVersion{*live}
+}
+
+// AssertDraftCount is deprecated and only checks that a live version exists when expected > 0.
+func (s *CanvasSteps) AssertDraftCount(expected int) {
+	if expected == 0 {
+		return
+	}
+	require.NotNil(s.t, s.FindCurrentDraft())
+}
+
+// AssertVersionHistoryContains verifies commit labels appear in the versions sidebar.
+func (s *CanvasSteps) AssertVersionHistoryContains(labels ...string) {
 	s.OpenVersionsSidebar()
-	s.session.AssertVisible(q.TestID("canvas-drafts-section"))
-	for _, displayName := range displayNames {
-		s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="canvas-drafts-section"] :text-is("%s")`, displayName)))
+	for _, label := range labels {
+		s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="versions-sidebar-scroll"] :text-is("%s")`, label)))
 	}
 }
 
@@ -164,14 +323,21 @@ func (s *CanvasSteps) waitForEnabledEditButton() {
 	}
 }
 
+func (s *CanvasSteps) WaitForEnabledExitEditButton() {
+	s.waitForEnabledExitEditButton()
+}
+
 func (s *CanvasSteps) waitForEnabledExitEditButton() {
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for {
-		disabled, err := exitEditButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			return
+		visible, visibleErr := exitEditButton.IsVisible()
+		if visibleErr == nil && visible {
+			disabled, err := exitEditButton.IsDisabled()
+			require.NoError(s.t, err)
+			if !disabled {
+				return
+			}
 		}
 		if time.Now().After(deadline) {
 			s.t.Fatalf("exit edit button did not become enabled")
@@ -180,37 +346,278 @@ func (s *CanvasSteps) waitForEnabledExitEditButton() {
 	}
 }
 
-// Publish clicks the Publish button in the header to publish the current draft version.
-// This should be called after making and saving canvas changes.
-func (s *CanvasSteps) Publish() {
-	publishButton := q.Locator(`header button:has-text("Publish")`).Run(s.session)
-
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		disabled, err := publishButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("publish button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, publishButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(1000)
+// WaitForStaging waits until the current user has workflow_staged_files rows.
+func (s *CanvasSteps) WaitForStaging(_ uuid.UUID) {
+	userID := s.sessionUserID()
+	require.Eventually(s.t, func() bool {
+		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+		return err == nil && hasStaging
+	}, 15*time.Second, 200*time.Millisecond)
 }
 
-// FindCurrentDraft returns the most recently created draft version for this canvas, or nil if none exists.
-func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
-	drafts, err := models.ListDraftCanvasVersions(s.WorkflowID)
+// WaitForStagingOnCurrentDraft waits until the current user has staging rows and returns the live version id.
+func (s *CanvasSteps) WaitForStagingOnCurrentDraft() uuid.UUID {
+	s.WaitForStaging(uuid.Nil)
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
 	require.NoError(s.t, err)
-	if len(drafts) == 0 {
-		return nil
+	s.AssertEditModeTabChrome()
+	s.AssertStagingActionsVisibleAndEnabled()
+	return live.ID
+}
+
+const canvasYAMLRepositoryPath = "canvas.yaml"
+
+// DraftEffectiveSpec returns nodes and edges from staged canvas.yaml when present,
+// otherwise from the live version row.
+func (s *CanvasSteps) DraftEffectiveSpec() ([]models.Node, []models.Edge) {
+	userID := s.sessionUserID()
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+
+	for _, row := range rows {
+		if row.Path == canvasYAMLRepositoryPath && !row.Deleted && row.Content != "" {
+			canvas, err := yaml.CanvasFromYAML([]byte(row.Content))
+			if err != nil {
+				break
+			}
+			return canvas.Nodes(), canvas.Edges()
+		}
 	}
 
-	return &drafts[0]
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+	return live.Nodes, live.Edges
+}
+
+// DraftNodeByName returns a node from the effective draft state (staged or committed).
+func (s *CanvasSteps) DraftNodeByName(name string) (models.Node, bool) {
+	nodes, _ := s.DraftEffectiveSpec()
+	for _, node := range nodes {
+		if node.Name == name {
+			return node, true
+		}
+	}
+	return models.Node{}, false
+}
+
+// CommitAndPublish commits staged edits to main (commit replaces publish).
+func (s *CanvasSteps) CommitAndPublish() {
+	s.CommitStaging()
+}
+
+// CommitStaging opens the commit dialog, submits a message, and waits for staging to clear.
+func (s *CanvasSteps) CommitStaging() {
+	commitButton := q.TestID("canvas-commit-staging-button").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := commitButton.IsVisible()
+		return err == nil && visible
+	}, 15*time.Second, 200*time.Millisecond)
+	s.AssertStagingActionsVisibleAndEnabled()
+
+	require.NoError(s.t, commitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+
+	messageInput := q.TestID("canvas-commit-message-input").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := messageInput.IsVisible()
+		return err == nil && visible
+	}, 15*time.Second, 200*time.Millisecond)
+	require.NoError(s.t, messageInput.Fill("E2E commit"))
+
+	submit := q.TestID("canvas-commit-message-submit").Run(s.session)
+	require.NoError(s.t, submit.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+
+	userID := s.sessionUserID()
+	require.Eventually(s.t, func() bool {
+		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+		return err == nil && !hasStaging
+	}, 30*time.Second, 200*time.Millisecond)
+
+	// Commit closes the edit session and returns to the live canvas view.
+	s.waitForEnabledEditButton()
+}
+
+// AssertNoStaging verifies the current user has no workflow_staged_files rows.
+func (s *CanvasSteps) AssertNoStaging(_ uuid.UUID) {
+	s.AssertNoStagingForUser(s.sessionUserID())
+}
+
+// AssertHasStaging verifies the current user has workflow_staged_files rows.
+func (s *CanvasSteps) AssertHasStaging(_ uuid.UUID) {
+	s.AssertHasStagingForUser(s.sessionUserID())
+}
+
+// AssertHasStagingForUser verifies a specific user has workflow_staged_files rows.
+func (s *CanvasSteps) AssertHasStagingForUser(userID uuid.UUID) {
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+	require.True(s.t, hasStaging, "expected staging rows for user %s on workflow %s", userID, s.WorkflowID)
+}
+
+// AssertNoStagingForUser verifies a specific user has no workflow_staged_files rows.
+func (s *CanvasSteps) AssertNoStagingForUser(userID uuid.UUID) {
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+	require.False(s.t, hasStaging, "expected no staging rows for user %s on workflow %s", userID, s.WorkflowID)
+}
+
+// AssertStagingStaleForUser verifies staged files were created against an older live version.
+func (s *CanvasSteps) AssertStagingStaleForUser(userID uuid.UUID) {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+	require.NotEmpty(s.t, rows)
+
+	for _, row := range rows {
+		require.NotEqual(s.t, live.ID, row.BaseVersionID, "expected stale staging for user %s", userID)
+	}
+}
+
+// StagingContainsNodeForUser reports whether a user's staged canvas.yaml includes a node name.
+func (s *CanvasSteps) StagingContainsNodeForUser(userID uuid.UUID, nodeName string) bool {
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	if err != nil {
+		return false
+	}
+	for _, row := range rows {
+		if row.Path == canvasYAMLRepositoryPath && strings.Contains(row.Content, nodeName) {
+			return true
+		}
+	}
+	return false
+}
+
+// FindDraftByDisplayName returns the live version (display names are no longer used).
+func (s *CanvasSteps) FindDraftByDisplayName(_ string) *models.CanvasVersion {
+	return s.FindCurrentDraft()
+}
+
+// DraftCommittedNodeNames returns node names stored on the committed draft version row.
+func (s *CanvasSteps) DraftCommittedNodeNames(versionID uuid.UUID) []string {
+	version, err := models.FindCanvasVersion(s.WorkflowID, versionID)
+	require.NoError(s.t, err)
+
+	names := make([]string, 0, len(version.Nodes))
+	for _, node := range version.Nodes {
+		names = append(names, node.Name)
+	}
+	return names
+}
+
+// AssertDraftCommittedHasNode verifies a node exists on the committed version row (not staging).
+func (s *CanvasSteps) AssertDraftCommittedHasNode(versionID uuid.UUID, nodeName string) {
+	require.Eventually(s.t, func() bool {
+		return slices.Contains(s.DraftCommittedNodeNames(versionID), nodeName)
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+// AssertDraftCommittedLacksNode verifies a node is absent from the committed version row.
+func (s *CanvasSteps) AssertDraftCommittedLacksNode(versionID uuid.UUID, nodeName string) {
+	require.Eventually(s.t, func() bool {
+		return !slices.Contains(s.DraftCommittedNodeNames(versionID), nodeName)
+	}, 5*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveCanvasHasNode verifies a node exists on the live (published) canvas.
+func (s *CanvasSteps) AssertLiveCanvasHasNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		nodes, err := models.FindCanvasNodes(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range nodes {
+			if node.Name == nodeName {
+				return true
+			}
+		}
+		return false
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveCanvasLacksNode verifies a node is absent from the materialized live canvas.
+func (s *CanvasSteps) AssertLiveCanvasLacksNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		nodes, err := models.FindCanvasNodes(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range nodes {
+			if node.Name == nodeName {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+// LiveVersionID returns the current live workflow_versions row id.
+func (s *CanvasSteps) LiveVersionID() uuid.UUID {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+	return live.ID
+}
+
+// AssertLiveVersionHasNode verifies a node exists on the live version spec row.
+func (s *CanvasSteps) AssertLiveVersionHasNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range live.Nodes {
+			if node.Name == nodeName {
+				return true
+			}
+		}
+		return false
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveVersionLacksNode verifies a node is absent from the live version spec row.
+func (s *CanvasSteps) AssertLiveVersionLacksNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range live.Nodes {
+			if node.Name == nodeName {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveVersionCommitMessage verifies the live version commit message.
+func (s *CanvasSteps) AssertLiveVersionCommitMessage(message string) {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+	require.Equal(s.t, message, live.CommitMessage)
+}
+
+// AssertVersionCountAtLeast verifies the canvas has at least the expected number of versions.
+func (s *CanvasSteps) AssertVersionCountAtLeast(expected int) {
+	require.Eventually(s.t, func() bool {
+		versions, err := models.ListCanvasVersions(s.WorkflowID)
+		return err == nil && len(versions) >= expected
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
+// WaitForPublishEnabled is deprecated; commit replaces publish.
+func (s *CanvasSteps) WaitForPublishEnabled() {}
+
+// Publish is deprecated; use CommitStaging or CommitAndPublish instead.
+func (s *CanvasSteps) Publish() {}
+
+// FindCurrentDraft returns the live canvas version used as the staging base.
+func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	if err != nil {
+		return nil
+	}
+	return live
 }
 
 func (s *CanvasSteps) Create() {
@@ -401,16 +808,8 @@ func (s *CanvasSteps) AddNote() {
 
 	s.session.Click(q.TestID("add-note-button"))
 	require.Eventually(s.t, func() bool {
-		draft := s.FindCurrentDraft()
-		if draft == nil {
-			return false
-		}
-		for _, node := range draft.Nodes {
-			if node.Name == "Note" {
-				return true
-			}
-		}
-		return false
+		_, ok := s.DraftNodeByName("Note")
+		return ok
 	}, 10*time.Second, 200*time.Millisecond)
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
@@ -457,6 +856,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	source := q.TestID("building-block-approval")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-approval")
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
@@ -474,6 +874,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	startSource := q.TestID("building-block-start")
 	s.addBlockFromSidebar(startSource, pos)
+	s.openComponentSidebarForLatestBlock("building-block-start")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
 }
@@ -484,6 +885,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	source := q.TestID("building-block-wait")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-wait")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
 	modeSelector := q.TestID("field-mode-select")
@@ -506,6 +908,7 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	source := q.TestID("building-block-filter")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-filter")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
 	s.session.Sleep(300)
@@ -517,6 +920,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 }
@@ -527,6 +931,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
@@ -541,6 +946,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
+	s.session.Sleep(500)
+	s.openComponentSidebarForLatestBlock(blockTestID)
 }
 
 func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Position) {
@@ -548,14 +955,22 @@ func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Posit
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 }
 
-func (s *CanvasSteps) selectLatestNoopNode() {
-	headers := s.session.Page().Locator(`.react-flow__node [data-testid^="node-noop"][data-testid$="-header"]`)
+func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
+	slug := strings.ToLower(strings.TrimPrefix(blockTestID, "building-block-"))
+	headers := s.session.Page().Locator(fmt.Sprintf(
+		`.react-flow__node [data-testid^="node-%s"][data-testid$="-header"]`,
+		slug,
+	))
 	count, err := headers.Count()
 	require.NoError(s.t, err)
-	require.Greater(s.t, count, 0, "expected at least one noop node after adding a noop block")
+	require.Greater(s.t, count, 0, "expected at least one %s node after dropping block", slug)
 
 	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(150)
+}
+
+func (s *CanvasSteps) selectLatestNoopNode() {
+	s.openComponentSidebarForLatestBlock("building-block-noop")
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
@@ -572,18 +987,57 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
+		if nodeID := s.nodeIDFromCanvasDOM(nodeName); nodeID != "" {
+			return nodeID
+		}
+
 		for _, draft := range s.ListDraftVersions() {
 			for _, node := range draft.Nodes {
 				if node.Name == nodeName {
 					return node.ID
 				}
 			}
+
+			if s.userStagingYAMLContainsNodeName(nodeName) {
+				if nodeID := s.nodeIDFromCanvasDOM(nodeName); nodeID != "" {
+					return nodeID
+				}
+			}
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	s.t.Fatalf("node %q not found in any draft branch", nodeName)
+	s.t.Fatalf("node %q not found in staged or live canvas", nodeName)
 	return ""
+}
+
+func (s *CanvasSteps) nodeIDFromCanvasDOM(nodeName string) string {
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	loc := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`).Run(s.session)
+	id, err := loc.GetAttribute("data-id")
+	if err != nil || id == "" {
+		return ""
+	}
+	return id
+}
+
+func (s *CanvasSteps) userStagingYAMLContainsNodeName(nodeName string) bool {
+	rows, err := models.ListStagedFilesForUser(database.DB(s.t.Context()), s.WorkflowID, s.sessionUserID())
+	if err != nil {
+		return false
+	}
+
+	for _, row := range rows {
+		if row.Path == "canvas.yaml" && strings.Contains(row.Content, nodeName) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *CanvasSteps) draftStagingYAMLContainsNodeName(_ uuid.UUID, nodeName string) bool {
+	return s.userStagingYAMLContainsNodeName(nodeName)
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
@@ -636,11 +1090,8 @@ func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 
 func (s *CanvasSteps) waitForDraftEdgeCount(expected int) {
 	require.Eventually(s.t, func() bool {
-		draft := s.FindCurrentDraft()
-		if draft == nil {
-			return false
-		}
-		return len(draft.Edges) == expected
+		_, edges := s.DraftEffectiveSpec()
+		return len(edges) == expected
 	}, 10*time.Second, 200*time.Millisecond, "draft edge count to reach %d", expected)
 }
 

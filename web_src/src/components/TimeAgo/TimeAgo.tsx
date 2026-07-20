@@ -24,6 +24,10 @@ interface TimeAgoProps {
   includeAgo?: boolean;
 }
 
+/**
+ * @deprecated Use `Timestamp` from `@/components/Timestamp` so users get the
+ * standardized hover details and copy affordance from issue #5150.
+ */
 export const TimeAgo = React.memo(function TimeAgo({ date, className, includeAgo = true }: TimeAgoProps) {
   const d = typeof date === "string" ? new Date(date) : date;
   const dateMs = d.getTime();

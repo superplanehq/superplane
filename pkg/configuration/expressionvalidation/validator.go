@@ -164,7 +164,6 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 	env := map[string]any{
 		"$":      dollar,
 		"memory": map[string]any{"find": memoryStub, "findFirst": memoryStub},
-		"config": map[string]any{},
 	}
 	for key, value := range extraEnv {
 		env[key] = value

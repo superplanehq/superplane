@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SuperplaneActionsAction, SuperplaneComponentsNode } from "@/api-client";
+import type { ActionsAction, SuperplaneComponentsNode } from "@/api-client";
 import { makeCanvas, makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
@@ -35,7 +35,7 @@ function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): Superplane
   });
 }
 
-function makeComponent(overrides: Partial<SuperplaneActionsAction> = {}): SuperplaneActionsAction {
+function makeComponent(overrides: Partial<ActionsAction> = {}): ActionsAction {
   return {
     name: "approval",
     label: "Approval",
@@ -43,7 +43,7 @@ function makeComponent(overrides: Partial<SuperplaneActionsAction> = {}): Superp
     color: "orange",
     outputChannels: [{ name: "default" }],
     ...overrides,
-  } as SuperplaneActionsAction;
+  } as ActionsAction;
 }
 
 function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {

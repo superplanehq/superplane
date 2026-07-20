@@ -1,0 +1,224 @@
+---
+title: "Coolify"
+---
+
+List and control Coolify applications and services, and trigger deployments
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Control Application" href="#control-application" description="Start, stop, or restart a Coolify application" />
+  <LinkCard title="Control Service" href="#control-service" description="Start, stop, or restart a Coolify service" />
+  <LinkCard title="Deploy Application" href="#deploy-application" description="Queue a deployment for a Coolify application (fire-and-forget)" />
+  <LinkCard title="List Applications" href="#list-applications" description="List all applications visible to the Coolify API token" />
+  <LinkCard title="List Services" href="#list-services" description="List all services visible to the Coolify API token" />
+</CardGrid>
+
+## Instructions
+
+**Setup steps:**
+
+1. **Base URL:** Use your Coolify instance URL (for example `https://coolify.example.com` for self-hosted, or `https://app.coolify.io` for Coolify Cloud).
+2. **API Token:** In Coolify, go to **Keys & Tokens → API tokens**, click **Create new token**, give it a name, select the required permissions (read + write), and copy the generated token.
+3. The API token is **team-scoped** — SuperPlane will see all applications and services available to that team.
+
+<a id="control-application"></a>
+
+## Control Application
+
+**Component key:** `coolify.controlApplication`
+
+The Control Application component invokes a lifecycle operation on a Coolify application.
+
+### How It Works
+
+1. Calls `GET /api/v1/applications/{uuid}/{operation}` on the configured Coolify instance
+2. Emits the API confirmation message on the default output channel
+
+### Configuration
+
+- **Application**: The Coolify application to control
+- **Operation**: One of `start`, `stop`, or `restart`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationUuid": "abc123def456",
+    "message": "Application restarting.",
+    "operation": "restart"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "coolify.application.controlled"
+}
+```
+
+<a id="control-service"></a>
+
+## Control Service
+
+**Component key:** `coolify.controlService`
+
+The Control Service component invokes a lifecycle operation on a Coolify service (one-click or custom Docker Compose stack).
+
+### How It Works
+
+1. Calls `GET /api/v1/services/{uuid}/{operation}` on the configured Coolify instance
+2. Emits the API confirmation message on the default output channel
+
+### Configuration
+
+- **Service**: The Coolify service to control
+- **Operation**: One of `start`, `stop`, or `restart`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "Service restarting.",
+    "operation": "restart",
+    "serviceUuid": "svc111aaa222"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "coolify.service.controlled"
+}
+```
+
+<a id="deploy-application"></a>
+
+## Deploy Application
+
+**Component key:** `coolify.deployApplication`
+
+The Deploy Application component queues a deployment for a Coolify application. It does not wait for the deployment to finish — the execution emits as soon as Coolify acknowledges the request.
+
+### How It Works
+
+1. Calls `GET /api/v1/deploy?uuid={uuid}&force={force}` on the configured Coolify instance
+2. Emits the queued deployment metadata (deployment UUID, message) on the default output channel and finishes immediately
+
+### Configuration
+
+- **Application**: The Coolify application to deploy
+- **Force**: When enabled, Coolify rebuilds the image instead of redeploying the existing one (defaults to false)
+
+### Output
+
+A `coolify.application.deploy.queued` payload with `applicationUuid`, `deploymentUuid` (when returned), and `message`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationUuid": "abc123def456",
+    "deploymentUuid": "deploy-uuid-xyz",
+    "force": false,
+    "message": "Deployment queued."
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "coolify.application.deploy.queued"
+}
+```
+
+<a id="list-applications"></a>
+
+## List Applications
+
+**Component key:** `coolify.listApplications`
+
+The List Applications component fetches every application available to the Coolify API token and emits the list on the default output channel.
+
+### How It Works
+
+1. Calls `GET /api/v1/applications` on the configured Coolify instance
+2. Emits the array of applications, each with `uuid`, `name`, `status`, `fqdn`, `description`, `gitRepository`, and `gitBranch`
+
+### Use Cases
+
+- Iterate over every application with a downstream `forEach` to act on each (e.g. restart all)
+- Filter applications by status before invoking lifecycle actions
+- Surface application details into other workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applications": [
+      {
+        "description": "Marketing site",
+        "fqdn": "https://app.example.com",
+        "gitBranch": "main",
+        "gitRepository": "https://github.com/example/frontend",
+        "name": "frontend",
+        "status": "running",
+        "uuid": "abc123def456"
+      },
+      {
+        "fqdn": "https://api.example.com",
+        "gitBranch": "main",
+        "gitRepository": "https://github.com/example/api",
+        "name": "api",
+        "status": "exited",
+        "uuid": "def456abc789"
+      }
+    ],
+    "count": 2
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "coolify.applications.listed"
+}
+```
+
+<a id="list-services"></a>
+
+## List Services
+
+**Component key:** `coolify.listServices`
+
+The List Services component fetches every Coolify service (one-click and custom Docker Compose stacks) available to the API token and emits the list on the default output channel.
+
+### How It Works
+
+1. Calls `GET /api/v1/services` on the configured Coolify instance
+2. Emits the array of services, each with `uuid`, `name`, `status`, `fqdn`, `description`, and `serverUuid`
+
+### Use Cases
+
+- Iterate over every service with a downstream `forEach` to act on each
+- Filter services by status before invoking lifecycle actions
+- Inventory services across an environment
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 2,
+    "services": [
+      {
+        "description": "Primary database",
+        "name": "postgres",
+        "serverUuid": "srv999zzz000",
+        "status": "running",
+        "uuid": "svc111aaa222"
+      },
+      {
+        "fqdn": "https://analytics.example.com",
+        "name": "plausible",
+        "serverUuid": "srv999zzz000",
+        "status": "running",
+        "uuid": "svc333bbb444"
+      }
+    ]
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "coolify.services.listed"
+}
+```
+

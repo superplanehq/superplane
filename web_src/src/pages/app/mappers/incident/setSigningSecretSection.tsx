@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesCommitCanvasRepositoryFiles,
+  canvasesPutCanvasStaging,
+  canvasesCommitCanvasStaging,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
@@ -14,10 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { registerLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
-import { fetchCanvasVersionWithSpec } from "../../lib/repository-spec-files";
+import { fetchCommittedCanvasVersionWithSpec } from "../../lib/repository-spec-files";
 import { materializeCanvasSpec } from "../../lib/workflow-spec-files";
 import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 
@@ -58,12 +60,11 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
-  await canvasesCommitCanvasRepositoryFiles(
+  registerLocalStagingWrite(params.canvasId);
+  await canvasesPutCanvasStaging(
     withOrganizationHeader({
       path: { canvasId: params.canvasId },
       body: {
-        versionId: params.versionId,
-        message: "Update canvas.yaml",
         operations: [
           {
             path: CANVAS_YAML_PATH,
@@ -71,6 +72,12 @@ async function commitUpdatedCanvasVersionYaml(params: {
           },
         ],
       },
+    }),
+  );
+  await canvasesCommitCanvasStaging(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId },
+      body: { commitMessage: "Update signing secret configuration" },
     }),
   );
   params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);
@@ -106,7 +113,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
 
       const freshVersion = await queryClient.fetchQuery({
         queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
+        queryFn: async () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
       });
 
       if (!freshVersion) {

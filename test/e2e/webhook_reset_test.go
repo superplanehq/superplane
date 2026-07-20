@@ -43,7 +43,7 @@ func (s *WebhookResetSteps) givenACanvasWithWebhook(canvasName, nodeName string)
 	s.canvas.EnterEditMode()
 	s.addWebhookTrigger(nodeName, models.Position{X: 500, Y: 200})
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 	s.session.Sleep(1000)
 }
 
@@ -56,6 +56,7 @@ func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) 
 }
 
 func (s *WebhookResetSteps) openWebhookConfiguration(nodeName string) {
+	s.canvas.EnterEditMode()
 	s.canvas.StartEditingNode(nodeName)
 	s.session.Click(q.Text("Configuration"))
 	s.session.Sleep(200)

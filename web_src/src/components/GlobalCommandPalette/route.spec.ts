@@ -6,7 +6,6 @@ describe("getRouteContext", () => {
     expect(getRouteContext("/org-1/apps/canvas-1")).toEqual({
       organizationId: "org-1",
       canvasId: "canvas-1",
-      isTemplateRoute: false,
     });
   });
 
@@ -14,7 +13,6 @@ describe("getRouteContext", () => {
     expect(getRouteContext("/org-1/apps/new")).toEqual({
       organizationId: "org-1",
       canvasId: null,
-      isTemplateRoute: false,
     });
   });
 
@@ -22,7 +20,6 @@ describe("getRouteContext", () => {
     expect(getRouteContext("/org-1/apps/new/settings")).toEqual({
       organizationId: "org-1",
       canvasId: null,
-      isTemplateRoute: false,
     });
   });
 
@@ -30,15 +27,23 @@ describe("getRouteContext", () => {
     expect(getRouteContext("/org-1/canvases/canvas-1")).toEqual({
       organizationId: "org-1",
       canvasId: "canvas-1",
-      isTemplateRoute: false,
     });
   });
 
-  it("parses template routes", () => {
-    expect(getRouteContext("/org-1/templates/template-1")).toEqual({
-      organizationId: "org-1",
-      canvasId: "template-1",
-      isTemplateRoute: true,
-    });
+  it("does not treat public top-level routes as organization context", () => {
+    const publicPaths = [
+      "/",
+      "/admin",
+      "/create",
+      "/invite/token-1",
+      "/install",
+      "/login",
+      "/setup",
+      "/signup",
+      "/welcome",
+    ];
+    for (const path of publicPaths) {
+      expect(getRouteContext(path)).toEqual({ organizationId: null, canvasId: null });
+    }
   });
 });

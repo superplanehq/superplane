@@ -25,51 +25,6 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
-	t.Run("can complete owner setup with SMTP configuration", func(t *testing.T) {
-		steps := &ownerSetupSteps{t: t}
-		steps.start()
-		steps.visitRootPage()
-		steps.assertRedirectedToSetup()
-		steps.visitSetupPage()
-		steps.fillInOwnerDetails("smtp-owner@example.com", "SMTP", "Owner", "Password1")
-		steps.chooseSMTPSetup()
-		steps.fillInSMTPDetails("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
-		steps.submitSMTPSetup()
-		steps.assertOwnerAndOrganizationCreated()
-		steps.assertRedirectedToOrganizationHome()
-		steps.assertOwnerSetupIsNoLongerRequired()
-	})
-
-	t.Run("can skip SMTP after opening SMTP configuration", func(t *testing.T) {
-		steps := &ownerSetupSteps{t: t}
-		steps.start()
-		steps.visitRootPage()
-		steps.assertRedirectedToSetup()
-		steps.visitSetupPage()
-		steps.fillInOwnerDetails("smtp-skip@example.com", "SMTP", "Skip", "Password1")
-		steps.chooseSMTPSetup()
-		steps.finishOwnerSetupWithoutSMTPFromSMTPConfig()
-		steps.assertOwnerAndOrganizationCreated()
-		steps.assertRedirectedToOrganizationHome()
-		steps.assertOwnerSetupIsNoLongerRequired()
-	})
-
-	t.Run("can enable private network access during owner setup", func(t *testing.T) {
-		steps := &ownerSetupSteps{t: t}
-		steps.start()
-		steps.visitRootPage()
-		steps.assertRedirectedToSetup()
-		steps.visitSetupPage()
-		steps.fillInOwnerDetails("private-network-owner@example.com", "Private", "Network", "Password1")
-		steps.goToPrivateNetworkSettings()
-		steps.enablePrivateNetworkAccess()
-		steps.goToSetupOptions()
-		steps.finishOwnerSetupWithoutSMTP()
-		steps.assertOwnerAndOrganizationCreated()
-		steps.assertPrivateNetworkAccessEnabled()
-		steps.assertRedirectedToOrganizationHome()
-	})
-
 	t.Run("can login with email and password after owner setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -124,25 +79,7 @@ func (s *ownerSetupSteps) assertRedirectedToSetup() {
 
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
 	s.fillInOwnerDetails(email, firstName, lastName, password)
-	s.submitOwnerSetupWithoutSMTP()
-}
-
-func (s *ownerSetupSteps) submitOwnerSetupWithoutSMTP() {
-	s.goToPrivateNetworkSettings()
-	s.goToSetupOptions()
-	s.finishOwnerSetupWithoutSMTP()
-}
-
-func (s *ownerSetupSteps) goToPrivateNetworkSettings() {
-	s.session.Click(q.Text("Next"))
-}
-
-func (s *ownerSetupSteps) goToSetupOptions() {
-	s.session.Click(q.Text("Next"))
-}
-
-func (s *ownerSetupSteps) finishOwnerSetupWithoutSMTP() {
-	s.session.Click(q.Text("Do this later"))
+	s.session.Click(q.Text("Finish setup"))
 	// Poll for setup to complete - wait for organization to be created in database
 	s.waitForSetupToComplete()
 }
@@ -153,45 +90,6 @@ func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, passwor
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), password)
-}
-
-func (s *ownerSetupSteps) chooseSMTPSetup() {
-	s.goToPrivateNetworkSettings()
-	s.goToSetupOptions()
-	s.session.Click(q.Text("Set up SMTP"))
-}
-
-func (s *ownerSetupSteps) finishOwnerSetupWithoutSMTPFromSMTPConfig() {
-	s.session.Click(q.Text("Do this later"))
-	s.waitForSetupToComplete()
-}
-
-func (s *ownerSetupSteps) enablePrivateNetworkAccess() {
-	s.session.Click(q.TestID("owner-setup-private-network-switch"))
-}
-
-func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, fromName, fromEmail string, useTLS bool) {
-	s.session.FillIn(q.Locator(`input[placeholder="smtp.example.com"]`), host)
-	s.session.FillIn(q.Locator(`input[placeholder="587"]`), port)
-	if username != "" {
-		s.session.FillIn(q.Locator(`input[placeholder="smtp-user"]`), username)
-	}
-	if password != "" {
-		s.session.FillIn(q.Locator(`input[placeholder="SMTP password"]`), password)
-	}
-	if fromName != "" {
-		s.session.FillIn(q.Locator(`input[placeholder="SuperPlane"]`), fromName)
-	}
-	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
-
-	if !useTLS {
-		s.session.Click(q.Locator(`#owner-setup-smtp-use-tls`))
-	}
-}
-
-func (s *ownerSetupSteps) submitSMTPSetup() {
-	s.session.Click(q.Text("Finish setup"))
-	s.waitForSetupToComplete()
 }
 
 func (s *ownerSetupSteps) waitForSetupToComplete() {
@@ -241,12 +139,6 @@ func (s *ownerSetupSteps) assertRedirectedToOrganizationHome() {
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
 	required := middleware.IsOwnerSetupRequired()
 	assert.False(s.t, required, "owner setup should no longer be required after completion")
-}
-
-func (s *ownerSetupSteps) assertPrivateNetworkAccessEnabled() {
-	metadata, err := models.GetInstallationMetadata()
-	assert.NoError(s.t, err, "load installation metadata")
-	assert.True(s.t, metadata.AllowPrivateNetworkAccess, "expected private network access to be enabled")
 }
 
 func (s *ownerSetupSteps) clearCookies() {

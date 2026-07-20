@@ -72,40 +72,6 @@ service Organizations {
     };
   }
 
-  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invitations"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create an organization invitation";
-      description: "Invites a user to join an organization by email";
-      tags: "Organization";
-    };
-  }
-
-  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invitations"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List organization invitations";
-      description: "Returns pending invitations for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc RemoveInvitation(RemoveInvitationRequest) returns (RemoveInvitationResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/invitations/{invitation_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove an organization invitation";
-      description: "Removes an organization invitation";
-      tags: "Organization";
-    };
-  }
-
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/invite-link"
@@ -302,7 +268,6 @@ message Organization {
   }
 
   message Spec {
-    optional bool change_management_enabled = 1;
     repeated string enabled_experimental_features = 2;
   }
 
@@ -333,14 +298,6 @@ message DeleteOrganizationRequest {
 
 message DeleteOrganizationResponse {}
 
-message Invitation {
-  string id = 1;
-  string organization_id = 2;
-  string email = 3;
-  string state = 4;
-  google.protobuf.Timestamp created_at = 5;
-}
-
 message InviteLink {
   string id = 1;
   string organization_id = 2;
@@ -349,30 +306,6 @@ message InviteLink {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
 }
-
-message CreateInvitationRequest {
-  string id = 1;
-  string email = 2;
-}
-
-message CreateInvitationResponse {
-  Invitation invitation = 1;
-}
-
-message ListInvitationsRequest {
-  string id = 1;
-}
-
-message ListInvitationsResponse {
-  repeated Invitation invitations = 1;
-}
-
-message RemoveInvitationRequest {
-  string id = 1;
-  string invitation_id = 2;
-}
-
-message RemoveInvitationResponse {}
 
 message GetInviteLinkRequest {
   string id = 1;
@@ -470,7 +403,7 @@ message DescribeIntegrationResponse {
 message ListIntegrationResourcesRequest {
   string id = 1;
   string integration_id = 2;
-  map<string, string> parameters = 4;
+  map<string, string> parameters = 3;
 }
 
 message ListIntegrationResourcesResponse {
@@ -698,10 +631,5 @@ message OrganizationUpdated {
 
 message OrganizationDeleted {
   string organization_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-}
-
-message InvitationCreated {
-  string invitation_id = 1;
   google.protobuf.Timestamp timestamp = 2;
 }

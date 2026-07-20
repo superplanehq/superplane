@@ -6,7 +6,7 @@ type UseSelectedRunCanvasParams = {
   organizationId: string;
   canvasId: string;
   selectedRun: CanvasesCanvasRun | null;
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   liveCanvasVersionId?: string;
   canvas?: CanvasesCanvas | null;
   liveCanvas?: CanvasesCanvas | null;
@@ -16,7 +16,7 @@ export function useSelectedRunCanvas({
   organizationId,
   canvasId,
   selectedRun,
-  isRunsMode,
+  isRunInspectionMode,
   liveCanvasVersionId,
   canvas,
   liveCanvas,
@@ -26,7 +26,7 @@ export function useSelectedRunCanvas({
     organizationId,
     canvasId,
     selectedRunVersionId,
-    isRunsMode && !!selectedRunVersionId && selectedRunVersionId !== liveCanvasVersionId,
+    isRunInspectionMode && !!selectedRunVersionId && selectedRunVersionId !== liveCanvasVersionId,
   );
   const selectedRunVersion = selectedRunVersionQuery.data;
 
@@ -52,7 +52,7 @@ export function useSelectedRunCanvas({
   return {
     selectedRunCanvas,
     isSelectedRunVersionLoading:
-      isRunsMode &&
+      isRunInspectionMode &&
       !!selectedRunVersionId &&
       selectedRunVersionId !== liveCanvasVersionId &&
       !selectedRunVersion?.spec &&

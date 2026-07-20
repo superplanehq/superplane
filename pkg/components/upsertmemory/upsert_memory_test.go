@@ -489,6 +489,198 @@ func TestUpsertMemoryExecute(t *testing.T) {
 			map[string]any{"environment": "production", "name": "worker"},
 		}, innerData["records"])
 	})
+
+	t.Run("list mode resolves matchList per item with iteration variable", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{
+			updatedRecordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"uuid": "A", "name": "api"})},
+				nil,
+			},
+		}
+
+		items := []any{
+			map[string]any{"uuid": "A", "name": "api"},
+			map[string]any{"uuid": "B", "name": "worker"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "apps",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+				},
+				"valueList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: items,
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					item := variables["item"].(map[string]any)
+					switch expression {
+					case "item.uuid":
+						return item["uuid"], nil
+					case "item.name":
+						return item["name"], nil
+					}
+					return expression, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, memoryCtx.updateCalls)
+		assert.Equal(t, 1, memoryCtx.addCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, metadata["updatedCount"])
+		assert.Equal(t, 1, metadata["createdCount"])
+
+		require.Len(t, execState.Payloads, 1)
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		outerData, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		require.True(t, ok)
+		itemsResults, ok := innerData["items"].([]any)
+		require.True(t, ok)
+		require.Len(t, itemsResults, 2)
+		first, ok := itemsResults[0].(map[string]any)
+		require.True(t, ok)
+		second, ok := itemsResults[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"uuid": "A"}, first["matches"])
+		assert.Equal(t, map[string]any{"uuid": "B"}, second["matches"])
+		assert.Equal(t, OperationUpdated, first["operation"])
+		assert.Equal(t, OperationCreated, second["operation"])
+	})
+
+	t.Run("list mode upserts existing rows on second run via per-item match", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{
+			updatedRecordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"uuid": "A", "name": "api"})},
+				{memoryRecord("22222222-2222-2222-2222-222222222222", map[string]any{"uuid": "B", "name": "worker"})},
+			},
+		}
+
+		items := []any{
+			map[string]any{"uuid": "A", "name": "api"},
+			map[string]any{"uuid": "B", "name": "worker"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "apps",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+				},
+				"valueList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: items,
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					item := variables["item"].(map[string]any)
+					switch expression {
+					case "item.uuid":
+						return item["uuid"], nil
+					case "item.name":
+						return item["name"], nil
+					}
+					return expression, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.updateCalls)
+		assert.Equal(t, 0, memoryCtx.addCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 2, metadata["updatedCount"])
+		assert.Equal(t, 0, metadata["createdCount"])
+	})
+
+	t.Run("list mode treats blank-name matchList as insert-only", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{}
+
+		items := []any{
+			map[string]any{"uuid": "A", "name": "api"},
+			map[string]any{"uuid": "B", "name": "worker"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "apps",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "", "value": "item.uuid"},
+				},
+				"valueList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: items,
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					item := variables["item"].(map[string]any)
+					switch expression {
+					case "item.uuid":
+						return item["uuid"], nil
+					case "item.name":
+						return item["name"], nil
+					}
+					return expression, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.addCalls)
+		assert.Equal(t, 0, memoryCtx.updateCalls)
+		assert.Equal(t, 0, memoryCtx.namespaceUpdateCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 0, metadata["updatedCount"])
+		assert.Equal(t, 2, metadata["createdCount"])
+	})
 }
 
 func TestUpsertMemorySetup(t *testing.T) {

@@ -4,12 +4,22 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
+
+// isExpression reports whether the given string contains an expression
+// placeholder (e.g. `{{ ... }}`). Useful in Setup paths to skip strict
+// validation of values that will only be known at execution time.
+func isExpression(s string) bool {
+	return expressionPlaceholderRegex.MatchString(s)
+}
 
 const (
 	PipelineStatusSuccess   = "success"
@@ -20,6 +30,12 @@ const (
 	PipelineStatusManual    = "manual"
 	PipelineStatusBlocked   = "blocked"
 )
+
+// zeroSHA is the all-zero commit SHA GitLab sends in push events to signal a
+// ref that did not exist before the push (branch creation, where "before" is
+// zeroed) or no longer exists after it (branch deletion, where "after" is
+// zeroed).
+const zeroSHA = "0000000000000000000000000000000000000000"
 
 type WebhookConfiguration struct {
 	EventType string `json:"eventType" mapstructure:"eventType"`
@@ -99,6 +115,14 @@ func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContex
 
 	if projectID == "" {
 		return fmt.Errorf("project is required")
+	}
+
+	//
+	// Expression values are only known at execution time, so skip the
+	// accessibility check and node metadata caching until then.
+	//
+	if isExpression(projectID) {
+		return nil
 	}
 
 	//

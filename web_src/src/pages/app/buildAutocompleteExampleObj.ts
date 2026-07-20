@@ -1,6 +1,6 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
-import type { SuperplaneActionsAction, TriggersTrigger } from "@/api-client";
+import type { ActionsAction, TriggersTrigger } from "@/api-client";
 
 export type AutocompleteExampleContext = {
   canvasNodes: ComponentsNode[];
@@ -8,7 +8,7 @@ export type AutocompleteExampleContext = {
   incomingNodeIdsByTargetId: Map<string, string[]>;
   visibleNodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
-  allComponentsByName: Map<string | undefined, SuperplaneActionsAction>;
+  allComponentsByName: Map<string | undefined, ActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
 };
 
@@ -257,10 +257,6 @@ function buildNamedExampleObj({
     namedExampleObj[nodeName] = value;
   }
 
-  if (Object.keys(namedExampleObj).length === 0) {
-    return null;
-  }
-
   if (exampleObj.__root) {
     namedExampleObj.__root = exampleObj.__root;
   }
@@ -278,6 +274,10 @@ function buildNamedExampleObj({
   }
   if (currentNodeId) {
     delete nodeMetadata[currentNodeId];
+  }
+
+  if (Object.keys(namedExampleObj).length === 0) {
+    return null;
   }
 
   if (Object.keys(nodeMetadata).length > 0) {

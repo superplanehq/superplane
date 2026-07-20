@@ -89,6 +89,87 @@ function comparableNode(node: Record<string, unknown>) {
   };
 }
 
+function nodesByID(nodes: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> {
+  const map = new Map<string, Record<string, unknown>>();
+  nodes.forEach((node) => {
+    const nodeID = String(node.id || "");
+    if (nodeID) {
+      map.set(nodeID, node);
+    }
+  });
+  return map;
+}
+
+function formatDiffValueLines(value: unknown): string[] {
+  const normalizedValue = value === undefined ? null : value;
+  return yaml
+    .dump(normalizedValue, {
+      lineWidth: -1,
+      noRefs: true,
+      sortKeys: true,
+    })
+    .trimEnd()
+    .split("\n");
+}
+
+function buildYamlFieldLines(prefix: "+" | "-", key: string, value: unknown): DraftDiffLine[] {
+  const valueLines = formatDiffValueLines(value);
+  if (valueLines.length === 1) {
+    return [{ prefix, text: `${key}: ${valueLines[0]}` }];
+  }
+
+  return [{ prefix, text: `${key}:` }, ...valueLines.map((line) => ({ prefix, text: `  ${line}` }))];
+}
+
+function buildNodeLines(prefix: "+" | "-", node: Record<string, unknown>): DraftDiffLine[] {
+  const nodeComparable = comparableNode(node) as Record<string, unknown>;
+  const keys = ["id", ...Object.keys(nodeComparable).sort((left, right) => left.localeCompare(right))];
+  const nodeFilePath = `nodes/${String(node.id || "unknown")}.yaml`;
+  const header: DraftDiffLine[] = [
+    { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+    { prefix: "meta", text: `--- ${prefix === "-" ? `a/${nodeFilePath}` : "/dev/null"}` },
+    { prefix: "meta", text: `+++ ${prefix === "+" ? `b/${nodeFilePath}` : "/dev/null"}` },
+    { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+  ];
+
+  return keys.flatMap((key) => {
+    const value = key === "id" ? node.id : nodeComparable[key];
+    return [...(key === "id" ? header : []), ...buildYamlFieldLines(prefix, key, value)];
+  });
+}
+
+function buildUpdatedLines(
+  previousNode: Record<string, unknown>,
+  currentNode: Record<string, unknown>,
+): DraftDiffLine[] {
+  const previousComparable = comparableNode(previousNode) as Record<string, unknown>;
+  const currentComparable = comparableNode(currentNode) as Record<string, unknown>;
+  const allKeys = ["id", ...Object.keys({ ...previousComparable, ...currentComparable })].sort((left, right) =>
+    left.localeCompare(right),
+  );
+
+  const nodeFilePath = `nodes/${String(currentNode.id || previousNode.id || "unknown")}.yaml`;
+  const lines: DraftDiffLine[] = [
+    { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
+    { prefix: "meta", text: `--- a/${nodeFilePath}` },
+    { prefix: "meta", text: `+++ b/${nodeFilePath}` },
+    { prefix: "context", text: "@@ -1,0 +1,0 @@" },
+  ];
+
+  allKeys.forEach((key) => {
+    const previousValue = key === "id" ? previousNode.id : previousComparable[key];
+    const currentValue = key === "id" ? currentNode.id : currentComparable[key];
+    if (JSON.stringify(previousValue) === JSON.stringify(currentValue)) {
+      return;
+    }
+
+    lines.push(...buildYamlFieldLines("-", key, previousValue));
+    lines.push(...buildYamlFieldLines("+", key, currentValue));
+  });
+
+  return lines;
+}
+
 /** True when draft workflow graph differs from live (nodes and/or edges). */
 export function hasDraftVersusLiveGraphDiff(
   liveVersion?: CanvasesCanvasVersion,
@@ -109,89 +190,8 @@ export function buildDraftNodeDiffSummary(
   const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
 
-  const byID = (nodes: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> => {
-    const map = new Map<string, Record<string, unknown>>();
-    nodes.forEach((node) => {
-      const nodeID = String(node.id || "");
-      if (nodeID) {
-        map.set(nodeID, node);
-      }
-    });
-    return map;
-  };
-
-  const formatDiffValueLines = (value: unknown): string[] => {
-    const normalizedValue = value === undefined ? null : value;
-    return yaml
-      .dump(normalizedValue, {
-        lineWidth: -1,
-        noRefs: true,
-        sortKeys: true,
-      })
-      .trimEnd()
-      .split("\n");
-  };
-
-  const buildYamlFieldLines = (prefix: "+" | "-", key: string, value: unknown): DraftDiffLine[] => {
-    const valueLines = formatDiffValueLines(value);
-    if (valueLines.length === 1) {
-      return [{ prefix, text: `${key}: ${valueLines[0]}` }];
-    }
-
-    return [{ prefix, text: `${key}:` }, ...valueLines.map((line) => ({ prefix, text: `  ${line}` }))];
-  };
-
-  const buildNodeLines = (prefix: "+" | "-", node: Record<string, unknown>): DraftDiffLine[] => {
-    const nodeComparable = comparableNode(node) as Record<string, unknown>;
-    const keys = ["id", ...Object.keys(nodeComparable).sort((left, right) => left.localeCompare(right))];
-    const nodeFilePath = `nodes/${String(node.id || "unknown")}.yaml`;
-    const header: DraftDiffLine[] = [
-      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
-      { prefix: "meta", text: `--- ${prefix === "-" ? `a/${nodeFilePath}` : "/dev/null"}` },
-      { prefix: "meta", text: `+++ ${prefix === "+" ? `b/${nodeFilePath}` : "/dev/null"}` },
-      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
-    ];
-
-    return keys.flatMap((key) => {
-      const value = key === "id" ? node.id : nodeComparable[key];
-      return [...(key === "id" ? header : []), ...buildYamlFieldLines(prefix, key, value)];
-    });
-  };
-
-  const buildUpdatedLines = (
-    previousNode: Record<string, unknown>,
-    currentNode: Record<string, unknown>,
-  ): DraftDiffLine[] => {
-    const previousComparable = comparableNode(previousNode) as Record<string, unknown>;
-    const currentComparable = comparableNode(currentNode) as Record<string, unknown>;
-    const allKeys = ["id", ...Object.keys({ ...previousComparable, ...currentComparable })].sort((left, right) =>
-      left.localeCompare(right),
-    );
-
-    const nodeFilePath = `nodes/${String(currentNode.id || previousNode.id || "unknown")}.yaml`;
-    const lines: DraftDiffLine[] = [
-      { prefix: "meta", text: `diff --git a/${nodeFilePath} b/${nodeFilePath}` },
-      { prefix: "meta", text: `--- a/${nodeFilePath}` },
-      { prefix: "meta", text: `+++ b/${nodeFilePath}` },
-      { prefix: "context", text: "@@ -1,0 +1,0 @@" },
-    ];
-
-    allKeys.forEach((key) => {
-      const previousValue = key === "id" ? previousNode.id : previousComparable[key];
-      const currentValue = key === "id" ? currentNode.id : currentComparable[key];
-      if (JSON.stringify(previousValue) === JSON.stringify(currentValue)) {
-        return;
-      }
-
-      lines.push(...buildYamlFieldLines("-", key, previousValue));
-      lines.push(...buildYamlFieldLines("+", key, currentValue));
-    });
-
-    return lines;
-  };
-
-  const liveByID = byID(liveNodes);
-  const draftByID = byID(draftNodes);
+  const liveByID = nodesByID(liveNodes);
+  const draftByID = nodesByID(draftNodes);
   const allNodeIDs = Array.from(new Set([...liveByID.keys(), ...draftByID.keys()])).sort((left, right) =>
     left.localeCompare(right),
   );
@@ -259,17 +259,6 @@ export function buildDraftDiffMap(
   const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
 
-  const byID = (nodes: Array<Record<string, unknown>>) => {
-    const map = new Map<string, Record<string, unknown>>();
-    nodes.forEach((node) => {
-      const id = String(node.id || "");
-      if (id) {
-        map.set(id, node);
-      }
-    });
-    return map;
-  };
-
   const functionalSnapshot = (node: Record<string, unknown>) =>
     JSON.stringify({
       name: node.name || null,
@@ -280,8 +269,8 @@ export function buildDraftDiffMap(
       integrationId: getComparableIntegrationId(node),
     });
 
-  const liveByID = byID(liveNodes);
-  const draftByID = byID(draftNodes);
+  const liveByID = nodesByID(liveNodes);
+  const draftByID = nodesByID(draftNodes);
   const allNodeIDs = new Set([...liveByID.keys(), ...draftByID.keys()]);
   const statusMap: Record<string, DraftDiffStatus> = {};
 

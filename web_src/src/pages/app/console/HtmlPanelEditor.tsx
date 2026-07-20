@@ -5,7 +5,9 @@ import type { editor as MonacoEditor } from "monaco-editor";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/useTheme";
 
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
 import { markdownTextIsLoading } from "./markdownInterpolation";
@@ -42,13 +44,13 @@ function useHtmlEditorPreview(
   draftVariables: MarkdownVariable[],
 ) {
   const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars, errors, isLoading, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, errors, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading);
-  return { previewVars: vars, errors, isLoading, previewLoading };
+  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
+  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
 }
 
 interface HtmlPanelEditorProps {
@@ -95,7 +97,7 @@ export function HtmlPanelEditor({
     }
   };
 
-  const { previewVars, errors, isLoading, previewLoading } = useHtmlEditorPreview(
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } = useHtmlEditorPreview(
     canvasId,
     draftTitle,
     draftBody,
@@ -104,8 +106,17 @@ export function HtmlPanelEditor({
 
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
+  // Variables rail collapses automatically when the parent widget is narrow.
+  // The manual toggle wins until the breakpoint flips again, at which point
+  // the auto behavior takes over so resizes always honor the current width.
+  const {
+    containerRef: gridRef,
+    collapsed: variablesCollapsed,
+    toggle: toggleVariablesCollapsed,
+  } = useResponsiveRailCollapse();
+
   return (
-    <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
+    <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
       <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
         <Input
           ref={titleInputRef}
@@ -114,12 +125,18 @@ export function HtmlPanelEditor({
           onKeyDown={handleTitleKeyDown}
           placeholder={panelId}
           aria-label="Panel title"
-          className="h-7 border-0 bg-transparent px-2 text-xs font-medium text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="h-7 border-0 bg-transparent px-2 text-xs font-medium text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-gray-100"
           data-testid="console-html-title-editor"
         />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
-        <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10">
+      <div
+        ref={gridRef}
+        className={cn(
+          "grid min-h-0 flex-1 grid-cols-1 gap-0",
+          variablesCollapsed ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_minmax(220px,320px)]",
+        )}
+      >
+        <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10 dark:border-gray-800">
           <HtmlCodeEditor
             ref={codeEditorRef}
             value={draftBody}
@@ -142,29 +159,53 @@ export function HtmlPanelEditor({
           setDraftVariables={setDraftVariables}
           previewVars={previewVars}
           errors={errors}
-          isLoading={isLoading}
+          baseLoading={baseLoading}
+          sideloadLoading={sideloadLoading}
+          searchingNames={searchingNames}
           onInsertSnippet={(snippet) => codeEditorRef.current?.insertAtCursor(snippet)}
+          collapsed={variablesCollapsed}
+          onToggleCollapsed={toggleVariablesCollapsed}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
-        {saveError ? (
-          <span className="text-[11px] text-red-600" role="alert" data-testid="console-html-save-error">
-            {saveError}
-          </span>
-        ) : (
-          <span className="text-[11px] text-slate-500">
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
-          </span>
-        )}
-        <div className="flex items-center gap-1">
-          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="button" size="sm" onClick={onCommit} data-testid="console-html-save">
-            Save
-          </Button>
-        </div>
+      <HtmlEditorFooter saveError={saveError} onCancel={onCancel} onCommit={onCommit} />
+    </div>
+  );
+}
+
+function HtmlEditorFooter({
+  saveError,
+  onCancel,
+  onCommit,
+}: {
+  saveError?: string | null;
+  onCancel: () => void;
+  onCommit: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-800/50">
+      {saveError ? (
+        <span className="text-[11px] text-red-600 dark:text-red-400" role="alert" data-testid="console-html-save-error">
+          {saveError}
+        </span>
+      ) : (
+        <span className="text-[11px] text-slate-500 dark:text-gray-400">
+          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
+            Esc
+          </kbd>{" "}
+          cancel &middot;{" "}
+          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
+            Cmd+Enter
+          </kbd>{" "}
+          save
+        </span>
+      )}
+      <div className="flex items-center gap-1">
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={onCommit} data-testid="console-html-save">
+          Save
+        </Button>
       </div>
     </div>
   );
@@ -212,6 +253,8 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
   { value, onChange, onSave, onCancel },
   ref,
 ) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const pendingFocusRef = useRef(false);
   // Hold the latest callbacks in refs so the Monaco mount handler can call
@@ -259,14 +302,14 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
   };
 
   return (
-    <div className="min-h-[160px] flex-1 overflow-hidden bg-white" data-testid="console-html-editor">
+    <div className="min-h-[160px] flex-1 overflow-hidden bg-white dark:bg-gray-900" data-testid="console-html-editor">
       <Editor
         height="100%"
         language="html"
         value={value}
         onChange={(next) => onChange(next ?? "")}
         onMount={handleMount}
-        theme="vs"
+        theme={monacoTheme}
         options={CODE_EDITOR_OPTIONS}
       />
     </div>
@@ -289,7 +332,7 @@ function HtmlLivePreview({
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden border-t border-slate-950/10 bg-slate-50/40",
+        "flex flex-col overflow-hidden border-t border-slate-950/10 bg-slate-50/40 dark:border-gray-800 dark:bg-gray-800/40",
         collapsed ? "shrink-0" : "min-h-[120px] flex-1",
       )}
       data-testid="console-html-editor-preview"
@@ -298,14 +341,16 @@ function HtmlLivePreview({
         type="button"
         onClick={onToggle}
         aria-expanded={!collapsed}
-        className="flex items-center justify-between gap-2 border-b border-slate-950/10 px-3 py-1.5 text-left hover:bg-slate-100/60"
+        className="flex items-center justify-between gap-2 border-b border-slate-950/10 px-3 py-1.5 text-left hover:bg-slate-100/60 dark:border-gray-800 dark:hover:bg-gray-800/60"
         data-testid="console-html-editor-preview-toggle"
       >
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Preview</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          Preview
+        </span>
         {collapsed ? (
-          <ChevronUp className="size-3.5 text-slate-500" />
+          <ChevronUp className="size-3.5 text-slate-500 dark:text-gray-400" />
         ) : (
-          <ChevronDown className="size-3.5 text-slate-500" />
+          <ChevronDown className="size-3.5 text-slate-500 dark:text-gray-400" />
         )}
       </button>
       {!collapsed ? (
@@ -317,7 +362,9 @@ function HtmlLivePreview({
               <HtmlBody body={body} vars={vars} />
             )
           ) : (
-            <p className="text-[12px] text-slate-400">Preview will appear once you write HTML above.</p>
+            <p className="text-[12px] text-slate-400 dark:text-gray-500">
+              Preview will appear once you write HTML above.
+            </p>
           )}
         </div>
       ) : null}

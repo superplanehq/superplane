@@ -2,7 +2,8 @@ approval_defaults:
   options:
     request_review:
       enabled: true
-      mode: all-users
+      mode: random-users
+      count: 1
     ignore_update_merges: true
 
 policy:

@@ -51,7 +51,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 		return nil
 	}
 
-	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID, e.NodeID, CanvasRunStateStarted, "")
 	if err != nil {
 		return err
 	}
@@ -60,9 +60,13 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
+func FindCanvasEvents(tx *gorm.DB, ids []string) ([]CanvasEvent, error) {
+	if len(ids) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("id IN ?", ids).
 		Find(&events).
 		Error
@@ -74,9 +78,13 @@ func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
 	return events, nil
 }
 
-func FindCanvasEventsForExecutions(executionIDs []string) ([]CanvasEvent, error) {
+func FindCanvasEventsForExecutions(tx *gorm.DB, executionIDs []string) ([]CanvasEvent, error) {
+	if len(executionIDs) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("execution_id IN ?", executionIDs).
 		Find(&events).
 		Error
@@ -174,127 +182,6 @@ func CountCanvasEvents(canvasID uuid.UUID, nodeID string) (int64, error) {
 	return count, nil
 }
 
-func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
-	var events []CanvasEvent
-	query := database.Conn().
-		Where("workflow_id = ?", canvasID).
-		Where("execution_id IS NULL")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	if before != nil {
-		query = query.Where("created_at < ?", before)
-	}
-
-	err := query.Order("created_at DESC").Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
-	var count int64
-
-	err := database.Conn().
-		Model(&CanvasEvent{}).
-		Where("workflow_id = ?", canvasID).
-		Where("execution_id IS NULL").
-		Count(&count).
-		Error
-
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
-func LockExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime time.Time, limit int) ([]CanvasEvent, error) {
-	var events []CanvasEvent
-
-	query := expiredRoutedRootCanvasEventsQuery(tx, referenceTime).
-		Scopes(
-			lockCanvasEventsForUpdate,
-			withoutRootEventQueueItems,
-			withoutActiveRootEventExecutions,
-			withoutPendingRootEventRequests,
-			oldestCanvasEventsFirst,
-		)
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-func expiredRoutedRootCanvasEventsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
-	return tx.
-		Table("workflow_events").
-		Select("workflow_events.*").
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
-		Where("workflow_events.execution_id IS NULL").
-		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
-}
-
-func lockCanvasEventsForUpdate(tx *gorm.DB) *gorm.DB {
-	return tx.Clauses(clause.Locking{
-		Strength: "UPDATE",
-		Table:    clause.Table{Name: "workflow_events"},
-		Options:  "SKIP LOCKED",
-	})
-}
-
-func withoutRootEventQueueItems(tx *gorm.DB) *gorm.DB {
-	return tx.Where(`
-		NOT EXISTS (
-			SELECT 1
-			FROM workflow_node_queue_items
-			WHERE workflow_node_queue_items.root_event_id = workflow_events.id
-		)
-	`)
-}
-
-func withoutActiveRootEventExecutions(tx *gorm.DB) *gorm.DB {
-	return tx.Where(`
-		NOT EXISTS (
-			SELECT 1
-			FROM workflow_node_executions
-			WHERE workflow_node_executions.root_event_id = workflow_events.id
-			AND workflow_node_executions.state IN ?
-		)
-	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
-}
-
-func withoutPendingRootEventRequests(tx *gorm.DB) *gorm.DB {
-	return tx.Where(`
-		NOT EXISTS (
-			SELECT 1
-			FROM workflow_node_requests
-			JOIN workflow_node_executions ON workflow_node_requests.execution_id = workflow_node_executions.id
-			WHERE workflow_node_executions.root_event_id = workflow_events.id
-			AND workflow_node_requests.state = ?
-		)
-	`, NodeExecutionRequestStatePending)
-}
-
-func oldestCanvasEventsFirst(tx *gorm.DB) *gorm.DB {
-	return tx.Order("workflow_events.created_at ASC")
-}
-
 func ListPendingCanvasEvents() ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	query := database.Conn().
@@ -320,7 +207,7 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		Table("workflow_events").
 		Select("workflow_events.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_events"},
 			Options:  "SKIP LOCKED",
 		}).
@@ -338,65 +225,6 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 	return &event, nil
 }
 
-func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.UUID) error {
-	if len(rootEventIDs) == 0 {
-		return nil
-	}
-
-	var executionIDs []uuid.UUID
-	err := tx.
-		Model(&CanvasNodeExecution{}).
-		Where("root_event_id IN ?", rootEventIDs).
-		Pluck("id", &executionIDs).
-		Error
-	if err != nil {
-		return err
-	}
-
-	var runIDs []uuid.UUID
-	err = tx.
-		Model(&CanvasEvent{}).
-		Where("id IN ?", rootEventIDs).
-		Distinct("run_id").
-		Pluck("run_id", &runIDs).
-		Error
-	if err != nil {
-		return err
-	}
-
-	if len(executionIDs) > 0 {
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasEvent{}).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeExecution{}).Error; err != nil {
-			return err
-		}
-	}
-
-	if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error; err != nil {
-		return err
-	}
-
-	if len(runIDs) > 0 {
-		return tx.Where("id IN ?", runIDs).Delete(&CanvasRun{}).Error
-	}
-
-	return nil
-}
-
 func (e *CanvasEvent) Routed() error {
 	return e.RoutedInTransaction(database.Conn())
 }
@@ -406,21 +234,24 @@ func (e *CanvasEvent) RoutedInTransaction(tx *gorm.DB) error {
 	return tx.Save(e).Error
 }
 
-// FindLastEventPerNode finds the most recent event for each node in a workflow
-// using DISTINCT ON to get one event per node_id, ordered by created_at DESC
-// Only returns events for nodes that have not been deleted
-func FindLastEventPerNode(canvasID uuid.UUID) ([]CanvasEvent, error) {
+// FindLastEventPerNode finds the most recent event for each node in a workflow.
+// Only returns events for nodes that have not been deleted.
+func FindLastEventPerNode(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Raw(`
-			SELECT DISTINCT ON (we.node_id) we.*
-			FROM workflow_events we
-			INNER JOIN workflow_nodes wn
-				ON we.workflow_id = wn.workflow_id
-				AND we.node_id = wn.node_id
-			WHERE we.workflow_id = ?
-			AND wn.deleted_at IS NULL
-			ORDER BY we.node_id, we.created_at DESC
+			SELECT we.*
+			FROM workflow_nodes wn
+			INNER JOIN LATERAL (
+				SELECT *
+				FROM workflow_events
+				WHERE workflow_id = wn.workflow_id
+				  AND node_id = wn.node_id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) we ON true
+			WHERE wn.workflow_id = ?
+			  AND wn.deleted_at IS NULL
 		`, canvasID).
 		Scan(&events).
 		Error

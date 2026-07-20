@@ -1,54 +1,27 @@
-import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CanvasesCanvasVersion } from "@/api-client";
+import { Timestamp } from "@/components/Timestamp";
 import { cn } from "@/lib/utils";
-import { Diff } from "lucide-react";
 import { useCallback } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { getChangeRequestReviewPhase } from "@/pages/app/changeRequestReviewActions";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
-
-type ActiveReviewPhase = Exclude<ReturnType<typeof getChangeRequestReviewPhase>, { kind: "none" }>;
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { formatVersionLabel } from "@/pages/app/lib/canvas-versions";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
   version,
-  changeRequest,
-  changeRequestApprovalConfig,
-  previousVersion,
-  variant = "default",
   isActive = false,
   isCurrentLive = false,
   isFirstCanvasVersion = false,
   rowTestId,
   onUseVersion,
-  onViewDiff,
 }: {
   version: CanvasesCanvasVersion;
-  changeRequest?: CanvasesCanvasChangeRequest;
-  changeRequestApprovalConfig?: CanvasChangeManagement;
-  previousVersion?: CanvasesCanvasVersion;
-  variant?: "default" | "rejected";
   isActive?: boolean;
   isCurrentLive?: boolean;
   isFirstCanvasVersion?: boolean;
   rowTestId?: string;
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
 }) {
-  const versionID = version.metadata?.id ?? "";
-
-  const viewModel = buildVersionRowViewModel({
-    version,
-    changeRequest,
-    changeRequestApprovalConfig,
-    variant,
-    isCurrentLive,
-    isFirstCanvasVersion,
-  });
+  const { versionID, ownerName, versionLabel, timestamp } = deriveVersionRowFields(version, isFirstCanvasVersion);
 
   const handleRowActivate = useCallback(() => {
     onUseVersion(versionID);
@@ -70,199 +43,60 @@ export function VersionRow({
   return (
     <div
       data-testid={rowTestId}
-      className={versionRowClassName({
-        isActive,
-        variant,
-        activeReviewPhase: viewModel.activeReviewPhase,
-      })}
+      className={versionRowClassName(isActive)}
       role="button"
       tabIndex={0}
       onClick={handleRowActivate}
       onKeyDown={handleRowKeyDown}
-      aria-label={`Preview ${viewModel.versionLabel}`}
+      aria-label={`Preview ${versionLabel}`}
+      title={`${versionLabel} · ${ownerName}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-slate-900">{viewModel.versionLabel}</p>
-          <VersionSubtitle
-            isCurrentLive={isCurrentLive}
-            variant={variant}
-            activeReviewPhase={viewModel.activeReviewPhase}
-            versionSubtitle={viewModel.versionSubtitle}
-          />
-        </div>
-        <VersionDetailsButton
-          version={version}
-          previousVersion={previousVersion}
-          changeRequest={changeRequest}
-          onViewDiff={onViewDiff}
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-xs",
+          isActive
+            ? "font-semibold text-sky-900 dark:text-indigo-300"
+            : "font-medium text-slate-900 dark:text-gray-100",
+        )}
+      >
+        {versionLabel}
+      </span>
+      {isCurrentLive ? (
+        <span className="shrink-0 rounded bg-sky-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-800 dark:bg-gray-700 dark:text-indigo-300">
+          Current
+        </span>
+      ) : null}
+      <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500 dark:text-gray-400">{ownerName}</span>
+      {timestamp ? (
+        <Timestamp
+          date={timestamp}
+          display="relative"
+          relativeStyle="abbreviated"
+          includeAgo={false}
+          className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-gray-400"
         />
-      </div>
+      ) : null}
     </div>
   );
 }
 
-function buildVersionRowViewModel({
-  version,
-  changeRequest,
-  changeRequestApprovalConfig,
-  variant,
-  isCurrentLive,
-  isFirstCanvasVersion,
-}: {
-  version: CanvasesCanvasVersion;
-  changeRequest?: CanvasesCanvasChangeRequest;
-  changeRequestApprovalConfig?: CanvasChangeManagement;
-  variant: "default" | "rejected";
-  isCurrentLive: boolean;
-  isFirstCanvasVersion: boolean;
-}) {
-  const ownerName = version.metadata?.owner?.name || "Unknown owner";
-  const changeRequestTitle = changeRequest?.metadata?.title?.trim();
-  const reviewPhase = getChangeRequestReviewPhase(changeRequest, changeRequestApprovalConfig);
+function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVersion: boolean) {
   return {
-    versionLabel: isFirstCanvasVersion
-      ? "v1"
-      : changeRequestTitle || formatVersionTimestamp(version) || formatVersionLabel(version),
-    versionSubtitle: ownerName,
-    activeReviewPhase: resolveActiveReviewPhase(reviewPhase, variant, isCurrentLive),
+    versionID: version.metadata?.id ?? "",
+    ownerName: version.metadata?.owner?.name || "Unknown owner",
+    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionLabel(version),
+    timestamp: version.metadata?.updatedAt || version.metadata?.createdAt,
   };
-}
-
-function resolveActiveReviewPhase(
-  reviewPhase: ReturnType<typeof getChangeRequestReviewPhase>,
-  variant: "default" | "rejected",
-  isCurrentLive: boolean,
-): ActiveReviewPhase | null {
-  if (variant === "rejected" || isCurrentLive || reviewPhase.kind === "none") {
-    return null;
-  }
-  return reviewPhase;
 }
 
 function isActivationKey(key: string): boolean {
   return key === "Enter" || key === " ";
 }
 
-function versionRowClassName({
-  isActive,
-  variant,
-  activeReviewPhase,
-}: {
-  isActive: boolean;
-  variant: "default" | "rejected";
-  activeReviewPhase: ActiveReviewPhase | null;
-}): string {
-  const baseClassName = "w-full cursor-pointer border-b border-b-slate-950/10 px-4 py-2 text-left transition";
-  if (!isActive) {
-    return `${baseClassName} bg-white hover:bg-slate-100`;
-  }
-  if (variant === "rejected") {
-    return `${baseClassName} bg-red-50`;
-  }
-  return cn(baseClassName, activeReviewPhase ? activeReviewPhase.sidebarRowActiveClassName : "bg-sky-100");
-}
-
-function VersionSubtitle({
-  isCurrentLive,
-  variant,
-  activeReviewPhase,
-  versionSubtitle,
-}: {
-  isCurrentLive: boolean;
-  variant: "default" | "rejected";
-  activeReviewPhase: ActiveReviewPhase | null;
-  versionSubtitle: string;
-}) {
-  const statusIndicator = buildStatusIndicator(isCurrentLive, variant, activeReviewPhase);
-
-  return (
-    <p className="mt-0.5 truncate text-xs text-slate-600">
-      {statusIndicator ? (
-        <>
-          {statusIndicator.dotClassName ? <span className={cn("mr-1", statusIndicator.dotClassName)}>●</span> : null}
-          <StatusBadge className={statusIndicator.labelClassName} label={statusIndicator.label} />
-        </>
-      ) : null}
-      {versionSubtitle}
-    </p>
-  );
-}
-
-function buildStatusIndicator(
-  isCurrentLive: boolean,
-  variant: "default" | "rejected",
-  activeReviewPhase: ActiveReviewPhase | null,
-) {
-  if (isCurrentLive) {
-    return { label: "Current Version", labelClassName: "font-medium text-sky-700" };
-  }
-  if (variant === "rejected") {
-    return { label: "Rejected", labelClassName: "font-medium text-red-600" };
-  }
-  if (!activeReviewPhase) {
-    return null;
-  }
-  return {
-    label: activeReviewPhase.label,
-    labelClassName: activeReviewPhase.labelClassName,
-    dotClassName: activeReviewPhase.dotClassName,
-  };
-}
-
-function StatusBadge({ className, label }: { className: string; label: string }) {
-  return (
-    <>
-      <span className={className}>{label}</span> {"·"}{" "}
-    </>
-  );
-}
-
-function VersionDetailsButton({
-  version,
-  previousVersion,
-  changeRequest,
-  onViewDiff,
-}: {
-  version: CanvasesCanvasVersion;
-  previousVersion?: CanvasesCanvasVersion;
-  changeRequest?: CanvasesCanvasChangeRequest;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
-}) {
-  const handleClick = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      if (!previousVersion) return;
-      onViewDiff(version, previousVersion, changeRequest);
-    },
-    [changeRequest, onViewDiff, previousVersion, version],
-  );
-
-  if (!previousVersion) return null;
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
-              onClick={handleClick}
-              aria-label="View Diff"
-            >
-              <Diff className="size-3.5" />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top">View Diff</TooltipContent>
-      </Tooltip>
-    </div>
+function versionRowClassName(isActive: boolean): string {
+  return cn(
+    RUNS_SIDEBAR_ROW_CLASS,
+    "group w-full cursor-pointer text-left transition-colors",
+    isActive ? "bg-sky-100 dark:bg-gray-800" : "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800",
   );
 }

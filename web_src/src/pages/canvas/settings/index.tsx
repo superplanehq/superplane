@@ -1,12 +1,15 @@
-import type { CanvasesCanvas, OrganizationsOrganization, RolesRole, SuperplaneUsersUser } from "@/api-client";
+import type { CanvasesCanvas, OrganizationsOrganization } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvas, useUpdateCanvas } from "@/hooks/useCanvasData";
-import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Loader2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { appPath } from "@/lib/appPaths";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 import { buildSettingsInitialValues } from "./buildInitialValues";
 import { PageHeader } from "./PageHeader";
 import type { SettingsSavePayload } from "./types";
@@ -21,6 +24,10 @@ export function CanvasSettingsPage() {
 
   const { data: organization } = useOrganization(organizationId, canReadOrg);
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId, canvasId);
+
+  useReportPageReady(!canvasLoading && !!canvas && !!organizationId && !!organization, {
+    failed: !!canvasError,
+  });
 
   if (!organizationId || !canvasId || !organization) {
     return <ErrorView organizationId={organizationId} error="Missing organization or canvas." />;
@@ -41,11 +48,14 @@ function LoadingView({ organizationId }: { organizationId: string }) {
   usePageTitle(["Canvas settings"]);
 
   return (
-    <div className="flex h-full flex-col bg-slate-100">
+    <div className={cn("flex h-full flex-col bg-slate-100", appDarkModeClasses.surface)}>
       <PageHeader organizationId={organizationId} title="" />
 
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" aria-label="Loading" />
+        <Loader2
+          className={cn("h-8 w-8 animate-spin text-slate-400", appDarkModeClasses.textMuted)}
+          aria-label="Loading"
+        />
       </div>
     </div>
   );
@@ -55,11 +65,11 @@ function ErrorView({ organizationId, error }: { organizationId?: string; error: 
   usePageTitle(["Canvas settings"]);
 
   return (
-    <div className="flex h-full flex-col bg-slate-100">
+    <div className={cn("flex h-full flex-col bg-slate-100", appDarkModeClasses.surface)}>
       {organizationId && <PageHeader organizationId={organizationId} title="" />}
 
       <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-slate-600">{error}</p>
+        <p className={cn("text-sm text-slate-600", appDarkModeClasses.textSecondary)}>{error}</p>
       </div>
     </div>
   );
@@ -72,78 +82,31 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = appPath(orgId, resolvedCanvasId);
-  const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
   const { canAct } = usePermissions();
   const canUpdateCanvas = canAct("canvases", "update");
 
-  const { data: organizationUsers = [] } = useOrganizationUsers(orgId);
-  const { data: organizationRoles = [] } = useOrganizationRoles(orgId);
-
   const updateCanvasMutation = useUpdateCanvas(orgId, resolvedCanvasId);
 
   const initialValues = useMemo(() => buildSettingsInitialValues(canvas), [canvas]);
-  const approverUsers = useApproverUsers(organizationUsers);
-  const approverRoles = useApproverRoles(organizationRoles);
   const onSave = useSaveCallback(resolvedCanvasId, orgId);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-100">
+    <div className={cn("flex h-full min-h-0 flex-col bg-slate-100", appDarkModeClasses.surface)}>
       <PageHeader organizationId={orgId} title={`${canvasName} · Settings`} />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <SettingsView
           initialValues={initialValues}
           canUpdateCanvas={canUpdateCanvas}
-          orgChangeManagementEnabled={isOrgChangeManagementEnabled}
           isSaving={updateCanvasMutation.isPending}
-          availableUsers={approverUsers}
-          availableRoles={approverRoles}
           onSave={onSave}
           onBackToCanvas={() => navigate(baseCanvasPath)}
         />
       </div>
     </div>
-  );
-}
-
-function useApproverUsers(organizationUsers: SuperplaneUsersUser[]) {
-  return useMemo(
-    () =>
-      organizationUsers
-        .map((user) => {
-          const id = user.metadata?.id || "";
-          if (!id) {
-            return null;
-          }
-          return {
-            id,
-            name: user.spec?.displayName || user.metadata?.email || id,
-          };
-        })
-        .filter((item): item is { id: string; name: string } => !!item),
-    [organizationUsers],
-  );
-}
-
-function useApproverRoles(organizationRoles: RolesRole[]) {
-  return useMemo(
-    () =>
-      organizationRoles
-        .map((role) => {
-          const name = role.metadata?.name || "";
-          if (!name) {
-            return null;
-          }
-          return {
-            name,
-            label: role.spec?.displayName || name,
-          };
-        })
-        .filter((item): item is { name: string; label: string } => !!item),
-    [organizationRoles],
   );
 }
 
@@ -160,7 +123,6 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        changeManagement: values.changeManagement,
       });
 
       navigate(baseCanvasPath, { replace: true });

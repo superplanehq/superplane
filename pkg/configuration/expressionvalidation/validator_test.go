@@ -56,7 +56,6 @@ func TestValidateExpression_Valid(t *testing.T) {
 		{name: "now builtin", raw: `now()`},
 		{name: "date builtin", raw: `date('2026-01-01')`},
 		{name: "type conversion", raw: `int($['Build'].count) + 1`, knownNames: []string{"Build"}},
-		{name: "config blueprint placeholder", raw: `config.foo.bar`},
 		{name: "standalone dollar", raw: `$`},
 	})
 }

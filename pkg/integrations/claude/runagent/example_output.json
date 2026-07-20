@@ -2,7 +2,22 @@
   "data": {
     "status": "idle",
     "sessionId": "sess_01ExampleManagedSession",
-    "lastMessage": "Finished the requested task."
+    "lastMessage": "Finished the requested task.",
+    "messages": [
+      "Let me check the documentation...",
+      "Finished the requested task."
+    ],
+    "artifacts": [
+      {
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "report.md",
+        "mimeType": "text/markdown",
+        "sizeBytes": 4096,
+        "encoding": "text",
+        "content": "# Report\n\nAll checks passed.\n",
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
+      }
+    ]
   },
   "timestamp": "2026-04-26T12:00:00Z",
   "type": "claude.runAgent.finished"

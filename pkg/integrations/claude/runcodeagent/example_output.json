@@ -1,0 +1,22 @@
+{
+  "data": {
+    "status": "idle",
+    "sessionId": "sess_01ExampleCodeSession",
+    "prUrl": "https://github.com/owner/repo/pull/42",
+    "branch": "claude/agent-1a2b3c4d5e6f",
+    "lastMessage": "Done. PR_URL=https://github.com/owner/repo/pull/42",
+    "artifacts": [
+      {
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "migration-notes.md",
+        "mimeType": "text/markdown",
+        "sizeBytes": 2048,
+        "encoding": "text",
+        "content": "# Migration notes\n\nRenamed the legacy column.\n",
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
+      }
+    ]
+  },
+  "timestamp": "2026-07-02T12:00:00Z",
+  "type": "claude.runCodeAgent"
+}

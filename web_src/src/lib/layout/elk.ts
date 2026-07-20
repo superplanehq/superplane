@@ -1,6 +1,7 @@
-import type { CanvasesCanvas, SuperplaneActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
+import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
 
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
@@ -299,8 +300,10 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
+    positioningEdges?: Array<{ sourceId?: string; targetId?: string; channel?: string }>,
   ) {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
+    const graphEdges = positioningEdges ?? layoutEdges;
     const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
 
     for (const edge of layoutEdges) {
@@ -330,7 +333,7 @@ export class ElkLayoutEngine implements LayoutEngine {
           .map((channel) => this.normalizeChannel(channel))
           .filter((channel, index, channels) => channels.indexOf(channel) === index);
         const edgeOutputChannels = Array.from(edgeChannelsBySourceNodeID.get(nodeId) || []);
-        const outputChannels = Array.from(new Set([...metadataOutputChannels, ...edgeOutputChannels]));
+        const outputChannels = appendUniqueChannels(metadataOutputChannels, edgeOutputChannels);
         if (outputChannels.length === 0) {
           outputChannels.push("default");
         }
@@ -362,7 +365,7 @@ export class ElkLayoutEngine implements LayoutEngine {
         };
       }),
       edges: this.deduplicateEdges(
-        layoutEdges.map((edge) => ({
+        graphEdges.map((edge) => ({
           id: `${edge.sourceId}->${edge.targetId}->${this.normalizeChannel(edge.channel)}`,
           sources: [`${edge.sourceId}__${this.normalizeChannel(edge.channel)}`],
           targets: [`${edge.targetId}__input`],
@@ -449,7 +452,12 @@ export class ElkLayoutEngine implements LayoutEngine {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const components = this.resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges);
     if (components.length <= 1) {
-      const graph = this.buildElkGraph(workflow, layoutNodes, outputChannelsByNodeId);
+      const graph = this.buildElkGraph(
+        workflow,
+        layoutNodes,
+        outputChannelsByNodeId,
+        resolveForwardLayoutEdges(layoutNodes, layoutEdges),
+      );
       const layoutedGraph = await this.elk.layout(graph);
       return this.extractLayoutedPositions(layoutedGraph);
     }
@@ -459,7 +467,13 @@ export class ElkLayoutEngine implements LayoutEngine {
     let currentTopY = 0;
 
     for (const componentNodes of sortedComponents) {
-      const graph = this.buildElkGraph(workflow, componentNodes, outputChannelsByNodeId);
+      const componentEdges = this.resolveLayoutEdges(workflow, componentNodes);
+      const graph = this.buildElkGraph(
+        workflow,
+        componentNodes,
+        outputChannelsByNodeId,
+        resolveForwardLayoutEdges(componentNodes, componentEdges),
+      );
       const layoutedGraph = await this.elk.layout(graph);
       const componentPositions = this.extractLayoutedPositions(layoutedGraph);
       if (componentPositions.size === 0) {
@@ -546,7 +560,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     });
   }
 
-  private resolveNodeOutputChannels(node: ComponentsNode, components: SuperplaneActionsAction[]): string[] {
+  private resolveNodeOutputChannels(node: ComponentsNode, components: ActionsAction[]): string[] {
     const defaultChannels = ["default"];
 
     if (node.type === "TYPE_ACTION" && node.component) {
@@ -557,10 +571,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     return defaultChannels;
   }
 
-  private buildOutputChannelsByNodeId(
-    workflow: CanvasesCanvas,
-    components: SuperplaneActionsAction[],
-  ): Map<string, string[]> {
+  private buildOutputChannelsByNodeId(workflow: CanvasesCanvas, components: ActionsAction[]): Map<string, string[]> {
     const map = new Map<string, string[]>();
     for (const node of workflow.spec?.nodes || []) {
       if (!node.id) {

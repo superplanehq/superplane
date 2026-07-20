@@ -196,6 +196,11 @@ type alertPolicy struct {
 			ThresholdValue float64 `json:"thresholdValue"`
 			Duration       string  `json:"duration"`
 		} `json:"conditionThreshold"`
+		ConditionPrometheusQueryLanguage *struct {
+			Query              string `json:"query"`
+			Duration           string `json:"duration"`
+			EvaluationInterval string `json:"evaluationInterval"`
+		} `json:"conditionPrometheusQueryLanguage"`
 	} `json:"conditions"`
 }
 
@@ -217,12 +222,26 @@ func policyPayload(p *alertPolicy) map[string]any {
 	if len(p.NotificationChannels) > 0 {
 		payload["notificationChannels"] = p.NotificationChannels
 	}
-	if len(p.Conditions) > 0 && p.Conditions[0].ConditionThreshold != nil {
-		c := p.Conditions[0].ConditionThreshold
-		payload["filter"] = c.Filter
-		payload["comparison"] = c.Comparison
-		payload["thresholdValue"] = c.ThresholdValue
-		payload["duration"] = c.Duration
+	if len(p.Conditions) > 0 {
+		switch first := p.Conditions[0]; {
+		case first.ConditionThreshold != nil:
+			c := first.ConditionThreshold
+			payload["conditionType"] = conditionKindThreshold
+			payload["filter"] = c.Filter
+			payload["comparison"] = c.Comparison
+			payload["thresholdValue"] = c.ThresholdValue
+			payload["duration"] = c.Duration
+		case first.ConditionPrometheusQueryLanguage != nil:
+			c := first.ConditionPrometheusQueryLanguage
+			payload["conditionType"] = conditionKindPromQL
+			payload["query"] = c.Query
+			if c.Duration != "" {
+				payload["duration"] = c.Duration
+			}
+			if c.EvaluationInterval != "" {
+				payload["evaluationInterval"] = c.EvaluationInterval
+			}
+		}
 	}
 	return payload
 }

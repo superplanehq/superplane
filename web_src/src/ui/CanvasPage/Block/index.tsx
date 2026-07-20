@@ -11,17 +11,17 @@ export type { CanvasBlockData } from "./types";
 const DRAFT_DIFF_BADGE = {
   added: {
     label: "ADDED",
-    className: "bg-green-500 text-white",
+    className: "bg-green-500 text-white dark:bg-green-400 dark:text-green-950",
     Icon: Plus,
   },
   updated: {
     label: "EDITED",
-    className: "bg-sky-500 text-white",
+    className: "bg-sky-500 text-white dark:bg-sky-400 dark:text-sky-950",
     Icon: Diff,
   },
   removed: {
     label: "REMOVED",
-    className: "bg-red-500 text-white",
+    className: "bg-red-500 text-white dark:bg-red-400 dark:text-red-950",
     Icon: Minus,
   },
 } as const;
@@ -51,7 +51,7 @@ function DraftDiffBadge({
       {showDiffAction ? (
         <button
           type="button"
-          className="mt-1 flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 outline outline-1 outline-slate-950/15 transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100"
+          className="mt-1 flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 outline outline-1 outline-slate-950/15 transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100 dark:bg-gray-900 dark:text-gray-400 dark:outline-gray-700/50 dark:hover:bg-gray-800 dark:focus:ring-sky-800"
           onClick={(event) => {
             event.stopPropagation();
             onShowDiff();
@@ -69,9 +69,10 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const data = props.data;
   const isHighlighted = data._isHighlighted || false;
   const hasHighlightedNodes = data._hasHighlightedNodes || false;
-  const shouldFade = hasHighlightedNodes && !isHighlighted;
+  const isAnnotation = data.type === "annotation";
+  const shouldFade = !isAnnotation && hasHighlightedNodes && !isHighlighted;
   const isRemoved = data._draftDiffStatus === "removed";
-  const shouldBlankBody = data._dimBodyBelowHeader || isRemoved;
+  const shouldBlankBody = !isAnnotation && (data._dimBodyBelowHeader || isRemoved);
   const isConnectionInteractive = props.canvasMode !== "live" && !isRemoved;
 
   return (

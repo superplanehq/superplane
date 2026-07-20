@@ -23,19 +23,19 @@ const MARKDOWN_CLASSES =
   "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
   "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
   "[&_strong]:font-semibold [&_b]:font-semibold " +
-  "[&_hr]:my-5 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-slate-200 " +
+  "[&_hr]:my-5 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-slate-200 dark:[&_hr]:border-gray-700 " +
   "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-0.5 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 dark:[&_blockquote]:border-gray-600 " +
+  "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs dark:[&_code]:bg-gray-700 " +
+  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 dark:[&_pre]:bg-gray-900/80 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
   "[&_table]:w-full [&_table]:text-xs [&_table]:border-collapse " +
-  "[&_thead]:bg-slate-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
-  "[&_th]:border-b [&_th]:border-slate-200 " +
-  "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
-  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
-  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
+  "[&_thead]:bg-slate-50 dark:[&_thead]:bg-gray-900/60 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 dark:[&_th]:text-gray-200 " +
+  "[&_th]:border-b [&_th]:border-slate-200 dark:[&_th]:border-gray-700 " +
+  "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 dark:[&_td]:text-gray-300 [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-gray-700 " +
+  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 dark:[&_tbody_tr:nth-child(even)]:bg-gray-900/40 " +
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50 dark:[&_tr:hover]:bg-gray-900/50";
 
 type StartBuildingRubric = {
   title: string;
@@ -126,7 +126,7 @@ function SegmentRenderer({
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
     case "draft-actions":
-      // Rendered externally as DraftActionsBar, not inline
+      // Rendered externally as StagingActionsBar, not inline
       return null;
   }
 }
@@ -154,7 +154,7 @@ function MarkdownSegment({
           code: MarkdownCode,
           pre: ({ children }) => <>{children}</>,
           table: ({ children, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
               <table {...props}>{children}</table>
             </div>
           ),

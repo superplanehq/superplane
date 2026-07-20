@@ -1,33 +1,16 @@
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
-import {
-  CANVAS_FOLDER_COLORS,
-  DEFAULT_CANVAS_FOLDER_COLOR,
-  useCanvasFolders,
-  useCanvases,
-  type CanvasFolderColor,
-} from "@/hooks/useCanvasData";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
+import { normalizeCanvasFolderColor, useCanvasFolders, useCanvases } from "@/hooks/useCanvasData";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
-
-function asCanvasFolderColor(value?: string): CanvasFolderColor {
-  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
-    ? (value as CanvasFolderColor)
-    : DEFAULT_CANVAS_FOLDER_COLOR;
-}
 
 function formatCanvasDate(value?: string) {
   if (!value) return "Unknown";
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
-  const metadata = canvas.metadata;
-  if (!metadata) {
-    return null;
-  }
-
-  const { id, name, createdBy } = metadata;
+function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null {
+  const { id, name, createdBy } = canvas;
   const createdByName = createdBy?.name;
   if (!id || !name || !createdByName) {
     return null;
@@ -36,12 +19,14 @@ function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
   return {
     id,
     name,
-    description: metadata.description,
-    createdAt: formatCanvasDate(metadata.createdAt),
-    canvasFolderId: metadata.folderId || undefined,
+    description: canvas.description,
+    createdAt: formatCanvasDate(canvas.createdAt),
+    canvasFolderId: canvas.folderId || undefined,
+    isStarred: canvas.starred ?? false,
+    starredAt: canvas.starredAt,
     createdBy: { name: createdByName },
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
+    nodes: canvas.nodes || [],
+    edges: canvas.edges || [],
   };
 }
 
@@ -55,7 +40,7 @@ function toCanvasFolderData(folder: CanvasFoldersCanvasFolder): CanvasFolderData
   return {
     id,
     title,
-    backgroundColor: asCanvasFolderColor(folder.spec?.backgroundColor),
+    backgroundColor: normalizeCanvasFolderColor(folder.spec?.backgroundColor),
     canvasIds: folder.spec?.canvases?.map((canvas) => canvas.id || "").filter(Boolean) || [],
   };
 }

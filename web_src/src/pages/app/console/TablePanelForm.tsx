@@ -1,5 +1,6 @@
 import { useConsoleContext } from "./ConsoleContext";
 import { DataSourceForm } from "./DataSourceForm";
+import { isManualRunNode } from "./manualRunTriggers";
 import type { TablePanelContent } from "./panelTypes";
 import {
   TablePanelColumnsSection,
@@ -23,7 +24,10 @@ interface TablePanelFormProps {
 export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId;
-  const triggerNodes = (ctx?.nodes ?? []).filter((n) => n.type === "TYPE_TRIGGER");
+  // Row actions fire the user-invokable `run` hook, so the editor's node
+  // dropdown only exposes triggers the backend will actually accept —
+  // `TYPE_TRIGGER` nodes whose component is in the manual-run allowlist.
+  const triggerNodes = (ctx?.nodes ?? []).filter(isManualRunNode);
   const namespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : "";
   const { fields: memoryFields } = useMemoryCatalog(canvasId, namespace);
   const fields = resolveFieldCatalog(value, memoryFields);
@@ -35,7 +39,11 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   return (
     <div className="space-y-4">
       <TablePanelTitleField value={value} onChange={onChange} />
-      <DataSourceForm value={value.dataSource} onChange={(dataSource) => onChange({ ...value, dataSource })} />
+      <DataSourceForm
+        value={value.dataSource}
+        onChange={(dataSource) => onChange({ ...value, dataSource })}
+        loadAllWhenBlank
+      />
       <TablePanelMemorySourcePicker value={value} canvasId={canvasId} onChange={onChange} />
       <TablePanelColumnsSection value={value} fields={fields} fieldOptions={fieldOptions} actions={actions} />
       <TablePanelFiltersSection value={value} fieldOptions={fieldOptions} actions={actions} />
@@ -53,6 +61,13 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
         <datalist id="table-field-options">
           {fieldOptions.map((f) => (
             <option key={f} value={f} />
+          ))}
+        </datalist>
+      ) : null}
+      {fieldOptions.length > 0 ? (
+        <datalist id="table-href-field-options">
+          {fieldOptions.map((f) => (
+            <option key={f} value={`{{ ${f} }}`} />
           ))}
         </datalist>
       ) : null}

@@ -1,4 +1,5 @@
 import { useIntegration } from "@/hooks/useIntegrations";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { LegacyIntegrationDetails } from "./LegacyIntegrationDetails";
@@ -13,6 +14,10 @@ export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRo
   const { integrationId } = useParams<{ integrationId: string }>();
   const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
   const integrationsHref = `/${organizationId}/settings/integrations`;
+
+  useReportPageReady(!isLoading, {
+    failed: !!(error || !integration),
+  });
 
   if (isLoading) {
     return (

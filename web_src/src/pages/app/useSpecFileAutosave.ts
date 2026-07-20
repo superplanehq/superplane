@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, isWorkflowSpecPath } from "./lib/workflow-spec-paths";
 import { parseCanvasYamlForImport, parseConsoleYamlForSave } from "./lib/workflow-spec-files";
@@ -17,6 +17,7 @@ type UseSpecFileAutosaveParams = {
     options?: { showToast?: boolean },
   ) => Promise<{ status: "saved" | "replaced" | "stale" } | undefined | void>;
   updateConsoleMutation: UpdateCanvasConsoleMutationResult;
+  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
 };
 
 /**
@@ -31,6 +32,7 @@ export function useSpecFileAutosave({
   applyLocalWorkflowUpdate,
   handleSaveWorkflow,
   updateConsoleMutation,
+  onEffectiveConsoleChange,
 }: UseSpecFileAutosaveParams) {
   const canvasRef = useRef(canvas);
   canvasRef.current = canvas;
@@ -42,6 +44,8 @@ export function useSpecFileAutosave({
   handleSaveWorkflowRef.current = handleSaveWorkflow;
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
   updateConsoleMutationRef.current = updateConsoleMutation;
+  const onEffectiveConsoleChangeRef = useRef(onEffectiveConsoleChange);
+  onEffectiveConsoleChangeRef.current = onEffectiveConsoleChange;
 
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -55,7 +59,27 @@ export function useSpecFileAutosave({
     };
   }, []);
 
-  const flushCanvasSpec = useCallback((content: string) => {
+  const applyCanvasSpecLocal = useCallback((content: string) => {
+    const current = canvasRef.current;
+    if (!current) return;
+
+    const parsed = parseCanvasYamlForImport(content);
+    if (!parsed.ok) return;
+
+    applyLocalWorkflowUpdateRef.current({
+      ...current,
+      spec: { ...current.spec, ...parsed.spec },
+    });
+  }, []);
+
+  const applyConsoleSpecLocal = useCallback((content: string) => {
+    const parsed = parseConsoleYamlForSave(content);
+    if (!parsed.ok) return;
+
+    onEffectiveConsoleChangeRef.current?.({ panels: parsed.panels, layout: parsed.layout });
+  }, []);
+
+  const persistCanvasSpec = useCallback((content: string) => {
     const current = canvasRef.current;
     if (!current) return;
 
@@ -67,11 +91,10 @@ export function useSpecFileAutosave({
       spec: { ...current.spec, ...parsed.spec },
     };
 
-    applyLocalWorkflowUpdateRef.current(updatedWorkflow);
     void handleSaveWorkflowRef.current(updatedWorkflow, { showToast: false });
   }, []);
 
-  const flushConsoleSpec = useCallback((content: string) => {
+  const persistConsoleSpec = useCallback((content: string) => {
     const parsed = parseConsoleYamlForSave(content);
     if (!parsed.ok) return;
 
@@ -82,23 +105,29 @@ export function useSpecFileAutosave({
     (path: string, content: string) => {
       if (isReadOnlyRef.current || !isWorkflowSpecPath(path)) return;
 
+      if (path === CANVAS_YAML_PATH) {
+        applyCanvasSpecLocal(content);
+      } else if (path === CONSOLE_YAML_PATH) {
+        applyConsoleSpecLocal(content);
+      }
+
       const existing = timersRef.current.get(path);
       if (existing) clearTimeout(existing);
 
       const timer = setTimeout(() => {
         timersRef.current.delete(path);
         if (path === CANVAS_YAML_PATH) {
-          flushCanvasSpec(content);
+          persistCanvasSpec(content);
           return;
         }
         if (path === CONSOLE_YAML_PATH) {
-          flushConsoleSpec(content);
+          persistConsoleSpec(content);
         }
       }, SPEC_FILE_AUTOSAVE_DEBOUNCE_MS);
 
       timersRef.current.set(path, timer);
     },
-    [flushCanvasSpec, flushConsoleSpec],
+    [applyCanvasSpecLocal, applyConsoleSpecLocal, persistCanvasSpec, persistConsoleSpec],
   );
 
   return { onSpecFileChange };

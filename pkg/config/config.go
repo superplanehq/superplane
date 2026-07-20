@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+const MaxWebhookPayloadSize = 512 * 1024
+
 func RabbitMQURL() (string, error) {
 	URL := os.Getenv("RABBITMQ_URL")
 	if URL == "" {
@@ -16,6 +18,14 @@ func RabbitMQURL() (string, error) {
 
 func UsageGRPCURL() string {
 	return os.Getenv("USAGE_GRPC_URL")
+}
+
+func MaxEmitCount() int {
+	return intFromEnv("SUPERPLANE_MAX_EMIT_COUNT", 100)
+}
+
+func MaxPayloadSize() int {
+	return intFromEnv("SUPERPLANE_MAX_PAYLOAD_SIZE", 512*1024)
 }
 
 // AnthropicAgentConfig holds the credentials and identifiers needed to talk

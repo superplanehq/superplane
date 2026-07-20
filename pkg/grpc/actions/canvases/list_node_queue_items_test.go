@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -276,13 +276,53 @@ func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := ListNodeQueueItems(context.Background(), r.Registry, "invalid-uuid", "node-1", 10, nil)
 	require.Error(t, err)
 	assert.Nil(t, response)
-	s, ok := status.FromError(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, s.Code())
+	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
-	result, err := SerializeNodeQueueItems([]models.CanvasNodeQueueItem{})
+	result, err := SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{})
 	require.NoError(t, err)
 	assert.Empty(t, result)
+}
+
+func Test__SerializeNodeQueueItemsWithInputEvents__KeepsItemsWithMissingInput(t *testing.T) {
+	now := time.Now()
+	validEventID := uuid.New()
+	missingEventID := uuid.New()
+	missingQueueItemID := uuid.New()
+	validQueueItemID := uuid.New()
+
+	result, err := serializeNodeQueueItemsWithInputEvents(
+		[]models.CanvasNodeQueueItem{
+			{
+				ID:         missingQueueItemID,
+				WorkflowID: uuid.New(),
+				NodeID:     "node-1",
+				EventID:    missingEventID,
+				CreatedAt:  &now,
+			},
+			{
+				ID:         validQueueItemID,
+				WorkflowID: uuid.New(),
+				NodeID:     "node-1",
+				EventID:    validEventID,
+				CreatedAt:  &now,
+			},
+		},
+		[]models.CanvasEvent{
+			{
+				ID:   validEventID,
+				Data: models.NewJSONValue(map[string]any{"message": "queued"}),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	assert.Equal(t, missingQueueItemID.String(), result[0].Id)
+	assert.Empty(t, result[0].Input.AsMap())
+	assert.Equal(t, validQueueItemID.String(), result[1].Id)
+	assert.Equal(t, "queued", result[1].Input.AsMap()["message"])
 }

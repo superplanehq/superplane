@@ -1,5 +1,8 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
+import { withEventSectionDarkBackground } from "@/lib/eventSectionBackground";
+import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
+import { eventSectionMetadataTextClassName } from "@/lib/nodeCanvasSections";
 import { calcRelativeTimeFromDiff, cn, resolveIcon } from "@/lib/utils";
 import { CircleAlert, Rabbit } from "lucide-react";
 import React from "react";
@@ -11,7 +14,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -54,8 +57,8 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
   const currentState = section.eventState || "neutral";
   const stateStyle = stateMap[currentState] || stateMap["neutral"];
 
-  const LastEventBackground = stateStyle.backgroundColor;
-  const LastEventStateColor = stateStyle.badgeColor;
+  const LastEventBackground = withEventSectionDarkBackground(stateStyle.backgroundColor);
+  const LastEventStateColor = withEventStatusBadgeClasses(stateStyle.badgeColor);
   const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
 
   return (
@@ -63,7 +66,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       key={index}
       className={
         `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b border-slate-950/20" : "") +
+        (index < totalSections - 1 ? " border-b border-slate-950/20 dark:border-gray-600/70" : "") +
         ` ${className}`
       }
     >
@@ -76,21 +79,31 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         {section.eventSubtitle ? (
           <span
             title={typeof section.eventSubtitle === "string" ? section.eventSubtitle : undefined}
-            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50"
+            className={cn(
+              "text-[13px] font-medium truncate flex-shrink-0 max-w-[65%]",
+              eventSectionMetadataTextClassName,
+            )}
           >
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
           </span>
         ) : (
-          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50">
-            <TimeAgo date={section.receivedAt!} />
+          <span
+            className={cn(
+              "text-[13px] font-medium truncate flex-shrink-0 max-w-[65%]",
+              eventSectionMetadataTextClassName,
+            )}
+          >
+            <Timestamp date={section.receivedAt} display="relative" relativeStyle="abbreviated" />
           </span>
         )}
       </div>
       <div className="flex justify-left items-center mt-1 gap-2">
         {section.eventId && (
-          <span className="text-[13px] text-gray-950/50 font-mono">#{section.eventId?.slice(0, 4)}</span>
+          <span className={cn("text-[13px] font-mono", eventSectionMetadataTextClassName)}>
+            #{section.eventId?.slice(0, 4)}
+          </span>
         )}
-        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate">
+        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate dark:text-white/70">
           {section.eventTitle}
         </span>
       </div>
@@ -188,6 +201,13 @@ export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },
+  cancelling: {
+    icon: "refresh-cw",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
+    label: "Cancelling",
+  },
 };
 
 export interface EventSection {
@@ -206,7 +226,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
-  paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -252,12 +271,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
-  onTogglePause,
-  onEdit: _onEdit,
   onDuplicate,
-  onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -272,7 +286,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   emptyStateProps,
   error,
   warning,
-  paused,
   canvasMode = "live",
   dimBodyBelowHeader = false,
   draftDiffStatus,
@@ -317,8 +330,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
       tone: "neutral" as const,
     };
   }, [canvasMode, emptyStateProps, emptyStatePurpose]);
-  const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
-  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -337,36 +348,30 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
       : typeof safeCustomField === "function"
         ? safeCustomField()
         : safeCustomField || null;
-
+  const shouldClipCustomFieldToBottom =
+    !!renderedCustomField &&
+    (safeCustomFieldPosition === "after" || (!safeEventSections?.length && !includeEmptyState));
+  const customFieldNode = renderedCustomField ? (
+    shouldClipCustomFieldToBottom ? (
+      <div className="overflow-hidden rounded-b-md">{renderedCustomField}</div>
+    ) : (
+      renderedCustomField
+    )
+  ) : null;
   return (
     <SelectionWrapper selected={selected}>
       <div
         className={cn(
           "group relative flex flex-col rounded-md w-[23rem]",
           getDraftDiffOutlineClassName(draftDiffStatus),
-          !draftDiffStatus && hasError && "!outline-orange-500",
-          dimBodyBelowHeader ? "bg-slate-200" : "bg-white",
+          !draftDiffStatus && hasError && "!outline-orange-500 dark:!outline-orange-400/50",
+          dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-800" : "bg-white dark:bg-gray-800",
         )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onTogglePause && !hasError && (
-              <button
-                type="button"
-                data-testid="node-action-pause"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTogglePause();
-                }}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
-              >
-                {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
-                <span>{paused ? "Resume" : "Pause"}</span>
-              </button>
-            )}
             {onDuplicate && (
               <button
                 type="button"
@@ -376,7 +381,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onDuplicate();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
               >
                 <DuplicateIcon className="h-4 w-4" />
               </button>
@@ -390,7 +395,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onToggleView();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
               >
                 <ToggleViewIcon className="h-4 w-4" />
               </button>
@@ -404,7 +409,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onDelete();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
               >
                 <DeleteIcon className="h-4 w-4" />
               </button>
@@ -423,7 +428,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {dimBodyBelowHeader ? (
           !isCompactView ? (
-            <div className="min-h-28 w-full shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
+            <div className="min-h-28 w-full shrink-0 bg-slate-200 rounded-b-md dark:bg-gray-800" aria-hidden />
           ) : null
         ) : (
           <>
@@ -433,31 +438,13 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   <TooltipTrigger asChild>
                     <div
                       data-testid="node-warning-badge"
-                      className="absolute -top-8 left-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-orange-500"
+                      className="absolute -top-8 left-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-orange-500 dark:bg-orange-400/25 dark:ring-1 dark:ring-orange-400/50"
                     >
-                      <CircleAlert className="h-4 w-4 text-white" />
+                      <CircleAlert className="h-4 w-4 text-white dark:text-orange-300" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {paused && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      data-testid="node-paused-badge"
-                      className={`absolute -top-8 ${hasBadge ? "left-7" : "left-0"} bg-blue-500 rounded-md h-6 p-1 cursor-pointer`}
-                    >
-                      <PauseIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -468,9 +455,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 {!hideMetadataList && safeMetadata && safeMetadata.length > 0 && <MetadataList items={safeMetadata} />}
 
                 {safeSpecs && safeSpecs.length > 0 && (
-                  <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
+                  <div className="px-2 py-1.5 border-b border-slate-950/20 dark:border-gray-600/70 text-gray-500 flex flex-col gap-1.5">
                     {safeSpecs.map((spec, index) => (
-                      <div key={index} className="flex items-center text-md text-gray-500">
+                      <div key={index} className="flex items-center text-md text-gray-500 dark:text-gray-400">
                         <div className="w-4 h-4 mr-2">
                           {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
                         </div>
@@ -501,7 +488,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   </div>
                 )}
 
-                {safeCustomFieldPosition === "before" && renderedCustomField}
+                {safeCustomFieldPosition === "before" && customFieldNode}
 
                 {safeEventSections?.map((section, index) => (
                   <EventSectionDisplay
@@ -526,7 +513,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
                 {includeEmptyState && <EmptyState compact {...resolvedEmptyStateProps} />}
 
-                {safeCustomFieldPosition === "after" && renderedCustomField}
+                {safeCustomFieldPosition === "after" && customFieldNode}
               </>
             )}
           </>

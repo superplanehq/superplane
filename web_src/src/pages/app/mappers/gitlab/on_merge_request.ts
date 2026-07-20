@@ -36,74 +36,82 @@ interface OnMergeRequestEventData {
   };
 }
 
+function formatReceivedAt(createdAt?: string): string {
+  return createdAt ? new Date(createdAt).toLocaleString() : "-";
+}
+
+function mergeRequestEventTitle(eventData?: OnMergeRequestEventData): string {
+  const mr = eventData?.object_attributes;
+  return `!${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`;
+}
+
+function mergeRequestEventSubtitle(eventData?: OnMergeRequestEventData, createdAt?: string) {
+  return buildGitlabSubtitle(eventData?.object_attributes?.action || "", createdAt);
+}
+
+function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnMergeRequestConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.project?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.project.name,
+    });
+  }
+
+  if (configuration?.actions) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.actions.join(", "),
+    });
+  }
+
+  return metadataItems;
+}
+
 export const onMergeRequestTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnMergeRequestEventData;
-    const mr = eventData?.object_attributes;
 
     return {
-      title: `#${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`,
-      subtitle: buildGitlabSubtitle(mr?.action || "", context.event?.createdAt),
+      title: mergeRequestEventTitle(eventData),
+      subtitle: mergeRequestEventSubtitle(eventData, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnMergeRequestEventData;
     const mr = eventData?.object_attributes;
-    const values: Record<string, string> = {
-      URL: mr?.url || "",
-      Title: mr?.title || "",
-      Action: mr?.action || "",
-      State: mr?.state || "",
-      IID: mr?.iid?.toString() || "",
+
+    return {
+      "Received At": formatReceivedAt(context.event?.createdAt),
+      Title: mr?.title || "-",
+      URL: mr?.url || "-",
+      Action: mr?.action || "-",
+      State: mr?.state || "-",
+      Author: eventData?.user?.username || "-",
     };
-
-    if (eventData?.user?.username) {
-      values.Author = eventData.user.username;
-    }
-
-    if (eventData?.project?.path_with_namespace) {
-      values.Project = eventData.project.path_with_namespace;
-    }
-
-    return values;
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as GitLabNodeMetadata;
     const configuration = node.configuration as unknown as OnMergeRequestConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.project?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.project.name,
-      });
-    }
-
-    if (configuration?.actions) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.actions.join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: gitlabIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnMergeRequestEventData;
-      const mr = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: `#${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`,
-        subtitle: buildGitlabSubtitle(mr?.action || "", lastEvent.createdAt),
+        title: mergeRequestEventTitle(eventData),
+        subtitle: mergeRequestEventSubtitle(eventData, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,

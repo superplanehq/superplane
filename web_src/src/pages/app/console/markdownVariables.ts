@@ -7,6 +7,11 @@
  * for the markdown kind.
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+
+import { asObject } from "./panelContentValidation";
+import { validateRunStatusesArray, validateRunTriggersArray } from "./runDataSourceFilterSchema";
+
 /** Variable identifiers must match this regex so they can appear in `{{ }}` CEL expressions. */
 export const MARKDOWN_VARIABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -17,6 +22,16 @@ export type MarkdownRunSelect = (typeof MARKDOWN_RUN_SELECTS)[number];
 /** Sort direction for memory variables. */
 export const MARKDOWN_VARIABLE_DIRECTIONS = ["asc", "desc"] as const;
 export type MarkdownVariableDirection = (typeof MARKDOWN_VARIABLE_DIRECTIONS)[number];
+
+/**
+ * How a memory variable resolves the rows it selected:
+ *  - `single` (default): return the first sorted row, so authors can write
+ *    `{{ name.field }}` directly.
+ *  - `list`: return the full sorted array, unlocking CEL list macros like
+ *    `name.map(r, r.field)` / `name.filter(r, r.passed)` inside `{{ }}`.
+ */
+export const MARKDOWN_VARIABLE_MODES = ["single", "list"] as const;
+export type MarkdownVariableMode = (typeof MARKDOWN_VARIABLE_MODES)[number];
 
 /** One property-equality match clause for memory variable selection. */
 export interface MarkdownVariableMatch {
@@ -34,6 +49,13 @@ export interface MarkdownMemoryVariableSource {
   direction?: MarkdownVariableDirection;
   /** Optional property-equality filter applied before sorting. */
   matches?: MarkdownVariableMatch[];
+  /** Resolution mode — defaults to `single` when omitted for back-compat. */
+  mode?: MarkdownVariableMode;
+  /**
+   * Maximum number of rows to expose when `mode === "list"`. Omitted (or
+   * unset) means return every matching row. Ignored when `mode !== "list"`.
+   */
+  limit?: number;
 }
 
 export interface MarkdownRunVariableSource {
@@ -45,6 +67,18 @@ export interface MarkdownRunVariableSource {
    *  - `latest_failed` — the most recent `RESULT_FAILED` run
    */
   select: MarkdownRunSelect;
+  /**
+   * Optional status filter (running / passed / failed / cancelled) applied
+   * on top of `select`. Empty or omitted means "all statuses". Applied
+   * client-side after the underlying runs query returns so the same
+   * `select` bucket is shared across variables regardless of filter.
+   */
+  statuses?: RunStatusFilter[];
+  /**
+   * Optional trigger filter — each entry references a trigger node by id
+   * or name. Empty or omitted means "all triggers".
+   */
+  triggers?: string[];
 }
 
 export type MarkdownVariableSource = MarkdownMemoryVariableSource | MarkdownRunVariableSource;
@@ -53,11 +87,6 @@ export interface MarkdownVariable {
   /** Identifier used in the markdown body as `{{ name.field }}`. */
   name: string;
   source: MarkdownVariableSource;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }
 
 /**
@@ -122,7 +151,27 @@ function validateMarkdownMemorySource(source: Record<string, unknown>, index: nu
   }
   const directionError = validateMemoryDirection(source.direction, index);
   if (directionError) return directionError;
-  return validateMemoryMatches(source.matches, index);
+  const matchesError = validateMemoryMatches(source.matches, index);
+  if (matchesError) return matchesError;
+  const modeError = validateMemoryMode(source.mode, index);
+  if (modeError) return modeError;
+  return validateMemoryLimit(source.limit, index);
+}
+
+function validateMemoryMode(mode: unknown, index: number): string | null {
+  if (mode === undefined || mode === null) return null;
+  if (typeof mode !== "string" || !(MARKDOWN_VARIABLE_MODES as readonly string[]).includes(mode)) {
+    return `content.variables[${index}].source.mode must be "single" or "list".`;
+  }
+  return null;
+}
+
+function validateMemoryLimit(limit: unknown, index: number): string | null {
+  if (limit === undefined || limit === null) return null;
+  if (typeof limit !== "number" || !Number.isFinite(limit) || !Number.isInteger(limit) || limit <= 0) {
+    return `content.variables[${index}].source.limit must be a positive integer.`;
+  }
+  return null;
 }
 
 function validateMemoryDirection(direction: unknown, index: number): string | null {
@@ -153,5 +202,8 @@ function validateMarkdownRunSource(source: Record<string, unknown>, index: numbe
   if (typeof source.select !== "string" || !(MARKDOWN_RUN_SELECTS as readonly string[]).includes(source.select)) {
     return `content.variables[${index}].source.select must be one of ${MARKDOWN_RUN_SELECTS.join(", ")}.`;
   }
-  return null;
+  const statusesPath = `content.variables[${index}].source.statuses`;
+  const statusesError = validateRunStatusesArray(source.statuses, statusesPath);
+  if (statusesError) return statusesError;
+  return validateRunTriggersArray(source.triggers, `content.variables[${index}].source.triggers`);
 }

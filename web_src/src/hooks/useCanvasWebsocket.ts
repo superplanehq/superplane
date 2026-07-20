@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import useWebSocket from "react-use-websocket";
-import { useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/lib/reactUseWebsocket";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -8,16 +8,25 @@ import type {
   CanvasesCanvasRun,
 } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { canvasKeys } from "./useCanvasData";
+import {
+  parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoInfiniteRunsData,
+  upsertRunIntoDescribeRunData,
+  upsertRunIntoInfiniteData,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
+import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
 type CanvasWebsocketPayload = {
   canvasId: string;
-  versionId?: string;
+  userId?: string;
 };
 
-type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
+type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
+
+type CanvasStagingEventName = "staging_updated";
 
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
@@ -44,20 +53,129 @@ export function useCanvasWebsocket(
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
+  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
 ): void {
-  const nodeExecutionStore = useNodeExecutionStore();
+  const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
+  const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
+  const addNodeQueueItem = useNodeExecutionStore((state) => state.addNodeQueueItem);
+  const removeNodeQueueItem = useNodeExecutionStore((state) => state.removeNodeQueueItem);
   const queryClient = useQueryClient();
 
   // Queue for messages per nodeId
   const messageQueues = useRef<Map<string, QueuedMessage[]>>(new Map());
   const processingNodes = useRef<Set<string>>(new Set());
 
+  const handleCanvasLifecycleEvent = useCallback(
+    (eventName: CanvasLifecycleEventName, payload: WebsocketPayload) => {
+      const canvasMessage = payload as Partial<CanvasWebsocketPayload>;
+      if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
+        return;
+      }
+
+      const shouldInvalidateLifecycleQueries =
+        onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, eventName) !== false;
+      if (!shouldInvalidateLifecycleQueries) {
+        return;
+      }
+
+      if (eventName === "canvas_deleted") {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        return;
+      }
+
+      if (!shouldApplyCanvasUpdate?.()) {
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    },
+    [canvasId, organizationId, queryClient, onCanvasLifecycleEvent, shouldApplyCanvasUpdate],
+  );
+
+  const hasConnectedOnce = useRef(false);
+
+  const patchRunInCache = useCallback(
+    (run: CanvasesCanvasRun) => {
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
+
+        const filters = parseRunsFiltersFromQueryKey(queryKey);
+        const next = upsertRunIntoInfiniteData(data, run, filters);
+        if (next !== data) {
+          queryClient.setQueryData(queryKey, next);
+        }
+      }
+
+      if (run.id) {
+        queryClient.setQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, run.id), (current) =>
+          upsertRunIntoDescribeRunData(current, run),
+        );
+      }
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchExecutionInCache = useCallback(
+    (execution: CanvasesCanvasNodeExecution): boolean => {
+      let patched = false;
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
+
+        const next = upsertExecutionIntoInfiniteRunsData(data, execution);
+        if (next !== data) {
+          patched = true;
+          queryClient.setQueryData(queryKey, next);
+        }
+      }
+
+      return patched;
+    },
+    [queryClient, canvasId],
+  );
+
+  const invalidateRuns = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
+  const invalidateCanvasRunQueries = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: [...canvasKeys.runs(), canvasId],
+    });
+  }, [queryClient, canvasId]);
+
+  const invalidateMemoryEntries = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
-      const isCanvasLifecycleEvent =
-        data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
-      if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
+      const isCanvasLifecycleEvent = data.event === "canvas_updated" || data.event === "canvas_deleted";
+      // Staging events fire while editing a draft (not the live version), so they
+      // must bypass the runtime-event gate that is disabled outside the live view.
+      const isCanvasStagingEvent = data.event === "staging_updated";
+      // Memory updates can happen from manual mutations regardless of the live
+      // view, so they bypass the runtime-event gate as well.
+      const isMemoryUpdatedEvent = data.event === "memory_updated";
+      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !isMemoryUpdatedEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -66,16 +184,9 @@ export function useCanvasWebsocket(
         case "workflow_event_created":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
-            nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
-
-            /*
-             * We only invalidate the canvas root events query
-             * if the event being received is a root canvas event.
-             */
+            updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
             if (workflowEvent.root) {
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
+              invalidateRuns();
             }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
@@ -84,24 +195,16 @@ export function useCanvasWebsocket(
           break;
         case "execution_created":
         case "execution_started":
+        case "execution_cancelling":
         case "execution_finished":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const execution = payload as CanvasesCanvasNodeExecution;
             if (execution.nodeId) {
-              const storeNodeId =
-                execution.parentExecutionId && execution.nodeId.includes(":")
-                  ? execution.nodeId.split(":")[0]
-                  : execution.nodeId;
+              updateNodeExecution(execution.nodeId, execution);
 
-              nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteRuns(canvasId),
-              });
+              if (!patchExecutionInCache(execution)) {
+                invalidateRuns();
+              }
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -116,7 +219,8 @@ export function useCanvasWebsocket(
         case "queue_item_created":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
-            nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+            addNodeQueueItem(queueItem.nodeId!, queueItem);
+            invalidateCanvasRunQueries();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -124,64 +228,48 @@ export function useCanvasWebsocket(
         case "queue_item_consumed":
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
-            nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+            removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+            invalidateCanvasRunQueries();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
         case "run_started":
+        case "run_cancelling":
         case "run_finished": {
           const run = payload as CanvasesCanvasRun;
           if (!run.canvasId || run.canvasId !== canvasId) {
             break;
           }
 
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.infiniteRuns(canvasId),
-          });
+          patchRunInCache(run);
           break;
         }
         case "canvas_updated":
-        case "canvas_version_updated":
-        case "canvas_deleted": {
-          // Canvas structure changed from another actor (e.g. CLI), refresh cache.
-          const canvasMessage = payload as Partial<CanvasWebsocketPayload>;
-          if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
+        case "canvas_deleted":
+          handleCanvasLifecycleEvent(data.event as CanvasLifecycleEventName, payload);
+          break;
+        case "staging_updated": {
+          const stagingMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId) {
             break;
           }
 
-          if (data.event === "canvas_version_updated" && !canvasMessage.versionId) {
-            break;
+          const shouldInvalidateStagingQueries =
+            onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
+          if (shouldInvalidateStagingQueries) {
+            invalidateStagedCanvasCaches(queryClient, canvasId);
           }
-
-          const shouldInvalidateLifecycleQueries =
-            onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event) !== false;
-
-          if (data.event === "canvas_deleted") {
-            if (shouldInvalidateLifecycleQueries) {
-              queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-              queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-            }
-            break;
+          break;
+        }
+        case "memory_updated": {
+          // Canvas memory changed (from a node execution, manual mutation, or
+          // another tab). Invalidate the shared memory cache so the Memory tab
+          // and any memory-bound widget refetches once.
+          const memoryMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (memoryMessage.canvasId === canvasId) {
+            invalidateMemoryEntries();
           }
-
-          if (!shouldInvalidateLifecycleQueries) {
-            break;
-          }
-
-          queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-
-          if (data.event === "canvas_version_updated") {
-            queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
-            break;
-          }
-
-          if (!shouldApplyCanvasUpdate?.()) {
-            break;
-          }
-
-          queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-          queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
           break;
         }
         default:
@@ -189,16 +277,23 @@ export function useCanvasWebsocket(
       }
     },
     [
-      nodeExecutionStore,
+      updateNodeEvent,
+      updateNodeExecution,
+      addNodeQueueItem,
+      removeNodeQueueItem,
       queryClient,
       canvasId,
       onNodeEvent,
       onWorkflowEvent,
       onExecutionEvent,
-      onCanvasLifecycleEvent,
-      shouldApplyCanvasUpdate,
+      onCanvasStagingEvent,
       processRuntimeEvents,
-      organizationId,
+      handleCanvasLifecycleEvent,
+      patchRunInCache,
+      patchExecutionInCache,
+      invalidateMemoryEntries,
+      invalidateRuns,
+      invalidateCanvasRunQueries,
     ],
   );
 
@@ -250,13 +345,6 @@ export function useCanvasWebsocket(
         let nodeId: string | undefined;
         if (payload && "nodeId" in payload && payload.nodeId) {
           nodeId = payload.nodeId as string;
-
-          // For child executions, use parent nodeId for queuing
-          if (data.event.startsWith("execution_") && "parentExecutionId" in payload && payload.parentExecutionId) {
-            if (nodeId.includes(":")) {
-              nodeId = nodeId.split(":")[0];
-            }
-          }
         }
 
         if (!nodeId) {
@@ -285,6 +373,18 @@ export function useCanvasWebsocket(
     [processMessage, processQueue],
   );
 
+  const handleWebSocketOpen = useCallback(() => {
+    if (!hasConnectedOnce.current) {
+      hasConnectedOnce.current = true;
+      return;
+    }
+
+    invalidateRuns();
+    // Refresh memory in case mutations happened while we were disconnected; we
+    // no longer poll, so the websocket is the only push channel.
+    invalidateMemoryEntries();
+  }, [invalidateRuns, invalidateMemoryEntries]);
+
   // Cleanup on unmount
   useEffect(() => {
     const queues = messageQueues.current;
@@ -302,7 +402,7 @@ export function useCanvasWebsocket(
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
       reconnectInterval: 3000,
-      onOpen: () => {},
+      onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
       share: false,

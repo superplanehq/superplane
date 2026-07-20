@@ -48,7 +48,6 @@ export function useConsoleTriggerNode({
 
 function invalidateConsoleTriggerQueries(queryClient: QueryClient, canvasId: string, nodeId: string) {
   queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteEvents(canvasId) });
   queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
   queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
 }

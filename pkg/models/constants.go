@@ -27,8 +27,8 @@ const (
 	MetaDescOrgViewer = "Read-only access to organization resources and information."
 
 	// User types
-	UserTypeHuman          = "human"
-	UserTypeServiceAccount = "service_account"
+	UserTypeHuman  = "human"
+	UserTypeAPIKey = "api_key"
 )
 
 var (

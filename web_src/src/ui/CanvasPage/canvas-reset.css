@@ -2,6 +2,21 @@
   --sp-handle-border: #c9d5e1;
   --sp-handle-border-hover: #94a3b8;
   --sp-handle-highlight-border: #a1aec0;
+  --sp-append-handle-bg: #ffffff;
+  --sp-append-handle-icon: #94a3b8;
+  --sp-append-handle-icon-hover: #64748b;
+  --xy-edge-stroke: var(--sp-handle-border);
+  --xy-edge-stroke-selected: var(--sp-handle-highlight-border);
+  --xy-edge-stroke-width: 3;
+}
+
+.dark .sp-canvas {
+  --sp-handle-border: #374151;
+  --sp-handle-border-hover: #4b5563;
+  --sp-handle-highlight-border: #6b7280;
+  --sp-append-handle-bg: #1f2937;
+  --sp-append-handle-icon: #9ca3af;
+  --sp-append-handle-icon-hover: #d1d5db;
 }
 
 .sp-canvas .react-flow__node {
@@ -61,6 +76,25 @@
   transition: stroke 0.2s ease-in-out;
 }
 
+.sp-canvas .react-flow__edge-path {
+  stroke: var(--xy-edge-stroke) !important;
+  stroke-width: var(--xy-edge-stroke-width) !important;
+}
+
+.sp-canvas .react-flow__edge.selected .react-flow__edge-path,
+.sp-canvas .react-flow__edge.hovered .react-flow__edge-path {
+  stroke: var(--xy-edge-stroke-selected) !important;
+}
+
+.sp-canvas .react-flow__edge.sp-edge-draft-added .react-flow__edge-path {
+  stroke: #22c55e !important;
+}
+
+.sp-canvas .react-flow__edge.sp-edge-draft-removed .react-flow__edge-path {
+  stroke: #f87171 !important;
+  stroke-dasharray: 8 4 !important;
+}
+
 .sp-canvas.sp-canvas-live .react-flow__edge,
 .sp-canvas.sp-canvas-live .react-flow__edge * {
   cursor: default !important;
@@ -71,7 +105,7 @@
 }
 
 .sp-canvas .react-flow__connectionline path {
-  stroke: #A1AEC0 !important;
+  stroke: var(--sp-handle-border) !important;
   stroke-width: 3 !important;
   stroke-dasharray: 8 4 !important;
 }
@@ -121,11 +155,14 @@
 }
 
 .sp-canvas .sp-append-source-handle {
-  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  background-color: var(--sp-append-handle-bg, #ffffff);
+  color: var(--sp-append-handle-icon, #94a3b8);
+  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
 .sp-canvas .sp-append-source-handle:hover {
   border-color: var(--sp-handle-border-hover) !important;
+  color: var(--sp-append-handle-icon-hover, #64748b);
 }
 
 .sp-canvas .sp-append-source-preview {

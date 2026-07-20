@@ -12,6 +12,7 @@ type UsePendingStateOptions = {
   finalRepositoryPathsRef: RefObject<string[]>;
   allPathsRef: RefObject<string[]>;
   loadedContentByPathRef: RefObject<Record<string, string>>;
+  committedContentByPathRef: RefObject<Record<string, string>>;
   openFile: (path: string) => void;
   versionId?: string;
   onSpecFileChange?: (path: string, content: string) => void;
@@ -23,6 +24,7 @@ export function usePendingState({
   finalRepositoryPathsRef,
   allPathsRef,
   loadedContentByPathRef,
+  committedContentByPathRef,
   openFile,
   versionId,
   onSpecFileChange,
@@ -84,10 +86,15 @@ export function usePendingState({
 
       if (generatedPathSet.has(selectedPath)) return;
 
-      const originalContent = loadedContentByPathRef.current[selectedPath];
+      // Prefer the committed (stage=false) baseline so reverting an edit back to
+      // the original clears the pending change. loadedContentByPath holds staged
+      // content for draft reads, so after autosave it no longer reflects the
+      // original and would keep a phantom pending change (and Diff button) alive.
+      const originalContent =
+        committedContentByPathRef.current[selectedPath] ?? loadedContentByPathRef.current[selectedPath];
       setPendingChangesByPath((current) => applyPendingContentUpdate(current, selectedPath, value, originalContent));
     },
-    [generatedPathSet, loadedContentByPathRef, onSpecFileChange],
+    [committedContentByPathRef, generatedPathSet, loadedContentByPathRef, onSpecFileChange],
   );
 
   const deleteFile = useCallback(
@@ -108,6 +115,27 @@ export function usePendingState({
     setNewFilePath(null);
   }, []);
 
+  const reconcilePendingWithCommitted = useCallback((committedContentByPath: Record<string, string>) => {
+    setPendingChangesByPath((current) => {
+      let changed = false;
+      const next: Record<string, PendingFileChange> = { ...current };
+
+      for (const [path, change] of Object.entries(current)) {
+        if (change.type !== "modified") {
+          continue;
+        }
+
+        const committed = committedContentByPath[path];
+        if (committed !== undefined && change.content === committed) {
+          delete next[path];
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, []);
+
   return {
     pendingChangesByPath,
     setPendingChangesByPath,
@@ -121,5 +149,6 @@ export function usePendingState({
     deleteFile,
     discardAllChanges,
     resetPendingState,
+    reconcilePendingWithCommitted,
   };
 }

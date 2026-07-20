@@ -80,4 +80,114 @@ describe("validateMarkdownVariables", () => {
       validateMarkdownVariables([{ name: "bad", source: { kind: "run", select: "first" as unknown as never } }]),
     ).toMatch(/select/);
   });
+
+  describe("run source status/trigger filters", () => {
+    it("accepts empty and populated status arrays", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "run", select: "latest", statuses: [] } }]),
+      ).toBeNull();
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "run", select: "latest", statuses: ["running", "failed"] } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("accepts empty and populated trigger arrays", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "run", select: "latest", triggers: [] } }]),
+      ).toBeNull();
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "run", select: "latest", triggers: ["deploy", "release"] } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("rejects unknown status values", () => {
+      expect(
+        validateMarkdownVariables([
+          {
+            name: "bad",
+            source: { kind: "run", select: "latest", statuses: ["running", "flaky"] as unknown as never },
+          },
+        ]),
+      ).toMatch(/statuses/);
+    });
+
+    it("rejects non-string trigger entries", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "run", select: "latest", triggers: [""] as unknown as never } },
+        ]),
+      ).toMatch(/triggers/);
+    });
+  });
+
+  describe("memory list mode", () => {
+    it("accepts mode: list with no limit", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "memory", namespace: "n", mode: "list" } }]),
+      ).toBeNull();
+    });
+
+    it("accepts mode: list with a positive integer limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "memory", namespace: "n", mode: "list", limit: 10 } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("accepts explicit mode: single", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "memory", namespace: "n", mode: "single" } }]),
+      ).toBeNull();
+    });
+
+    it("rejects an unknown mode", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "many" as unknown as never } },
+        ]),
+      ).toMatch(/mode/);
+    });
+
+    it("rejects a non-numeric limit", () => {
+      expect(
+        validateMarkdownVariables([
+          {
+            name: "bad",
+            source: {
+              kind: "memory",
+              namespace: "n",
+              mode: "list",
+              limit: "5" as unknown as never,
+            },
+          },
+        ]),
+      ).toMatch(/limit/);
+    });
+
+    it("rejects a non-integer limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: 1.5 } },
+        ]),
+      ).toMatch(/limit/);
+    });
+
+    it("rejects a zero / negative limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: 0 } },
+        ]),
+      ).toMatch(/limit/);
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: -3 } },
+        ]),
+      ).toMatch(/limit/);
+    });
+  });
 });

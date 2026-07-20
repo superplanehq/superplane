@@ -58,10 +58,10 @@ func (c *ActiveCommand) setActiveInteractively(ctx core.CommandContext) error {
 	err = ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		for i, canvas := range canvases {
 			prefix := " "
-			if *canvas.Metadata.Id == ctx.Config.GetActiveApp() {
+			if *canvas.Id == ctx.Config.GetActiveApp() {
 				prefix = "*"
 			}
-			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", prefix, i+1, *canvas.Metadata.Name, *canvas.Metadata.Id)
+			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", prefix, i+1, *canvas.Name, *canvas.Id)
 		}
 		_, _ = fmt.Fprint(stdout, "Select an app number: ")
 		return nil
@@ -87,5 +87,5 @@ func (c *ActiveCommand) setActiveInteractively(ctx core.CommandContext) error {
 	}
 
 	selected := canvases[selectedIndex-1]
-	return ctx.Config.SetActiveApp(*selected.Metadata.Id)
+	return ctx.Config.SetActiveApp(*selected.Id)
 }

@@ -2,10 +2,9 @@ import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
 import { HANDLE_STYLE } from "./handleStyle";
 import type { BlockProps } from "./types";
-
-export const APPEND_CONNECTOR_COLOR = "#C9D5E1";
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
 const APPEND_HORIZONTAL_NUDGE = -4;
@@ -15,20 +14,17 @@ const APPEND_HANDLE_STYLE: React.CSSProperties = {
   height: 24,
   borderRadius: 100,
   border: "3px solid var(--sp-handle-border, #C9D5E1)",
-  background: "white",
   pointerEvents: "auto",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  color: "#94A3B8",
 };
 
-const APPEND_PREVIEW_DOT_STYLE: React.CSSProperties = {
+const APPEND_PREVIEW_DOT_BASE_STYLE: React.CSSProperties = {
   width: 12,
   height: 12,
   borderRadius: 100,
-  border: `3px solid ${APPEND_CONNECTOR_COLOR}`,
   background: "transparent",
 };
 
@@ -97,7 +93,7 @@ export function AppendSourceHandle({
           width: lineWidth,
           height: 3,
           transform: "translateY(-50%)",
-          backgroundColor: APPEND_CONNECTOR_COLOR,
+          backgroundColor: CANVAS_CONNECTOR_COLOR,
           pointerEvents: "none",
           zIndex: -1,
         }}
@@ -131,7 +127,7 @@ export function AppendHandleButton({
     <button
       type="button"
       aria-label={label}
-      className="sp-append-source-handle hover:text-slate-500"
+      className="sp-append-source-handle"
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -175,13 +171,14 @@ export function AppendHandlePreview({
           width: previewStemLength,
           height: 3,
           transform: "translateY(-50%)",
-          backgroundColor: APPEND_CONNECTOR_COLOR,
+          backgroundColor: CANVAS_CONNECTOR_COLOR,
           borderRadius: 999,
         }}
       />
       <div
         style={{
-          ...APPEND_PREVIEW_DOT_STYLE,
+          ...APPEND_PREVIEW_DOT_BASE_STYLE,
+          border: `3px solid ${CANVAS_CONNECTOR_COLOR}`,
           position: "absolute",
           left: previewStemLength + previewConnectorSize / 2 + previewNudgeLeft,
           top: `calc(${connectorTopValue} + var(--sp-append-preview-connector-offset-y, 0px) + var(--sp-append-preview-offset-y, 0px))`,

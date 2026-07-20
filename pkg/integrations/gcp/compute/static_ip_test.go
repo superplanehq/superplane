@@ -34,6 +34,10 @@ func (m *mockStaticIPClient) Post(ctx context.Context, path string, body any) ([
 	return nil, fmt.Errorf("unexpected Post(%s)", path)
 }
 
+func (m *mockStaticIPClient) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	return nil, fmt.Errorf("unexpected Patch(%s)", path)
+}
+
 func (m *mockStaticIPClient) Delete(ctx context.Context, path string) ([]byte, error) {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, path)

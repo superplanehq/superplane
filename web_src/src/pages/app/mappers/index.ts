@@ -61,6 +61,11 @@ import {
   eventStateRegistry as cloudflareEventStateRegistry,
 } from "./cloudflare/index";
 import {
+  componentMappers as cloudsmithComponentMappers,
+  triggerRenderers as cloudsmithTriggerRenderers,
+  eventStateRegistry as cloudsmithEventStateRegistry,
+} from "./cloudsmith/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -123,6 +128,7 @@ import {
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
   componentMappers as jfrogArtifactoryComponentMappers,
@@ -253,10 +259,11 @@ import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
+import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
-import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
+import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
@@ -268,6 +275,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   schedule: scheduleTriggerRenderer,
   webhook: webhookTriggerRenderer,
   start: startTriggerRenderer,
+  onBroadcast: onBroadcastTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -279,6 +287,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   updateMemory: updateMemoryMapper,
   upsertMemory: upsertMemoryMapper,
   if: ifMapper,
+  loop: loopMapper,
   http: httpMapper,
   graphql: graphqlMapper,
   ssh: sshMapper,
@@ -292,11 +301,11 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
-  sendEmail: sendEmailMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
@@ -331,6 +340,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  coolify: coolifyComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
@@ -344,6 +354,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
+  cloudsmith: cloudsmithTriggerRenderers,
   digitalocean: digitaloceanTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
@@ -391,6 +402,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
@@ -447,10 +459,10 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   filter: FILTER_STATE_REGISTRY,
   forEach: FOR_EACH_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
+  loop: LOOP_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
-  sendEmail: SEND_EMAIL_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

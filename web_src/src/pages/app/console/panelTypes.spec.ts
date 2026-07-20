@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CREATABLE_PANEL_TYPES,
   isPanelType,
   normalizeTablePanelContent,
+  PANEL_TYPE_META,
   PANEL_TYPES,
   templateForPanelType,
   validatePanelContent,
 } from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
-  it("includes the seven supported types", () => {
-    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number"]);
+  it("includes the eight supported types", () => {
+    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"]);
   });
 
   it("isPanelType narrows to the union", () => {
@@ -18,8 +20,27 @@ describe("PANEL_TYPES", () => {
     expect(isPanelType("html")).toBe(true);
     expect(isPanelType("node")).toBe(true);
     expect(isPanelType("nodes")).toBe(true);
+    expect(isPanelType("scorecard")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
     expect(isPanelType(42)).toBe(false);
+  });
+});
+
+describe("CREATABLE_PANEL_TYPES", () => {
+  it("hides the legacy `node` type from the Add Panel picker", () => {
+    expect(CREATABLE_PANEL_TYPES).not.toContain("node");
+  });
+
+  it("still offers every other panel type", () => {
+    for (const type of PANEL_TYPES) {
+      if (type === "node") continue;
+      expect(CREATABLE_PANEL_TYPES).toContain(type);
+    }
+  });
+
+  it("uses the merged label/description for the nodes type", () => {
+    expect(PANEL_TYPE_META.nodes.label).toBe("Nodes");
+    expect(PANEL_TYPE_META.nodes.description.toLowerCase()).toContain("one or more");
   });
 });
 
@@ -54,6 +75,30 @@ describe("templateForPanelType", () => {
     const tpl = templateForPanelType("chart") as { render: { series: Array<{ field?: string; label?: string }> } };
     expect(tpl.render.series).toEqual([{ label: "Count" }]);
   });
+
+  it("seeds scorecard panels with a valid drop-in aggregation and screenshot-friendly caption", () => {
+    const tpl = templateForPanelType("scorecard") as {
+      dataSource: { kind: string; namespace?: string };
+      render: {
+        kind: string;
+        aggregation: string;
+        better: string;
+        showChange: string;
+        changeCaption: string;
+      };
+    };
+    expect(tpl.dataSource).toEqual({ kind: "memory", namespace: "" });
+    // Seed with `count` so a newly added panel passes validation before the
+    // author picks a data source / field. Authors typically switch to
+    // `last` (with a field on the same metric as `sparklineField`).
+    expect(tpl.render).toMatchObject({
+      kind: "scorecard",
+      aggregation: "count",
+      better: "up",
+      showChange: "both",
+      changeCaption: "vs previous",
+    });
+  });
 });
 
 describe("validatePanelContent — markdown and node", () => {
@@ -69,6 +114,11 @@ describe("validatePanelContent — markdown and node", () => {
     expect(validatePanelContent("node", { node: 42 })).toMatch(/content\.node must be a string/);
     expect(validatePanelContent("node", { node: "" })).toBeNull();
     expect(validatePanelContent("node", { node: "deploy-prod" })).toBeNull();
+  });
+
+  it("accepts an optional string label on node panels", () => {
+    expect(validatePanelContent("node", { node: "deploy-prod", label: "Ship" })).toBeNull();
+    expect(validatePanelContent("node", { node: "deploy-prod", label: 42 })).toMatch(/content\.label must be a string/);
   });
 });
 
@@ -203,9 +253,104 @@ describe("validatePanelContent — table", () => {
     });
     expect(error).toMatch(/render\.rowStyles\[0\]\.field must be a non-empty string/);
   });
+
+  it("requires progressTarget when format is progress", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressTarget/);
+  });
+
+  it("rejects an unknown progressLabel value", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "fraction" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressLabel must be one of/);
+  });
+
+  it("accepts a well-formed progress column", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "env" },
+        render: {
+          kind: "table",
+          columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "number" }],
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("normalizeTablePanelContent — data source limits", () => {
+  it("preserves an explicit numeric limit for runs and executions", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs", limit: 250 },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: 250 });
+
+    const executions = normalizeTablePanelContent({
+      dataSource: { kind: "executions", node: "deploy", limit: 75 },
+      render: { kind: "table", columns: [] },
+    });
+    expect(executions.dataSource).toEqual({ kind: "executions", node: "deploy", limit: 75 });
+  });
+
+  it("leaves limit undefined when not provided, so blank means 'load all'", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: undefined });
+
+    const executions = normalizeTablePanelContent({
+      dataSource: { kind: "executions" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(executions.dataSource).toEqual({ kind: "executions", node: undefined, limit: undefined });
+  });
+
+  it("drops a non-numeric limit rather than coercing it to a default", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs", limit: "many" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: undefined });
+  });
 });
 
 describe("normalizeTablePanelContent — rowStyles round-trip", () => {
+  it("preserves avatar column options", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "checks" },
+      render: {
+        kind: "table",
+        columns: [
+          {
+            field: "author",
+            label: "Author",
+            format: "avatar",
+            avatarCommitterField: "committer",
+          },
+        ],
+      },
+    });
+    expect(normalized.render.columns[0]).toEqual({
+      field: "author",
+      label: "Author",
+      format: "avatar",
+      avatarCommitterField: "committer",
+    });
+  });
+
   it("preserves valid rowStyles entries verbatim", () => {
     const normalized = normalizeTablePanelContent({
       title: "Envs",

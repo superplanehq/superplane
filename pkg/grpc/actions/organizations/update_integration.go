@@ -10,14 +10,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -35,31 +34,31 @@ func UpdateIntegration(
 ) (*pb.UpdateIntegrationResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization ID: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
 
 	ID, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid integration ID: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid integration ID")
 	}
 
 	instance, err := models.FindIntegration(org, ID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "integration not found")
 	}
 
 	if !instance.IsLegacy() {
-		return nil, status.Errorf(codes.InvalidArgument, "integration %s is not a legacy setup", instance.ID.String())
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s is not a legacy setup", instance.ID.String()))
 	}
 
 	if name != "" && name != instance.InstallationName {
 		existing, err := models.FindIntegrationByName(org, name)
 		if err == nil && existing.ID != instance.ID {
-			return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
+			return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
 		}
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.Internal, "failed to verify integration name uniqueness")
+			return nil, grpcerrors.Internal(err, "failed to verify integration name uniqueness")
 		}
 
 		instance.InstallationName = name
@@ -67,7 +66,7 @@ func UpdateIntegration(
 
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
+		return nil, grpcerrors.Internal(err, "integration not found")
 	}
 
 	if configuration == nil {
@@ -78,7 +77,7 @@ func UpdateIntegration(
 	configuration, err = encryptConfigurationIfNeeded(ctx, registry, integration, configuration, instance.ID, existingConfig)
 	if err != nil {
 		log.Errorf("failed to encrypt sensitive configuration for integration %s: %v", instance.ID, err)
-		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
+		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
 	}
 
 	maps.Copy(existingConfig, configuration)
@@ -93,6 +92,7 @@ func UpdateIntegration(
 		nil,
 	)
 
+	logging.ForIntegration(*instance).WithField("source", "integration_update").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            registry.HTTPContext(),
@@ -114,13 +114,13 @@ func UpdateIntegration(
 	err = database.Conn().Save(instance).Error
 	if err != nil {
 		log.Errorf("failed to save integration %s: %v", instance.ID, err)
-		return nil, status.Error(codes.Internal, "failed to save integration")
+		return nil, grpcerrors.Internal(err, "failed to save integration")
 	}
 
 	proto, err := serializeIntegration(registry, instance, []models.CanvasNodeReference{})
 	if err != nil {
 		log.Errorf("failed to serialize integration %s: %v", instance.ID, err)
-		return nil, status.Error(codes.Internal, "failed to serialize integration")
+		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
 	return &pb.UpdateIntegrationResponse{

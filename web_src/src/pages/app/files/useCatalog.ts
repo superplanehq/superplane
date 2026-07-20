@@ -45,27 +45,29 @@ export function useRepositoryPathLists(
   generatedPaths: string[],
   repositoryPaths: string[],
   pendingChanges: PendingFileChange[],
+  stagedRepositoryPaths: string[] = [],
 ) {
   const repositoryAndPendingPaths = useMemo(() => {
     return Array.from(
       new Set([
         ...repositoryPaths,
+        ...stagedRepositoryPaths,
         ...pendingChanges.filter((change) => change.type === "added").map((change) => change.path),
       ]),
     ).sort();
-  }, [pendingChanges, repositoryPaths]);
+  }, [pendingChanges, repositoryPaths, stagedRepositoryPaths]);
   const allPaths = useMemo(
     () => Array.from(new Set([...generatedPaths, ...repositoryAndPendingPaths])).sort(),
     [generatedPaths, repositoryAndPendingPaths],
   );
   const visiblePaths = useMemo(() => {
     return Array.from(
-      new Set([...generatedPaths, ...buildRenderableTreePaths(repositoryPaths, pendingChanges)]),
+      new Set([...generatedPaths, ...buildRenderableTreePaths(repositoryAndPendingPaths, pendingChanges)]),
     ).sort();
-  }, [generatedPaths, pendingChanges, repositoryPaths]);
+  }, [generatedPaths, pendingChanges, repositoryAndPendingPaths]);
   const finalRepositoryPaths = useMemo(
-    () => buildFinalRepositoryPaths(repositoryPaths, pendingChanges),
-    [pendingChanges, repositoryPaths],
+    () => buildFinalRepositoryPaths(repositoryAndPendingPaths, pendingChanges),
+    [pendingChanges, repositoryAndPendingPaths],
   );
   const commitPathError = useMemo(
     () => getPathValidationError([...generatedPaths, ...finalRepositoryPaths]),
@@ -75,13 +77,23 @@ export function useRepositoryPathLists(
   return { allPaths, visiblePaths, finalRepositoryPaths, commitPathError };
 }
 
-export function useRepositorySelectedFileQuery(
-  canvasId: string | undefined,
-  selectedPath: string | null,
-  repositoryPathSet: Set<string>,
-  generatedFilesByPath: Map<string, AppFile>,
-  versionId?: string,
-) {
+type UseRepositorySelectedFileQueryOptions = {
+  canvasId?: string;
+  selectedPath: string | null;
+  repositoryPathSet: Set<string>;
+  generatedFilesByPath: Map<string, AppFile>;
+  versionId?: string;
+  stage?: boolean;
+};
+
+export function useRepositorySelectedFileQuery({
+  canvasId,
+  selectedPath,
+  repositoryPathSet,
+  generatedFilesByPath,
+  versionId,
+  stage = false,
+}: UseRepositorySelectedFileQueryOptions) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
   const selectedFileQuery = useCanvasRepositoryFile(
@@ -89,6 +101,7 @@ export function useRepositorySelectedFileQuery(
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
     versionId,
+    stage,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };

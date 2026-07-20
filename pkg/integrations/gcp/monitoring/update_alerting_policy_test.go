@@ -38,6 +38,17 @@ func Test__UpdateAlertingPolicy__Setup(t *testing.T) {
 	t.Run("displayName only -> valid", func(t *testing.T) {
 		require.NoError(t, setup(map[string]any{"alertPolicy": policy, "displayName": "New name"}))
 	})
+
+	t.Run("promql conditionKind without a query does not block other updates", func(t *testing.T) {
+		// conditionKind may be persisted as "promql" from a prior toggle; with no
+		// query it must not be treated as a condition replacement, so a
+		// severity-only update still validates.
+		require.NoError(t, setup(map[string]any{"alertPolicy": policy, "conditionKind": conditionKindPromQL, "severity": "CRITICAL"}))
+	})
+
+	t.Run("promql conditionKind with a query -> valid", func(t *testing.T) {
+		require.NoError(t, setup(map[string]any{"alertPolicy": policy, "conditionKind": conditionKindPromQL, "promqlQuery": "vector(1) > 0"}))
+	})
 }
 
 func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
@@ -73,6 +84,29 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 		assert.Equal(t, "New name", patchBody["displayName"])
 		assert.Equal(t, false, patchBody["enabled"])
 		assert.Equal(t, "WARNING", patchBody["severity"])
+		_, hasConditions := patchBody["conditions"]
+		assert.False(t, hasConditions)
+	})
+
+	t.Run("promql conditionKind without query updates other fields only (no conditions patch)", func(t *testing.T) {
+		var patchBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchBody, _ = body.(map[string]any)
+				return alertPolicyJSON(policy, "x", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := u.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"alertPolicy": policy, "conditionKind": conditionKindPromQL, "severity": "CRITICAL"},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, "CRITICAL", patchBody["severity"])
 		_, hasConditions := patchBody["conditions"]
 		assert.False(t, hasConditions)
 	})

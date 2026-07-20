@@ -1,0 +1,27 @@
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example quarantined package record",
+    "format": "docker",
+    "name": "example-app",
+    "namespace": "example-owner",
+    "repository": "example-repo",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/EXAMPLE123/",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-er5g",
+    "slug_perm": "EXAMPLE123",
+    "status": 7,
+    "status_str": "Quarantined",
+    "summary": "",
+    "uploaded_at": "2026-01-01T01:00:00Z",
+    "version": "example-version-hash"
+  },
+  "timestamp": "2026-01-01T01:05:00Z",
+  "type": "cloudsmith.package.quarantined"
+}

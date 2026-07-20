@@ -14,7 +14,59 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__CanvasRun__PendingOutputEventKeepsRunStarted(t *testing.T) {
+func Test__CanvasRun__DeleteChain__DeletesAllData(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+
+	childEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "node-1", "default", &execution.ID)
+	require.NoError(t, database.Conn().Model(childEvent).Update("state", models.CanvasEventStateRouted).Error)
+
+	queueItem := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
+	queueItem.RunID = run.ID
+	require.NoError(t, database.Conn().Save(queueItem).Error)
+
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(database.Conn(), run.WorkflowID, "node-1", execution.ID, "test-key", "test-value"))
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  run.WorkflowID,
+		NodeID:      "node-1",
+		ExecutionID: &execution.ID,
+		State:       models.NodeExecutionRequestStateCompleted,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{ActionName: "test", Parameters: map[string]any{}},
+		}),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	var summary *models.RunDeletionSummary
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		summary, err = run.DeleteChain(tx)
+		return err
+	}))
+
+	require.Equal(t, &models.RunDeletionSummary{
+		Runs:             1,
+		Events:           2,
+		NodeExecutions:   1,
+		NodeRequests:     1,
+		NodeExecutionKVs: 1,
+		NodeQueueItems:   1,
+	}, summary)
+
+	var runCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	require.Equal(t, int64(0), runCount)
+
+	support.VerifyCanvasEventsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeQueueCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionKVCount(t, run.WorkflowID, 0)
+	support.VerifyNodeRequestCount(t, run.WorkflowID, 0)
+}
+
+func Test__CanvasRun__FindOpenWork__PendingOutputEvent(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 
 	_, err := execution.Pass(map[string][]any{
@@ -22,10 +74,11 @@ func Test__CanvasRun__PendingOutputEventKeepsRunStarted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	updatedRun := findRun(t, run.ID)
-	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
-	assert.Empty(t, updatedRun.Result)
-	assert.Nil(t, updatedRun.FinishedAt)
+	openWork, err := run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.True(t, openWork.HasPendingEvents)
+	assert.False(t, openWork.HasActiveExecutions)
+	assert.False(t, openWork.HasQueueItems)
 
 	var outputEvent models.CanvasEvent
 	require.NoError(t, database.Conn().
@@ -35,18 +88,14 @@ func Test__CanvasRun__PendingOutputEventKeepsRunStarted(t *testing.T) {
 	assert.Equal(t, run.ID, outputEvent.RunID)
 
 	require.NoError(t, outputEvent.Routed())
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, run.ID)
-		return err
-	}))
-
-	updatedRun = findRun(t, run.ID)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
-	assert.NotNil(t, updatedRun.FinishedAt)
+	openWork, err = run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.False(t, openWork.HasPendingEvents)
+	assert.False(t, openWork.HasActiveExecutions)
+	assert.False(t, openWork.HasQueueItems)
 }
 
-func Test__CanvasRun__QueueItemKeepsRunStarted(t *testing.T) {
+func Test__CanvasRun__FindOpenWork__QueueItem(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -58,26 +107,41 @@ func Test__CanvasRun__QueueItemKeepsRunStarted(t *testing.T) {
 	queueItem.RunID = run.ID
 	require.NoError(t, database.Conn().Save(queueItem).Error)
 
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, run.ID)
-		return err
-	}))
-
-	updatedRun := findRun(t, run.ID)
-	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+	openWork, err := run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.True(t, openWork.HasQueueItems)
+	assert.False(t, openWork.HasActiveExecutions)
+	assert.False(t, openWork.HasPendingEvents)
 
 	require.NoError(t, queueItem.Delete(database.Conn()))
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, run.ID)
-		return err
-	}))
-
-	updatedRun = findRun(t, run.ID)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+	openWork, err = run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.False(t, openWork.HasQueueItems)
+	assert.False(t, openWork.HasActiveExecutions)
+	assert.False(t, openWork.HasPendingEvents)
 }
 
-func Test__CanvasRun__ResultPrecedence(t *testing.T) {
+func Test__CanvasRun__FindOpenWork__ActiveExecution(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+
+	for _, state := range []string{
+		models.CanvasNodeExecutionStatePending,
+		models.CanvasNodeExecutionStateStarted,
+	} {
+		require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+			"state":      state,
+			"updated_at": time.Now(),
+		}).Error)
+
+		openWork, err := run.FindOpenWork(database.DB(t.Context()))
+		require.NoError(t, err)
+		assert.True(t, openWork.HasActiveExecutions, "expected active execution for state %s", state)
+		assert.False(t, openWork.HasQueueItems)
+		assert.False(t, openWork.HasPendingEvents)
+	}
+}
+
+func Test__CanvasRun__CalculateResult__FailedTakesPrecedenceOverCancelled(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -92,14 +156,35 @@ func Test__CanvasRun__ResultPrecedence(t *testing.T) {
 		"updated_at": time.Now(),
 	}).Error)
 
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, run.ID)
-		return err
-	}))
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultFailed, result)
+}
 
-	updatedRun := findRun(t, run.ID)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
+func Test__CanvasRun__CalculateResult__Cancelled(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultCancelled,
+		"updated_at": time.Now(),
+	}).Error)
+
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CanvasRun__CalculateResult__Passed(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
 }
 
 func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
@@ -146,6 +231,7 @@ func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string
 	run := models.CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: workflowID,
+		NodeID:     "trigger",
 		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
@@ -191,6 +277,7 @@ func createRunForRootEvent(t *testing.T, rootEvent *models.CanvasEvent) *models.
 		return rootEvent.RoutedInTransaction(tx)
 	}))
 
+	require.Equal(t, "trigger", run.NodeID)
 	return run
 }
 
@@ -210,13 +297,4 @@ func createExecutionForRun(t *testing.T, run *models.CanvasRun, rootEventID uuid
 	}
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return &execution
-}
-
-func findRun(t *testing.T, runID uuid.UUID) *models.CanvasRun {
-	var run models.CanvasRun
-	require.NoError(t, database.Conn().
-		Where("id = ?", runID).
-		First(&run).
-		Error)
-	return &run
 }

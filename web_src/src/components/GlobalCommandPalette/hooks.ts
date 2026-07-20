@@ -1,7 +1,5 @@
-import { meMe } from "@/api-client";
 import type { AuthorizationPermission } from "@/api-client";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { useQuery } from "@tanstack/react-query";
+import { useMe } from "@/hooks/useMe";
 import { useCallback, useEffect, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { COMMAND_SHORTCUT } from "./constants";
@@ -9,18 +7,10 @@ import { subscribeToOpenCommandPalette } from "./controller";
 import { isEditableTarget } from "./route";
 import type { CommandPage } from "./types";
 
-export function usePalettePermissions(organizationId: string | null, enabled: boolean) {
-  const { data: permissions = [], isLoading } = useQuery({
-    queryKey: ["command-palette", "permissions", organizationId],
-    queryFn: async () => {
-      const response = await meMe(withOrganizationHeader({ organizationId, query: { includePermissions: true } }));
-      return response.data?.user?.permissions || [];
-    },
-    enabled: enabled && !!organizationId,
-    staleTime: 5 * 60 * 1000,
-  });
+export function usePalettePermissions(organizationId: string | null) {
+  const { data: me, isLoading } = useMe(true, organizationId);
 
-  const permissionSet = useMemo(() => toPermissionSet(permissions), [permissions]);
+  const permissionSet = useMemo(() => toPermissionSet(me?.permissions ?? []), [me?.permissions]);
 
   const canAct = useCallback(
     (resource: string, action: string) => {

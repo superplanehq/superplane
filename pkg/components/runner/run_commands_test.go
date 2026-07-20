@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -29,6 +30,288 @@ func TestNormalizeCommands(t *testing.T) {
 	if len(normalizeCommands("\n \n")) != 0 {
 		t.Fatal("blank-only lines should yield empty slice")
 	}
+}
+
+func TestNormalizeCommandsPreservesShellBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+echo before
+if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  for package in curl unzip; do
+    apt-get install -y "$package"
+  done
+fi
+echo ready
+`
+	want := []string{
+		"echo before",
+		`if ! command -v aws >/dev/null 2>&1; then
+apt-get update
+for package in curl unzip; do
+apt-get install -y "$package"
+done
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresQuotedShellClosers(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  echo "; fi"
+  echo "}"
+fi
+echo ready
+`
+	want := []string{
+		`if true; then
+echo "; fi"
+echo "}"
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresHeredocBodyShellWords(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  cat <<'EOF'
+fi
+done
+  indented
+
+EOF
+fi
+echo ready
+`
+	want := []string{
+		`if true; then
+cat <<'EOF'
+fi
+done
+  indented
+
+EOF
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsPreservesIndentedHeredocs(t *testing.T) {
+	t.Parallel()
+
+	input := strings.Join([]string{
+		"",
+		"if true; then",
+		"  cat <<-EOF",
+		"\tfi",
+		"\tEOF",
+		"fi",
+		"echo ready",
+		"",
+	}, "\n")
+	want := []string{
+		"if true; then\ncat <<-EOF\n\tfi\n\tEOF\nfi",
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresQuotedHeredocOperators(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  grep '<<' pattern
+fi
+echo ready
+`
+	want := []string{
+		"if true; then\ngrep '<<' pattern\nfi",
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsDoesNotTreatHereStringAsHeredoc(t *testing.T) {
+	t.Parallel()
+
+	input := `
+cat <<< "foo"
+echo ready
+`
+	want := []string{
+		`cat <<< "foo"`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresArgumentShellClosers(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  echo fi
+  apt-get install -y done
+fi
+echo ready
+`
+	want := []string{
+		`if true; then
+echo fi
+apt-get install -y done
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsCountsMultipleCommandPositionClosers(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  for package in curl; do
+    echo "$package"
+  done; fi
+echo ready
+`
+	want := []string{
+		`if true; then
+for package in curl; do
+echo "$package"
+done; fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsPreservesChainedShellBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+command -v aws >/dev/null 2>&1 || if true; then
+  echo install
+fi
+echo ready
+`
+	want := []string{
+		`command -v aws >/dev/null 2>&1 || if true; then
+echo install
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsSeparatesUnclosedShellBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  echo install
+echo ready
+`
+	want := []string{
+		"if true; then",
+		"echo install",
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresBacktickCommandSubstitution(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  echo ` + "`echo fi`" + `
+fi
+echo ready
+`
+	want := []string{
+		"if true; then\necho `echo fi`\nfi",
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsPreservesFunctionBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+function install_tools {
+  echo install
+}
+echo ready
+`
+	want := []string{
+		`function install_tools {
+echo install
+}`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsPreservesFunctionParenBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+function install_tools() {
+  echo install
+}
+echo ready
+`
+	want := []string{
+		`function install_tools() {
+echo install
+}`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsPreservesPosixFunctionBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+install_tools() {
+  echo install
+}
+echo ready
+`
+	want := []string{
+		`install_tools() {
+echo install
+}`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
 }
 
 func TestValidateEnvironment(t *testing.T) {
@@ -164,6 +447,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, []string{"echo hello"}, req.Commands)
+	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 }
 
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
@@ -179,7 +463,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"commands":     "echo hi",
-			"machine_type": "aws-arm64-1",
+			"machine_type": MachineTypeE1LargeARM64,
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -194,7 +478,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "aws-arm64-1", req.FleetID)
+	assert.Equal(t, MachineTypeE1LargeARM64, req.FleetID)
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {

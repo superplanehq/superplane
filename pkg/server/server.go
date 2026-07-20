@@ -3,15 +3,19 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
+	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
+	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
-	agenttools "github.com/superplanehq/superplane/pkg/agents/tools"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -27,7 +31,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
@@ -59,10 +62,10 @@ func getAgentProviderOverride() agents.Provider {
 	return agentProviderOverride.provider
 }
 
-func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
 	if provider := getAgentProviderOverride(); provider != nil {
 		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+		return provider, agents.NewService(provider, authService)
 	}
 
 	cfg := config.LoadAnthropicAgentConfig()
@@ -102,7 +105,7 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		return nil, nil
 	}
 
-	service := agents.NewService(provider, authService, jwtSigner, baseURL)
+	service := agents.NewService(provider, authService)
 	log.Info("Anthropic managed agents enabled")
 	return provider, service
 }
@@ -124,7 +127,7 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		startEmailConsumers(rabbitMQURL, encryptor, baseURL, authService)
+		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -134,11 +137,25 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUN_FINALIZER") == "yes" {
+		log.Println("Starting Run Finalizer")
+
+		w := workers.NewRunFinalizer(rabbitMQURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EXECUTION_TERMINATOR") == "yes" {
+		log.Println("Starting Execution Terminator")
+
+		w := workers.NewExecutionTerminator(rabbitMQURL, authService, encryptor, registry)
 		go w.Start(context.Background())
 	}
 
@@ -146,7 +163,14 @@ func startWorkers(
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_APP_MESSAGE_WORKER") == "yes" {
+		log.Println("Starting App Message Worker")
+
+		w := workers.NewAppMessageWorker(registry)
 		go w.Start(context.Background())
 	}
 
@@ -161,7 +185,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -241,16 +265,20 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agents.NewCustomToolRouter(
-			agenttools.NewSuperPlaneCanvasTool(agenttools.SuperPlaneCanvasToolOptions{
-				Encryptor:      encryptor,
-				Registry:       registry,
-				WebhookBaseURL: getWebhookBaseURL(baseURL),
-				AuthService:    authService,
-				UsageService:   getOptionalWorkerUsageService(),
-			}),
-			agenttools.NewSuperPlaneComponentSchemaTool(registry),
-		))
+		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
+			Encryptor:         encryptor,
+			ComponentRegistry: registry,
+			GitProvider:       gitProvider,
+			WebhookBaseURL:    getWebhookBaseURL(baseURL),
+			AuthService:       authService,
+			UsageService:      getOptionalWorkerUsageService(),
+		})
+		w := workers.NewAgentStreamWorkerWithUsageService(
+			agentProvider,
+			rabbitMQURL,
+			getOptionalWorkerUsageService(),
+			agentToolRegistry,
+		)
 		go w.Start(context.Background())
 	}
 
@@ -272,7 +300,7 @@ func startWorkers(
 
 }
 
-func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
+func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
 	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
 		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
 		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
@@ -285,48 +313,40 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
+	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string, authService authorization.Authorization) {
-	log.Println("Starting Invitation Email Consumer")
-	invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go invitationEmailConsumer.Start()
-
-	log.Println("Starting Notification Email Consumer")
-	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
-	go notificationEmailConsumer.Start()
-
+func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
 }
 
-func startInternalAPI(
-	baseURL, webhooksBaseURL, basePath string,
+func buildGRPCServices(
+	baseURL, webhooksBaseURL string,
 	encryptor crypto.Encryptor,
-	jwtSigner *jwt.Signer,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
-) {
-	log.Println("Starting Internal API")
+) (*grpc.Services, error) {
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("initialize usage service: %w", err)
+	}
 
-	grpc.RunServer(
-		baseURL,
-		webhooksBaseURL,
-		basePath,
-		encryptor,
-		jwtSigner,
-		authService,
-		registry,
-		oidcProvider,
-		gitProvider,
-		agentService,
-		lookupInternalAPIPort(),
-	)
+	return grpc.NewServices(grpc.ServicesConfig{
+		BaseURL:         baseURL,
+		WebhooksBaseURL: webhooksBaseURL,
+		Encryptor:       encryptor,
+		AuthService:     authService,
+		Registry:        registry,
+		OIDCProvider:    oidcProvider,
+		GitProvider:     gitProvider,
+		AgentService:    agentService,
+		UsageService:    usageService,
+	})
 }
 
 func startPublicAPI(
@@ -337,6 +357,7 @@ func startPublicAPI(
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
 	gitProvider gitprovider.Provider,
+	grpcServices *grpc.Services,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -377,21 +398,14 @@ func startPublicAPI(
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
-		log.Println("Adding gRPC Gateway to Public API")
+	log.Println("Registering gRPC gateway handlers on Public API")
 
-		grpcServerAddr := os.Getenv("GRPC_SERVER_ADDR")
-		if grpcServerAddr == "" {
-			grpcServerAddr = "localhost:50051"
-		}
-
-		err := server.RegisterGRPCGateway(grpcServerAddr)
-		if err != nil {
-			log.Fatalf("Failed to register gRPC gateway: %v", err)
-		}
-
-		server.RegisterOpenAPIHandler()
+	err = server.RegisterGRPCGateway(grpcServices)
+	if err != nil {
+		log.Fatalf("Failed to register gRPC gateway: %v", err)
 	}
+
+	server.RegisterOpenAPIHandler()
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -422,20 +436,6 @@ func lookupPublicAPIPort() int {
 	return port
 }
 
-func lookupInternalAPIPort() int {
-	port := 50051
-
-	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
-		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
-			port = v
-		} else {
-			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
-		}
-	}
-
-	return port
-}
-
 func configureLogging() {
 	appEnv := os.Getenv("APP_ENV")
 
@@ -452,7 +452,7 @@ func configureLogging() {
 	}
 }
 
-func setupOtelMetrics() {
+func setupOtel() {
 	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
@@ -465,11 +465,40 @@ func setupOtelMetrics() {
 	} else {
 		log.Info("OpenTelemetry metrics initialized")
 	}
+
+	if err := telemetry.InitTracing(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry tracing: %v", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized for critical API endpoints")
+	}
+}
+
+func startPprofServer() {
+	if os.Getenv("PPROF_ENABLED") != "yes" {
+		return
+	}
+
+	port := os.Getenv("PPROF_PORT")
+	if port == "" {
+		port = "6060"
+	}
+
+	// Sample contention so /debug/pprof/block and /debug/pprof/mutex are useful.
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(5)
+
+	go func() {
+		log.Infof("pprof server listening on :%s", port)
+		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+			log.Warnf("pprof server stopped: %v", err)
+		}
+	}()
 }
 
 func Start() {
 	configureLogging()
-	setupOtelMetrics()
+	setupOtel()
+	startPprofServer()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
@@ -563,11 +592,25 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
-	templates.Setup(registry)
+	agentProvider, agentService := buildAgentService(authService)
 
-	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
-
+	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
+		services, err := buildGRPCServices(
+			baseURL,
+			webhooksBaseURL,
+			encryptorInstance,
+			authService,
+			registry,
+			oidcProvider,
+			gitProvider,
+			agentService,
+		)
+		if err != nil {
+			log.Fatalf("failed to build gRPC services: %v", err)
+		}
+		grpcServices = services
+
 		go startPublicAPI(
 			baseURL,
 			basePath,
@@ -577,21 +620,7 @@ func Start() {
 			oidcProvider,
 			authService,
 			gitProvider,
-		)
-	}
-
-	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(
-			baseURL,
-			webhooksBaseURL,
-			basePath,
-			encryptorInstance,
-			jwtSigner,
-			authService,
-			registry,
-			oidcProvider,
-			gitProvider,
-			agentService,
+			grpcServices,
 		)
 	}
 

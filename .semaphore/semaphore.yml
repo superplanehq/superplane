@@ -24,17 +24,6 @@ auto_cancel:
   queued:
     when: branch != 'main'
 blocks:
-  - name: "License Check"
-    dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
-    task:
-      jobs:
-        - name: Licence Check
-          commands:
-            - sudo rm -rf tmp/go/pkg/mod tmp/go-build
-            - make test.license.check
-
   - name: "Backend Tests"
     dependencies: []
     run:
@@ -61,7 +50,10 @@ blocks:
             - make check.components.docs
             - make check.format.go
             - make check.example.payloads
-            - make check.templates
+            - make check.proto.field.numbers
+            - make check.configuration.fields
+            - make check.grpc.actions.status
+            - make check.models.tx.debt
             - make check.generated.artifacts
 
       epilogue:
@@ -82,9 +74,14 @@ blocks:
           commands:
             - make check.build.ui
 
-        - name: Unit Tests
+        - name: Storybook Build
           commands:
-            - make check.test.ui
+            - make check.build.storybook
+
+        - name: Unit Tests
+          parallelism: 4
+          commands:
+            - make check.test.ui.shard INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:

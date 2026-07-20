@@ -35,7 +35,7 @@ const {
     { resource: "org", action: "read" },
     { resource: "members", action: "read" },
     { resource: "members", action: "create" },
-    { resource: "service_accounts", action: "read" },
+    { resource: "api_keys", action: "read" },
     { resource: "groups", action: "read" },
     { resource: "roles", action: "read" },
     { resource: "integrations", action: "read" },
@@ -85,18 +85,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases: () => ({
     data: [
       {
-        metadata: {
-          id: "canvas-1",
-          name: "Deploy API",
-          description: "Production deployment flow",
-        },
+        id: "canvas-1",
+        name: "Deploy API",
+        description: "Production deployment flow",
       },
       {
-        metadata: {
-          id: "canvas-2",
-          name: "Database Backups",
-          description: "Nightly backup flow",
-        },
+        id: "canvas-2",
+        name: "Database Backups",
+        description: "Nightly backup flow",
       },
     ],
     isLoading: false,
@@ -144,9 +140,9 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useServiceAccounts", () => ({
-  useServiceAccounts: () => ({
-    data: [{ id: "sa-1", name: "deploy-bot" }],
+vi.mock("@/hooks/useApiKeys", () => ({
+  useAPIKeys: () => ({
+    data: [{ id: "api-key-1", name: "deploy-bot" }],
   }),
 }));
 
@@ -303,7 +299,7 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByText("deploy-alerts")).toBeInTheDocument();
   });
 
-  it("searches service accounts by name", async () => {
+  it("searches API keys by name", async () => {
     const user = userEvent.setup();
     renderPalette();
 

@@ -12,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="CodePipeline • On Pipeline" href="#code-pipeline-•-on-pipeline" description="Listen to AWS CodePipeline pipeline execution state change events" />
+  <LinkCard title="EC2 • On Alarm" href="#ec2-•-on-alarm" description="Listen to CloudWatch alarm state change events for a specific EC2 instance" />
   <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
@@ -32,19 +33,28 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Get Pipeline Execution" href="#code-pipeline-•-get-pipeline-execution" description="Retrieve the status and details of an AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
+  <LinkCard title="EC2 • Allocate Elastic IP" href="#ec2-•-allocate-elastic-ip" description="Allocate a new Elastic IP address in a VPC" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
+  <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
+  <LinkCard title="EC2 • Create Load Balancer" href="#ec2-•-create-load-balancer" description="Create an Application, Network, or Gateway Load Balancer and wait for it to become active" />
+  <LinkCard title="EC2 • Delete Alarm" href="#ec2-•-delete-alarm" description="Delete a CloudWatch metric alarm for an EC2 instance" />
   <LinkCard title="EC2 • Delete Instance" href="#ec2-•-delete-instance" description="Terminate an EC2 instance and wait for termination" />
+  <LinkCard title="EC2 • Delete Load Balancer" href="#ec2-•-delete-load-balancer" description="Delete an Elastic Load Balancer and wait for deletion to complete" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image" href="#ec2-•-disable-image" description="Disable an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image Deprecation" href="#ec2-•-disable-image-deprecation" description="Disable deprecation for an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image" href="#ec2-•-enable-image" description="Enable an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
+  <LinkCard title="EC2 • Get Alarm" href="#ec2-•-get-alarm" description="Fetch the current state and details of a CloudWatch alarm for an EC2 instance" />
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
   <LinkCard title="EC2 • Get Instance Metrics" href="#ec2-•-get-instance-metrics" description="Fetch CPU, network, and optional memory metrics for an EC2 instance via CloudWatch" />
+  <LinkCard title="EC2 • Manage Elastic IP" href="#ec2-•-manage-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 instance" />
   <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
+  <LinkCard title="EC2 • Release Elastic IP" href="#ec2-•-release-elastic-ip" description="Release an Elastic IP address back to the AWS address pool" />
+  <LinkCard title="EC2 • Update Alarm" href="#ec2-•-update-alarm" description="Update an existing CloudWatch metric alarm for an EC2 instance" />
   <LinkCard title="EC2 • Update Instance" href="#ec2-•-update-instance" description="Resize an EC2 instance or update its security groups" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
@@ -56,6 +66,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="ECS • Update Service" href="#ecs-•-update-service" description="Update an AWS ECS service configuration" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="Prometheus • Create Workspace" href="#prometheus-•-create-workspace" description="Create an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Delete Workspace" href="#prometheus-•-delete-workspace" description="Delete an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Get Workspace" href="#prometheus-•-get-workspace" description="Get an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Query" href="#prometheus-•-query" description="Execute a PromQL instant query against an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Query Range" href="#prometheus-•-query-range" description="Execute a PromQL range query against an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Update Workspace" href="#prometheus-•-update-workspace" description="Update a Prometheus workspace alias" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
@@ -250,6 +266,92 @@ Each event includes:
   },
   "timestamp": "2026-02-24T15:21:52.212Z",
   "type": "aws.codepipeline.pipeline"
+}
+```
+
+<a id="ec2-•-on-alarm"></a>
+
+## EC2 • On Alarm
+
+**Trigger key:** `aws.ec2.onAlarm`
+
+The On Alarm trigger starts a workflow execution when a CloudWatch alarm attached to a specific EC2 instance transitions to the configured state.
+
+### Use Cases
+
+- **Incident response**: Trigger remediation workflows when a CPU, network, or status-check alarm fires
+- **Auto-scaling**: React to alarms on individual instances without polling
+- **Audit**: Record alarm state transitions for specific instances over time
+
+### Configuration
+
+- **Region**: AWS region where the instance and alarms reside
+- **Instance**: EC2 instance whose alarms to monitor (required)
+- **Alarm State**: Only trigger for a specific state: ALARM, OK, or INSUFFICIENT_DATA (required)
+- **Alarm**: Optionally restrict to a single alarm selected from the alarms attached to the chosen instance; leave empty to trigger on any alarm for that instance
+
+### Event Data
+
+Each matched event includes the full EventBridge payload:
+- **detail.alarmName**: CloudWatch alarm name
+- **detail.state.value**: Current alarm state (ALARM / OK / INSUFFICIENT_DATA)
+- **detail.previousState.value**: Previous alarm state
+- **detail.configuration**: Full alarm configuration including metric, threshold, and dimensions
+- **region**, **account**, **time**: Event envelope fields
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "alarmName": "high cpu usage",
+      "configuration": {
+        "description": "The alarm",
+        "metrics": [
+          {
+            "id": "56cf46e9-e800-a52b-b55b-7f3c770c24ef",
+            "metricStat": {
+              "metric": {
+                "dimensions": {
+                  "InstanceId": "i-1234567890abcdef0"
+                },
+                "name": "CPUUtilization",
+                "namespace": "AWS/EC2"
+              },
+              "period": 30,
+              "stat": "Average"
+            },
+            "returnData": true
+          }
+        ]
+      },
+      "previousState": {
+        "reason": "Threshold Crossed: 1 datapoint [0.3166666666666666 (03/06/26 14:15:00)] was not greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T14:15:45.660+0000\",\"startDate\":\"2026-06-03T14:15:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[0.3166666666666666],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T14:15:00.000+0000\",\"sampleCount\":1.0,\"value\":0.3166666666666666}]}",
+        "timestamp": "2026-06-03T14:15:45.663+0000",
+        "value": "OK"
+      },
+      "state": {
+        "reason": "Threshold Crossed: 1 datapoint [31.3283485070315 (03/06/26 15:45:00)] was greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T15:46:15.660+0000\",\"startDate\":\"2026-06-03T15:45:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[31.3283485070315],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T15:45:00.000+0000\",\"sampleCount\":2.0,\"value\":31.3283485070315}]}",
+        "timestamp": "2026-06-03T15:46:15.662+0000",
+        "value": "ALARM"
+      }
+    },
+    "detail-type": "CloudWatch Alarm State Change",
+    "id": "ccc0350a-524d-2f57-068b-1cebb2a4b6c0",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:high cpu usage"
+    ],
+    "source": "aws.cloudwatch",
+    "time": "2026-06-03T15:46:15Z",
+    "version": "0"
+  },
+  "timestamp": "2026-06-03T15:46:16.233981639Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
@@ -982,6 +1084,59 @@ The Run Pipeline component triggers an AWS CodePipeline execution and waits for 
 }
 ```
 
+<a id="ec2-•-allocate-elastic-ip"></a>
+
+## EC2 • Allocate Elastic IP
+
+**Component key:** `aws.ec2.allocateElasticIP`
+
+The Allocate Elastic IP component allocates a new Elastic IP address to your AWS account in the selected region.
+
+### Use Cases
+
+- **Static public IPs**: Reserve a public IPv4 address before launching or exposing a service
+- **Failover workflows**: Allocate a replacement Elastic IP during disaster recovery
+- **Pre-provisioning**: Reserve an address ahead of association with an instance or network interface
+- **BYOIP and IPAM**: Allocate from your own address pools or VPC IPAM pools
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP will be allocated
+- **IP source**: Where the address comes from:
+  - **Amazon's pool**: Default public IPv4 address from AWS
+  - **BYOIP pool**: Address from a public IPv4 pool you brought to your account
+  - **Customer-owned pool**: Address from an on-premises pool for use with an Outpost
+  - **IPAM pool**: Address from a VPC IPAM pool with a public IPv4 CIDR
+- **Pool**: Required when using BYOIP, customer-owned, or IPAM sources (searchable pickers scoped to the selected region)
+- **Address** (optional): Request a specific IPv4 address from the selected pool
+- **Tags** (optional): Key/value tags applied to the Elastic IP at allocation time
+
+### Output
+
+Emits the allocated Elastic IP details on the default output channel:
+- `allocationId`, `publicIp`, `domain`, `region`
+
+### Important Notes
+
+- Elastic IPs are allocated to your account and incur charges when not associated with a running instance
+- The address is allocated for use in a VPC (`domain: vpc`)
+- BYOIP, customer-owned, and IPAM pools must already exist in the target region
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "domain": "vpc",
+    "publicIp": "203.0.113.10",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.elastic-ip.allocated"
+}
+```
+
 <a id="ec2-•-copy-image"></a>
 
 ## EC2 • Copy Image
@@ -1033,6 +1188,74 @@ The Copy Image component copies an AMI to another AWS region.
   },
   "timestamp": "2026-02-19T09:00:00Z",
   "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-create-alarm"></a>
+
+## EC2 • Create Alarm
+
+**Component key:** `aws.ec2.createAlarm`
+
+The Create Alarm component creates a CloudWatch metric alarm targeting a specific EC2 instance.
+
+### Use Cases
+
+- **Proactive monitoring**: Set up CPU or network alarms as part of an instance provisioning workflow
+- **Auto-remediation**: Create alarms that trigger downstream workflows when thresholds are crossed
+- **Compliance**: Ensure every new instance has required alarms configured automatically
+
+### Configuration
+
+- **Region**: AWS region where the EC2 instance and alarm reside
+- **Instance**: EC2 instance to monitor
+- **Alarm Name**: Unique name for the CloudWatch alarm
+- **Metric Name**: EC2 CloudWatch metric to monitor (CPU, disk, network, status checks)
+- **Statistic**: Aggregation function applied over the evaluation period (Average, Sum, Min, Max, SampleCount)
+- **Comparison Operator**: How the metric is compared to the threshold (e.g. GreaterThanThreshold)
+- **Threshold**: Numeric value to compare the metric against
+- **Period**: Evaluation window in seconds (default: 300)
+- **Evaluation Periods**: Number of consecutive periods that must breach the threshold before the alarm fires (default: 1)
+- **Alarm Description**: Optional free-text description
+- **Treat Missing Data**: How to treat missing data points (missing, ignore, breaching, notBreaching)
+- **Alarm Action** *(toggleable)*: EC2 automation action to execute when the alarm enters ALARM state — Recover, Reboot, Stop, or Terminate
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to publish a notification to when the alarm enters ALARM state
+
+### Output
+
+Emits the created alarm details on the default output channel:
+- `alarmName`, `alarmArn`, `namespace`, `metricName`
+- `statistic`, `threshold`, `comparisonOperator`, `stateValue`
+- `period`, `evaluationPeriods`, `dimensions`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
@@ -1112,26 +1335,49 @@ The Create Instance component launches a new Amazon EC2 instance and waits until
 - **Image**: Public AMI for the selected operating system. These are filtered to only show currently available images in the selected region for the chosen OS family
 - **Instance Type**: EC2 instance type from the current generation catalog
 - **Subnet**: VPC subnet for the primary network interface
-- **Firewall**: Create a launch security group (like the AWS launch wizard) or use an existing one
+- **Firewall**: Create a launch security group (like the AWS launch wizard) or use one or more existing security groups
+- **IAM Instance Profile** (optional): IAM instance profile name or ARN attached to the launched instance
 - **Allow SSH/HTTP/HTTPS from the internet**: Ingress rules when creating a new security group
-- **Configure Root Volume** (optional): Override the AMI root volume size and type
+- **Configure Root Volume** (optional): Override the AMI root volume device name, size, type, IOPS, delete-on-termination, and encryption settings
+- **Additional Block Devices** (optional): Extra EBS volumes attached at launch
 - **Key Pair** (optional): EC2 key pair for SSH access. These are filtered to show only key pairs available in the selected region
 - **User Data** (optional): Shell script or cloud-init payload executed at launch
 - **Associate Public IP Address**: Assign a public IPv4 address when the subnet supports it
+- **Tags** (optional): Additional tags applied to both instance and volume resources. The `Name` tag is set from the Name field
+- **Wait For Running Timeout**: Maximum time to wait for the instance to reach running state
+- **Wait For Status Checks**: Also wait for EC2 instance and system status checks to pass
 
 ### Output
 
-Emits instance details on the default output channel, including:
+Emits instance details on the created output channel, including:
 - `instanceId` — EC2 instance ID
 - `state` — should be `running`
 - `publicIpAddress` / `privateIpAddress` — network addresses when available
 - `publicDnsName` / `privateDnsName` — DNS names when available
+- `name` — the Name tag value
+- `availabilityZone` — EC2 availability zone
+- `tags` — instance tags as key/value pairs
+
+### runnerBash Migration
+
+| `aws ec2 run-instances` flag | `aws.ec2.createInstance` field |
+|---|---|
+| `--image-id` | `image` |
+| `--instance-type` | `instanceType` |
+| `--subnet-id` | `subnet` |
+| `--security-group-ids` | `securityGroup` |
+| `--iam-instance-profile Name=...` | `iamInstanceProfile` |
+| `--associate-public-ip-address` | `associatePublicIpAddress` |
+| `--user-data file://...` | `userData` |
+| `--block-device-mappings` | `configureRootVolume` and `additionalBlockDevices` |
+| `--tag-specifications` | `name` and `tags` |
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "availabilityZone": "us-east-1a",
     "imageId": "ami-07f0e4f3e9c123abc",
     "instanceId": "i-0abc1234567890def",
     "instanceType": "t3.micro",
@@ -1145,10 +1391,124 @@ Emits instance details on the default output channel, including:
     "region": "us-east-1",
     "state": "running",
     "subnetId": "subnet-0abc1234567890def",
+    "tags": [
+      {
+        "key": "Name",
+        "value": "ephemeral-builder"
+      },
+      {
+        "key": "purpose",
+        "value": "release-canary"
+      }
+    ],
     "vpcId": "vpc-0abc1234567890def"
   },
   "timestamp": "2026-05-21T12:01:00Z",
   "type": "aws.ec2.instance"
+}
+```
+
+<a id="ec2-•-create-load-balancer"></a>
+
+## EC2 • Create Load Balancer
+
+**Component key:** `aws.ec2.createLoadBalancer`
+
+The Create Load Balancer component provisions an Elastic Load Balancer (ELBv2) and waits until it reaches **active** state before emitting.
+
+### Use Cases
+
+- **Traffic distribution**: Add a load balancer in front of EC2 instances or ECS services
+- **Environment provisioning**: Create load balancers as part of infrastructure workflows
+- **Blue/green deployments**: Stand up a new load balancer before switching traffic
+
+### Configuration
+
+- **Name**: Name for the load balancer (must be unique per account/region)
+- **Region**: AWS region where the load balancer will be created
+- **Type**: Load balancer type:
+  - `application` — Layer 7; routes HTTP/HTTPS traffic
+  - `network` — Layer 4; routes TCP, TLS, UDP, or TCP_UDP traffic
+  - `gateway` — Layer 3; routes traffic through third-party virtual appliances using GENEVE
+- **Scheme** (Application and Network only): `internet-facing` (public DNS) or `internal` (private VPC only). Not applicable for Gateway load balancers.
+- **Subnets**: Subnets to attach to the load balancer. Application and Network load balancers require at least two subnets in different Availability Zones; Gateway load balancers require at least one.
+- **Security Groups** (Application only): Security groups to associate with the load balancer.
+- **IP Address Type** (optional): Address family for the load balancer:
+  - `ipv4` — IPv4 only (default)
+  - `dualstack` — IPv4 and IPv6
+  - `dualstack-without-public-ipv4` — IPv6 public, IPv4 private only
+- **Listener Protocol** (optional): Protocol for the default listener. Valid values depend on the load balancer type:
+  - Application: `HTTP`, `HTTPS`
+  - Network: `TCP`, `TLS`, `UDP`, `TCP_UDP`
+  - Gateway: `GENEVE`
+- **Listener Port** (optional): Port the listener receives traffic on (1–65535). Shown when a Listener Protocol is selected.
+- **Target Group** (optional): Target group to forward listener traffic to. Shown when a Listener Protocol is selected.
+
+### Output
+
+Emits load balancer details on the default output channel, including:
+- `loadBalancerArn` — full ARN of the load balancer
+- `name` — load balancer name
+- `dnsName` — DNS name for routing traffic
+- `scheme` — `internet-facing` or `internal`
+- `type` — `application`, `network`, or `gateway`
+- `state` — should be `active`
+- `vpcId` — VPC the load balancer is associated with
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dnsName": "my-load-balancer-123456789.us-east-1.elb.amazonaws.com",
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "name": "my-load-balancer",
+    "region": "us-east-1",
+    "scheme": "internet-facing",
+    "state": "active",
+    "type": "application",
+    "vpcId": "vpc-0598c7d356eba48d7"
+  },
+  "timestamp": "2026-05-21T12:00:00Z",
+  "type": "aws.ec2.loadBalancer"
+}
+```
+
+<a id="ec2-•-delete-alarm"></a>
+
+## EC2 • Delete Alarm
+
+**Component key:** `aws.ec2.deleteAlarm`
+
+The Delete Alarm component removes a CloudWatch metric alarm.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary alarms created by automation workflows
+- **Decommissioning**: Delete monitoring for instances being retired
+- **Rollback**: Undo alarm creation steps in failed provisioning runs
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to delete (`ec2.alarm` resource picker)
+
+### Output
+
+Emits a deletion confirmation on the default output channel:
+- `alarmName`, `deleted`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmName": "cpuUsage",
+    "deleted": true,
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-06-03T16:38:01.123456789Z",
+  "type": "aws.ec2.alarm.deleted"
 }
 ```
 
@@ -1186,6 +1546,44 @@ Emits a deletion payload on the default output channel:
   },
   "timestamp": "2026-05-21T12:05:00Z",
   "type": "aws.ec2.instance.deleted"
+}
+```
+
+<a id="ec2-•-delete-load-balancer"></a>
+
+## EC2 • Delete Load Balancer
+
+**Component key:** `aws.ec2.deleteLoadBalancer`
+
+The Delete Load Balancer component deletes an Elastic Load Balancer (ELBv2) and waits until AWS confirms deletion.
+
+### Use Cases
+
+- **Environment teardown**: Remove load balancers when decommissioning an environment
+- **Cost control**: Delete unused load balancers after a workflow finishes
+- **Blue/green cleanup**: Remove the old load balancer after a successful deployment
+
+### Configuration
+
+- **Region**: AWS region where the load balancer resides
+- **Load Balancer**: ARN of the load balancer to delete
+
+### Output
+
+Emits a deletion payload on the default output channel once AWS confirms the load balancer is gone:
+- `loadBalancerArn` — ARN of the deleted load balancer
+- `state` — `deleted`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "state": "deleted"
+  },
+  "timestamp": "2026-05-21T12:05:00Z",
+  "type": "aws.ec2.loadBalancer.deleted"
 }
 ```
 
@@ -1362,6 +1760,63 @@ The Enable Image Deprecation component sets a deprecation time for an AMI.
 }
 ```
 
+<a id="ec2-•-get-alarm"></a>
+
+## EC2 • Get Alarm
+
+**Component key:** `aws.ec2.getAlarm`
+
+The Get Alarm component describes a CloudWatch alarm and emits its current details.
+
+### Use Cases
+
+- **State inspection**: Check whether an alarm is in ALARM, OK, or INSUFFICIENT_DATA state before taking action
+- **Alarm metadata lookup**: Retrieve threshold, metric, and dimension details mid-workflow
+- **Audit**: Record alarm configuration at a point in time
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to describe, selected from all alarms in the chosen region (`ec2.alarm` resource picker)
+
+### Output
+
+Emits the alarm details on the default output channel:
+- `alarmName`, `alarmArn`, `namespace`, `metricName`
+- `statistic`, `threshold`, `comparisonOperator`, `stateValue`
+- `period`, `evaluationPeriods`, `dimensions`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:37:20.636935245Z",
+  "type": "aws.ec2.alarm"
+}
+```
+
 <a id="ec2-•-get-image"></a>
 
 ## EC2 • Get Image
@@ -1520,6 +1975,55 @@ Returns averaged and aggregated metrics over the lookback window:
 }
 ```
 
+<a id="ec2-•-manage-elastic-ip"></a>
+
+## EC2 • Manage Elastic IP
+
+**Component key:** `aws.ec2.manageElasticIP`
+
+The Manage Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
+
+### Use Cases
+
+- **Static addressing**: Attach a reserved Elastic IP to an instance after launch
+- **Failover**: Re-associate an Elastic IP to a replacement instance
+- **Cleanup**: Disassociate an Elastic IP before releasing it
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP and instance reside
+- **Operation**: Choose **Associate** or **Disassociate**
+- **Elastic IP** (associate only): The allocated Elastic IP to attach
+- **Instance** (associate only): EC2 instance to associate the Elastic IP with
+- **Association** (disassociate only): The active Elastic IP association to remove
+
+### Output
+
+Emits operation-specific details on the default output channel:
+- **Associate**: `associationId`, `allocationId`, `instanceId`, `region`
+- **Disassociate**: `associationId`, `region`
+
+### Important Notes
+
+- The Elastic IP must be allocated before it can be associated
+- Disassociating is required before releasing an Elastic IP
+- Re-association to a different instance is allowed when the address is already associated elsewhere
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "associationId": "eipassoc-0abc1234567890def",
+    "instanceId": "i-0abc1234567890def",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:03:00Z",
+  "type": "aws.ec2.elastic-ip.associated"
+}
+```
+
 <a id="ec2-•-manage-instance-power"></a>
 
 ## EC2 • Manage Instance Power
@@ -1577,6 +2081,112 @@ Emits instance details on the default output channel once the operation complete
   },
   "timestamp": "2026-05-28T09:41:26.29656651Z",
   "type": "aws.ec2.instance.power.started"
+}
+```
+
+<a id="ec2-•-release-elastic-ip"></a>
+
+## EC2 • Release Elastic IP
+
+**Component key:** `aws.ec2.releaseElasticIP`
+
+The Release Elastic IP component releases an allocated Elastic IP address from your AWS account.
+
+### Use Cases
+
+- **Cost optimisation**: Release unused Elastic IPs to avoid idle charges
+- **Cleanup workflows**: Remove temporary addresses after a workflow completes
+- **Decommissioning**: Release addresses when tearing down infrastructure
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP was allocated
+- **Elastic IP**: The allocated Elastic IP to release
+
+### Output
+
+Emits a release confirmation on the default output channel:
+- `allocationId`, `region`
+
+### Important Notes
+
+- The Elastic IP must be disassociated before it can be released
+- Released addresses may be allocated to another AWS account and cannot always be recovered
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:02:00Z",
+  "type": "aws.ec2.elastic-ip.released"
+}
+```
+
+<a id="ec2-•-update-alarm"></a>
+
+## EC2 • Update Alarm
+
+**Component key:** `aws.ec2.updateAlarm`
+
+The Update Alarm component modifies an existing CloudWatch metric alarm scoped to an EC2 instance.
+
+### Use Cases
+
+- **Threshold tuning**: Raise or lower alert thresholds without recreating the alarm
+- **Operational changes**: Adjust evaluation periods or comparison operators as workloads change
+- **Notification updates**: Add or change SNS topics and EC2 automation actions when an alarm fires
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to update (`ec2.alarm` resource picker)
+- **Threshold** *(toggleable)*: New threshold and comparison operator (both must be set together)
+- **Statistic** *(toggleable)*: Aggregation function (Average, Sum, Min, Max, SampleCount)
+- **Period** *(toggleable)*: Evaluation window in seconds
+- **Evaluation Periods** *(toggleable)*: Consecutive breaching periods required before ALARM
+- **Alarm Description** *(toggleable)*: Free-text description
+- **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
+- **Alarm Action** *(toggleable)*: EC2 automation action when the alarm enters ALARM state
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to notify when the alarm enters ALARM state
+
+At least one toggleable property must be enabled. Unspecified properties keep their current values.
+
+### Output
+
+Emits the updated alarm details on the default output channel (same fields as Get Alarm).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Threshold Crossed: 1 datapoint (85.3) was greater than the threshold (80.0).",
+    "stateValue": "ALARM",
+    "statistic": "Average",
+    "threshold": 90,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:37:20.636935245Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
@@ -2178,6 +2788,252 @@ The Run Lambda component invokes a Lambda function.
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "aws.lambda.run"
+}
+```
+
+<a id="prometheus-•-create-workspace"></a>
+
+## Prometheus • Create Workspace
+
+**Component key:** `aws.prometheus.createWorkspace`
+
+The Create Workspace component creates an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region for the workspace
+- **Alias**: Optional workspace alias
+- **KMS Key ARN**: Optional customer managed AWS KMS key ARN for encryption
+- **Client Token**: Optional idempotency token
+- **Tags**: Optional workspace tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workspace": {
+      "alias": "example-workspace-created",
+      "arn": "arn:aws:aps:us-east-1:123456789012:workspace/ws-22222222-2222-4222-8222-222222222222",
+      "status": {
+        "statusCode": "CREATING"
+      },
+      "tags": {
+        "purpose": "example"
+      },
+      "workspaceId": "ws-22222222-2222-4222-8222-222222222222"
+    }
+  },
+  "timestamp": "2026-01-01T00:10:00.000000000Z",
+  "type": "aws.prometheus.workspace"
+}
+```
+
+<a id="prometheus-•-delete-workspace"></a>
+
+## Prometheus • Delete Workspace
+
+**Component key:** `aws.prometheus.deleteWorkspace`
+
+The Delete Workspace component deletes an Amazon Managed Service for Prometheus workspace.
+
+### Notes
+
+AWS does not immediately delete metrics data that has already been ingested. It is permanently deleted within one month.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Client Token**: Optional idempotency token
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+  },
+  "timestamp": "2026-01-01T00:15:00.000000000Z",
+  "type": "aws.prometheus.workspace.deleted"
+}
+```
+
+<a id="prometheus-•-get-workspace"></a>
+
+## Prometheus • Get Workspace
+
+**Component key:** `aws.prometheus.getWorkspace`
+
+The Get Workspace component retrieves details for an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workspace": {
+      "alias": "example-workspace",
+      "arn": "arn:aws:aps:us-east-1:123456789012:workspace/ws-11111111-1111-4111-8111-111111111111",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "prometheusEndpoint": "https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-11111111-1111-4111-8111-111111111111/",
+      "status": {
+        "statusCode": "ACTIVE"
+      },
+      "tags": {
+        "environment": "example"
+      },
+      "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+    }
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.workspace"
+}
+```
+
+<a id="prometheus-•-query"></a>
+
+## Prometheus • Query
+
+**Component key:** `aws.prometheus.query`
+
+The Query component executes an instant PromQL query against an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Query**: Required PromQL expression to evaluate. Example: `up`
+- **Time**: Optional evaluation timestamp in RFC3339 or Unix format
+- **Timeout**: Optional query timeout duration
+- **Query sample thresholds**: Optional warning and error thresholds for query samples processed
+
+### Output
+
+Emits one `aws.prometheus.query` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "94.39090288589495"
+        ]
+      },
+      {
+        "metric": {
+          "component": "run_promql_range_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "72.52482929121066"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.query"
+}
+```
+
+<a id="prometheus-•-query-range"></a>
+
+## Prometheus • Query Range
+
+**Component key:** `aws.prometheus.queryRange`
+
+The Query Range component executes a range PromQL query against an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Query**: Required PromQL expression to evaluate. Example: `up`
+- **Start**: Required start timestamp in RFC3339 or Unix format. Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format. Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step. Example: `15s`
+- **Timeout**: Optional query timeout duration
+- **Query sample thresholds**: Optional warning and error thresholds for query samples processed
+
+### Output
+
+Emits one `aws.prometheus.queryRange` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query"
+        },
+        "values": [
+          [
+            1781102220,
+            "0.620012400248005"
+          ],
+          [
+            1781102250,
+            "0.5400108002160044"
+          ],
+          [
+            1781105820,
+            "0.48"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.queryRange"
+}
+```
+
+<a id="prometheus-•-update-workspace"></a>
+
+## Prometheus • Update Workspace
+
+**Component key:** `aws.prometheus.updateWorkspace`
+
+The Update Workspace component updates the alias for an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Alias**: New workspace alias
+- **Client Token**: Optional idempotency token
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alias": "example-workspace-updated",
+    "updated": true,
+    "workspaceId": "ws-22222222-2222-4222-8222-222222222222"
+  },
+  "timestamp": "2026-01-01T00:20:00.000000000Z",
+  "type": "aws.prometheus.workspace.updated"
 }
 ```
 

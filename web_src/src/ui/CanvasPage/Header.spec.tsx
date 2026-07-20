@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { Header } from "./Header";
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -16,6 +18,10 @@ vi.mock("./components/CanvasToolSidebarTrigger", () => ({
   CanvasToolSidebarTrigger: () => null,
 }));
 
+vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
+  CanvasRunsSidebarTrigger: () => null,
+}));
+
 vi.mock("./components/CanvasModeToggle", () => ({
   CanvasModeToggle: () => null,
 }));
@@ -23,11 +29,20 @@ vi.mock("./components/CanvasModeToggle", () => ({
 const toolSidebarState = {
   canvasId: "canvas-1",
   organizationId: "org-1",
+  liveCanvasVersionId: undefined,
+  headerMode: undefined,
+  isRunInspectionMode: false,
+  onAgentStagingReady: undefined,
+  onAgentStagingCommit: undefined,
   isEditing: false,
+  isAutoLayoutOnUpdateEnabled: false,
   readOnly: false,
   isToolSidebarOpen: true,
   showToolSidebarToggle: true,
   isAgentEnabled: false,
+  agentUnavailable: false,
+  markAgentUnavailable: vi.fn(),
+  markAgentAvailable: vi.fn(),
   handleToolSidebarToggle: vi.fn(),
   openToolSidebar: vi.fn(),
   closeToolSidebar: vi.fn(),
@@ -35,8 +50,24 @@ const toolSidebarState = {
   switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: true,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
+
+const versionsSidebarState = {
+  isVersionsSidebarOpen: false,
+  showVersionsSidebarToggle: true,
+  handleVersionsSidebarToggle: vi.fn(),
+  openVersionsSidebar: vi.fn(),
+  closeVersionsSidebar: vi.fn(),
+} satisfies CanvasVersionsSidebarState;
+
 function renderHeader(
-  mode: "runs" | "version-live" | "version-edit",
+  mode: "version-live",
   options?: {
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
@@ -58,6 +89,8 @@ function renderHeader(
               onEnterEditMode={vi.fn()}
               onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
+              runsSidebarState={runsSidebarState}
+              versionsSidebarState={versionsSidebarState}
             />
           }
         />
@@ -67,13 +100,7 @@ function renderHeader(
 }
 
 describe("Header", () => {
-  it("hides enter edit actions in runs mode", () => {
-    renderHeader("runs");
-
-    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
-  });
-
-  it("shows enter edit actions outside runs mode", () => {
+  it("shows enter edit actions on the live canvas tab", () => {
     renderHeader("version-live");
 
     expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
@@ -84,14 +111,15 @@ describe("Header", () => {
   });
 
   it("shows the active draft label and exit control in edit mode", () => {
-    renderHeader("version-edit", {
+    renderHeader("version-live", {
       isEditing: true,
       activeDraftBranchLabel: "Draft #1",
       onExitEditMode: vi.fn(),
     });
 
     expect(screen.getByTestId("active-draft-branch-chip")).toHaveTextContent("Editing: Draft #1");
-    expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Exit edit");
+    expect(screen.getByText("Finish Editing")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Finish editing");
     expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 });

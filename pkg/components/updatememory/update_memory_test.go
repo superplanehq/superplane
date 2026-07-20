@@ -205,6 +205,8 @@ func TestUpdateMemoryExecute(t *testing.T) {
 				switch expression {
 				case "item.name":
 					return item["name"], nil
+				case "prod":
+					return "prod", nil
 				}
 				return "running", nil
 			},
@@ -304,6 +306,84 @@ func TestUpdateMemoryExecute(t *testing.T) {
 		assert.Equal(t, []any{
 			map[string]any{"name": "api", "status": "running"},
 		}, innerData["updated"])
+	})
+
+	t.Run("list mode resolves matchList per item with iteration variable", func(t *testing.T) {
+		component := &UpdateMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{
+			recordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"uuid": "A", "status": "running"})},
+				{memoryRecord("22222222-2222-2222-2222-222222222222", map[string]any{"uuid": "B", "status": "stopped"})},
+			},
+		}
+
+		items := []any{
+			map[string]any{"uuid": "A", "status": "running"},
+			map[string]any{"uuid": "B", "status": "stopped"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "apps",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+				},
+				"valueList": []map[string]any{
+					{"name": "status", "value": "item.status"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: items,
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					item := variables["item"].(map[string]any)
+					switch expression {
+					case "item.uuid":
+						return item["uuid"], nil
+					case "item.status":
+						return item["status"], nil
+					}
+					return expression, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, memoryCtx.updateCalls)
+		assert.Equal(t, ChannelNameFound, execState.Channel)
+
+		require.Len(t, memoryCtx.matchesPerCall, 2)
+		assert.Equal(t, map[string]any{"uuid": "A"}, memoryCtx.matchesPerCall[0])
+		assert.Equal(t, map[string]any{"uuid": "B"}, memoryCtx.matchesPerCall[1])
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 2, metadata["updatedCount"])
+
+		require.Len(t, execState.Payloads, 1)
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		outerData, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		require.True(t, ok)
+		itemsResults, ok := innerData["items"].([]any)
+		require.True(t, ok)
+		require.Len(t, itemsResults, 2)
+		first, ok := itemsResults[0].(map[string]any)
+		require.True(t, ok)
+		second, ok := itemsResults[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"uuid": "A"}, first["matches"])
+		assert.Equal(t, map[string]any{"uuid": "B"}, second["matches"])
 	})
 
 	t.Run("list mode emits notFound when nothing matches", func(t *testing.T) {

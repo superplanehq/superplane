@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -67,10 +67,10 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err := DescribeIntegration(ctx, r.Registry, "invalid-uuid", uuid.NewString())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid organization ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid organization ID")
 	})
 
 	t.Run("invalid integration ID -> error", func(t *testing.T) {
@@ -79,10 +79,10 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), "invalid-uuid")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid integration ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid integration ID")
 	})
 
 	t.Run("non-existent integration -> error", func(t *testing.T) {
@@ -127,6 +127,40 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err = DescribeIntegration(ctx, r.Registry, org2.ID.String(), integrationID)
 		require.Error(t, err)
+	})
+
+	t.Run("integration app no longer registered -> internal error", func(t *testing.T) {
+		//
+		// Register a test integration and create an integration with it.
+		//
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value"})
+		require.NoError(t, err)
+
+		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
+		require.NoError(t, err)
+		integrationID := createResponse.Integration.Metadata.Id
+
+		//
+		// Unregister the app to simulate an integration whose app was removed.
+		// Serialization now fails, but the error must be classified as Internal
+		// instead of leaking an unhandled HTTP 500.
+		//
+		delete(r.Registry.Integrations, "dummy")
+
+		_, err = DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID)
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.Internal, code)
+		assert.Contains(t, msg, "failed to serialize integration")
 	})
 
 	t.Run("describe integration with configuration -> configuration returned", func(t *testing.T) {

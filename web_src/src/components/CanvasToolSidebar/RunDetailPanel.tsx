@@ -1,7 +1,9 @@
-import { ArrowLeft, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
 import { useMemo } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { buildRunPresentation, buildNodeMap } from "@/ui/Runs/runPresentation";
 import { buildExecutionChain } from "@/ui/Runs/runNodeDetailModel";
@@ -16,6 +18,11 @@ export interface RunDetailPanelProps {
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onBack: () => void;
+  newerRunId?: string | null;
+  olderRunId?: string | null;
+  canNavigateOlder?: boolean;
+  onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
 }
 
 export function RunDetailPanel({
@@ -26,6 +33,11 @@ export function RunDetailPanel({
   selectedNodeId,
   onSelectNode,
   onBack,
+  newerRunId = null,
+  olderRunId = null,
+  canNavigateOlder = false,
+  onNavigateRun,
+  onNavigateOlder,
 }: RunDetailPanelProps) {
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [run, nodeMap]);
@@ -39,7 +51,7 @@ export function RunDetailPanel({
 
   const copyRunLink = async () => {
     const url = new URL(window.location.href);
-    url.searchParams.set("view", "runs");
+    url.searchParams.delete("view");
     url.searchParams.set("run", run.id || "");
     try {
       await navigator.clipboard.writeText(url.toString());
@@ -50,17 +62,69 @@ export function RunDetailPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="run-detail-panel">
-      <div className="flex shrink-0 items-center gap-2 px-3 pt-4 pb-1.5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex shrink-0 items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800"
-          data-testid="run-detail-back"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Runs
-        </button>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="run-detail-panel">
+      <div className="flex h-9 min-w-0 shrink-0 items-stretch justify-between pl-3 pr-1">
+        <div className="flex min-w-0 flex-1 items-center">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            data-testid="run-detail-back"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Runs
+          </button>
+        </div>
+        {onNavigateRun ? (
+          <div className="flex shrink-0 items-stretch">
+            <div className="flex items-center px-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      disabled={!newerRunId}
+                      aria-label="Newer Run"
+                      data-testid="run-detail-newer"
+                      onClick={() => newerRunId && onNavigateRun(newerRunId)}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">Newer Run</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      disabled={!canNavigateOlder}
+                      aria-label="Older Run"
+                      data-testid="run-detail-older"
+                      onClick={() => {
+                        if (olderRunId) {
+                          onNavigateRun?.(olderRunId);
+                          return;
+                        }
+                        onNavigateOlder?.();
+                      }}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">Older Run</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="shrink-0 border-b border-b-slate-950/10 px-3 py-3">
@@ -68,7 +132,7 @@ export function RunDetailPanel({
         {run.createdAt ? (
           <div className="mt-1 flex items-center gap-1">
             <span className="text-xs text-gray-500">
-              <TimeAgo date={run.createdAt} />
+              <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" />
             </span>
             <button
               type="button"
@@ -82,7 +146,7 @@ export function RunDetailPanel({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto" data-testid="run-detail-node-list">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto" data-testid="run-detail-node-list">
         {executionsQuery.isLoading ? (
           <p className="px-3 py-4 text-xs text-gray-400">Loading nodes...</p>
         ) : executionChain.length === 0 ? (

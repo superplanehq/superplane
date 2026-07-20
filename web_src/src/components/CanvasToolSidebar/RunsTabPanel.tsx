@@ -1,10 +1,10 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import { useCallback, useEffect, useRef, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
-import { RunDetailPanel } from "./RunDetailPanel";
+import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunsTabListView } from "./RunsTabListView";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
-import { useRunFilters } from "./useRunFilters";
+import { useRunFilters, type RunFiltersState } from "./useRunFilters";
 
 export type RunsSidebarView = "list" | "detail";
 
@@ -12,7 +12,10 @@ export interface RunsTabPanelProps {
   canvasId: string;
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
+  selectedRun?: CanvasesCanvasRun | null;
+  isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
   detailDismissedForRunId?: string | null;
@@ -30,15 +33,10 @@ export interface RunsTabPanelProps {
 }
 
 export function RunsTabPanel({
-  canvasId,
   runs,
   selectedRunId,
   onSelectRun,
-  onBackToRunList,
-  initialOpenDetail = false,
-  detailDismissedForRunId = null,
-  selectedNodeId = null,
-  onSelectNode,
+  onSelectLiveCanvas,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -49,15 +47,56 @@ export function RunsTabPanel({
   componentIconMap = {},
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
-  const [sidebarView, setSidebarView] = useState<RunsSidebarView>(() =>
-    initialOpenDetail && selectedRunId ? "detail" : "list",
-  );
-
-  const selectedRun = useMemo(() => runs.find((run) => run.id === selectedRunId) || null, [runs, selectedRunId]);
-
   const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+
+  return (
+    <RunsTabPanelContent
+      runs={runs}
+      selectedRunId={selectedRunId}
+      onSelectRun={onSelectRun}
+      onSelectLiveCanvas={onSelectLiveCanvas}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={onLoadMore}
+      isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
+      componentIconMap={componentIconMap}
+      filterState={filterState}
+    />
+  );
+}
+
+export interface RunsTabPanelContentProps {
+  runs: CanvasesCanvasRun[];
+  selectedRunId: string | null;
+  onSelectRun: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  componentIconMap?: Record<string, string>;
+  filterState: RunFiltersState;
+}
+
+export function RunsTabPanelContent({
+  runs,
+  selectedRunId,
+  onSelectRun,
+  onSelectLiveCanvas,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  isLoading,
+  isError,
+  onRetry,
+  componentIconMap = {},
+  filterState,
+}: RunsTabPanelContentProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const previousSelectedRunIdRef = useRef<string | null>(selectedRunId);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: hasNextPage,
     isLoading: isFetchingNextPage,
@@ -71,85 +110,52 @@ export function RunsTabPanel({
   );
 
   useEffect(() => {
-    if (!selectedRunId) {
-      setSidebarView("list");
-      previousSelectedRunIdRef.current = null;
-      return;
-    }
-
-    const previousRunId = previousSelectedRunIdRef.current;
-    const runIdChanged = previousRunId !== selectedRunId;
-
-    if (initialOpenDetail && selectedRunId !== detailDismissedForRunId) {
-      setSidebarView("detail");
-    } else if (previousRunId !== null && runIdChanged && selectedRunId !== detailDismissedForRunId) {
-      setSidebarView("detail");
-    }
-
-    previousSelectedRunIdRef.current = selectedRunId;
-  }, [detailDismissedForRunId, initialOpenDetail, selectedRunId]);
-
-  useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);
   }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
 
   const handleRunSelect = useCallback(
     (runId: string) => {
       onSelectRun(runId);
-      setSidebarView("detail");
     },
     [onSelectRun],
   );
 
-  const handleBack = useCallback(() => {
-    setSidebarView("list");
-    onBackToRunList?.();
-  }, [onBackToRunList]);
+  const handleSelectLiveCanvas = useCallback(() => {
+    onSelectLiveCanvas();
+  }, [onSelectLiveCanvas]);
 
-  const isDetailView = sidebarView === "detail" && !!selectedRun;
+  const isLiveCanvasSelected = !selectedRunId;
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
-      <RunsTabListView
-        isActive={!isDetailView}
-        scrollRef={scrollRef}
-        onScroll={handleScroll}
-        runs={runs}
-        filteredRuns={filterState.filteredRuns}
-        orderedRuns={filterState.orderedRuns}
-        selectedRunId={selectedRunId}
-        onSelectRun={handleRunSelect}
-        componentIconMap={componentIconMap}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={onRetry}
-        onClearFilters={filterState.clearFilters}
-        hasAnyFilter={filterState.hasAnyFilter}
-        selectedStatuses={filterState.selectedStatuses}
-        selectedTriggerIds={filterState.selectedTriggerIds}
-        triggerOptions={filterState.triggerOptions}
-        onToggleStatus={filterState.toggleStatus}
-        onClearStatuses={filterState.clearStatuses}
-        onToggleTrigger={filterState.toggleTrigger}
-        onClearTriggers={filterState.clearTriggers}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <LiveCanvasSidebarRow isSelected={isLiveCanvasSelected} onSelect={handleSelectLiveCanvas} />
 
-      <div
-        className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
-          isDetailView ? "translate-x-0" : "translate-x-full"
-        } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
-      >
-        {selectedRun ? (
-          <RunDetailPanel
-            canvasId={canvasId}
-            run={selectedRun}
-            workflowNodes={workflowNodes}
-            componentIconMap={componentIconMap}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode ?? (() => {})}
-            onBack={handleBack}
-          />
-        ) : null}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <RunsTabListView
+          isActive
+          scrollRef={scrollRef}
+          onScroll={handleScroll}
+          runs={runs}
+          filteredRuns={filterState.filteredRuns}
+          orderedRuns={filterState.orderedRuns}
+          selectedRunId={selectedRunId}
+          onSelectRun={handleRunSelect}
+          componentIconMap={componentIconMap}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={onRetry}
+          onClearFilters={filterState.clearFilters}
+          hasAnyFilter={filterState.hasAnyFilter}
+          selectedStatuses={filterState.selectedStatuses}
+          selectedTriggerIds={filterState.selectedTriggerIds}
+          searchQuery={filterState.searchQuery}
+          triggerOptions={filterState.triggerOptions}
+          onToggleStatus={filterState.toggleStatus}
+          onClearStatuses={filterState.clearStatuses}
+          onToggleTrigger={filterState.toggleTrigger}
+          onClearTriggers={filterState.clearTriggers}
+          onSearchQueryChange={filterState.setSearchQuery}
+        />
       </div>
     </div>
   );

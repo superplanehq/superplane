@@ -197,8 +197,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
-	err = server.RegisterGRPCGateway("localhost:50051")
-	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, gitProvider, nil)
 
 	response := execRequest(server, requestParams{
 		method: "GET",
@@ -298,19 +297,8 @@ func Test__GRPCGatewayRejectsUnknownFields(t *testing.T) {
 	require.NoError(t, err)
 
 	requestBody := `{
-  "canvas": {
-    "metadata": { "name": "unknown-field-test" },
-    "spec": {
-      "nodes": [{
-        "id": "wait-1",
-        "name": "wait",
-        "type": "TYPE_ACTION",
-        "component": "wait",
-        "hello": "what"
-      }],
-      "edges": []
-    }
-  }
+  "name": "unknown-field-test",
+  "hello": "what"
 }`
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/canvases", strings.NewReader(requestBody))
@@ -536,7 +524,7 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, account.Email, user.GetEmail())
 
-		roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
+		roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 	})
@@ -771,7 +759,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.Equal(t, "account organization limit exceeded", data.Message)
 	})
 
-	t.Run("returns 500 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
+	t.Run("returns 503 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
 		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
@@ -813,6 +801,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			authCookie: token,
 		})
 
-		require.Equal(t, http.StatusInternalServerError, response.Code)
+		require.Equal(t, http.StatusServiceUnavailable, response.Code)
+		assert.Contains(t, response.Body.String(), "Usage service unavailable")
 	})
 }

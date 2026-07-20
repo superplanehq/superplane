@@ -12,9 +12,11 @@ const NODES: SuperplaneComponentsNode[] = [
 
 const PAGES = [
   {
-    events: [
+    runs: [
       {
-        data: { pr_number: 42, branch: "main" },
+        rootEvent: {
+          data: { pr_number: 42, branch: "main" },
+        },
         executions: [
           { id: "exec-1", nodeId: "node-a", state: "STATE_FINISHED", result: "RESULT_PASSED" },
           { id: "exec-2", nodeId: "node-b", state: "STATE_STARTED" },
@@ -84,18 +86,19 @@ describe("collectExecutionRows nodeName resolution", () => {
     expect(rows.map((r) => r.status)).toEqual(["passed", "running", "failed", "pending"]);
   });
 
-  it("attaches the parent event's data as the row payload", () => {
+  it("attaches the run root event data as the row payload", () => {
     const rows = collectExecutionRows(PAGES, undefined, buildNodeNameMap(NODES), 10) as ExecutionRow[];
     for (const row of rows) {
       expect(row.payload).toEqual({ pr_number: 42, branch: "main" });
     }
   });
 
-  it("leaves payload undefined when the parent event has no data", () => {
+  it("leaves payload undefined when the run root event has no data", () => {
     const pages = [
       {
-        events: [
+        runs: [
           {
+            rootEvent: {},
             executions: [{ id: "exec-x", nodeId: "node-a", state: "STATE_STARTED" }],
           },
         ],

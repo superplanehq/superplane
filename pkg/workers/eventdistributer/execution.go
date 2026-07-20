@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -20,9 +21,10 @@ type ExecutionStateWebsocketEvent struct {
 }
 
 const (
-	ExecutionCreatedEvent  = "execution_created"
-	ExecutionFinishedEvent = "execution_finished"
-	ExecutionStartedEvent  = "execution_started"
+	ExecutionCreatedEvent    = "execution_created"
+	ExecutionFinishedEvent   = "execution_finished"
+	ExecutionStartedEvent    = "execution_started"
+	ExecutionCancellingEvent = "execution_cancelling"
 )
 
 func HandleCanvasExecution(messageBody []byte, wsHub *ws.Hub) error {
@@ -44,6 +46,8 @@ func workflowExecutionStateToWsEvent(workflowState string) string {
 		return ExecutionFinishedEvent
 	case models.CanvasNodeExecutionStateStarted:
 		return ExecutionStartedEvent
+	case models.CanvasNodeExecutionStateCancelling:
+		return ExecutionCancellingEvent
 	default:
 		return ""
 	}
@@ -70,7 +74,12 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
-	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, []models.CanvasNodeExecution{})
+	resources, err := canvases.LoadNodeExecutionResources(database.Conn(), []models.CanvasNodeExecution{*execution})
+	if err != nil {
+		return fmt.Errorf("failed to load execution resources: %w", err)
+	}
+
+	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, resources)
 	if err != nil {
 		return fmt.Errorf("failed to serialize execution: %w", err)
 	}

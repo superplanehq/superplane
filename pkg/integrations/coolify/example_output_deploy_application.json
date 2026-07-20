@@ -1,0 +1,10 @@
+{
+  "type": "coolify.application.deploy.queued",
+  "data": {
+    "applicationUuid": "abc123def456",
+    "force": false,
+    "deploymentUuid": "deploy-uuid-xyz",
+    "message": "Deployment queued."
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

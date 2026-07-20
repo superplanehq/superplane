@@ -92,6 +92,7 @@ func (f *If) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "expression",
+			Label:       "Condition",
 			Type:        configuration.FieldTypeExpression,
 			Description: "Boolean expression to evaluate",
 			Required:    true,

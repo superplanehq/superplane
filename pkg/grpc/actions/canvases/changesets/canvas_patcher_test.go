@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
@@ -46,39 +45,39 @@ func Test__CanvasPatcher(t *testing.T) {
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "true"}},
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-c",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-c",
 						Name:          "Node C",
 						Block:         "noop",
 						Configuration: structFromMap(t, map[string]any{}),
 					},
 				},
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A Updated",
 						Configuration: structFromMap(t, map[string]any{"expression": "false"}),
 					},
 				},
 				{
-					Type: pb.CanvasChangeset_Change_ADD_EDGE,
-					Edge: &pb.CanvasChangeset_Change_Edge{
-						SourceId: "node-a",
-						TargetId: "node-c",
+					Type: ChangeTypeAddEdge,
+					Edge: &ChangeEdge{
+						SourceID: "node-a",
+						TargetID: "node-c",
 						Channel:  "true",
 					},
 				},
 				{
-					Type: pb.CanvasChangeset_Change_DELETE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
+					Type: ChangeTypeDeleteNode,
+					Node: &ChangeNode{ID: "node-b"},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
@@ -106,17 +105,17 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:   "node-a",
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:   "node-a",
 						Name: "Node A Updated",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeOrder([]string{"node-a", "node-b", "node-c"})
@@ -127,42 +126,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 	})
 
-	t.Run("returns error when auto layout is invalid", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
-		steps.givenCanvasVersion(
-			[]models.Node{
-				{
-					ID:   "node-a",
-					Name: "Node A",
-					Type: models.NodeTypeComponent,
-					Ref: models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					},
-				},
-			},
-			nil,
-		)
-
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
-				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:   "node-a",
-						Name: "Node A Updated",
-					},
-				},
-			},
-		}, &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
-		})
-
-		steps.assertHasError()
-		steps.assertErrorContains("layout algorithm is required")
-		require.Nil(t, steps.finalVersion)
-	})
-
-	t.Run("does not apply layout when auto layout is omitted", func(t *testing.T) {
+	t.Run("preserves node positions when changeset adds edges", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
 			[]models.Node{
@@ -188,18 +152,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_EDGE,
-					Edge: &pb.CanvasChangeset_Change_Edge{
-						SourceId: "node-a",
-						TargetId: "node-b",
+					Type: ChangeTypeAddEdge,
+					Edge: &ChangeEdge{
+						SourceID: "node-a",
+						TargetID: "node-b",
 						Channel:  "default",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodePosition("node-a", 125, 240)
@@ -237,18 +201,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_EDGE,
-					Edge: &pb.CanvasChangeset_Change_Edge{
-						SourceId: "http-1",
-						TargetId: "if-1",
+					Type: ChangeTypeAddEdge,
+					Edge: &ChangeEdge{
+						SourceID: "http-1",
+						TargetID: "if-1",
 						Channel:  "default",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertHasError()
 		steps.assertErrorContains(`source node http-1 does not have output channel "default"`)
@@ -257,7 +221,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	t.Run("returns error when change object is misconfigured", func(t *testing.T) {
 		testCases := []struct {
 			name            string
-			changeset       *pb.CanvasChangeset
+			changeset       *CanvasChangeset
 			expectedMessage string
 		}{
 			{
@@ -267,32 +231,32 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name:            "changeset has no changes",
-				changeset:       &pb.CanvasChangeset{},
+				changeset:       &CanvasChangeset{},
 				expectedMessage: "changeset is required",
 			},
 			{
 				name: "changeset has nil change",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{nil},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{nil},
 				},
 				expectedMessage: "change is required",
 			},
 			{
 				name: "add node change has no node payload",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
-						{Type: pb.CanvasChangeset_Change_ADD_NODE},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
+						{Type: ChangeTypeAddNode},
 					},
 				},
 				expectedMessage: "node is required for ADD_NODE",
 			},
 			{
 				name: "add node change has empty id",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_ADD_NODE,
-							Node: &pb.CanvasChangeset_Change_Node{Name: "Node A", Block: "noop"},
+							Type: ChangeTypeAddNode,
+							Node: &ChangeNode{Name: "Node A", Block: "noop"},
 						},
 					},
 				},
@@ -300,11 +264,11 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name: "add node change has empty name",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_ADD_NODE,
-							Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Block: "noop"},
+							Type: ChangeTypeAddNode,
+							Node: &ChangeNode{ID: "node-a", Block: "noop"},
 						},
 					},
 				},
@@ -312,20 +276,20 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name: "update node change has no node payload",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
-						{Type: pb.CanvasChangeset_Change_UPDATE_NODE},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
+						{Type: ChangeTypeUpdateNode},
 					},
 				},
 				expectedMessage: "node is required for UPDATE_NODE",
 			},
 			{
 				name: "update node change has empty id",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-							Node: &pb.CanvasChangeset_Change_Node{Name: "Node A"},
+							Type: ChangeTypeUpdateNode,
+							Node: &ChangeNode{Name: "Node A"},
 						},
 					},
 				},
@@ -333,20 +297,20 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name: "delete node change has no node payload",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
-						{Type: pb.CanvasChangeset_Change_DELETE_NODE},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
+						{Type: ChangeTypeDeleteNode},
 					},
 				},
 				expectedMessage: "target is required for DELETE_NODE",
 			},
 			{
 				name: "delete node change has empty id",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_DELETE_NODE,
-							Node: &pb.CanvasChangeset_Change_Node{},
+							Type: ChangeTypeDeleteNode,
+							Node: &ChangeNode{},
 						},
 					},
 				},
@@ -354,20 +318,20 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name: "add edge change has no edge payload",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
-						{Type: pb.CanvasChangeset_Change_ADD_EDGE},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
+						{Type: ChangeTypeAddEdge},
 					},
 				},
 				expectedMessage: "edge is required for ADD_EDGE",
 			},
 			{
 				name: "add edge change has empty source id",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_ADD_EDGE,
-							Edge: &pb.CanvasChangeset_Change_Edge{TargetId: "node-b", Channel: "default"},
+							Type: ChangeTypeAddEdge,
+							Edge: &ChangeEdge{TargetID: "node-b", Channel: "default"},
 						},
 					},
 				},
@@ -375,20 +339,20 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			{
 				name: "delete edge change has no edge payload",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
-						{Type: pb.CanvasChangeset_Change_DELETE_EDGE},
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
+						{Type: ChangeTypeDeleteEdge},
 					},
 				},
 				expectedMessage: "edge is required for DELETE_EDGE",
 			},
 			{
 				name: "delete edge change has empty channel",
-				changeset: &pb.CanvasChangeset{
-					Changes: []*pb.CanvasChangeset_Change{
+				changeset: &CanvasChangeset{
+					Changes: []*Change{
 						{
-							Type: pb.CanvasChangeset_Change_DELETE_EDGE,
-							Edge: &pb.CanvasChangeset_Change_Edge{SourceId: "node-a", TargetId: "node-b"},
+							Type: ChangeTypeDeleteEdge,
+							Edge: &ChangeEdge{SourceID: "node-a", TargetID: "node-b"},
 						},
 					},
 				},
@@ -401,7 +365,7 @@ func Test__CanvasPatcher(t *testing.T) {
 				steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 				steps.givenCanvasVersion(nil, nil)
 
-				steps.whenHandling(tc.changeset, nil)
+				steps.whenHandling(tc.changeset)
 
 				steps.assertHasError()
 				steps.assertErrorContains(tc.expectedMessage)
@@ -425,17 +389,113 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Name: "Node A Updated"},
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{ID: "node-a", Name: "Node A Updated"},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "true"})
+	})
+
+	t.Run("update node -> assigns first implementation to placeholder component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		errorMessage := "component name is required"
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "New Component",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{},
+				ErrorMessage:  &errorMessage,
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
+						Name:          "No-op",
+						Block:         "noop",
+						Configuration: structFromMap(t, map[string]any{}),
+					},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertHasNode("node-a", "No-op", map[string]any{})
+		steps.assertHasNodeBlock("node-a", "noop")
+		steps.assertNodeHasNoError("node-a")
+	})
+
+	t.Run("update node -> rejects implementation changes for implemented component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "Node A",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{},
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				},
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{ID: "node-a", Name: "Node A", Block: "if"},
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("cannot change node node-a implementation; delete the node and add a new one instead")
+	})
+
+	t.Run("update node -> allows repeated implementation for implemented component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "Node A",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{"expression": "true"},
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "if"},
+				},
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
+						Name:          "Node A Updated",
+						Block:         "if",
+						Configuration: structFromMap(t, map[string]any{"expression": "false"}),
+					},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
+		steps.assertHasNodeBlock("node-a", "if")
 	})
 
 	t.Run("update node -> no collapsed change provided, previous collapsed state is preserved", func(t *testing.T) {
@@ -454,14 +514,14 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Name: "Node A Updated"},
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{ID: "node-a", Name: "Node A Updated"},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCollapsed("node-a", true)
@@ -483,18 +543,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:          "node-a",
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:          "node-a",
 						Name:        "Node A Updated",
 						IsCollapsed: proto.Bool(false),
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCollapsed("node-a", false)
@@ -517,18 +577,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Configuration: structFromMap(t, map[string]any{"expression": nil}),
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A", map[string]any{"expression": nil})
@@ -542,18 +602,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_EDGE,
-					Edge: &pb.CanvasChangeset_Change_Edge{
-						SourceId: "node-a",
-						TargetId: "node-a",
+					Type: ChangeTypeAddEdge,
+					Edge: &ChangeEdge{
+						SourceID: "node-a",
+						TargetID: "node-a",
 						Channel:  "default",
 					},
 				},
 			},
-		}, nil)
+		})
 		steps.assertHasError()
 		steps.assertErrorContains("self-loop edges are not allowed")
 	})
@@ -562,18 +622,18 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:    "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
 						Name:  "Node A",
 						Block: "core.hello",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertHasError()
 		steps.assertErrorContains("block core.hello not found in registry")
@@ -583,13 +643,13 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_UNSPECIFIED,
+					Type: ChangeTypeUnspecified,
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertHasError()
 	})
@@ -606,18 +666,18 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_EDGE,
-					Edge: &pb.CanvasChangeset_Change_Edge{
-						SourceId: "node-b",
-						TargetId: "node-a",
+					Type: ChangeTypeAddEdge,
+					Edge: &ChangeEdge{
+						SourceID: "node-b",
+						TargetID: "node-a",
 						Channel:  "default",
 					},
 				},
 			},
-		}, nil)
+		})
 		steps.assertHasError()
 	})
 
@@ -625,18 +685,18 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:    "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
 						Name:  "Node A",
 						Block: "if",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -649,18 +709,18 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:    "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
 						Name:  "Node A",
 						Block: "schedule",
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -673,18 +733,18 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:    "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
 						Name:  "Node A",
 						Block: "annotation",
 					},
 				},
 			},
-		}, nil)
+		})
 		steps.assertNoError()
 		steps.assertNodeCount(1)
 		steps.assertHasNode("node-a", "Node A", nil)
@@ -696,12 +756,12 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:    "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
 						Name:  "Node A",
 						Block: "github.getIssue",
 						Configuration: structFromMap(t, map[string]any{
@@ -711,7 +771,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -724,15 +784,15 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Block:         "github.getIssue",
-						IntegrationId: "not-a-uuid",
+						IntegrationID: "not-a-uuid",
 						Configuration: structFromMap(t, map[string]any{
 							"repository":  "superplanehq/superplane",
 							"issueNumber": "1",
@@ -740,7 +800,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -755,15 +815,15 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		missingIntegrationID := uuid.New().String()
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Block:         "github.getIssue",
-						IntegrationId: missingIntegrationID,
+						IntegrationID: missingIntegrationID,
 						Configuration: structFromMap(t, map[string]any{
 							"repository":  "superplanehq/superplane",
 							"issueNumber": "1",
@@ -771,7 +831,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -793,15 +853,15 @@ func Test__CanvasPatcher(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Block:         "github.getIssue",
-						IntegrationId: integration.ID.String(),
+						IntegrationID: integration.ID.String(),
 						Configuration: structFromMap(t, map[string]any{
 							"repository":  "superplanehq/superplane",
 							"issueNumber": "1",
@@ -809,7 +869,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -829,15 +889,15 @@ func Test__CanvasPatcher(t *testing.T) {
 			{Name: "github.getIssue", State: core.IntegrationCapabilityStateEnabled},
 		})
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Block:         "github.getIssue",
-						IntegrationId: integration.ID.String(),
+						IntegrationID: integration.ID.String(),
 						Configuration: structFromMap(t, map[string]any{
 							"repository":  "superplanehq/superplane",
 							"issueNumber": "1",
@@ -845,7 +905,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -865,15 +925,15 @@ func Test__CanvasPatcher(t *testing.T) {
 			{Name: "github.getIssue", State: core.IntegrationCapabilityStateDisabled},
 		})
 
-		steps.whenHandling(&pb.CanvasChangeset{
-			Changes: []*pb.CanvasChangeset_Change{
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
 				{
-					Type: pb.CanvasChangeset_Change_ADD_NODE,
-					Node: &pb.CanvasChangeset_Change_Node{
-						Id:            "node-a",
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
 						Name:          "Node A",
 						Block:         "github.getIssue",
-						IntegrationId: integration.ID.String(),
+						IntegrationID: integration.ID.String(),
 						Configuration: structFromMap(t, map[string]any{
 							"repository":  "superplanehq/superplane",
 							"issueNumber": "1",
@@ -881,7 +941,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		}, nil)
+		})
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -910,8 +970,8 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 	})
 }
 
-func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) {
-	s.err = s.patcher.ApplyChangeset(operations, autoLayout)
+func (s *CanvasPatcherSteps) whenHandling(operations *CanvasChangeset) {
+	s.err = s.patcher.ApplyChangeset(operations)
 	s.finalVersion = s.patcher.GetVersion()
 }
 
@@ -989,6 +1049,15 @@ func (s *CanvasPatcherSteps) assertNodeErrorContains(nodeID string, text string)
 	require.True(s.t, i != -1, "expected node %s", nodeID)
 	require.NotNil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 	require.Contains(s.t, *s.finalVersion.Nodes[i].ErrorMessage, text)
+}
+
+func (s *CanvasPatcherSteps) assertNodeHasNoError(nodeID string) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Nil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 }
 
 func (s *CanvasPatcherSteps) assertNodePosition(nodeID string, x int, y int) {

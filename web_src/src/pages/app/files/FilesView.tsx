@@ -7,28 +7,36 @@ import { FileList } from "./FileList";
 import { TabBar } from "./TabBar";
 import { DiffHeaderAction, IconButton } from "./FilesUi";
 import { useEditor } from "./useEditor";
-import type { AppFile, FilesHeaderActionsState } from "./types";
+import type { AppFile } from "./types";
 
 const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default: module.DiffDialog })));
 
 export function FilesView({
   canvasId,
+  organizationId,
   versionId,
   isEditing,
   canWrite,
   files,
   headerActionsSlotId,
-  onHeaderActionsChange,
+  stagingResetNonce,
+  suspendRepositoryFileStaging,
   onSpecFileChange,
+  onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: {
   canvasId?: string;
+  organizationId?: string;
   versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  stagingResetNonce?: number;
+  suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
+  onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 }) {
   const editor = useEditor({
     canvasId,
@@ -37,19 +45,22 @@ export function FilesView({
     canWrite,
     files,
     headerActionsSlotId,
-    onHeaderActionsChange,
+    stagingResetNonce,
+    suspendRepositoryFileStaging,
     onSpecFileChange,
+    onLocalFilesStagingChange,
+    onFlushRepositoryFileStagingReady,
   });
 
   return (
     <div
-      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50 dark:bg-gray-900"
       style={{ left: editor.leftOffset, right: 0 }}
       data-testid="files-overlay"
     >
-      <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
+      <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
         {editor.canManageRepositoryFiles ? (
-          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
+          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2 dark:border-gray-800/70">
             <div className="ml-auto flex shrink-0 items-center">
               <IconButton label="New file" onClick={editor.startNewFile} className="size-6 hover:bg-transparent">
                 <FilePlus2 className="h-3.5 w-3.5" />
@@ -78,6 +89,7 @@ export function FilesView({
           openTabs={editor.openTabs}
           selectedPath={editor.selectedPath}
           pendingChangesByPath={editor.pendingChangesByPath}
+          specDraftByPath={editor.specDraftByPath}
           onOpenFile={editor.openFile}
           onCloseTab={editor.closeTab}
         />
@@ -85,6 +97,8 @@ export function FilesView({
         <FileEditor
           path={editor.selectedPath}
           content={editor.selectedContent}
+          canvasId={canvasId}
+          organizationId={organizationId}
           deleted={editor.selectedIsDeleted}
           language={editor.selectedGeneratedFile?.language}
           loading={editor.editorLoading}
@@ -98,7 +112,9 @@ export function FilesView({
         <Suspense fallback={null}>
           <DiffDialog
             changes={editor.pendingChanges}
+            committedContentByPath={editor.committedContentByPath}
             loadedContentByPath={editor.loadedContentByPath}
+            stagedFileDiffs={editor.stagedFileDiffs}
             open={editor.isDiffOpen}
             onOpenChange={editor.setIsDiffOpen}
           />
@@ -107,7 +123,7 @@ export function FilesView({
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
             <DiffHeaderAction
-              hasPendingChanges={editor.pendingChanges.length > 0}
+              hasPendingChanges={editor.pendingChanges.length > 0 || editor.stagedDiffPaths.length > 0}
               onDiffOpen={() => editor.setIsDiffOpen(true)}
             />,
             editor.headerActionsHost,

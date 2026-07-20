@@ -3,7 +3,7 @@ import {
   formatVersionLabel,
   formatVersionLabelWithTimestamp,
   formatVersionTimestamp,
-  sortDraftVersionsDesc,
+  sortVersionsDesc,
   versionSortValue,
 } from "./canvas-versions";
 
@@ -36,12 +36,22 @@ describe("formatVersionTimestamp", () => {
 });
 
 describe("formatVersionLabel", () => {
-  it("labels published versions", () => {
-    expect(formatVersionLabel({ metadata: { state: "STATE_PUBLISHED" } })).toBe("Published version");
+  it("uses the commit message when present", () => {
+    expect(formatVersionLabel({ metadata: { commitMessage: "Fix webhook retry" } })).toBe("Fix webhook retry");
   });
 
-  it("labels unpublished versions as drafts", () => {
-    expect(formatVersionLabel({ metadata: { state: "STATE_DRAFT" } })).toBe("Draft version");
+  it("falls back to a timestamp-based label when commit message is missing", () => {
+    const createdAt = "2026-05-18T12:00:00.000Z";
+    const expectedTimestamp = new Date(createdAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    expect(formatVersionLabel({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
+  });
+
+  it("falls back to an untitled label when commit message and createdAt are missing", () => {
+    expect(formatVersionLabel({ metadata: {} })).toBe("Untitled update");
   });
 });
 
@@ -56,59 +66,65 @@ describe("formatVersionLabelWithTimestamp", () => {
     expect(
       formatVersionLabelWithTimestamp({
         metadata: {
-          state: "STATE_DRAFT",
+          commitMessage: "Initial setup",
           createdAt,
         },
       }),
-    ).toBe(`Draft version · ${expectedTimestamp}`);
+    ).toBe(`Initial setup · ${expectedTimestamp}`);
   });
 
   it("returns only the label when no valid timestamp exists", () => {
-    expect(formatVersionLabelWithTimestamp({ metadata: { state: "STATE_PUBLISHED" } })).toBe("Published version");
+    expect(formatVersionLabelWithTimestamp({ metadata: { commitMessage: "Initial setup" } })).toBe("Initial setup");
+  });
+
+  it("uses a legacy timestamp label without duplicating the timestamp suffix", () => {
+    const createdAt = "2026-05-18T12:00:00.000Z";
+    const expectedTimestamp = new Date(createdAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    expect(formatVersionLabelWithTimestamp({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
   });
 });
 
-describe("sortDraftVersionsDesc", () => {
-  it("sorts drafts by updatedAt descending", () => {
-    const sorted = sortDraftVersionsDesc([
+describe("sortVersionsDesc", () => {
+  it("sorts versions by updatedAt descending", () => {
+    const sorted = sortVersionsDesc([
       {
         metadata: {
-          state: "STATE_DRAFT",
-          branchName: "drafts/older",
+          id: "older",
           updatedAt: "2026-06-01T12:00:00.000Z",
         },
       },
       {
         metadata: {
-          state: "STATE_DRAFT",
-          branchName: "drafts/newer",
+          id: "newer",
           updatedAt: "2026-06-03T12:00:00.000Z",
         },
       },
     ]);
 
-    expect(sorted.map((version) => version.metadata?.branchName)).toEqual(["drafts/newer", "drafts/older"]);
+    expect(sorted.map((version) => version.metadata?.id)).toEqual(["newer", "older"]);
   });
 
   it("falls back to createdAt when updatedAt is missing", () => {
-    const sorted = sortDraftVersionsDesc([
+    const sorted = sortVersionsDesc([
       {
         metadata: {
-          state: "STATE_DRAFT",
-          branchName: "drafts/bbb",
+          id: "bbb",
           createdAt: "2026-06-01T12:00:00.000Z",
         },
       },
       {
         metadata: {
-          state: "STATE_DRAFT",
-          branchName: "drafts/aaa",
+          id: "aaa",
           createdAt: "2026-06-03T12:00:00.000Z",
         },
       },
     ]);
 
-    expect(sorted.map((version) => version.metadata?.branchName)).toEqual(["drafts/aaa", "drafts/bbb"]);
+    expect(sorted.map((version) => version.metadata?.id)).toEqual(["aaa", "bbb"]);
   });
 });
 

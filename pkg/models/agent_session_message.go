@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -19,6 +20,12 @@ const (
 	AgentToolStatusFailed   = "failed"
 )
 
+// AgentSessionImage is a base64-encoded image attached to a user message.
+type AgentSessionImage struct {
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
 type AgentSessionMessage struct {
 	ID              uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	SessionID       uuid.UUID
@@ -28,6 +35,7 @@ type AgentSessionMessage struct {
 	ToolCallID      string
 	ToolName        string
 	ToolStatus      string
+	Images          datatypes.JSONSlice[AgentSessionImage]
 	CreatedAt       *time.Time
 }
 
@@ -43,6 +51,9 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 	if msg.CreatedAt == nil {
 		now := time.Now()
 		msg.CreatedAt = &now
+	}
+	if msg.Images == nil {
+		msg.Images = datatypes.JSONSlice[AgentSessionImage]{}
 	}
 
 	if msg.ProviderEventID == "" {
@@ -86,6 +97,14 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 
 func AppendAgentSessionMessage(msg *AgentSessionMessage) error {
 	return AppendAgentSessionMessageInTransaction(database.Conn(), msg)
+}
+
+func FindAgentSessionMessage(tx *gorm.DB, id uuid.UUID) (*AgentSessionMessage, error) {
+	var message AgentSessionMessage
+	if err := tx.Where("id = ?", id).First(&message).Error; err != nil {
+		return nil, err
+	}
+	return &message, nil
 }
 
 // ListAgentSessionMessagesPage returns up to `limit` messages strictly older

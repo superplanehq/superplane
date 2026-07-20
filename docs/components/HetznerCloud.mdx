@@ -2,24 +2,66 @@
 title: "Hetzner Cloud"
 ---
 
-Create and delete Hetzner Cloud servers/load balancers and create/delete server snapshots
+Create and delete Hetzner Cloud servers/load balancers, manage snapshots, and interact with Hetzner Object Storage via the S3-compatible API
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Bucket" href="#create-bucket" description="Create a new Hetzner Object Storage bucket" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Hetzner Cloud Load Balancer." />
   <LinkCard title="Create Server" href="#create-server" description="Create a Hetzner Cloud server and wait for the action to complete" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a server snapshot in Hetzner Cloud and wait for completion" />
+  <LinkCard title="Delete Bucket" href="#delete-bucket" description="Delete a Hetzner Object Storage bucket" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Hetzner Cloud Load Balancer" />
+  <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from a Hetzner Object Storage bucket" />
   <LinkCard title="Delete Server" href="#delete-server" description="Delete a Hetzner Cloud server and wait for the action to complete" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a Hetzner Cloud snapshot image" />
+  <LinkCard title="List Objects" href="#list-objects" description="List objects in a Hetzner Object Storage bucket" />
+  <LinkCard title="Presigned URL" href="#presigned-url" description="Generate a presigned URL for a Hetzner Object Storage object" />
+  <LinkCard title="Upload Object" href="#upload-object" description="Upload content to a Hetzner Object Storage bucket" />
 </CardGrid>
 
 ## Instructions
 
 **API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
+
+**Object Storage (optional):** To use S3 components, go to **Object Storage** in the Hetzner Cloud Console and create S3 credentials (Access Key + Secret Key). Set the region to match your bucket location (e.g. fsn1 or nbg1).
+
+<a id="create-bucket"></a>
+
+## Create Bucket
+
+**Component key:** `hetzner.createBucket`
+
+Creates a new bucket in Hetzner Object Storage using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+
+### Configuration
+
+- **Bucket**: The name of the bucket to create (supports expressions).
+
+### Output
+
+Emits the bucket name, region, and S3 endpoint on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts",
+    "endpoint": "https://fsn1.your-objectstorage.com/my-artifacts",
+    "region": "fsn1"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.bucket.created"
+}
+```
 
 <a id="create-load-balancer"></a>
 
@@ -130,6 +172,39 @@ The Create Snapshot component creates a snapshot image from an existing Hetzner 
 }
 ```
 
+<a id="delete-bucket"></a>
+
+## Delete Bucket
+
+**Component key:** `hetzner.deleteBucket`
+
+Deletes a bucket from Hetzner Object Storage using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+The bucket must be empty before it can be deleted.
+
+### Configuration
+
+- **Bucket**: The bucket to delete (dropdown or expression).
+
+### Output
+
+Emits the deleted bucket name on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.bucket.deleted"
+}
+```
+
 <a id="delete-load-balancer"></a>
 
 ## Delete Load Balancer
@@ -152,6 +227,40 @@ The Delete Load Balancer component deletes a load balancer in Hetzner Cloud.
   },
   "timestamp": "2024-01-15T10:30:00Z",
   "type": "hetzner.load_balancer.deleted"
+}
+```
+
+<a id="delete-object"></a>
+
+## Delete Object
+
+**Component key:** `hetzner.deleteObject`
+
+Deletes an object from a Hetzner Object Storage bucket using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+
+### Configuration
+
+- **Bucket**: The bucket containing the object (dropdown or expression).
+- **Key**: The object key to delete (supports expressions).
+
+### Output
+
+Emits the bucket and key on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts",
+    "key": "releases/v1.0.0/app.tar.gz"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.object.deleted"
 }
 ```
 
@@ -204,6 +313,138 @@ The Delete Snapshot component deletes a snapshot image in Hetzner Cloud.
   },
   "timestamp": "2024-01-15T10:30:00Z",
   "type": "hetzner.snapshot.deleted"
+}
+```
+
+<a id="list-objects"></a>
+
+## List Objects
+
+**Component key:** `hetzner.listObjects`
+
+Lists objects in a Hetzner Object Storage bucket using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+
+### Configuration
+
+- **Bucket**: The bucket to list (dropdown or expression).
+- **Prefix** (optional): Filter objects by key prefix (supports expressions). Example: `artifacts/`
+- **Max Keys** (optional): Maximum number of objects to return. Defaults to 100.
+
+### Output
+
+Emits the bucket, prefix, an array of objects (each with key, size, lastModified, etag), count, and a truncated flag on the default channel. When truncated is true, more objects exist beyond maxKeys; narrow the prefix or increase Max Keys to see them.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts",
+    "count": 2,
+    "objects": [
+      {
+        "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+        "key": "releases/v1.2.3/app.tar.gz",
+        "lastModified": "2024-03-15T10:30:00.000Z",
+        "size": 4096000
+      },
+      {
+        "etag": "\"5d41402abc4b2a76b9719d911017c592\"",
+        "key": "releases/v1.2.2/app.tar.gz",
+        "lastModified": "2024-03-01T08:15:00.000Z",
+        "size": 3921000
+      }
+    ],
+    "prefix": "releases/",
+    "truncated": false
+  },
+  "timestamp": "2024-03-15T10:30:00Z",
+  "type": "hetzner.objects.listed"
+}
+```
+
+<a id="presigned-url"></a>
+
+## Presigned URL
+
+**Component key:** `hetzner.presignedUrl`
+
+Generates a time-limited presigned URL for a Hetzner Object Storage object using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+
+### Configuration
+
+- **Bucket**: The bucket containing the object (dropdown or expression).
+- **Key**: The object key (supports expressions).
+- **Expires In** (optional): URL expiry in seconds. Defaults to 3600 (1 hour).
+- **Method**: The HTTP method the presigned URL allows — GET (download) or PUT (upload).
+
+### Output
+
+Emits the bucket, key, the presigned URL, and the expiry timestamp (ISO 8601) on the default channel.
+
+### Use cases
+
+- Share a generated report or artifact with an external system via Slack/email without exposing credentials.
+- Allow an external agent to upload a file to a specific bucket/key without permanent access.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts",
+    "expiresAt": "2024-03-15T11:30:00Z",
+    "key": "releases/v1.2.3/app.tar.gz",
+    "url": "https://fsn1.your-objectstorage.com/my-artifacts/releases/v1.2.3/app.tar.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Credential=...\u0026X-Amz-Date=...\u0026X-Amz-Expires=3600\u0026X-Amz-SignedHeaders=host\u0026X-Amz-Signature=..."
+  },
+  "timestamp": "2024-03-15T10:30:00Z",
+  "type": "hetzner.object.presigned"
+}
+```
+
+<a id="upload-object"></a>
+
+## Upload Object
+
+**Component key:** `hetzner.uploadObject`
+
+Uploads content to an object in a Hetzner Object Storage bucket using the S3-compatible API.
+
+### Requirements
+
+S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured on the Hetzner integration.
+
+### Configuration
+
+- **Bucket**: The target bucket (dropdown or expression).
+- **Key**: The object key / path within the bucket (supports expressions). Example: `artifacts/{{ $.run.id }}.json`
+- **Content**: The content to upload (expression). Strings are uploaded as-is; objects/arrays are JSON-serialized automatically.
+- **Content Type** (optional): MIME type for the object. Defaults to `application/octet-stream`.
+
+### Output
+
+Emits the bucket, key, size in bytes, and ETag on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-artifacts",
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "key": "releases/v1.2.3/app.tar.gz",
+    "size": 4096000
+  },
+  "timestamp": "2024-03-15T10:30:00Z",
+  "type": "hetzner.object.uploaded"
 }
 ```
 

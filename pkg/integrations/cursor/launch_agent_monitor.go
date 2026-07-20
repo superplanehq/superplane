@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -85,6 +86,17 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 			branchName = metadata.Target.BranchName
 		}
 		outputPayload := buildOutputPayload(metadata.Agent.Status, metadata.Agent.ID, prURL, metadata.Agent.Summary, branchName)
+
+		// On success, attach the agent conversation (messages + last message) and
+		// the produced artifacts so the single Launch Cloud Agent output carries
+		// the result of the work.
+		if isSuccessStatus(metadata.Agent.Status) && executionCtx.HTTP != nil && executionCtx.Integration != nil {
+			if convClient, err := NewClient(executionCtx.HTTP, executionCtx.Integration); err == nil {
+				attachConversation(&outputPayload, convClient, metadata.Agent.ID, executionCtx.Logger)
+				attachArtifacts(&outputPayload, convClient, metadata.Agent.ID, executionCtx.Logger)
+			}
+		}
+
 		if err := executionCtx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload}); err != nil {
 			return http.StatusInternalServerError, nil, err
 		}
@@ -180,6 +192,15 @@ func (c *LaunchAgent) poll(ctx core.ActionHookContext) error {
 			branchName = metadata.Target.BranchName
 		}
 		outputPayload := buildOutputPayload(metadata.Agent.Status, metadata.Agent.ID, prURL, metadata.Agent.Summary, branchName)
+
+		// On success, attach the agent conversation (messages + last message) and
+		// the produced artifacts so the single Launch Cloud Agent output carries
+		// the result of the work.
+		if isSuccessStatus(metadata.Agent.Status) {
+			attachConversation(&outputPayload, client, metadata.Agent.ID, ctx.Logger)
+			attachArtifacts(&outputPayload, client, metadata.Agent.ID, ctx.Logger)
+		}
+
 		return ctx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload})
 	}
 
@@ -217,3 +238,94 @@ func (c *LaunchAgent) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *LaunchAgent) Cleanup(ctx core.SetupContext) error { return nil }
+
+// attachConversation fetches the agent's conversation (best-effort) and attaches
+// the full message history plus a convenience last message to the output payload.
+// It never fails the emission: on a nil client, missing key, empty conversation,
+// or fetch error it logs and leaves the message fields unset so the terminal
+// output is still emitted. Intended for successful completions only.
+func attachConversation(payload *LaunchAgentOutputPayload, client *Client, agentID string, logger *logrus.Entry) {
+	if client == nil || client.LaunchAgentKey == "" || agentID == "" {
+		return
+	}
+
+	conversation, err := client.GetAgentConversation(agentID)
+	if err != nil {
+		if logger != nil {
+			logger.WithError(err).Warnf("Failed to fetch conversation for Cursor Agent %s", agentID)
+		}
+		return
+	}
+
+	if conversation == nil || len(conversation.Messages) == 0 {
+		return
+	}
+
+	payload.Messages = conversation.Messages
+	payload.LastMessage = lastConversationMessage(conversation.Messages)
+}
+
+// lastConversationMessage returns the final assistant reply, falling back to the
+// last message overall when the conversation has no assistant message yet.
+// maxAttachedArtifacts bounds the per-artifact download-link requests made
+// when attaching artifacts to the output payload.
+const maxAttachedArtifacts = 20
+
+// attachArtifacts lists the artifacts the agent produced and attaches them to
+// the output payload with presigned download links, mirroring how the
+// conversation is attached. Failures are logged and leave the payload as-is.
+func attachArtifacts(payload *LaunchAgentOutputPayload, client *Client, agentID string, logger *logrus.Entry) {
+	if client == nil || client.LaunchAgentKey == "" || agentID == "" {
+		return
+	}
+
+	items, err := client.ListArtifacts(agentID)
+	if err != nil {
+		if logger != nil {
+			logger.WithError(err).Warnf("Failed to list artifacts for Cursor Agent %s", agentID)
+		}
+		return
+	}
+
+	if len(items) == 0 {
+		return
+	}
+
+	if len(items) > maxAttachedArtifacts {
+		if logger != nil {
+			logger.Warnf("Cursor Agent %s produced %d artifacts; attaching the first %d", agentID, len(items), maxAttachedArtifacts)
+		}
+		items = items[:maxAttachedArtifacts]
+	}
+
+	artifacts := make([]LaunchAgentArtifact, 0, len(items))
+	for _, item := range items {
+		artifact := LaunchAgentArtifact{
+			Path:      item.Path,
+			SizeBytes: item.SizeBytes,
+			UpdatedAt: item.UpdatedAt,
+		}
+
+		if download, err := client.DownloadArtifact(agentID, item.Path); err == nil {
+			artifact.URL = download.URL
+			artifact.ExpiresAt = download.ExpiresAt
+		} else if logger != nil {
+			logger.WithError(err).Warnf("Failed to get download link for artifact %s of Cursor Agent %s", item.Path, agentID)
+		}
+
+		artifacts = append(artifacts, artifact)
+	}
+
+	payload.Artifacts = artifacts
+}
+
+func lastConversationMessage(messages []ConversationMessage) *ConversationMessage {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Type == ConversationMessageTypeAssistant {
+			msg := messages[i]
+			return &msg
+		}
+	}
+	msg := messages[len(messages)-1]
+	return &msg
+}

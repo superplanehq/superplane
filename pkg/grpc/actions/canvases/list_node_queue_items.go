@@ -6,19 +6,20 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	limit = getLimit(limit)
@@ -37,7 +38,7 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeQueueItems(queueItems)
+	serialized, err := SerializeNodeQueueItems(database.DB(ctx), queueItems)
 	if err != nil {
 		return nil, err
 	}
@@ -50,23 +51,32 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
-	//
-	// Fetch all input records
-	//
-	inputEvents, err := models.FindCanvasEvents(eventIDsFromQueueItems(queueItems))
+func SerializeNodeQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
+	inputEvents, err := loadInputEventsForQueueItems(db, queueItems)
+	if err != nil {
+		return nil, err
+	}
+
+	return serializeNodeQueueItemsWithInputEvents(queueItems, inputEvents)
+}
+
+func loadInputEventsForQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueItem) ([]models.CanvasEvent, error) {
+	inputEvents, err := models.FindCanvasEvents(db, eventIDsFromQueueItems(queueItems))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
 	}
 
-	//
-	// Combine everything into the response
-	//
+	return inputEvents, nil
+}
+
+func serializeNodeQueueItemsWithInputEvents(queueItems []models.CanvasNodeQueueItem, inputEvents []models.CanvasEvent) ([]*pb.CanvasNodeQueueItem, error) {
+	inputEventsByID := indexEventsByID(inputEvents)
 	result := make([]*pb.CanvasNodeQueueItem, 0, len(queueItems))
 	for _, queueItem := range queueItems {
-		input, err := getInputForQueueItem(queueItem, inputEvents)
+		input, err := getInputForQueueItem(queueItem, inputEventsByID)
 		if err != nil {
-			return nil, err
+			log.WithError(err).Warnf("Serializing queue item %s with empty input", queueItem.ID.String())
+			input = &structpb.Struct{}
 		}
 
 		serializedQueueItem := &pb.CanvasNodeQueueItem{
@@ -81,7 +91,7 @@ func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.Can
 			serializedQueueItem.RootEvent, err = SerializeCanvasEvent(*queueItem.RootEvent)
 			if err != nil {
 				log.Errorf("Failed to serialize workflow event: %v", err)
-				return nil, status.Error(codes.Internal, "failed to list node queue items")
+				return nil, grpcerrors.Internal(err, "failed to list node queue items")
 			}
 		}
 
@@ -89,6 +99,15 @@ func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.Can
 	}
 
 	return result, nil
+}
+
+func indexEventsByID(events []models.CanvasEvent) map[string]models.CanvasEvent {
+	eventsByID := make(map[string]models.CanvasEvent, len(events))
+	for _, event := range events {
+		eventsByID[event.ID.String()] = event
+	}
+
+	return eventsByID
 }
 
 func getLastQueueItemTimestamp(queueItems []models.CanvasNodeQueueItem) *timestamppb.Timestamp {
@@ -107,22 +126,21 @@ func eventIDsFromQueueItems(queueItems []models.CanvasNodeQueueItem) []string {
 	return ids
 }
 
-func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, events []models.CanvasEvent) (*structpb.Struct, error) {
-	for _, event := range events {
-		if event.ID.String() == queueItem.EventID.String() {
-			eventData, ok := event.Data.Data().(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("event data cannot be turned into input for queue item %s", queueItem.ID.String())
-			}
-
-			data, err := newStructpbStruct(eventData)
-			if err != nil {
-				return nil, err
-			}
-
-			return data, nil
-		}
+func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, eventsByID map[string]models.CanvasEvent) (*structpb.Struct, error) {
+	event, ok := eventsByID[queueItem.EventID.String()]
+	if !ok {
+		return nil, fmt.Errorf("input not found for queue item %s", queueItem.ID.String())
 	}
 
-	return nil, fmt.Errorf("input not found for queue item %s", queueItem.ID.String())
+	eventData, ok := event.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data cannot be turned into input for queue item %s", queueItem.ID.String())
+	}
+
+	data, err := newStructpbStruct(eventData)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

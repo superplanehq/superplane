@@ -1,9 +1,12 @@
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 
-export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+import { DraftChangeDots } from "./DraftChangeDots";
+
+export type CanvasMode = "version-live" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
@@ -12,29 +15,23 @@ interface CanvasModeToggleProps {
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
-  hasDraft?: boolean;
-  hasConsoleDraft?: boolean;
+  hasCanvasUncommitted?: boolean;
+  hasCanvasCommitted?: boolean;
+  hasConsoleUncommitted?: boolean;
+  hasConsoleCommitted?: boolean;
+  hasFilesUncommitted?: boolean;
+  hasFilesCommitted?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
-const RUNS_MODE = "runs";
-
-const BASE_TAB_CLASSES =
-  "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
-
-const ACTIVE_CLASSES = "bg-background text-foreground shadow-sm";
-const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
-const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
-const EDITING_INACTIVE_CLASSES = "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none";
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
   memory: MEMORY_TAB,
   files: FILES_TAB,
-  runs: RUNS_MODE,
 };
 
 /** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
@@ -49,16 +46,31 @@ function modeToTab(mode: string): string {
   return MODE_TO_TAB[mode] ?? CANVAS_TAB;
 }
 
+/** Edit-mode nav background tinted to match edit-session chrome. */
+function editingNavClassName(): string {
+  return "bg-orange-200";
+}
+
+/** Edit-mode inactive tab text on the orange nav track. */
+function editingInactiveClassName(): string {
+  return "bg-transparent text-orange-950/80 hover:text-orange-950 transition-none";
+}
+
+/** Active edit tab — white pill on the orange nav track in light mode. */
+function editingActiveClassName(): string {
+  return "rounded-full bg-white text-gray-800 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:shadow-none";
+}
+
 function tabClasses(selected: string, value: string, editing: boolean) {
   const isActive = selected === value;
-  const stateClass = isActive
-    ? editing
-      ? EDITING_ACTIVE_CLASSES
-      : ACTIVE_CLASSES
-    : editing
-      ? EDITING_INACTIVE_CLASSES
-      : INACTIVE_CLASSES;
-  return cn(BASE_TAB_CLASSES, stateClass);
+  if (!editing) {
+    return segmentedNavTabClassName(isActive);
+  }
+
+  return segmentedNavTabClassName(isActive, {
+    activeClasses: editingActiveClassName(),
+    inactiveClasses: editingInactiveClassName(),
+  });
 }
 
 export function CanvasModeToggle({
@@ -68,8 +80,12 @@ export function CanvasModeToggle({
   onSelectMemory,
   onSelectFiles,
   editing = false,
-  hasDraft = false,
-  hasConsoleDraft = false,
+  hasCanvasUncommitted = false,
+  hasCanvasCommitted = false,
+  hasConsoleUncommitted = false,
+  hasConsoleCommitted = false,
+  hasFilesUncommitted = false,
+  hasFilesCommitted = false,
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
@@ -84,9 +100,26 @@ export function CanvasModeToggle({
       aria-label="Canvas view"
       className={cn(
         "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
-        editing ? "bg-blue-50" : "bg-slate-100",
+        editing ? editingNavClassName() : "bg-slate-100 dark:bg-gray-800",
       )}
     >
+      <Link
+        to={tabHref()}
+        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
+        className={tabClasses(selected, CANVAS_TAB, editing)}
+        data-testid="canvas-view-mode-live"
+        aria-label={editing ? "Canvas (editing)" : "Canvas"}
+        aria-current={selected === CANVAS_TAB ? "page" : undefined}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          Canvas
+          <DraftChangeDots
+            uncommitted={hasCanvasUncommitted}
+            committed={hasCanvasCommitted}
+            testIdPrefix="canvas-view-mode-live"
+          />
+        </span>
+      </Link>
       {showConsole ? (
         <Link
           to={tabHref("console")}
@@ -98,23 +131,14 @@ export function CanvasModeToggle({
         >
           <span className="inline-flex items-center gap-1.5">
             Console
-            <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
+            <DraftChangeDots
+              uncommitted={hasConsoleUncommitted}
+              committed={hasConsoleCommitted}
+              testIdPrefix="canvas-view-mode-console"
+            />
           </span>
         </Link>
       ) : null}
-      <Link
-        to={tabHref()}
-        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
-        className={tabClasses(selected, CANVAS_TAB, editing)}
-        data-testid="canvas-view-mode-live"
-        aria-label={editing ? "Canvas (editing)" : "Canvas"}
-        aria-current={selected === CANVAS_TAB ? "page" : undefined}
-      >
-        <span className="inline-flex items-center gap-1.5">
-          Canvas
-          <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
-        </span>
-      </Link>
       {showMemory ? (
         <Link
           to={tabHref("memory")}
@@ -136,23 +160,16 @@ export function CanvasModeToggle({
           aria-label="Files"
           aria-current={selected === FILES_TAB ? "page" : undefined}
         >
-          Files
+          <span className="inline-flex items-center gap-1.5">
+            Files
+            <DraftChangeDots
+              uncommitted={hasFilesUncommitted}
+              committed={hasFilesCommitted}
+              testIdPrefix="canvas-view-mode-files"
+            />
+          </span>
         </Link>
       ) : null}
     </nav>
-  );
-}
-
-function DraftDot({ show, editing, testId }: { show: boolean; editing: boolean; testId: string }) {
-  if (!show) {
-    return null;
-  }
-
-  return (
-    <span
-      className={cn("inline-flex size-1.5 shrink-0 rounded-full", editing ? "bg-blue-500" : "bg-slate-400")}
-      aria-hidden="true"
-      data-testid={testId}
-    />
   );
 }

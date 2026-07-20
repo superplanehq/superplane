@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { posthog } from "@/posthog";
+import { consumePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
 
 import { AccountContext, type AccountContextType } from "./accountContextState";
 
@@ -31,11 +32,33 @@ export function AccountProvider({ children }: AccountProviderProps) {
           setAccount(accountData);
 
           if (!accountData.impersonation?.active) {
-            posthog.identify(accountData.id, {
+            const signupPreference = consumePendingSignupAnalyticsPreference({
+              accountEmail: accountData.email,
+              currentPath: window.location.pathname,
+              signupResult: getSignupAnalyticsResult(window.location.search),
+            });
+
+            const accountProperties = {
               email: accountData.email,
               name: accountData.name,
               installation_admin: accountData.installation_admin,
-            });
+              ...(signupPreference
+                ? {
+                    product_updates_opt_in: signupPreference.productUpdatesOptIn,
+                  }
+                : {}),
+            };
+
+            posthog.identify(accountData.id, accountProperties);
+
+            if (signupPreference) {
+              posthog.capture("auth:signup", {
+                product_updates_opt_in: signupPreference.productUpdatesOptIn,
+                $set: {
+                  product_updates_opt_in: signupPreference.productUpdatesOptIn,
+                },
+              });
+            }
           }
         }
         // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
@@ -50,4 +73,13 @@ export function AccountProvider({ children }: AccountProviderProps) {
   }, []);
 
   return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
+}
+
+function getSignupAnalyticsResult(search: string) {
+  const value = new URLSearchParams(search).get("auth_signup_result");
+  if (value === "created" || value === "existing") {
+    return value;
+  }
+
+  return null;
 }

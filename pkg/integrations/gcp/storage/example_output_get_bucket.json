@@ -1,0 +1,18 @@
+{
+  "data": {
+    "id": "my-bucket",
+    "name": "my-bucket",
+    "location": "US",
+    "locationType": "multi-region",
+    "storageClass": "STANDARD",
+    "projectNumber": "123456789012",
+    "timeCreated": "2025-01-01T00:00:00.000Z",
+    "updated": "2025-01-02T00:00:00.000Z",
+    "versioning": false,
+    "uniformBucketLevelAccess": true,
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket",
+    "consoleUrl": "https://console.cloud.google.com/storage/browser/my-bucket"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}

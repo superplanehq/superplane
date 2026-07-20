@@ -2,7 +2,6 @@ import {
   ArrowRightLeft,
   BookOpen,
   CircleUser,
-  History,
   LogOut,
   MemoryStick,
   Palette,
@@ -36,7 +35,7 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "console" | "memory" | "runs") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
@@ -71,7 +70,7 @@ export function buildRootActions({
       label: "Change Organization",
       description: "Return to organization picker",
       icon: ArrowRightLeft,
-      onSelect: () => goTo("/"),
+      onSelect: () => goTo("/?select=true"),
       keywords: ["switch", "organization", "workspace"],
     },
     {
@@ -128,7 +127,7 @@ export function buildCurrentCanvasActions({
       label: "Runs",
       description: currentCanvasName,
       icon: PlayCircle,
-      onSelect: () => goToCurrentCanvasView("runs"),
+      onSelect: () => goToCurrentCanvasView(),
       keywords: ["runs", "executions"],
     },
     {
@@ -149,17 +148,6 @@ export function buildCurrentCanvasActions({
       keywords: ["canvas", "settings"],
     },
   ];
-
-  if (showToolTabCommands) {
-    actions.splice(4, 0, {
-      id: "current-canvas-versions",
-      label: "Versions",
-      description: currentCanvasName,
-      icon: History,
-      onSelect: () => openCurrentCanvasToolTab("versions"),
-      keywords: ["versions", "version history", "change requests"],
-    });
-  }
 
   if (agentEnabled && showToolTabCommands) {
     actions.splice(1, 0, {

@@ -13,6 +13,7 @@ interface MentionTextareaProps {
   setValue: (v: string) => void;
   setCursorPos: (pos: number) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   backdropRef: React.RefObject<HTMLDivElement | null>;
@@ -24,6 +25,7 @@ export function MentionTextarea({
   setValue,
   setCursorPos,
   onKeyDown,
+  onPaste,
   placeholder,
   textareaRef,
   backdropRef,
@@ -110,6 +112,7 @@ export function MentionTextarea({
         onKeyUp={handleSelect}
         onClick={handleSelect}
         onScroll={handleScroll}
+        onPaste={onPaste}
         rows={1}
         placeholder={placeholder}
         data-testid="agent-input"
@@ -118,7 +121,7 @@ export function MentionTextarea({
           composerTextMetrics,
           "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
           "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          "text-transparent caret-slate-900 selection:bg-blue-200/50",
+          "text-transparent caret-slate-900 selection:bg-blue-200/50 dark:caret-gray-100 dark:selection:bg-blue-500/30",
           "dark:bg-transparent",
         )}
         onKeyDown={onKeyDown}

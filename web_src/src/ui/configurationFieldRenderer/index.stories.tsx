@@ -200,6 +200,7 @@ export const Catalog: Story = {
 
 export const StringField = createExampleStory("string");
 export const TextField = createExampleStory("text");
+export const TextFieldCode = createExampleStory("text-code");
 export const ExpressionField = createExampleStory("expression");
 export const XMLField = createExampleStory("xml");
 export const NumberField = createExampleStory("number");
@@ -220,6 +221,7 @@ export const UserField = createExampleStory("user");
 export const RoleField = createExampleStory("role");
 export const GroupField = createExampleStory("group");
 export const IntegrationResourceField = createExampleStory("integration-resource");
+export const AppField = createExampleStory("app");
 export const AnyPredicateListField = createExampleStory("any-predicate-list");
 export const GitRefField = createExampleStory("git-ref");
 export const SecretKeyField = createExampleStory("secret-key");

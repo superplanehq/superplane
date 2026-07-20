@@ -2,15 +2,23 @@ package actions
 
 import (
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/registryimports"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
+
+var _ = registryimports.Loaded
 
 func TestConfigurationFieldToProto(t *testing.T) {
 	t.Run("roundtrip string default value does not introduce extra quotes", func(t *testing.T) {
@@ -131,6 +139,200 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
 }
+
+func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
+	triggers := SerializeTriggers([]core.Trigger{
+		&testTriggerDefinition{name: "github.onPush"},
+	})
+
+	require.Len(t, triggers, 1)
+	require.Len(t, triggers[0].Configuration, 1)
+
+	runTitle := triggers[0].Configuration[0]
+	require.Equal(t, "customName", runTitle.Name)
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", runTitle.GetDefaultValue())
+}
+
+func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	for triggerName, exampleData := range builtInTriggerExamples(reg) {
+		t.Run(triggerName, func(t *testing.T) {
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(rootPayloadFromExample(triggerName, exampleData)).
+				ResolveTemplateExpressions(defaultRunTitleExpression(triggerName))
+
+			require.NoError(t, err)
+			require.NotEmpty(t, resolved)
+			require.NotContains(t, resolved, "<nil>")
+			require.NotContains(t, resolved, "<no value>")
+		})
+	}
+}
+
+// GitLab sends push events for valid pushes that carry no commits (or omit the
+// key entirely). The default title must fall back to the branch ref instead of
+// failing to resolve commits[-1].
+func TestGitlabOnPushRunTitleFallsBackWithoutCommits(t *testing.T) {
+	expression := defaultRunTitleExpression("gitlab.onPush")
+	require.NotEmpty(t, expression)
+
+	cases := map[string]map[string]any{
+		"empty commits":   {"ref": "refs/heads/main", "commits": []any{}},
+		"missing commits": {"ref": "refs/heads/main"},
+	}
+
+	for name, data := range cases {
+		t.Run(name, func(t *testing.T) {
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(map[string]any{
+					"type":      "gitlab.onPush",
+					"timestamp": time.Now(),
+					"data":      data,
+				}).
+				ResolveTemplateExpressions(expression)
+
+			require.NoError(t, err)
+			require.Equal(t, "refs/heads/main", resolved)
+		})
+	}
+}
+
+func TestBuiltInTriggersHaveDefaultRunTitleExpressions(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	missing := []string{}
+	for _, triggerName := range builtInTriggerNames(reg) {
+		if defaultRunTitleExpression(triggerName) == "" {
+			missing = append(missing, triggerName)
+		}
+	}
+
+	require.Empty(t, missing, "missing default run title expressions")
+}
+
+func builtInTriggerNames(reg *registry.Registry) []string {
+	names := []string{}
+
+	for triggerName := range builtInTriggerExamples(reg) {
+		names = append(names, triggerName)
+	}
+
+	return names
+}
+
+func builtInTriggerExamples(reg *registry.Registry) map[string]map[string]any {
+	examples := map[string]map[string]any{}
+
+	for _, trigger := range reg.ListTriggers() {
+		examples[trigger.Name()] = trigger.ExampleData()
+	}
+
+	for _, integration := range reg.ListIntegrations() {
+		for _, trigger := range integration.Triggers() {
+			examples[trigger.Name()] = trigger.ExampleData()
+		}
+
+		setupProvider := reg.SetupProviders[integration.Name()]
+		if setupProvider == nil {
+			continue
+		}
+
+		for _, group := range setupProvider.CapabilityGroups() {
+			for _, capability := range group.Capabilities {
+				if capability.Type == core.IntegrationCapabilityTypeTrigger {
+					if len(capability.ExampleData) > 0 {
+						examples[capability.Name] = capability.ExampleData
+					} else if _, ok := examples[capability.Name]; !ok {
+						examples[capability.Name] = nil
+					}
+				}
+			}
+		}
+	}
+
+	return examples
+}
+
+func rootPayloadFromExample(triggerName string, exampleData map[string]any) map[string]any {
+	if exampleData == nil {
+		return map[string]any{
+			"type":      triggerName,
+			"timestamp": time.Now(),
+			"data":      map[string]any{},
+		}
+	}
+
+	if isRootEventExample(exampleData) {
+		payload := cloneExampleData(exampleData)
+		if _, ok := payload["timestamp"].(time.Time); !ok {
+			payload["timestamp"] = time.Now()
+		}
+
+		return payload
+	}
+
+	return map[string]any{
+		"type":      triggerName,
+		"timestamp": time.Now(),
+		"data":      cloneExampleData(exampleData),
+	}
+}
+
+func isRootEventExample(exampleData map[string]any) bool {
+	_, hasType := exampleData["type"]
+	_, hasData := exampleData["data"]
+	return hasType && hasData
+}
+
+func cloneExampleData(exampleData map[string]any) map[string]any {
+	clone := make(map[string]any, len(exampleData))
+	for key, value := range exampleData {
+		clone[key] = cloneExampleValue(value)
+	}
+
+	return clone
+}
+
+func cloneExampleValue(value any) any {
+	switch typedValue := value.(type) {
+	case map[string]any:
+		return cloneExampleData(typedValue)
+	case []any:
+		clone := make([]any, len(typedValue))
+		for i, item := range typedValue {
+			clone[i] = cloneExampleValue(item)
+		}
+
+		return clone
+	default:
+		return value
+	}
+}
+
+type testTriggerDefinition struct {
+	name string
+}
+
+func (t *testTriggerDefinition) Name() string                         { return t.name }
+func (t *testTriggerDefinition) Label() string                        { return t.name }
+func (t *testTriggerDefinition) Description() string                  { return t.name }
+func (t *testTriggerDefinition) Documentation() string                { return "" }
+func (t *testTriggerDefinition) Icon() string                         { return "" }
+func (t *testTriggerDefinition) Color() string                        { return "" }
+func (t *testTriggerDefinition) ExampleData() map[string]any          { return nil }
+func (t *testTriggerDefinition) Configuration() []configuration.Field { return nil }
+func (t *testTriggerDefinition) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (t *testTriggerDefinition) Setup(core.TriggerContext) error { return nil }
+func (t *testTriggerDefinition) Hooks() []core.Hook              { return nil }
+func (t *testTriggerDefinition) HandleHook(core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
+}
+func (t *testTriggerDefinition) Cleanup(core.TriggerContext) error { return nil }
 
 func TestCapabilityStateToProto(t *testing.T) {
 	tests := []struct {

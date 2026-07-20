@@ -2,25 +2,22 @@ package canvases
 
 import (
 	"context"
-	"slices"
 	"sort"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Canvases)
@@ -69,7 +66,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Canvases, 2)
@@ -77,7 +74,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// Verify both canvases are returned
 	//
-	canvasIDs := []string{response.Canvases[0].Metadata.Id, response.Canvases[1].Metadata.Id}
+	canvasIDs := []string{response.Canvases[0].Id, response.Canvases[1].Id}
 	assert.Contains(t, canvasIDs, canvas1.ID.String())
 	assert.Contains(t, canvasIDs, canvas2.ID.String())
 
@@ -86,10 +83,58 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	canvasNames := make([]string, len(response.Canvases))
 	for i, canvas := range response.Canvases {
-		canvasNames[i] = canvas.Metadata.Name
+		canvasNames[i] = canvas.Name
 	}
 
 	assert.True(t, sort.StringsAreSorted(canvasNames), "canvases should be sorted by name in ascending order")
+}
+
+func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
+	r := support.Setup(t)
+
+	starredCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	plainCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	// Another user's star must not leak into this user's view.
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	_, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), otherUser.ID.String(), &pb.UpdateCanvasPreferenceRequest{
+		CanvasId: plainCanvas.ID.String(),
+		Starred:  proto.Bool(true),
+	})
+	require.NoError(t, err)
+
+	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+		CanvasId: starredCanvas.ID.String(),
+		Starred:  proto.Bool(true),
+	})
+	require.NoError(t, err)
+
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	require.NoError(t, err)
+	require.Len(t, response.Canvases, 2)
+
+	starredSummary := findCanvasSummary(response.Canvases, starredCanvas.ID.String())
+	require.NotNil(t, starredSummary)
+	assert.True(t, starredSummary.Starred)
+	assert.NotNil(t, starredSummary.StarredAt)
+
+	plainSummary := findCanvasSummary(response.Canvases, plainCanvas.ID.String())
+	require.NotNil(t, plainSummary)
+	assert.False(t, plainSummary.Starred)
+	assert.Nil(t, plainSummary.StarredAt)
 }
 
 func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.T) {
@@ -139,7 +184,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// List canvases for original organization
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -147,9 +192,8 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	// Should only return the canvas from the original organization
 	//
 	assert.Len(t, response.Canvases, 1)
-	assert.Equal(t, canvas.ID.String(), response.Canvases[0].Metadata.Id)
-	assert.Equal(t, r.Organization.ID.String(), response.Canvases[0].Metadata.OrganizationId)
-	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Metadata.Id)
+	assert.Equal(t, canvas.ID.String(), response.Canvases[0].Id)
+	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Id)
 }
 
 func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
@@ -180,24 +224,19 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 	support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
-
-	//
-	// Verify status is nil (not loaded)
-	//
-	assert.Nil(t, response.Canvases[0].Status)
 }
 
-func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
+func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	r := support.Setup(t)
 
 	//
@@ -237,7 +276,7 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -245,116 +284,25 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	listedCanvas := response.Canvases[0]
 
 	//
-	// Verify metadata is present
+	// Verify summary is returned
 	//
-	require.NotNil(t, listedCanvas.Metadata)
-	assert.Equal(t, canvas.ID.String(), listedCanvas.Metadata.Id)
-	assert.Equal(t, r.Organization.ID.String(), listedCanvas.Metadata.OrganizationId)
-	assert.Equal(t, canvas.Name, listedCanvas.Metadata.Name)
-	assert.Equal(t, canvas.Description, listedCanvas.Metadata.Description)
-	assert.NotNil(t, listedCanvas.Metadata.CreatedAt)
-	assert.NotNil(t, listedCanvas.Metadata.UpdatedAt)
-	assert.NotNil(t, listedCanvas.Metadata.CreatedBy)
-
-	//
-	// Verify spec is present with nodes and edges
-	//
-	require.NotNil(t, listedCanvas.Spec)
-	assert.Len(t, listedCanvas.Spec.Nodes, 2)
-	assert.Equal(t, "node-1", listedCanvas.Spec.Nodes[0].Id)
-	assert.Equal(t, "First Node", listedCanvas.Spec.Nodes[0].Name)
-	assert.Equal(t, "node-2", listedCanvas.Spec.Nodes[1].Id)
-	assert.Equal(t, "Second Node", listedCanvas.Spec.Nodes[1].Name)
-
-	assert.Len(t, listedCanvas.Spec.Edges, 1)
-	assert.Equal(t, "node-1", listedCanvas.Spec.Edges[0].SourceId)
-	assert.Equal(t, "node-2", listedCanvas.Spec.Edges[0].TargetId)
-	assert.Equal(t, "default", listedCanvas.Spec.Edges[0].Channel)
-
-	//
-	// Verify status is NOT present
-	//
-	assert.Nil(t, listedCanvas.Status)
+	require.NotNil(t, listedCanvas)
+	assert.Equal(t, canvas.ID.String(), listedCanvas.Id)
+	assert.Equal(t, canvas.Name, listedCanvas.Name)
+	assert.Equal(t, canvas.Description, listedCanvas.Description)
+	assert.NotNil(t, listedCanvas.CreatedAt)
+	assert.NotNil(t, listedCanvas.UpdatedAt)
+	assert.NotNil(t, listedCanvas.CreatedBy.Id)
+	assert.NotNil(t, listedCanvas.CreatedBy.Name)
+	assert.NotNil(t, listedCanvas.FolderId)
 }
 
-func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(t *testing.T) {
-	r := support.Setup(t)
-
-	activeCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-1",
-				Name:   "Node 1",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	deletedCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-2",
-				Name:   "Node 2",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	require.NoError(t, deletedCanvas.SoftDelete())
-
-	now := time.Now()
-	templateLiveVersionID := uuid.New()
-	templateCanvas := &models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: models.TemplateOrganizationID,
-		LiveVersionID:  &templateLiveVersionID,
-		IsTemplate:     true,
-		Name:           support.RandomName("template"),
-		Description:    "Template workflow",
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(templateCanvas).Error; err != nil {
-			return err
+func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {
+	for _, canvas := range canvases {
+		if canvas.Id == canvasID {
+			return canvas
 		}
-
-		return tx.Create(&models.CanvasVersion{
-			ID:          templateLiveVersionID,
-			WorkflowID:  templateCanvas.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
-		}).Error
-	}))
-
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), true)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-
-	canvasIDs := make([]string, len(response.Canvases))
-	for i, canvas := range response.Canvases {
-		canvasIDs[i] = canvas.Metadata.Id
 	}
 
-	assert.True(t, slices.Contains(canvasIDs, activeCanvas.ID.String()))
-	assert.True(t, slices.Contains(canvasIDs, templateCanvas.ID.String()))
-	assert.False(t, slices.Contains(canvasIDs, deletedCanvas.ID.String()))
+	return nil
 }

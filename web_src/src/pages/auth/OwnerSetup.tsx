@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
-import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
+import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
-import { PrivateNetworkStep } from "./ownerSetup/PrivateNetworkStep";
-import { SmtpPromptStep } from "./ownerSetup/SmtpPromptStep";
-import { SmtpConfigStep } from "./ownerSetup/SmtpConfigStep";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -14,20 +14,14 @@ const OwnerSetup: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [smtpHost, setSmtpHost] = useState("");
-  const [smtpPort, setSmtpPort] = useState("");
-  const [smtpUsername, setSmtpUsername] = useState("");
-  const [smtpPassword, setSmtpPassword] = useState("");
-  const [smtpFromName, setSmtpFromName] = useState("");
-  const [smtpFromEmail, setSmtpFromEmail] = useState("");
-  const [smtpUseTLS, setSmtpUseTLS] = useState(true);
-  const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
-  const [step, setStep] = useState<"owner" | "privateNetwork" | "smtpPrompt" | "smtpConfig" | "survey">("owner");
+  const [step, setStep] = useState<"owner" | "survey">("owner");
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useReportPageReady(true);
 
   const isEmailValid = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -74,34 +68,7 @@ const OwnerSetup: React.FC = () => {
     return errors;
   };
 
-  const validateSMTPFields = () => {
-    const errors: Record<string, string> = {};
-
-    if (!smtpHost.trim()) {
-      errors.smtpHost = "SMTP host is required.";
-    }
-
-    if (!smtpPort.trim()) {
-      errors.smtpPort = "SMTP port is required.";
-    } else if (!/^[0-9]+$/.test(smtpPort.trim())) {
-      errors.smtpPort = "SMTP port must be a number.";
-    }
-
-    if (!smtpFromEmail.trim()) {
-      errors.smtpFromEmail = "SMTP from email is required.";
-    } else if (!isEmailValid(smtpFromEmail.trim())) {
-      errors.smtpFromEmail = "Please enter a valid from email address.";
-    }
-
-    if (smtpUsername.trim() && !smtpPassword) {
-      errors.smtpPassword = "SMTP password is required when username is provided.";
-    }
-
-    setFieldErrors(errors);
-    return errors;
-  };
-
-  const submitSetup = async (enableSMTP: boolean) => {
+  const submitSetup = async () => {
     setError(null);
 
     setLoading(true);
@@ -118,15 +85,6 @@ const OwnerSetup: React.FC = () => {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           password,
-          smtp_enabled: enableSMTP,
-          smtp_host: enableSMTP ? smtpHost.trim() : "",
-          smtp_port: enableSMTP && smtpPort ? Number(smtpPort) : 0,
-          smtp_username: enableSMTP ? smtpUsername.trim() : "",
-          smtp_password: enableSMTP ? smtpPassword : "",
-          smtp_from_name: enableSMTP ? smtpFromName.trim() : "",
-          smtp_from_email: enableSMTP ? smtpFromEmail.trim() : "",
-          smtp_use_tls: enableSMTP ? smtpUseTLS : false,
-          allow_private_network_access: allowPrivateNetworkAccess,
         }),
       });
 
@@ -176,60 +134,26 @@ const OwnerSetup: React.FC = () => {
     }
   };
 
-  const handleOwnerNext = (e: React.FormEvent) => {
+  const handleOwnerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors = validateOwnerFields();
     if (Object.keys(errors).length > 0) {
       return;
     }
-    setStep("privateNetwork");
-  };
-
-  const handlePrivateNetworkNext = () => {
-    setStep("smtpPrompt");
-  };
-
-  const handlePrivateNetworkBack = () => {
-    setError(null);
-    setFieldErrors({});
-    setStep("owner");
-  };
-
-  const handleSkipSMTP = () => {
-    setFieldErrors({});
-    submitSetup(false);
-  };
-
-  const handleEnableSMTP = () => {
-    setError(null);
-    setFieldErrors({});
-    setStep("smtpConfig");
-  };
-
-  const handleSMTPPromptBack = () => {
-    setError(null);
-    setFieldErrors({});
-    setStep("privateNetwork");
-  };
-
-  const handleSMTPConfigBack = () => {
-    setError(null);
-    setFieldErrors({});
-    setStep("smtpPrompt");
-  };
-
-  const handleSubmitSMTP = (e: React.FormEvent) => {
-    e.preventDefault();
-    const errors = validateSMTPFields();
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
-    submitSetup(true);
+    submitSetup();
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
+    <div
+      className={cn("min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8", appDarkModeClasses.surface)}
+    >
+      <div
+        className={cn(
+          "max-w-md w-full rounded-lg bg-white p-8 shadow-sm",
+          appDarkModeClasses.modalEdge,
+          appDarkModeClasses.surfaceRaised,
+        )}
+      >
         {step === "owner" && (
           <OwnerStep
             email={email}
@@ -245,58 +169,12 @@ const OwnerSetup: React.FC = () => {
             onLastNameChange={setLastName}
             onPasswordChange={setPassword}
             onConfirmPasswordChange={setConfirmPassword}
-            onNext={handleOwnerNext}
-          />
-        )}
-
-        {step === "privateNetwork" && (
-          <PrivateNetworkStep
-            allowPrivateNetworkAccess={allowPrivateNetworkAccess}
-            loading={loading}
-            error={error}
-            onAllowPrivateNetworkAccessChange={setAllowPrivateNetworkAccess}
-            onBack={handlePrivateNetworkBack}
-            onNext={handlePrivateNetworkNext}
-          />
-        )}
-
-        {step === "smtpPrompt" && (
-          <SmtpPromptStep
-            loading={loading}
-            error={error}
-            onBack={handleSMTPPromptBack}
-            onEnableSMTP={handleEnableSMTP}
-            onSkipSMTP={handleSkipSMTP}
+            onSubmit={handleOwnerSubmit}
           />
         )}
 
         {step === "survey" && activeSurvey && pendingOrganizationId && (
-          <OwnerSetupSurvey survey={activeSurvey} organizationId={pendingOrganizationId} />
-        )}
-
-        {step === "smtpConfig" && (
-          <SmtpConfigStep
-            smtpHost={smtpHost}
-            smtpPort={smtpPort}
-            smtpUsername={smtpUsername}
-            smtpPassword={smtpPassword}
-            smtpFromName={smtpFromName}
-            smtpFromEmail={smtpFromEmail}
-            smtpUseTLS={smtpUseTLS}
-            loading={loading}
-            error={error}
-            fieldErrors={fieldErrors}
-            onSmtpHostChange={setSmtpHost}
-            onSmtpPortChange={setSmtpPort}
-            onSmtpUsernameChange={setSmtpUsername}
-            onSmtpPasswordChange={setSmtpPassword}
-            onSmtpFromNameChange={setSmtpFromName}
-            onSmtpFromEmailChange={setSmtpFromEmail}
-            onSmtpUseTLSChange={setSmtpUseTLS}
-            onBack={handleSMTPConfigBack}
-            onSkipSMTP={handleSkipSMTP}
-            onSubmit={handleSubmitSMTP}
-          />
+          <PostHogSurveyForm survey={activeSurvey} redirectTo={`/${pendingOrganizationId}`} />
         )}
       </div>
     </div>

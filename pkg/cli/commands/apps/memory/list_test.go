@@ -46,7 +46,7 @@ func newMemoryListServer(t *testing.T) *httptest.Server {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"` + memoryCanvasID + `","name":"my-app"}}]}`))
+			_, _ = w.Write([]byte(`{"canvases":[{"id":"` + memoryCanvasID + `","name":"my-app"}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+memoryCanvasID+"/memory":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(memoriesListResponse))

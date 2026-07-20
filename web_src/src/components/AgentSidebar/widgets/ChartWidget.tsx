@@ -38,7 +38,7 @@ export function ChartWidget({ config }: ChartWidgetProps) {
 function XYChartWidget({ config }: { config: ChartConfig }) {
   const { type, title, x, series } = config;
   if (!x || !series?.length) {
-    return <div className="text-xs text-slate-400 my-2">Chart: missing data</div>;
+    return <div className="my-2 text-xs text-slate-400 dark:text-gray-500">Chart: missing data</div>;
   }
 
   const data = x.map((label, i) => {
@@ -60,8 +60,8 @@ function XYChartWidget({ config }: { config: ChartConfig }) {
   const ChartComponent = type === "bar" ? BarChart : type === "area" ? AreaChart : LineChart;
 
   return (
-    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3">
-      {title && <p className="text-xs font-medium text-slate-700 mb-2">{title}</p>}
+    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+      {title && <p className="mb-2 text-xs font-medium text-slate-700 dark:text-gray-200">{title}</p>}
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <ChartComponent data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
           <CartesianGrid vertical={false} />
@@ -107,7 +107,7 @@ function XYChartWidget({ config }: { config: ChartConfig }) {
 function PieChartWidget({ config }: { config: ChartConfig }) {
   const { title, data } = config;
   if (!data?.length) {
-    return <div className="text-xs text-slate-400 my-2">Pie chart: missing data</div>;
+    return <div className="my-2 text-xs text-slate-400 dark:text-gray-500">Pie chart: missing data</div>;
   }
 
   const chartConfig: ShadcnChartConfig = {};
@@ -119,8 +119,8 @@ function PieChartWidget({ config }: { config: ChartConfig }) {
   });
 
   return (
-    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3">
-      {title && <p className="text-xs font-medium text-slate-700 mb-2">{title}</p>}
+    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+      {title && <p className="mb-2 text-xs font-medium text-slate-700 dark:text-gray-200">{title}</p>}
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent />} />

@@ -13,6 +13,10 @@ vi.mock("@monaco-editor/react", () => ({
   },
 }));
 
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
 describe("CodeBlockWidget", () => {
   it("applies width constraints so it cannot stretch a narrow parent", () => {
     const { container } = render(<CodeBlockWidget code="echo hello" language="bash" />);
@@ -46,5 +50,14 @@ describe("CodeBlockWidget", () => {
     fireEvent.click(getByTestId("bump"));
 
     expect(editorMountSpy.mock.calls.length).toBe(initialMounts);
+  });
+
+  it("opens the shared fullscreen dialog when expand is clicked", () => {
+    const { getByRole, getByText } = render(<CodeBlockWidget code="echo hello" language="bash" />);
+
+    fireEvent.click(getByRole("button", { name: "Expand code" }));
+
+    expect(getByText("BASH")).toBeInTheDocument();
+    expect(getByRole("button", { name: "Copy" })).toBeInTheDocument();
   });
 });

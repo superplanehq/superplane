@@ -11,18 +11,20 @@ export function CollapseWidget({ title, content }: CollapseWidgetProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="my-4 border border-slate-200 rounded-lg overflow-hidden">
+    <div className="my-4 overflow-hidden rounded-lg border border-slate-200 dark:border-gray-700 dark:bg-gray-800">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-gray-300 dark:hover:bg-gray-700"
       >
         <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
         {title}
       </button>
       {open && (
-        <div className="px-3 pb-2 border-t border-slate-100">
-          <pre className="text-xs text-slate-600 whitespace-pre-wrap break-words mt-2 font-mono">{content}</pre>
+        <div className="border-t border-slate-100 px-3 pb-2 dark:border-gray-700">
+          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-slate-600 dark:text-gray-300">
+            {content}
+          </pre>
         </div>
       )}
     </div>

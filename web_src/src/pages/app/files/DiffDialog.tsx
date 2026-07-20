@@ -1,45 +1,61 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useTheme } from "@/contexts/useTheme";
 import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { useMemo } from "react";
 import type { FileContents } from "@pierre/diffs/react";
 
-import type { PendingFileChange } from "./types";
+import type { PendingFileChange, StagedFileDiff } from "./types";
 
 interface DiffDialogProps {
   changes: PendingFileChange[];
+  committedContentByPath: Record<string, string>;
   loadedContentByPath: Record<string, string>;
+  stagedFileDiffs: StagedFileDiff[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DiffDialog({ changes, loadedContentByPath, open, onOpenChange }: DiffDialogProps) {
-  const diffFiles = useMemo(
-    () =>
-      changes.map((change) => ({
-        path: change.path,
-        ...buildDiffFile(change, loadedContentByPath),
-      })),
-    [changes, loadedContentByPath],
-  );
+export function DiffDialog({
+  changes,
+  committedContentByPath,
+  loadedContentByPath,
+  stagedFileDiffs,
+  open,
+  onOpenChange,
+}: DiffDialogProps) {
+  const { resolvedTheme } = useTheme();
+  const diffFiles = useMemo(() => {
+    const pendingDiffs = changes.map((change) => ({
+      path: change.path,
+      ...buildDiffFile(change, committedContentByPath, loadedContentByPath),
+    }));
+    const stagedDiffs = stagedFileDiffs.map((diff) => ({
+      path: diff.path,
+      ...buildStagedDiffFile(diff),
+    }));
+    return [...stagedDiffs, ...pendingDiffs].sort((left, right) => left.path.localeCompare(right.path));
+  }, [changes, committedContentByPath, loadedContentByPath, stagedFileDiffs]);
   const diffOptions = useMemo(
     () => ({
-      theme: "pierre-light" as const,
-      themeType: "light" as const,
+      theme: resolvedTheme === "dark" ? ("pierre-dark" as const) : ("pierre-light" as const),
+      themeType: resolvedTheme === "dark" ? ("dark" as const) : ("light" as const),
       diffStyle: "split" as const,
       stickyHeader: true,
     }),
-    [],
+    [resolvedTheme],
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="90vw" className="grid grid-rows-[auto_minmax(0,1fr)] gap-4 p-0">
-        <DialogHeader className="border-b border-slate-950/15 px-5 py-4">
+        <DialogHeader className="border-b border-slate-950/15 px-5 py-4 dark:border-gray-800/70">
           <DialogTitle>Diff</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 overflow-hidden">
           {diffFiles.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500">No changes</div>
+            <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+              No changes
+            </div>
           ) : (
             <Virtualizer className="h-full overflow-auto" contentClassName="min-w-0">
               <div className="space-y-4 p-4">
@@ -49,7 +65,7 @@ export function DiffDialog({ changes, loadedContentByPath, open, onOpenChange }:
                     oldFile={oldFile}
                     newFile={newFile}
                     options={diffOptions}
-                    className="overflow-hidden rounded border border-slate-950/15 bg-white"
+                    className="overflow-hidden rounded border border-slate-950/15 bg-white dark:border-gray-800/70 dark:bg-gray-900"
                   />
                 ))}
               </div>
@@ -63,9 +79,14 @@ export function DiffDialog({ changes, loadedContentByPath, open, onOpenChange }:
 
 function buildDiffFile(
   change: PendingFileChange,
+  committedContentByPath: Record<string, string>,
   loadedContentByPath: Record<string, string>,
 ): { oldFile: FileContents; newFile: FileContents } {
-  const previousContents = change.type === "added" ? "" : (loadedContentByPath[change.path] ?? "");
+  // Use committed (stage=false) content as the diff baseline. loadedContentByPath
+  // reflects staged content for draft reads, so after autosave to staging it would
+  // match the edited content and the diff would appear empty.
+  const baselineContents = committedContentByPath[change.path] ?? loadedContentByPath[change.path] ?? "";
+  const previousContents = change.type === "added" ? "" : baselineContents;
   const nextContents = change.type === "deleted" ? "" : change.content;
 
   return {
@@ -78,6 +99,21 @@ function buildDiffFile(
       name: change.path,
       contents: nextContents,
       cacheKey: `${change.path}:new:${nextContents}`,
+    },
+  };
+}
+
+function buildStagedDiffFile(diff: StagedFileDiff): { oldFile: FileContents; newFile: FileContents } {
+  return {
+    oldFile: {
+      name: diff.path,
+      contents: diff.committedContent,
+      cacheKey: `${diff.path}:old:${diff.committedContent}`,
+    },
+    newFile: {
+      name: diff.path,
+      contents: diff.effectiveContent,
+      cacheKey: `${diff.path}:new:${diff.effectiveContent}`,
     },
   };
 }

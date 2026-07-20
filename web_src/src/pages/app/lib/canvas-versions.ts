@@ -1,27 +1,16 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 
-export function isPublishedVersion(version: CanvasesCanvasVersion): boolean {
-  return version.metadata?.state === "STATE_PUBLISHED";
+export function sortVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
+  return [...versions].sort(
+    (a, b) =>
+      versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
+      versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
+  );
 }
 
-export function isDraftVersion(version: CanvasesCanvasVersion): boolean {
-  return version.metadata?.state === "STATE_DRAFT";
-}
-
+/** @deprecated All versions are main-branch commits; use sortVersionsDesc. */
 export function sortPublishedVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
-  return versions
-    .filter(isPublishedVersion)
-    .sort((a, b) => versionSortValue(b.metadata?.publishedAt) - versionSortValue(a.metadata?.publishedAt));
-}
-
-export function sortDraftVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
-  return versions
-    .filter(isDraftVersion)
-    .sort(
-      (a, b) =>
-        versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
-        versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
-    );
+  return sortVersionsDesc(versions);
 }
 
 export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string | undefined {
@@ -38,22 +27,42 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
-  if (version?.metadata?.state === "STATE_PUBLISHED") {
-    return "Published version";
+function formatLegacyVersionLabel(version?: CanvasesCanvasVersion | null): string | undefined {
+  const raw = version?.metadata?.createdAt;
+  if (!raw) {
+    return undefined;
   }
 
-  return "Draft version";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  const formatted = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return `Update from ${formatted}`;
+}
+
+export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
+  const message = version?.metadata?.commitMessage?.trim();
+  if (message) {
+    return message;
+  }
+
+  return formatLegacyVersionLabel(version) ?? "Untitled update";
 }
 
 export function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {
-  const label = formatVersionLabel(version);
-  const timestamp = formatVersionTimestamp(version);
-  if (!timestamp) {
-    return label;
+  const message = version?.metadata?.commitMessage?.trim();
+  if (message) {
+    const timestamp = formatVersionTimestamp(version);
+    if (!timestamp) {
+      return message;
+    }
+
+    return `${message} · ${timestamp}`;
   }
 
-  return `${label} · ${timestamp}`;
+  return formatLegacyVersionLabel(version) ?? "Untitled update";
 }
 
 export function versionSortValue(raw?: string): number {

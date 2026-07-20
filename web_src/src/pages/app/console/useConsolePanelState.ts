@@ -9,6 +9,7 @@ export function useConsolePanelState(
   panels: ConsolePanel[],
   layout: ConsoleLayoutItem[],
   onChange: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void,
+  onEffectiveChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void,
 ) {
   const [localPanels, setLocalPanels] = useState<ConsolePanel[]>(panels);
   const [localLayout, setLocalLayout] = useState<ConsoleLayoutItem[]>(layout);
@@ -22,6 +23,10 @@ export function useConsolePanelState(
       setLocalLayout(layout);
     }
   }, [panels, layout]);
+
+  useEffect(() => {
+    onEffectiveChange?.({ panels: localPanels, layout: localLayout });
+  }, [localLayout, localPanels, onEffectiveChange]);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<{ panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | null>(null);
@@ -82,9 +87,20 @@ export function useConsolePanelState(
     [localLayout, localPanels, queueSave],
   );
 
+  /**
+   * Commit an edited panel's content. When a legacy `type: "node"` panel is
+   * saved with the modern `nodes`-list shape (produced by the merged
+   * {@link NodesPanelCard} form), migrate the persisted type to `nodes` so
+   * subsequent loads use the same shape. The reverse path is intentionally
+   * absent — dashboards only migrate forward, never back.
+   */
   const handlePanelContentChange = useCallback(
     (id: string, content: Record<string, unknown>) => {
-      const nextPanels = localPanels.map((p) => (p.id === id ? { ...p, content } : p));
+      const nextPanels = localPanels.map((p) => {
+        if (p.id !== id) return p;
+        const nextType = migratedPanelType(p.type, content);
+        return { ...p, type: nextType, content };
+      });
       setLocalPanels(nextPanels);
       queueSave(nextPanels, localLayout);
     },
@@ -126,6 +142,16 @@ export function useConsolePanelState(
     handlePanelContentChange,
     handleLayoutChange,
   };
+}
+
+/**
+ * Detect a legacy `type: "node"` panel whose editor just emitted the
+ * modern nodes-list shape and rewrite the type accordingly. Any other
+ * combination is a no-op — this migration only runs forward.
+ */
+function migratedPanelType(currentType: string, content: Record<string, unknown>): string {
+  if (currentType === "node" && Array.isArray(content.nodes)) return "nodes";
+  return currentType;
 }
 
 /**

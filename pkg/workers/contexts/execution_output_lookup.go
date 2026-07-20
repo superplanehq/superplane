@@ -18,12 +18,14 @@ type executionOutputLookup struct {
 	eventsByID            map[uuid.UUID]models.CanvasEvent
 	eventsByExecutionID   map[uuid.UUID][]models.CanvasEvent
 	consumedEventByParent map[uuid.UUID]uuid.UUID
+	incomingEventID       *uuid.UUID
 }
 
 func newExecutionOutputLookup(
 	tx *gorm.DB,
 	runChain []models.CanvasNodeExecution,
 	executionIDs []uuid.UUID,
+	incomingEventID *uuid.UUID,
 ) (executionOutputLookup, error) {
 	consumedEventByParent := consumedEventByParentFromRunChain(runChain)
 
@@ -36,6 +38,7 @@ func newExecutionOutputLookup(
 		eventsByID:            indexEventsByID(events),
 		eventsByExecutionID:   indexEventsByExecutionID(events),
 		consumedEventByParent: consumedEventByParent,
+		incomingEventID:       incomingEventID,
 	}, nil
 }
 
@@ -55,6 +58,14 @@ func (l executionOutputLookup) outputEvent(executionID uuid.UUID) (models.Canvas
 	case 1:
 		return matched[0], true, nil
 	default:
+		if l.incomingEventID != nil {
+			for _, event := range matched {
+				if event.ID == *l.incomingEventID {
+					return event, true, nil
+				}
+			}
+		}
+
 		return models.CanvasEvent{}, false, fmt.Errorf(
 			"execution %s has ambiguous outputs (%d events)",
 			executionID,

@@ -73,10 +73,63 @@ describe("ConversationTranscript command groups", () => {
 });
 
 describe("ConversationTranscript user messages", () => {
+  it("opens attached images in a viewport-sized lightbox", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "fix this",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", url: "/api/v1/agents/chats/c-1/messages/user-with-image/images/0" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    const image = screen.getByRole("img", { name: "attachment" });
+    expect(image).toHaveAttribute("src", "/api/v1/agents/chats/c-1/messages/user-with-image/images/0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open attachment" }));
+
+    expect(screen.getByRole("dialog")).toHaveClass("max-h-[calc(100dvh-2rem)]");
+    expect(screen.getByRole("link", { name: /Open original/ })).toHaveAttribute(
+      "href",
+      "/api/v1/agents/chats/c-1/messages/user-with-image/images/0",
+    );
+  });
+
   it("keeps compact user messages sticky", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Build a release workflow")} />);
 
     expect(screen.getByTestId("agent-user-message").parentElement).toHaveClass("sticky");
+  });
+
+  it("does not keep user messages with image attachments sticky", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", url: "/img/0" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    expect(screen.getByTestId("agent-user-message").parentElement).not.toHaveClass("sticky");
   });
 
   it("does not keep long user messages sticky", () => {

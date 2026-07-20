@@ -1,12 +1,5 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 
-export type ChangeRequestAction =
-  | "ACTION_APPROVE"
-  | "ACTION_UNAPPROVE"
-  | "ACTION_PUBLISH"
-  | "ACTION_REJECT"
-  | "ACTION_REOPEN";
-
 export type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
   workflow: CanvasesCanvas;

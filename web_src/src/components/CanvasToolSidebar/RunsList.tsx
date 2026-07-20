@@ -78,7 +78,7 @@ export function RunsList({
     );
   }
 
-  const renderRow = (item: DecoratedRun, hideBottomBorder = false) => (
+  const renderRow = (item: DecoratedRun) => (
     <RunRow
       key={item.run.id}
       run={item.run}
@@ -87,21 +87,15 @@ export function RunsList({
       status={item.status}
       triggerNode={item.triggerNode}
       isSelected={item.run.id === selectedRunId}
-      hideBottomBorder={hideBottomBorder}
       componentIconMap={componentIconMap}
       onSelectRun={onSelectRun}
     />
   );
 
-  const hasRunningSectionDivider = orderedRuns.active.length > 0 && orderedRuns.rest.length > 0;
-
   return (
     <>
-      {orderedRuns.active.map((item, index) =>
-        renderRow(item, hasRunningSectionDivider && index === orderedRuns.active.length - 1),
-      )}
-      {hasRunningSectionDivider ? <div className="h-px bg-slate-300" aria-hidden /> : null}
-      {orderedRuns.rest.map((item) => renderRow(item))}
+      {orderedRuns.active.map(renderRow)}
+      {orderedRuns.rest.map(renderRow)}
       {isError ? (
         <div role="alert" className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-red-600">
           <span className="inline-flex items-center gap-1">

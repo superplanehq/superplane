@@ -1,8 +1,9 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { appPath, appSettingsPath } from "./lib/appPaths";
+import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -10,6 +11,7 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { AccountProvider } from "./contexts/AccountProvider";
+import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
@@ -17,13 +19,13 @@ import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { AppPage } from "./pages/app";
+import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -32,6 +34,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -61,12 +64,14 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AccountProvider>
-        <TooltipProvider delayDuration={150}>
-          <AppRouter />
-        </TooltipProvider>
-        <Toaster position="bottom-center" closeButton />
-      </AccountProvider>
+      <ThemeProvider>
+        <AccountProvider>
+          <TooltipProvider delayDuration={150}>
+            <AppRouter />
+          </TooltipProvider>
+          <Toaster position="bottom-center" closeButton />
+        </AccountProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -74,6 +79,7 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
         <div className="flex-1 overflow-auto">
@@ -82,6 +88,8 @@ function AppRouter() {
             <Routes>
               {/* public routes */}
               <Route path="login" element={<Login />} />
+              <Route path="signup" element={<Login mode="signup" />} />
+              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
 
@@ -107,17 +115,15 @@ function AppRouter() {
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
                 <Route path="apps">
-                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "read")} />
+                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "create")} />
                   <Route
                     path=":appId/settings"
                     element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
                   />
-                  <Route path=":appId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
+                  <Route path=":appId" element={withAuthAndPermission(AppDefaultTabGate, "canvases", "read")} />
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
-                <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-                <Route path="templates/:canvasId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
@@ -131,7 +137,21 @@ function AppRouter() {
   );
 }
 
+function PageObservabilityScope() {
+  usePageObservability();
+  return null;
+}
+
 function OrganizationScope() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { account } = useAccount();
+
+  useEffect(() => {
+    if (account?.id && organizationId) {
+      recordLastVisitedOrganization(account.id, organizationId);
+    }
+  }, [account?.id, organizationId]);
+
   return (
     <PermissionsProvider>
       <Outlet />

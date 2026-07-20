@@ -68,7 +68,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.NoError(t, server.RegisterGRPCGateway("localhost:50051"))
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 
 	authenticated := &r.Account.ID
 
@@ -116,19 +116,19 @@ func Test__RepositoryFileDownload(t *testing.T) {
 
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md")
 		assert.Equal(t, http.StatusNotFound, response.Code)
-		assert.Contains(t, response.Body.String(), "Repository not found")
+		assert.Contains(t, response.Body.String(), "File not found")
 	})
 
 	t.Run("git provider error -> internal server error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "missing.txt")
 		assert.Equal(t, http.StatusInternalServerError, response.Code)
-		assert.Contains(t, response.Body.String(), "Failed to get file")
+		assert.Contains(t, response.Body.String(), "Failed to read file")
 	})
 
 	t.Run("returns file contents", func(t *testing.T) {
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID)
+		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
 		require.NoError(t, err)
 
 		_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, git.CommitOptions{

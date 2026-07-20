@@ -1,12 +1,33 @@
 import type {
+  ActionsAction,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
+  ComponentsEdge,
+  ConfigurationField,
   SuperplaneComponentsNode as ComponentsNode,
+  TriggersTrigger,
 } from "@/api-client";
-import { flattenObject } from "@/lib/utils";
-import { getExecutionDetails, getState, getStateMap } from "@/pages/app/mappers";
+import { getState, getStateMap } from "@/pages/app/mappers";
 import { buildExecutionInfo } from "@/pages/app/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import {
+  buildComponentDefinitionsByName,
+  buildTriggerDefinitionsByName,
+  resolveConfigurationFields,
+} from "./runNodeConfigurationFields";
+import {
+  buildNodeActions,
+  buildOutputSections,
+  buildTriggerOutputSections,
+  getExecutionErrorMessage,
+  normalizeExecutionOutputsForDisplay,
+} from "./runNodeDetailOutputs";
+import { buildExecutionTabData, buildTriggerTabData } from "./runNodeDetailTabs";
+import { buildQueuedNodeSections } from "./runQueuedNodeSections";
+export { hasObjectValue } from "./runNodeDetailOutputs";
+export { buildExecutionTabData, buildTriggerTabData, isErrorValue } from "./runNodeDetailTabs";
 
 export type RunNodeDetailTabKey = "details" | "payload" | "configuration";
 
@@ -52,6 +73,80 @@ export type RunNodeDetailTabData = {
   configuration?: unknown;
 };
 
+export type RunInspectorOutputSection = {
+  channel: string;
+  value: unknown;
+  sizeKb: string;
+};
+
+export type RunInspectorCurrentUser = {
+  id: string;
+  email: string;
+  roles?: string[];
+  groups?: string[];
+};
+
+export type RunInspectorApprovalRecord = {
+  index: number;
+  state?: string;
+  type?: string;
+  user?: {
+    id?: string;
+    email?: string;
+    name?: string;
+  };
+  roleRef?: {
+    name?: string;
+    displayName?: string;
+  };
+  groupRef?: {
+    name?: string;
+    displayName?: string;
+  };
+};
+
+export type RunInspectorNodeActions = {
+  canStop: boolean;
+  canPushThrough: boolean;
+  approvalRecords: RunInspectorApprovalRecord[];
+};
+
+export type RunInspectorUpstreamSection = {
+  nodeId: string;
+  nodeName: string;
+  workflowNode?: ComponentsNode;
+  badge: { badgeColor: string; label: string } | null;
+  output: unknown;
+};
+
+export type RunInspectorNodeSection = {
+  sectionValue: string;
+  nodeId: string;
+  nodeName: string;
+  workflowNode?: ComponentsNode;
+  execution?: CanvasesCanvasNodeExecution;
+  executionRef?: CanvasesCanvasNodeExecutionRef;
+  queueItem?: CanvasesCanvasNodeQueueItem;
+  isTrigger: boolean;
+  isQueued: boolean;
+  createdAt?: string;
+  durationMs?: number;
+  badge: { badgeColor: string; label: string } | null;
+  tabData: RunNodeDetailTabData | null;
+  upstreamSections: RunInspectorUpstreamSection[];
+  primaryInputNodeId?: string;
+  outputSections: RunInspectorOutputSection[];
+  errorMessage?: string;
+  actions: RunInspectorNodeActions;
+  configurationFields: ConfigurationField[];
+};
+
+export type RunInspectorErrorSummary = {
+  nodeId: string;
+  nodeName: string;
+  message: string;
+};
+
 export function workflowComponentName(node: ComponentsNode | undefined): string {
   if (node?.type === "TYPE_ACTION" && node.component) return node.component;
   if (node?.type === "TYPE_TRIGGER" && node.component) return node.component;
@@ -76,7 +171,30 @@ export function eventBadgeForExecution(
   return { badgeColor: style.badgeColor, label: style.label ?? String(eventState) };
 }
 
-export function buildExecutionChain(executions: CanvasesCanvasNodeExecution[], triggerNodeId?: string | null) {
+export function eventBadgeForExecutionRef(
+  node: ComponentsNode | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef,
+): { badgeColor: string; label: string } {
+  return eventBadgeForExecution(node, {
+    id: executionRef.id,
+    nodeId: executionRef.nodeId,
+    state: executionRef.state ?? "STATE_UNKNOWN",
+    result: executionRef.result ?? "RESULT_UNKNOWN",
+    resultReason: executionRef.resultReason ?? "RESULT_REASON_OK",
+    resultMessage: executionRef.resultMessage ?? "",
+    createdAt: executionRef.createdAt,
+    updatedAt: executionRef.updatedAt,
+    outputs: {},
+    metadata: {},
+    configuration: {},
+  });
+}
+
+export function buildExecutionChain(
+  executions: CanvasesCanvasNodeExecution[],
+  triggerNodeId?: string | null,
+  executionRefs: CanvasesCanvasNodeExecutionRef[] = [],
+) {
   const chain: string[] = [];
   const visited = new Set<string>();
 
@@ -85,10 +203,10 @@ export function buildExecutionChain(executions: CanvasesCanvasNodeExecution[], t
     visited.add(triggerNodeId);
   }
 
-  for (const execution of executions) {
-    if (execution.nodeId && !visited.has(execution.nodeId)) {
-      visited.add(execution.nodeId);
-      chain.push(execution.nodeId);
+  for (const executionRef of [...executionRefs, ...executions]) {
+    if (executionRef.nodeId && !visited.has(executionRef.nodeId)) {
+      visited.add(executionRef.nodeId);
+      chain.push(executionRef.nodeId);
     }
   }
 
@@ -107,120 +225,292 @@ export function getAdjacentRunNodeId(
   return chain[nextIndex] ?? null;
 }
 
-function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
-  if (!execution.outputs || Object.keys(execution.outputs).length === 0) {
-    return undefined;
-  }
+export function buildRunInspectorNodeSections({
+  run,
+  executions,
+  workflowNodes,
+  workflowEdges,
+  componentDefinitions,
+  triggerDefinitions,
+}: {
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowNodes: ComponentsNode[];
+  workflowEdges?: ComponentsEdge[];
+  componentDefinitions?: ActionsAction[];
+  triggerDefinitions?: TriggersTrigger[];
+}): RunInspectorNodeSection[] {
+  const triggerNodeId = run.rootEvent?.nodeId;
+  const executionChain = buildExecutionChain(executions, triggerNodeId, run.executions);
+  const executionIndexByNodeId = new Map(executionChain.map((nodeId, index) => [nodeId, index]));
+  const componentDefinitionsByName = buildComponentDefinitionsByName(componentDefinitions);
+  const triggerDefinitionsByName = buildTriggerDefinitionsByName(triggerDefinitions);
 
-  const outputData = Object.values(execution.outputs).find((output) => Array.isArray(output) && output.length > 0) as
-    | unknown[]
-    | undefined;
-  if (outputData && outputData.length > 0) {
-    return outputData[0];
-  }
+  const executionSections = executionChain.map((nodeId, index) => {
+    const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+    const execution = executions.find((item) => item.nodeId === nodeId);
+    const executionRef = run.executions?.find((item) => item.nodeId === nodeId) ?? execution;
+    const errorSource = execution ?? executionRef;
+    const isTrigger = nodeId === triggerNodeId;
+    const tabData = isTrigger
+      ? buildTriggerTabData(run, workflowNode)
+      : execution
+        ? buildExecutionTabData(execution, workflowNode, workflowNodes)
+        : null;
+    const upstreamSections = isTrigger
+      ? []
+      : buildUpstreamSections({
+          executionChain,
+          currentIndex: index,
+          run,
+          executions,
+          executionRefs: run.executions ?? [],
+          workflowNodes,
+          workflowEdges,
+          executionIndexByNodeId,
+        });
 
-  return execution.outputs;
-}
-
-function buildDefaultExecutionDetails(
-  execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode | undefined,
-  workflowNodes: ComponentsNode[],
-): Record<string, unknown> {
-  const componentName = typeof workflowNode?.component === "string" ? workflowNode.component : undefined;
-
-  if (componentName && workflowNode) {
-    const customDetails = getExecutionDetails(componentName, execution, workflowNode, workflowNodes);
-    if (customDetails && Object.keys(customDetails).length > 0) {
-      return { ...customDetails };
-    }
-  }
-
-  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-  return { ...flattenObject((hasOutputs ? execution.outputs : execution.metadata) || {}) };
-}
-
-function applyExecutionResultDetails(
-  details: Record<string, unknown>,
-  execution: CanvasesCanvasNodeExecution,
-): Record<string, unknown> {
-  const next = { ...details };
-
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
-    !("Error" in next)
-  ) {
-    next.Error = {
-      __type: "error",
-      message: execution.resultMessage,
+    return {
+      sectionValue: nodeId,
+      nodeId,
+      nodeName: workflowNode?.name || nodeId,
+      workflowNode,
+      execution,
+      executionRef,
+      isTrigger,
+      isQueued: false,
+      createdAt: isTrigger ? run.rootEvent?.createdAt : (execution?.createdAt ?? executionRef?.createdAt),
+      durationMs: execution
+        ? calculateExecutionDuration(execution)
+        : executionRef
+          ? calculateExecutionRefDuration(executionRef)
+          : undefined,
+      badge: isTrigger
+        ? eventBadgeForTriggeredTrigger(workflowNode)
+        : execution
+          ? eventBadgeForExecution(workflowNode, execution)
+          : executionRef
+            ? eventBadgeForExecutionRef(workflowNode, executionRef)
+            : null,
+      tabData,
+      upstreamSections,
+      primaryInputNodeId: isTrigger
+        ? undefined
+        : findPrimaryInputNodeId({
+            executionChain,
+            currentIndex: index,
+            run,
+            executions,
+            executionRefs: run.executions ?? [],
+            workflowEdges,
+            executionIndexByNodeId,
+          }),
+      outputSections: isTrigger
+        ? buildTriggerOutputSections(run)
+        : execution
+          ? buildOutputSections(execution.outputs)
+          : [],
+      errorMessage: errorSource ? getExecutionErrorMessage(errorSource) : undefined,
+      actions: buildNodeActions(workflowNode, execution),
+      configurationFields: resolveConfigurationFields({
+        workflowNode,
+        componentDefinitionsByName,
+        triggerDefinitionsByName,
+      }),
     };
-  }
+  });
 
-  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in next)) {
-    const cancelledBy = execution.cancelledBy;
-    next["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
-  }
-
-  return next;
+  return [...executionSections, ...buildQueuedNodeSections({ run, workflowNodes })];
 }
 
-function filterEmptyDetailEntries(details: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined && value !== "" && value !== null),
+export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
+  return sections
+    .filter((section) => !!section.errorMessage)
+    .map((section) => ({
+      nodeId: section.nodeId,
+      nodeName: section.nodeName,
+      message: section.errorMessage!,
+    }));
+}
+
+export function calculateRunDuration(run: CanvasesCanvasRun): number | null {
+  return calculateDuration(run.createdAt, run.finishedAt || run.updatedAt);
+}
+
+function calculateExecutionDuration(execution: CanvasesCanvasNodeExecution): number | undefined {
+  return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
+}
+
+function calculateExecutionRefDuration(execution: CanvasesCanvasNodeExecutionRef): number | undefined {
+  return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
+}
+
+function calculateDuration(start?: string, end?: string): number | null {
+  if (!start || !end) return null;
+
+  const startedAt = new Date(start).getTime();
+  const endedAt = new Date(end).getTime();
+  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt < startedAt) return null;
+
+  return endedAt - startedAt;
+}
+
+function buildUpstreamSections({
+  executionChain,
+  currentIndex,
+  run,
+  executions,
+  executionRefs,
+  workflowNodes,
+  workflowEdges,
+  executionIndexByNodeId,
+}: {
+  executionChain: string[];
+  currentIndex: number;
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  executionRefs: CanvasesCanvasNodeExecutionRef[];
+  workflowNodes: ComponentsNode[];
+  workflowEdges?: ComponentsEdge[];
+  executionIndexByNodeId: Map<string, number>;
+}): RunInspectorUpstreamSection[] {
+  if (currentIndex <= 0) return [];
+
+  let orderedNodeIds: string[];
+  if (!hasWorkflowEdges(workflowEdges)) {
+    orderedNodeIds = executionChain.slice(0, currentIndex);
+  } else {
+    orderedNodeIds = findAccessibleUpstreamNodeIds(
+      executionChain[currentIndex],
+      workflowEdges,
+      executionIndexByNodeId,
+    ).sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions, executionRefs));
+  }
+
+  return orderedNodeIds.map((nodeId) => {
+    const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+    const execution = executions.find((item) => item.nodeId === nodeId);
+    const isTrigger = nodeId === run.rootEvent?.nodeId;
+
+    return {
+      nodeId,
+      nodeName: workflowNode?.name || nodeId,
+      workflowNode,
+      badge: isTrigger
+        ? eventBadgeForTriggeredTrigger(workflowNode)
+        : execution
+          ? eventBadgeForExecution(workflowNode, execution)
+          : null,
+      output: isTrigger ? run.rootEvent?.data : normalizeExecutionOutputsForDisplay(execution?.outputs),
+    };
+  });
+}
+
+function findPrimaryInputNodeId({
+  executionChain,
+  currentIndex,
+  run,
+  executions,
+  executionRefs,
+  workflowEdges,
+  executionIndexByNodeId,
+}: {
+  executionChain: string[];
+  currentIndex: number;
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  executionRefs: CanvasesCanvasNodeExecutionRef[];
+  workflowEdges?: ComponentsEdge[];
+  executionIndexByNodeId: Map<string, number>;
+}): string | undefined {
+  if (currentIndex <= 0) return undefined;
+
+  if (!hasWorkflowEdges(workflowEdges)) {
+    return executionChain[currentIndex - 1];
+  }
+
+  const currentNodeId = executionChain[currentIndex];
+  const directInputNodeIds = workflowEdges
+    .filter((edge) => edge.targetId === currentNodeId && edge.sourceId)
+    .map((edge) => edge.sourceId!)
+    .filter((nodeId) => {
+      const executionIndex = executionIndexByNodeId.get(nodeId);
+      return executionIndex !== undefined && executionIndex < currentIndex;
+    });
+
+  if (directInputNodeIds.length > 0) {
+    return directInputNodeIds
+      .sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions, executionRefs))
+      .at(-1);
+  }
+
+  return findAccessibleUpstreamNodeIds(currentNodeId, workflowEdges, executionIndexByNodeId)
+    .sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions, executionRefs))
+    .at(-1);
+}
+
+function hasWorkflowEdges(workflowEdges: ComponentsEdge[] | undefined): workflowEdges is ComponentsEdge[] {
+  return Boolean(workflowEdges?.length);
+}
+
+function findAccessibleUpstreamNodeIds(
+  nodeId: string,
+  workflowEdges: ComponentsEdge[],
+  executionIndexByNodeId: Map<string, number>,
+): string[] {
+  const accessibleNodeIds = new Set<string>();
+  const visited = new Set<string>();
+  const pending = [nodeId];
+  const currentNodeIndex = executionIndexByNodeId.get(nodeId) ?? Number.POSITIVE_INFINITY;
+
+  while (pending.length > 0) {
+    const currentNodeId = pending.pop();
+    if (!currentNodeId || visited.has(currentNodeId)) continue;
+
+    visited.add(currentNodeId);
+
+    workflowEdges
+      .filter((edge) => edge.targetId === currentNodeId && edge.sourceId)
+      .forEach((edge) => {
+        const sourceId = edge.sourceId!;
+        const sourceIndex = executionIndexByNodeId.get(sourceId);
+        if (sourceIndex !== undefined && sourceIndex < currentNodeIndex) {
+          accessibleNodeIds.add(sourceId);
+        }
+        if (!visited.has(sourceId)) {
+          pending.push(sourceId);
+        }
+      });
+  }
+
+  return Array.from(accessibleNodeIds);
+}
+
+function compareUpstreamCreatedAt(
+  leftNodeId: string,
+  rightNodeId: string,
+  run: CanvasesCanvasRun,
+  executions: CanvasesCanvasNodeExecution[],
+  executionRefs: CanvasesCanvasNodeExecutionRef[],
+): number {
+  return (
+    getUpstreamCreatedAt(leftNodeId, run, executions, executionRefs) -
+    getUpstreamCreatedAt(rightNodeId, run, executions, executionRefs)
   );
 }
 
-export function buildExecutionTabData(
-  execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode | undefined,
-  workflowNodes: ComponentsNode[],
-): RunNodeDetailTabData {
-  const tabData: RunNodeDetailTabData = {
-    details: filterEmptyDetailEntries(
-      applyExecutionResultDetails(buildDefaultExecutionDetails(execution, workflowNode, workflowNodes), execution),
-    ),
-    payload: extractExecutionPayload(execution),
-  };
-
-  if (execution.configuration && Object.keys(execution.configuration).length > 0) {
-    tabData.configuration = execution.configuration;
-  }
-
-  return tabData;
-}
-
-export function buildTriggerTabData(
+function getUpstreamCreatedAt(
+  nodeId: string,
   run: CanvasesCanvasRun,
-  workflowNode: ComponentsNode | undefined,
-): RunNodeDetailTabData {
-  const details: Record<string, unknown> = {};
-  const rootEvent = run.rootEvent;
+  executions: CanvasesCanvasNodeExecution[],
+  executionRefs: CanvasesCanvasNodeExecutionRef[],
+): number {
+  const createdAt =
+    nodeId === run.rootEvent?.nodeId
+      ? run.rootEvent?.createdAt
+      : (executions.find((item) => item.nodeId === nodeId)?.createdAt ??
+        executionRefs.find((item) => item.nodeId === nodeId)?.createdAt);
 
-  if (rootEvent?.channel) details.Channel = rootEvent.channel;
-  if (rootEvent?.customName) details.Name = rootEvent.customName;
-  if (rootEvent?.createdAt) details["Triggered at"] = rootEvent.createdAt;
-
-  const tabData: RunNodeDetailTabData = {
-    details: Object.keys(details).length > 0 ? details : undefined,
-    payload: rootEvent?.data && Object.keys(rootEvent.data).length > 0 ? rootEvent.data : undefined,
-  };
-
-  if (
-    workflowNode?.configuration &&
-    typeof workflowNode.configuration === "object" &&
-    Object.keys(workflowNode.configuration).length > 0
-  ) {
-    tabData.configuration = workflowNode.configuration;
-  }
-
-  return tabData;
-}
-
-export function isErrorValue(value: unknown): value is { __type: "error"; message: string } {
-  return !!value && typeof value === "object" && (value as { __type?: string }).__type === "error";
-}
-
-export function hasObjectValue(value: unknown) {
-  return !!value && typeof value === "object" && Object.keys(value).length > 0;
+  const timestamp = createdAt ? new Date(createdAt).getTime() : Number.POSITIVE_INFINITY;
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
 }

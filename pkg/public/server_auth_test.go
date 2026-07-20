@@ -166,7 +166,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
 		require.Error(t, err)
-		assert.Equal(t, "signup is currently disabled", err.Error())
+		assert.Equal(t, "signup must be started from the signup page", err.Error())
 		assert.Nil(t, resultAccount)
 	})
 

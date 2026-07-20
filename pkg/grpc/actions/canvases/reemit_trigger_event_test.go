@@ -101,7 +101,6 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 			triggerNodeID,
 			sourceEvent.ID,
 			sourceEvent.ID,
-			nil,
 		)
 		require.NoError(
 			t,

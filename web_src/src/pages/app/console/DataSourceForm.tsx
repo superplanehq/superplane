@@ -11,6 +11,13 @@ interface DataSourceFormProps {
   onChange: (next: ChartPanelDataSource) => void;
   /** Hide the limit input (e.g. number panels that aggregate everything). */
   hideLimit?: boolean;
+  /**
+   * Whether the consuming widget supports progressive loading (table panel).
+   * When `true`, a blank limit means "load all rows on demand" rather than
+   * being silently substituted with a default cap — so `setKind` leaves the
+   * limit undefined and the input's placeholder advertises "Load all".
+   */
+  loadAllWhenBlank?: boolean;
 }
 
 /**
@@ -18,7 +25,7 @@ interface DataSourceFormProps {
  * number form editors. Switching `kind` resets the kind-specific fields to
  * sensible defaults so the resulting object always matches the validator.
  */
-export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormProps) {
+export function DataSourceForm({ value, onChange, hideLimit, loadAllWhenBlank }: DataSourceFormProps) {
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const canvasId = ctx?.canvasId;
@@ -31,9 +38,9 @@ export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormPro
     if (kind === "memory") {
       onChange({ kind: "memory", namespace: "" });
     } else if (kind === "runs") {
-      onChange({ kind: "runs", limit: 100 });
+      onChange(loadAllWhenBlank ? { kind: "runs" } : { kind: "runs", limit: 100 });
     } else {
-      onChange({ kind: "executions", limit: 50 });
+      onChange(loadAllWhenBlank ? { kind: "executions" } : { kind: "executions", limit: 50 });
     }
   };
 
@@ -54,9 +61,20 @@ export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormPro
       </div>
 
       {value.kind === "runs" ? (
-        <DataSourceRunsFields value={value} hideLimit={hideLimit} onChange={onChange} />
+        <DataSourceRunsFields
+          value={value}
+          hideLimit={hideLimit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          onChange={onChange}
+        />
       ) : value.kind === "executions" ? (
-        <DataSourceExecutionsFields value={value} hideLimit={hideLimit} nodes={nodes} onChange={onChange} />
+        <DataSourceExecutionsFields
+          value={value}
+          hideLimit={hideLimit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          nodes={nodes}
+          onChange={onChange}
+        />
       ) : (
         <DataSourceMemoryFields
           value={value}
