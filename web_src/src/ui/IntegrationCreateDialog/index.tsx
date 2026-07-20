@@ -339,8 +339,6 @@ export function IntegrationCreateDialog({
                       }))
                     }
                     allValues={configuration}
-                    domainId={organizationId}
-                    domainType="DOMAIN_TYPE_ORGANIZATION"
                     organizationId={organizationId}
                   />
                 ))}
@@ -378,8 +376,6 @@ export function IntegrationCreateDialog({
                           }))
                         }
                         allValues={configuration}
-                        domainId={organizationId}
-                        domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={organizationId}
                       />
                     );

@@ -6,20 +6,23 @@ import (
 )
 
 type AppExecutionContext struct {
-	tx     *gorm.DB
-	canvas *models.Canvas
-	node   *models.CanvasNode
+	tx        *gorm.DB
+	canvas    *models.Canvas
+	node      *models.CanvasNode
+	execution *models.CanvasNodeExecution
 }
 
 func NewAppExecutionContext(
 	tx *gorm.DB,
 	canvas *models.Canvas,
 	node *models.CanvasNode,
+	execution *models.CanvasNodeExecution,
 ) *AppExecutionContext {
 	return &AppExecutionContext{
-		tx:     tx,
-		canvas: canvas,
-		node:   node,
+		tx:        tx,
+		canvas:    canvas,
+		node:      node,
+		execution: execution,
 	}
 }
 

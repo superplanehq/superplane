@@ -6,7 +6,7 @@ import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
 import { cn, resolveIcon } from "@/lib/utils";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
-import type { RunNodeDetailTabData, RunNodeDetailTabKey } from "./runNodeDetailModel";
+import type { RunNodeDetailTabData, RunNodeDetailTabKey } from "./types";
 
 export interface RunNodeDetailTabSectionProps {
   activeTab: RunNodeDetailTabKey;

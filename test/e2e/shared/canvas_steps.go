@@ -1122,7 +1122,7 @@ func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[
 
 func (s *CanvasSteps) EmitManualTrigger(name string) {
 	node := s.GetNodeFromDB(name)
-	context := contexts.NewEventContext(database.Conn(), node, func(events []models.CanvasEvent) {
+	context := contexts.NewEventContext(database.Conn(), node, nil, func(events []models.CanvasEvent) {
 		for i := range events {
 			require.NoError(s.t, messages.PublishCanvasEventCreatedMessage(&events[i]))
 		}

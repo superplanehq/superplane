@@ -15,8 +15,6 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   allValues = {},
-  domainId,
-  domainType,
   integrationId,
   organizationId,
   autocompleteExampleObj,
@@ -291,8 +289,6 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
             onChange(newValue);
           }}
           allValues={nestedAllValues}
-          domainId={domainId}
-          domainType={domainType}
           integrationId={integrationId}
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}

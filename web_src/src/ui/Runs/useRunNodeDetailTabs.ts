@@ -4,9 +4,8 @@ import {
   isRunNodeDetailTabAvailable,
   rememberRunNodeDetailTab,
   resolveRunNodeDetailTab,
-  type RunNodeDetailTabAvailability,
-  type RunNodeDetailTabKey,
 } from "./runNodeDetailModel";
+import type { RunNodeDetailTabAvailability, RunNodeDetailTabKey } from "./types";
 
 export function useRunNodeDetailTabs(nodeId: string, tabAvailability: RunNodeDetailTabAvailability) {
   const [activeTab, setActiveTab] = useState<RunNodeDetailTabKey>(() => getLastRunNodeDetailTab());

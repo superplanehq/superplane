@@ -3,7 +3,7 @@ import { Accordion } from "@/ui/accordion";
 import { RunInspectorErrorSummaryCard } from "./RunInspectorErrorSummaryCard";
 import { RunInspectorNodeAccordion } from "./RunInspectorNodeAccordion";
 import { RunInspectorStepsHeader } from "./RunInspectorStepsHeader";
-import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
 import type { RUN_STATUS_META } from "./runPresentation";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
