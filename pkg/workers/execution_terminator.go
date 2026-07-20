@@ -165,7 +165,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	logger := logging.WithExecution(w.logger, &execution)
 
 	finished := false
-	cancelledChildRuns := []cancelledChildRun{}
+	runCancellations := &RunCancellationNotifier{}
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, execution.ID)
 		if err != nil {
@@ -178,12 +178,9 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 			return err
 		}
 
-		outcomes, err := w.cancelComponent(tx, logger, canvas, execution)
-		if err != nil {
+		if err := w.cancelComponent(tx, logger, canvas, execution, runCancellations); err != nil {
 			return err
 		}
-
-		cancelledChildRuns = append(cancelledChildRuns, outcomes...)
 
 		err = execution.CancelInTransaction(tx, execution.CancelledBy)
 		if err != nil {
@@ -206,9 +203,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 		return nil
 	}
 
-	for _, cancelled := range cancelledChildRuns {
-		publishCancelledChildRun(cancelled.workflowID, cancelled.runID, cancelled.drainResult)
-	}
+	runCancellations.Publish()
 
 	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
 		w.logger.Errorf("failed to publish execution finished RabbitMQ message: %v", err)
@@ -217,47 +212,33 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	return nil
 }
 
-type cancelledChildRun struct {
-	workflowID  uuid.UUID
-	runID       uuid.UUID
-	drainResult *models.RunCancellationDrainResult
-}
-
-func publishCancelledChildRun(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
-	messages.PublishRunCancellationDrain(workflowID, drainResult)
-
-	if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
-		log.Errorf("failed to publish run state RabbitMQ message: %v", err)
-	}
-}
-
 func (w *ExecutionTerminator) cancelComponent(
 	tx *gorm.DB,
 	logger *log.Entry,
 	canvas *models.Canvas,
 	execution *models.CanvasNodeExecution,
-) ([]cancelledChildRun, error) {
+	runCancellations *RunCancellationNotifier,
+) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if node.Type != models.NodeTypeComponent {
-		return nil, nil
+		return nil
 	}
 
 	ref := node.Ref.Data()
 	if ref.Component == nil {
-		return nil, nil
+		return nil
 	}
 
 	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
 		log.Errorf("action %s not found: %v", ref.Component.Name, err)
-		return nil, err
+		return err
 	}
 
-	cancelledChildRuns := []cancelledChildRun{}
 	orgUUID := canvas.OrganizationID
 
 	ctx := core.ExecutionContext{
@@ -274,21 +255,14 @@ func (w *ExecutionTerminator) cancelComponent(
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, orgUUID, w.authService, nil),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		Runs: contexts.NewRunExecutionContext(tx, canvas, node, execution).
-			WithRunCancelled(func(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
-				cancelledChildRuns = append(cancelledChildRuns, cancelledChildRun{
-					workflowID:  workflowID,
-					runID:       runID,
-					drainResult: drainResult,
-				})
-			}),
+		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
 	}
 
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
-			return nil, err
+			return err
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -300,5 +274,5 @@ func (w *ExecutionTerminator) cancelComponent(
 		logger.Errorf("failed to cancel component execution %s: %v", execution.ID, err)
 	}
 
-	return cancelledChildRuns, nil
+	return nil
 }

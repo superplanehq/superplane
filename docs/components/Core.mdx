@@ -1062,7 +1062,14 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 **Component key:** `runApp`
 
-Run another SuperPlane app and wait for its run to finish
+Run another SuperPlane app and wait for its run to finish.
+
+### Configuration
+
+- **App**: The SuperPlane app to invoke
+- **Node**: The On Run trigger in the target app
+- **Parameters**: Values passed to the target app's On Run trigger
+- **Timeout**: Maximum wait time in seconds for the child run (default 3600). When the timeout expires before the child run finishes, the child run is cancelled and the parent continues through the Failed output channel.
 
 ### Example Output
 
