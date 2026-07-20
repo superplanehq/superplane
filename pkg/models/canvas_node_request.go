@@ -159,3 +159,16 @@ func CountPendingRequestsForExecutionsInTransaction(tx *gorm.DB, executionIDs []
 
 	return count, nil
 }
+
+// DeleteExpiredCompletedNodeRequests deletes up to limit completed node requests
+// whose updated_at is on or before olderThan. Pending requests are never touched.
+func DeleteExpiredCompletedNodeRequests(db *gorm.DB, olderThan time.Time, limit int) (int64, error) {
+	return deleteRowsLimited(
+		db,
+		&CanvasNodeRequest{},
+		limit,
+		"state = ? AND updated_at <= ?",
+		NodeExecutionRequestStateCompleted,
+		olderThan,
+	)
+}
