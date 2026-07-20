@@ -51,7 +51,7 @@ func (c *SendTextMessage) Documentation() string {
 ## Configuration
 
 - **Channel**: Select the Slack channel to send the message to
-- **Text**: The message text to send (supports expressions and Slack markdown formatting)
+- **Text**: The message text to send (supports expressions and Slack markdown formatting). For example, link to the current run with ` + "`Deploy started: <{{ run().url }}|view run>`" + `.
 
 ## Output
 

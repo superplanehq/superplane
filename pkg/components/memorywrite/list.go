@@ -25,6 +25,7 @@ var (
 		"config":   {},
 		"root":     {},
 		"previous": {},
+		"run":      {},
 		"ctx":      {},
 	}
 
