@@ -680,7 +680,7 @@ var (
 //  1. Entrypoint cycle — A/run1 -> A/run2 -> A/run1
 //  2. Workflow cycle   — A -> B -> C -> A
 //  3. Cross-app depth  — A -> B -> C -> D -> ... -> Z (too many app hops)
-func ValidateSubRunCreationInTransaction(
+func ValidateSubRunCreation(
 	tx *gorm.DB,
 	parentRunID uuid.UUID,
 	targetWorkflowID uuid.UUID,
@@ -691,7 +691,7 @@ func ValidateSubRunCreationInTransaction(
 		return nil
 	}
 
-	ancestors, err := collectRunAncestorsInTransaction(tx, parentRunID)
+	ancestors, err := collectRunAncestors(tx, parentRunID)
 	if err != nil {
 		return err
 	}
@@ -733,9 +733,9 @@ func ValidateSubRunCreationInTransaction(
 	return nil
 }
 
-// collectRunAncestorsInTransaction loads the parent run and every ancestor in one
+// collectRunAncestors loads the parent run and every ancestor in one
 // query, ordered nearest-first: [parent, grandparent, ..., root].
-func collectRunAncestorsInTransaction(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
+func collectRunAncestors(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
 	var ancestors []CanvasRun
 	err := tx.Raw(`
 		WITH RECURSIVE ancestors AS (
@@ -822,11 +822,7 @@ func crossWorkflowDepthForSubRun(ancestors []CanvasRun, targetWorkflowID uuid.UU
 	return depth
 }
 
-func ListChildRunsByParentExecutionsInTransaction(
-	tx *gorm.DB,
-	parentWorkflowID uuid.UUID,
-	parentExecutionIDs []uuid.UUID,
-) ([]CanvasRun, error) {
+func ListChildRunsByParentExecutions(tx *gorm.DB, parentWorkflowID uuid.UUID, parentExecutionIDs []uuid.UUID) ([]CanvasRun, error) {
 	if len(parentExecutionIDs) == 0 {
 		return []CanvasRun{}, nil
 	}
@@ -912,7 +908,7 @@ type CanvasRunKey struct {
 	RunID      uuid.UUID
 }
 
-func FindCanvasRunsByKeysInTransaction(tx *gorm.DB, keys []CanvasRunKey) ([]CanvasRun, error) {
+func FindCanvasRunsByKeys(tx *gorm.DB, keys []CanvasRunKey) ([]CanvasRun, error) {
 	if len(keys) == 0 {
 		return []CanvasRun{}, nil
 	}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -181,13 +181,13 @@ func serializeCanvasRunWithQueueItemInputs(
 	parentRun models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
-	if rootEvent.ID == uuid.Nil {
-		return nil, grpcerrors.NotFound(nil, "root event not found")
-	}
-
-	serializedRootEvent, err := SerializeCanvasEvent(rootEvent)
-	if err != nil {
-		return nil, err
+	var serializedRootEvent *pb.CanvasEvent
+	if rootEvent.ID != uuid.Nil {
+		var err error
+		serializedRootEvent, err = SerializeCanvasEvent(rootEvent)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	executionRefs := make([]*pb.CanvasNodeExecutionRef, 0, len(executions))
@@ -492,7 +492,7 @@ func loadParentRunsForRuns(ctx context.Context, runs []models.CanvasRun) (map[st
 	ctx, done := telemetry.Span(ctx, "runs.load_parent_runs")
 	defer done(nil)
 
-	parents, err := models.FindCanvasRunsByKeysInTransaction(database.DB(ctx), models.CollectParentRunKeys(runs))
+	parents, err := models.FindCanvasRunsByKeys(database.DB(ctx), models.CollectParentRunKeys(runs))
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func listChildRunsForExecutions(ctx context.Context, canvasID uuid.UUID, executi
 	ctx, done := telemetry.Span(ctx, "runs.load_child_runs")
 	defer done(nil)
 
-	return models.ListChildRunsByParentExecutionsInTransaction(database.DB(ctx), canvasID, executionIDs)
+	return models.ListChildRunsByParentExecutions(database.DB(ctx), canvasID, executionIDs)
 }
 
 func listQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (queueItems []models.CanvasNodeQueueItem, err error) {

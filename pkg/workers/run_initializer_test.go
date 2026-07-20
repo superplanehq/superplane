@@ -89,6 +89,15 @@ func Test__RunInitializer__PublishesRunStateWhenInitializationSucceeds(t *testin
 			Hook: "onMessage",
 		},
 	})
+	require.NoError(t, database.Conn().Model(run).Update("input", models.NewJSONValue(map[string]any{
+		"app": map[string]any{
+			"id":   canvas.ID.String(),
+			"name": "Source App",
+		},
+		"parameters": map[string]any{
+			"parameter": "hello",
+		},
+	})).Error)
 
 	initializer := NewRunInitializer(amqpURL, r.Registry)
 	require.NoError(t, initializer.initializeRun(canvas.ID, run.ID, runInitializerTriggerPending))

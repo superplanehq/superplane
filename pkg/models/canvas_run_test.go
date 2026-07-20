@@ -322,7 +322,7 @@ func Test__ValidateSubRunCreationInTransaction__SameWorkflowDoesNotIncreaseCross
 	)
 
 	parentRun := createSubRun(t, canvas.ID, "run1", nil, nil, nil)
-	err := models.ValidateSubRunCreationInTransaction(
+	err := models.ValidateSubRunCreation(
 		database.Conn(),
 		parentRun.ID,
 		canvas.ID,
@@ -353,7 +353,7 @@ func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *
 	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
 	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
 
-	err := models.ValidateSubRunCreationInTransaction(
+	err := models.ValidateSubRunCreation(
 		database.Conn(),
 		runC.ID,
 		uuid.New(),
@@ -362,7 +362,7 @@ func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *
 	)
 	require.NoError(t, err)
 
-	err = models.ValidateSubRunCreationInTransaction(
+	err = models.ValidateSubRunCreation(
 		database.Conn(),
 		runC.ID,
 		uuid.New(),
@@ -393,7 +393,7 @@ func Test__ValidateSubRunCreationInTransaction__WorkflowCycleAcrossApps(t *testi
 	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
 	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
 
-	err := models.ValidateSubRunCreationInTransaction(
+	err := models.ValidateSubRunCreation(
 		database.Conn(),
 		runC.ID,
 		canvasA.ID,
@@ -416,7 +416,7 @@ func Test__ValidateSubRunCreationInTransaction__EntrypointCycleWithinWorkflow(t 
 	run2InChain := createSubRun(t, canvas.ID, "run2", &rootRun.ID, &canvas.ID, nil)
 	parentRun := createSubRun(t, canvas.ID, "run1", &run2InChain.ID, &canvas.ID, nil)
 
-	err := models.ValidateSubRunCreationInTransaction(
+	err := models.ValidateSubRunCreation(
 		database.Conn(),
 		parentRun.ID,
 		canvas.ID,
@@ -438,7 +438,7 @@ func Test__ValidateSubRunCreationInTransaction__SiblingSubRunsAllowRepeatedEntry
 	parentRun := createSubRun(t, canvas.ID, "forEach", nil, nil, nil)
 	createSubRun(t, canvas.ID, "item", &parentRun.ID, &canvas.ID, nil)
 
-	err := models.ValidateSubRunCreationInTransaction(
+	err := models.ValidateSubRunCreation(
 		database.Conn(),
 		parentRun.ID,
 		canvas.ID,

@@ -48,7 +48,13 @@ func (c *OnRun) ExampleData() map[string]any {
 		"timestamp": "2026-07-19T12:00:00Z",
 		"type":      "app.invocation",
 		"data": map[string]any{
-			"parameter": "hello",
+			"app": map[string]any{
+				"id":   "123",
+				"name": "Source App",
+			},
+			"parameters": map[string]any{
+				"parameter": "hello",
+			},
 		},
 	}
 }
@@ -172,14 +178,27 @@ func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, erro
 		return nil, fmt.Errorf("on run: decode configuration: %w", err)
 	}
 
+	parameters, ok := ctx.Parameters["parameters"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("on run: parameters not found")
+	}
+
+	sourceApp, ok := ctx.Parameters["app"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("on run: source app not found")
+	}
+
 	if len(config.Parameters) > 0 {
-		err = configuration.ValidateConfiguration(config.Parameters, ctx.Parameters)
+		err = configuration.ValidateConfiguration(config.Parameters, parameters)
 		if err != nil {
 			return nil, fmt.Errorf("on run: validate configuration: %w", err)
 		}
 	}
 
-	err = ctx.Events.Emit("app.invocation", ctx.Parameters)
+	err = ctx.Events.Emit("app.invocation", map[string]any{
+		"app":        sourceApp,
+		"parameters": parameters,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("on run: emit event: %w", err)
 	}

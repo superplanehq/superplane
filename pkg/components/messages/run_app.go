@@ -204,10 +204,18 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("run app: metadata is required")
 	}
 
+	input := map[string]any{
+		"app": map[string]any{
+			"id":   ctx.WorkflowID,
+			"name": ctx.CanvasName,
+		},
+		"parameters": config.Parameters,
+	}
+
 	run, err := ctx.Runs.Create(core.RunCreationParams{
 		App:   nodeMetadata.App.ID,
 		Node:  nodeMetadata.Node.ID,
-		Input: config.Parameters,
+		Input: input,
 		Callbacks: []core.RunCallback{
 			{
 				When: core.RunCallbackWhenPending,

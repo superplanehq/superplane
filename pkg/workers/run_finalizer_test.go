@@ -4,18 +4,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
@@ -427,4 +432,112 @@ func Test__RunFinalizer_SweepCancellingRuns_DoesNotBumpUpdatedAtWhenStillOpenAft
 	require.NoError(t, err)
 	assert.Equal(t, staleUpdatedAt.Unix(), unchangedRun.UpdatedAt.Unix())
 	assert.Equal(t, models.CanvasRunStateCancelling, unchangedRun.State)
+}
+
+func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
+	actionName := "run_finalizer_finished_cb_" + uuid.New().String()
+	hookCalled := false
+	var receivedCallback core.RunFinishedCallback
+
+	registry.RegisterAction(actionName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  actionName,
+		Hooks: []core.Hook{{Name: "onRunFinished", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			hookCalled = true
+			var err error
+			receivedCallback, err = core.DecodeRunFinishedCallback(ctx.Parameters)
+			return err
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+
+	parentCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "runApp",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: actionName}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: "trigger", TargetID: "runApp", Channel: "default"},
+		},
+	)
+	childCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "entry", Type: models.NodeTypeTrigger},
+			{NodeID: "component", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "entry", TargetID: "component", Channel: "default"},
+		},
+	)
+
+	parentRootEvent := support.EmitCanvasEventForNode(t, parentCanvas.ID, "trigger", "default", nil)
+	parentRun, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), parentRootEvent)
+	require.NoError(t, err)
+	require.NoError(t, parentRootEvent.Routed())
+
+	parentExecution := support.CreateCanvasNodeExecution(t, parentCanvas.ID, "runApp", parentRootEvent.ID, parentRootEvent.ID)
+	parentExecution.RunID = parentRun.ID
+	require.NoError(t, database.Conn().Save(parentExecution).Error)
+
+	childRun := createSubRunWithCallbacks(t, subRunOptions{
+		workflowID:        childCanvas.ID,
+		nodeID:            "entry",
+		parentRunID:       parentRun.ID,
+		parentWorkflowID:  parentCanvas.ID,
+		parentExecutionID: parentExecution.ID,
+		state:             models.CanvasRunStateStarted,
+		callbacks: []core.RunCallback{
+			{
+				When: core.RunCallbackWhenFinished,
+				On:   core.RunCallbackOnParent,
+				Hook: "onRunFinished",
+			},
+		},
+	})
+
+	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "entry", "default", nil)
+	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
+	require.NoError(t, childRootEvent.Routed())
+
+	childExecution := support.CreateCanvasNodeExecution(t, childCanvas.ID, "component", childRootEvent.ID, childRootEvent.ID)
+	childExecution.RunID = childRun.ID
+	require.NoError(t, database.Conn().Save(childExecution).Error)
+	_, err = childExecution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(childCanvas.ID, "component", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	require.NoError(t, router.LockAndProcessEvent(logger, events[0], time.Now()))
+
+	require.NoError(t, finalizer.finalizeRun(childCanvas.ID, childRun.ID, runFinalizerTriggerEventTerminal))
+
+	updatedChildRun, err := models.FindCanvasRunInTransaction(database.Conn(), childCanvas.ID, childRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedChildRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedChildRun.Result)
+
+	assert.True(t, hookCalled)
+	assert.Equal(t, childRun.ID, receivedCallback.Run.ID)
+	assert.Equal(t, childCanvas.ID, receivedCallback.Run.AppID)
+	assert.Equal(t, models.CanvasRunResultPassed, receivedCallback.Run.Result)
+	assert.Equal(t, "runApp", parentExecution.NodeID)
 }

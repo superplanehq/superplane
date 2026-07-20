@@ -17,7 +17,7 @@ interface OnRunEventData {
     id?: string;
     name?: string;
   };
-  payload?: Record<string, unknown>;
+  parameters?: Record<string, unknown>;
 }
 
 export const onRunTriggerRenderer: TriggerRenderer = {
@@ -40,8 +40,8 @@ export const onRunTriggerRenderer: TriggerRenderer = {
       values.App = eventData.app.id;
     }
 
-    if (eventData?.payload && typeof eventData.payload === "object" && !Array.isArray(eventData.payload)) {
-      for (const [key, value] of Object.entries(eventData.payload)) {
+    if (eventData?.parameters && typeof eventData.parameters === "object" && !Array.isArray(eventData.parameters)) {
+      for (const [key, value] of Object.entries(eventData.parameters)) {
         const formatted = formatEventValue(value);
         if (formatted.length > 0) {
           values[key] = formatted;

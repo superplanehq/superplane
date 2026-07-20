@@ -40,7 +40,7 @@ func (c *RunExecutionContext) WithRunCancelled(fn func(workflowID, runID uuid.UU
 }
 
 func (c *RunExecutionContext) Cancel() error {
-	childRuns, err := models.ListChildRunsByParentExecutionsInTransaction(
+	childRuns, err := models.ListChildRunsByParentExecutions(
 		c.tx,
 		c.canvas.ID,
 		[]uuid.UUID{c.execution.ID},
@@ -95,7 +95,7 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 	}
 
 	targetWorkflowID := uuid.MustParse(app.ID)
-	err = models.ValidateSubRunCreationInTransaction(
+	err = models.ValidateSubRunCreation(
 		c.tx,
 		c.execution.RunID,
 		targetWorkflowID,

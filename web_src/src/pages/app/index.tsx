@@ -13,7 +13,6 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
-  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,

@@ -176,7 +176,13 @@ Handle runs started from another app
 ```json
 {
   "data": {
-    "parameter": "hello"
+    "app": {
+      "id": "123",
+      "name": "Source App"
+    },
+    "parameters": {
+      "parameter": "hello"
+    }
   },
   "timestamp": "2026-07-19T12:00:00Z",
   "type": "app.invocation"
@@ -1062,10 +1068,14 @@ Run another SuperPlane app and wait for its run to finish
 
 ```json
 {
-  "run": {
-    "id": "123",
-    "result": "passed"
-  }
+  "data": {
+    "run": {
+      "id": "123",
+      "result": "passed"
+    }
+  },
+  "timestamp": "2026-07-19T12:00:00Z",
+  "type": "app.invocation.passed"
 }
 ```
 
