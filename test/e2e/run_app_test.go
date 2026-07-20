@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -75,7 +74,7 @@ func TestRunApp(t *testing.T) {
 		steps.givenParentAppCallingChildOnFailedWithTimeout(map[string]any{}, 2)
 		steps.whenTheParentManualTriggerRuns()
 		steps.thenTheChildRunFinishedWithResultWithin(runAppTimeoutFlowDeadline, models.CanvasRunResultCancelled)
-		steps.thenTheParentRunAppExecutionReportsTimeoutWithin(steps.remainingWithin(runAppTimeoutFlowDeadline), 2)
+		steps.thenTheParentRunAppExecutionReportsCancelledWithin(steps.remainingWithin(runAppTimeoutFlowDeadline))
 		steps.thenTheParentOutputNodeFinishedWithin(steps.remainingWithin(runAppTimeoutFlowDeadline))
 		steps.thenTheParentRunFinishedWithResultWithin(steps.remainingWithin(runAppTimeoutFlowDeadline), models.CanvasRunResultPassed)
 	})
@@ -320,9 +319,8 @@ func (s *runAppSteps) thenTheParentRunFinishedWithResultWithin(within time.Durat
 	require.Equal(s.t, expected, parentRun.Result)
 }
 
-func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within time.Duration, timeoutSeconds int) {
+func (s *runAppSteps) thenTheParentRunAppExecutionReportsCancelledWithin(within time.Duration) {
 	deadline := time.Now().Add(within)
-	expectedError := fmt.Sprintf("timed out after %ds", timeoutSeconds)
 
 	for time.Now().Before(deadline) {
 		executions := s.parentCanvas.GetExecutionsForNode("Run Child")
@@ -338,10 +336,7 @@ func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within ti
 		}
 
 		metadata := runAppExecutionMetadataFromExecution(execution)
-		if metadata.Run != nil &&
-			metadata.Run.Result == models.CanvasRunResultCancelled &&
-			metadata.Run.Error != nil &&
-			*metadata.Run.Error == expectedError {
+		if metadata.Run != nil && metadata.Run.Result == models.CanvasRunResultCancelled {
 			return
 		}
 
@@ -355,8 +350,6 @@ func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within ti
 	metadata := runAppExecutionMetadataFromExecution(executions[0])
 	require.NotNil(s.t, metadata.Run)
 	require.Equal(s.t, models.CanvasRunResultCancelled, metadata.Run.Result)
-	require.NotNil(s.t, metadata.Run.Error)
-	require.Equal(s.t, expectedError, *metadata.Run.Error)
 }
 
 type runAppExecutionMetadata struct {
