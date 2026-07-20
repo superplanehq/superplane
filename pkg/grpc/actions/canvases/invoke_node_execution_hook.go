@@ -89,6 +89,7 @@ func InvokeNodeExecutionHook(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Auth:           contexts.NewAuthReader(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Runs:           contexts.NewRunExecutionContext(tx, canvas, node, execution),
 	}
 
 	if node.AppInstallationID != nil {
