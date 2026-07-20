@@ -31,6 +31,14 @@ type RunAppConfiguration struct {
 	Timeout    *int           `json:"timeout,omitempty" mapstructure:"timeout,omitempty"`
 }
 
+func (c *RunAppConfiguration) TimeoutDuration() time.Duration {
+	if c.Timeout == nil || *c.Timeout <= 0 {
+		return time.Duration(defaultRunAppTimeoutSeconds) * time.Second
+	}
+
+	return time.Duration(*c.Timeout) * time.Second
+}
+
 type runAppExecutionMetadata struct {
 	Run *RunMetadata `json:"run" mapstructure:"run"`
 }
@@ -266,8 +274,7 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 		},
 	}
 
-	timeoutSeconds := runAppTimeoutSeconds(config.Timeout)
-	if err := ctx.Requests.ScheduleActionCall(ActionRunTimeout, map[string]any{}, time.Duration(timeoutSeconds)*time.Second); err != nil {
+	if err := ctx.Requests.ScheduleActionCall(ActionRunTimeout, map[string]any{}, config.TimeoutDuration()); err != nil {
 		return fmt.Errorf("run app: schedule timeout: %w", err)
 	}
 
@@ -332,7 +339,10 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 		})
 	}
 
-	errMessage := runAppFailureMessage(ctx.Configuration, callback.Run.Result, callback.Run.Error)
+	errMessage := ""
+	if callback.Run.Error != nil {
+		errMessage = *callback.Run.Error
+	}
 
 	err = ctx.Metadata.Set(runAppExecutionMetadata{
 		Run: &RunMetadata{
@@ -367,29 +377,4 @@ func (c *RunApp) Cancel(ctx core.ExecutionContext) error {
 
 func (c *RunApp) Cleanup(ctx core.SetupContext) error {
 	return nil
-}
-
-func runAppFailureMessage(configuration any, runResult string, runError *string) string {
-	if runResult == core.RunResultCancelled {
-		config := RunAppConfiguration{}
-		if err := mapstructure.Decode(configuration, &config); err != nil {
-			return "timed out"
-		}
-
-		return fmt.Sprintf("timed out after %ds", runAppTimeoutSeconds(config.Timeout))
-	}
-
-	if runError != nil {
-		return *runError
-	}
-
-	return ""
-}
-
-func runAppTimeoutSeconds(timeout *int) int {
-	if timeout == nil || *timeout <= 0 {
-		return defaultRunAppTimeoutSeconds
-	}
-
-	return *timeout
 }

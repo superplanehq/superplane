@@ -12,26 +12,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__RunApp__FailureMessage(t *testing.T) {
-	assert.Equal(t, "timed out after 30s", runAppFailureMessage(map[string]any{"timeout": 30}, core.RunResultCancelled, nil))
-	assert.Equal(t, "timed out after 3600s", runAppFailureMessage(map[string]any{}, core.RunResultCancelled, nil))
-
-	runError := "child failed"
-	assert.Equal(t, "child failed", runAppFailureMessage(nil, core.RunResultFailed, &runError))
-	assert.Equal(t, "", runAppFailureMessage(nil, core.RunResultFailed, nil))
-}
-
-func Test__RunApp__TimeoutSeconds(t *testing.T) {
-	defaultTimeout := runAppTimeoutSeconds(nil)
-	assert.Equal(t, defaultRunAppTimeoutSeconds, defaultTimeout)
-
-	zero := 0
-	assert.Equal(t, defaultRunAppTimeoutSeconds, runAppTimeoutSeconds(&zero))
-
-	custom := 120
-	assert.Equal(t, 120, runAppTimeoutSeconds(&custom))
-}
-
 func Test__RunApp__Execute__SchedulesConfiguredTimeout(t *testing.T) {
 	childAppID := uuid.New()
 	runID := uuid.New()
