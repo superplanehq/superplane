@@ -897,6 +897,7 @@ message CanvasRun {
   repeated CanvasNodeQueueItem queue_items = 11;
   google.protobuf.Timestamp cancelled_at = 12;
   CanvasRunRef parent = 13;
+  repeated string errors = 14;
 }
 
 message CanvasRunRef {
@@ -904,6 +905,7 @@ message CanvasRunRef {
   string canvas_id = 2;
   CanvasRun.State state = 3;
   CanvasRun.Result result = 4;
+  repeated string errors = 5;
 }
 
 message ListEventExecutionsRequest {

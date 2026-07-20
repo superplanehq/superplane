@@ -16,13 +16,15 @@ const (
 type RunExecutionContext interface {
 	Create(params RunCreationParams) (*Run, error)
 	Cancel() error
+	AssignOutput(output map[string]any) error
+	AddError(message string) error
 }
 
 type Run struct {
 	ID     uuid.UUID `json:"id" mapstructure:"id"`
 	AppID  uuid.UUID `json:"app_id" mapstructure:"app_id"`
 	Result string    `json:"result" mapstructure:"result"`
-	Error  *string   `json:"error,omitempty" mapstructure:"error,omitempty"`
+	Errors []string  `json:"errors" mapstructure:"errors"`
 }
 
 type RunCreationParams struct {
@@ -96,13 +98,4 @@ func decodeRunCallback[T any](params map[string]any) (T, error) {
 	}
 
 	return callback, nil
-}
-
-func NewRun(id, appID uuid.UUID, result string, errMessage *string) Run {
-	return Run{
-		ID:     id,
-		AppID:  appID,
-		Result: result,
-		Error:  errMessage,
-	}
 }

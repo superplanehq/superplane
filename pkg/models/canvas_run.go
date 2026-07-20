@@ -1,8 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +42,8 @@ type CanvasRun struct {
 	Input             JSONValue
 	State             string
 	Result            string
-	ResultMessage     string
+	Output            JSONValue
+	Errors            datatypes.JSONSlice[RunError]
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	CancelledAt       *time.Time
@@ -588,6 +591,10 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 		return CanvasRunResultCancelled, nil
 	}
 
+	if len(r.Errors) > 0 {
+		return CanvasRunResultFailed, nil
+	}
+
 	var result struct {
 		HasFailed    bool
 		HasCancelled bool
@@ -1006,4 +1013,134 @@ func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error 
 			"updated_at":   &now,
 		}).
 		Error
+}
+
+const MaxRunErrorsCount = 50
+
+var ErrRunErrorsTooLarge = errors.New("run errors exceed maximum size")
+var ErrRunErrorsTooMany = errors.New("run errors exceed maximum count")
+var ErrRunErrorMessageRequired = errors.New("run error message is required")
+
+type RunError struct {
+	Message string `json:"message"`
+}
+
+func (r *CanvasRun) ErrorMessages() []string {
+	if len(r.Errors) == 0 {
+		return nil
+	}
+
+	messages := make([]string, 0, len(r.Errors))
+	for _, runError := range r.Errors {
+		messages = append(messages, runError.Message)
+	}
+
+	return messages
+}
+
+/*
+ * Appends a new error into the run errors slice.
+ * Caller must lock the run first to ensure concurrent callers do not overwrite each other's changes.
+ */
+func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
+	if message == "" {
+		return ErrRunErrorMessageRequired
+	}
+
+	if len(r.Errors) >= MaxRunErrorsCount {
+		return fmt.Errorf("%w: %d (max %d)", ErrRunErrorsTooMany, len(r.Errors), MaxRunErrorsCount)
+	}
+
+	next := append(slices.Clone(r.Errors), RunError{Message: message})
+	encoded, err := json.Marshal(next)
+	if err != nil {
+		return fmt.Errorf("marshal run errors: %w", err)
+	}
+
+	if len(encoded) > maxSize {
+		return fmt.Errorf("%w: %d bytes (max %d)", ErrRunErrorsTooLarge, len(encoded), maxSize)
+	}
+
+	r.Errors = next
+	return tx.Model(r).Update("errors", r.Errors).Error
+}
+
+/*
+ * Shallow-merges patch into the run's accumulated output.
+ * Caller must lock the run first to ensure concurrent callers do not overwrite each other's changes.
+ */
+func (r *CanvasRun) AssignRunOutput(tx *gorm.DB, patch map[string]any, maxSize int) error {
+	if patch == nil {
+		return ErrRunOutputPatchInvalid
+	}
+
+	current, err := runOutputAsMap(r.Output)
+	if err != nil {
+		return err
+	}
+
+	merged := ShallowMergeObjects(current, patch)
+	size, err := runOutputSize(merged)
+	if err != nil {
+		return err
+	}
+
+	if size > maxSize {
+		return fmt.Errorf("%w: %d bytes (max %d)", ErrRunOutputTooLarge, size, maxSize)
+	}
+
+	return tx.Model(r).Update("output", NewJSONValue(merged)).Error
+}
+
+var ErrRunOutputTooLarge = errors.New("run output exceeds maximum size")
+var ErrRunOutputPatchInvalid = errors.New("run output patch must be a JSON object")
+
+// ShallowMergeObjects merges patch into base using Object.assign semantics.
+// Top-level keys from patch replace keys in base; nested objects are not merged recursively.
+func ShallowMergeObjects(base, patch map[string]any) map[string]any {
+	if len(patch) == 0 {
+		if base == nil {
+			return map[string]any{}
+		}
+
+		merged := make(map[string]any, len(base))
+		for key, value := range base {
+			merged[key] = value
+		}
+
+		return merged
+	}
+
+	merged := make(map[string]any, len(base)+len(patch))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range patch {
+		merged[key] = value
+	}
+
+	return merged
+}
+
+func runOutputAsMap(output JSONValue) (map[string]any, error) {
+	data := output.Data()
+	if data == nil {
+		return map[string]any{}, nil
+	}
+
+	asMap, ok := data.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("run output must be a JSON object")
+	}
+
+	return asMap, nil
+}
+
+func runOutputSize(output map[string]any) (int, error) {
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		return 0, fmt.Errorf("marshal run output: %w", err)
+	}
+
+	return len(encoded), nil
 }

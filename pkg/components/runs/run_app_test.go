@@ -1,4 +1,4 @@
-package messages
+package runs
 
 import (
 	"testing"
@@ -41,7 +41,7 @@ func Test__RunApp__Execute__SchedulesConfiguredTimeout(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, ActionRunTimeout, requests.Action)
+	assert.Equal(t, RunAppActionRunTimeout, requests.Action)
 	assert.Equal(t, 45*time.Second, requests.Duration)
 
 	metadata := decodeRunAppExecutionMetadata(t, executionMetadata)
@@ -80,7 +80,7 @@ func Test__RunApp__Execute__SchedulesDefaultTimeout(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, ActionRunTimeout, requests.Action)
+	assert.Equal(t, RunAppActionRunTimeout, requests.Action)
 	assert.Equal(t, time.Duration(defaultRunAppTimeoutSeconds)*time.Second, requests.Duration)
 }
 
@@ -135,12 +135,11 @@ func Test__RunApp__HandleRunFinished__EmitsFailedWhenCancelled(t *testing.T) {
 	}
 	execState := &contexts.ExecutionStateContext{}
 
-	params, err := core.NewRunFinishedCallback(core.NewRun(
-		childRunID,
-		uuid.New(),
-		core.RunResultCancelled,
-		nil,
-	)).ToParameters()
+	params, err := core.NewRunFinishedCallback(core.Run{
+		ID:     childRunID,
+		AppID:  uuid.New(),
+		Result: core.RunResultCancelled,
+	}).ToParameters()
 	require.NoError(t, err)
 
 	err = (&RunApp{}).handleRunFinished(core.ActionHookContext{
@@ -150,7 +149,7 @@ func Test__RunApp__HandleRunFinished__EmitsFailedWhenCancelled(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, FailedOutputChannel, execState.Channel)
+	assert.Equal(t, RunAppFailedOutputChannel, execState.Channel)
 	assert.True(t, execState.Finished)
 
 	metadata := decodeRunAppExecutionMetadata(t, metadataCtx)

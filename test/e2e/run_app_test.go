@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,7 +63,7 @@ func TestRunApp(t *testing.T) {
 		steps.givenParentAppCallingChildOnFailed(map[string]any{})
 		steps.whenTheParentManualTriggerRuns()
 		steps.thenTheChildRunFinishedWithResult(models.CanvasRunResultFailed)
-		steps.thenTheChildRunResultMessageContains("field 'message' is required")
+		steps.thenTheChildRunErrorsContain("field 'message' is required")
 		steps.thenTheParentOutputNodeFinished()
 		steps.thenTheParentRunFinishedWithResult(models.CanvasRunResultPassed)
 	})
@@ -297,9 +298,19 @@ func (s *runAppSteps) thenTheChildRunFinishedWithResultWithin(within time.Durati
 	require.Equal(s.t, expected, childRun.Result)
 }
 
-func (s *runAppSteps) thenTheChildRunResultMessageContains(expected string) {
+func (s *runAppSteps) thenTheChildRunErrorsContain(expected string) {
 	childRun := s.waitForChildRunFinished(90 * time.Second)
-	require.Contains(s.t, childRun.ResultMessage, expected)
+	require.NotEmpty(s.t, childRun.Errors)
+
+	found := false
+	for _, runError := range childRun.Errors {
+		if strings.Contains(runError.Message, expected) {
+			found = true
+			break
+		}
+	}
+
+	require.True(s.t, found, "expected child run errors to contain %q, got %#v", expected, childRun.Errors)
 }
 
 func (s *runAppSteps) thenTheParentOutputNodeFinished() {

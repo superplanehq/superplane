@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -131,4 +132,30 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 	return &core.Run{
 		ID: run.ID,
 	}, nil
+}
+
+func (c *RunExecutionContext) AssignOutput(output map[string]any) error {
+	if c.execution == nil {
+		return fmt.Errorf("assign run output: execution is required")
+	}
+
+	run, err := models.LockCanvasRunInTransaction(c.tx, c.execution.RunID)
+	if err != nil {
+		return err
+	}
+
+	return run.AssignRunOutput(c.tx, output, config.MaxPayloadSize())
+}
+
+func (c *RunExecutionContext) AddError(message string) error {
+	if c.execution == nil {
+		return fmt.Errorf("add run error: execution is required")
+	}
+
+	run, err := models.LockCanvasRunInTransaction(c.tx, c.execution.RunID)
+	if err != nil {
+		return err
+	}
+
+	return run.AddError(c.tx, message, config.MaxPayloadSize())
 }

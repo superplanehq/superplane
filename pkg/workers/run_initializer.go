@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -244,21 +245,23 @@ func (w *RunInitializer) failRun(
 	run *models.CanvasRun,
 	eventCollector func([]models.CanvasEvent),
 	executionCollector func([]models.CanvasNodeExecution),
-	resultMessage string,
+	message string,
 ) error {
+	if err := run.AddError(tx, message, config.MaxPayloadSize()); err != nil {
+		return fmt.Errorf("record run error: %w", err)
+	}
+
 	now := time.Now()
 	run.State = models.CanvasRunStateFinished
 	run.Result = models.CanvasRunResultFailed
-	run.ResultMessage = resultMessage
 	run.UpdatedAt = &now
 	run.FinishedAt = &now
 	err := tx.Model(run).
 		Updates(map[string]any{
-			"state":          models.CanvasRunStateFinished,
-			"result":         models.CanvasRunResultFailed,
-			"result_message": &resultMessage,
-			"updated_at":     &now,
-			"finished_at":    &now,
+			"state":       models.CanvasRunStateFinished,
+			"result":      models.CanvasRunResultFailed,
+			"updated_at":  &now,
+			"finished_at": &now,
 		}).
 		Error
 

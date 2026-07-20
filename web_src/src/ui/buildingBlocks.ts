@@ -191,7 +191,14 @@ function isRunnerBlock(component: { name?: string }): boolean {
   return name === "runner" || name === "runnerJS" || name === "runnerBash" || name === "runnerPython";
 }
 
-const SUPERPLANE_BLOCK_NAMES = new Set(["onbroadcast", "broadcastmessage", "onrun", "runapp"]);
+const SUPERPLANE_BLOCK_NAMES = new Set([
+  "onbroadcast",
+  "broadcastmessage",
+  "onrun",
+  "runapp",
+  "assignrunoutput",
+  "addrunerror",
+]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
   return SUPERPLANE_BLOCK_NAMES.has((component.name || "").toLowerCase());

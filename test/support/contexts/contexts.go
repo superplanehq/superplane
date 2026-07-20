@@ -682,11 +682,15 @@ func (c *AppContext) Unsubscribe() error {
 }
 
 type RunExecutionContext struct {
-	CreateRunID      uuid.UUID
-	CreateErr        error
-	CancelErr        error
-	CancelCalled     bool
-	LastCreateParams *core.RunCreationParams
+	CreateRunID       uuid.UUID
+	CreateErr         error
+	CancelErr         error
+	CancelCalled      bool
+	LastCreateParams  *core.RunCreationParams
+	AssignOutputCalls []map[string]any
+	AssignOutputErr   error
+	AddErrorCalls     []string
+	AddErrorErr       error
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -710,4 +714,14 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 func (c *RunExecutionContext) Cancel() error {
 	c.CancelCalled = true
 	return c.CancelErr
+}
+
+func (c *RunExecutionContext) AssignOutput(output map[string]any) error {
+	c.AssignOutputCalls = append(c.AssignOutputCalls, output)
+	return c.AssignOutputErr
+}
+
+func (c *RunExecutionContext) AddError(message string) error {
+	c.AddErrorCalls = append(c.AddErrorCalls, message)
+	return c.AddErrorErr
 }

@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -481,4 +482,157 @@ func createSubRun(
 	}
 	require.NoError(t, database.Conn().Create(&run).Error)
 	return &run
+}
+
+func TestShallowMergeObjects(t *testing.T) {
+	t.Run("merges disjoint keys", func(t *testing.T) {
+		merged := models.ShallowMergeObjects(
+			map[string]any{"a": 1},
+			map[string]any{"b": 2},
+		)
+
+		assert.Equal(t, map[string]any{"a": 1, "b": 2}, merged)
+	})
+
+	t.Run("patch replaces top-level keys", func(t *testing.T) {
+		merged := models.ShallowMergeObjects(
+			map[string]any{"deploy": map[string]any{"status": "running"}},
+			map[string]any{"deploy": map[string]any{"status": "failed", "url": "https://example.com"}},
+		)
+
+		assert.Equal(t, map[string]any{
+			"deploy": map[string]any{"status": "failed", "url": "https://example.com"},
+		}, merged)
+	})
+
+	t.Run("empty patch returns copy of base", func(t *testing.T) {
+		base := map[string]any{"a": 1}
+		merged := models.ShallowMergeObjects(base, map[string]any{})
+
+		assert.Equal(t, base, merged)
+	})
+}
+
+func Test__CanvasRun__AssignRunOutput(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	t.Run("merges output on the run", func(t *testing.T) {
+		err := run.AssignRunOutput(database.Conn(), map[string]any{
+			"deploy": map[string]any{"id": "d-1"},
+		}, 1024)
+		require.NoError(t, err)
+
+		err = run.AssignRunOutput(database.Conn(), map[string]any{
+			"test": map[string]any{"passed": true},
+		}, 1024)
+		require.NoError(t, err)
+
+		updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+		require.NoError(t, err)
+
+		output := updated.Output.Data().(map[string]any)
+		assert.Equal(t, map[string]any{
+			"deploy": map[string]any{"id": "d-1"},
+			"test":   map[string]any{"passed": true},
+		}, output)
+	})
+
+	t.Run("rejects output larger than max size", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		err = otherRun.AssignRunOutput(database.Conn(), map[string]any{
+			"payload": strings.Repeat("a", 128),
+		}, 32)
+		require.ErrorIs(t, err, models.ErrRunOutputTooLarge)
+	})
+
+	t.Run("rejects nil patch", func(t *testing.T) {
+		err := run.AssignRunOutput(database.Conn(), nil, 1024)
+		require.ErrorIs(t, err, models.ErrRunOutputPatchInvalid)
+	})
+}
+
+func Test__CanvasRun__AddError(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	t.Run("appends error entries on the run", func(t *testing.T) {
+		err := run.AddError(database.Conn(), "pipeline failed", 1024)
+		require.NoError(t, err)
+
+		err = run.AddError(database.Conn(), "tests failed", 1024)
+		require.NoError(t, err)
+
+		updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []models.RunError{
+			{Message: "pipeline failed"},
+			{Message: "tests failed"},
+		}, []models.RunError(updated.Errors))
+	})
+
+	t.Run("rejects empty message", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		err = otherRun.AddError(database.Conn(), "", 1024)
+		require.ErrorIs(t, err, models.ErrRunErrorMessageRequired)
+	})
+
+	t.Run("rejects errors larger than max size", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		err = otherRun.AddError(database.Conn(), strings.Repeat("a", 128), 32)
+		require.ErrorIs(t, err, models.ErrRunErrorsTooLarge)
+	})
+}
+
+func Test__CanvasRun__CalculateResult__WithErrors(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	err = run.AddError(database.Conn(), "pipeline failed", 1024)
+	require.NoError(t, err)
+
+	updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+
+	result, err := updated.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultFailed, result)
+}
+
+func Test__CanvasRun__ErrorMessages(t *testing.T) {
+	run := models.CanvasRun{}
+	assert.Nil(t, run.ErrorMessages())
+
+	run.Errors = []models.RunError{
+		{Message: "pipeline failed"},
+		{Message: "tests failed"},
+	}
+	assert.Equal(t, []string{"pipeline failed", "tests failed"}, run.ErrorMessages())
 }

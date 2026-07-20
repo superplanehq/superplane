@@ -264,6 +264,8 @@ import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
+import { assignRunOutputMapper } from "./assignRunOutput";
+import { addRunErrorMapper } from "./addRunError";
 import { runAppMapper, RUN_APP_STATE_REGISTRY } from "./runApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -309,6 +311,8 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   approval: approvalMapper,
   merge: mergeMapper,
   runApp: runAppMapper,
+  assignRunOutput: assignRunOutputMapper,
+  addRunError: addRunErrorMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {

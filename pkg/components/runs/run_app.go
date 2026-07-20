@@ -1,4 +1,4 @@
-package messages
+package runs
 
 import (
 	"fmt"
@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	PassedOutputChannel         = "passed"
-	FailedOutputChannel         = "failed"
-	ActionRunTimeout            = "onRunTimeout"
+	RunAppPassedOutputChannel   = "passed"
+	RunAppFailedOutputChannel   = "failed"
+	RunAppActionRunTimeout      = "onRunTimeout"
 	defaultRunAppTimeoutSeconds = 3600
 )
 
@@ -110,8 +110,8 @@ func (c *RunApp) ExampleOutput() map[string]any {
 
 func (c *RunApp) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
-		{Name: PassedOutputChannel, Label: "Passed"},
-		{Name: FailedOutputChannel, Label: "Failed"},
+		{Name: RunAppPassedOutputChannel, Label: "Passed"},
+		{Name: RunAppFailedOutputChannel, Label: "Failed"},
 	}
 }
 
@@ -274,7 +274,7 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 		},
 	}
 
-	if err := ctx.Requests.ScheduleActionCall(ActionRunTimeout, map[string]any{}, config.TimeoutDuration()); err != nil {
+	if err := ctx.Requests.ScheduleActionCall(RunAppActionRunTimeout, map[string]any{}, config.TimeoutDuration()); err != nil {
 		return fmt.Errorf("run app: schedule timeout: %w", err)
 	}
 
@@ -284,7 +284,7 @@ func (c *RunApp) Execute(ctx core.ExecutionContext) error {
 func (c *RunApp) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "onRunFinished", Type: core.HookTypeInternal},
-		{Name: ActionRunTimeout, Type: core.HookTypeInternal},
+		{Name: RunAppActionRunTimeout, Type: core.HookTypeInternal},
 	}
 }
 
@@ -292,7 +292,7 @@ func (c *RunApp) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "onRunFinished":
 		return c.handleRunFinished(ctx)
-	case ActionRunTimeout:
+	case RunAppActionRunTimeout:
 		return c.handleRunTimeout(ctx)
 	default:
 		return fmt.Errorf("run app: unknown hook %s", ctx.Name)
@@ -329,7 +329,7 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 			return fmt.Errorf("run app: set execution metadata: %w", err)
 		}
 
-		return ctx.ExecutionState.Emit(PassedOutputChannel, "app.invocation.passed", []any{
+		return ctx.ExecutionState.Emit(RunAppPassedOutputChannel, "app.invocation.passed", []any{
 			map[string]any{
 				"run": map[string]any{
 					"id":     callback.Run.ID.String(),
@@ -340,8 +340,8 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 	}
 
 	errMessage := ""
-	if callback.Run.Error != nil {
-		errMessage = *callback.Run.Error
+	if len(callback.Run.Errors) > 0 {
+		errMessage = callback.Run.Errors[0]
 	}
 
 	err = ctx.Metadata.Set(runAppExecutionMetadata{
@@ -356,12 +356,12 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 		return fmt.Errorf("run app: set execution metadata: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(FailedOutputChannel, "app.invocation.failed", []any{
+	return ctx.ExecutionState.Emit(RunAppFailedOutputChannel, "app.invocation.failed", []any{
 		map[string]any{
 			"run": map[string]any{
 				"id":     callback.Run.ID.String(),
 				"result": callback.Run.Result,
-				"error":  errMessage,
+				"errors": callback.Run.Errors,
 			},
 		},
 	})

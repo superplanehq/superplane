@@ -12,6 +12,8 @@ describe("buildBuildingBlockCategories", () => {
         { name: "deploy", label: "Deploy" },
         { name: "broadcastMessage", label: "Broadcast Message" },
         { name: "runApp", label: "Run App" },
+        { name: "assignRunOutput", label: "Assign Run Output" },
+        { name: "addRunError", label: "Add Run Error" },
         { name: "runnerJS", label: "Run JavaScript" },
         { name: "runnerBash", label: "Run Bash" },
         { name: "runnerPython", label: "Run Python" },
@@ -34,6 +36,8 @@ describe("buildBuildingBlockCategories", () => {
       "onRun",
       "broadcastMessage",
       "runApp",
+      "assignRunOutput",
+      "addRunError",
     ]);
     expect(categories.find((category) => category.name === "Runners")?.blocks.map((block) => block.name)).toEqual([
       "runner",
