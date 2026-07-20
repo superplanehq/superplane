@@ -110,15 +110,15 @@ Choose one style per concern and stick to it. Prefer object style when you alrea
 
 | Situation | Prefer | Example |
 | --- | --- | --- |
-| Operation on a loaded model | Method on the struct | `node.HardDelete(tx)` |
-| Multi-step / configurable DB work for a model | Package constructor + collaborator/builder | `NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(n).Run()` |
-| Lookup / list when you do **not** have a handle | Package function with `tx` first | `ListDeletedCanvasNodes(tx, …)`, `FindCanvas(tx, …)` |
+| Operation on a loaded model | Method on the struct | `node.HardDelete(tx)`, `run.DeleteChain(tx)` |
+| Multi-step / configurable DB work for a model | Method on the aggregate (or a dedicated collaborator when clearer) | `node.DeleteRemainingResources(tx, n)`, canvas publisher patterns |
+| Lookup / list when you do **not** have a handle | Package function with `tx` first | `ListDeletedCanvasNodes(tx, before, limit)`, `FindCanvas(tx, …)` |
 
 Rules:
 
 - **Do not** add `models.HardDeleteCanvasNode(tx, orgID, nodeID)` (or similar) when the caller already has `*CanvasNode` — that forces an extra find and mixes procedural style with OO for the same concern.
-- **Do not** hang multi-step cleanup/publish logic as a thick method chain on the aggregate when a dedicated collaborator is clearer (`NodeResourceCleaner`, canvas publisher patterns).
-- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions **orchestrate** (lock → clean → hard-delete); they do not own batched delete queries.
+- Prefer run-centric cleanup (`run.DeleteChain`) over inventing node-scoped resource collaborators; workers orchestrate lock → delete runs → remaining sweep → hard-delete.
+- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions **orchestrate**; they do not own batched delete queries.
 - Receivers on model methods should use a short name consistent with the type (`c` for `*CanvasNode`, etc.), matching nearby code in the file.
 
 ```go
@@ -127,8 +127,9 @@ if err := node.HardDelete(tx); err != nil {
     return err
 }
 
-// Good: multi-step cleanup as a collaborator
-n, err := NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(batchSize).Run()
+// Good: run-centric cleanup
+summary, err := run.DeleteChain(tx)
+remaining, done, err := node.DeleteRemainingResources(tx, batchSize)
 
 // Good: no handle yet — package function
 nodes, err := ListDeletedCanvasNodes(tx, before, limit)
