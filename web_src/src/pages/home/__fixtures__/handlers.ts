@@ -21,6 +21,29 @@ function buildMeUser(orgId: string) {
   };
 }
 
+function storybookIntegrationDefinition(name: string, label: string, description: string) {
+  return {
+    name,
+    label,
+    icon: name,
+    description,
+    configuration: [
+      {
+        name: "organization",
+        type: "string",
+        description: "Optional organization or account scope.",
+        required: false,
+        label: "Organization",
+        visibilityConditions: [],
+        requiredConditions: [],
+        sensitive: false,
+        togglable: false,
+      },
+    ],
+    instructions: "",
+  };
+}
+
 export type FixtureResult = { json: unknown } | { text: string } | null;
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
@@ -101,7 +124,44 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/canvas-folders/[^/]+"),
       resolve: () => ({ json: {} }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
+    {
+      pattern: re("/api/v1/integrations"),
+      resolve: () => ({
+        json: {
+          integrations: [
+            storybookIntegrationDefinition("github", "GitHub", "GitHub repositories, issues, and pull requests"),
+            storybookIntegrationDefinition("gitlab", "GitLab", "GitLab repositories, issues, and merge requests"),
+            storybookIntegrationDefinition("linear", "Linear", "Linear issues and projects"),
+            storybookIntegrationDefinition("jira", "Jira", "Jira issues and projects"),
+            storybookIntegrationDefinition("claude", "Claude", "Anthropic Claude API"),
+            storybookIntegrationDefinition("openai", "OpenAI", "OpenAI API"),
+            storybookIntegrationDefinition("cursor", "Cursor", "Cursor API"),
+            storybookIntegrationDefinition("gemini", "Gemini", "Google Gemini API"),
+            storybookIntegrationDefinition("opencode", "Open Code", "Open Code harness"),
+          ],
+        },
+      }),
+    },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/integrations"),
+      resolve: (_m, _url, method) => {
+        if (method === "POST") {
+          return {
+            json: {
+              integration: {
+                metadata: {
+                  id: "storybook-integration",
+                  name: "storybook-connection",
+                  integrationName: "github",
+                },
+                status: { state: "ready" },
+              },
+            },
+          };
+        }
+        return { json: { integrations: [] } };
+      },
+    },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
