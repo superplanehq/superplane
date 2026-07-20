@@ -88,6 +88,20 @@ describe("getSuggestions", () => {
     expect(labels).toContain("image");
   });
 
+  it("suggests run() metadata fields after dot", () => {
+    const suggestions = getSuggestions("run().", "run().".length, {
+      __run: {
+        id: "abc",
+        url: "https://app.superplane.com/org/apps/canvas?view=runs&run=abc",
+        started_at: "2026-01-01T00:00:00Z",
+      },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("id");
+    expect(labels).toContain("url");
+    expect(labels).toContain("started_at");
+  });
+
   it("suggests previous(n) payload fields after dot", () => {
     const suggestions = getSuggestions("previous(2).", "previous(2).".length, {
       __previousByDepth: { "2": { build: { id: "abc" } } },

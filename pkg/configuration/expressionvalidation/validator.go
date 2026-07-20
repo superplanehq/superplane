@@ -136,6 +136,10 @@ func checkTopLevelCall(name string, args []ast.Node) error {
 				return fmt.Errorf("previous() depth must be an integer literal")
 			}
 		}
+	case "run":
+		if len(args) != 0 {
+			return fmt.Errorf("run() takes no arguments, got %d", len(args))
+		}
 	}
 	return nil
 }
@@ -173,6 +177,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		exprruntime.DateFunctionOption(),
 		expr.Function("root", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("previous", func(params ...any) (any, error) { return nil, nil }),
+		expr.Function("run", func(params ...any) (any, error) { return nil, nil }),
 	}
 
 	if _, err := expr.Compile(body, opts...); err != nil {
