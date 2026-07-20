@@ -1567,18 +1567,17 @@ CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_
 
 
 --
--- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
-
-
-
---
 -- Name: idx_workflow_node_requests_completed_updated_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_node_requests_completed_updated_at ON public.workflow_node_requests USING btree (updated_at) WHERE ((state)::text = 'completed'::text);
+
+
+--
+-- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
 
 
 --
