@@ -338,8 +338,10 @@ func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within ti
 		}
 
 		metadata := runAppExecutionMetadataFromExecution(execution)
-		if metadata.TimedOutAt != nil && *metadata.TimedOutAt != "" &&
-			metadata.Run != nil && metadata.Run.Error != nil && *metadata.Run.Error == expectedError {
+		if metadata.Run != nil &&
+			metadata.Run.Result == models.CanvasRunResultCancelled &&
+			metadata.Run.Error != nil &&
+			*metadata.Run.Error == expectedError {
 			return
 		}
 
@@ -351,20 +353,19 @@ func (s *runAppSteps) thenTheParentRunAppExecutionReportsTimeoutWithin(within ti
 	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, executions[0].State)
 
 	metadata := runAppExecutionMetadataFromExecution(executions[0])
-	require.NotNil(s.t, metadata.TimedOutAt)
-	require.NotEmpty(s.t, *metadata.TimedOutAt)
 	require.NotNil(s.t, metadata.Run)
+	require.Equal(s.t, models.CanvasRunResultCancelled, metadata.Run.Result)
 	require.NotNil(s.t, metadata.Run.Error)
 	require.Equal(s.t, expectedError, *metadata.Run.Error)
 }
 
 type runAppExecutionMetadata struct {
-	Run        *runAppRunMetadata `mapstructure:"run"`
-	TimedOutAt *string            `mapstructure:"timedOutAt"`
+	Run *runAppRunMetadata `mapstructure:"run"`
 }
 
 type runAppRunMetadata struct {
-	Error *string `mapstructure:"error"`
+	Result string  `mapstructure:"result"`
+	Error  *string `mapstructure:"error"`
 }
 
 func runAppExecutionMetadataFromExecution(execution models.CanvasNodeExecution) runAppExecutionMetadata {

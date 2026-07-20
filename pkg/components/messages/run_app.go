@@ -32,8 +32,7 @@ type RunAppConfiguration struct {
 }
 
 type runAppExecutionMetadata struct {
-	Run        *RunMetadata `json:"run" mapstructure:"run"`
-	TimedOutAt *string      `json:"timedOutAt,omitempty" mapstructure:"timedOutAt,omitempty"`
+	Run *RunMetadata `json:"run" mapstructure:"run"`
 }
 
 type RunMetadata struct {
@@ -298,17 +297,6 @@ func (c *RunApp) handleRunTimeout(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	executionMetadata := runAppExecutionMetadata{}
-	err := mapstructure.Decode(ctx.Metadata.Get(), &executionMetadata)
-	if err != nil {
-		return fmt.Errorf("run app: decode execution metadata: %w", err)
-	}
-
-	executionMetadata.TimedOutAt = stringPtr(time.Now().UTC().Format(time.RFC3339))
-	if err := ctx.Metadata.Set(executionMetadata); err != nil {
-		return fmt.Errorf("run app: set execution metadata: %w", err)
-	}
-
 	return ctx.Runs.Cancel()
 }
 
@@ -320,12 +308,6 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 	callback, err := core.DecodeRunFinishedCallback(ctx.Parameters)
 	if err != nil {
 		return fmt.Errorf("run app: decode run finished callback: %w", err)
-	}
-
-	executionMetadata := runAppExecutionMetadata{}
-	err = mapstructure.Decode(ctx.Metadata.Get(), &executionMetadata)
-	if err != nil {
-		return fmt.Errorf("run app: decode execution metadata: %w", err)
 	}
 
 	if callback.Run.Result == core.RunResultPassed {
@@ -350,7 +332,7 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 		})
 	}
 
-	errMessage := runAppFailureMessage(executionMetadata, ctx.Configuration, callback.Run.Error)
+	errMessage := runAppFailureMessage(ctx.Configuration, callback.Run.Result, callback.Run.Error)
 
 	err = ctx.Metadata.Set(runAppExecutionMetadata{
 		Run: &RunMetadata{
@@ -358,7 +340,6 @@ func (c *RunApp) handleRunFinished(ctx core.ActionHookContext) error {
 			Result: callback.Run.Result,
 			Error:  &errMessage,
 		},
-		TimedOutAt: executionMetadata.TimedOutAt,
 	})
 
 	if err != nil {
@@ -388,8 +369,8 @@ func (c *RunApp) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func runAppFailureMessage(executionMetadata runAppExecutionMetadata, configuration any, runError *string) string {
-	if executionMetadata.TimedOutAt != nil && *executionMetadata.TimedOutAt != "" {
+func runAppFailureMessage(configuration any, runResult string, runError *string) string {
+	if runResult == core.RunResultCancelled {
 		config := RunAppConfiguration{}
 		if err := mapstructure.Decode(configuration, &config); err != nil {
 			return "timed out"
@@ -411,8 +392,4 @@ func runAppTimeoutSeconds(timeout *int) int {
 	}
 
 	return *timeout
-}
-
-func stringPtr(value string) *string {
-	return &value
 }

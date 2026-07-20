@@ -41,7 +41,6 @@ type AppMetadata = {
 
 type RunAppExecutionMetadata = {
   run?: RunMetadata;
-  timedOutAt?: string;
 };
 
 type RunMetadata = {
@@ -70,10 +69,6 @@ export const runAppStateFunction: StateFunction = (execution: ExecutionInfo): Ev
   }
 
   const metadata = execution.metadata as RunAppExecutionMetadata;
-  if (metadata?.timedOutAt) {
-    return "failed";
-  }
-
   const runResult = metadata?.run?.result;
   if (runResult === "failed" || runResult === "cancelled") {
     return "failed";

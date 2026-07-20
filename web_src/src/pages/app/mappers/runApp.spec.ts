@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { runAppMapper, runAppStateFunction } from "./runApp";
-import type { ExecutionInfo, NodeInfo } from "./types";
+import type { ComponentBaseContext, ComponentDefinition, ExecutionInfo, NodeInfo } from "./types";
+
+const defaultDefinition: ComponentDefinition = {
+  name: "runApp",
+  label: "Run App",
+  description: "",
+  icon: "play",
+  color: "gray",
+};
 
 function buildRunAppExecution(overrides: Partial<ExecutionInfo>): ExecutionInfo {
   return {
@@ -17,13 +25,23 @@ function buildRunAppExecution(overrides: Partial<ExecutionInfo>): ExecutionInfo 
   } as ExecutionInfo;
 }
 
+function buildContext(node: NodeInfo): ComponentBaseContext {
+  return {
+    nodes: [node],
+    node,
+    componentDefinition: defaultDefinition,
+    lastExecutions: [],
+    currentUser: { id: "user-1", name: "Test User", email: "test@example.com", roles: [], groups: [] },
+    actions: { invokeNodeExecutionHook: async () => {} },
+  };
+}
+
 describe("runAppStateFunction", () => {
   it("shows failed when the child run timed out", () => {
     expect(
       runAppStateFunction(
         buildRunAppExecution({
           metadata: {
-            timedOutAt: "2026-07-20T12:00:00Z",
             run: { id: "child-run", result: "cancelled", error: "timed out after 2s" },
           },
         }),
@@ -74,12 +92,7 @@ describe("runAppMapper.props metadata", () => {
       },
     };
 
-    const props = runAppMapper.props({
-      node,
-      nodes: [node],
-      componentDefinition: { name: "runApp", label: "Run App", icon: "play", color: "gray" },
-      lastExecutions: [],
-    });
+    const props = runAppMapper.props(buildContext(node));
 
     expect(props.metadata).toEqual([
       { icon: "layout-grid", label: "Child App" },
@@ -105,12 +118,7 @@ describe("runAppMapper.props metadata", () => {
       },
     };
 
-    const props = runAppMapper.props({
-      node,
-      nodes: [node],
-      componentDefinition: { name: "runApp", label: "Run App", icon: "play", color: "gray" },
-      lastExecutions: [],
-    });
+    const props = runAppMapper.props(buildContext(node));
 
     expect(props.metadata).toEqual([
       { icon: "layout-grid", label: "Child App" },
@@ -137,12 +145,7 @@ describe("runAppMapper.props metadata", () => {
       },
     };
 
-    const props = runAppMapper.props({
-      node,
-      nodes: [node],
-      componentDefinition: { name: "runApp", label: "Run App", icon: "play", color: "gray" },
-      lastExecutions: [],
-    });
+    const props = runAppMapper.props(buildContext(node));
 
     expect(props.metadata?.at(-1)).toEqual({ icon: "clock", label: "Timeout: 2m" });
   });

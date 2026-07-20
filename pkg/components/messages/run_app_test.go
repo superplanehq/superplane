@@ -13,17 +13,12 @@ import (
 )
 
 func Test__RunApp__FailureMessage(t *testing.T) {
-	timedOutAt := "2026-07-20T12:00:00Z"
-	assert.Equal(t, "timed out after 30s", runAppFailureMessage(runAppExecutionMetadata{
-		TimedOutAt: &timedOutAt,
-	}, map[string]any{"timeout": 30}, nil))
-	assert.Equal(t, "timed out after 3600s", runAppFailureMessage(runAppExecutionMetadata{
-		TimedOutAt: &timedOutAt,
-	}, map[string]any{}, nil))
+	assert.Equal(t, "timed out after 30s", runAppFailureMessage(map[string]any{"timeout": 30}, core.RunResultCancelled, nil))
+	assert.Equal(t, "timed out after 3600s", runAppFailureMessage(map[string]any{}, core.RunResultCancelled, nil))
 
 	runError := "child failed"
-	assert.Equal(t, "child failed", runAppFailureMessage(runAppExecutionMetadata{}, nil, &runError))
-	assert.Equal(t, "", runAppFailureMessage(runAppExecutionMetadata{}, nil, nil))
+	assert.Equal(t, "child failed", runAppFailureMessage(nil, core.RunResultFailed, &runError))
+	assert.Equal(t, "", runAppFailureMessage(nil, core.RunResultFailed, nil))
 }
 
 func Test__RunApp__TimeoutSeconds(t *testing.T) {
@@ -72,7 +67,6 @@ func Test__RunApp__Execute__SchedulesConfiguredTimeout(t *testing.T) {
 	metadata := decodeRunAppExecutionMetadata(t, executionMetadata)
 	require.NotNil(t, metadata.Run)
 	assert.Equal(t, runID.String(), metadata.Run.ID)
-	assert.Nil(t, metadata.TimedOutAt)
 
 	require.NotNil(t, runs.LastCreateParams)
 	assert.Equal(t, childAppID.String(), runs.LastCreateParams.App)
@@ -128,8 +122,6 @@ func Test__RunApp__HandleRunTimeout__CancelsChildRun(t *testing.T) {
 	assert.True(t, runs.CancelCalled)
 
 	metadata := decodeRunAppExecutionMetadata(t, metadataCtx)
-	require.NotNil(t, metadata.TimedOutAt)
-	assert.NotEmpty(t, *metadata.TimedOutAt)
 	assert.Equal(t, childRunID, metadata.Run.ID)
 }
 
@@ -151,16 +143,14 @@ func Test__RunApp__HandleRunTimeout__NoOpWhenFinished(t *testing.T) {
 	assert.False(t, runs.CancelCalled)
 
 	metadata := decodeRunAppExecutionMetadata(t, metadataCtx)
-	assert.Nil(t, metadata.TimedOutAt)
+	assert.Equal(t, childRunID, metadata.Run.ID)
 }
 
 func Test__RunApp__HandleRunFinished__EmitsFailedWithTimeoutMessage(t *testing.T) {
-	timedOutAt := time.Now().UTC().Format(time.RFC3339)
 	childRunID := uuid.New()
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: runAppExecutionMetadata{
-			Run:        &RunMetadata{ID: childRunID.String()},
-			TimedOutAt: &timedOutAt,
+			Run: &RunMetadata{ID: childRunID.String()},
 		},
 	}
 	execState := &contexts.ExecutionStateContext{}
@@ -191,7 +181,6 @@ func Test__RunApp__HandleRunFinished__EmitsFailedWithTimeoutMessage(t *testing.T
 	require.NotNil(t, metadata.Run.Error)
 	assert.Equal(t, "timed out after 5s", *metadata.Run.Error)
 	assert.Equal(t, core.RunResultCancelled, metadata.Run.Result)
-	assert.Equal(t, &timedOutAt, metadata.TimedOutAt)
 }
 
 func decodeRunAppExecutionMetadata(t *testing.T, metadataCtx *contexts.MetadataContext) runAppExecutionMetadata {
