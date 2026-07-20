@@ -54,10 +54,12 @@ type RunClaudeCodeSpec struct {
 	AfterCommands       string `mapstructure:"after_commands"`
 }
 
-// ClaudeCodeBrokerTask is the ordered broker commands for a Run Claude Code run.
-// The first command prepares shared state; each following command is one user step.
+// ClaudeCodeBrokerTask is the ordered broker commands and task files for a run.
+// Helpers (formatter, step scripts) ship via files under SUPERPLANE_TASK_DIR;
+// the first command only checks prerequisites and initializes mutable state.
 type ClaudeCodeBrokerTask struct {
 	Commands []runner.BrokerCommand
+	Files    []runner.BrokerTaskFile
 }
 
 func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
@@ -168,36 +170,16 @@ func validateClaudeCodeSteps(steps []ClaudeCodeStep) error {
 	return nil
 }
 
-// buildClaudeCodeBrokerTask builds broker `commands` only (same shape as Run Shell
-// Commands): prepare first, then one command per step. Live logs get a section per
-// command. Shared state lives under $(dirname "$SUPERPLANE_RESULT_FILE")/claude-code.
+// buildClaudeCodeBrokerTask builds broker commands plus task files.
+// Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
+// Prepare only checks claude/node and initializes mutable run state.
 func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
-	var prepare strings.Builder
-	prepare.WriteString("set -euo pipefail\n")
-	prepare.WriteString(claudeCodeStateDirAssignment())
-	prepare.WriteString("mkdir -p \"$SP/steps\"\n")
-	prepare.WriteString("if ! command -v claude >/dev/null 2>&1; then\n")
-	prepare.WriteString("  echo \"claude CLI not found on PATH; install Claude Code on the runner\" >&2\n")
-	prepare.WriteString("  exit 127\n")
-	prepare.WriteString("fi\n")
-	prepare.WriteString("if ! command -v node >/dev/null 2>&1; then\n")
-	prepare.WriteString("  echo \"node not found on PATH; required to format Claude Code live logs\" >&2\n")
-	prepare.WriteString("  exit 127\n")
-	prepare.WriteString("fi\n")
-	formatterB64 := base64.StdEncoding.EncodeToString([]byte(streamFormatJS))
-	fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/format.js\"\n", shellSingleQuote(formatterB64))
-	writeResultB64 := base64.StdEncoding.EncodeToString([]byte(claudeWriteResultScript()))
-	fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/write-result.sh\"\n", shellSingleQuote(writeResultB64))
-	prepare.WriteString("chmod +x \"$SP/write-result.sh\"\n")
-	prepare.WriteString(": >\"$SP/stream.jsonl\"\n")
-	prepare.WriteString("printf '0\\n' >\"$SP/prompt_count\"\n")
-	if workdir != "" {
-		fmt.Fprintf(&prepare, "printf '%%s\\n' %s >\"$SP/workdir\"\n", shellSingleQuote(workdir))
-	} else {
-		prepare.WriteString("rm -f \"$SP/workdir\"\n")
+	files := []runner.BrokerTaskFile{
+		{Path: "format.js", Content: streamFormatJS, Mode: "0644"},
+		{Path: "write-result.sh", Content: claudeWriteResultScript(), Mode: "0755"},
 	}
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
@@ -218,19 +200,44 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 			}
 			stepScript = buildClaudePromptStepScript(prompt, model)
 		}
-		stepB64 := base64.StdEncoding.EncodeToString([]byte(stepScript))
-		fmt.Fprintf(&prepare, "printf '%%s' %s | base64 -d >\"$SP/steps/%s\"\n", shellSingleQuote(stepB64), scriptName)
-		fmt.Fprintf(&prepare, "chmod +x \"$SP/steps/%s\"\n", scriptName)
+		files = append(files, runner.BrokerTaskFile{
+			Path:    "steps/" + scriptName,
+			Content: stepScript,
+			Mode:    "0755",
+		})
 		stepCommands = append(stepCommands, claudeStepBrokerCommand(step.Name, scriptName))
 	}
 
 	prepareCommand := runner.BrokerCommand{
 		Name:    "Prepare Claude Code",
-		Command: "bash -c " + shellSingleQuote(prepare.String()),
+		Command: "bash -c " + shellSingleQuote(claudePrepareScript(workdir)),
 	}
 	return ClaudeCodeBrokerTask{
 		Commands: append([]runner.BrokerCommand{prepareCommand}, stepCommands...),
+		Files:    files,
 	}
+}
+
+func claudePrepareScript(workdir string) string {
+	var prepare strings.Builder
+	prepare.WriteString("set -euo pipefail\n")
+	prepare.WriteString(claudeCodeStateDirAssignment())
+	prepare.WriteString("if ! command -v claude >/dev/null 2>&1; then\n")
+	prepare.WriteString("  echo \"claude CLI not found on PATH; install Claude Code on the runner\" >&2\n")
+	prepare.WriteString("  exit 127\n")
+	prepare.WriteString("fi\n")
+	prepare.WriteString("if ! command -v node >/dev/null 2>&1; then\n")
+	prepare.WriteString("  echo \"node not found on PATH; required to format Claude Code live logs\" >&2\n")
+	prepare.WriteString("  exit 127\n")
+	prepare.WriteString("fi\n")
+	prepare.WriteString(": >\"$SP/stream.jsonl\"\n")
+	prepare.WriteString("printf '0\\n' >\"$SP/prompt_count\"\n")
+	if workdir != "" {
+		fmt.Fprintf(&prepare, "printf '%%s\\n' %s >\"$SP/workdir\"\n", shellSingleQuote(workdir))
+	} else {
+		prepare.WriteString("rm -f \"$SP/workdir\"\n")
+	}
+	return prepare.String()
 }
 
 func claudeWriteResultScript() string {
@@ -310,7 +317,7 @@ func buildClaudePromptStepScript(prompt, model string) string {
 }
 
 func claudeCodeStateDirAssignment() string {
-	return "SP=\"$(dirname \"$SUPERPLANE_RESULT_FILE\")/claude-code\"\n"
+	return ": \"${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}\"\nSP=\"$SUPERPLANE_TASK_DIR\"\n"
 }
 
 func claudeStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
@@ -319,11 +326,8 @@ func claudeStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 		label = scriptName
 	}
 	return runner.BrokerCommand{
-		Name: label,
-		Command: fmt.Sprintf(
-			`bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/%s"`,
-			scriptName,
-		),
+		Name:    label,
+		Command: fmt.Sprintf(`bash "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
 	}
 }
 
