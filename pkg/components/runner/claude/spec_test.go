@@ -114,25 +114,31 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.True(t, strings.HasPrefix(task.Commands[0].Command, "bash -c "))
 	assert.Contains(t, task.Commands[0].Command, "claude CLI not found")
 	assert.Contains(t, task.Commands[0].Command, "node not found")
+	assert.Contains(t, task.Commands[0].Command, "SUPERPLANE_TASK_DIR")
 	assert.Contains(t, task.Commands[0].Command, "/tmp/workspace")
-	assert.Contains(t, task.Commands[0].Command, "01-clone-repo.sh")
-	assert.Contains(t, task.Commands[0].Command, "02-fix-panic.sh")
-	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(streamFormatJS)))
-	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(claudeWriteResultScript())))
+	assert.NotContains(t, task.Commands[0].Command, "base64 -d")
+	assert.NotContains(t, task.Commands[0].Command, "format.js")
 
-	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/01-clone-repo.sh"`}, task.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{Name: "Fix panic", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/02-fix-panic.sh"`}, task.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/03-fix-tests.sh"`}, task.Commands[3])
-	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `bash "$(dirname "$SUPERPLANE_RESULT_FILE")/claude-code/steps/04-push.sh"`}, task.Commands[4])
+	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `bash "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`}, task.Commands[1])
+	assert.Equal(t, runner.BrokerCommand{Name: "Fix panic", Command: `bash "$SUPERPLANE_TASK_DIR/steps/02-fix-panic.sh"`}, task.Commands[2])
+	assert.Equal(t, runner.BrokerCommand{Name: "Fix tests", Command: `bash "$SUPERPLANE_TASK_DIR/steps/03-fix-tests.sh"`}, task.Commands[3])
+	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `bash "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`}, task.Commands[4])
 
-	cloneScript := buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo")
-	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(cloneScript)))
+	require.Len(t, task.Files, 6)
+	assert.Equal(t, streamFormatJS, requireTaskFile(t, task.Files, "format.js").Content)
+	assert.Equal(t, "0644", requireTaskFile(t, task.Files, "format.js").Mode)
+	assert.Equal(t, claudeWriteResultScript(), requireTaskFile(t, task.Files, "write-result.sh").Content)
+	assert.Equal(t, "0755", requireTaskFile(t, task.Files, "write-result.sh").Mode)
+
+	cloneScript := requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content
+	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo"), cloneScript)
 	assert.Contains(t, cloneScript, "git clone https://github.com/acme/widgets.git repo\n")
 	assert.Contains(t, cloneScript, `pwd -P >"$SP/workdir"`)
+	assert.Contains(t, cloneScript, "SUPERPLANE_TASK_DIR")
 	assert.NotContains(t, cloneScript, "bash -c ")
 
-	promptScript := buildClaudePromptStepScript("Fix auth.py's nil panic", "sonnet")
-	assert.Contains(t, task.Commands[0].Command, base64.StdEncoding.EncodeToString([]byte(promptScript)))
+	promptScript := requireTaskFile(t, task.Files, "steps/02-fix-panic.sh").Content
+	assert.Equal(t, buildClaudePromptStepScript("Fix auth.py's nil panic", "sonnet"), promptScript)
 	assert.Contains(t, promptScript, "--output-format stream-json")
 	assert.Contains(t, promptScript, "--append-system-prompt")
 	assert.Contains(t, promptScript, "plain terminal text")
@@ -156,4 +162,15 @@ func TestShellSingleQuote(t *testing.T) {
 
 	assert.Equal(t, `'hello'`, shellSingleQuote("hello"))
 	assert.Equal(t, `'it'\''s fine'`, shellSingleQuote("it's fine"))
+}
+
+func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+	t.Helper()
+	for _, file := range files {
+		if file.Path == path {
+			return file
+		}
+	}
+	t.Fatalf("missing task file %q", path)
+	return runner.BrokerTaskFile{}
 }
