@@ -30,9 +30,15 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import geminiIcon from "@/assets/icons/integrations/gemini.svg";
+import anthropicIcon from "@/assets/icons/integrations/anthropic.svg";
+import deepseekIcon from "@/assets/icons/integrations/deepseek.svg";
+import groqIcon from "@/assets/icons/integrations/groq.svg";
+import mistralIcon from "@/assets/icons/integrations/mistral.svg";
+import openRouterIcon from "@/assets/icons/integrations/openrouter.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import openCodeIcon from "@/assets/icons/integrations/opencode.svg";
+import ollamaIcon from "@/assets/icons/integrations/ollama.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
@@ -95,11 +101,18 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   linear: linearIcon,
   gemini: geminiIcon,
   googlegemini: geminiIcon,
+  anthropic: anthropicIcon,
+  deepseek: deepseekIcon,
+  groq: groqIcon,
+  mistral: mistralIcon,
+  mistralai: mistralIcon,
+  openrouter: openRouterIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   opencode: openCodeIcon,
   "open-code": openCodeIcon,
+  ollama: ollamaIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
@@ -151,11 +164,18 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   linear: linearIcon,
   gemini: geminiIcon,
   googlegemini: geminiIcon,
+  anthropic: anthropicIcon,
+  deepseek: deepseekIcon,
+  groq: groqIcon,
+  mistral: mistralIcon,
+  mistralai: mistralIcon,
+  openrouter: openRouterIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   opencode: openCodeIcon,
   "open-code": openCodeIcon,
+  ollama: ollamaIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
