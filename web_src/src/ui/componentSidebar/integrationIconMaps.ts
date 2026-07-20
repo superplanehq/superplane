@@ -28,8 +28,11 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
+import geminiIcon from "@/assets/icons/integrations/gemini.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import openCodeIcon from "@/assets/icons/integrations/opencode.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
@@ -89,9 +92,14 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   jfrogartifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
+  linear: linearIcon,
+  gemini: geminiIcon,
+  googlegemini: geminiIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencode: openCodeIcon,
+  "open-code": openCodeIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
@@ -140,9 +148,14 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
+  linear: linearIcon,
+  gemini: geminiIcon,
+  googlegemini: geminiIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  opencode: openCodeIcon,
+  "open-code": openCodeIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
