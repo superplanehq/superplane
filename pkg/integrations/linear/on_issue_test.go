@@ -78,6 +78,28 @@ func Test__OnIssue__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "team other not found")
 	})
 
+	t.Run("missing actions -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"team": "t1"},
+		})
+
+		require.ErrorContains(t, err, "at least one action is required")
+	})
+
+	// The shared multi-select validation lets an empty list satisfy Required,
+	// so Setup has to reject it or the trigger would never match anything.
+	t.Run("empty actions -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"team": "t1", "actions": []string{}},
+		})
+
+		require.ErrorContains(t, err, "at least one action is required")
+	})
+
 	t.Run("requests a webhook scoped to the team", func(t *testing.T) {
 		integration := integrationWithTeam()
 		metadataContext := &contexts.MetadataContext{}
@@ -185,6 +207,30 @@ func Test__OnIssue__HandleWebhook__FiltersActions(t *testing.T) {
 	t.Run("action not selected is ignored", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		ctx := signedRequest(t, issueEvent("update", nil), map[string]any{"team": "t1", "actions": []string{"create"}}, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	// Regression: an empty list must match nothing rather than falling through
+	// and emitting every action.
+	t.Run("empty actions emits nothing", func(t *testing.T) {
+		for _, action := range []string{"create", "update", "remove"} {
+			events := &contexts.EventContext{}
+			ctx := signedRequest(t, issueEvent(action, nil), map[string]any{"team": "t1", "actions": []string{}}, events)
+
+			code, _, err := trigger.HandleWebhook(ctx)
+			assert.Equal(t, http.StatusOK, code)
+			require.NoError(t, err)
+			assert.Zero(t, events.Count(), "action %q must not be emitted with an empty action list", action)
+		}
+	})
+
+	t.Run("missing actions key emits nothing", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedRequest(t, issueEvent("create", nil), map[string]any{"team": "t1"}, events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)

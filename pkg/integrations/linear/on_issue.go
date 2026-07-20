@@ -123,6 +123,14 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("team is required")
 	}
 
+	//
+	// The shared multi-select validation accepts an empty list for a required
+	// field, so reject it here rather than saving a trigger that can never match.
+	//
+	if len(config.Actions) == 0 {
+		return fmt.Errorf("at least one action is required")
+	}
+
 	team, err := requireTeam(ctx.Integration, config.Team)
 	if err != nil {
 		return err
@@ -175,7 +183,11 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if len(config.Actions) > 0 && !i.whitelistedAction(ctx.Logger, data, config.Actions) {
+	//
+	// Fail closed: an empty action list matches nothing, so a trigger that
+	// somehow reaches this state stays silent instead of emitting everything.
+	//
+	if !i.whitelistedAction(ctx.Logger, data, config.Actions) {
 		return http.StatusOK, nil, nil
 	}
 
