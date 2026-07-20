@@ -41,6 +41,11 @@ import {
   eventStateRegistry as jiraEventStateRegistry,
 } from "./jira/index";
 import {
+  componentMappers as linearComponentMappers,
+  triggerRenderers as linearTriggerRenderers,
+  eventStateRegistry as linearEventStateRegistry,
+} from "./linear/index";
+import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
@@ -311,6 +316,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
   jira: jiraComponentMappers,
+  linear: linearComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
@@ -360,6 +366,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
   jira: jiraTriggerRenderers,
+  linear: linearTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
@@ -438,6 +445,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jira: jiraEventStateRegistry,
+  linear: linearEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,
