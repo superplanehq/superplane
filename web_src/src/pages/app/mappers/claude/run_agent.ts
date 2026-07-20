@@ -59,7 +59,7 @@ export const runAgentMapper: ComponentBaseMapper = {
         context.node.name ||
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
-        "Run Claude Agent",
+        "Run Managed Agent",
       eventSections: lastExecution ? runAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),

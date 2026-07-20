@@ -11,7 +11,7 @@ type CanvasRunMessage struct {
 	message *pb.CanvasRunMessage
 }
 
-func NewCanvasRunMessage(canvasID string, runID string) CanvasRunMessage {
+func NewCanvasRunMessage(canvasID, runID string) CanvasRunMessage {
 	return CanvasRunMessage{
 		message: &pb.CanvasRunMessage{
 			Id:        runID,

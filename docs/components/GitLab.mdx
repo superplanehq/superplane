@@ -9,11 +9,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to branch creation events from GitLab" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
   <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
   <LinkCard title="On Pipeline" href="#on-pipeline" description="Listen to pipeline events from GitLab" />
+  <LinkCard title="On Push" href="#on-push" description="Listen to push events from GitLab" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events from GitLab" />
   <LinkCard title="On Tag" href="#on-tag" description="Listen to tag events from GitLab" />
   <LinkCard title="On Vulnerability" href="#on-vulnerability" description="Listen to vulnerability events from GitLab" />
@@ -28,11 +30,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a deployment for a GitLab environment" />
   <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitLab deployment" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitLab issue" />
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
 </CardGrid>
 
 ## Instructions
@@ -48,12 +53,95 @@ To connect with a **Personal Access Token**:
 1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) — the link prefills the name and scopes (api, read_user, read_api, write_repository, read_repository), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
 2. Paste the token into the **Access Token** field and click **Save**.
 
-**Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
+**Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
 
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
 - **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
 - **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
+
+<a id="on-branch-created"></a>
+
+## On Branch Created
+
+**Trigger key:** `gitlab.onBranchCreated`
+
+The On Branch Created trigger starts a workflow execution when a new branch is created in a GitLab project.
+
+### Use Cases
+
+- **Preview environments**: Provision a temporary environment when a feature branch is created
+- **Branch conventions**: Validate branch naming and alert on anomalies
+- **Release tracking**: Open tracking issues or apply protective rules when release branches are created
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Branches** (required): Configure branch filters using predicates. You can match full refs (refs/heads/main) or branch names (main).
+
+### Event Data
+
+GitLab signals branch creation with a push event whose "before" SHA is all zeros. Each event includes:
+- **ref**: The branch reference that was created (e.g. refs/heads/feature/new-feature)
+- **before**: All-zero SHA, indicating the branch did not exist before
+- **after**: The SHA the new branch points to
+- **user_name/user_username**: The user who created the branch
+- **project**: Project information
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "after": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+    "before": "0000000000000000000000000000000000000000",
+    "checkout_sha": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+    "commits": [],
+    "event_name": "push",
+    "message": null,
+    "object_kind": "push",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "",
+      "git_http_url": "https://gitlab.example.com/jsmith/example.git",
+      "git_ssh_url": "git@gitlab.example.com:jsmith/example.git",
+      "id": 15,
+      "name": "Example",
+      "namespace": "Jsmith",
+      "path_with_namespace": "jsmith/example",
+      "visibility_level": 0,
+      "web_url": "https://gitlab.example.com/jsmith/example"
+    },
+    "project_id": 15,
+    "push_options": {},
+    "ref": "refs/heads/feature/new-feature",
+    "ref_protected": false,
+    "repository": {
+      "description": "",
+      "git_http_url": "https://gitlab.example.com/jsmith/example.git",
+      "git_ssh_url": "git@gitlab.example.com:jsmith/example.git",
+      "homepage": "https://gitlab.example.com/jsmith/example",
+      "name": "Example",
+      "url": "git@gitlab.example.com:jsmith/example.git",
+      "visibility_level": 0
+    },
+    "total_commits_count": 0,
+    "user_avatar": "https://s.gravatar.com/avatar/d4c74594d841139328695756648b6bd6?s=80",
+    "user_email": "john@example.com",
+    "user_id": 4,
+    "user_name": "John Smith",
+    "user_username": "jsmith"
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.branchCreated"
+}
+```
 
 <a id="on-issue"></a>
 
@@ -531,6 +619,124 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   },
   "timestamp": "2026-02-13T18:00:00.000000000Z",
   "type": "gitlab.pipeline"
+}
+```
+
+<a id="on-push"></a>
+
+## On Push
+
+**Trigger key:** `gitlab.onPush`
+
+The On Push trigger starts a workflow execution when code is pushed to an existing branch in a GitLab project. New-branch creation is handled by the dedicated On Branch Created trigger, and branch deletions are ignored.
+
+### Use Cases
+
+- **CI/CD automation**: Trigger builds and deployments when code is pushed to `main`
+- **Policy gates**: Run linting, security, or policy checks on every push
+- **Notifications**: Post a summary to Slack when code lands on a branch
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Branches** (required): Configure branch filters using predicates. You can match full refs (refs/heads/main) or branch names (main).
+
+### Event Data
+
+Each push event includes:
+- **ref**: The branch reference that was pushed to (e.g. refs/heads/main)
+- **before/after**: Commit SHAs before and after the push
+- **commits**: Array of commit information, each with added/modified/removed file lists
+- **user_name/user_username**: The user who pushed
+- **project**: Project information
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "after": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+    "before": "95790bf891e76fee5e1747ab589903a6a1f80f22",
+    "checkout_sha": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+    "commits": [
+      {
+        "added": [
+          "CHANGELOG.md"
+        ],
+        "author": {
+          "email": "john@example.com",
+          "name": "John Smith"
+        },
+        "id": "b6568db1bc1dcd7f8b4d5a946b0b91f9dacd7327",
+        "message": "Update Catalog page",
+        "modified": [
+          "app/controller/application.rb"
+        ],
+        "removed": [],
+        "timestamp": "2026-02-12T20:39:00+00:00",
+        "title": "Update Catalog page",
+        "url": "https://gitlab.example.com/jsmith/example/-/commit/b6568db1bc1dcd7f8b4d5a946b0b91f9dacd7327"
+      },
+      {
+        "added": [],
+        "author": {
+          "email": "john@example.com",
+          "name": "John Smith"
+        },
+        "id": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+        "message": "Fix catalog rendering bug",
+        "modified": [
+          "app/views/catalog/index.html.haml"
+        ],
+        "removed": [],
+        "timestamp": "2026-02-12T20:40:00+00:00",
+        "title": "Fix catalog rendering bug",
+        "url": "https://gitlab.example.com/jsmith/example/-/commit/da1560886d4f094c3e6c9ef40349f7d38b5d27d7"
+      }
+    ],
+    "event_name": "push",
+    "message": null,
+    "object_kind": "push",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "",
+      "git_http_url": "https://gitlab.example.com/jsmith/example.git",
+      "git_ssh_url": "git@gitlab.example.com:jsmith/example.git",
+      "id": 15,
+      "name": "Example",
+      "namespace": "Jsmith",
+      "path_with_namespace": "jsmith/example",
+      "visibility_level": 0,
+      "web_url": "https://gitlab.example.com/jsmith/example"
+    },
+    "project_id": 15,
+    "push_options": {},
+    "ref": "refs/heads/main",
+    "ref_protected": true,
+    "repository": {
+      "description": "",
+      "git_http_url": "https://gitlab.example.com/jsmith/example.git",
+      "git_ssh_url": "git@gitlab.example.com:jsmith/example.git",
+      "homepage": "https://gitlab.example.com/jsmith/example",
+      "name": "Example",
+      "url": "git@gitlab.example.com:jsmith/example.git",
+      "visibility_level": 0
+    },
+    "total_commits_count": 2,
+    "user_avatar": "https://s.gravatar.com/avatar/d4c74594d841139328695756648b6bd6?s=80",
+    "user_email": "john@example.com",
+    "user_id": 4,
+    "user_name": "John Smith",
+    "user_username": "jsmith"
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.push"
 }
 ```
 
@@ -1230,6 +1436,62 @@ The component outputs the created issue object, including:
 }
 ```
 
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+**Component key:** `gitlab.createIssueComment`
+
+The Create Issue Comment component adds a comment (note) to an existing GitLab issue.
+
+### Use Cases
+
+- **Automated updates**: Post deployment status or remediation updates to GitLab issues
+- **Runbook linking**: Add runbook links, error details, or status for responders
+- **Cross-platform sync**: Sync Slack or PagerDuty notes into GitLab as comments
+- **Automated comments**: Add automated comments based on workflow events
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to comment on (supports expressions)
+- **Body** (required): The comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the created note object, including:
+- **id**: The ID of the note
+- **body**: The comment text
+- **author**: The user who created the comment
+- **created_at**: When the comment was created
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "body": "This is an example comment created via SuperPlane",
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 302,
+    "noteable_id": 1,
+    "noteable_iid": 1,
+    "noteable_type": "Issue",
+    "system": false,
+    "updated_at": "2023-01-01T10:00:00.000Z"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.createIssueComment"
+}
+```
+
 <a id="create-merge-request-comment"></a>
 
 ## Create Merge Request Comment
@@ -1282,6 +1544,80 @@ Returns the created note object, including:
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.createMergeComment"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+**Component key:** `gitlab.getIssue`
+
+The Get Issue component fetches a single issue from a GitLab project by its internal ID (IID).
+
+### Use Cases
+
+- **Read state, then act**: Look up an issue's current title, description, state, labels, or assignees before deciding what to do next
+- **Data enrichment**: Pull issue details into a workflow to combine with other information
+- **Status checking**: Check whether an issue is open or closed before performing an action
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to fetch (supports expressions)
+
+### Output
+
+Returns the issue object, including:
+- **id** / **iid**: The internal and project-relative IDs of the issue
+- **title** / **description**: The issue's content
+- **state**: The current state of the issue (opened/closed)
+- **labels**, **assignees**, **milestone**: Metadata on the issue
+- **web_url**: The URL to view the issue in GitLab
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue created via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "opened",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.getIssue"
 }
 ```
 
@@ -1522,6 +1858,91 @@ The Run Pipeline component triggers a GitLab pipeline and waits for it to comple
   },
   "timestamp": "2026-02-13T18:04:12.000Z",
   "type": "gitlab.pipeline.finished"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+**Component key:** `gitlab.updateIssue`
+
+The Update Issue component modifies an existing GitLab issue: its title, description, state, labels, assignees, or milestone.
+
+### Use Cases
+
+- **Status updates**: Close or reopen an issue based on workflow results
+- **Label management**: Apply labels to an issue automatically
+- **Assignee updates**: Assign an issue to team members automatically
+- **Content updates**: Update the issue title or description with new information
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to update (supports expressions)
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description for the issue
+- **State** (toggle): Close or reopen the issue
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
+- **Milestone** (toggle): Milestone to associate with the issue
+
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+### Output
+
+Returns the updated issue object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": "2023-01-01T10:05:00.000Z",
+    "closed_by": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue updated via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "closed",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:05:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:05:00.000Z",
+  "type": "gitlab.updateIssue"
 }
 ```
 
