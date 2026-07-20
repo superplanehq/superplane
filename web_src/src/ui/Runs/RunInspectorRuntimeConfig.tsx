@@ -7,7 +7,8 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { cn } from "@/lib/utils";
 import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
-import { hasObjectValue, type RunInspectorNodeSection } from "./runNodeDetailModel";
+import { hasObjectValue } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 import { buildRuntimeExpressionContext } from "./runInspectorExpressionContext";
 
 export function RuntimeTimelineCard({
@@ -166,7 +167,6 @@ function RuntimeSchemaConfigForm({
             value={value[field.name]}
             allValues={value}
             onChange={() => {}}
-            domainId={organizationId}
             organizationId={organizationId}
             readOnly
             expressionPreviewContext={expressionPreviewContext}

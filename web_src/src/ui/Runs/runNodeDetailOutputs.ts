@@ -7,9 +7,7 @@ import type {
   RunInspectorApprovalRecord,
   RunInspectorNodeActions,
   RunInspectorOutputSection,
-} from "./runNodeDetailModel";
-
-type ExecutionErrorSource = Pick<CanvasesCanvasNodeExecution, "result" | "resultReason" | "resultMessage">;
+} from "./types";
 
 export function buildTriggerOutputSections(run: CanvasesCanvasRun): RunInspectorOutputSection[] {
   if (!hasObjectValue(run.rootEvent?.data)) return [];
@@ -43,14 +41,6 @@ export function normalizeExecutionOutputsForDisplay(outputs?: CanvasesCanvasNode
   if (outputSections.length === 1) return outputSections[0].value;
 
   return Object.fromEntries(outputSections.map((section) => [section.channel, section.value]));
-}
-
-export function getExecutionErrorMessage(execution: ExecutionErrorSource): string | undefined {
-  if (execution.result !== "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR") {
-    return undefined;
-  }
-
-  return execution.resultMessage || execution.resultReason || "Execution failed";
 }
 
 export function buildNodeActions(

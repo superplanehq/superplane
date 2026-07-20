@@ -32,7 +32,7 @@ func Test__AppExecutionContext__Broadcast(t *testing.T) {
 		nil,
 	)
 
-	ctx := NewAppExecutionContext(database.Conn(), canvas, &nodes[0])
+	ctx := NewAppExecutionContext(database.Conn(), canvas, &nodes[0], nil)
 	payload := map[string]any{"message": "hello"}
 
 	require.NoError(t, ctx.Broadcast(payload))

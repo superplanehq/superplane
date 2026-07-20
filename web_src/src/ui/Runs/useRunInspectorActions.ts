@@ -10,7 +10,7 @@ import {
 } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 export function useRunInspectorActions({
   canvasId,

@@ -9,11 +9,7 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
-import {
-  type RunInspectorApprovalRecord,
-  type RunInspectorCurrentUser,
-  type RunInspectorNodeSection,
-} from "./runNodeDetailModel";
+import type { RunInspectorApprovalRecord, RunInspectorCurrentUser, RunInspectorNodeSection } from "./types";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorNodeAccordion({
