@@ -244,6 +244,122 @@ func (c *CanvasNode) HardDelete(tx *gorm.DB) error {
 		Error
 }
 
+func (c *CanvasNode) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+
+	query := db.
+		Model(&CanvasRun{}).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func (c *CanvasNode) CountRuns(db *gorm.DB) (int64, error) {
+	var count int64
+	err := db.Model(&CanvasRun{}).
+		Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// DeleteRemainingResources deletes node-scoped rows that are not owned by a
+// still-existing workflow run. Rows belonging to live runs rooted elsewhere are
+// left alone so those runs stay consistent.
+func (c *CanvasNode) DeleteRemainingResources(db *gorm.DB, maxRecords int) (*RunDeletionSummary, bool, error) {
+	summary := &RunDeletionSummary{}
+	if maxRecords <= 0 {
+		return summary, true, nil
+	}
+
+	type remainingResource struct {
+		model any
+		query string
+		args  []any
+		apply func(int64)
+	}
+
+	nodeScope := []any{c.WorkflowID, c.NodeID}
+	runOrphan := `workflow_id = ? AND node_id = ? AND (
+		run_id IS NULL OR NOT EXISTS (
+			SELECT 1 FROM workflow_runs r WHERE r.id = run_id
+		)
+	)`
+	executionOrphan := `workflow_id = ? AND node_id = ? AND (
+		execution_id IS NULL OR NOT EXISTS (
+			SELECT 1 FROM workflow_node_executions e
+			WHERE e.id = execution_id
+			AND EXISTS (SELECT 1 FROM workflow_runs r WHERE r.id = e.run_id)
+		)
+	)`
+
+	resources := []remainingResource{
+		{model: &CanvasNodeRequest{}, query: executionOrphan, args: nodeScope, apply: func(count int64) { summary.NodeRequests = count }},
+		{model: &CanvasNodeExecutionKV{}, query: executionOrphan, args: nodeScope, apply: func(count int64) { summary.NodeExecutionKVs = count }},
+		{model: &CanvasNodeQueueItem{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.NodeQueueItems = count }},
+		{model: &CanvasEvent{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.Events = count }},
+		{model: &CanvasNodeExecution{}, query: runOrphan, args: nodeScope, apply: func(count int64) { summary.NodeExecutions = count }},
+	}
+
+	for _, resource := range resources {
+		if summary.TotalRecords() >= int64(maxRecords) {
+			return summary, false, nil
+		}
+
+		budget := maxRecords - int(summary.TotalRecords())
+		count, err := deleteRowsLimited(db, resource.model, budget, resource.query, resource.args...)
+		if err != nil {
+			return nil, false, err
+		}
+
+		resource.apply(count)
+	}
+
+	return summary, summary.TotalRecords() < int64(maxRecords), nil
+}
+
+// HasRemainingResources reports whether any node-scoped rows still exist for this
+// node, including rows owned by runs rooted on other nodes.
+func (c *CanvasNode) HasRemainingResources(db *gorm.DB) (bool, error) {
+	models := []any{
+		&CanvasNodeRequest{},
+		&CanvasNodeExecutionKV{},
+		&CanvasNodeQueueItem{},
+		&CanvasEvent{},
+		&CanvasNodeExecution{},
+		&CanvasRun{},
+	}
+
+	for _, model := range models {
+		var rows []map[string]any
+		err := db.Unscoped().Model(model).
+			Where("workflow_id = ? AND node_id = ?", c.WorkflowID, c.NodeID).
+			Limit(1).
+			Find(&rows).Error
+		if err != nil {
+			return false, err
+		}
+		if len(rows) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
 	var node CanvasNode
 	err := tx.

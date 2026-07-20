@@ -11,12 +11,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
 	canvasNodeCleanupTickEvery           = 30 * time.Second
 	canvasNodeCleanupMaxNodesPerTick     = 10
+	canvasNodeCleanupMaxRunsPerNode      = 10
 	canvasNodeCleanupDeleteBatchSize     = 50
 	canvasNodeCleanupMaxResourcesPerNode = 200
 	canvasNodeCleanupPauseBetweenBatches = 50 * time.Millisecond
@@ -25,6 +27,7 @@ const (
 type CanvasNodeCleanupWorker struct {
 	logger                     *log.Entry
 	maxNodesPerTick            int
+	maxRunsPerNodePerTick      int
 	deleteBatchSize            int
 	maxResourcesPerNodePerTick int
 	pauseBetweenBatches        time.Duration
@@ -36,6 +39,7 @@ func NewCanvasNodeCleanupWorker() *CanvasNodeCleanupWorker {
 	return &CanvasNodeCleanupWorker{
 		logger:                     log.WithFields(log.Fields{"worker": "CanvasNodeCleanupWorker"}),
 		maxNodesPerTick:            canvasNodeCleanupMaxNodesPerTick,
+		maxRunsPerNodePerTick:      canvasNodeCleanupMaxRunsPerNode,
 		deleteBatchSize:            canvasNodeCleanupDeleteBatchSize,
 		maxResourcesPerNodePerTick: canvasNodeCleanupMaxResourcesPerNode,
 		pauseBetweenBatches:        canvasNodeCleanupPauseBetweenBatches,
@@ -87,22 +91,157 @@ func (w *CanvasNodeCleanupWorker) LockAndProcessNode(node models.CanvasNode) err
 		return nil
 	}
 
-	resourcesDeleted := 0
-	for resourcesDeleted < w.maxResourcesPerNodePerTick {
-		batchLimit := w.deleteBatchSize
-		remaining := w.maxResourcesPerNodePerTick - resourcesDeleted
-		if batchLimit > remaining {
-			batchLimit = remaining
-		}
+	progress := false
 
-		batchDeleted, done, err := w.processNodeBatch(node, batchLimit)
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		lockedNode, err := models.LockDeletedCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
-			return err
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				w.logger.Infof("Canvas node %s/%s already being processed - skipping", node.WorkflowID, node.NodeID)
+				progress = true
+				return nil
+			}
+			return fmt.Errorf("lock deleted canvas node %s/%s: %w", node.WorkflowID, node.NodeID, err)
 		}
 
-		resourcesDeleted += batchDeleted
-		if done || batchDeleted == 0 {
+		if !lockedNode.DeletedAt.Valid || deletedResourceWithinGracePeriod(lockedNode.DeletedAt.Time, time.Now()) {
+			progress = true
 			return nil
+		}
+
+		node = *lockedNode
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if progress {
+		return nil
+	}
+
+	runsDeleted, err := w.cleanNodeRuns(node)
+	if err != nil {
+		return err
+	}
+	if runsDeleted > 0 {
+		progress = true
+	}
+
+	remainingRuns, err := node.CountRuns(database.Conn())
+	if err != nil {
+		return fmt.Errorf("count remaining runs for node %s: %w", node.NodeID, err)
+	}
+	if remainingRuns > 0 {
+		if !progress {
+			return w.rotateBlockedNode(node)
+		}
+		w.logger.Infof(
+			"Partially cleaned runs from node %s on canvas %s (deleted %d runs, %d remaining)",
+			node.NodeID,
+			node.WorkflowID,
+			runsDeleted,
+			remainingRuns,
+		)
+		return nil
+	}
+
+	resourcesDeleted, complete, err := w.cleanRemainingResources(node)
+	if err != nil {
+		return err
+	}
+	if resourcesDeleted > 0 {
+		progress = true
+	}
+	if !complete {
+		if !progress {
+			return w.rotateBlockedNode(node)
+		}
+		w.logger.Infof(
+			"Partially cleaned remaining resources for node %s on canvas %s (deleted %d resources)",
+			node.NodeID,
+			node.WorkflowID,
+			resourcesDeleted,
+		)
+		return nil
+	}
+
+	hasRemaining, err := node.HasRemainingResources(database.Conn())
+	if err != nil {
+		return fmt.Errorf("check remaining resources for node %s: %w", node.NodeID, err)
+	}
+	if hasRemaining {
+		return w.rotateBlockedNode(node)
+	}
+
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		lockedNode, err := models.LockDeletedCanvasNode(tx, node.WorkflowID, node.NodeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return fmt.Errorf("lock deleted canvas node %s/%s: %w", node.WorkflowID, node.NodeID, err)
+		}
+
+		hasRemaining, err := lockedNode.HasRemainingResources(tx)
+		if err != nil {
+			return fmt.Errorf("check remaining resources for node %s: %w", lockedNode.NodeID, err)
+		}
+		if hasRemaining {
+			return lockedNode.RotateCleanupQueue(tx)
+		}
+
+		if err := lockedNode.HardDelete(tx); err != nil {
+			return fmt.Errorf("failed to delete canvas node %s: %w", lockedNode.NodeID, err)
+		}
+
+		w.logger.Infof("Deleted node %s from canvas %s", lockedNode.NodeID, lockedNode.WorkflowID)
+		return nil
+	})
+}
+
+func (w *CanvasNodeCleanupWorker) cleanNodeRuns(node models.CanvasNode) (int, error) {
+	runs, err := node.ListRuns(database.Conn(), w.maxRunsPerNodePerTick)
+	if err != nil {
+		return 0, fmt.Errorf("list workflow runs for node cleanup: %w", err)
+	}
+
+	deleted := 0
+	for _, run := range runs {
+		logger := logging.WithRun(w.logger, run)
+
+		var summary *models.RunDeletionSummary
+		err := w.withTrackedBatch(func() error {
+			return database.Conn().Transaction(func(tx *gorm.DB) error {
+				locked, err := models.LockCanvasRun(tx, node.WorkflowID, run.ID)
+				if err != nil {
+					return fmt.Errorf("lock run %s: %w", run.ID, err)
+				}
+				if locked == nil {
+					return nil
+				}
+
+				summary, err = locked.DeleteChain(tx)
+				if err != nil {
+					return fmt.Errorf("delete run chain: %w", err)
+				}
+				return nil
+			})
+		})
+		if err != nil {
+			logger.Errorf("Error cleaning run: %v", err)
+			return deleted, err
+		}
+
+		if summary != nil {
+			logger.WithFields(log.Fields{
+				"runs":          summary.Runs,
+				"events":        summary.Events,
+				"executions":    summary.NodeExecutions,
+				"requests":      summary.NodeRequests,
+				"execution_kvs": summary.NodeExecutionKVs,
+				"queue_items":   summary.NodeQueueItems,
+			}).Info("Cleaned run for deleted node")
+			deleted++
 		}
 
 		if w.pauseBetweenBatches > 0 {
@@ -110,16 +249,75 @@ func (w *CanvasNodeCleanupWorker) LockAndProcessNode(node models.CanvasNode) err
 		}
 	}
 
+	return deleted, nil
+}
+
+func (w *CanvasNodeCleanupWorker) cleanRemainingResources(node models.CanvasNode) (int, bool, error) {
+	totalDeleted := 0
+	for totalDeleted < w.maxResourcesPerNodePerTick {
+		budget := w.deleteBatchSize
+		remaining := w.maxResourcesPerNodePerTick - totalDeleted
+		if budget > remaining {
+			budget = remaining
+		}
+
+		var (
+			summary  *models.RunDeletionSummary
+			complete bool
+		)
+		err := w.withTrackedBatch(func() error {
+			return database.Conn().Transaction(func(tx *gorm.DB) error {
+				var err error
+				summary, complete, err = node.DeleteRemainingResources(tx, budget)
+				return err
+			})
+		})
+		if err != nil {
+			return totalDeleted, false, fmt.Errorf("delete remaining resources for node %s: %w", node.NodeID, err)
+		}
+
+		batchDeleted := 0
+		if summary != nil {
+			batchDeleted = int(summary.TotalRecords())
+		}
+		totalDeleted += batchDeleted
+
+		if complete || batchDeleted == 0 {
+			return totalDeleted, complete || batchDeleted == 0, nil
+		}
+
+		if w.pauseBetweenBatches > 0 {
+			time.Sleep(w.pauseBetweenBatches)
+		}
+	}
+
+	return totalDeleted, false, nil
+}
+
+func (w *CanvasNodeCleanupWorker) rotateBlockedNode(node models.CanvasNode) error {
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		lockedNode, err := models.LockDeletedCanvasNode(tx, node.WorkflowID, node.NodeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		return lockedNode.RotateCleanupQueue(tx)
+	})
+	if err != nil {
+		return fmt.Errorf("rotate blocked canvas node %s: %w", node.NodeID, err)
+	}
+
 	w.logger.Infof(
-		"Partially cleaned node %s from canvas %s (deleted %d resources this pass, more remain)",
+		"No progress cleaning node %s from canvas %s; rotated cleanup queue position",
 		node.NodeID,
 		node.WorkflowID,
-		resourcesDeleted,
 	)
 	return nil
 }
 
-func (w *CanvasNodeCleanupWorker) processNodeBatch(node models.CanvasNode, batchLimit int) (deleted int, done bool, err error) {
+func (w *CanvasNodeCleanupWorker) withTrackedBatch(fn func() error) error {
 	inFlight := w.inFlightBatches.Add(1)
 	for {
 		observed := w.maxObservedInFlight.Load()
@@ -128,60 +326,5 @@ func (w *CanvasNodeCleanupWorker) processNodeBatch(node models.CanvasNode, batch
 		}
 	}
 	defer w.inFlightBatches.Add(-1)
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		lockedNode, lockErr := models.LockDeletedCanvasNode(tx, node.WorkflowID, node.NodeID)
-		if lockErr != nil {
-			if errors.Is(lockErr, gorm.ErrRecordNotFound) {
-				w.logger.Infof("Canvas node %s/%s already being processed - skipping", node.WorkflowID, node.NodeID)
-				done = true
-				return nil
-			}
-			return fmt.Errorf("lock deleted canvas node %s/%s: %w", node.WorkflowID, node.NodeID, lockErr)
-		}
-
-		if !lockedNode.DeletedAt.Valid || deletedResourceWithinGracePeriod(lockedNode.DeletedAt.Time, time.Now()) {
-			done = true
-			return nil
-		}
-
-		result, cleanErr := models.NewNodeResourceCleaner(tx, lockedNode).
-			ForUnreferenced().
-			WithLimit(batchLimit).
-			Run()
-		if cleanErr != nil {
-			return fmt.Errorf("failed to delete resources for node %s: %w", lockedNode.NodeID, cleanErr)
-		}
-
-		deleted = result.ResourcesDeleted
-		if !result.AllDeleted {
-			if deleted == 0 {
-				// Referenced events (or similar) block hard-delete with no
-				// progress — rotate so other deleted nodes are not starved.
-				if rotateErr := lockedNode.RotateCleanupQueue(tx); rotateErr != nil {
-					return fmt.Errorf("rotate blocked canvas node %s: %w", lockedNode.NodeID, rotateErr)
-				}
-				w.logger.Infof(
-					"No progress cleaning node %s from canvas %s; rotated cleanup queue position",
-					lockedNode.NodeID,
-					lockedNode.WorkflowID,
-				)
-			}
-			return nil
-		}
-
-		if hardDeleteErr := lockedNode.HardDelete(tx); hardDeleteErr != nil {
-			return fmt.Errorf("failed to delete canvas node %s: %w", lockedNode.NodeID, hardDeleteErr)
-		}
-
-		w.logger.Infof(
-			"Deleted node %s from canvas %s (deleted %d resources in final batch)",
-			lockedNode.NodeID,
-			lockedNode.WorkflowID,
-			result.ResourcesDeleted,
-		)
-		done = true
-		return nil
-	})
-	return deleted, done, err
+	return fn()
 }
