@@ -87,10 +87,13 @@ services:
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       # Task broker /v1 (Runner component). Base URL has no trailing slash.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      RUNNER_BROKER_ENABLED: ${RUNNER_BROKER_ENABLED:-yes}
+      RUNNER_BROKER_REAP_INTERVAL_SEC: ${RUNNER_BROKER_REAP_INTERVAL_SEC:-15}
+      RUNNER_BROKER_AUTH_TOKEN: ${RUNNER_BROKER_AUTH_TOKEN:-dev-runner-broker-token}
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://localhost:8000/runner-broker}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN when auth is enabled
-      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-runner-broker-token}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}

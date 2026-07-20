@@ -32,6 +32,15 @@ api:
       cpu: 100m
       memory: 128Mi
 
+runnerBroker:
+  enabled: true
+  externalBaseUrl: ""
+  reapIntervalSeconds: 15
+  auth:
+    secretName: ""
+    key: TASK_BROKER_AUTH_TOKEN
+    token: ""
+
 domain:
   name: ""
   configMapName: "base-domain"

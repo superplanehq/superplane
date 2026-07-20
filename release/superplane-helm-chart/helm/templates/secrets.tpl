@@ -86,3 +86,15 @@
 {{- .Values.email.secretName }}
 {{- end }}
 {{- end }}
+
+{{- define "secrets.runnerBroker.name" }}
+{{- if eq .Values.runnerBroker.auth.secretName "" }}
+{{- printf "%s-runner-broker" .Release.Name }}
+{{- else }}
+{{- .Values.runnerBroker.auth.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "runnerBroker.internalBaseUrl" }}
+{{- printf "http://%s-api:8000/runner-broker" .Release.Name }}
+{{- end }}

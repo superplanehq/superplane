@@ -1,0 +1,11 @@
+{{- if and .Values.runnerBroker.enabled (eq .Values.runnerBroker.auth.secretName "") }}
+{{- $token := .Values.runnerBroker.auth.token | required ".Values.runnerBroker.auth.token is required when runnerBroker.enabled=true and no existing secret is provided." -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.runnerBroker.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  {{ .Values.runnerBroker.auth.key }}: {{ $token | quote }}
+{{- end }}

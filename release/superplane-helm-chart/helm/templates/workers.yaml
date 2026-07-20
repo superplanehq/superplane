@@ -109,6 +109,19 @@ spec:
               value: supergit
             - name: GIT_STORAGE_SUPERGIT_BASE_URL
               value: {{ printf "http://%s:%v%s" .Values.supergit.host .Values.supergit.port .Values.supergit.apiPath | quote }}
+{{- if or .Values.runnerBroker.enabled .Values.runnerBroker.externalBaseUrl }}
+            - name: TASK_BROKER_BASE_URL
+{{- if .Values.runnerBroker.enabled }}
+              value: {{ include "runnerBroker.internalBaseUrl" . | quote }}
+{{- else }}
+              value: {{ .Values.runnerBroker.externalBaseUrl | quote }}
+{{- end }}
+            - name: TASK_BROKER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secrets.runnerBroker.name" . }}
+                  key: {{ .Values.runnerBroker.auth.key }}
+{{- end }}
 
           volumeMounts:
             - name: oidc-keys

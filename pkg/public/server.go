@@ -31,6 +31,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/runnerbroker"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
@@ -90,6 +91,7 @@ type Server struct {
 	BaseURL               string
 	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
+	runnerBroker          *runnerbroker.Service
 	authHandler           *authentication.Handler
 	isDev                 bool
 	usageService          usage.Service
@@ -207,6 +209,15 @@ func NewServer(
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
+	}
+
+	if runnerbroker.Enabled() {
+		runnerBroker, err := runnerbroker.NewFromEnv()
+		if err != nil {
+			return nil, fmt.Errorf("initialize runner broker: %w", err)
+		}
+		runnerBroker.Start(context.Background())
+		server.runnerBroker = runnerBroker
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -644,6 +655,10 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
+
+	if s.runnerBroker != nil {
+		r.PathPrefix("/runner-broker").Handler(http.StripPrefix("/runner-broker", s.runnerBroker.Handler))
+	}
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
