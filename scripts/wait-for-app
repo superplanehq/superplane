@@ -38,3 +38,28 @@ done
 port="${PUBLIC_API_PORT:-8000}"
 echo ""
 echo "Open http://localhost:${port} in your browser."
+
+# Embedded task broker (START_TASK_BROKER=yes) listens on a separate port.
+task_broker_port="${TASK_BROKER_PORT:-8081}"
+task_broker_url="http://${HOST}:${task_broker_port}/healthz"
+if curl -fsS "${task_broker_url}" >/dev/null 2>&1; then
+  echo "Task broker is healthy at ${task_broker_url}."
+elif [ "${START_TASK_BROKER:-yes}" = "yes" ]; then
+  echo "Waiting for task broker health at ${task_broker_url} (timeout ${TIMEOUT_SECONDS}s)..."
+  start_epoch="$(date +%s)"
+  while true; do
+    if curl -fsS "${task_broker_url}" >/dev/null 2>&1; then
+      echo "Task broker is healthy at ${task_broker_url}."
+      break
+    fi
+
+    now_epoch="$(date +%s)"
+    elapsed="$((now_epoch - start_epoch))"
+    if [ "${elapsed}" -ge "${TIMEOUT_SECONDS}" ]; then
+      echo "Timed out waiting for task broker at ${task_broker_url}." >&2
+      echo "Ensure START_TASK_BROKER=yes and recreate the app container (make dev.up)." >&2
+      exit 1
+    fi
+    sleep "${INTERVAL_SECONDS}"
+  done
+fi

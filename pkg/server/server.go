@@ -31,6 +31,7 @@ import (
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
+	"github.com/superplanehq/superplane/pkg/taskbroker"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
@@ -310,6 +311,15 @@ func startWorkers(
 			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
 			go w.Start(context.Background())
 		}
+	}
+
+	if os.Getenv("START_TASK_BROKER") == "yes" {
+		log.Println("Starting Task Broker")
+		go func() {
+			if err := taskbroker.Start(context.Background()); err != nil {
+				log.Fatalf("task broker stopped: %v", err)
+			}
+		}()
 	}
 
 }

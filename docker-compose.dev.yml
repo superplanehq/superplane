@@ -61,6 +61,8 @@ services:
       START_EVENT_RETENTION_WORKER: "yes"
       START_USAGE_SYNC_WORKER: "yes"
       START_REPOSITORY_PROVISIONER: "yes"
+      START_TASK_BROKER: ${START_TASK_BROKER:-yes}
+      TASK_BROKER_LISTEN_ADDR: ${TASK_BROKER_LISTEN_ADDR:-:8081}
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -86,11 +88,11 @@ services:
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      # Task broker /v1 (Runner component). Base URL has no trailing slash.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      # Task broker /v1 (embedded when START_TASK_BROKER=yes). Base URL has no trailing slash.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://localhost:8081}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
-      # Bearer; must match broker AUTH_TOKEN when auth is enabled
-      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
+      # Bearer secret for /v1 and live-log JWTs (required when START_TASK_BROKER=yes)
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-task-broker-token}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
@@ -133,6 +135,7 @@ services:
       - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
+      - ${TASK_BROKER_PORT:-8081}:8081
       - ${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
 
     links:
