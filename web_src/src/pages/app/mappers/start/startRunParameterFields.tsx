@@ -45,13 +45,13 @@ export function StartRunParameterFields({
                     }))
                   }
                 />
-                <Label htmlFor={id} className={showLabels ? "min-w-0 cursor-pointer" : "sr-only"}>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels, "min-w-0 cursor-pointer")}>
                   {label}
                 </Label>
               </div>
             ) : param.type === "select" ? (
               <>
-                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
                   {label}
                 </Label>
                 <Select
@@ -80,7 +80,7 @@ export function StartRunParameterFields({
               </>
             ) : param.type === "text" ? (
               <>
-                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
                   {label}
                 </Label>
                 <Textarea
@@ -98,7 +98,7 @@ export function StartRunParameterFields({
               </>
             ) : (
               <>
-                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
                   {label}
                 </Label>
                 <Input
@@ -120,4 +120,8 @@ export function StartRunParameterFields({
       })}
     </div>
   );
+}
+
+function parameterLabelClassName(showLabels: boolean, visibleClassName?: string): string | undefined {
+  return showLabels ? visibleClassName : "sr-only";
 }
