@@ -339,6 +339,19 @@ CREATE TABLE public.email_settings (
 
 
 --
+-- Name: fleets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.fleets (
+    id text NOT NULL,
+    provisioner text NOT NULL,
+    arch text NOT NULL,
+    size text NOT NULL,
+    created_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -487,6 +500,39 @@ CREATE TABLE public.secrets (
     data bytea NOT NULL,
     domain_type character varying(64) NOT NULL,
     domain_id character varying(64) NOT NULL
+);
+
+
+--
+-- Name: tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tasks (
+    id text NOT NULL,
+    fleet_id text NOT NULL,
+    run_mode text DEFAULT 'command_list'::text NOT NULL,
+    script_json text,
+    message_chain_json text,
+    command_json text NOT NULL,
+    commands_json text,
+    setup_commands_json text,
+    environment_json text,
+    files_json text,
+    webhook_url text NOT NULL,
+    status text NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    claimed_at timestamp with time zone,
+    lease_until timestamp with time zone,
+    runner_id text,
+    execution_mode text DEFAULT 'host'::text NOT NULL,
+    docker_image text,
+    execution_timeout_seconds integer,
+    exit_code integer,
+    output text,
+    result_json text,
+    error_message text,
+    infra_retry_count integer DEFAULT 0 NOT NULL,
+    cancel_requested boolean DEFAULT false NOT NULL
 );
 
 
@@ -939,6 +985,14 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
+-- Name: fleets fleets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fleets
+    ADD CONSTRAINT fleets_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1064,6 +1118,14 @@ ALTER TABLE ONLY public.secrets
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tasks tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tasks
+    ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
 
 
 --
@@ -1438,6 +1500,13 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_tasks_fleet_status_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tasks_fleet_status_created ON public.tasks USING btree (fleet_id, status, created_at);
 
 
 --
@@ -2275,7 +2344,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260720144835	f
+20260721132654	f
 \.
 
 

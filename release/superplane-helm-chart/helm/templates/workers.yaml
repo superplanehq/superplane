@@ -79,6 +79,18 @@ spec:
               value: "yes"
             - name: START_REPOSITORY_PROVISIONER
               value: "yes"
+{{- if .Values.workers.taskBroker.enabled }}
+            - name: START_TASK_BROKER
+              value: "yes"
+            - name: TASK_BROKER_LISTEN_ADDR
+              value: {{ .Values.workers.taskBroker.listenAddr | quote }}
+            - name: TASK_BROKER_AUTH_TOKEN
+              value: {{ .Values.workers.taskBroker.authToken | quote }}
+{{- if .Values.workers.taskBroker.baseURL }}
+            - name: TASK_BROKER_BASE_URL
+              value: {{ .Values.workers.taskBroker.baseURL | quote }}
+{{- end }}
+{{- end }}
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf
             - name: PUBLIC_API_BASE_PATH
@@ -110,6 +122,13 @@ spec:
             - name: GIT_STORAGE_SUPERGIT_BASE_URL
               value: {{ printf "http://%s:%v%s" .Values.supergit.host .Values.supergit.port .Values.supergit.apiPath | quote }}
 
+{{- if .Values.workers.taskBroker.enabled }}
+          ports:
+            - name: task-broker
+              containerPort: 8081
+              protocol: TCP
+{{- end }}
+
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
@@ -130,3 +149,24 @@ spec:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
+{{- if .Values.workers.taskBroker.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-task-broker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-task-broker
+spec:
+  type: ClusterIP
+  selector:
+    app: superplane
+    service: {{ .Release.Name }}-workers
+  ports:
+    - name: task-broker
+      port: 8081
+      targetPort: task-broker
+      protocol: TCP
+{{- end }}
