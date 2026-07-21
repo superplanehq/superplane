@@ -84,8 +84,7 @@ func writeIntro(b *strings.Builder, hasFiles bool) {
 }
 
 // writeFinalMarker writes the machine-readable PR_URL/NO_PR marker the agent
-// must end its message with. When schema is set, the structured-output
-// instructions are written first so the marker line stays truly last.
+// must end its message with.
 func writeFinalMarker(b *strings.Builder, prExpected bool, schema map[string]any) {
 	if schema != nil {
 		b.WriteString(structuredoutput.PromptSuffix(structuredoutput.Prepare(schema, false)))

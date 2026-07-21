@@ -1,20 +1,12 @@
-// Package structuredoutput lets LLM text-prompt components accept a JSON Schema
-// that describes the desired response. The component shows a default schema the
-// user edits; the backend validates that it is well-formed JSON before the
-// provider request is fired, and normalizes it to the constraints both providers
-// enforce:
+// Package structuredoutput lets LLM components accept a JSON Schema
+// describing the desired response, validating it and normalizing it to the
+// constraints strict-mode providers enforce (every object gets
+// "additionalProperties": false; strict mode also requires listing every
+// property in "required").
 //
-//   - Every object node gets "additionalProperties": false.
-//   - OpenAI strict mode (strict=true) additionally forces every object's
-//     "required" to list all of its properties; optional fields are expressed by
-//     making their type nullable in the schema itself.
-//   - Anthropic (strict=false) leaves "required" as the user wrote it.
-//
-// Agent components (Claude Managed Agents sessions) have no equivalent to the
-// Messages API's output_config.format — there is no server-side grammar
-// constraint for a Sessions-based run. For those, PromptSuffix and ExtractJSON
-// emulate structured output by asking the model to comply and best-effort
-// parsing its final message
+// Some agent-style components have no server-side schema enforcement at all.
+// For those, PromptSuffix and ExtractJSON emulate it by asking the model to
+// comply and best-effort parsing its final message.
 package structuredoutput
 
 import (
@@ -129,9 +121,8 @@ func ValidateAtSetup(raw string) error {
 }
 
 // PromptSuffix renders schema-following instructions to append to an agent's
-// task prompt. There is no output_config.format equivalent for Managed Agents
-// sessions, so this is the only lever: ask the model to emit matching JSON,
-// then extract it with ExtractJSON. Returns "" if schema is nil.
+// task prompt, for components with no server-side schema enforcement to rely
+// on instead. Returns "" if schema is nil.
 func PromptSuffix(schema map[string]any) string {
 	if schema == nil {
 		return ""
@@ -147,14 +138,10 @@ func PromptSuffix(schema map[string]any) string {
 // language tag.
 var jsonFencePattern = regexp.MustCompile("(?s)```(?:json)?\\s*\\n?(.*?)\\n?```")
 
-// ExtractJSON pulls a JSON object out of free-form text, as produced by an
-// agent asked (via PromptSuffix) to emit structured output in its final
-// message. It tries each fenced code block, last to first, then falls back to
-// parsing the whole trimmed text, and reports false if none of those parse as
-// a JSON object. There is no schema validation here: for agent components
-// there is no server-side grammar constraint to trust, so this is inherently
-// best-effort — callers decide whether to trust it (e.g. only on a normal
-// completion).
+// ExtractJSON pulls a JSON object out of text produced by PromptSuffix's
+// instructions: it tries each fenced code block (last to first), then the
+// whole trimmed text, and reports false if none parse as a JSON object. This
+// is best-effort with no schema validation — callers decide when to trust it.
 func ExtractJSON(text string) (any, bool) {
 	matches := jsonFencePattern.FindAllStringSubmatch(text, -1)
 	for i := len(matches) - 1; i >= 0; i-- {

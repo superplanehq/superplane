@@ -176,11 +176,7 @@ func buildOutput(status, sessionID, branch string, sm *runagent.SessionMessages,
 }
 
 // applyStructuredOutput sets out.Parsed by best-effort extracting JSON from
-// the agent's final message, when a schema is configured and the session
-// completed normally ("idle"). There is no server-side schema enforcement for
-// Managed Agents sessions (unlike output_config.format on the Messages API),
-// so this is prompt-guided and best-effort — a "terminated" session may have
-// errored or been interrupted mid-task, so its message is not trusted either.
+// the agent's final message.
 func applyStructuredOutput(out *OutputPayload, status string, schema map[string]any) {
 	if schema == nil || status != sessionStatusIdle || out.LastMessage == "" {
 		return
@@ -191,9 +187,7 @@ func applyStructuredOutput(out *OutputPayload, status string, schema map[string]
 }
 
 // schemaFromConfiguration re-derives the parsed output schema from the node's
-// raw configuration for the async poll path, where the schema was already
-// validated at Setup/Execute — a decode or parse failure here is tolerated as
-// "no schema" rather than failing an otherwise-complete run.
+// raw configuration for the async poll path.
 func schemaFromConfiguration(config any) map[string]any {
 	spec, err := decodeSpec(config)
 	if err != nil {

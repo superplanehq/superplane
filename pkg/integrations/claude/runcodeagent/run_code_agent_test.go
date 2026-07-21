@@ -791,9 +791,6 @@ func Test__RunCodeAgent__poll__terminalWithUnavailableEventsPastBudget(t *testin
 	assert.Nil(t, out.Artifacts)
 }
 
-// Past the poll budget with incomplete events, LastMessage may not be the
-// agent's real final message — structured output must not be trusted then,
-// even though the session is reported as genuinely finished (idle).
 func Test__RunCodeAgent__poll__terminalWithIncompleteEventsSkipsStructuredOutput(t *testing.T) {
 	a := &RunCodeAgent{}
 	restore := finalMessageDelay
