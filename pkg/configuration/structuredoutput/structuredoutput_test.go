@@ -85,6 +85,20 @@ func TestPrepare_NestedObjectsAndArrays(t *testing.T) {
 	}
 }
 
+func TestPrepare_StrictWithNoProperties(t *testing.T) {
+	// An object schema with no "properties" (e.g. an empty object schema
+	// built directly rather than through Parse, which rejects that case)
+	// must not panic; strict mode just requires nothing.
+	out := Prepare(map[string]any{"type": "object"}, true)
+	req, ok := out["required"].([]string)
+	if !ok {
+		t.Fatalf("required should be []string in strict mode, got %T", out["required"])
+	}
+	if len(req) != 0 {
+		t.Errorf("expected no required properties, got %v", req)
+	}
+}
+
 func TestPrepare_StrictForcesRequired(t *testing.T) {
 	schema, _ := Parse(`{"type":"object","properties":{"a":{"type":"string"},"b":{"type":"number"}},"required":["a"]}`)
 	out := Prepare(schema, true)
@@ -136,6 +150,15 @@ func TestPromptSuffix(t *testing.T) {
 	}
 }
 
+func TestPromptSuffix_UnencodableSchema(t *testing.T) {
+	// A channel value can't be marshaled to JSON, so PromptSuffix must fall
+	// back to its empty-string result rather than panicking or erroring.
+	schema := map[string]any{"bad": make(chan int)}
+	if got := PromptSuffix(schema); got != "" {
+		t.Errorf("PromptSuffix(unencodable) = %q, want empty", got)
+	}
+}
+
 func TestExtractJSON(t *testing.T) {
 	cases := []struct {
 		name string
@@ -181,6 +204,11 @@ func TestExtractJSON(t *testing.T) {
 		{
 			name: "JSON array is not an object",
 			text: `["a", "b"]`,
+			ok:   false,
+		},
+		{
+			name: "blank text",
+			text: "   ",
 			ok:   false,
 		},
 	}
