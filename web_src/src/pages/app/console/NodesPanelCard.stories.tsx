@@ -107,6 +107,31 @@ export const WithLabelOverrides: Story = {
   },
 };
 
+/**
+ * Prompt-submission layout with the redundant in-body node heading and
+ * visible field labels removed. The trigger placeholder still explains the
+ * textarea, while its associated label remains available to screen readers.
+ */
+export const PersonalizedInlineForm: Story = {
+  args: {
+    panel: panel({
+      title: "Create work item",
+      nodes: [
+        {
+          node: "deploy-prod",
+          description: "Turn a short prompt into a queued delivery task.",
+          showRun: true,
+          triggerName: "manual",
+          formMode: "inline",
+          showNodeLabel: false,
+          showFieldLabels: false,
+          submitLabel: "Create task",
+        },
+      ],
+    }),
+  },
+};
+
 export const NodeNotFound: Story = {
   args: {
     panel: panel({
