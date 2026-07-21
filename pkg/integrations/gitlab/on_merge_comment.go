@@ -197,6 +197,11 @@ func (m *OnMergeComment) isMergeRequestComment(logger *log.Entry, data map[strin
 		return false
 	}
 
+	if noteType, _ := attrs["type"].(string); noteType == "DiffNote" {
+		logger.Info("Comment is a diff note, not a regular merge request comment - ignoring")
+		return false
+	}
+
 	return true
 }
 
