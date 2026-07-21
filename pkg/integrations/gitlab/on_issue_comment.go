@@ -155,7 +155,7 @@ func (m *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	matched, err := m.matchesContentFilter(config.ContentFilter, data)
+	matched, err := matchesNoteContentFilter(config.ContentFilter, data)
 	if err != nil {
 		return http.StatusBadRequest, nil, err
 	}
@@ -203,27 +203,4 @@ func (m *OnIssueComment) isIssueComment(logger *log.Entry, data map[string]any) 
 	}
 
 	return true
-}
-
-func (m *OnIssueComment) matchesContentFilter(filter string, data map[string]any) (bool, error) {
-	if filter == "" {
-		return true, nil
-	}
-
-	attrs, ok := data["object_attributes"].(map[string]any)
-	if !ok {
-		return false, nil
-	}
-
-	note, ok := attrs["note"].(string)
-	if !ok {
-		return false, nil
-	}
-
-	matched, err := regexp.MatchString(filter, note)
-	if err != nil {
-		return false, fmt.Errorf("invalid content filter pattern: %w", err)
-	}
-
-	return matched, nil
 }
