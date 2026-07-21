@@ -3328,8 +3328,12 @@ export function AppPage() {
     }
     // Deliberate preview of the current version keeps the edit session open.
     previewingCurrentVersionRef.current = true;
-    void resyncLiveVersionDraftAfterSwitch(effectiveLiveCanvasVersionId);
-  }, [effectiveLiveCanvasVersionId, resyncLiveVersionDraftAfterSwitch]);
+    if (editSessionActive) {
+      void resyncLiveVersionDraftAfterSwitch(effectiveLiveCanvasVersionId);
+      return;
+    }
+    handleUseVersion(effectiveLiveCanvasVersionId);
+  }, [editSessionActive, effectiveLiveCanvasVersionId, handleUseVersion, resyncLiveVersionDraftAfterSwitch]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
