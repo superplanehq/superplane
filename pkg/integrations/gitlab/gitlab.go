@@ -198,9 +198,11 @@ func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnBranchCreated{},
 		&OnIssue{},
+		&OnIssueComment{},
 		&OnMergeComment{},
 		&OnMergeRequest{},
 		&OnMilestone{},
+		&OnMRDiffNote{},
 		&OnPipeline{},
 		&OnPush{},
 		&OnRelease{},
