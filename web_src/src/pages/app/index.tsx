@@ -94,6 +94,7 @@ import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from 
 import {
   clearLiveEditSessionDraftState,
   clearLiveEditSessionSearchParams,
+  isActiveCanvasVersionCurrentLive,
   resetCommittedLiveCanvasDetail,
 } from "./lib/live-edit-session";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
@@ -3312,6 +3313,14 @@ export function AppPage() {
     [activateCanvasVersionForEditing, canvasId, organizationId, selectableVersionsById],
   );
 
+  const resyncLiveVersionDraftAfterSwitch = useCallback(
+    async (versionId: string, options?: { preserveStagedLayer?: boolean }) => {
+      handleUseVersion(versionId, options);
+      await resyncStagedEditorState(versionId, { bumpResetNonce: false });
+    },
+    [handleUseVersion, resyncStagedEditorState],
+  );
+
   const handleSeeCurrentVersion = useCallback(() => {
     if (!effectiveLiveCanvasVersionId) {
       showErrorToast("No live version available");
@@ -3319,8 +3328,8 @@ export function AppPage() {
     }
     // Deliberate preview of the current version keeps the edit session open.
     previewingCurrentVersionRef.current = true;
-    handleUseVersion(effectiveLiveCanvasVersionId);
-  }, [effectiveLiveCanvasVersionId, handleUseVersion]);
+    void resyncLiveVersionDraftAfterSwitch(effectiveLiveCanvasVersionId);
+  }, [effectiveLiveCanvasVersionId, resyncLiveVersionDraftAfterSwitch]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
@@ -3333,16 +3342,33 @@ export function AppPage() {
         }
       }
 
+      const isSelectingLiveVersion = isActiveCanvasVersionCurrentLive({
+        activeCanvasVersionId: versionID,
+        effectiveLiveCanvasVersionId,
+        liveCanvasVersionId,
+      });
+
       // Track when the user deliberately selects the current/live version from
       // the sidebar so the edit session stays open (vs. internal navigation back
       // to live after publish/discard, which must close it).
-      previewingCurrentVersionRef.current =
-        (!!effectiveLiveCanvasVersionId && versionID === effectiveLiveCanvasVersionId) ||
-        (!!liveCanvasVersionId && versionID === liveCanvasVersionId);
+      previewingCurrentVersionRef.current = isSelectingLiveVersion;
+
+      if (editSessionActive && isSelectingLiveVersion) {
+        void resyncLiveVersionDraftAfterSwitch(versionID);
+        return;
+      }
 
       handleUseVersion(versionID);
     },
-    [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
+    [
+      handleUseVersion,
+      resyncLiveVersionDraftAfterSwitch,
+      hasEditableVersion,
+      hasLocalSaveActivity,
+      editSessionActive,
+      effectiveLiveCanvasVersionId,
+      liveCanvasVersionId,
+    ],
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
