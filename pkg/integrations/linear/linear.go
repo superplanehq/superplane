@@ -39,11 +39,6 @@ func init() {
 
 type Linear struct{}
 
-type Configuration struct {
-	ClientID     string `json:"clientId" mapstructure:"clientId"`
-	ClientSecret string `json:"clientSecret" mapstructure:"clientSecret"`
-}
-
 type Metadata struct {
 	State        *string `json:"state,omitempty" mapstructure:"state,omitempty"`
 	User         *User   `json:"user,omitempty" mapstructure:"user,omitempty"`
@@ -53,10 +48,12 @@ type Metadata struct {
 }
 
 const installationInstructions = `
-SuperPlane connects to Linear with OAuth, so there are no API keys to manage.
+SuperPlane connects to Linear with OAuth.
 
-1. Click **Save** below to start the setup wizard. It opens Linear's OAuth application form pre-filled with everything SuperPlane needs — just click **Create**, then copy the **Client ID** and **Client Secret** back here.
-2. Click **Save** again, then **Continue** to authorize SuperPlane in your Linear workspace.
+1. Click **Connect** below to start the setup wizard. 
+2. On the connecion wizard that opens, click **Connect** which will open Linear's OAuth application form pre-filled with everything SuperPlane needs. 
+3. Click **Create** on Linear, then copy the **Client ID** and **Client Secret** in the input fields provided on SuperPlane.
+4. Click **Save**, then once saved, click **Continue** on the integration configurationto authorize SuperPlane in your Linear workspace.
 
 **Permissions:** SuperPlane requests the read, write and admin scopes. The admin scope is required because the On Issue trigger registers Linear webhooks, and Linear only allows webhook management with admin access — so connect as a **workspace admin**.
 
@@ -114,19 +111,22 @@ func (l *Linear) Triggers() []core.Trigger {
 }
 
 func (l *Linear) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode config: %v", err)
-	}
-
 	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+
+	//
+	// Sensitive configuration values are stored encrypted, and only
+	// GetConfig decrypts them - never read the client secret from
+	// ctx.Configuration directly.
+	//
+	clientID, _ := ctx.Integration.GetConfig("clientId")
+	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
 
 	//
 	// Without app credentials, guide the user through creating the OAuth app.
 	// Linear has no API for this, but its creation form accepts manifest query
 	// parameters, so the form opens fully pre-filled.
 	//
-	if config.ClientID == "" || config.ClientSecret == "" {
+	if len(clientID) == 0 || len(clientSecret) == 0 {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupDescription,
 			URL:         appCreateURL(ctx.BaseURL, callbackURL),
@@ -141,14 +141,14 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 	//
 	accessToken, _ := findSecret(ctx.Integration, OAuthAccessToken)
 	if accessToken == "" {
-		return l.requestAuthorization(ctx, config.ClientID, callbackURL)
+		return l.requestAuthorization(ctx, string(clientID), callbackURL)
 	}
 
 	//
 	// Linear access tokens expire after 24 hours,
 	// so refresh on every scheduled resync.
 	//
-	if err := l.refreshToken(ctx, config.ClientID, config.ClientSecret); err != nil {
+	if err := l.refreshToken(ctx, string(clientID), string(clientSecret)); err != nil {
 		ctx.Logger.Errorf("Failed to refresh token: %v", err)
 		return err
 	}
@@ -215,8 +215,13 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackUR
 func (l *Linear) refreshToken(ctx core.SyncContext, clientID, clientSecret string) error {
 	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
 	if refreshToken == "" {
-		ctx.Logger.Warn("Linear integration has no refresh token - not refreshing token")
-		return nil
+		//
+		// Linear access tokens always expire within 24 hours, so an access token
+		// without a refresh token is a dead end. Clear it so the next sync sends
+		// the user back to the authorize step instead of reporting ready.
+		//
+		_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
+		return fmt.Errorf("no refresh token stored - re-authorize the integration")
 	}
 
 	ctx.Logger.Info("Refreshing Linear token")

@@ -20,10 +20,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-SuperPlane connects to Linear with OAuth, so there are no API keys to manage.
+SuperPlane connects to Linear with OAuth.
 
-1. Click **Save** below to start the setup wizard. It opens Linear's OAuth application form pre-filled with everything SuperPlane needs — just click **Create**, then copy the **Client ID** and **Client Secret** back here.
-2. Click **Save** again, then **Continue** to authorize SuperPlane in your Linear workspace.
+1. Click **Connect** below to start the setup wizard. 
+2. On the connecion wizard that opens, click **Connect** which will open Linear's OAuth application form pre-filled with everything SuperPlane needs. 
+3. Click **Create** on Linear, then copy the **Client ID** and **Client Secret** in the input fields provided on SuperPlane.
+4. Click **Save**, then once saved, click **Continue** on the integration configurationto authorize SuperPlane in your Linear workspace.
 
 **Permissions:** SuperPlane requests the read, write and admin scopes. The admin scope is required because the On Issue trigger registers Linear webhooks, and Linear only allows webhook management with admin access — so connect as a **workspace admin**.
 
@@ -57,8 +59,8 @@ The On Issue trigger starts a workflow execution when issue events occur in a Li
 ### Webhook Setup
 
 This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only lets **workspace admins** manage webhooks, so the API key connected
-to this integration must belong to an admin and carry the **Admin** permission.
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
 
 ### Example Data
 
@@ -144,6 +146,7 @@ The Create Issue component creates a new issue in a Linear team.
 - **Team** (required): The Linear team to create the issue in
 - **Title** (required): The issue title
 - **Description** (optional): Issue description, written in Markdown
+- **Project** (optional): Project to add the issue to
 - **Status** (optional): Workflow state for the new issue. Leave empty to use the team's default — Linear
   puts new issues in the first Backlog state, or in Triage when the team has triage enabled.
 - **Assignee** (optional): Team member to assign the issue to
@@ -157,8 +160,8 @@ Returns the created issue, including its `identifier` (e.g. ENG-142), `url`, `ti
 
 ### Permissions
 
-The API key owner must be a member of the selected team, and the key needs **Write** or
-**Create issues** permission.
+The user who authorized the Linear connection must be a member of the selected team. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating issues.
 
 ### Example Output
 
