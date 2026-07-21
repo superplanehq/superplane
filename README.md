@@ -16,6 +16,39 @@ A **task** is one execution of a user’s script for a Runner node: SuperPlane c
 
 Shared contracts live under **`shared/`** (JSON types, WebSocket messages, webhook retries).
 
+## Architecture diagram
+
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}} }%%
+flowchart LR
+  subgraph sp["SuperPlane"]
+    direction TB
+    canvas["Canvas<br/>Runner node"]
+    worker["Worker<br/>enqueue + webhook handling"]
+  end
+
+  subgraph queue["Runner control plane"]
+    broker["task-broker<br/>fleet catalog + task queue"]
+  end
+
+  subgraph capacity["Runner capacity"]
+    direction TB
+    fm["fleet-manager<br/>optional EC2 autoscaler"]
+    runners["runner workers<br/>pods, hosts, or EC2 VMs"]
+  end
+
+  canvas --> worker
+  worker -- "POST /v1/tasks" --> broker
+  broker -- "completion webhook" --> worker
+  broker <-- "claim / stream / complete" --> runners
+  fm -- "register fleets + poll counts" --> broker
+  fm -- "launch / health-check / terminate" --> runners
+```
+
+Fleet-manager is optional because it is only a capacity provisioner. It does not
+own the task queue or the canvas contract; runners only need a reachable
+`TASK_BROKER_URL`, a `RUNNER_FLEET_ID`, and the shared broker token.
+
 ## Why it is built this way
 
 SuperPlane needs a safe, scalable way to run **user-authored bash** from canvas Runner nodes without embedding shells and fleets in the main app. This repo separates concerns deliberately:
