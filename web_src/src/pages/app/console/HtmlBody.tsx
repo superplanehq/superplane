@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, type SyntheticEvent } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -64,11 +64,53 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
       <div
         className={cn("dark-mode-disabled", HTML_ROOT_CLASSES)}
         data-testid="console-html"
+        // Capture phase: `<img>` error events don't bubble, so a bubbling
+        // `onError` on this container would never fire. `onErrorCapture` catches
+        // them on the way down and lets us swap a broken avatar image for a
+        // graceful initials/silhouette fallback instead of the browser's
+        // broken-image icon.
+        onErrorCapture={replaceBrokenAvatarImage}
         {...{ [HTML_WIDGET_ROOT_ATTR]: rootId }}
         dangerouslySetInnerHTML={{ __html: sanitized }}
       />
     </div>
   );
+}
+
+/**
+ * Replace an avatar `<img>` that failed to load with a fallback element,
+ * mirroring the initials/silhouette markup that `githubAvatarOrInitial`
+ * produces when there is no image. Only images emitted by that helper (they
+ * carry the `avatar-image` class) are touched, so author-authored images are
+ * left untouched. The fallback reuses the author's own `.avatar` /
+ * `.avatar-fallback` styling.
+ */
+function replaceBrokenAvatarImage(event: SyntheticEvent) {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  if (!image.classList.contains("avatar-image")) return;
+
+  const fallback = image.ownerDocument.createElement("div");
+  const classes = image.className.split(/\s+/).filter((c) => c && c !== "avatar-image");
+  if (!classes.includes("avatar")) classes.push("avatar");
+  classes.push("avatar-fallback");
+  fallback.className = classes.join(" ");
+
+  const letter = firstInitial(image.getAttribute("alt") ?? "");
+  if (letter) {
+    fallback.textContent = letter;
+  } else {
+    fallback.setAttribute("aria-hidden", "true");
+  }
+  image.replaceWith(fallback);
+}
+
+/** First alphanumeric character of `value`, uppercased; `""` when none. */
+function firstInitial(value: string): string {
+  const text = value.trim();
+  if (text === "") return "";
+  const match = text.match(/[A-Za-z0-9]/);
+  return match ? match[0].toUpperCase() : text.charAt(0).toUpperCase();
 }
 
 /**

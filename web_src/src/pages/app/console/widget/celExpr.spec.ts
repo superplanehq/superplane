@@ -488,6 +488,9 @@ describe("celExpr", () => {
           buildEnv(),
         );
         expect(out).toContain('src="https://github.com/forestileao.png"');
+        // The display name rides along in `alt` so the HTML panel can derive an
+        // initials fallback if the avatar image 404s.
+        expect(out).toContain('alt="Pedro Leão"');
       });
 
       it("renders an initial badge when author.username is missing", () => {

@@ -1,6 +1,6 @@
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
-import React, { forwardRef } from "react";
+import React, { forwardRef, useEffect, useState } from "react";
 import { Link } from "../Link/link";
 
 type AvatarProps = {
@@ -19,6 +19,22 @@ export function Avatar({
   className,
   ...props
 }: AvatarProps & React.ComponentPropsWithoutRef<"span">) {
+  // Track image load failures (e.g. a 404 avatar URL for a user without a
+  // photo, or a bot account with no GitHub avatar) so we can fall back to the
+  // initials / generic placeholder instead of leaving the browser's
+  // broken-image icon on screen.
+  const [imageFailed, setImageFailed] = useState(false);
+
+  // Reset the failure flag whenever the source changes so a fresh (possibly
+  // valid) URL gets another chance to load after a previous one failed.
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  const showImage = Boolean(src) && !imageFailed;
+  const showInitials = Boolean(initials) && !showImage;
+  const showPlaceholder = !showImage && !showInitials;
+
   return (
     <span
       data-slot="avatar"
@@ -32,7 +48,7 @@ export function Avatar({
         square ? "rounded-(--avatar-radius) *:rounded-(--avatar-radius)" : "rounded-full *:rounded-full",
       )}
     >
-      {initials && (
+      {showInitials && (
         <svg
           className="size-full fill-current p-[5%] text-[48px] font-medium uppercase select-none"
           viewBox="0 0 100 100"
@@ -44,8 +60,27 @@ export function Avatar({
           </text>
         </svg>
       )}
-      {src && <img className="size-full" src={src} alt={alt} />}
+      {showPlaceholder && <PlaceholderIcon alt={alt} />}
+      {showImage && <img className="size-full" src={src!} alt={alt} onError={() => setImageFailed(true)} />}
     </span>
+  );
+}
+
+/**
+ * Generic user silhouette shown when there is no image to display and no
+ * initials to fall back to (either the avatar had neither, or the image URL
+ * failed to load and no initials were provided).
+ */
+function PlaceholderIcon({ alt }: { alt?: string }) {
+  return (
+    <svg
+      className="size-full fill-current p-[15%] opacity-60 select-none"
+      viewBox="0 0 24 24"
+      aria-hidden={alt ? undefined : "true"}
+    >
+      {alt && <title>{alt}</title>}
+      <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
+    </svg>
   );
 }
 

@@ -352,17 +352,29 @@ function githubAvatar(author: unknown, committer: unknown): string {
   const authorRecord = asRecord(author);
   const committerRecord = asRecord(committer);
   const username = coerceToString(authorRecord?.username).trim();
-  if (username) {
-    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
-  }
+  const name = coerceToString(authorRecord?.name).trim() || coerceToString(committerRecord?.name).trim() || username;
   const letter = firstInitialFromValues(
     authorRecord?.name,
     committerRecord?.name,
     authorRecord?.username,
     committerRecord?.username,
   );
+  if (username) {
+    // `alt` carries the display name so the HTML panel's runtime error handler
+    // (see `HtmlBody`) can derive an initials fallback when the avatar image
+    // 404s — e.g. bot accounts with no `github.com/<name>.png` avatar.
+    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="${escapeHtmlAttr(name)}" />`;
+  }
   if (!letter) return "";
-  return `<div class="avatar avatar-fallback">${letter}</div>`;
+  return `<div class="avatar avatar-fallback">${escapeHtmlText(letter)}</div>`;
+}
+
+function escapeHtmlAttr(value: string): string {
+  return escapeHtmlText(value).replace(/"/g, "&quot;");
+}
+
+function escapeHtmlText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function clampIndex(value: unknown, length: number): number {
