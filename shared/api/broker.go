@@ -55,3 +55,26 @@ type DrainRunnerStatus struct {
 type DrainRunnersResponse struct {
 	Runners []DrainRunnerStatus `json:"runners"`
 }
+
+type RecoverLostRunnersRequest struct {
+	FleetID   string   `json:"fleet_id"`
+	RunnerIDs []string `json:"runner_ids"`
+}
+
+type RunnerTaskRecoveryState string
+
+const (
+	RunnerTaskRecoveryStateRequeued RunnerTaskRecoveryState = "requeued"
+	RunnerTaskRecoveryStateFailed   RunnerTaskRecoveryState = "failed"
+	RunnerTaskRecoveryStateCanceled RunnerTaskRecoveryState = "canceled"
+)
+
+type RunnerTaskRecovery struct {
+	RunnerID string                  `json:"runner_id"`
+	TaskID   string                  `json:"task_id"`
+	State    RunnerTaskRecoveryState `json:"state"`
+}
+
+type RecoverLostRunnersResponse struct {
+	Tasks []RunnerTaskRecovery `json:"tasks"`
+}

@@ -203,6 +203,80 @@ func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int)
 	return drained, busy
 }
 
+func (s *Server) recoverLostRunners(w http.ResponseWriter, r *http.Request) {
+	var req api.RecoverLostRunnersRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.FleetID = strings.TrimSpace(req.FleetID)
+	req.RunnerIDs = compactRunnerIDs(req.RunnerIDs)
+	if req.FleetID == "" {
+		writeError(w, http.StatusBadRequest, "fleet_id required")
+		return
+	}
+	if len(req.RunnerIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "runner_ids required")
+		return
+	}
+
+	recoveries, err := s.Store.RecoverLostRunnerTasks(r.Context(), req.FleetID, req.RunnerIDs)
+	if err != nil {
+		s.logErr("recover lost runner tasks", err)
+		writeError(w, http.StatusInternalServerError, "could not recover lost runner tasks")
+		return
+	}
+
+	out := make([]api.RunnerTaskRecovery, 0, len(recoveries))
+	for _, recovery := range recoveries {
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.CompleteTask(recovery.RunnerID, recovery.ID)
+		}
+		state := recoveryState(recovery.Status)
+		out = append(out, api.RunnerTaskRecovery{
+			RunnerID: recovery.RunnerID,
+			TaskID:   recovery.ID,
+			State:    state,
+		})
+		s.afterLostRunnerRecovery(r.Context(), recovery, state)
+	}
+	if s.TaskNotify != nil {
+		s.TaskNotify.Notify()
+	}
+	if s.Log != nil {
+		s.Log.Info("lost_runner_tasks_recovered",
+			slog.String("fleet_id", req.FleetID),
+			slog.Int("task_count", len(out)),
+			slog.Any("tasks", out))
+	}
+	writeJSON(w, http.StatusOK, api.RecoverLostRunnersResponse{Tasks: out})
+}
+
+func recoveryState(status models.TaskStatus) api.RunnerTaskRecoveryState {
+	switch status {
+	case models.StatusQueued:
+		return api.RunnerTaskRecoveryStateRequeued
+	case models.StatusCanceled:
+		return api.RunnerTaskRecoveryStateCanceled
+	default:
+		return api.RunnerTaskRecoveryStateFailed
+	}
+}
+
+func (s *Server) afterLostRunnerRecovery(ctx context.Context, recovery taskstore.LostRunnerTaskRecovery, state api.RunnerTaskRecoveryState) {
+	if state == api.RunnerTaskRecoveryStateRequeued {
+		s.recordTaskUnclaimed(ctx, recovery.FleetID)
+		return
+	}
+	task, err := s.Store.GetTask(ctx, recovery.ID)
+	if err != nil {
+		s.logErr("get recovered lost runner task", err)
+		return
+	}
+	s.recordTaskCompleted(ctx, task)
+	go s.DeliverWebhook(task)
+}
+
 func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 	if f == nil {
 		return nil

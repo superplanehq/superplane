@@ -233,10 +233,12 @@ func terminalTaskStatus(st models.TaskStatus) bool {
 }
 
 const (
-	msgCanceledQueued    = "canceled before execution"
-	msgCanceledLeaseReap = "canceled (lease expired while stop pending)"
-	exitCanceled         = 130
-	maxInfraRetries      = 1
+	msgCanceledQueued     = "canceled before execution"
+	msgCanceledLeaseReap  = "canceled (lease expired while stop pending)"
+	msgCanceledRunnerLost = "canceled (runner lost while stop pending)"
+	msgRunnerLost         = "runner lost before completion"
+	exitCanceled          = 130
+	maxInfraRetries       = 1
 )
 
 func (s *PostgresStore) RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error) {
@@ -382,6 +384,143 @@ RETURNING id`,
 		return nil, nil
 	}
 	return s.GetTask(ctx, rows[0].ID)
+}
+
+func (s *PostgresStore) RecoverLostRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for lost runner recovery")
+	}
+	runnerIDs = compactRunnerIDs(runnerIDs)
+	if len(runnerIDs) == 0 {
+		return []LostRunnerTaskRecovery{}, nil
+	}
+
+	var recoveries []LostRunnerTaskRecovery
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		canceled, err := recoverLostRunnerTasks(tx, `
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = true
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		status = ?,
+		cancel_requested = false,
+		claimed_at = NULL,
+		lease_until = NULL,
+		runner_id = NULL,
+		exit_code = ?,
+		output = ?,
+		result_json = NULL,
+		error_message = NULL,
+		environment_json = ''
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id, t.status
+)
+SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs,
+			string(models.StatusCanceled), exitCanceled, msgCanceledRunnerLost,
+		)
+		if err != nil {
+			return err
+		}
+		recoveries = append(recoveries, canceled...)
+
+		requeued, err := recoverLostRunnerTasks(tx, `
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false AND infra_retry_count < ?
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		status = ?,
+		claimed_at = NULL,
+		lease_until = NULL,
+		runner_id = NULL,
+		exit_code = NULL,
+		output = '',
+		result_json = NULL,
+		error_message = NULL,
+		cancel_requested = false,
+		infra_retry_count = infra_retry_count + 1
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id, t.status
+)
+SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs, maxInfraRetries,
+			string(models.StatusQueued),
+		)
+		if err != nil {
+			return err
+		}
+		recoveries = append(recoveries, requeued...)
+
+		failed, err := recoverLostRunnerTasks(tx, `
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false AND infra_retry_count >= ?
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		status = ?,
+		claimed_at = NULL,
+		lease_until = NULL,
+		runner_id = NULL,
+		exit_code = 1,
+		output = '',
+		result_json = NULL,
+		error_message = ?,
+		cancel_requested = false,
+		environment_json = ''
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id, t.status
+)
+SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs, maxInfraRetries,
+			string(models.StatusFailed), msgRunnerLost,
+		)
+		if err != nil {
+			return err
+		}
+		recoveries = append(recoveries, failed...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return recoveries, nil
+}
+
+func recoverLostRunnerTasks(tx *gorm.DB, query string, args ...any) ([]LostRunnerTaskRecovery, error) {
+	var rows []struct {
+		ID       string
+		FleetID  string
+		RunnerID string
+		Status   string
+	}
+	if err := tx.Raw(query, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	recoveries := make([]LostRunnerTaskRecovery, 0, len(rows))
+	for _, row := range rows {
+		recoveries = append(recoveries, LostRunnerTaskRecovery{
+			ID:       row.ID,
+			FleetID:  row.FleetID,
+			RunnerID: row.RunnerID,
+			Status:   models.TaskStatus(row.Status),
+		})
+	}
+	return recoveries, nil
 }
 
 func nullIfEmpty(s string) *string {

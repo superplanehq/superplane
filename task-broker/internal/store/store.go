@@ -25,6 +25,13 @@ type ReapedLease struct {
 	FleetID string
 }
 
+type LostRunnerTaskRecovery struct {
+	ID       string
+	FleetID  string
+	RunnerID string
+	Status   models.TaskStatus
+}
+
 type CompleteTaskOutcome string
 
 const (
@@ -67,6 +74,7 @@ type Store interface {
 	// Returns unclaimed=true when a row was updated; false when the task was not
 	// claimed by runnerID (no-op).
 	UnclaimTask(ctx context.Context, taskID, runnerID string) (unclaimed bool, err error)
+	RecoverLostRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error)
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)

@@ -634,6 +634,134 @@ func TestCompleteTaskTreatsSameRunnerTerminalCompletionAsIdempotent(t *testing.T
 	}
 }
 
+func TestRecoverLostRunnerTasksRequeuesFirstInfraLoss(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveries) != 1 {
+		t.Fatalf("recoveries: %#v", recoveries)
+	}
+	if recoveries[0].ID != taskID || recoveries[0].RunnerID != "runner-1" || recoveries[0].Status != models.StatusQueued {
+		t.Fatalf("recovery: %#v", recoveries[0])
+	}
+
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusQueued {
+		t.Fatalf("status: got %s want queued", got.Status)
+	}
+	if got.InfraRetryCount != 1 {
+		t.Fatalf("infra retry count: got %d want 1", got.InfraRetryCount)
+	}
+	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
+		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
+			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
+	}
+	if len(got.Environment) != 1 ||
+		got.Environment[0].Name != "BASE_URL" ||
+		got.Environment[0].Value != "http://example.test" {
+		t.Fatalf("expected environment preserved on requeue, got %#v", got.Environment)
+	}
+
+	retried, err := st.ClaimTask(ctx, "runner-2", "fleet-retry", 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retried == nil || retried.ID != taskID {
+		t.Fatalf("retried task: %#v", retried)
+	}
+}
+
+func TestRecoverLostRunnerTasksFailsAfterInfraRetry(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 1)
+	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveries) != 1 {
+		t.Fatalf("recoveries: %#v", recoveries)
+	}
+	if recoveries[0].ID != taskID || recoveries[0].Status != models.StatusFailed {
+		t.Fatalf("recovery: %#v", recoveries[0])
+	}
+
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusFailed {
+		t.Fatalf("status: got %s want failed", got.Status)
+	}
+	if got.ExitCode == nil || *got.ExitCode != 1 {
+		t.Fatalf("exit code: %#v", got.ExitCode)
+	}
+	if got.ErrorMessage != "runner lost before completion" {
+		t.Fatalf("error message: %q", got.ErrorMessage)
+	}
+	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
+		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
+			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
+	}
+	if len(got.Environment) != 0 {
+		t.Fatalf("expected environment cleared, got %#v", got.Environment)
+	}
+}
+
+func TestRecoverLostRunnerTasksCancelsStopPendingTask(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	_, outcome, err := st.RequestCancelTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome != taskstore.CancelOutcomeCancelRequested {
+		t.Fatalf("cancel outcome: got %s want %s", outcome, taskstore.CancelOutcomeCancelRequested)
+	}
+
+	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveries) != 1 {
+		t.Fatalf("recoveries: %#v", recoveries)
+	}
+	if recoveries[0].ID != taskID || recoveries[0].Status != models.StatusCanceled {
+		t.Fatalf("recovery: %#v", recoveries[0])
+	}
+
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusCanceled {
+		t.Fatalf("status: got %s want canceled", got.Status)
+	}
+	if got.ExitCode == nil || *got.ExitCode != 130 {
+		t.Fatalf("exit code: %#v", got.ExitCode)
+	}
+	if got.Output != "canceled (runner lost while stop pending)" {
+		t.Fatalf("output: %q", got.Output)
+	}
+	if got.CancelRequested {
+		t.Fatal("cancel requested should be cleared")
+	}
+}
+
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
 	t.Helper()
 	taskID := uuid.NewString()

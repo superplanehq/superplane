@@ -271,7 +271,43 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string,
 			slog.Any("runner_ids", busy),
 			slog.Any("active_task_ids", busyTaskIDs))
 	}
+	if reason != "unhealthy" || len(busy) == 0 {
+		return drained, nil
+	}
+
+	recovered, err := l.BrokerClient.RecoverLostRunners(ctx, api.RecoverLostRunnersRequest{
+		FleetID:   l.Config.RunnerFleetID,
+		RunnerIDs: busy,
+	})
+	if err != nil {
+		return nil, err
+	}
+	recoveredRunnerIDs := runnerIDsWithRecoveredTasks(recovered.Tasks)
+	if l.Log != nil {
+		l.Log.Warn("ec2 unhealthy busy runners recovered before termination",
+			slog.String("fleet_id", l.Config.RunnerFleetID),
+			slog.Any("runner_ids", recoveredRunnerIDs),
+			slog.Any("tasks", recovered.Tasks))
+	}
+	drained = append(drained, recoveredRunnerIDs...)
 	return drained, nil
+}
+
+func runnerIDsWithRecoveredTasks(tasks []api.RunnerTaskRecovery) []string {
+	out := make([]string, 0, len(tasks))
+	seen := make(map[string]struct{}, len(tasks))
+	for _, task := range tasks {
+		id := strings.TrimSpace(task.RunnerID)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 func selectExcessRunnerIDs(instances []managedInstance, claimedRunnerIDs []string, remove int) []string {

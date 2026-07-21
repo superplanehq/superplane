@@ -12,14 +12,18 @@ import (
 )
 
 type fakeBrokerClient struct {
-	counts       api.FleetTaskCountsResponse
-	err          error
-	drain        api.DrainRunnersResponse
-	drainErr     error
-	calls        int
-	drainCalls   int
-	gotID        string
-	drainRequest api.DrainRunnersRequest
+	counts         api.FleetTaskCountsResponse
+	err            error
+	drain          api.DrainRunnersResponse
+	drainErr       error
+	recover        api.RecoverLostRunnersResponse
+	recoverErr     error
+	calls          int
+	drainCalls     int
+	recoverCalls   int
+	gotID          string
+	drainRequest   api.DrainRunnersRequest
+	recoverRequest api.RecoverLostRunnersRequest
 }
 
 func (f *fakeBrokerClient) FleetTaskCounts(_ context.Context, fleetID string) (api.FleetTaskCountsResponse, error) {
@@ -32,6 +36,12 @@ func (f *fakeBrokerClient) DrainRunners(_ context.Context, req api.DrainRunnersR
 	f.drainCalls++
 	f.drainRequest = req
 	return f.drain, f.drainErr
+}
+
+func (f *fakeBrokerClient) RecoverLostRunners(_ context.Context, req api.RecoverLostRunnersRequest) (api.RecoverLostRunnersResponse, error) {
+	f.recoverCalls++
+	f.recoverRequest = req
+	return f.recover, f.recoverErr
 }
 
 func TestDesiredWant_HeadroomOff_UsesHotInstanceCount(t *testing.T) {
@@ -254,6 +264,9 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 	if fake.drainRequest.FleetID != "fleet-a" || len(fake.drainRequest.RunnerIDs) != 2 {
 		t.Fatalf("drain request: %#v", fake.drainRequest)
 	}
+	if fake.recoverCalls != 0 {
+		t.Fatalf("recover calls = %d, want 0", fake.recoverCalls)
+	}
 }
 
 func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T) {
@@ -265,6 +278,60 @@ func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T
 
 	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, "test"); err == nil {
 		t.Fatal("expected drain error")
+	}
+}
+
+func TestDrainTerminationCandidates_RecoversBusyUnhealthyRunners(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
+				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
+			},
+		},
+		recover: api.RecoverLostRunnersResponse{
+			Tasks: []api.RunnerTaskRecovery{
+				{RunnerID: "i-busy", TaskID: "task-1", State: api.RunnerTaskRecoveryStateRequeued},
+			},
+		},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, "unhealthy")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 2 || got[0] != "i-idle" || got[1] != "i-busy" {
+		t.Fatalf("drained ids: got %#v want [i-idle i-busy]", got)
+	}
+	if fake.recoverCalls != 1 {
+		t.Fatalf("recover calls = %d, want 1", fake.recoverCalls)
+	}
+	if fake.recoverRequest.FleetID != "fleet-a" || len(fake.recoverRequest.RunnerIDs) != 1 || fake.recoverRequest.RunnerIDs[0] != "i-busy" {
+		t.Fatalf("recover request: %#v", fake.recoverRequest)
+	}
+}
+
+func TestDrainTerminationCandidates_FailsClosedWhenLostRunnerRecoveryFails(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
+			},
+		},
+		recoverErr: errors.New("broker down"),
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-busy"}, "unhealthy"); err == nil {
+		t.Fatal("expected recover error")
 	}
 }
 
