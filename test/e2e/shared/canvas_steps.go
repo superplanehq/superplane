@@ -246,7 +246,10 @@ func (s *CanvasSteps) AssertEditSessionReady() {
 	s.session.AssertHidden(q.TestID("canvas-mode-floating-bar"))
 	s.waitForEnabledExitEditButton()
 	s.AssertEditModeTabChrome()
-	s.session.AssertVisible(q.TestID("building-blocks-sidebar"))
+	// Building blocks stay collapsed when the canvas already has nodes; edit controls
+	// on the right rail are the reliable signal that live edit mode is active again.
+	s.session.AssertVisible(q.TestID("canvas-add-component-button"))
+	s.AssertStagingActionsVisibleAndDisabled()
 }
 
 func (s *CanvasSteps) waitForVisible(query q.Query, timeout time.Duration) {
