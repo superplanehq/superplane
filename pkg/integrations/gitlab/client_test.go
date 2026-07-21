@@ -930,6 +930,52 @@ func Test__Client__ApproveMergeRequest(t *testing.T) {
 	})
 }
 
+func Test__Client__GetMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "iid": 42, "title": "Test MR", "state": "opened", "draft": true}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetMergeRequest(context.Background(), "456", "42")
+		require.NoError(t, err)
+		assert.Equal(t, 42, result.IID)
+		assert.Equal(t, "Test MR", result.Title)
+		assert.True(t, result.Draft)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Merge Request Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetMergeRequest(context.Background(), "456", "999")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get merge request")
+	})
+}
+
 func Test__Client__ListEnvironments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{

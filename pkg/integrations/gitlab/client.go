@@ -231,6 +231,7 @@ type UpdateIssueRequest struct {
 	Description *string `json:"description,omitempty"`
 	StateEvent  *string `json:"state_event,omitempty"`
 	Labels      *string `json:"labels,omitempty"`
+	AddLabels   *string `json:"add_labels,omitempty"`
 	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
 	MilestoneID *int    `json:"milestone_id,omitempty"`
 	DueDate     *string `json:"due_date,omitempty"`
@@ -655,6 +656,32 @@ type MergeRequest struct {
 	Squash                   bool       `json:"squash"`
 	ShouldRemoveSourceBranch bool       `json:"should_remove_source_branch"`
 	WebURL                   string     `json:"web_url"`
+}
+
+func (c *Client) GetMergeRequest(ctx context.Context, projectID, mergeRequestIID string) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
 }
 
 type AcceptMergeRequestRequest struct {
