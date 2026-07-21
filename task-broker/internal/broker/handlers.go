@@ -151,7 +151,14 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claimedTaskIDs, err := s.Store.ClaimedTaskIDsByRunners(r.Context(), req.FleetID, req.RunnerIDs)
+	if err != nil {
+		s.logErr("claimed task ids by runners", err)
+		writeError(w, http.StatusInternalServerError, "could not load claimed runner tasks")
+		return
+	}
 	statuses := s.RunnerDrain.Drain(req.FleetID, req.RunnerIDs)
+	statuses = mergePersistedClaimedTasks(statuses, claimedTaskIDs)
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
@@ -163,6 +170,25 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 			slog.Int("busy_count", busy))
 	}
 	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses})
+}
+
+func mergePersistedClaimedTasks(statuses []api.DrainRunnerStatus, claimedTaskIDs map[string]string) []api.DrainRunnerStatus {
+	if len(claimedTaskIDs) == 0 {
+		return statuses
+	}
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		taskID, ok := claimedTaskIDs[out[i].RunnerID]
+		if !ok {
+			continue
+		}
+		out[i].State = api.DrainRunnerStateBusy
+		if out[i].ActiveTaskID == "" {
+			out[i].ActiveTaskID = taskID
+		}
+	}
+	return out
 }
 
 func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int) {

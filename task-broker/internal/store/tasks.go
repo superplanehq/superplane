@@ -114,6 +114,40 @@ func (s *PostgresStore) ClaimedRunnerIDsByFleet(ctx context.Context, fleetID str
 	return runnerIDs, nil
 }
 
+func (s *PostgresStore) ClaimedTaskIDsByRunners(ctx context.Context, fleetID string, runnerIDs []string) (map[string]string, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for claimed task ids")
+	}
+	runnerIDs = compactRunnerIDs(runnerIDs)
+	if len(runnerIDs) == 0 {
+		return map[string]string{}, nil
+	}
+
+	var rows []struct {
+		RunnerID string
+		TaskID   string
+	}
+	err := s.db.WithContext(ctx).
+		Model(&brokermodels.Task{}).
+		Select("runner_id, id AS task_id").
+		Where("fleet_id = ? AND status = ? AND runner_id IN ?", fleetID, string(models.StatusClaimed), runnerIDs).
+		Order("runner_id ASC, created_at ASC, id ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]string, len(rows))
+	for _, row := range rows {
+		if _, ok := out[row.RunnerID]; ok {
+			continue
+		}
+		out[row.RunnerID] = row.TaskID
+	}
+	return out, nil
+}
+
 func (s *PostgresStore) ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {
@@ -152,6 +186,23 @@ RETURNING id`,
 		return nil, nil
 	}
 	return s.GetTask(ctx, id)
+}
+
+func compactRunnerIDs(ids []string) []string {
+	out := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // UnclaimTask re-queues a claimed task so another runner can pick it up.
