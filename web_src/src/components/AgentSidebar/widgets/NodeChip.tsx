@@ -4,6 +4,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { appPath } from "@/lib/appPaths";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { AppLogo } from "@/ui/componentSidebar/AppLogo";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { MetadataList } from "@/ui/metadataList";
@@ -82,7 +83,7 @@ function getChipStyle(node: SuperplaneComponentsNode | undefined, component?: st
 
 function NodeIconInline({ component, isTrigger }: { component?: string; isTrigger: boolean }) {
   const iconSrc = component ? getHeaderIconSrc(component) : undefined;
-  if (iconSrc) return <img src={iconSrc} alt="" className="size-3 object-contain shrink-0" />;
+  if (iconSrc) return <AppLogo src={iconSrc} className="size-3 object-contain shrink-0" />;
 
   const slug = component ? BUILTIN_COMPONENT_ICON_SLUGS[component] : undefined;
   if (slug) return createElement(resolveIcon(slug), { className: "size-3 shrink-0" });
@@ -92,7 +93,7 @@ function NodeIconInline({ component, isTrigger }: { component?: string; isTrigge
 
 function NodeHoverIcon({ component, isTrigger }: { component?: string; isTrigger: boolean }) {
   const iconSrc = component ? getHeaderIconSrc(component) : undefined;
-  if (iconSrc) return <img src={iconSrc} alt="" className="size-4 object-contain shrink-0" />;
+  if (iconSrc) return <AppLogo src={iconSrc} className="size-4 object-contain shrink-0" />;
 
   const builtinSlug = component ? BUILTIN_COMPONENT_ICON_SLUGS[component] : undefined;
   if (builtinSlug) return createElement(resolveIcon(builtinSlug), { className: "size-4 shrink-0" });

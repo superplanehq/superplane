@@ -36,6 +36,23 @@ export function getSystemPrefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/** SVG favicons per resolved theme; keep in sync with the FOUC script in index.html. */
+export const FAVICON_HREF: Record<ResolvedTheme, string> = {
+  light: "/favicon.svg",
+  dark: "/favicon-dark.svg",
+};
+
+export function applyFaviconForTheme(resolvedTheme: ResolvedTheme): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]');
+  if (link) {
+    link.href = FAVICON_HREF[resolvedTheme];
+  }
+}
+
 export function applyResolvedThemeToDocument(resolvedTheme: ResolvedTheme): void {
   if (typeof document === "undefined") {
     return;
@@ -43,6 +60,7 @@ export function applyResolvedThemeToDocument(resolvedTheme: ResolvedTheme): void
 
   document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
   document.documentElement.style.colorScheme = resolvedTheme;
+  applyFaviconForTheme(resolvedTheme);
 }
 
 export function persistThemePreference(preference: ThemePreference): void {

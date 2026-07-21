@@ -61,6 +61,7 @@ vi.mock("@/ui/Runs/RunNodeIcon", () => ({
 
 vi.mock("@/ui/componentSidebar/integrationIconMaps", () => ({
   getHeaderIconSrc: () => undefined,
+  getIconThemeTreatment: () => ({}),
 }));
 
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({

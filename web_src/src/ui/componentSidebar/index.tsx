@@ -5,6 +5,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { Check, Copy, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { AppLogo } from "@/ui/componentSidebar/AppLogo";
 import { useAvailableIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
@@ -546,7 +547,7 @@ export const ComponentSidebar = ({
                   <div className="flex items-center gap-2">
                     <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                       {headerIconSrc ? (
-                        <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
+                        <AppLogo src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
                       ) : (
                         <Icon size={16} />
                       )}

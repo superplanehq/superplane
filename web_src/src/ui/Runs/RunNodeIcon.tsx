@@ -1,5 +1,6 @@
 import React from "react";
 import { cn, resolveIcon } from "@/lib/utils";
+import { AppLogo } from "@/ui/componentSidebar/AppLogo";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 
 export const RUN_NODE_ICON_SIZE = 14;
@@ -24,7 +25,7 @@ export function RunNodeIcon({
 
   if (resolvedIconSrc) {
     return (
-      <img
+      <AppLogo
         src={resolvedIconSrc}
         alt={alt}
         className={cn("shrink-0 object-contain", dimensionClass, className)}
