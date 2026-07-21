@@ -197,7 +197,7 @@ func (l *Launcher) scaleDownExcess(ctx context.Context, instances []managedInsta
 		return nil
 	}
 
-	drainedIDs, err := l.drainTerminationCandidates(ctx, ids)
+	drainedIDs, err := l.drainTerminationCandidates(ctx, ids, "scale_down")
 	if err != nil {
 		return fmt.Errorf("drain runners: %w", err)
 	}
@@ -235,7 +235,7 @@ func (l *Launcher) logBusyScaleDownSkipped(have, want int) {
 		slog.String("fleet_id", l.Config.RunnerFleetID))
 }
 
-func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string) ([]string, error) {
+func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string, reason string) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -261,7 +261,8 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string)
 		}
 	}
 	if l.Log != nil && len(busy) > 0 {
-		l.Log.Info("ec2 scale-down deferred busy runners",
+		l.Log.Info("ec2 termination deferred busy runners",
+			slog.String("reason", reason),
 			slog.String("fleet_id", l.Config.RunnerFleetID),
 			slog.Any("runner_ids", busy))
 	}

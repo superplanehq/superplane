@@ -65,14 +65,28 @@ func (l *Launcher) SweepUnhealthy(ctx context.Context) ([]string, error) {
 	if len(terminate) == 0 {
 		return nil, nil
 	}
-	_, err = l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: terminate})
+	return l.terminateUnhealthyRunners(ctx, terminate)
+}
+
+func (l *Launcher) terminateUnhealthyRunners(ctx context.Context, ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	drained, err := l.drainTerminationCandidates(ctx, ids, "unhealthy")
+	if err != nil {
+		return nil, fmt.Errorf("drain unhealthy runners: %w", err)
+	}
+	if len(drained) == 0 {
+		return nil, nil
+	}
+	_, err = l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: drained})
 	if err != nil {
 		return nil, fmt.Errorf("terminate unhealthy: %w", err)
 	}
 	if l.Log != nil {
-		l.Log.Info("ec2 terminated unhealthy runners", slog.Int("count", len(terminate)), slog.Any("instance_ids", terminate))
+		l.Log.Info("ec2 terminated unhealthy runners", slog.Int("count", len(drained)), slog.Any("instance_ids", drained))
 	}
-	return terminate, nil
+	return drained, nil
 }
 
 func (l *Launcher) listManagedInstances(ctx context.Context) ([]managedInstance, error) {
