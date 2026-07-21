@@ -130,6 +130,22 @@ describe("runCodeAgentMapper.getExecutionDetails", () => {
     );
     expect(withoutArtifacts["Artifacts"]).toBeUndefined();
   });
+
+  it("surfaces parsed structured output as JSON", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: { default: [buildOutput({ status: "idle", parsed: { summary: "fixed the bug" } })] },
+      },
+    });
+    const details = runCodeAgentMapper.getExecutionDetails(ctx);
+    expect(details["Parsed Output"]).toBe('{"summary":"fixed the bug"}');
+  });
+
+  it("omits parsed output when structured output was not configured", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput({ status: "idle" })] } } });
+    const details = runCodeAgentMapper.getExecutionDetails(ctx);
+    expect(details["Parsed Output"]).toBeUndefined();
+  });
 });
 
 describe("runCodeAgentMapper.props", () => {
@@ -170,6 +186,29 @@ describe("runCodeAgentMapper.props", () => {
       { icon: "git-branch", label: "acme/widgets" },
       { icon: "git-branch", label: "develop" },
     ]);
+  });
+
+  it("shows a structured output badge when the schema is configured", () => {
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: { outputSchema: "{}" } }) }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "braces", label: "Structured output" });
+  });
+
+  it("prefers the live configuration over stale metadata for structured output", () => {
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: {}, metadata: { structuredOutput: true } }) }),
+    );
+    expect(props.metadata).not.toContainEqual({ icon: "braces", label: "Structured output" });
+  });
+
+  it("falls back to node metadata for structured output when configuration is null", () => {
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: null as unknown as undefined, metadata: { structuredOutput: true } }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "braces", label: "Structured output" });
   });
 });
 

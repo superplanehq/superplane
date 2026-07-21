@@ -1,19 +1,18 @@
-// Package structuredoutput lets LLM text-prompt components accept a JSON Schema
-// that describes the desired response. The component shows a default schema the
-// user edits; the backend validates that it is well-formed JSON before the
-// provider request is fired, and normalizes it to the constraints both providers
-// enforce:
+// Package structuredoutput lets LLM components accept a JSON Schema
+// describing the desired response, validating it and normalizing it to the
+// constraints strict-mode providers enforce (every object gets
+// "additionalProperties": false; strict mode also requires listing every
+// property in "required").
 //
-//   - Every object node gets "additionalProperties": false.
-//   - OpenAI strict mode (strict=true) additionally forces every object's
-//     "required" to list all of its properties; optional fields are expressed by
-//     making their type nullable in the schema itself.
-//   - Anthropic (strict=false) leaves "required" as the user wrote it.
+// Some agent-style components have no server-side schema enforcement at all.
+// For those, PromptSuffix and ExtractJSON emulate it by asking the model to
+// comply and best-effort parsing its final message.
 package structuredoutput
 
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -107,6 +106,65 @@ func validateRoot(schema map[string]any) error {
 // to send. It does not mutate the input.
 func Prepare(schema map[string]any, strict bool) map[string]any {
 	return normalizeMap(schema, strict)
+}
+
+// ValidateAtSetup validates a raw structured-output config value at Setup
+// time. An empty value is fine (structured output is optional). A value that
+// still contains an unresolved "{{" expression is skipped, mirroring how the
+// prompt field itself is only resolved at Execute.
+func ValidateAtSetup(raw string) error {
+	if strings.TrimSpace(raw) == "" || strings.Contains(raw, "{{") {
+		return nil
+	}
+	_, err := Parse(raw)
+	return err
+}
+
+// PromptSuffix renders schema-following instructions to append to an agent's
+// task prompt, for components with no server-side schema enforcement to rely
+// on instead. Returns "" if schema is nil.
+func PromptSuffix(schema map[string]any) string {
+	if schema == nil {
+		return ""
+	}
+	encoded, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("\n\nBefore you finish, include a fenced json code block in your message with data matching this JSON Schema exactly:\n\n```json\n%s\n```\n", encoded)
+}
+
+// jsonFencePattern matches a fenced code block, with or without a "json"
+// language tag.
+var jsonFencePattern = regexp.MustCompile("(?s)```(?:json)?\\s*\\n?(.*?)\\n?```")
+
+// ExtractJSON pulls a JSON object out of text produced by PromptSuffix's
+// instructions: it tries each fenced code block (last to first), then the
+// whole trimmed text, and reports false if none parse as a JSON object. This
+// is best-effort with no schema validation — callers decide when to trust it.
+func ExtractJSON(text string) (any, bool) {
+	matches := jsonFencePattern.FindAllStringSubmatch(text, -1)
+	for i := len(matches) - 1; i >= 0; i-- {
+		if parsed, ok := unmarshalJSONObject(matches[i][1]); ok {
+			return parsed, true
+		}
+	}
+	return unmarshalJSONObject(text)
+}
+
+func unmarshalJSONObject(s string) (any, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, false
+	}
+	var parsed any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return nil, false
+	}
+	if _, ok := parsed.(map[string]any); !ok {
+		return nil, false
+	}
+	return parsed, true
 }
 
 func normalizeMap(node map[string]any, strict bool) map[string]any {
