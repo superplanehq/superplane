@@ -2,6 +2,8 @@ package apikeys
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -69,8 +71,11 @@ func UpdateAPIKey(ctx context.Context, req *pb.UpdateAPIKeyRequest) (*pb.UpdateA
 	}
 
 	user.UpdatedAt = time.Now()
-	err = db.Save(user).Error
+	err = models.UpdateAPIKey(db, user)
 	if err != nil {
+		if errors.Is(err, models.ErrAPIKeyNameAlreadyExists) {
+			return nil, grpcerrors.AlreadyExists(err, fmt.Sprintf("an API key with the name %q already exists in this organization", user.Name))
+		}
 		return nil, grpcerrors.Internal(err, "failed to update API key")
 	}
 

@@ -2,6 +2,8 @@ package apikeys
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -104,6 +106,9 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	})
 
 	if err != nil {
+		if errors.Is(err, models.ErrAPIKeyNameAlreadyExists) {
+			return nil, grpcerrors.AlreadyExists(err, fmt.Sprintf("an API key with the name %q already exists in this organization", name))
+		}
 		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 
