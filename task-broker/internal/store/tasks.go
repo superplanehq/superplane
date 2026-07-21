@@ -275,13 +275,30 @@ WHERE id = ? AND runner_id = ? AND status = ?`,
 		return nil, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return nil, fmt.Errorf("task not found, wrong runner, or not claimed: %s", req.ID)
+		return s.completeTaskNoRows(ctx, req)
 	}
 	task, err := s.GetTask(ctx, req.ID)
 	if err != nil {
 		return nil, err
 	}
 	return &CompleteTaskResult{Task: task, Outcome: CompleteTaskOutcomeTerminal}, nil
+}
+
+func (s *PostgresStore) completeTaskNoRows(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error) {
+	task, err := s.GetTask(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	if task == nil {
+		return nil, fmt.Errorf("task not found: %s", req.ID)
+	}
+	if task.RunnerID != req.RunnerID {
+		return nil, fmt.Errorf("wrong runner for task %s", req.ID)
+	}
+	if terminalTaskStatus(task.Status) {
+		return &CompleteTaskResult{Task: task, Outcome: CompleteTaskOutcomeAlreadyTerminal}, nil
+	}
+	return nil, fmt.Errorf("task not claimed: %s", req.ID)
 }
 
 func isRetryableInfraFailure(req CompleteTaskRequest) bool {

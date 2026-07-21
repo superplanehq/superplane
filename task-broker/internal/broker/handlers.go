@@ -522,6 +522,17 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 		}
 		return result, nil
 	}
+	if result.Outcome == taskstore.CompleteTaskOutcomeAlreadyTerminal {
+		if s.Log != nil {
+			s.Log.Info("task_complete_duplicate",
+				slog.String("task_id", taskID),
+				slog.String("runner_id", runnerID),
+				slog.String("fleet_id", task.FleetID),
+				slog.String("status", string(task.Status)),
+			)
+		}
+		return result, nil
+	}
 
 	s.recordTaskCompleted(ctx, task)
 	if s.Log != nil {

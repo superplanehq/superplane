@@ -28,8 +28,9 @@ type ReapedLease struct {
 type CompleteTaskOutcome string
 
 const (
-	CompleteTaskOutcomeTerminal CompleteTaskOutcome = "terminal"
-	CompleteTaskOutcomeRequeued CompleteTaskOutcome = "requeued"
+	CompleteTaskOutcomeTerminal        CompleteTaskOutcome = "terminal"
+	CompleteTaskOutcomeAlreadyTerminal CompleteTaskOutcome = "already_terminal"
+	CompleteTaskOutcomeRequeued        CompleteTaskOutcome = "requeued"
 )
 
 type CompleteTaskRequest struct {
