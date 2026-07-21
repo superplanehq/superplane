@@ -282,9 +282,9 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string,
 	if err != nil {
 		return nil, err
 	}
-	recoveredRunnerIDs := runnerIDsWithRecoveredTasks(recovered.Tasks)
+	recoveredRunnerIDs := terminationReadyLostRunnerIDs(busy, busyTaskIDs, recovered.Tasks)
 	if l.Log != nil {
-		l.Log.Warn("ec2 unhealthy busy runners recovered before termination",
+		l.Log.Warn("ec2 unhealthy busy runners ready after recovery",
 			slog.String("fleet_id", l.Config.RunnerFleetID),
 			slog.Any("runner_ids", recoveredRunnerIDs),
 			slog.Any("tasks", recovered.Tasks))
@@ -293,19 +293,33 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string,
 	return drained, nil
 }
 
-func runnerIDsWithRecoveredTasks(tasks []api.RunnerTaskRecovery) []string {
-	out := make([]string, 0, len(tasks))
-	seen := make(map[string]struct{}, len(tasks))
+func terminationReadyLostRunnerIDs(busyRunnerIDs []string, activeTaskIDs map[string]string, tasks []api.RunnerTaskRecovery) []string {
+	recovered := make(map[string]struct{}, len(tasks))
 	for _, task := range tasks {
 		id := strings.TrimSpace(task.RunnerID)
 		if id == "" {
 			continue
 		}
-		if _, ok := seen[id]; ok {
+		recovered[id] = struct{}{}
+	}
+
+	out := make([]string, 0, len(busyRunnerIDs))
+	seen := make(map[string]struct{}, len(busyRunnerIDs))
+	for _, runnerID := range busyRunnerIDs {
+		runnerID = strings.TrimSpace(runnerID)
+		if runnerID == "" {
 			continue
 		}
-		seen[id] = struct{}{}
-		out = append(out, id)
+		if _, ok := seen[runnerID]; ok {
+			continue
+		}
+		_, hasRecoveredTask := recovered[runnerID]
+		hasActiveTaskID := strings.TrimSpace(activeTaskIDs[runnerID]) != ""
+		if !hasRecoveredTask && !hasActiveTaskID {
+			continue
+		}
+		seen[runnerID] = struct{}{}
+		out = append(out, runnerID)
 	}
 	return out
 }

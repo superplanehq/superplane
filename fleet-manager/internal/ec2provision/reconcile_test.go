@@ -316,6 +316,60 @@ func TestDrainTerminationCandidates_RecoversBusyUnhealthyRunners(t *testing.T) {
 	}
 }
 
+func TestDrainTerminationCandidates_TerminatesUnhealthyRunnerWithNoPersistedTaskAfterRecovery(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-stale", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-stale"},
+			},
+		},
+		recover: api.RecoverLostRunnersResponse{},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-stale"}, "unhealthy")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || got[0] != "i-stale" {
+		t.Fatalf("drained ids: got %#v want [i-stale]", got)
+	}
+	if fake.recoverCalls != 1 {
+		t.Fatalf("recover calls = %d, want 1", fake.recoverCalls)
+	}
+}
+
+func TestDrainTerminationCandidates_DefersInProgressClaimWithNoPersistedTaskAfterRecovery(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-claiming", State: api.DrainRunnerStateBusy},
+			},
+		},
+		recover: api.RecoverLostRunnersResponse{},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-claiming"}, "unhealthy")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 0 {
+		t.Fatalf("drained ids: got %#v want none", got)
+	}
+	if fake.recoverCalls != 1 {
+		t.Fatalf("recover calls = %d, want 1", fake.recoverCalls)
+	}
+}
+
 func TestDrainTerminationCandidates_FailsClosedWhenLostRunnerRecoveryFails(t *testing.T) {
 	fake := &fakeBrokerClient{
 		drain: api.DrainRunnersResponse{
