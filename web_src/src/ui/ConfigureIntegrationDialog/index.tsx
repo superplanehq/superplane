@@ -184,8 +184,6 @@ export function ConfigureIntegrationDialog({
                       value={config[field.name]}
                       onChange={(value) => setConfig((prev) => ({ ...prev, [field.name || ""]: value }))}
                       allValues={config}
-                      domainId={organizationId}
-                      domainType="DOMAIN_TYPE_ORGANIZATION"
                       organizationId={organizationId}
                       integrationId={integration.metadata?.id}
                     />

@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -166,6 +165,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	logger := logging.WithExecution(w.logger, &execution)
 
 	finished := false
+	runCancellations := &RunCancellationNotifier{}
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, execution.ID)
 		if err != nil {
@@ -178,7 +178,7 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 			return err
 		}
 
-		if err := w.cancelComponent(tx, logger, canvas.OrganizationID.String(), execution); err != nil {
+		if err := w.cancelComponent(tx, logger, canvas, execution, runCancellations); err != nil {
 			return err
 		}
 
@@ -203,6 +203,8 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 		return nil
 	}
 
+	runCancellations.Publish()
+
 	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
 		w.logger.Errorf("failed to publish execution finished RabbitMQ message: %v", err)
 	}
@@ -210,7 +212,13 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	return nil
 }
 
-func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, organizationID string, execution *models.CanvasNodeExecution) error {
+func (w *ExecutionTerminator) cancelComponent(
+	tx *gorm.DB,
+	logger *log.Entry,
+	canvas *models.Canvas,
+	execution *models.CanvasNodeExecution,
+	runCancellations *RunCancellationNotifier,
+) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return err
@@ -231,17 +239,13 @@ func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, or
 		return err
 	}
 
-	orgUUID := uuid.MustParse(organizationID)
-	canvasName := ""
-	if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-		canvasName = workflow.Name
-	}
+	orgUUID := canvas.OrganizationID
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
-		OrganizationID: organizationID,
-		CanvasName:     canvasName,
+		OrganizationID: orgUUID.String(),
+		CanvasName:     canvas.Name,
 		NodeID:         execution.NodeID,
 		NodeName:       node.Name,
 		Configuration:  execution.Configuration.Data(),
@@ -251,13 +255,14 @@ func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, or
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, orgUUID, w.authService, nil),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
 	}
 
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
-			return grpcerrors.Internal(err, "error building context")
+			return err
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -266,7 +271,7 @@ func (w *ExecutionTerminator) cancelComponent(tx *gorm.DB, logger *log.Entry, or
 
 	ctx.Logger = logger
 	if err := action.Cancel(ctx); err != nil {
-		log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
+		logger.Errorf("failed to cancel component execution %s: %v", execution.ID, err)
 	}
 
 	return nil

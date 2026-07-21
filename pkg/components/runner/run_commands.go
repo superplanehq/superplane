@@ -305,7 +305,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       cmds,
+		Commands:       BrokerCommandsFromLines(cmds),
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,

@@ -4,7 +4,7 @@ import { isExecutionInFlight } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspectorNodeSection; isOpen: boolean }) {
   const execution = section.execution;

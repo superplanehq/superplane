@@ -3,7 +3,7 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 import { useRunInspectorActions } from "./useRunInspectorActions";
 
 const run: CanvasesCanvasRun = {

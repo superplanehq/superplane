@@ -126,4 +126,36 @@ describe("getExecutionDetails", () => {
     expect(props.customField).toBeDefined();
     expect(getStateMap("runnerPython")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
+
+  it("resolves runnerClaudeCode mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerClaudeCode");
+    const props = mapper.props({
+      node: {
+        id: "node-claude-1",
+        name: "Run Claude Code",
+        componentName: "runnerClaudeCode",
+        isCollapsed: false,
+        configuration: {
+          machineType: "aws-standard-1",
+          prompt: "Fix the failing tests",
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerClaudeCode",
+        label: "Run Claude Code",
+        description: "Runs Claude Code on a fleet runner",
+        icon: "code",
+        color: "#C9784D",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
 });

@@ -652,6 +652,10 @@ func (c *AppContext) Get(idOrName string) (*core.App, error) {
 	return app, nil
 }
 
+func (c *AppContext) GetNode(app, node string) (*core.CanvasNode, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
 func (c *AppContext) Subscribe(id string) error {
 	if c.SubscribeErrFor != nil {
 		if err, ok := c.SubscribeErrFor[id]; ok {
@@ -675,4 +679,35 @@ func (c *AppContext) Subscribe(id string) error {
 func (c *AppContext) Unsubscribe() error {
 	c.UnsubscribeCalls++
 	return nil
+}
+
+type RunExecutionContext struct {
+	CreateRunID      uuid.UUID
+	CreateErr        error
+	CancelErr        error
+	CancelCalled     bool
+	LastCreateParams *core.RunCreationParams
+}
+
+func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
+	if c.CreateErr != nil {
+		return nil, c.CreateErr
+	}
+
+	runID := c.CreateRunID
+	if runID == uuid.Nil {
+		runID = uuid.New()
+	}
+
+	c.LastCreateParams = &params
+
+	return &core.Run{
+		ID:    runID,
+		AppID: uuid.MustParse(params.App),
+	}, nil
+}
+
+func (c *RunExecutionContext) Cancel() error {
+	c.CancelCalled = true
+	return c.CancelErr
 }

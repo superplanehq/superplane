@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
+  <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
@@ -35,8 +36,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
+  <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
@@ -158,6 +161,32 @@ Each emitted event carries:
   },
   "timestamp": "2024-01-01T09:00:00Z",
   "type": "onError.triggered"
+}
+```
+
+<a id="on-run"></a>
+
+## On Run
+
+**Trigger key:** `onRun`
+
+Handle runs started from another app
+
+### Example Data
+
+```json
+{
+  "data": {
+    "app": {
+      "id": "123",
+      "name": "Source App"
+    },
+    "parameters": {
+      "parameter": "hello"
+    }
+  },
+  "timestamp": "2026-07-19T12:00:00Z",
+  "type": "app.invocation"
 }
 ```
 
@@ -1028,6 +1057,36 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
+<a id="run-app"></a>
+
+## Run App
+
+**Component key:** `runApp`
+
+Run another SuperPlane app and wait for its run to finish.
+
+### Configuration
+
+- **App**: The SuperPlane app to invoke
+- **Node**: The On Run trigger in the target app
+- **Parameters**: Values passed to the target app's On Run trigger
+- **Timeout**: Maximum wait time in seconds for the child run (default 3600). When the timeout expires before the child run finishes, the child run is cancelled and the parent continues through the Failed output channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "run": {
+      "id": "123",
+      "result": "passed"
+    }
+  },
+  "timestamp": "2026-07-19T12:00:00Z",
+  "type": "app.invocation.passed"
+}
+```
+
 <a id="run-shell-commands"></a>
 
 ## Run Shell Commands
@@ -1133,6 +1192,66 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerBash.finished"
+}
+```
+
+<a id="run-claude-code"></a>
+
+## Run Claude Code
+
+**Component key:** `runnerClaudeCode`
+
+Runs [Claude Code](https://code.claude.com/docs/en/headless) in non-interactive mode on a fleet runner.
+
+### Prerequisites
+- The `claude` CLI is installed on the runner machine and available on `PATH`.
+- An Anthropic API key stored as a SuperPlane secret.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — a Claude Code turn. Later prompts continue the same session.
+
+Example:
+
+1. bash — `git clone …`
+2. prompt — implement the feature
+3. prompt — run tests and fix failures
+4. bash — `git push`
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Anthropic API Key**: SuperPlane secret used as `ANTHROPIC_API_KEY`.
+- **Model**: Optional model id or alias (for example `sonnet`).
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output
+Prompt steps stream agent activity to **View logs**. The finished event includes the latest Claude `result`.
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "session_id": "session-123",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerClaudeCode.finished"
 }
 ```
 

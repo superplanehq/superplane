@@ -10,6 +10,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"webhook":     "Webhook {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 	"onError":     "{{ root().data.node.name }} errored",
 	"onBroadcast": "{{ root().data.app.name }}",
+	"onRun":       "App run {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.detail.alarmName }} - {{ root().data.detail.previousState.value }} -> {{ root().data.detail.state.value }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",
