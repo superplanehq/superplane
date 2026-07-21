@@ -164,10 +164,7 @@ type TextTypeOptions struct {
 	// Language is the Monaco editor language id (e.g. "javascript", "python").
 	Language string `json:"language,omitempty"`
 
-	// When false, SuperPlane does not resolve expression placeholders in this
-	// field (they are left as literal text) and the UI does not offer expression
-	// autocomplete. Unlike StringTypeOptions.AllowExpressions=false, this does
-	// not reject values that contain expression placeholders.
+	// When false, expressions stay literal and autocomplete is disabled.
 	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 

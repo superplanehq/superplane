@@ -55,10 +55,6 @@ message TextTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
   optional string language = 3;
-  // When false, SuperPlane does not resolve expression placeholders in this
-  // field (they are left as literal text) and the UI does not offer expression
-  // autocomplete. Unlike StringTypeOptions.allow_expressions=false, this does
-  // not reject values that contain expression placeholders.
   optional bool allow_expressions = 4;
 }
 
