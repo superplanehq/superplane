@@ -49,4 +49,4 @@ spec:
   edges:
     - sourceId: submit-task
       targetId: add-random-task
-      channel: task
+      channel: default
