@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
@@ -39,10 +40,13 @@ func (a *RunAgent) Documentation() string {
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
 - **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
+- **Structured Output** (optional): A JSON Schema the agent is asked to match in its final message. Managed Agents sessions have no server-enforced equivalent to the Messages API's ` + "`output_config.format`" + ` used by Text Prompt, so this works by appending instructions to the task asking the agent to include a JSON code block matching the schema, then best-effort parsing it from the final message. Treat the result as best-effort, not a guarantee — validate before relying on it downstream.
 
 ## Output
 
 Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
+
+When Structured Output is configured, **parsed** carries the JSON object extracted from the final message — only when the session finished normally (idle), never on a timeout, error, or terminated session.
 
 Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only). Instruct the agent in the task to save its deliverables there.`
 }
@@ -118,6 +122,11 @@ func (a *RunAgent) Configuration() []configuration.Field {
 			Required:    true,
 			Description: "User message (task) for the agent",
 		},
+		structuredoutput.ConfigField(
+			"outputSchema",
+			"Structured Output",
+			"A JSON Schema the agent is asked to match in its final message. Best-effort: Managed Agents sessions have no server-side schema enforcement, so this is prompt-guided, not guaranteed.",
+		),
 		{
 			Name:     "vaultIds",
 			Label:    "Vault IDs",
@@ -215,6 +224,10 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	if err := structuredoutput.ValidateAtSetup(spec.OutputSchema); err != nil {
+		return err
+	}
+
 	if len(spec.Files) > 0 {
 		if ctx.Files == nil {
 			return fmt.Errorf("files configured but file access is not available")
@@ -249,6 +262,12 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	if ctx.Metadata != nil {
+		_ = ctx.Metadata.Set(RunAgentNodeMetadata{
+			StructuredOutput: strings.TrimSpace(spec.OutputSchema) != "",
+		})
+	}
+
 	return nil
 }
 
@@ -262,6 +281,11 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	if err := validateSpec(spec); err != nil {
+		return err
+	}
+
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
+	if err != nil {
 		return err
 	}
 
@@ -344,7 +368,11 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set managed_session_id: %w", err)
 	}
 
-	if err := client.SendManagedSessionUserMessage(session.ID, spec.Prompt); err != nil {
+	prompt := spec.Prompt
+	if schema != nil {
+		prompt += structuredoutput.PromptSuffix(structuredoutput.Prepare(schema, false))
+	}
+	if err := client.SendManagedSessionUserMessage(session.ID, prompt); err != nil {
 		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
@@ -363,6 +391,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
 		} else if sm != nil && sm.Complete {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
+			applyStructuredOutput(&out, refreshed.Status, schema)
 			out.Artifacts = CollectSessionArtifacts(client, session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
