@@ -124,6 +124,41 @@ func TestCompleteTaskRecordsTasksCompletedMetric(t *testing.T) {
 	require.Equal(t, int64(1), metricCounterTotal(t, reader, telemetry.MetricTasksCompleted))
 }
 
+func TestCompleteTaskDoesNotRecordDuplicateTerminalMetric(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	require.NoError(t, st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID: "fleet-1", Provisioner: "local", Arch: "amd64", Size: "local", CreatedAt: time.Now().UTC(),
+	}))
+	require.NoError(t, st.CreateTask(ctx, &models.Task{
+		ID: "task-1", FleetID: "fleet-1", WebhookURL: "https://example.com/hook",
+		Status: models.StatusQueued, CreatedAt: time.Now().UTC(), Command: []string{"echo"},
+	}))
+	_, err := st.ClaimTask(ctx, "runner-1", "fleet-1", time.Minute)
+	require.NoError(t, err)
+
+	m, reader := testBrokerMetrics(t)
+	srv := &Server{Store: st, Metrics: m}
+	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "token"}))
+	defer ts.Close()
+
+	body, err := json.Marshal(api.CompleteTaskRequest{RunnerID: "runner-1", ExitCode: 0})
+	require.NoError(t, err)
+	for range 2 {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/tasks/task-1/complete", bytes.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer token")
+		resp, err := ts.Client().Do(req)
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+		require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	}
+
+	require.Equal(t, int64(1), metricCounterTotal(t, reader, telemetry.MetricTasksCompleted))
+}
+
 func TestDeliverWebhookRecordsWebhookMetrics(t *testing.T) {
 	m, reader := testBrokerMetrics(t)
 

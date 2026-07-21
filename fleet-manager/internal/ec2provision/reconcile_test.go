@@ -240,7 +240,7 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"})
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T
 		BrokerClient: fake,
 	}
 
-	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}); err == nil {
+	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, "test"); err == nil {
 		t.Fatal("expected drain error")
 	}
 }

@@ -46,6 +46,8 @@ type File struct {
 	VolumeSizeGB                 int32      `json:"volume_size_gb"`
 	BootGraceSec                 int        `json:"boot_grace_sec"`
 	RunnerHealthPort             int        `json:"runner_health_port"`
+	RunnerHealthTimeoutSec       int        `json:"runner_health_timeout_sec"`
+	RunnerHealthFailureThreshold int        `json:"runner_health_failure_threshold"`
 	RunnerTerminateAfterEachTask *bool      `json:"runner_terminate_after_each_task,omitempty"`
 	CloudWatch                   CloudWatch `json:"cloudwatch"`
 
@@ -77,13 +79,15 @@ type Pool struct {
 
 // Defaults applied when fields are absent or zero.
 const (
-	defaultInstanceType         = "t3.micro"
-	defaultListenAddr           = ":8080"
-	defaultReconcileIntervalSec = 60
-	minReconcileIntervalSec     = 15
-	defaultVolumeSizeGB         = 30
-	defaultBootGraceSec         = 300
-	defaultRunnerHealthPort     = 9090
+	defaultInstanceType                 = "t3.micro"
+	defaultListenAddr                   = ":8080"
+	defaultReconcileIntervalSec         = 60
+	minReconcileIntervalSec             = 15
+	defaultVolumeSizeGB                 = 30
+	defaultBootGraceSec                 = 300
+	defaultRunnerHealthPort             = 9090
+	defaultRunnerHealthTimeoutSec       = 15
+	defaultRunnerHealthFailureThreshold = 3
 )
 
 // Load reads path, parses JSON, applies defaults, and validates. Returns an error
@@ -126,6 +130,12 @@ func (f *File) applyDefaults() {
 	}
 	if f.RunnerHealthPort == 0 {
 		f.RunnerHealthPort = defaultRunnerHealthPort
+	}
+	if f.RunnerHealthTimeoutSec == 0 {
+		f.RunnerHealthTimeoutSec = defaultRunnerHealthTimeoutSec
+	}
+	if f.RunnerHealthFailureThreshold == 0 {
+		f.RunnerHealthFailureThreshold = defaultRunnerHealthFailureThreshold
 	}
 	if f.RunnerTerminateAfterEachTask == nil {
 		t := true
@@ -173,6 +183,12 @@ func (f *File) validate() error {
 	}
 	if f.RunnerHealthPort < 1 || f.RunnerHealthPort > 65535 {
 		return fmt.Errorf("runner_health_port must be a valid TCP port")
+	}
+	if f.RunnerHealthTimeoutSec < 1 {
+		return fmt.Errorf("runner_health_timeout_sec must be a positive integer")
+	}
+	if f.RunnerHealthFailureThreshold < 1 {
+		return fmt.Errorf("runner_health_failure_threshold must be a positive integer")
 	}
 	if f.ReconcileIntervalSec < minReconcileIntervalSec {
 		return fmt.Errorf("reconcile_interval_sec must be >= %d", minReconcileIntervalSec)
@@ -262,5 +278,7 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 		VolumeSizeGB:                    f.VolumeSizeGB,
 		BootGraceSec:                    f.BootGraceSec,
 		RunnerHealthPort:                f.RunnerHealthPort,
+		RunnerHealthTimeoutSec:          f.RunnerHealthTimeoutSec,
+		RunnerHealthFailureThreshold:    f.RunnerHealthFailureThreshold,
 	}
 }

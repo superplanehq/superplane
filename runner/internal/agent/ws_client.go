@@ -50,8 +50,8 @@ func transportWebSocket(c Config) bool {
 }
 
 // RunWebSocket runs the agent against task-broker using GET /v1/runners/stream.
-// It reconnects with a fixed delay after session errors. Returns nil after one claimed
-// task is handled when ExitAfterEachTask is set, even if complete or the broker ack fails.
+// It reconnects with a fixed delay after session errors. Completion delivery
+// failures are returned so one-shot runners do not terminate silently.
 func RunWebSocket(ctx context.Context, a *Agent) error {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -62,6 +62,10 @@ func RunWebSocket(ctx context.Context, a *Agent) error {
 			return nil
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		var deliveryErr completionDeliveryError
+		if errors.As(err, &deliveryErr) {
 			return err
 		}
 		if a.Config.Log != nil {
@@ -75,21 +79,7 @@ func RunWebSocket(ctx context.Context, a *Agent) error {
 	}
 }
 
-func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
-	oneShot := a.Config.ExitAfterEachTask
-	taskHandled := false
-	defer func() {
-		if oneShot && taskHandled && err != nil &&
-			!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			if a.Config.Log != nil {
-				a.Config.Log.Warn("task_broker_ws",
-					slog.String("op", "exit_after_task"),
-					slog.Any("err", err))
-			}
-			err = nil
-		}
-	}()
-
+func runWebSocketSession(ctx context.Context, a *Agent) error {
 	wsURL, err := brokerStreamURL(a.Config.BaseURL)
 	if err != nil {
 		return err
@@ -150,7 +140,6 @@ func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
 			return fmt.Errorf("unexpected message type %q", taskMsg.Type)
 		}
 		task := taskMsg.Task
-		taskHandled = true
 
 		pushCh := make(chan struct{}, 1)
 		readCtx, readStop := context.WithCancel(ctx)
@@ -165,57 +154,104 @@ func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
 		wg.Wait()
 		_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
 
-		comp := wsrunner.Complete{
-			Type:        wsrunner.TypeComplete,
-			TaskID:      task.ID,
-			RunnerID:    a.Config.RunnerID,
-			ExitCode:    execution.ExitCode,
-			Error:       execution.errorMessage(),
-			FailureKind: execution.FailureKind,
-			Canceled:    execution.UserCanceled,
-			Result:      execution.Result,
-		}
-		writeMu.Lock()
-		_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))
-		werr := conn.WriteJSON(comp)
-		writeMu.Unlock()
-		if werr != nil {
-			return fmt.Errorf("write complete: %w", werr)
-		}
-
-		_, raw, err := conn.ReadMessage()
-		if err != nil {
-			return fmt.Errorf("read complete reply: %w", err)
-		}
-		var disc struct {
-			Type string `json:"type"`
-		}
-		if err := json.Unmarshal(raw, &disc); err != nil {
-			return fmt.Errorf("decode reply: %w", err)
-		}
-		switch disc.Type {
-		case wsrunner.TypeError:
-			var wse wsrunner.Error
-			if err := json.Unmarshal(raw, &wse); err != nil {
-				return err
-			}
-			return fmt.Errorf("complete failed: %d %s", wse.Code, wse.Message)
-		case wsrunner.TypeAck:
-			if a.Config.Log != nil {
-				a.Config.Log.Info("task_broker_ws",
-					slog.String("op", "complete_task"),
-					slog.String("runner_id", a.Config.RunnerID),
-					slog.String("task_id", task.ID),
-				)
-			}
-		default:
-			return fmt.Errorf("unexpected reply type %q", disc.Type)
+		if err := a.completeWebSocketWithHTTPFallback(ctx, conn, &writeMu, task.ID, execution); err != nil {
+			return completionDeliveryError{err: err}
 		}
 
 		if a.Config.ExitAfterEachTask {
 			return nil
 		}
 	}
+}
+
+type completionDeliveryError struct {
+	err error
+}
+
+func (e completionDeliveryError) Error() string {
+	return e.err.Error()
+}
+
+func (e completionDeliveryError) Unwrap() error {
+	return e.err
+}
+
+func (a *Agent) completeWebSocketWithHTTPFallback(
+	ctx context.Context,
+	conn *websocket.Conn,
+	writeMu *sync.Mutex,
+	taskID string,
+	execution taskExecutionResult,
+) error {
+	err := a.completeWebSocket(conn, writeMu, taskID, execution)
+	if err == nil {
+		return nil
+	}
+	if a.Config.Log != nil {
+		a.Config.Log.Warn("task_broker_ws",
+			slog.String("op", "complete_fallback"),
+			slog.String("task_id", taskID),
+			slog.Any("err", err))
+	}
+	if fallbackErr := a.completeWithRetry(ctx, a.fleetBase(), taskID, execution); fallbackErr != nil {
+		return fmt.Errorf("websocket complete failed (%v); http fallback failed: %w", err, fallbackErr)
+	}
+	return nil
+}
+
+func (a *Agent) completeWebSocket(
+	conn *websocket.Conn,
+	writeMu *sync.Mutex,
+	taskID string,
+	execution taskExecutionResult,
+) error {
+	comp := wsrunner.Complete{
+		Type:        wsrunner.TypeComplete,
+		TaskID:      taskID,
+		RunnerID:    a.Config.RunnerID,
+		ExitCode:    execution.ExitCode,
+		Error:       execution.errorMessage(),
+		FailureKind: execution.FailureKind,
+		Canceled:    execution.UserCanceled,
+		Result:      execution.Result,
+	}
+	writeMu.Lock()
+	_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))
+	werr := conn.WriteJSON(comp)
+	writeMu.Unlock()
+	if werr != nil {
+		return fmt.Errorf("write complete: %w", werr)
+	}
+
+	_, raw, err := conn.ReadMessage()
+	if err != nil {
+		return fmt.Errorf("read complete reply: %w", err)
+	}
+	var disc struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(raw, &disc); err != nil {
+		return fmt.Errorf("decode reply: %w", err)
+	}
+	switch disc.Type {
+	case wsrunner.TypeError:
+		var wse wsrunner.Error
+		if err := json.Unmarshal(raw, &wse); err != nil {
+			return err
+		}
+		return fmt.Errorf("complete failed: %d %s", wse.Code, wse.Message)
+	case wsrunner.TypeAck:
+		if a.Config.Log != nil {
+			a.Config.Log.Info("task_broker_ws",
+				slog.String("op", "complete_task"),
+				slog.String("runner_id", a.Config.RunnerID),
+				slog.String("task_id", taskID),
+			)
+		}
+	default:
+		return fmt.Errorf("unexpected reply type %q", disc.Type)
+	}
+	return nil
 }
 
 // wsCtrlReadDuringExecute reads control frames and server push cancel while execute runs.

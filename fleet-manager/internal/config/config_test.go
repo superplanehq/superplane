@@ -25,6 +25,8 @@ func validConfigJSON() string {
 		"volume_size_gb": 30,
 		"boot_grace_sec": 300,
 		"runner_health_port": 9090,
+		"runner_health_timeout_sec": 15,
+		"runner_health_failure_threshold": 3,
 		"runner_terminate_after_each_task": true,
 		"cloudwatch": {
 			"log_group": "/superplane/runner",
@@ -223,6 +225,14 @@ func TestLoad_GlobalBoundsValidation(t *testing.T) {
 		{"runner_health_port_too_high", func(s string) string {
 			return strings.Replace(s, `"runner_health_port": 9090,`, `"runner_health_port": 70000,`, 1)
 		}, "runner_health_port"},
+		{"runner_health_timeout_zero_uses_default", nil, ""}, // tested elsewhere
+		{"runner_health_timeout_negative", func(s string) string {
+			return strings.Replace(s, `"runner_health_timeout_sec": 15,`, `"runner_health_timeout_sec": -1,`, 1)
+		}, "runner_health_timeout_sec"},
+		{"runner_health_failure_threshold_zero_uses_default", nil, ""}, // tested elsewhere
+		{"runner_health_failure_threshold_negative", func(s string) string {
+			return strings.Replace(s, `"runner_health_failure_threshold": 3,`, `"runner_health_failure_threshold": -1,`, 1)
+		}, "runner_health_failure_threshold"},
 		{"reconcile_interval_below_min", func(s string) string {
 			return strings.Replace(s, `"reconcile_interval_sec": 60,`, `"reconcile_interval_sec": 5,`, 1)
 		}, "reconcile_interval_sec"},
@@ -278,6 +288,12 @@ func TestLoad_DefaultsApplied(t *testing.T) {
 	}
 	if f.RunnerHealthPort != defaultRunnerHealthPort {
 		t.Errorf("RunnerHealthPort default = %d, want %d", f.RunnerHealthPort, defaultRunnerHealthPort)
+	}
+	if f.RunnerHealthTimeoutSec != defaultRunnerHealthTimeoutSec {
+		t.Errorf("RunnerHealthTimeoutSec default = %d, want %d", f.RunnerHealthTimeoutSec, defaultRunnerHealthTimeoutSec)
+	}
+	if f.RunnerHealthFailureThreshold != defaultRunnerHealthFailureThreshold {
+		t.Errorf("RunnerHealthFailureThreshold default = %d, want %d", f.RunnerHealthFailureThreshold, defaultRunnerHealthFailureThreshold)
 	}
 	if f.Pools[0].InstanceType != defaultInstanceType {
 		t.Errorf("pool InstanceType default = %q, want %q", f.Pools[0].InstanceType, defaultInstanceType)
@@ -354,6 +370,12 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	}
 	if cfg.RunnerHealthPort != 9090 {
 		t.Errorf("RunnerHealthPort = %d", cfg.RunnerHealthPort)
+	}
+	if cfg.RunnerHealthTimeoutSec != 15 {
+		t.Errorf("RunnerHealthTimeoutSec = %d", cfg.RunnerHealthTimeoutSec)
+	}
+	if cfg.RunnerHealthFailureThreshold != 3 {
+		t.Errorf("RunnerHealthFailureThreshold = %d", cfg.RunnerHealthFailureThreshold)
 	}
 	if !cfg.RunnerTerminateAfterEachTask {
 		t.Errorf("RunnerTerminateAfterEachTask = false, want true")

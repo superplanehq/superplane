@@ -544,6 +544,40 @@ func TestCompleteTaskDoesNotRequeueCancelRequestedInfraFailure(t *testing.T) {
 	}
 }
 
+func TestCompleteTaskTreatsSameRunnerTerminalCompletionAsIdempotent(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:       taskID,
+		RunnerID: "runner-1",
+		ExitCode: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
+	}
+
+	duplicate, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:       taskID,
+		RunnerID: "runner-1",
+		ExitCode: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if duplicate.Outcome != taskstore.CompleteTaskOutcomeAlreadyTerminal {
+		t.Fatalf("duplicate outcome: got %s want %s", duplicate.Outcome, taskstore.CompleteTaskOutcomeAlreadyTerminal)
+	}
+	if duplicate.Task.Status != models.StatusSucceeded {
+		t.Fatalf("duplicate status: got %s want succeeded", duplicate.Task.Status)
+	}
+}
+
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
 	t.Helper()
 	taskID := uuid.NewString()
