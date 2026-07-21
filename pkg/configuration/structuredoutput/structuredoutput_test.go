@@ -2,6 +2,7 @@ package structuredoutput
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -101,5 +102,101 @@ func TestPrepare_DoesNotMutateInput(t *testing.T) {
 	_ = Prepare(schema, true)
 	if _, exists := schema["additionalProperties"]; exists {
 		t.Errorf("Prepare must not mutate the input schema")
+	}
+}
+
+func TestValidateAtSetup(t *testing.T) {
+	for _, raw := range []string{"", "   ", "{{ event.schema }}"} {
+		if err := ValidateAtSetup(raw); err != nil {
+			t.Errorf("ValidateAtSetup(%q) unexpected error: %v", raw, err)
+		}
+	}
+
+	if err := ValidateAtSetup(`{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}`); err != nil {
+		t.Errorf("unexpected error for valid schema: %v", err)
+	}
+
+	if err := ValidateAtSetup(`{"type":"object"}`); err == nil {
+		t.Error("expected error for schema missing properties")
+	}
+}
+
+func TestPromptSuffix(t *testing.T) {
+	if got := PromptSuffix(nil); got != "" {
+		t.Errorf("PromptSuffix(nil) = %q, want empty", got)
+	}
+
+	schema, _ := Parse(`{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`)
+	got := PromptSuffix(schema)
+	if !strings.Contains(got, "```json") {
+		t.Errorf("expected a fenced json block, got %q", got)
+	}
+	if !strings.Contains(got, `"summary"`) {
+		t.Errorf("expected the schema to be embedded, got %q", got)
+	}
+}
+
+func TestExtractJSON(t *testing.T) {
+	cases := []struct {
+		name string
+		text string
+		want map[string]any
+		ok   bool
+	}{
+		{
+			name: "fenced json block",
+			text: "Here you go:\n\n```json\n{\"summary\": \"ok\"}\n```\n",
+			want: map[string]any{"summary": "ok"},
+			ok:   true,
+		},
+		{
+			name: "bare fence without json tag",
+			text: "```\n{\"summary\": \"ok\"}\n```",
+			want: map[string]any{"summary": "ok"},
+			ok:   true,
+		},
+		{
+			name: "whole message is JSON",
+			text: `{"summary": "ok"}`,
+			want: map[string]any{"summary": "ok"},
+			ok:   true,
+		},
+		{
+			name: "last fenced block wins",
+			text: "Example:\n```json\n{\"summary\": \"example\"}\n```\n\nActual:\n```json\n{\"summary\": \"real\"}\n```",
+			want: map[string]any{"summary": "real"},
+			ok:   true,
+		},
+		{
+			name: "non-json fence falls back to next candidate",
+			text: "```bash\necho hi\n```\n```json\n{\"summary\": \"ok\"}\n```",
+			want: map[string]any{"summary": "ok"},
+			ok:   true,
+		},
+		{
+			name: "no JSON anywhere",
+			text: "Sorry, I can't help with that.",
+			ok:   false,
+		},
+		{
+			name: "JSON array is not an object",
+			text: `["a", "b"]`,
+			ok:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := ExtractJSON(tc.text)
+			if ok != tc.ok {
+				t.Fatalf("ExtractJSON(%q) ok = %v, want %v", tc.text, ok, tc.ok)
+			}
+			if !tc.ok {
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ExtractJSON(%q) = %v, want %v", tc.text, got, tc.want)
+			}
+		})
 	}
 }

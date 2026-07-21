@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
 )
 
@@ -25,7 +26,6 @@ const (
 	maxPollAttempts   = 80
 	maxPollErrors     = 5
 	finalMessageReads = 15
-	finalMessageDelay = 2 * time.Second
 
 	// Where attached files are mounted inside the sandbox.
 	attachmentsMountDir = "/workspace/attachments"
@@ -33,6 +33,10 @@ const (
 	networkingUnrestricted = "unrestricted"
 	networkingLimited      = "limited"
 )
+
+// finalMessageDelay is the pause between event-stream reads while waiting for
+// the terminal event to be written. A var so tests can shrink it.
+var finalMessageDelay = 2 * time.Second
 
 // defaultGitHubHosts are always allowed when networking is "limited" so the
 // agent can clone, push, and open pull requests.
@@ -63,6 +67,9 @@ type Spec struct {
 	// runs in) after the run finishes so the transcript stays readable in the
 	// Anthropic Console.
 	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`
+	// OutputSchema is a JSON Schema the agent is asked (via a prompt suffix, not
+	// a server-enforced constraint) to match in its final message.
+	OutputSchema string `json:"outputSchema" mapstructure:"outputSchema"`
 }
 
 // SecretRef references a SuperPlane secret by name and key.
@@ -77,11 +84,12 @@ func (r SecretRef) isSet() bool {
 
 // NodeMetadata is resolved at Setup for display on the component card.
 type NodeMetadata struct {
-	Repository string `json:"repository,omitempty" mapstructure:"repository,omitempty"`
-	BaseBranch string `json:"baseBranch,omitempty" mapstructure:"baseBranch,omitempty"`
-	PrURL      string `json:"prUrl,omitempty" mapstructure:"prUrl,omitempty"`
-	Model      string `json:"model,omitempty" mapstructure:"model,omitempty"`
-	SourceMode string `json:"sourceMode,omitempty" mapstructure:"sourceMode,omitempty"`
+	Repository       string `json:"repository,omitempty" mapstructure:"repository,omitempty"`
+	BaseBranch       string `json:"baseBranch,omitempty" mapstructure:"baseBranch,omitempty"`
+	PrURL            string `json:"prUrl,omitempty" mapstructure:"prUrl,omitempty"`
+	Model            string `json:"model,omitempty" mapstructure:"model,omitempty"`
+	SourceMode       string `json:"sourceMode,omitempty" mapstructure:"sourceMode,omitempty"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
 // ExecutionMetadata tracks every resource provisioned for a run so it can be
@@ -111,6 +119,9 @@ type OutputPayload struct {
 	Branch      string                     `json:"branch"`
 	LastMessage string                     `json:"lastMessage"`
 	Artifacts   []runagent.SessionArtifact `json:"artifacts,omitempty"`
+	// Parsed is the JSON object extracted from LastMessage when Structured
+	// Output is configured and the session completed normally.
+	Parsed any `json:"parsed,omitempty"`
 }
 
 func isSessionTerminal(status string) bool {
@@ -162,4 +173,32 @@ func buildOutput(status, sessionID, branch string, sm *runagent.SessionMessages,
 		}
 	}
 	return out
+}
+
+// applyStructuredOutput sets out.Parsed by best-effort extracting JSON from
+// the agent's final message, when a schema is configured and the session
+// completed normally ("idle"). There is no server-side schema enforcement for
+// Managed Agents sessions (unlike output_config.format on the Messages API),
+// so this is prompt-guided and best-effort — a "terminated" session may have
+// errored or been interrupted mid-task, so its message is not trusted either.
+func applyStructuredOutput(out *OutputPayload, status string, schema map[string]any) {
+	if schema == nil || status != sessionStatusIdle || out.LastMessage == "" {
+		return
+	}
+	if parsed, ok := structuredoutput.ExtractJSON(out.LastMessage); ok {
+		out.Parsed = parsed
+	}
+}
+
+// schemaFromConfiguration re-derives the parsed output schema from the node's
+// raw configuration for the async poll path, where the schema was already
+// validated at Setup/Execute — a decode or parse failure here is tolerated as
+// "no schema" rather than failing an otherwise-complete run.
+func schemaFromConfiguration(config any) map[string]any {
+	spec, err := decodeSpec(config)
+	if err != nil {
+		return nil
+	}
+	schema, _ := structuredoutput.Parse(spec.OutputSchema)
+	return schema
 }

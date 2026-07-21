@@ -115,6 +115,52 @@ describe("runAgentMapper.getExecutionDetails", () => {
     const details = runAgentMapper.getExecutionDetails(ctx);
     expect(details["Artifacts"]).toBeUndefined();
   });
+
+  it("surfaces parsed structured output as JSON", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: { default: [buildOutput({ status: "idle", parsed: { summary: "looks good" } })] },
+      },
+    });
+    const details = runAgentMapper.getExecutionDetails(ctx);
+    expect(details["Parsed Output"]).toBe('{"summary":"looks good"}');
+  });
+
+  it("omits parsed output when structured output was not configured", () => {
+    const ctx = buildDetailsCtx({
+      execution: { outputs: { default: [buildOutput({ status: "idle" })] } },
+    });
+    const details = runAgentMapper.getExecutionDetails(ctx);
+    expect(details["Parsed Output"]).toBeUndefined();
+  });
+});
+
+describe("runAgentMapper node metadata", () => {
+  it("shows a structured output badge when the schema is configured", () => {
+    const props = runAgentMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: { outputSchema: "{}" } }) }),
+    );
+    expect(props.metadata).toEqual([{ icon: "braces", label: "Structured output" }]);
+  });
+
+  it("omits the badge when no schema is configured", () => {
+    const props = runAgentMapper.props(buildPropsContext());
+    expect(props.metadata).toEqual([]);
+  });
+
+  it("falls back to node metadata when the node has no configuration yet", () => {
+    const props = runAgentMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: undefined, metadata: { structuredOutput: true } }) }),
+    );
+    expect(props.metadata).toEqual([{ icon: "braces", label: "Structured output" }]);
+  });
+
+  it("prefers the live configuration over stale metadata", () => {
+    const props = runAgentMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: {}, metadata: { structuredOutput: true } }) }),
+    );
+    expect(props.metadata).toEqual([]);
+  });
 });
 
 describe("runAgentMapper.props", () => {
