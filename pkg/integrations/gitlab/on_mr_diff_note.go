@@ -12,43 +12,45 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type OnMergeComment struct{}
+type OnMRDiffNote struct{}
 
-type OnMergeCommentConfiguration struct {
+type OnMRDiffNoteConfiguration struct {
 	Project       string `json:"project" mapstructure:"project"`
 	ContentFilter string `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
-func (m *OnMergeComment) Name() string {
-	return "gitlab.onMergeComment"
+func (m *OnMRDiffNote) Name() string {
+	return "gitlab.onMRDiffNote"
 }
 
-func (m *OnMergeComment) Label() string {
-	return "On Merge Comment"
+func (m *OnMRDiffNote) Label() string {
+	return "On MR Diff Note"
 }
 
-func (m *OnMergeComment) Description() string {
-	return "Listen to merge request comment events from GitLab"
+func (m *OnMRDiffNote) Description() string {
+	return "Listen to merge request diff (inline code review) comment events from GitLab"
 }
 
-func (m *OnMergeComment) Documentation() string {
-	return `The On Merge Comment trigger starts a workflow execution when a comment is added to a merge request in a GitLab project.
+func (m *OnMRDiffNote) Documentation() string {
+	return `The On MR Diff Note trigger starts a workflow execution when an inline comment is added to a merge request's diff in a GitLab project.
+
+Diff notes (also known as inline comments) are comments left on a specific line of a merge request's changes, as opposed to a regular top-level merge request comment. Use ` + "`gitlab.onMergeComment`" + ` if you want to react to regular merge request discussion comments instead.
 
 ## Use Cases
 
-- **Command processing**: Process slash commands in merge request comments (e.g., /deploy, /test)
-- **Bot interactions**: Respond to merge request comments with automated actions
-- **Notification systems**: Notify teams when important merge request comments are added
+- **Review triage**: Have an agent triage a merge request review by reading the diff note together with the file and line it was left on
+- **Command processing**: Process slash commands left as inline review comments (e.g., /fix, /explain)
+- **Notification systems**: Notify teams when important inline review comments are added
 
 ## Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., ` + "`/deploy`" + ` to only trigger on comments containing "/deploy")
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., ` + "`/fix`" + ` to only trigger on comments containing "/fix")
 
 ## Event Data
 
-Each comment event includes:
-- **object_attributes**: Comment information including note body, author, and URL
+Each diff note event includes:
+- **object_attributes**: Comment information including note body, author, URL, and the diff **position** (file paths, line numbers, and commit SHAs the comment is anchored to)
 - **merge_request**: Merge request the comment was added to
 - **user**: User who added the comment
 - **project**: Project information
@@ -57,22 +59,23 @@ Common expression paths:
 - Merge request IID: ` + "`root().data.merge_request.iid`" + `
 - Merge request title: ` + "`root().data.merge_request.title`" + `
 - Comment body: ` + "`root().data.object_attributes.note`" + `
-- Comment URL: ` + "`root().data.object_attributes.url`" + `
+- Diff file path: ` + "`root().data.object_attributes.position.new_path`" + `
+- Diff line number: ` + "`root().data.object_attributes.position.new_line`" + `
 
 ## Webhook Setup
 
 This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
 }
 
-func (m *OnMergeComment) Icon() string {
+func (m *OnMRDiffNote) Icon() string {
 	return "gitlab"
 }
 
-func (m *OnMergeComment) Color() string {
+func (m *OnMRDiffNote) Color() string {
 	return "orange"
 }
 
-func (m *OnMergeComment) Configuration() []configuration.Field {
+func (m *OnMRDiffNote) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "project",
@@ -90,14 +93,14 @@ func (m *OnMergeComment) Configuration() []configuration.Field {
 			Label:       "Content Filter",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Placeholder: "e.g., /deploy",
+			Placeholder: "e.g., /fix",
 			Description: "Optional regex pattern to filter comments by content",
 		},
 	}
 }
 
-func (m *OnMergeComment) Setup(ctx core.TriggerContext) error {
-	var config OnMergeCommentConfiguration
+func (m *OnMRDiffNote) Setup(ctx core.TriggerContext) error {
+	var config OnMRDiffNoteConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -118,16 +121,16 @@ func (m *OnMergeComment) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (m *OnMergeComment) Hooks() []core.Hook {
+func (m *OnMRDiffNote) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (m *OnMergeComment) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+func (m *OnMRDiffNote) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 
-func (m *OnMergeComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	var config OnMergeCommentConfiguration
+func (m *OnMRDiffNote) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	var config OnMRDiffNoteConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -151,7 +154,7 @@ func (m *OnMergeComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if !m.isMergeRequestComment(ctx.Logger, data) {
+	if !m.isDiffNoteComment(ctx.Logger, data) {
 		return http.StatusOK, nil, nil
 	}
 
@@ -165,18 +168,18 @@ func (m *OnMergeComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	if err := ctx.Events.Emit("gitlab.mergeComment", data); err != nil {
+	if err := ctx.Events.Emit("gitlab.mrDiffNote", data); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
 
 	return http.StatusOK, nil, nil
 }
 
-func (m *OnMergeComment) Cleanup(ctx core.TriggerContext) error {
+func (m *OnMRDiffNote) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (m *OnMergeComment) isMergeRequestComment(logger *log.Entry, data map[string]any) bool {
+func (m *OnMRDiffNote) isDiffNoteComment(logger *log.Entry, data map[string]any) bool {
 	attrs, ok := data["object_attributes"].(map[string]any)
 	if !ok {
 		return false
@@ -184,6 +187,11 @@ func (m *OnMergeComment) isMergeRequestComment(logger *log.Entry, data map[strin
 
 	if system, ok := attrs["system"].(bool); ok && system {
 		logger.Info("Comment is a system-generated note - ignoring")
+		return false
+	}
+
+	if action, _ := attrs["action"].(string); action != "create" {
+		logger.Infof("Comment action is %q, not create - ignoring", action)
 		return false
 	}
 
@@ -197,15 +205,16 @@ func (m *OnMergeComment) isMergeRequestComment(logger *log.Entry, data map[strin
 		return false
 	}
 
-	if noteType, _ := attrs["type"].(string); noteType == "DiffNote" {
-		logger.Info("Comment is a diff note, not a regular merge request comment - ignoring")
+	noteType, _ := attrs["type"].(string)
+	if noteType != "DiffNote" {
+		logger.Info("Comment is not a diff note - ignoring")
 		return false
 	}
 
 	return true
 }
 
-func (m *OnMergeComment) matchesContentFilter(filter string, data map[string]any) (bool, error) {
+func (m *OnMRDiffNote) matchesContentFilter(filter string, data map[string]any) (bool, error) {
 	if filter == "" {
 		return true, nil
 	}
