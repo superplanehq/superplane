@@ -29,7 +29,7 @@ func Test__Linear__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, integrationContext.BrowserAction)
-		assert.Contains(t, integrationContext.BrowserAction.Description, "pre-filled")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "OAuth application form")
 
 		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
 		require.NoError(t, parseErr)
