@@ -56,7 +56,7 @@ func (c *AddRunError) Documentation() string {
 }
 
 func (c *AddRunError) Icon() string {
-	return "circle-alert"
+	return "triangle-alert"
 }
 
 func (c *AddRunError) Color() string {

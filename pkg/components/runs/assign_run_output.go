@@ -59,7 +59,7 @@ Downstream nodes still receive an event on the default output channel. The run r
 }
 
 func (c *AssignRunOutput) Icon() string {
-	return "file-output"
+	return "arrow-right-from-line"
 }
 
 func (c *AssignRunOutput) Color() string {
