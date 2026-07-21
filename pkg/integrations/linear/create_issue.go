@@ -18,6 +18,7 @@ type CreateIssueSpec struct {
 	Team        string   `json:"team" mapstructure:"team"`
 	Title       string   `json:"title" mapstructure:"title"`
 	Description string   `json:"description" mapstructure:"description"`
+	Project     string   `json:"project" mapstructure:"project"`
 	State       string   `json:"state" mapstructure:"state"`
 	Assignee    string   `json:"assignee" mapstructure:"assignee"`
 	Priority    string   `json:"priority" mapstructure:"priority"`
@@ -50,6 +51,7 @@ func (c *CreateIssue) Documentation() string {
 - **Team** (required): The Linear team to create the issue in
 - **Title** (required): The issue title
 - **Description** (optional): Issue description, written in Markdown
+- **Project** (optional): Project to add the issue to
 - **Status** (optional): Workflow state for the new issue. Leave empty to use the team's default — Linear
   puts new issues in the first Backlog state, or in Triage when the team has triage enabled.
 - **Assignee** (optional): Team member to assign the issue to
@@ -63,8 +65,8 @@ Returns the created issue, including its ` + "`identifier`" + ` (e.g. ENG-142), 
 
 ## Permissions
 
-The API key owner must be a member of the selected team, and the key needs **Write** or
-**Create issues** permission.`
+The user who authorized the Linear connection must be a member of the selected team. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating issues.`
 }
 
 func (c *CreateIssue) Icon() string {
@@ -108,6 +110,25 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Description: "Issue description, written in Markdown",
+		},
+		{
+			Name:        "project",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Project to add the issue to",
+			Placeholder: "Leave empty to keep the issue out of a project",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "team",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "team"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "state",
@@ -246,6 +267,10 @@ func buildCreateIssueInput(spec CreateIssueSpec) (map[string]any, error) {
 
 	if description := strings.TrimSpace(spec.Description); description != "" {
 		input["description"] = description
+	}
+
+	if project := strings.TrimSpace(spec.Project); project != "" {
+		input["projectId"] = project
 	}
 
 	if state := strings.TrimSpace(spec.State); state != "" {

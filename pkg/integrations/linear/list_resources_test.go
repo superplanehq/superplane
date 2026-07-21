@@ -37,7 +37,7 @@ func Test__ListResources__UnknownType(t *testing.T) {
 func Test__ListResources__TeamScopedTypesRequireTeam(t *testing.T) {
 	integration := &Linear{}
 
-	for _, resourceType := range []string{ResourceTypeWorkflowState, ResourceTypeMember, ResourceTypeLabel} {
+	for _, resourceType := range []string{ResourceTypeWorkflowState, ResourceTypeMember, ResourceTypeLabel, ResourceTypeProject} {
 		t.Run(resourceType, func(t *testing.T) {
 			resources, err := integration.ListResources(resourceType, core.ListResourcesContext{
 				Integration: integrationWithTeam(),
@@ -90,6 +90,27 @@ func Test__ListResources__Members(t *testing.T) {
 	require.Len(t, resources, 2)
 	assert.Equal(t, "Jane Doe (@jane)", resources[0].Name)
 	assert.Equal(t, "John Doe", resources[1].Name)
+}
+
+func Test__ListResources__Projects(t *testing.T) {
+	integration := &Linear{}
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(`{"data":{"team":{"projects":{"nodes":[{"id":"p1","name":"Q3 Reliability"}],"pageInfo":{"hasNextPage":false}}}}}`),
+		},
+	}
+
+	resources, err := integration.ListResources(ResourceTypeProject, core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: integrationWithTeam(),
+		Parameters:  map[string]string{"team": "t1"},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "Q3 Reliability", resources[0].Name)
+	assert.Equal(t, "p1", resources[0].ID)
 }
 
 func Test__ListResources__Labels(t *testing.T) {

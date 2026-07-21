@@ -122,6 +122,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 				"team":        "t1",
 				"title":       "Boom",
 				"description": "It broke",
+				"project":     "p1",
 				"state":       "s1",
 				"assignee":    "u1",
 				"priority":    "2",
@@ -134,6 +135,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 		input := createIssueInputFromRequest(t, httpContext)
 		assert.Equal(t, "t1", input["teamId"])
 		assert.Equal(t, "It broke", input["description"])
+		assert.Equal(t, "p1", input["projectId"])
 		assert.Equal(t, "s1", input["stateId"])
 		assert.Equal(t, "u1", input["assigneeId"])
 		assert.Equal(t, float64(2), input["priority"])
@@ -157,6 +159,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		input := createIssueInputFromRequest(t, httpContext)
+		assert.NotContains(t, input, "projectId")
 		assert.NotContains(t, input, "stateId")
 		assert.NotContains(t, input, "assigneeId")
 		assert.NotContains(t, input, "priority")

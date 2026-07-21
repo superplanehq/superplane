@@ -12,6 +12,7 @@ const (
 	ResourceTypeWorkflowState = "workflowState"
 	ResourceTypeMember        = "member"
 	ResourceTypeLabel         = "label"
+	ResourceTypeProject       = "project"
 )
 
 func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -24,6 +25,8 @@ func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContex
 		return ListMembers(ctx)
 	case ResourceTypeLabel:
 		return ListLabels(ctx)
+	case ResourceTypeProject:
+		return ListProjects(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -127,6 +130,34 @@ func ListLabels(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 			Type: ResourceTypeLabel,
 			Name: label.Name,
 			ID:   label.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	teamID := ctx.Parameters["team"]
+	if teamID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	projects, err := client.ListTeamProjects(teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, project := range projects {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeProject,
+			Name: project.Name,
+			ID:   project.ID,
 		})
 	}
 

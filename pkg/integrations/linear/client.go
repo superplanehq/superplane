@@ -193,7 +193,7 @@ type Issue struct {
 	Labels        LabelList      `json:"labels,omitempty"`
 }
 
-// Viewer identifies the account behind the API key and the workspace it belongs to.
+// Viewer identifies the account behind the access token and the workspace it belongs to.
 type Viewer struct {
 	User         *User        `json:"viewer"`
 	Organization Organization `json:"organization"`
@@ -212,7 +212,7 @@ func (c *Client) GetViewer() (*Viewer, error) {
 	}
 
 	if viewer.User == nil {
-		return nil, fmt.Errorf("no user returned for the API key")
+		return nil, fmt.Errorf("no user returned for the access token")
 	}
 
 	return &viewer, nil
@@ -348,6 +348,38 @@ func (c *Client) ListTeamMembers(teamID string) ([]User, error) {
 	})
 }
 
+const teamProjectsQuery = `
+query TeamProjects($teamId: String!, $first: Int!, $after: String) {
+  team(id: $teamId) {
+    projects(first: $first, after: $after) {
+      nodes { id name }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`
+
+func (c *Client) ListTeamProjects(teamID string) ([]Project, error) {
+	variables := map[string]any{"teamId": teamID, "first": pageSize}
+
+	return collectPages(c, teamProjectsQuery, variables, func(data json.RawMessage) (*connection[Project], error) {
+		response := struct {
+			Team *struct {
+				Projects connection[Project] `json:"projects"`
+			} `json:"team"`
+		}{}
+
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("error parsing team projects: %v", err)
+		}
+
+		if response.Team == nil {
+			return nil, fmt.Errorf("team %s not found", teamID)
+		}
+
+		return &response.Team.Projects, nil
+	})
+}
+
 // labelsQuery includes workspace-level labels alongside the team's own labels.
 // Workspace labels have a null team, so filtering on team id alone hides them.
 const labelsQuery = `
@@ -426,8 +458,8 @@ mutation CreateWebhook($input: WebhookCreateInput!) {
   }
 }`
 
-// CreateWebhook registers a webhook on Linear. Managing webhooks requires the
-// API key owner to be a workspace admin.
+// CreateWebhook registers a webhook on Linear. Managing webhooks requires a
+// workspace admin or an OAuth token carrying the admin scope.
 func (c *Client) CreateWebhook(url, secret, label, teamID string, resourceTypes []string) (*Webhook, error) {
 	input := map[string]any{
 		"url":           url,

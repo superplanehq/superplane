@@ -94,6 +94,7 @@ export interface LinearNodeMetadata {
 export interface CreateIssueConfiguration {
   team?: string;
   title?: string;
+  project?: string;
   state?: string;
   assignee?: string;
   priority?: string;

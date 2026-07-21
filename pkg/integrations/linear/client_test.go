@@ -64,6 +64,11 @@ func Test__NewClient(t *testing.T) {
 		require.ErrorContains(t, err, "missing Linear access token")
 	})
 
+	t.Run("nil HTTP context -> error", func(t *testing.T) {
+		_, err := NewClient(nil, newAuthorizedIntegration())
+		require.ErrorContains(t, err, "missing HTTP context")
+	})
+
 	t.Run("valid configuration", func(t *testing.T) {
 		client, err := NewClient(&contexts.HTTPContext{}, newAuthorizedIntegration())
 		require.NoError(t, err)
@@ -255,6 +260,23 @@ func Test__Client__Pagination(t *testing.T) {
 		labels, err := client.ListLabels("t1")
 		require.NoError(t, err)
 		assert.Len(t, labels, 2)
+	})
+
+	t.Run("paginates team projects", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"team":{"projects":{"nodes":[{"id":"p1","name":"One"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}}`),
+				jsonResponse(`{"data":{"team":{"projects":{"nodes":[{"id":"p2","name":"Two"}],"pageInfo":{"hasNextPage":false}}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		projects, err := client.ListTeamProjects("t1")
+		require.NoError(t, err)
+		require.Len(t, projects, 2)
+		assert.Equal(t, "c1", variablesFromRequest(t, httpContext, 1)["after"])
 	})
 
 	t.Run("paginates workflow states", func(t *testing.T) {
