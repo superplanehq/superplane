@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
@@ -78,6 +78,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   noteId,
   selected = false,
   onDelete,
+  onDuplicate,
   hideActionsButton,
   canvasMode = "live",
   width: propWidth = DEFAULT_WIDTH,
@@ -314,6 +315,21 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         ))}
                       </div>
                     </div>
+                    {onDuplicate && (
+                      <button
+                        type="button"
+                        data-testid="node-action-duplicate"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onDuplicate();
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                        aria-label="Duplicate note"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    )}
                     {onDelete && (
                       <button
                         type="button"
