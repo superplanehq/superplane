@@ -326,7 +326,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
         </Tooltip>
         <HoverCard openDelay={100} closeDelay={150}>
           <HoverCardTrigger asChild>
-            <Badge className="cursor-pointer rounded-full border border-gray-500 bg-transparent pl-1.5 pr-1 py-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-950/5 dark:border-gray-400 dark:text-gray-400 dark:hover:bg-white/5">
+            <Badge className="cursor-pointer rounded-full border border-gray-800 bg-transparent pl-1.5 pr-1 py-0 text-[10px] font-semibold uppercase tracking-wide text-gray-800 hover:bg-gray-950/5 dark:border-gray-400 dark:text-gray-400 dark:hover:bg-white/5">
               Beta
             </Badge>
           </HoverCardTrigger>
