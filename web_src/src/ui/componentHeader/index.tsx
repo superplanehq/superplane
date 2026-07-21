@@ -2,6 +2,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { resolveNodeIconColorClass } from "@/lib/colors";
 import React from "react";
 import { toTestId } from "../../lib/testID";
+import { AppLogo } from "../componentSidebar/AppLogo";
 import type { ComponentActionsProps } from "../types/componentActions";
 
 export interface ComponentHeaderProps extends ComponentActionsProps {
@@ -40,7 +41,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         <div className="flex items-center">
           <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
             {iconSrc ? (
-              <img
+              <AppLogo
                 src={iconSrc}
                 alt={title}
                 className={cn("h-4 w-4 shrink-0 object-contain", mergeWithMutedBodyBelow && "opacity-70")}

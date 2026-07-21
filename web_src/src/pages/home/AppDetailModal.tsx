@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { AppLogo } from "@/ui/componentSidebar/AppLogo";
 import { resolveLucideIcon } from "@/lib/iconRegistry";
 import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
 import {
@@ -125,7 +126,7 @@ export function LeadIcon({
   const cls = size === "lg" ? "h-8 w-8" : "h-5 w-5";
   if (!iconName) return <Plus className={`${cls} text-slate-400 dark:text-gray-500`} />;
   const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
-  if (iconSrc) return <img src={iconSrc} alt={iconName} className={cls} />;
+  if (iconSrc) return <AppLogo src={iconSrc} alt={iconName} className={cls} />;
   const FallbackIcon = resolveLucideIcon(iconName);
   return <FallbackIcon className={`${cls} text-slate-500 dark:text-gray-400`} />;
 }
@@ -141,7 +142,7 @@ export function IntegrationIcons({ integrations }: { integrations: string[] }) {
           <Tooltip key={name}>
             <TooltipTrigger asChild>
               <span className="inline-block h-3.5 w-3.5 shrink-0">
-                <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
+                <AppLogo src={iconSrc} alt={name} className="h-full w-full object-contain" />
               </span>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="z-[300]">

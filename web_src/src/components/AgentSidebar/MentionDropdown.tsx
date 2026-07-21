@@ -2,6 +2,7 @@ import { createElement, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { AppLogo } from "@/ui/componentSidebar/AppLogo";
 import type { MentionItem } from "./useMentions";
 import { BUILTIN_COMPONENT_ICON_SLUGS } from "./widgets/componentIcons";
 
@@ -27,7 +28,7 @@ interface MentionDropdownProps {
 
 function NodeIcon({ component, isTrigger }: { component?: string; isTrigger?: boolean }) {
   const iconSrc = component ? getHeaderIconSrc(component) : undefined;
-  if (iconSrc) return <img src={iconSrc} alt="" className="size-4 object-contain shrink-0" />;
+  if (iconSrc) return <AppLogo src={iconSrc} className="size-4 object-contain shrink-0" />;
 
   const slug = component ? BUILTIN_COMPONENT_ICON_SLUGS[component] : undefined;
   if (slug) return createElement(resolveIcon(slug), { className: "size-4 shrink-0" });

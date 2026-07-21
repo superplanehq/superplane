@@ -1,4 +1,5 @@
 import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsDarkIcon from "@/assets/icons/integrations/aws.dark.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
@@ -66,6 +67,7 @@ import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
 import graphqlIcon from "@/assets/icons/graphql.svg";
+import superplaneLogo from "@/assets/superplane.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -204,6 +206,44 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   elastic: elasticIcon,
   oci: ociIcon,
 };
+
+/**
+ * How a logo should be recolored for the dark theme.
+ * - `invertInDark`: monochrome (near-black) logo → invert to stay visible on dark surfaces.
+ * - `darkSrc`: brand-colored logo whose colors must be preserved → swap to a dedicated dark asset.
+ * An empty object means the logo is theme-agnostic and needs no adjustment.
+ */
+export interface IconThemeTreatment {
+  invertInDark?: boolean;
+  darkSrc?: string;
+}
+
+/**
+ * Monochrome (near-black) logos that become invisible on dark surfaces.
+ * `dark:brightness-0 dark:invert` turns them white while preserving their shape.
+ */
+const INVERT_IN_DARK_SRCS: ReadonlySet<string> = new Set([githubIcon, SemaphoreLogo, circleciIcon, superplaneLogo]);
+
+/**
+ * Brand-colored logos whose hues must stay intact (so inversion is wrong):
+ * light src → dedicated dark-theme asset, swapped via pure CSS.
+ */
+const DARK_VARIANT_SRCS: Readonly<Record<string, string>> = {
+  [awsIcon]: awsDarkIcon,
+};
+
+/**
+ * Resolves the theme treatment for a logo src. Keyed by src so any render path
+ * that only has the resolved image URL (component headers, run rows, etc.) can
+ * recolor logos correctly without threading the integration name or theme.
+ */
+export function getIconThemeTreatment(src: string | undefined): IconThemeTreatment {
+  if (!src) return {};
+  const darkSrc = DARK_VARIANT_SRCS[src];
+  if (darkSrc) return { darkSrc };
+  if (INVERT_IN_DARK_SRCS.has(src)) return { invertInDark: true };
+  return {};
+}
 
 /**
  * Returns logo src for an integration type (e.g. "github" → github icon).

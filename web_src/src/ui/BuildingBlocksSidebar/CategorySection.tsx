@@ -6,6 +6,7 @@ import { ChevronRight, Plug } from "lucide-react";
 import { memo, useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIconMaps";
+import { AppLogo } from "../componentSidebar/AppLogo";
 import { filterBlocksInCategory, normalizeIntegrationName, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
@@ -96,7 +97,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
     >
       <ItemMedia>
         {appIconSrc ? (
-          <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
+          <AppLogo src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
         ) : (
           <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
         )}
