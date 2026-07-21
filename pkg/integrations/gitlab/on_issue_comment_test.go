@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnMergeComment__Setup(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__Setup(t *testing.T) {
+	trigger := &OnIssueComment{}
 	metadata := Metadata{
 		Projects: []ProjectMetadata{
 			{ID: 123, Name: "group/example", URL: "https://gitlab.com/group/example"},
@@ -57,7 +57,7 @@ func Test__OnMergeComment__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
-			Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+			Configuration: map[string]any{"project": "123", "contentFilter": "/sp-investigate"},
 		}))
 
 		require.Len(t, integrationCtx.WebhookRequests, 1)
@@ -68,8 +68,8 @@ func Test__OnMergeComment__Setup(t *testing.T) {
 	})
 }
 
-func Test__OnMergeComment__HandleWebhook__MissingEventHeader(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__MissingEventHeader(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       http.Header{},
@@ -82,12 +82,12 @@ func Test__OnMergeComment__HandleWebhook__MissingEventHeader(t *testing.T) {
 	assert.ErrorContains(t, err, "X-Gitlab-Event")
 }
 
-func Test__OnMergeComment__HandleWebhook__WrongEventType(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__WrongEventType(t *testing.T) {
+	trigger := &OnIssueComment{}
 	events := &contexts.EventContext{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-		Headers:       gitlabHeaders("Merge Request Hook", "token"),
+		Headers:       gitlabHeaders("Issue Hook", "token"),
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123"},
 		Events:        events,
@@ -99,8 +99,8 @@ func Test__OnMergeComment__HandleWebhook__WrongEventType(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__InvalidToken(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__InvalidToken(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "wrong"),
@@ -114,17 +114,18 @@ func Test__OnMergeComment__HandleWebhook__InvalidToken(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid webhook token")
 }
 
-func Test__OnMergeComment__HandleWebhook__MergeRequestComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__IssueComment(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This looks good to me",
-			"noteable_type": "MergeRequest",
+			"note":          "/sp-investigate",
+			"noteable_type": "Issue",
+			"action":        "create",
 		},
-		"merge_request": map[string]any{
-			"iid":   12,
-			"title": "Add merge request trigger",
+		"issue": map[string]any{
+			"iid":   8,
+			"title": "Login page throws 500 on invalid credentials",
 		},
 	})
 
@@ -141,15 +142,43 @@ func Test__OnMergeComment__HandleWebhook__MergeRequestComment(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, events.Count())
-	assert.Equal(t, "gitlab.mergeComment", events.Payloads[0].Type)
+	assert.Equal(t, "gitlab.issueComment", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__EditedComment(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This is an issue comment",
+			"note":          "/sp-investigate",
+			"noteable_type": "Issue",
+			"action":        "update",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
+func Test__OnIssueComment__HandleWebhook__MissingAction(t *testing.T) {
+	trigger := &OnIssueComment{}
+
+	// Older self-managed GitLab instances (pre-16.11) don't send `action`
+	// on Note Hook payloads at all. Comments should still fire in that case.
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "/sp-investigate",
 			"noteable_type": "Issue",
 		},
 	})
@@ -166,17 +195,18 @@ func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
-	assert.Zero(t, events.Count())
+	assert.Equal(t, 1, events.Count())
+	assert.Equal(t, "gitlab.issueComment", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__DiffNoteComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__NonIssueComment(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This variable name is misleading, can we rename it?",
+			"note":          "This looks good to me",
 			"noteable_type": "MergeRequest",
-			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 
@@ -195,14 +225,15 @@ func Test__OnMergeComment__HandleWebhook__DiffNoteComment(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__SystemNote(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "assigned to @agarcia",
-			"noteable_type": "MergeRequest",
+			"note":          "changed the description",
+			"noteable_type": "Issue",
 			"system":        true,
+			"action":        "create",
 		},
 	})
 
@@ -221,13 +252,14 @@ func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "/deploy to staging",
-			"noteable_type": "MergeRequest",
+			"note":          "/sp-investigate",
+			"noteable_type": "Issue",
+			"action":        "create",
 		},
 	})
 
@@ -235,7 +267,7 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "token"),
 		Body:          body,
-		Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+		Configuration: map[string]any{"project": "123", "contentFilter": "/sp-investigate"},
 		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
@@ -244,16 +276,17 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, events.Count())
-	assert.Equal(t, "gitlab.mergeComment", events.Payloads[0].Type)
+	assert.Equal(t, "gitlab.issueComment", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnIssueComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
+	trigger := &OnIssueComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
 			"note":          "Just a regular comment",
-			"noteable_type": "MergeRequest",
+			"noteable_type": "Issue",
+			"action":        "create",
 		},
 	})
 
@@ -261,7 +294,7 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "token"),
 		Body:          body,
-		Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+		Configuration: map[string]any{"project": "123", "contentFilter": "/sp-investigate"},
 		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),

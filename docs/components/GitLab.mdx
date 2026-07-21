@@ -11,6 +11,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to branch creation events from GitLab" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events from GitLab" />
+  <LinkCard title="On MR Diff Note" href="#on-mr-diff-note" description="Listen to merge request diff (inline code review) comment events from GitLab" />
   <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
@@ -244,6 +246,250 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   },
   "timestamp": "2026-02-05T14:00:00.000000000Z",
   "type": "gitlab.issue"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `gitlab.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is added to an issue in a GitLab project.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in issue comments (e.g., `/sp-investigate` to trigger an agent that investigates whether the issue is worth fixing and rates its urgency)
+- **Bot interactions**: Respond to issue comments with automated actions
+- **Notification systems**: Notify teams when important issue comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/sp-investigate` to only trigger on comments containing "/sp-investigate")
+
+### Event Data
+
+Each comment event includes:
+- **object_attributes**: Comment information including note body, author, and URL
+- **issue**: Issue the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Issue IID: `root().data.issue.iid`
+- Issue title: `root().data.issue.title`
+- Comment body: `root().data.object_attributes.note`
+- Comment URL: `root().data.object_attributes.url`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "issue": {
+      "author_id": 1,
+      "created_at": "2026-02-10 09:00:00 UTC",
+      "description": "Steps to reproduce: submit the login form with a wrong password.",
+      "id": 45,
+      "iid": 8,
+      "labels": [
+        "bug"
+      ],
+      "state": "opened",
+      "title": "Login page throws 500 on invalid credentials",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8"
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "created_at": "2026-02-12 20:40:00 UTC",
+      "discussion_id": "6c2bb44bdc7f5c8f21b9ff8422f3d60cc0e5e719",
+      "id": 1355,
+      "note": "/sp-investigate",
+      "noteable_id": 45,
+      "noteable_type": "Issue",
+      "project_id": 1,
+      "system": false,
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8#note_1355"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.issueComment"
+}
+```
+
+<a id="on-mr-diff-note"></a>
+
+## On MR Diff Note
+
+**Trigger key:** `gitlab.onMRDiffNote`
+
+The On MR Diff Note trigger starts a workflow execution when an inline comment is added to a merge request's diff in a GitLab project.
+
+Diff notes (also known as inline comments) are comments left on a specific line of a merge request's changes, as opposed to a regular top-level merge request comment. Use `gitlab.onMergeComment` if you want to react to regular merge request discussion comments instead.
+
+### Use Cases
+
+- **Review triage**: Have an agent triage a merge request review by reading the diff note together with the file and line it was left on
+- **Command processing**: Process slash commands left as inline review comments (e.g., /fix, /explain)
+- **Notification systems**: Notify teams when important inline review comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/fix` to only trigger on comments containing "/fix")
+
+### Event Data
+
+Each diff note event includes:
+- **object_attributes**: Comment information including note body, author, URL, and the diff **position** (file paths, line numbers, and commit SHAs the comment is anchored to)
+- **merge_request**: Merge request the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Merge request IID: `root().data.merge_request.iid`
+- Merge request title: `root().data.merge_request.title`
+- Comment body: `root().data.object_attributes.note`
+- Diff file path: `root().data.object_attributes.position.new_path`
+- Diff line number: `root().data.object_attributes.position.new_line`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "merge_request": {
+      "author_id": 1,
+      "created_at": "2026-02-12 18:30:00 UTC",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "draft": false,
+      "id": 93,
+      "iid": 12,
+      "last_commit": {
+        "author": {
+          "email": "agarcia@example.com",
+          "name": "Alex Garcia"
+        },
+        "id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "message": "Add merge request trigger",
+        "timestamp": "2026-02-12T18:25:00Z",
+        "url": "https://gitlab.example.com/group/example/-/commit/372fa8f809fe161ee0f22e04d1a4074e0be6ac47"
+      },
+      "merge_status": "can_be_merged",
+      "source_branch": "feature/merge-request-trigger",
+      "source_project_id": 1,
+      "state": "opened",
+      "target_branch": "main",
+      "target_project_id": 1,
+      "title": "Add merge request trigger",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12",
+      "work_in_progress": false
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "commit_id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+      "created_at": "2026-02-13 10:15:00 UTC",
+      "discussion_id": "b4f2a7d4c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9",
+      "id": 1401,
+      "line_code": "a5cc2925ca8258af241be7e5b0381edf30266302_10_10",
+      "note": "This variable name is misleading, can we rename it?",
+      "noteable_id": 93,
+      "noteable_type": "MergeRequest",
+      "position": {
+        "base_sha": "1234567890abcdef1234567890abcdef12345678",
+        "head_sha": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "new_line": 10,
+        "new_path": "src/handlers/login.go",
+        "old_line": 10,
+        "old_path": "src/handlers/login.go",
+        "position_type": "text",
+        "start_sha": "234567890abcdef1234567890abcdef123456789"
+      },
+      "project_id": 1,
+      "system": false,
+      "type": "DiffNote",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12#note_1401"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-13T10:15:00.000000000Z",
+  "type": "gitlab.mrDiffNote"
 }
 ```
 
