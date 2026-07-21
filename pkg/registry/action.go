@@ -169,3 +169,22 @@ func (s *PanicableAction) OnIntegrationMessage(ctx core.IntegrationMessageContex
 
 	return integrationAction.OnIntegrationMessage(ctx)
 }
+
+func (s *PanicableAction) Call(ctx core.IntegrationToolContext) (output any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger.Errorf("Action %s panicked in Call(): %v\nStack: %s",
+				s.underlying.Name(), r, debug.Stack())
+			output = nil
+			err = fmt.Errorf("action %s panicked in Call(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+
+	action, ok := s.underlying.(core.IntegrationTool)
+	if !ok {
+		return nil, fmt.Errorf("action %s is not a tool", s.underlying.Name())
+	}
+
+	return action.Call(ctx)
+}

@@ -20,6 +20,10 @@ type Configuration struct {
 	APIKey string `json:"apiKey"`
 }
 
+func (l *LaunchDarkly) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (l *LaunchDarkly) Name() string {
 	return "launchdarkly"
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore/components"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/tools"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -27,6 +28,12 @@ type Configuration struct {
 
 type Metadata struct {
 	Projects []string `json:"projects"`
+}
+
+func (s *Semaphore) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{
+		&tools.Hello{},
+	}
 }
 
 func (s *Semaphore) Name() string {

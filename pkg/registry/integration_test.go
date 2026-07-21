@@ -15,16 +15,17 @@ import (
 // panickingIntegration is an integration that panics in all panicable methods
 type panickingIntegration struct{}
 
-func (p *panickingIntegration) Name() string                         { return "panicking-integration" }
-func (p *panickingIntegration) Label() string                        { return "Panicking Integration" }
-func (p *panickingIntegration) Icon() string                         { return "icon" }
-func (p *panickingIntegration) Description() string                  { return "description" }
-func (p *panickingIntegration) Instructions() string                 { return "instructions" }
-func (p *panickingIntegration) Configuration() []configuration.Field { return nil }
-func (p *panickingIntegration) Actions() []core.Action               { return nil }
-func (p *panickingIntegration) Triggers() []core.Trigger             { return nil }
-func (p *panickingIntegration) Sync(ctx core.SyncContext) error      { panic("sync panic") }
-func (p *panickingIntegration) Hooks() []core.Hook                   { return nil }
+func (p *panickingIntegration) Name() string                              { return "panicking-integration" }
+func (p *panickingIntegration) Label() string                             { return "Panicking Integration" }
+func (p *panickingIntegration) Icon() string                              { return "icon" }
+func (p *panickingIntegration) Description() string                       { return "description" }
+func (p *panickingIntegration) Instructions() string                      { return "instructions" }
+func (p *panickingIntegration) Configuration() []configuration.Field      { return nil }
+func (p *panickingIntegration) Actions() []core.Action                    { return nil }
+func (p *panickingIntegration) Triggers() []core.Trigger                  { return nil }
+func (p *panickingIntegration) Sync(ctx core.SyncContext) error           { panic("sync panic") }
+func (p *panickingIntegration) Hooks() []core.Hook                        { return nil }
+func (p *panickingIntegration) CustomTools() []core.CustomIntegrationTool { return nil }
 
 func (p *panickingIntegration) HandleHook(ctx core.IntegrationHookContext) error {
 	panic("handle hook panic")

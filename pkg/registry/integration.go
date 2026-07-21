@@ -61,6 +61,15 @@ func (s *PanicableIntegration) Actions() []core.Action {
 	return safe
 }
 
+func (s *PanicableIntegration) CustomTools() []core.CustomIntegrationTool {
+	tools := s.underlying.CustomTools()
+	safe := make([]core.CustomIntegrationTool, len(tools))
+	for i, t := range tools {
+		safe[i] = NewPanicableCustomTool(t)
+	}
+	return safe
+}
+
 func (s *PanicableIntegration) Triggers() []core.Trigger {
 	triggers := s.underlying.Triggers()
 	safe := make([]core.Trigger, len(triggers))
@@ -128,4 +137,42 @@ func (s *PanicableIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 		}
 	}()
 	s.underlying.HandleRequest(ctx)
+}
+
+type PanicableCustomTool struct {
+	underlying core.CustomIntegrationTool
+}
+
+func NewPanicableCustomTool(t core.CustomIntegrationTool) core.CustomIntegrationTool {
+	return &PanicableCustomTool{underlying: t}
+}
+
+func (s *PanicableCustomTool) Name() string {
+	return s.underlying.Name()
+}
+
+func (s *PanicableCustomTool) Label() string {
+	return s.underlying.Label()
+}
+
+func (s *PanicableCustomTool) Description() string {
+	return s.underlying.Description()
+}
+
+func (s *PanicableCustomTool) Configuration() []configuration.Field {
+	return s.underlying.Configuration()
+}
+
+func (s *PanicableCustomTool) Call(ctx core.IntegrationToolContext) (output any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger.Errorf("Custom tool %s panicked in Call(): %v\nStack: %s",
+				s.underlying.Name(), r, debug.Stack())
+			output = nil
+			err = fmt.Errorf("custom tool %s panicked in Call(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+
+	return s.underlying.Call(ctx)
 }

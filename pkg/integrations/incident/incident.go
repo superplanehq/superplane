@@ -19,6 +19,10 @@ type Configuration struct {
 	APIKey string `json:"apiKey"`
 }
 
+func (i *IncidentIO) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (i *IncidentIO) Name() string {
 	return "incident"
 }

@@ -222,6 +222,10 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 	}
 }
 
+func (c *Cloudflare) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (c *Cloudflare) Actions() []core.Action {
 	return []core.Action{
 		&CreateDNSRecord{},

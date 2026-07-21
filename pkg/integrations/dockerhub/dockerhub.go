@@ -20,6 +20,10 @@ type Configuration struct {
 	AccessToken string `json:"accessToken"`
 }
 
+func (d *DockerHub) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (d *DockerHub) Name() string {
 	return "dockerhub"
 }

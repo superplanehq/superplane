@@ -112,6 +112,25 @@ func (c *GetPipeline) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
+func (c *GetPipeline) Call(ctx core.IntegrationToolContext) (any, error) {
+	var spec GetPipelineSpec
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return nil, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	pipeline, err := client.GetPipeline(spec.PipelineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pipeline: %w", err)
+	}
+
+	return pipeline, nil
+}
+
 func (c *GetPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }

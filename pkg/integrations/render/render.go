@@ -32,6 +32,10 @@ type WorkspaceMetadata struct {
 	Plan string `json:"plan" mapstructure:"plan"`
 }
 
+func (r *Render) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (r *Render) Name() string {
 	return "render"
 }

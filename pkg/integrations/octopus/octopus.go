@@ -30,6 +30,10 @@ type SpaceMetadata struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
+func (o *Octopus) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (o *Octopus) Name() string {
 	return "octopus"
 }

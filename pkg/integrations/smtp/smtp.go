@@ -26,6 +26,10 @@ type Configuration struct {
 	UseTLS    bool   `json:"useTLS" mapstructure:"useTLS"`
 }
 
+func (s *SMTP) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (s *SMTP) Name() string {
 	return "smtp"
 }

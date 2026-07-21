@@ -161,6 +161,18 @@ service Organizations {
     };
   }
 
+  rpc CallIntegrationTool(CallIntegrationToolRequest) returns (CallIntegrationToolResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/integrations/{integration_id}/tools"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Call an integration tool";
+      description: "Call an integration tool";
+      tags: "Organization";
+    };
+  }
+
   rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/integrations"
@@ -398,6 +410,17 @@ message DescribeIntegrationRequest {
 
 message DescribeIntegrationResponse {
   Integration integration = 1;
+}
+
+message CallIntegrationToolRequest {
+  string id = 1;
+  string integration_id = 2;
+  string tool_name = 3;
+  map<string, string> parameters = 4;
+}
+
+message CallIntegrationToolResponse {
+  google.protobuf.Struct output = 1;
 }
 
 message ListIntegrationResourcesRequest {

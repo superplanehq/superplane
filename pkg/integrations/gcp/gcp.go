@@ -81,6 +81,10 @@ type Configuration struct {
 	WorkloadIdentityProjectID string `json:"workloadIdentityProjectId" mapstructure:"workloadIdentityProjectId"`
 }
 
+func (g *GCP) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (g *GCP) Name() string {
 	return "gcp"
 }

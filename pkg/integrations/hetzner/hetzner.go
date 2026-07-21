@@ -23,6 +23,10 @@ type Configuration struct {
 	S3Region          string `json:"s3Region" mapstructure:"s3Region"`
 }
 
+func (h *Hetzner) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (h *Hetzner) Name() string {
 	return "hetzner"
 }

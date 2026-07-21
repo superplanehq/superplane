@@ -130,6 +130,10 @@ type WebhookMessage struct {
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
 }
 
+func (s *Sentry) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (s *Sentry) Name() string {
 	return "sentry"
 }

@@ -61,6 +61,10 @@ func (i *Claude) Configuration() []configuration.Field {
 	}
 }
 
+func (i *Claude) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (i *Claude) Actions() []core.Action {
 	return []core.Action{
 		&TextPrompt{},

@@ -14,6 +14,10 @@ func init() {
 
 type JFrogArtifactory struct{}
 
+func (j *JFrogArtifactory) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (j *JFrogArtifactory) Name() string {
 	return "jfrogArtifactory"
 }

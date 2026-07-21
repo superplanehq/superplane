@@ -110,11 +110,18 @@ func (c *OnRun) Configuration() []configuration.Field {
 								},
 							},
 							{
+								Name:        "required",
+								Label:       "Required",
+								Description: "Whether the parameter is required",
+								Type:        configuration.FieldTypeBool,
+								Default:     false,
+							},
+							{
 								Name:        "label",
 								Label:       "Label",
 								Description: "The label of the parameter",
 								Type:        configuration.FieldTypeString,
-								Required:    true,
+								Togglable:   true,
 								TypeOptions: &configuration.TypeOptions{
 									String: &configuration.StringTypeOptions{
 										AllowExpressions: new(bool),
@@ -126,18 +133,14 @@ func (c *OnRun) Configuration() []configuration.Field {
 								Label:       "Description",
 								Description: "The description of the parameter",
 								Type:        configuration.FieldTypeText,
-							},
-							{
-								Name:        "required",
-								Label:       "Required",
-								Description: "Whether the parameter is required",
-								Type:        configuration.FieldTypeBool,
+								Togglable:   true,
 							},
 							{
 								Name:        "default",
 								Label:       "Default",
 								Description: "The default value of the parameter",
 								Type:        configuration.FieldTypeString,
+								Togglable:   true,
 								TypeOptions: &configuration.TypeOptions{
 									String: &configuration.StringTypeOptions{
 										AllowExpressions: new(bool),

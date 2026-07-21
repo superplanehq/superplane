@@ -21,6 +21,10 @@ type Configuration struct {
 
 var agentPresets = []string{"fast-search", "pro-search", "deep-research", "advanced-deep-research"}
 
+func (p *Perplexity) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (p *Perplexity) Name() string {
 	return "perplexity"
 }

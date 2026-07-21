@@ -40,6 +40,10 @@ type Metadata struct {
 	Services []Service `json:"services"`
 }
 
+func (p *PagerDuty) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (p *PagerDuty) Name() string {
 	return "pagerduty"
 }

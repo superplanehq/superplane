@@ -41,6 +41,10 @@ type Configuration struct {
 
 type Metadata struct{}
 
+func (p *Prometheus) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (p *Prometheus) Name() string {
 	return "prometheus"
 }

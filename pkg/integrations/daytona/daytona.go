@@ -23,6 +23,10 @@ type Configuration struct {
 type Metadata struct {
 }
 
+func (d *Daytona) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (d *Daytona) Name() string {
 	return "daytona"
 }

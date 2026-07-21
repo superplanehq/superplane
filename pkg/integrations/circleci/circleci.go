@@ -43,6 +43,10 @@ func (c *CircleCI) Instructions() string {
 	return "Create a Personal API Token in CircleCI → User Settings → Personal API Tokens"
 }
 
+func (c *CircleCI) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (c *CircleCI) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

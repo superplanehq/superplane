@@ -21,6 +21,10 @@ type Configuration struct {
 	BaseURL  string `json:"baseURL"`
 }
 
+func (o *OpenAI) CustomTools() []core.CustomIntegrationTool {
+	return []core.CustomIntegrationTool{}
+}
+
 func (o *OpenAI) Name() string {
 	return "openai"
 }
