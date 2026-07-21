@@ -231,6 +231,7 @@ type UpdateIssueRequest struct {
 	Description *string `json:"description,omitempty"`
 	StateEvent  *string `json:"state_event,omitempty"`
 	Labels      *string `json:"labels,omitempty"`
+	AddLabels   *string `json:"add_labels,omitempty"`
 	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
 	MilestoneID *int    `json:"milestone_id,omitempty"`
 	DueDate     *string `json:"due_date,omitempty"`
