@@ -20,6 +20,7 @@ type BrokerMetrics struct {
 	webhookDeliveryDur     metric.Float64Histogram
 	tasksQueued            metric.Int64Gauge
 	tasksClaimed           metric.Int64Gauge
+	oldestQueuedTaskAge    metric.Float64Gauge
 	instanceSpinupDuration metric.Float64Histogram
 }
 
@@ -72,6 +73,12 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
+	oldestQueuedTaskAge, err := meter.Float64Gauge(telemetry.MetricOldestQueuedTaskAge,
+		metric.WithDescription("Age of the oldest task waiting for a runner to claim it"),
+		metric.WithUnit("s"))
+	if err != nil {
+		return nil, err
+	}
 	instanceSpinupDuration, err := meter.Float64Histogram(telemetry.MetricInstanceSpinupDuration,
 		metric.WithDescription("Time from instance request until runner WS connected (phase=runner_connected)"),
 		metric.WithUnit("s"))
@@ -88,6 +95,7 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 		webhookDeliveryDur:     webhookDeliveryDur,
 		tasksQueued:            tasksQueued,
 		tasksClaimed:           tasksClaimed,
+		oldestQueuedTaskAge:    oldestQueuedTaskAge,
 		instanceSpinupDuration: instanceSpinupDuration,
 	}, nil
 }
@@ -128,6 +136,10 @@ func (m *BrokerMetrics) SetTaskBacklog(ctx context.Context, fleetID string, queu
 	fleet := telemetry.FleetAttr(fleetID)
 	m.tasksQueued.Record(ctx, int64(queued), metric.WithAttributes(fleet))
 	m.tasksClaimed.Record(ctx, int64(claimed), metric.WithAttributes(fleet))
+}
+
+func (m *BrokerMetrics) SetOldestQueuedTaskAge(ctx context.Context, fleetID string, age time.Duration) {
+	m.oldestQueuedTaskAge.Record(ctx, age.Seconds(), metric.WithAttributes(telemetry.FleetAttr(fleetID)))
 }
 
 func (m *BrokerMetrics) InstanceSpinupDuration(ctx context.Context, fleetID, phase string, duration time.Duration) {

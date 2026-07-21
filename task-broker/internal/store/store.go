@@ -58,6 +58,7 @@ type Store interface {
 	GetTask(ctx context.Context, id string) (*models.Task, error)
 	ListActiveTasks(ctx context.Context) ([]*models.Task, error)
 	CountTasksByFleet(ctx context.Context, fleetID string) (queued, claimed int, err error)
+	OldestQueuedTaskCreatedAt(ctx context.Context, fleetID string) (*time.Time, error)
 	ClaimedRunnerIDsByFleet(ctx context.Context, fleetID string) ([]string, error)
 	ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error)
 	// UnclaimTask re-queues a claimed task so another runner can pick it up.
