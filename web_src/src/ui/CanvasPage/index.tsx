@@ -468,7 +468,10 @@ function CanvasModeFloatingBar({
   onAction: () => void;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3">
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3"
+      data-testid="canvas-mode-floating-bar"
+    >
       <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-gray-800">
         <span className="min-w-0 truncate text-[13px] font-medium text-white dark:text-gray-400">{label}</span>
         <Button
@@ -476,6 +479,7 @@ function CanvasModeFloatingBar({
           variant="outline"
           size="xs"
           className="shrink-0 border-0 shadow-none dark:border dark:border-gray-600/70 dark:shadow-xs"
+          data-testid="canvas-mode-floating-bar-action"
           onClick={onAction}
         >
           {actionLabel}

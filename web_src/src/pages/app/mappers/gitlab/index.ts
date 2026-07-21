@@ -1,8 +1,11 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { acceptMergeRequestMapper } from "./accept_merge_request";
+import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";
 import { addReactionMapper } from "./add_reaction";
 import { approveMergeRequestMapper } from "./approve_merge_request";
+import { createMergeRequestMapper } from "./create_merge_request";
+import { removeMergeRequestReviewersMapper } from "./remove_merge_request_reviewers";
 import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
 import { createIssueMapper } from "./create_issue";
@@ -11,9 +14,11 @@ import { createMergeCommentMapper } from "./create_merge_comment";
 import { getIssueMapper } from "./get_issue";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onIssueTriggerRenderer } from "./on_issue";
+import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
 import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
 import { onMergeRequestTriggerRenderer } from "./on_merge_request";
 import { onMilestoneTriggerRenderer } from "./on_milestone";
+import { onMRDiffNoteTriggerRenderer } from "./on_mr_diff_note";
 import { onPipelineTriggerRenderer } from "./on_pipeline";
 import { onPushTriggerRenderer } from "./on_push";
 import { onReleaseTriggerRenderer } from "./on_release";
@@ -31,6 +36,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getTestReportSummary: buildActionStateRegistry("retrieved"),
   createMergeComment: buildActionStateRegistry("created"),
   addReaction: buildActionStateRegistry("added"),
+  createMergeRequest: buildActionStateRegistry("created"),
+  addMergeRequestReviewers: buildActionStateRegistry("updated"),
+  removeMergeRequestReviewers: buildActionStateRegistry("updated"),
   acceptMergeRequest: buildActionStateRegistry("merged"),
   approveMergeRequest: buildActionStateRegistry("approved"),
   createDeployment: buildActionStateRegistry("created"),
@@ -48,6 +56,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getTestReportSummary: testReportSummaryMapper,
   createMergeComment: createMergeCommentMapper,
   addReaction: addReactionMapper,
+  createMergeRequest: createMergeRequestMapper,
+  addMergeRequestReviewers: addMergeRequestReviewersMapper,
+  removeMergeRequestReviewers: removeMergeRequestReviewersMapper,
   acceptMergeRequest: acceptMergeRequestMapper,
   approveMergeRequest: approveMergeRequestMapper,
   createDeployment: createDeploymentMapper,
@@ -60,9 +71,11 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onBranchCreated: onBranchCreatedTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
+  onIssueComment: onIssueCommentTriggerRenderer,
   onMergeComment: onMergeCommentTriggerRenderer,
   onMergeRequest: onMergeRequestTriggerRenderer,
   onMilestone: onMilestoneTriggerRenderer,
+  onMRDiffNote: onMRDiffNoteTriggerRenderer,
   onPipeline: onPipelineTriggerRenderer,
   onPush: onPushTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,
