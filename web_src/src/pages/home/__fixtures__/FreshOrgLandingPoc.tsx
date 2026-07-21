@@ -7,20 +7,25 @@ import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { cn } from "@/lib/utils";
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
-import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
+import type { AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Radio } from "@/components/ui/radio";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Eye,
   GitPullRequest,
   ListTodo,
   MessageSquare,
   Plus,
+  TextAlignStart,
   RefreshCw,
   Terminal,
   Trash2,
@@ -43,26 +48,62 @@ import { useCreateApp } from "../useCreateApp";
 
 const SETUP_STEPS = [
   {
+    railLabel: "Triggers",
     title: "Triggers",
-    detail: "Select the triggers you want to use to kick off Software Factory work.",
+    detail: "What kicks off the factory?",
   },
   {
-    title: "Version control",
-    detail: "Where the factory checks out code and opens pull or merge requests.",
+    railLabel: "Version Control",
+    title: "Version Control",
+    detail: "Where the factory checks out code?",
   },
   {
-    title: "Coding agent",
-    detail: "Pick a harness. Agents run in the SuperPlane sandbox; you provide the API key.",
+    railLabel: "Agent",
+    title: "Agent",
+    detail: "Which agent will run the factory?",
+    description: "Agents run in the SuperPlane sandbox, you provide the API key.",
   },
   {
-    title: "Agent settings",
-    detail: "Tune the planning, implementation, and PR review components the factory will run.",
+    railLabel: "Prompts",
+    title: "Prompts",
+    detail: "What should the factory do?",
+    description: "Tune the planning, implementation, and PR review steps the factory will run.",
   },
   {
+    railLabel: "Preview",
     title: "Preview",
     detail: "Confirm your setup before creating the Software Factory.",
   },
 ] as const;
+
+function FactorySetupStepNav({ currentIndex }: { currentIndex: number }) {
+  return (
+    <nav aria-label="Setup progress">
+      <ol className="space-y-1">
+        {SETUP_STEPS.map((step, index) => {
+          const isCurrent = index === currentIndex;
+          const isComplete = index < currentIndex;
+          return (
+            <li key={step.railLabel}>
+              <span
+                className={cn(
+                  "inline-flex items-baseline gap-1.5 text-sm",
+                  isCurrent && "font-medium text-gray-800 dark:text-gray-100",
+                  isComplete && "text-gray-600 dark:text-gray-400",
+                  !isCurrent && !isComplete && "text-gray-400 dark:text-gray-500",
+                )}
+                aria-current={isCurrent ? "step" : undefined}
+              >
+                <span className="tabular-nums">{index + 1}.</span>
+                {step.railLabel}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 type AgentStepKind = "prompt" | "bash";
 
@@ -189,8 +230,8 @@ function cloneDefaultAgentComponents(
   return [
     {
       id: "planning",
-      title: "Planning",
-      purpose: "Turns the trigger into a short implementation plan before coding starts.",
+      title: "Plan",
+      purpose: "Applies a plan before coding starts.",
       modelId,
       machineType: DEFAULT_AGENT_MACHINE,
       steps: [
@@ -243,48 +284,6 @@ function cloneDefaultAgentComponents(
     },
   ];
 }
-
-const OUTCOME_STEPS: {
-  title: string;
-  detail: string;
-  phase: "ready" | "running" | "review" | "done";
-}[] = [
-  {
-    title: "Work is triggered",
-    detail: "Manual prompt, issue, or PR/MR tag starts a run.",
-    phase: "ready",
-  },
-  {
-    title: "Agent plans and codes",
-    detail: "Harness runs in the SuperPlane sandbox.",
-    phase: "running",
-  },
-  {
-    title: "Opens a pull request",
-    detail: "Branch + PR or merge request.",
-    phase: "running",
-  },
-  {
-    title: "Keeps checks passing",
-    detail: "Watches PR checks and loops on failures until they pass.",
-    phase: "running",
-  },
-  {
-    title: "Waits for your review",
-    detail: "You stay on the loop.",
-    phase: "review",
-  },
-  {
-    title: "Addresses review comments",
-    detail: "Agent updates the PR from feedback.",
-    phase: "running",
-  },
-  {
-    title: "Gets to a mergeable state",
-    detail: "PR ready for you to merge.",
-    phase: "done",
-  },
-];
 
 type TriggerSourceId = "manual" | "issue" | "prOrMrTag";
 
@@ -420,9 +419,8 @@ function openCodeNeedsApiKey(harness: AgentHarnessId | null, openCodeProvider: O
 }
 
 /**
- * Storybook-only fresh-org landing POC: densified split (decision + outcome)
- * with quiet escape hatches for blank apps and the starter catalog.
- * Not mounted in production routes.
+ * Storybook-only fresh-org landing POC: factory-first hero with quiet escape
+ * hatches for blank apps and the starter catalog. Not mounted in production routes.
  */
 export function FreshOrgLandingPage() {
   return (
@@ -486,116 +484,45 @@ export function FreshOrgLandingPoc() {
         />
       )}
 
-      <div className="mx-auto w-full max-w-6xl px-8 py-14 lg:py-20">
-        <div className="grid items-start gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-400 dark:text-gray-500">
-              Recommended
-            </p>
-            <h1 className="mt-3 max-w-[16ch] text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-gray-100">
-              Ship PRs to a mergeable state
-            </h1>
-            <p className={cn(homePageSubtitleClassName, "mt-3 max-w-md")}>
-              An automated app that orchestrates cloud agents to solve issues end to end. Agents run in the SuperPlane
-              sandbox. You review; the factory keeps going until the PR is mergeable.
-            </p>
-            <div className="mt-7">
-              <Button type="button" size="lg" onClick={() => setShowFactorySetup(true)}>
-                Start setup
-                <ArrowRight />
-              </Button>
-            </div>
-
-            <ol className="mt-8 space-y-4" aria-label="Setup steps">
-              {SETUP_STEPS.map((step, index) => (
-                <li key={step.title} className="flex gap-3">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-gray-100 dark:text-slate-900">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{step.title}</p>
-                    <p className="mt-0.5 text-sm leading-snug text-gray-500 dark:text-gray-400">{step.detail}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-
-            <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-400 dark:text-gray-500">
-              <span>Or</span>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (busy) return;
-                  void createApp(generateCanvasName());
-                }}
-                className="inline-flex items-center gap-1.5 font-medium text-gray-500 underline-offset-4 hover:text-slate-900 hover:underline disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-100"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden />
-                Create a blank app
-              </button>
-              <span className="text-slate-300 dark:text-gray-600" aria-hidden>
-                ·
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowCatalog((open) => !open)}
-                className="font-medium text-gray-500 underline-offset-4 hover:text-slate-900 hover:underline dark:text-gray-400 dark:hover:text-gray-100"
-                aria-expanded={showCatalog}
-              >
-                {showCatalog ? "Hide starter apps" : "Browse other starter apps"}
-              </button>
-            </div>
-          </div>
-
-          <aside
-            className={cn(
-              "rounded-xl bg-white px-6 py-6 outline outline-slate-950/10",
-              "dark:bg-gray-900 dark:outline-gray-700/60",
-            )}
-          >
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100">What you get</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              End-to-end orchestration from trigger to a mergeable PR.
-            </p>
-            <ol className="relative mt-6 space-y-0">
-              {OUTCOME_STEPS.map((step, index) => {
-                const isLast = index === OUTCOME_STEPS.length - 1;
-                return (
-                  <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0">
-                    {!isLast && (
-                      <span
-                        className="absolute top-9 bottom-0 left-[15px] w-px bg-slate-200 dark:bg-gray-700"
-                        aria-hidden
-                      />
-                    )}
-                    <span
-                      className={cn(
-                        "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                        step.phase === "ready" && "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
-                        step.phase === "running" &&
-                          "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-                        step.phase === "review" &&
-                          "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-                        step.phase === "done" && "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
-                      )}
-                    >
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 pt-0.5">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{step.title}</p>
-                      <p className="mt-0.5 text-sm leading-snug text-gray-500 dark:text-gray-400">{step.detail}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </aside>
+      <div className="mx-auto w-full max-w-3xl px-8 py-14 lg:py-20">
+        <h1 className={cn(homePageTitleClassName, "text-2xl text-gray-800")}>Create a new app</h1>
+        <p className={cn(homePageSubtitleClassName, "mt-3 max-w-lg font-normal leading-normal text-gray-600")}>
+          Set up a Software Factory to automate coding work with agents, from trigger to pull request. Or start from a
+          blank app or starter template instead.
+        </p>
+        <div className="mt-7">
+          <Button type="button" size="lg" onClick={() => setShowFactorySetup(true)}>
+            Setup Factory
+            <ArrowRight />
+          </Button>
         </div>
+
+        <p className="mt-8 text-sm font-normal text-gray-600 dark:text-gray-400">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (busy) return;
+              void createApp(generateCanvasName());
+            }}
+            className="font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 disabled:opacity-50 dark:text-gray-200 dark:decoration-gray-600"
+          >
+            Create a blank app
+          </button>
+          {" or "}
+          <button
+            type="button"
+            onClick={() => setShowCatalog((open) => !open)}
+            className="font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+            aria-expanded={showCatalog}
+          >
+            {showCatalog ? "Hide starter apps" : "Browse starter apps"}
+          </button>
+        </p>
 
         {showCatalog && (
           <div className="mt-10 flex flex-col gap-3">
-            <p className="text-center text-xs font-medium text-gray-400 dark:text-gray-500">
+            <p className="text-xs font-normal text-gray-600 dark:text-gray-400">
               Automation starters (not Software Factory setup)
             </p>
             {visible.map((app) => (
@@ -764,6 +691,8 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
   const setupReady =
     requiredIntegrations.every((item) => connectedTools.has(item.key)) && openCodeKeyReady && defaultRepoReady;
   const emphasizeRequiredIntegrations = isFinalStep && !setupReady;
+  const showRequiredPanel =
+    requiredIntegrations.length > 0 || vcsHost !== null || (needsOpenCodeApiKey && selectedOpenCodeProvider !== null);
   const canContinue = isTriggerStep
     ? triggerChoicesReady
     : isVcsStep
@@ -880,14 +809,47 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-14">
-      <div className="grid items-start gap-8 lg:grid-cols-[1fr_0.95fr]">
+      <h1 className="text-2xl font-medium text-gray-800 dark:text-gray-100">Software Factory setup</h1>
+      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_2fr] lg:gap-16">
+        <div className="sticky top-8 min-w-0 space-y-6">
+          <FactorySetupStepNav currentIndex={stepIndex} />
+          {showRequiredPanel ? (
+            <RequiredIntegrationsPanel
+              requiredIntegrations={requiredIntegrations}
+              connectedTools={connectedTools}
+              onConnect={openConnectDialog}
+              emphasize={emphasizeRequiredIntegrations}
+              sticky={false}
+              defaultRepoPicker={
+                vcsHost
+                  ? {
+                      host: vcsHost,
+                      value: defaultRepoId ?? "",
+                      onChange: setDefaultRepoId,
+                    }
+                  : undefined
+              }
+              agentKeyPicker={
+                needsOpenCodeApiKey && selectedOpenCodeProvider
+                  ? {
+                      providerLabel: selectedOpenCodeProvider.label,
+                      iconName: selectedOpenCodeProvider.iconName,
+                      value: agentApiKey,
+                      onChange: setAgentApiKey,
+                      emphasize: isFinalStep && !openCodeKeyReady,
+                    }
+                  : undefined
+              }
+              defaultRepoEmphasize={isFinalStep && !defaultRepoReady}
+            />
+          ) : null}
+        </div>
+
         <div className="min-w-0">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
-            Step {stepIndex + 1} of {SETUP_STEPS.length}
-          </p>
-          <h1 className={cn(homePageTitleClassName, "mt-2")}>Software Factory setup</h1>
-          <h2 className="mt-6 text-lg font-semibold text-slate-900 dark:text-gray-100">{step.title}</h2>
-          <p className={cn(homePageSubtitleClassName, "mt-1")}>{step.detail}</p>
+          <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100">{step.detail}</h2>
+          {"description" in step && step.description ? (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{step.description}</p>
+          ) : null}
 
           {isTriggerStep ? (
             <TriggerStepContent
@@ -897,11 +859,15 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
               onToggleSource={toggleTriggerSource}
               onSelectIssueTracker={(id) => {
                 setIssueTracker(id);
+                setTriggerSources((prev) => new Set(prev).add("issue"));
                 if (triggerSources.has("prOrMrTag") && prMrProvider === null && (id === "github" || id === "gitlab")) {
                   setPrMrProvider(id);
                 }
               }}
-              onSelectPrMrProvider={setPrMrProvider}
+              onSelectPrMrProvider={(id) => {
+                setPrMrProvider(id);
+                setTriggerSources((prev) => new Set(prev).add("prOrMrTag"));
+              }}
             />
           ) : isVcsStep ? (
             <VersionControlStepContent
@@ -938,59 +904,15 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
           )}
 
           <div className="mt-10 flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={handleBack}>
+            <Button type="button" variant="outline" size="default" onClick={handleBack}>
               <ArrowLeft />
               Back
             </Button>
-            <Button type="button" onClick={handleContinue} disabled={!canContinue}>
+            <Button type="button" size="default" onClick={handleContinue} disabled={!canContinue}>
               {isFinalStep ? "Done" : "Continue"}
               <ArrowRight />
             </Button>
           </div>
-        </div>
-
-        <div className="sticky top-8 space-y-3">
-          <RequiredIntegrationsPanel
-            requiredIntegrations={requiredIntegrations}
-            connectedTools={connectedTools}
-            onConnect={openConnectDialog}
-            emphasize={emphasizeRequiredIntegrations}
-            sticky={false}
-            emptyHint={
-              isTriggerStep
-                ? "Select triggers on the left. Matching integrations show up here."
-                : "Integrations from earlier steps stay listed here as you continue setup."
-            }
-            defaultRepoPicker={
-              vcsHost
-                ? {
-                    host: vcsHost,
-                    value: defaultRepoId ?? "",
-                    onChange: setDefaultRepoId,
-                  }
-                : undefined
-            }
-            agentKeyPicker={
-              needsOpenCodeApiKey && selectedOpenCodeProvider
-                ? {
-                    providerLabel: selectedOpenCodeProvider.label,
-                    iconName: selectedOpenCodeProvider.iconName,
-                    value: agentApiKey,
-                    onChange: setAgentApiKey,
-                    emphasize: isFinalStep && !openCodeKeyReady,
-                  }
-                : undefined
-            }
-            defaultRepoEmphasize={isFinalStep && !defaultRepoReady}
-          />
-          {emphasizeRequiredIntegrations ? (
-            <p
-              role="status"
-              className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 outline outline-amber-500/40 dark:bg-amber-950/40 dark:text-amber-50 dark:outline-amber-400/40"
-            >
-              Hey, make sure you connect all the required tools.
-            </p>
-          ) : null}
         </div>
       </div>
 
@@ -1040,10 +962,13 @@ function TriggerStepContent({
   onSelectPrMrProvider: (id: string) => void;
 }) {
   return (
-    <div className="mt-8 space-y-3" role="group" aria-label="Select triggers">
-      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">Select triggers</p>
+    <div className="mt-8 space-y-5" role="group" aria-label="Select one or more triggers">
+      <p className="text-sm font-medium text-slate-900 dark:text-gray-100">Select one or more</p>
       {TRIGGER_SOURCES.map((source) => {
-        const selected = selectedSources.has(source.id);
+        const selected =
+          selectedSources.has(source.id) ||
+          (source.id === "issue" && issueTracker !== null) ||
+          (source.id === "prOrMrTag" && prMrProvider !== null);
         const subsection =
           source.id === "issue" ? (
             <ChoiceGroup
@@ -1051,6 +976,7 @@ function TriggerStepContent({
               choices={ISSUE_TRACKERS}
               selectedId={issueTracker}
               onSelect={onSelectIssueTracker}
+              embedded
             />
           ) : source.id === "prOrMrTag" ? (
             <ChoiceGroup
@@ -1058,28 +984,79 @@ function TriggerStepContent({
               choices={PR_MR_PROVIDERS}
               selectedId={prMrProvider}
               onSelect={onSelectPrMrProvider}
+              embedded
             />
           ) : null;
 
         return (
-          <div key={source.id} className="space-y-2">
-            <button
-              type="button"
-              aria-pressed={selected}
-              aria-expanded={subsection ? selected : undefined}
-              onClick={() => onToggleSource(source.id)}
-              className={cn(
-                "flex w-full flex-col items-start rounded-xl px-4 py-3.5 text-left outline transition-colors",
-                selected
-                  ? "bg-white outline-slate-900 dark:bg-gray-900 dark:outline-gray-100"
-                  : "bg-white outline-slate-950/10 hover:outline-slate-950/20 dark:bg-gray-900 dark:outline-gray-700/70 dark:hover:outline-gray-500",
-              )}
-            >
-              <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{source.title}</span>
-            </button>
-            {selected && subsection ? (
-              <div className="ml-3 border-l-2 border-slate-200 pl-4 dark:border-gray-700">{subsection}</div>
-            ) : null}
+          <div key={source.id}>
+            {subsection ? (
+              <div
+                className={cn(
+                  "overflow-hidden rounded-lg bg-white outline transition-colors dark:bg-gray-900",
+                  selected
+                    ? "outline-slate-900 dark:outline-gray-100"
+                    : "outline-slate-950/10 hover:outline-slate-950/20 dark:outline-gray-700/70 dark:hover:outline-gray-500",
+                )}
+              >
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  aria-expanded={selected}
+                  onClick={() => onToggleSource(source.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                >
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+                      selected ? "bg-gray-800 dark:bg-gray-100" : "bg-gray-200 dark:bg-gray-700",
+                    )}
+                    aria-hidden
+                  >
+                    <Check
+                      className={cn(
+                        "h-2.5 w-2.5",
+                        selected ? "text-white dark:text-gray-900" : "text-white",
+                      )}
+                      strokeWidth={3}
+                    />
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{source.title}</span>
+                </button>
+                {selected ? (
+                  <div className="border-t border-slate-200 px-3 pb-3 pt-3 dark:border-gray-700">{subsection}</div>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onToggleSource(source.id)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left outline transition-colors",
+                  selected
+                    ? "bg-white outline-slate-900 dark:bg-gray-900 dark:outline-gray-100"
+                    : "bg-white outline-slate-950/10 hover:outline-slate-950/20 dark:bg-gray-900 dark:outline-gray-700/70 dark:hover:outline-gray-500",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+                    selected ? "bg-gray-800 dark:bg-gray-100" : "bg-gray-200 dark:bg-gray-700",
+                  )}
+                  aria-hidden
+                >
+                  <Check
+                    className={cn(
+                      "h-2.5 w-2.5",
+                      selected ? "text-white dark:text-gray-900" : "text-white",
+                    )}
+                    strokeWidth={3}
+                  />
+                </span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{source.title}</span>
+              </button>
+            )}
           </div>
         );
       })}
@@ -1101,14 +1078,14 @@ function VersionControlStepContent({
   if (hostLocked && vcsHost) {
     const host = VCS_HOSTS.find((choice) => choice.id === vcsHost);
     return (
-      <div className="mt-8 rounded-xl bg-white px-4 py-4 outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/60">
+      <div className="mt-8 rounded-lg bg-white px-4 py-4 outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/60">
         <div className="flex items-center gap-2">
           <IntegrationIcon integrationName={vcsHost} className="h-4 w-4" size={16} />
-          <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">
+          <p className="text-sm font-medium text-slate-900 dark:text-gray-100">
             Using {host?.label ?? vcsHost} for version control
           </p>
         </div>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Based on the triggers you selected.</p>
+        <p className="mt-1 text-[13px] leading-normal text-gray-500 dark:text-gray-400">Based on the triggers you selected.</p>
       </div>
     );
   }
@@ -1117,7 +1094,7 @@ function VersionControlStepContent({
   return (
     <div className="mt-8">
       <ChoiceGroup
-        title="Host"
+        title="Select Host"
         choices={choices}
         selectedId={vcsHost}
         onSelect={(id) => onSelectHost(id as VcsHostId)}
@@ -1143,31 +1120,31 @@ function OpenCodeProviderGroup({
   openCodeProvider: OpenCodeProviderId | null;
   onSelectOpenCodeProvider: (id: OpenCodeProviderId) => void;
 }) {
+  const groupName = ariaLabel.replace(/\s+/g, "-").toLowerCase();
+
   return (
     <div>
-      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{title}</p>
-      <div className="mt-3 grid gap-2" role="group" aria-label={ariaLabel}>
+      <p className="text-[13px] font-normal text-gray-600 dark:text-gray-400">{title}</p>
+      <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={ariaLabel}>
         {providers.map((provider) => {
           const active = openCodeProvider === provider.id;
+          const inputId = `${groupName}-${provider.id}`;
           return (
-            <button
-              key={provider.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onSelectOpenCodeProvider(provider.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-xl bg-white px-3 py-3 text-left text-sm font-medium outline transition-colors dark:bg-gray-900",
-                active
-                  ? "text-slate-900 outline-slate-900 dark:text-gray-100 dark:outline-gray-100"
-                  : "text-slate-700 outline-slate-950/10 hover:outline-slate-950/20 dark:text-gray-200 dark:outline-gray-700/70",
-              )}
-            >
-              <IntegrationIcon integrationName={provider.iconName} className="h-4 w-4" size={16} />
-              <span className="min-w-0 flex-1 truncate">{provider.label}</span>
+            <Label key={provider.id} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 py-0.5 font-normal">
+              <Radio
+                id={inputId}
+                name={groupName}
+                checked={active}
+                onChange={() => onSelectOpenCodeProvider(provider.id)}
+              />
+              <IntegrationIcon integrationName={provider.iconName} className="h-4 w-4" size={16} aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-gray-100">
+                {provider.label}
+              </span>
               <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
                 {openCodeProviderModeLabel(provider.mode)}
               </span>
-            </button>
+            </Label>
           );
         })}
       </div>
@@ -1187,46 +1164,92 @@ function CodingAgentStepContent({
   onSelectOpenCodeProvider: (id: OpenCodeProviderId) => void;
 }) {
   return (
-    <div className="mt-8 space-y-3" role="group" aria-label="Select coding agent harness">
-      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">Harness</p>
+    <div className="mt-8 space-y-5" role="group" aria-label="Select coding agent harness">
+      <p className="text-sm font-medium text-slate-900 dark:text-gray-100">Select Agent</p>
       {AGENT_HARNESSES.map((harness) => {
         const selected = agentHarness === harness.id;
+        const hasSubsection = harness.id === "open-code";
+        const checkmark = (
+          <span
+            className={cn(
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+              selected ? "bg-gray-800 dark:bg-gray-100" : "bg-gray-200 dark:bg-gray-700",
+            )}
+            aria-hidden
+          >
+            <Check
+              className={cn("h-2.5 w-2.5", selected ? "text-white dark:text-gray-900" : "text-white")}
+              strokeWidth={3}
+            />
+          </span>
+        );
+        const label = (
+          <>
+            <IntegrationIcon integrationName={harness.integrationName} className="h-4 w-4" size={16} />
+            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{harness.label}</span>
+          </>
+        );
+
+        if (hasSubsection) {
+          return (
+            <div key={harness.id}>
+              <div
+                className={cn(
+                  "overflow-hidden rounded-lg bg-white outline transition-colors dark:bg-gray-900",
+                  selected
+                    ? "outline-slate-900 dark:outline-gray-100"
+                    : "outline-slate-950/10 hover:outline-slate-950/20 dark:outline-gray-700/70 dark:hover:outline-gray-500",
+                )}
+              >
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  aria-expanded={selected}
+                  onClick={() => onSelectHarness(harness.id as AgentHarnessId)}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                >
+                  {checkmark}
+                  {label}
+                </button>
+                {selected ? (
+                  <div className="space-y-5 border-t border-slate-200 px-3 pb-3 pt-3 dark:border-gray-700">
+                    <OpenCodeProviderGroup
+                      title="Free / local"
+                      ariaLabel="Free or local model provider"
+                      providers={OPEN_CODE_FREE_PROVIDERS}
+                      openCodeProvider={openCodeProvider}
+                      onSelectOpenCodeProvider={onSelectOpenCodeProvider}
+                    />
+                    <OpenCodeProviderGroup
+                      title="Model provider"
+                      ariaLabel="Model provider"
+                      providers={OPEN_CODE_CLOUD_PROVIDERS}
+                      openCodeProvider={openCodeProvider}
+                      onSelectOpenCodeProvider={onSelectOpenCodeProvider}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        }
+
         return (
-          <div key={harness.id} className="space-y-2">
+          <div key={harness.id}>
             <button
               type="button"
               aria-pressed={selected}
-              aria-expanded={harness.id === "open-code" ? selected : undefined}
               onClick={() => onSelectHarness(harness.id as AgentHarnessId)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-xl bg-white px-4 py-3.5 text-left text-sm font-semibold outline transition-colors",
-                "dark:bg-gray-900",
+                "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left outline transition-colors",
                 selected
-                  ? "text-slate-900 outline-slate-900 dark:text-gray-100 dark:outline-gray-100"
-                  : "text-slate-700 outline-slate-950/10 hover:outline-slate-950/20 dark:text-gray-200 dark:outline-gray-700/70",
+                  ? "bg-white outline-slate-900 dark:bg-gray-900 dark:outline-gray-100"
+                  : "bg-white outline-slate-950/10 hover:outline-slate-950/20 dark:bg-gray-900 dark:outline-gray-700/70 dark:hover:outline-gray-500",
               )}
             >
-              <IntegrationIcon integrationName={harness.integrationName} className="h-4 w-4" size={16} />
-              {harness.label}
+              {checkmark}
+              {label}
             </button>
-            {selected && harness.id === "open-code" ? (
-              <div className="ml-3 space-y-5 border-l-2 border-slate-200 pl-4 dark:border-gray-700">
-                <OpenCodeProviderGroup
-                  title="Free / local"
-                  ariaLabel="Free or local model provider"
-                  providers={OPEN_CODE_FREE_PROVIDERS}
-                  openCodeProvider={openCodeProvider}
-                  onSelectOpenCodeProvider={onSelectOpenCodeProvider}
-                />
-                <OpenCodeProviderGroup
-                  title="Model provider"
-                  ariaLabel="Model provider"
-                  providers={OPEN_CODE_CLOUD_PROVIDERS}
-                  openCodeProvider={openCodeProvider}
-                  onSelectOpenCodeProvider={onSelectOpenCodeProvider}
-                />
-              </div>
-            ) : null}
           </div>
         );
       })}
@@ -1309,14 +1332,14 @@ function WorkflowConnector({ fanIn = false }: { fanIn?: boolean }) {
   if (fanIn) {
     return (
       <div className="relative mx-auto h-7 w-full max-w-sm" aria-hidden>
-        <div className="absolute inset-x-[16%] top-0 h-3 rounded-b-xl border-x border-b border-slate-300 dark:border-gray-600" />
+        <div className="absolute inset-x-[16%] top-0 h-3 rounded-b-lg border-x border-b border-slate-300 dark:border-gray-600" />
         <div className="absolute left-1/2 top-3 h-4 w-px -translate-x-1/2 bg-slate-300 dark:bg-gray-600" />
       </div>
     );
   }
   return (
-    <div className="flex justify-center py-1" aria-hidden>
-      <div className="h-5 w-px bg-gradient-to-b from-slate-300 to-slate-400 dark:from-gray-600 dark:to-gray-500" />
+    <div className="flex justify-center" aria-hidden>
+      <div className="h-5 w-px bg-slate-300 dark:bg-gray-600" />
     </div>
   );
 }
@@ -1362,7 +1385,7 @@ function PreviewStepContent({
   }[] = [
     {
       id: "planning",
-      title: "Planning",
+      title: "Plan",
       detail: planning
         ? `${labelForOption(modelOptions, planning.modelId)} · ${shortMachineLabel(planning.machineType)}`
         : "Create an implementation plan",
@@ -1406,29 +1429,18 @@ function PreviewStepContent({
         </span>
       </div>
 
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-2xl px-4 py-5 outline outline-slate-950/10",
-          "bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]",
-          "dark:bg-[radial-gradient(circle_at_top,_rgba(71,85,105,0.35),_transparent_55%),linear-gradient(180deg,#0f172a_0%,#020617_100%)]",
-          "dark:outline-gray-700/60",
-        )}
-      >
-        <p className="text-center text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-gray-400">
-          Factory workflow
-        </p>
-
-        <div className="mt-4">
+      <div className="relative overflow-hidden rounded-lg px-4 py-8 outline outline-slate-950/10 dark:outline-gray-700/60">
+        <div>
           {triggers.length === 0 ? (
-            <div className="rounded-xl bg-white/80 px-4 py-3 text-center text-sm text-gray-500 outline outline-slate-950/10 dark:bg-gray-900/80 dark:text-gray-400 dark:outline-gray-700/60">
+            <div className="rounded-lg bg-white/80 px-4 py-3 text-center text-sm text-gray-500 outline outline-slate-950/10 dark:bg-gray-900/80 dark:text-gray-400 dark:outline-gray-700/60">
               No triggers selected
             </div>
           ) : (
-            <div className={cn("mx-auto grid max-w-md gap-2", triggerColumns)}>
+            <div className={cn("mx-auto grid max-w-sm gap-2", triggerColumns)}>
               {triggers.map((trigger) => (
                 <div
                   key={trigger.id}
-                  className="rounded-xl bg-white/90 px-3 py-3 shadow-sm outline outline-slate-950/10 backdrop-blur-sm dark:bg-gray-900/90 dark:outline-gray-700/70"
+                  className="rounded-lg bg-white/90 px-3 py-3 shadow-sm outline outline-slate-950/10 backdrop-blur-sm dark:bg-gray-900/90 dark:outline-gray-700/70"
                 >
                   <div className="flex items-center gap-2">
                     {trigger.integrationName ? (
@@ -1436,7 +1448,7 @@ function PreviewStepContent({
                     ) : (
                       <MessageSquare className="h-4 w-4 text-slate-500" aria-hidden />
                     )}
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">{trigger.title}</p>
+                    <p className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{trigger.title}</p>
                   </div>
                   <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{trigger.detail}</p>
                 </div>
@@ -1453,7 +1465,7 @@ function PreviewStepContent({
               {index > 0 ? <WorkflowConnector /> : null}
               <div
                 className={cn(
-                  "relative overflow-hidden rounded-xl bg-white shadow-sm outline outline-slate-950/10",
+                  "relative overflow-hidden rounded-lg bg-white shadow-sm outline outline-slate-950/10",
                   "dark:bg-gray-900 dark:outline-gray-700/70",
                 )}
               >
@@ -1465,7 +1477,7 @@ function PreviewStepContent({
                     {stage.icon}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{stage.title}</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-gray-100">{stage.title}</p>
                     <p className="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">{stage.detail}</p>
                   </div>
                 </div>
@@ -1475,7 +1487,7 @@ function PreviewStepContent({
 
           <WorkflowConnector />
 
-          <div className="relative overflow-hidden rounded-xl bg-emerald-50 shadow-sm outline outline-emerald-600/20 dark:bg-emerald-950/40 dark:outline-emerald-400/30">
+          <div className="relative overflow-hidden rounded-lg bg-emerald-50 shadow-sm outline outline-emerald-600/20 dark:bg-emerald-950/40 dark:outline-emerald-400/30">
             <div className="flex items-start gap-3 px-4 py-3.5">
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white dark:bg-emerald-400 dark:text-emerald-950">
                 {vcsHost === "gitlab" ? (
@@ -1485,7 +1497,7 @@ function PreviewStepContent({
                 )}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">You review and merge</p>
+                <p className="text-sm font-medium text-emerald-950 dark:text-emerald-50">You review and merge</p>
                 <p className="mt-0.5 text-xs leading-snug text-emerald-900/70 dark:text-emerald-100/70">
                   Stay in the loop until the {prNoun} is mergeable.
                 </p>
@@ -1495,6 +1507,48 @@ function PreviewStepContent({
         </div>
       </div>
     </div>
+  );
+}
+
+function AgentSettingSelect({
+  label,
+  id,
+  value,
+  onValueChange,
+  options,
+}: {
+  label: string;
+  id: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: AutoCompleteOption[];
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <SelectTrigger
+            id={id}
+            aria-label={label}
+            className={cn(
+              "h-auto w-fit max-w-full min-w-0 gap-1 border-0 bg-transparent px-0 py-0 text-[13px] font-medium text-gray-600 shadow-none",
+              "focus-visible:border-0 focus-visible:ring-0 dark:border-0 dark:bg-transparent dark:text-gray-400",
+              "[&_svg]:size-3.5 [&_svg]:opacity-60",
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">{label}</TooltipContent>
+      </Tooltip>
+      <SelectContent align="start">
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -1554,55 +1608,40 @@ function AgentSettingsStepContent({
   };
 
   return (
-    <div className="mt-8 space-y-8" aria-label="Agent component settings">
+    <TooltipProvider delayDuration={300}>
+      <div className="mt-8 space-y-8" aria-label="Agent component settings">
       {components.map((component) => (
         <section key={component.id} aria-labelledby={`agent-component-${component.id}`}>
           <h3
             id={`agent-component-${component.id}`}
-            className="text-sm font-semibold text-slate-900 dark:text-gray-100"
+            className="text-base font-medium text-gray-800 dark:text-gray-100"
           >
             {component.title}
           </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{component.purpose}</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{component.purpose}</p>
 
-          <div className={cn("mt-3 grid gap-3", component.id === "pr-loop" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
-            <div>
-              <Label
-                htmlFor={`agent-model-${component.id}`}
-                className="text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Model
-              </Label>
-              <div className="mt-1.5" id={`agent-model-${component.id}`}>
-                <AutoCompleteSelect
-                  options={modelOptions}
-                  value={component.modelId}
-                  onChange={(value) => updateComponent(component.id, (current) => ({ ...current, modelId: value }))}
-                  placeholder="Select model"
-                />
-              </div>
-            </div>
-            <div>
-              <Label
-                htmlFor={`agent-machine-${component.id}`}
-                className="text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Machine
-              </Label>
-              <div className="mt-1.5" id={`agent-machine-${component.id}`}>
-                <AutoCompleteSelect
-                  options={AGENT_MACHINE_OPTIONS}
-                  value={component.machineType}
-                  onChange={(value) => updateComponent(component.id, (current) => ({ ...current, machineType: value }))}
-                  placeholder="Select machine"
-                />
-              </div>
-            </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <AgentSettingSelect
+              label="Model"
+              id={`agent-model-${component.id}`}
+              value={component.modelId}
+              onValueChange={(value) => updateComponent(component.id, (current) => ({ ...current, modelId: value }))}
+              options={modelOptions}
+            />
+            <AgentSettingSelect
+              label="Machine"
+              id={`agent-machine-${component.id}`}
+              value={component.machineType}
+              onValueChange={(value) =>
+                updateComponent(component.id, (current) => ({ ...current, machineType: value }))
+              }
+              options={AGENT_MACHINE_OPTIONS}
+            />
             {component.id === "pr-loop" ? (
-              <div>
+              <div className="flex items-center gap-2">
                 <Label
                   htmlFor="agent-pr-loop-max-retries"
-                  className="text-xs font-medium text-gray-500 dark:text-gray-400"
+                  className="text-[13px] font-medium text-gray-600 dark:text-gray-400"
                 >
                   Max retries
                 </Label>
@@ -1619,45 +1658,58 @@ function AgentSettingsStepContent({
                       maxRetries: Number.isFinite(next) ? Math.min(20, Math.max(1, next)) : DEFAULT_PR_LOOP_MAX_RETRIES,
                     }));
                   }}
-                  className="mt-1.5"
+                  className="h-8 w-16"
                   aria-label="PR review loop max retries"
                 />
               </div>
             ) : null}
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className="relative mt-2 space-y-3">
+            {component.steps.length > 1 ? (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute bottom-6 left-6 top-6 z-0 w-px bg-slate-400 dark:bg-gray-500"
+              />
+            ) : null}
             {component.steps.map((step, index) => (
               <div
                 key={step.id}
-                className="rounded-xl bg-white px-4 py-3.5 outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70"
+                className="relative z-10 rounded-lg border border-black/15 bg-slate-100 px-3 py-2.5 shadow-[inset_0_0_0_9999px_rgba(2,6,23,0.05)] dark:border-white/15 dark:bg-gray-900 dark:shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.05)]"
               >
                 <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
-                      step.kind === "prompt"
-                        ? "bg-sky-50 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
-                        : "bg-orange-50 text-orange-800 dark:bg-orange-950/40 dark:text-orange-200",
-                    )}
-                  >
-                    {step.kind === "prompt" ? (
-                      <MessageSquare className="h-3 w-3" aria-hidden />
-                    ) : (
-                      <Terminal className="h-3 w-3" aria-hidden />
-                    )}
-                    {step.kind === "prompt" ? "Prompt" : "Bash"}
-                  </span>
                   <Input
                     aria-label={`${component.title} step ${index + 1} title`}
                     value={step.title}
                     onChange={(event) => updateStep(component.id, step.id, { title: event.target.value })}
-                    className="h-8 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                    className={cn(
+                      "h-6 flex-1 border border-transparent bg-transparent px-1.5 font-medium shadow-none transition-colors",
+                      "hover:bg-black/5 dark:hover:bg-white/5",
+                      "focus:border-gray-500 focus:bg-white focus:shadow-none focus:ring-0 focus-visible:ring-0",
+                      "dark:focus:border-gray-500 dark:focus:bg-gray-800",
+                    )}
                   />
+                  <div className="flex w-20 shrink-0 items-center justify-end">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border border-black/15 px-2 py-0.5 text-[11px] font-semibold dark:border-white/15",
+                        step.kind === "prompt"
+                          ? "bg-sky-200 text-sky-800 dark:bg-sky-200/20 dark:text-sky-200"
+                          : "bg-orange-200 text-orange-800 dark:bg-orange-200/20 dark:text-orange-200",
+                      )}
+                    >
+                      {step.kind === "prompt" ? (
+                        <TextAlignStart className="h-3 w-3" aria-hidden />
+                      ) : (
+                        <Terminal className="h-3 w-3" aria-hidden />
+                      )}
+                      {step.kind === "prompt" ? "Prompt" : "Bash"}
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon-xs"
                     aria-label={`Remove ${step.title || "step"}`}
                     onClick={() => removeStep(component.id, step.id)}
                     disabled={component.steps.length <= 1}
@@ -1671,25 +1723,31 @@ function AgentSettingsStepContent({
                   value={step.body}
                   onChange={(event) => updateStep(component.id, step.id, { body: event.target.value })}
                   rows={step.kind === "bash" ? 2 : 3}
-                  className="mt-2 resize-y text-sm"
+                  wrap={step.kind === "bash" ? "off" : undefined}
+                  className={cn(
+                    "mt-2 resize-y text-sm",
+                    step.kind === "bash" &&
+                      "overflow-x-auto whitespace-pre font-mono text-[13px] [overflow-wrap:normal] [word-break:normal]",
+                  )}
                 />
               </div>
             ))}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "prompt")}>
+            <Button type="button" variant="outline" size="xs" onClick={() => addStep(component.id, "prompt")}>
               <Plus className="h-3.5 w-3.5" />
               Add prompt
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "bash")}>
+            <Button type="button" variant="outline" size="xs" onClick={() => addStep(component.id, "bash")}>
               <Terminal className="h-3.5 w-3.5" />
               Add bash
             </Button>
           </div>
         </section>
       ))}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -1697,7 +1755,6 @@ function RequiredIntegrationsPanel({
   requiredIntegrations,
   connectedTools,
   onConnect,
-  emptyHint,
   emphasize = false,
   sticky = true,
   defaultRepoPicker,
@@ -1707,7 +1764,6 @@ function RequiredIntegrationsPanel({
   requiredIntegrations: RequiredIntegration[];
   connectedTools: Set<string>;
   onConnect: (item: RequiredIntegration) => void;
-  emptyHint: string;
   emphasize?: boolean;
   sticky?: boolean;
   defaultRepoPicker?: {
@@ -1724,42 +1780,39 @@ function RequiredIntegrationsPanel({
     emphasize?: boolean;
   };
 }) {
+  const hasContent = requiredIntegrations.length > 0 || defaultRepoPicker !== undefined || agentKeyPicker !== undefined;
+
+  if (!hasContent) {
+    return null;
+  }
+
   return (
     <aside
       data-emphasize={emphasize ? "true" : undefined}
       className={cn(
-        "rounded-xl bg-slate-50 px-5 py-5 outline transition-[outline-color,box-shadow]",
+        "rounded-lg p-4 outline transition-[outline-color]",
         sticky && "sticky top-8",
         emphasize
-          ? "outline-2 outline-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.15)] dark:outline-amber-400"
-          : "outline-slate-950/10 dark:outline-gray-700/60",
-        "dark:bg-gray-950/40",
+          ? "bg-[linear-gradient(to_bottom,var(--color-orange-100)_0%,white_60px)] outline-orange-500 dark:bg-[linear-gradient(to_bottom,rgb(255_237_213_/_0.2)_0%,var(--color-gray-900)_60px)]"
+          : "bg-white outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/60",
       )}
     >
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">Required integrations</h3>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {emphasize
-          ? "Connect these before finishing setup."
-          : "Helper list of integrations to connect for this factory."}
+      {emphasize ? (
+        <p role="status" className="mb-3 text-sm font-medium text-orange-500">
+          Hey, make sure you connect all the required tools.
+        </p>
+      ) : null}
+      <h3 className="text-sm font-medium text-slate-900 dark:text-gray-100">Required integrations</h3>
+      <p className="mt-1 text-[13px] leading-normal text-gray-500 dark:text-gray-400">
+        {emphasize ? "Connect before finishing setup." : "Integrations to connect."}
       </p>
 
-      {requiredIntegrations.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">{emptyHint}</p>
-      ) : (
-        <ul className="mt-5 space-y-3">
+      {requiredIntegrations.length > 0 && (
+        <ul className="mt-4 space-y-2">
           {requiredIntegrations.map((item) => {
             const isConnected = connectedTools.has(item.key);
-            const highlightRow = emphasize && !isConnected;
             return (
-              <li
-                key={item.key}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 outline dark:bg-gray-900",
-                  highlightRow
-                    ? "outline-2 outline-amber-500 dark:outline-amber-400"
-                    : "outline-slate-950/10 dark:outline-gray-700/70",
-                )}
-              >
+              <li key={item.key} className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <IntegrationIcon integrationName={item.integrationName} className="h-4 w-4" size={16} />
                   <span className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{item.label}</span>
@@ -1773,7 +1826,7 @@ function RequiredIntegrationsPanel({
                   </span>
                 </div>
                 {!isConnected && (
-                  <Button type="button" size="sm" onClick={() => onConnect(item)}>
+                  <Button type="button" size="xs" onClick={() => onConnect(item)}>
                     Connect
                   </Button>
                 )}
@@ -1784,40 +1837,36 @@ function RequiredIntegrationsPanel({
       )}
 
       {defaultRepoPicker ? (
-        <div
-          className={cn(
-            "mt-6 border-t pt-5",
-            defaultRepoEmphasize ? "border-amber-400 dark:border-amber-400" : "border-slate-200 dark:border-gray-700",
-          )}
-        >
-          <Label
-            htmlFor="factory-default-repository"
-            className="text-sm font-semibold text-slate-900 dark:text-gray-100"
-          >
+        <div className="mt-6 border-t border-slate-200 pt-5 dark:border-gray-700">
+          <label htmlFor="factory-default-repository" className="text-sm font-medium text-slate-900 dark:text-gray-100">
             Default repository
-          </Label>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          </label>
+          <p className="mt-1 text-[13px] leading-normal text-gray-500 dark:text-gray-400">
             {defaultRepoEmphasize
               ? "Select a repository before finishing setup."
               : "Where the factory checks out code and opens pull or merge requests."}
           </p>
-          <div className="mt-3" id="factory-default-repository">
-            {defaultRepoPicker.host ? (
-              <AutoCompleteSelect
-                options={fixtureRepoOptions(defaultRepoPicker.host)}
-                value={defaultRepoPicker.value}
-                onChange={defaultRepoPicker.onChange}
-                placeholder="Select repository"
-              />
-            ) : (
-              <AutoCompleteSelect
-                options={[]}
-                value=""
-                onChange={() => undefined}
-                placeholder="Select a host to load repositories"
-                disabled
-              />
-            )}
+          <div className="mt-3">
+            <Select
+              value={defaultRepoPicker.value || undefined}
+              onValueChange={defaultRepoPicker.onChange}
+              disabled={!defaultRepoPicker.host}
+            >
+              <SelectTrigger id="factory-default-repository" className="w-full">
+                <SelectValue
+                  placeholder={defaultRepoPicker.host ? "Select repository" : "Select a host to load repositories"}
+                />
+              </SelectTrigger>
+              {defaultRepoPicker.host ? (
+                <SelectContent>
+                  {fixtureRepoOptions(defaultRepoPicker.host).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              ) : null}
+            </Select>
           </div>
         </div>
       ) : null}
@@ -1831,14 +1880,14 @@ function RequiredIntegrationsPanel({
               : "border-slate-200 dark:border-gray-700",
           )}
         >
-          <Label
+          <label
             htmlFor="factory-agent-api-key"
-            className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-gray-100"
+            className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-gray-100"
           >
             <IntegrationIcon integrationName={agentKeyPicker.iconName} className="h-4 w-4" size={16} />
             {agentKeyPicker.providerLabel} API key
-          </Label>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          </label>
+          <p className="mt-1 text-[13px] leading-normal text-gray-500 dark:text-gray-400">
             {agentKeyPicker.emphasize
               ? "Enter an API key before finishing setup."
               : agentKeyPicker.providerLabel === "OpenCode Zen"
@@ -1866,18 +1915,49 @@ function ChoiceGroup({
   choices,
   selectedId,
   onSelect,
+  embedded = false,
 }: {
   title: string;
   choices: IntegrationChoice[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  embedded?: boolean;
 }) {
+  const groupName = title.replace(/\s+/g, "-").toLowerCase();
+
   return (
-    <div>
-      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{title}</p>
-      <div className="mt-3 grid gap-2" role="group" aria-label={title}>
+    <div className={cn(!embedded && "space-y-5")}>
+      <p
+        className={cn(
+          embedded
+            ? "text-[13px] font-normal text-gray-600 dark:text-gray-400"
+            : "text-sm font-medium text-slate-900 dark:text-gray-100",
+        )}
+      >
+        {title}
+      </p>
+      <div
+        className={cn(embedded ? "mt-3 flex flex-col gap-2" : "grid gap-4")}
+        role={embedded ? "radiogroup" : "group"}
+        aria-label={title}
+      >
         {choices.map((choice) => {
           const active = selectedId === choice.id;
+          if (embedded) {
+            const inputId = `${groupName}-${choice.id}`;
+            return (
+              <Label
+                key={choice.id}
+                htmlFor={inputId}
+                className="flex cursor-pointer items-center gap-2 py-0.5 font-normal"
+              >
+                <Radio id={inputId} name={groupName} checked={active} onChange={() => onSelect(choice.id)} />
+                <IntegrationIcon integrationName={choice.integrationName} className="h-4 w-4" size={16} aria-hidden />
+                <span className="text-sm font-medium text-slate-900 dark:text-gray-100">{choice.label}</span>
+              </Label>
+            );
+          }
+
           return (
             <button
               key={choice.id}
@@ -1885,15 +1965,26 @@ function ChoiceGroup({
               aria-pressed={active}
               onClick={() => onSelect(choice.id)}
               className={cn(
-                "flex items-center gap-2 rounded-xl bg-white px-3 py-3 text-left text-sm font-medium outline transition-colors",
-                "dark:bg-gray-900",
+                "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left outline transition-colors",
                 active
-                  ? "text-slate-900 outline-slate-900 dark:text-gray-100 dark:outline-gray-100"
-                  : "text-slate-700 outline-slate-950/10 hover:outline-slate-950/20 dark:text-gray-200 dark:outline-gray-700/70",
+                  ? "bg-white outline-slate-900 dark:bg-gray-900 dark:outline-gray-100"
+                  : "bg-white outline-slate-950/10 hover:outline-slate-950/20 dark:bg-gray-900 dark:outline-gray-700/70 dark:hover:outline-gray-500",
               )}
             >
+              <span
+                className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+                  active ? "bg-gray-800 dark:bg-gray-100" : "bg-gray-200 dark:bg-gray-700",
+                )}
+                aria-hidden
+              >
+                <Check
+                  className={cn("h-2.5 w-2.5", active ? "text-white dark:text-gray-900" : "text-white")}
+                  strokeWidth={3}
+                />
+              </span>
               <IntegrationIcon integrationName={choice.integrationName} className="h-4 w-4" size={16} />
-              {choice.label}
+              <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{choice.label}</span>
             </button>
           );
         })}
