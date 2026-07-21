@@ -32,3 +32,35 @@ func TestTerminateUnhealthyRunnersDefersBusyRunners(t *testing.T) {
 		t.Fatalf("drain request: %#v", fake.drainRequest)
 	}
 }
+
+func TestRecordHealthFailureRequiresConsecutiveFailures(t *testing.T) {
+	l := &Launcher{Config: Config{
+		RunnerFleetID:                "fleet-a",
+		RunnerHealthFailureThreshold: 3,
+	}}
+
+	if l.recordHealthFailure("i-runner", "timeout") {
+		t.Fatal("first failure should not terminate")
+	}
+	if l.recordHealthFailure("i-runner", "timeout") {
+		t.Fatal("second failure should not terminate")
+	}
+	if !l.recordHealthFailure("i-runner", "timeout") {
+		t.Fatal("third failure should terminate")
+	}
+}
+
+func TestRecordHealthSuccessResetsConsecutiveFailures(t *testing.T) {
+	l := &Launcher{Config: Config{
+		RunnerFleetID:                "fleet-a",
+		RunnerHealthFailureThreshold: 2,
+	}}
+
+	if l.recordHealthFailure("i-runner", "timeout") {
+		t.Fatal("first failure should not terminate")
+	}
+	l.recordHealthSuccess("i-runner")
+	if l.recordHealthFailure("i-runner", "timeout") {
+		t.Fatal("failure after recovery should restart the count")
+	}
+}

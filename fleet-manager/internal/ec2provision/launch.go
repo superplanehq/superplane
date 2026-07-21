@@ -46,6 +46,9 @@ type Launcher struct {
 	pendingMu sync.Mutex
 	pending   map[string]time.Time // instance id -> RunInstances request time
 
+	healthMu       sync.Mutex
+	healthFailures map[string]int // instance id -> consecutive health probe failures
+
 	// runInstancesHook, when set, replaces Client.RunInstances (tests only).
 	runInstancesHook func(context.Context, *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error)
 }
@@ -117,6 +120,11 @@ type Config struct {
 	BootGraceSec int
 	// RunnerHealthPort is the TCP port for GET /healthz on runner private IP (default 9090).
 	RunnerHealthPort int
+	// RunnerHealthTimeoutSec is the timeout for one runner /healthz probe.
+	RunnerHealthTimeoutSec int
+	// RunnerHealthFailureThreshold is the number of consecutive failed health probes
+	// required before the runner becomes an unhealthy termination candidate.
+	RunnerHealthFailureThreshold int
 }
 
 const (
@@ -357,13 +365,17 @@ const (
 	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
 	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
 	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
+	envRunnerHealthTimeout = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
+	envRunnerHealthFails   = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
 	envRunnerHeadroom      = "EC2_PROVISION_RUNNER_HEADROOM"
 
-	defaultInstanceType     = "t3.micro"
-	defaultArch             = "amd64"
-	defaultVolumeSizeGB     = 30
-	defaultBootGraceSec     = 300
-	defaultRunnerHealthPort = 9090
+	defaultInstanceType                 = "t3.micro"
+	defaultArch                         = "amd64"
+	defaultVolumeSizeGB                 = 30
+	defaultBootGraceSec                 = 300
+	defaultRunnerHealthPort             = 9090
+	defaultRunnerHealthTimeoutSec       = 15
+	defaultRunnerHealthFailureThreshold = 3
 )
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -466,6 +478,22 @@ func ConfigFromEnv() (Config, error) {
 		}
 		healthPort = n
 	}
+	healthTimeout := defaultRunnerHealthTimeoutSec
+	if v := strings.TrimSpace(os.Getenv(envRunnerHealthTimeout)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("%s must be a positive integer", envRunnerHealthTimeout)
+		}
+		healthTimeout = n
+	}
+	healthFailures := defaultRunnerHealthFailureThreshold
+	if v := strings.TrimSpace(os.Getenv(envRunnerHealthFails)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("%s must be a positive integer", envRunnerHealthFails)
+		}
+		healthFailures = n
+	}
 	headroom := 0
 	if v := strings.TrimSpace(os.Getenv(envRunnerHeadroom)); v != "" {
 		n, err := strconv.Atoi(v)
@@ -497,6 +525,8 @@ func ConfigFromEnv() (Config, error) {
 		VolumeSizeGB:                    volumeSizeGB,
 		BootGraceSec:                    bootGrace,
 		RunnerHealthPort:                healthPort,
+		RunnerHealthTimeoutSec:          healthTimeout,
+		RunnerHealthFailureThreshold:    healthFailures,
 		Headroom:                        headroom,
 	}, nil
 }
