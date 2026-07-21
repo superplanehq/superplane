@@ -122,6 +122,7 @@ func Test__OnMRDiffNote__HandleWebhook__DiffNoteComment(t *testing.T) {
 			"note":          "This variable name is misleading, can we rename it?",
 			"noteable_type": "MergeRequest",
 			"type":          "DiffNote",
+			"action":        "create",
 			"position": map[string]any{
 				"new_path": "src/handlers/login.go",
 				"new_line": 10,
@@ -149,6 +150,33 @@ func Test__OnMRDiffNote__HandleWebhook__DiffNoteComment(t *testing.T) {
 	assert.Equal(t, "gitlab.mrDiffNote", events.Payloads[0].Type)
 }
 
+func Test__OnMRDiffNote__HandleWebhook__EditedDiffNote(t *testing.T) {
+	trigger := &OnMRDiffNote{}
+
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "This variable name is misleading, can we rename it?",
+			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"action":        "update",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
 func Test__OnMRDiffNote__HandleWebhook__RegularMergeRequestComment(t *testing.T) {
 	trigger := &OnMRDiffNote{}
 
@@ -156,6 +184,7 @@ func Test__OnMRDiffNote__HandleWebhook__RegularMergeRequestComment(t *testing.T)
 		"object_attributes": map[string]any{
 			"note":          "This looks good to me",
 			"noteable_type": "MergeRequest",
+			"action":        "create",
 		},
 	})
 
@@ -182,6 +211,7 @@ func Test__OnMRDiffNote__HandleWebhook__NonMergeRequestDiffNote(t *testing.T) {
 			"note":          "This is a commit diff comment",
 			"noteable_type": "Commit",
 			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 
@@ -209,6 +239,7 @@ func Test__OnMRDiffNote__HandleWebhook__SystemNote(t *testing.T) {
 			"noteable_type": "MergeRequest",
 			"type":          "DiffNote",
 			"system":        true,
+			"action":        "create",
 		},
 	})
 
@@ -235,6 +266,7 @@ func Test__OnMRDiffNote__HandleWebhook__ContentFilterMatch(t *testing.T) {
 			"note":          "/fix this typo",
 			"noteable_type": "MergeRequest",
 			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 
@@ -262,6 +294,7 @@ func Test__OnMRDiffNote__HandleWebhook__ContentFilterMismatch(t *testing.T) {
 			"note":          "Just a regular comment",
 			"noteable_type": "MergeRequest",
 			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 

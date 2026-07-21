@@ -121,6 +121,7 @@ func Test__OnIssueComment__HandleWebhook__IssueComment(t *testing.T) {
 		"object_attributes": map[string]any{
 			"note":          "/sp-investigate",
 			"noteable_type": "Issue",
+			"action":        "create",
 		},
 		"issue": map[string]any{
 			"iid":   8,
@@ -144,6 +145,32 @@ func Test__OnIssueComment__HandleWebhook__IssueComment(t *testing.T) {
 	assert.Equal(t, "gitlab.issueComment", events.Payloads[0].Type)
 }
 
+func Test__OnIssueComment__HandleWebhook__EditedComment(t *testing.T) {
+	trigger := &OnIssueComment{}
+
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "/sp-investigate",
+			"noteable_type": "Issue",
+			"action":        "update",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
 func Test__OnIssueComment__HandleWebhook__NonIssueComment(t *testing.T) {
 	trigger := &OnIssueComment{}
 
@@ -151,6 +178,7 @@ func Test__OnIssueComment__HandleWebhook__NonIssueComment(t *testing.T) {
 		"object_attributes": map[string]any{
 			"note":          "This looks good to me",
 			"noteable_type": "MergeRequest",
+			"action":        "create",
 		},
 	})
 
@@ -177,6 +205,7 @@ func Test__OnIssueComment__HandleWebhook__SystemNote(t *testing.T) {
 			"note":          "changed the description",
 			"noteable_type": "Issue",
 			"system":        true,
+			"action":        "create",
 		},
 	})
 
@@ -202,6 +231,7 @@ func Test__OnIssueComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
 		"object_attributes": map[string]any{
 			"note":          "/sp-investigate",
 			"noteable_type": "Issue",
+			"action":        "create",
 		},
 	})
 
@@ -228,6 +258,7 @@ func Test__OnIssueComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
 		"object_attributes": map[string]any{
 			"note":          "Just a regular comment",
 			"noteable_type": "Issue",
+			"action":        "create",
 		},
 	})
 
