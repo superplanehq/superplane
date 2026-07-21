@@ -44,7 +44,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
-			"model":        "sonnet",
+			"model":       "sonnet",
 			"steps": []map[string]any{
 				{"name": "Clone", "type": "bash", "command": "git clone https://github.com/acme/widgets.git /tmp/repo"},
 				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
