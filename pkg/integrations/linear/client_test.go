@@ -328,6 +328,44 @@ func Test__Client__Pagination(t *testing.T) {
 	})
 }
 
+func Test__LabelList__UnmarshalJSON(t *testing.T) {
+	cases := []struct {
+		name     string
+		payload  string
+		expected int
+	}{
+		{"connection with nodes", `{"nodes":[{"id":"l1","name":"bug"}]}`, 1},
+		{"connection with empty nodes", `{"nodes":[]}`, 0},
+		{"connection with null nodes", `{"nodes":null}`, 0},
+		{"null connection", `null`, 0},
+		{"plain array", `[{"id":"l1","name":"bug"}]`, 1},
+		{"empty array", `[]`, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			labels := LabelList{}
+			require.NoError(t, json.Unmarshal([]byte(tc.payload), &labels))
+			assert.Len(t, labels, tc.expected)
+		})
+	}
+
+	t.Run("malformed payload -> error", func(t *testing.T) {
+		labels := LabelList{}
+		require.Error(t, json.Unmarshal([]byte(`{"nodes":"not-a-list"}`), &labels))
+	})
+
+	// The nasty case behind the hardening: a null labels connection inside a
+	// full issue response must not fail the parse - the issue already exists
+	// on Linear at that point, and a parse error would invite retries that
+	// create duplicates.
+	t.Run("issue with null labels connection parses", func(t *testing.T) {
+		issue := Issue{}
+		require.NoError(t, json.Unmarshal([]byte(`{"id":"i1","identifier":"ENG-1","labels":null}`), &issue))
+		assert.Empty(t, issue.Labels)
+	})
+}
+
 func Test__Client__CreateIssue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

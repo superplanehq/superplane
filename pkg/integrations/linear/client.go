@@ -151,21 +151,33 @@ type Project struct {
 
 // LabelList flattens Linear's `labels { nodes { ... } }` connection into a plain
 // array, so emitted payloads expose `labels[0].name` rather than
-// `labels.nodes[0].name`.
+// `labels.nodes[0].name`. Null connections and null node lists decode as empty
+// rather than failing: erroring here would fail the execution after the issue
+// was already created on Linear, inviting duplicate-creating retries.
 type LabelList []Label
 
 func (l *LabelList) UnmarshalJSON(data []byte) error {
-	connection := struct {
-		Nodes *[]Label `json:"nodes"`
-	}{}
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		*l = nil
+		return nil
+	}
 
-	if err := json.Unmarshal(data, &connection); err == nil && connection.Nodes != nil {
-		*l = *connection.Nodes
+	if trimmed[0] == '{' {
+		connection := struct {
+			Nodes []Label `json:"nodes"`
+		}{}
+
+		if err := json.Unmarshal(trimmed, &connection); err != nil {
+			return err
+		}
+
+		*l = connection.Nodes
 		return nil
 	}
 
 	plain := []Label{}
-	if err := json.Unmarshal(data, &plain); err != nil {
+	if err := json.Unmarshal(trimmed, &plain); err != nil {
 		return err
 	}
 
