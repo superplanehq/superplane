@@ -10,10 +10,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-const testAPIKey = "lin_api_test_key"
+const (
+	testAccessToken  = "lin_oauth_test_access_token"
+	testClientID     = "test-client-id"
+	testClientSecret = "test-client-secret"
+)
 
 func newAuthorizedIntegration() *contexts.IntegrationContext {
 	return newAuthorizedIntegrationWithMetadata(Metadata{})
@@ -21,8 +26,15 @@ func newAuthorizedIntegration() *contexts.IntegrationContext {
 
 func newAuthorizedIntegrationWithMetadata(metadata Metadata) *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Configuration: map[string]any{"apiKey": testAPIKey},
-		Metadata:      metadata,
+		Configuration: map[string]any{
+			"clientId":     testClientID,
+			"clientSecret": testClientSecret,
+		},
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			OAuthAccessToken:  {Name: OAuthAccessToken, Value: []byte(testAccessToken)},
+			OAuthRefreshToken: {Name: OAuthRefreshToken, Value: []byte("lin_oauth_test_refresh_token")},
+		},
+		Metadata: metadata,
 	}
 }
 
@@ -34,28 +46,32 @@ func jsonResponse(body string) *http.Response {
 }
 
 func Test__NewClient(t *testing.T) {
-	t.Run("missing API key -> error", func(t *testing.T) {
+	t.Run("no access token secret -> error", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{}}
 
 		_, err := NewClient(&contexts.HTTPContext{}, integration)
-		require.ErrorContains(t, err, "error reading API key")
+		require.ErrorContains(t, err, "missing Linear access token")
 	})
 
-	t.Run("blank API key -> error", func(t *testing.T) {
-		integration := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "   "}}
+	t.Run("blank access token -> error", func(t *testing.T) {
+		integration := &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("   ")},
+			},
+		}
 
 		_, err := NewClient(&contexts.HTTPContext{}, integration)
-		require.ErrorContains(t, err, "missing Linear API key")
+		require.ErrorContains(t, err, "missing Linear access token")
 	})
 
 	t.Run("valid configuration", func(t *testing.T) {
 		client, err := NewClient(&contexts.HTTPContext{}, newAuthorizedIntegration())
 		require.NoError(t, err)
-		assert.Equal(t, testAPIKey, client.APIKey)
+		assert.Equal(t, testAccessToken, client.AccessToken)
 	})
 }
 
-func Test__Client__SendsRawAPIKey(t *testing.T) {
+func Test__Client__SendsBearerToken(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(`{"data":{"viewer":{"id":"u1","name":"Jane"},"organization":{"id":"o1","name":"Acme","urlKey":"acme"}}}`),
@@ -73,8 +89,8 @@ func Test__Client__SendsRawAPIKey(t *testing.T) {
 	require.Len(t, httpContext.Requests, 1)
 	request := httpContext.Requests[0]
 
-	// Linear expects the bare key - a "Bearer " prefix is rejected.
-	assert.Equal(t, testAPIKey, request.Header.Get("Authorization"))
+	// OAuth tokens require the Bearer prefix - unlike personal API keys.
+	assert.Equal(t, "Bearer "+testAccessToken, request.Header.Get("Authorization"))
 	assert.Equal(t, APIURL, request.URL.String())
 	assert.Equal(t, http.MethodPost, request.Method)
 }

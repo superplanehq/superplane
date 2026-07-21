@@ -20,21 +20,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To connect Linear to SuperPlane:
+SuperPlane connects to Linear with OAuth, so there are no API keys to manage.
 
-1. Open [Linear API settings](https://linear.app/settings/account/security) and go to **Personal API keys**.
-2. Click **New API key**, give it a recognizable label such as `SuperPlane`, and copy the generated key.
-3. Paste the key into the **API Key** field below and click **Save**.
+1. Click **Save** below to start the setup wizard. It opens Linear's OAuth application form pre-filled with everything SuperPlane needs — just click **Create**, then copy the **Client ID** and **Client Secret** back here.
+2. Click **Save** again, then **Continue** to authorize SuperPlane in your Linear workspace.
 
-**Permissions:** components act as the user who owns the API key, so that user needs access to the
-teams you want to automate.
+**Permissions:** SuperPlane requests the read, write and admin scopes. The admin scope is required because the On Issue trigger registers Linear webhooks, and Linear only allows webhook management with admin access — so connect as a **workspace admin**.
 
-- **Create Issue** requires the key owner to be a member of the team the issue is created in.
-- **On Issue** creates a Linear webhook through the API. Only **workspace admins** can manage
-  webhooks, so the key owner must be an admin of the workspace.
-
-**Note:** actions performed by SuperPlane are attributed to the user who owns the API key, and the
-integration stops working if that user leaves the workspace.
+**Note:** actions performed by SuperPlane are attributed to the user who authorized the connection, and the integration stops working if that user leaves the workspace.
 
 <a id="on-issue"></a>
 

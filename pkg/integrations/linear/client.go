@@ -15,21 +15,21 @@ import (
 // APIURL is Linear's single GraphQL endpoint. Linear has no REST API.
 const APIURL = "https://api.linear.app/graphql"
 
-// Client talks to Linear's GraphQL API using a personal API key. Linear expects
-// the raw key in the Authorization header, without a "Bearer " prefix.
+// Client talks to Linear's GraphQL API using an OAuth access token, which
+// Linear expects with a "Bearer " prefix — unlike personal API keys.
 type Client struct {
-	APIKey string
-	http   core.HTTPContext
+	AccessToken string
+	http        core.HTTPContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	apiKey, err := ctx.GetConfig("apiKey")
+	accessToken, err := findSecret(ctx, OAuthAccessToken)
 	if err != nil {
-		return nil, fmt.Errorf("error reading API key: %v", err)
+		return nil, fmt.Errorf("error reading access token: %v", err)
 	}
 
-	if len(strings.TrimSpace(string(apiKey))) == 0 {
-		return nil, fmt.Errorf("missing Linear API key")
+	if strings.TrimSpace(accessToken) == "" {
+		return nil, fmt.Errorf("missing Linear access token - authorize the integration first")
 	}
 
 	if httpCtx == nil {
@@ -37,8 +37,8 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	return &Client{
-		APIKey: strings.TrimSpace(string(apiKey)),
-		http:   httpCtx,
+		AccessToken: strings.TrimSpace(accessToken),
+		http:        httpCtx,
 	}, nil
 }
 
@@ -73,7 +73,7 @@ func (c *Client) execute(query string, variables map[string]any, out any) error 
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.APIKey)
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {
