@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnMergeComment__Setup(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__Setup(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 	metadata := Metadata{
 		Projects: []ProjectMetadata{
 			{ID: 123, Name: "group/example", URL: "https://gitlab.com/group/example"},
@@ -57,7 +57,7 @@ func Test__OnMergeComment__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
-			Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+			Configuration: map[string]any{"project": "123", "contentFilter": "/fix"},
 		}))
 
 		require.Len(t, integrationCtx.WebhookRequests, 1)
@@ -68,8 +68,8 @@ func Test__OnMergeComment__Setup(t *testing.T) {
 	})
 }
 
-func Test__OnMergeComment__HandleWebhook__MissingEventHeader(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__MissingEventHeader(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       http.Header{},
@@ -82,8 +82,8 @@ func Test__OnMergeComment__HandleWebhook__MissingEventHeader(t *testing.T) {
 	assert.ErrorContains(t, err, "X-Gitlab-Event")
 }
 
-func Test__OnMergeComment__HandleWebhook__WrongEventType(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__WrongEventType(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 	events := &contexts.EventContext{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -99,8 +99,8 @@ func Test__OnMergeComment__HandleWebhook__WrongEventType(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__InvalidToken(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__InvalidToken(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "wrong"),
@@ -114,13 +114,19 @@ func Test__OnMergeComment__HandleWebhook__InvalidToken(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid webhook token")
 }
 
-func Test__OnMergeComment__HandleWebhook__MergeRequestComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__DiffNoteComment(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This looks good to me",
+			"note":          "This variable name is misleading, can we rename it?",
 			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"action":        "create",
+			"position": map[string]any{
+				"new_path": "src/handlers/login.go",
+				"new_line": 10,
+			},
 		},
 		"merge_request": map[string]any{
 			"iid":   12,
@@ -141,16 +147,18 @@ func Test__OnMergeComment__HandleWebhook__MergeRequestComment(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, events.Count())
-	assert.Equal(t, "gitlab.mergeComment", events.Payloads[0].Type)
+	assert.Equal(t, "gitlab.mrDiffNote", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__EditedDiffNote(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This is an issue comment",
-			"noteable_type": "Issue",
+			"note":          "This variable name is misleading, can we rename it?",
+			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"action":        "update",
 		},
 	})
 
@@ -169,9 +177,11 @@ func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__DiffNoteComment(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__MissingAction(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
+	// Older self-managed GitLab instances (pre-16.11) don't send `action`
+	// on Note Hook payloads at all. Comments should still fire in that case.
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
 			"note":          "This variable name is misleading, can we rename it?",
@@ -192,17 +202,18 @@ func Test__OnMergeComment__HandleWebhook__DiffNoteComment(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
-	assert.Zero(t, events.Count())
+	assert.Equal(t, 1, events.Count())
+	assert.Equal(t, "gitlab.mrDiffNote", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__RegularMergeRequestComment(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "assigned to @agarcia",
+			"note":          "This looks good to me",
 			"noteable_type": "MergeRequest",
-			"system":        true,
+			"action":        "create",
 		},
 	})
 
@@ -221,13 +232,15 @@ func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__NonMergeRequestDiffNote(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "/deploy to staging",
-			"noteable_type": "MergeRequest",
+			"note":          "This is a commit diff comment",
+			"noteable_type": "Commit",
+			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 
@@ -235,7 +248,62 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "token"),
 		Body:          body,
-		Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
+func Test__OnMRDiffNote__HandleWebhook__SystemNote(t *testing.T) {
+	trigger := &OnMRDiffNote{}
+
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "changed the diff",
+			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"system":        true,
+			"action":        "create",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
+func Test__OnMRDiffNote__HandleWebhook__ContentFilterMatch(t *testing.T) {
+	trigger := &OnMRDiffNote{}
+
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "/fix this typo",
+			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"action":        "create",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123", "contentFilter": "/fix"},
 		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
@@ -244,16 +312,18 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, events.Count())
-	assert.Equal(t, "gitlab.mergeComment", events.Payloads[0].Type)
+	assert.Equal(t, "gitlab.mrDiffNote", events.Payloads[0].Type)
 }
 
-func Test__OnMergeComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
-	trigger := &OnMergeComment{}
+func Test__OnMRDiffNote__HandleWebhook__ContentFilterMismatch(t *testing.T) {
+	trigger := &OnMRDiffNote{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
 			"note":          "Just a regular comment",
 			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+			"action":        "create",
 		},
 	})
 
@@ -261,7 +331,7 @@ func Test__OnMergeComment__HandleWebhook__ContentFilterMismatch(t *testing.T) {
 	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Headers:       gitlabHeaders("Note Hook", "token"),
 		Body:          body,
-		Configuration: map[string]any{"project": "123", "contentFilter": "/deploy"},
+		Configuration: map[string]any{"project": "123", "contentFilter": "/fix"},
 		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
 		Events:        events,
 		Logger:        log.NewEntry(log.New()),
