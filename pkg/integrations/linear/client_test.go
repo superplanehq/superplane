@@ -147,6 +147,21 @@ func variablesFromRequest(t *testing.T, httpContext *contexts.HTTPContext, n int
 	return payload.Variables
 }
 
+// queryFromRequest returns the GraphQL query document sent on the nth request.
+func queryFromRequest(t *testing.T, httpContext *contexts.HTTPContext, n int) string {
+	t.Helper()
+
+	require.Greater(t, len(httpContext.Requests), n)
+	body := readAndRestoreBody(t, httpContext.Requests[n])
+
+	payload := struct {
+		Query string `json:"query"`
+	}{}
+
+	require.NoError(t, json.Unmarshal(body, &payload))
+	return payload.Query
+}
+
 func readAndRestoreBody(t *testing.T, request *http.Request) []byte {
 	t.Helper()
 
@@ -293,6 +308,11 @@ func Test__Client__Pagination(t *testing.T) {
 		states, err := client.ListWorkflowStates("t1")
 		require.NoError(t, err)
 		assert.Len(t, states, 2)
+
+		// Duplicate-type states are not valid issueCreate targets, so the
+		// query must keep excluding them from the status picker.
+		query := queryFromRequest(t, httpContext, 0)
+		assert.Contains(t, query, `type: { neq: "duplicate" }`)
 	})
 
 	t.Run("missing team is still reported", func(t *testing.T) {

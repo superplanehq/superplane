@@ -292,9 +292,12 @@ func (c *Client) ListTeams() ([]Team, error) {
 	})
 }
 
+// workflowStatesQuery excludes "duplicate"-type states: an issue can only enter
+// one by being marked as a duplicate of another issue, and issueCreate rejects
+// them with "invalid state", so they must not appear in the status picker.
 const workflowStatesQuery = `
 query WorkflowStates($teamId: ID!, $first: Int!, $after: String) {
-  workflowStates(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
+  workflowStates(first: $first, after: $after, filter: { team: { id: { eq: $teamId } }, type: { neq: "duplicate" } }) {
     nodes { id name type }
     pageInfo { hasNextPage endCursor }
   }
