@@ -122,7 +122,9 @@ func Test__MarkMergeRequestReadyForReview__Execute(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				draftMergeRequestResponse(),
-				GitlabMockResponse(http.StatusCreated, `{"id": 55, "body": "/ready", "system": false}`),
+				// GitLab returns 202 (not 201) for a note whose body is only
+				// a quick action, with a commands summary instead of a note.
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"wip_event":"ready"},"summary":["Marked this merge request as ready."]}`),
 				readyMergeRequestResponse(),
 			},
 		}
