@@ -173,7 +173,8 @@ func (c *Runner) Configuration() []configuration.Field {
 			Description: "One shell command per line.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "shell",
+					Language:         "shell",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
@@ -255,6 +256,10 @@ func (c *Runner) Configuration() []configuration.Field {
 }
 
 func intPtr(v int) *int {
+	return &v
+}
+
+func boolPtr(v bool) *bool {
 	return &v
 }
 

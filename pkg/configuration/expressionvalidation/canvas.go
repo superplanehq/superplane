@@ -96,6 +96,16 @@ func validateString(fieldPath string, field configuration.Field, value string, k
 		return nil
 	}
 
+	// Text fields can disable expression resolution without forbidding literal
+	// {{ }} content (e.g. runner scripts). Skip SuperPlane expression checks.
+	if field.Type == configuration.FieldTypeText &&
+		field.TypeOptions != nil &&
+		field.TypeOptions.Text != nil &&
+		field.TypeOptions.Text.AllowExpressions != nil &&
+		!*field.TypeOptions.Text.AllowExpressions {
+		return nil
+	}
+
 	fieldType := field.Type
 	matches := configuration.ExpressionPlaceholderRegex.FindAllString(value, -1)
 
