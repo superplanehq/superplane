@@ -22,25 +22,14 @@ const (
 type UpdatePullRequest struct{}
 
 type UpdatePullRequestConfiguration struct {
-	Repository string   `mapstructure:"repository" json:"repository"`
-	PullNumber any      `mapstructure:"pullNumber" json:"pullNumber"`
-	Title      string   `mapstructure:"title" json:"title"`
-	Body       string   `mapstructure:"body" json:"body"`
-	State      string   `mapstructure:"state" json:"state"`
-	Base       string   `mapstructure:"base" json:"base"`
-	Assignees  []string `mapstructure:"assignees" json:"assignees"`
-	Labels     []string `mapstructure:"labels" json:"labels"`
-}
-
-type updatePullRequestInput struct {
-	Repository string
-	PullNumber int
-	Title      string
-	Body       string
-	State      string
-	Base       string
-	Assignees  []string
-	Labels     []string
+	Repository string    `mapstructure:"repository" json:"repository"`
+	PullNumber any       `mapstructure:"pullNumber" json:"pullNumber"`
+	Title      *string   `mapstructure:"title" json:"title"`
+	Body       *string   `mapstructure:"body" json:"body"`
+	State      *string   `mapstructure:"state" json:"state"`
+	Base       *string   `mapstructure:"base" json:"base"`
+	Assignees  *[]string `mapstructure:"assignees" json:"assignees"`
+	Labels     *[]string `mapstructure:"labels" json:"labels"`
 }
 
 func (c *UpdatePullRequest) Name() string {
@@ -69,14 +58,13 @@ func (c *UpdatePullRequest) Documentation() string {
 
 - **Repository**: Select the GitHub repository containing the pull request
 - **Pull Request Number**: Pull request number to update. Supports expressions.
-- **Title**: New title for the pull request (optional; leaves the title unchanged if empty)
-- **Body**: New body/description for the pull request (optional; leaves the body unchanged if empty)
-- **State**: Change the pull request state to "open" or "closed" (optional; unset leaves the state unchanged)
-- **Base Branch**: Retarget the pull request onto a different base branch (optional)
-- **Assignees**: Non-empty list replaces the full set of assignees on the pull request (optional)
-- **Labels**: Non-empty list replaces the full set of labels on the pull request (optional)
+- **Title**, **Body**, **State**, **Base Branch**, **Replace Assignees**, **Replace Labels**: each field has its own toggle. Only toggled-on fields are changed; toggled-off fields are left untouched on the pull request.
 
-At least one of title, body, state, base, assignees, or labels is required.
+At least one field must be toggled on.
+
+## Replacing labels and assignees
+
+**Replace Assignees** and **Replace Labels** replace the pull request's full set when toggled on, including replacing it with an empty list to clear all assignees or labels.
 
 ## Out of scope
 
@@ -89,7 +77,7 @@ The following pull request operations have their own dedicated components:
 ## Implementation notes
 
 - Title, body, state, and base are updated through GitHub's Pulls API.
-- Assignees and labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
+- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
 - GitHub ignores a base branch change in the same request that sets the state to "closed".
 
 ## Output
@@ -136,21 +124,24 @@ func (c *UpdatePullRequest) Configuration() []configuration.Field {
 			Label:       "Title",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "New title for the pull request. Leave empty to keep the current title.",
+			Togglable:   true,
+			Description: "New title for the pull request.",
 		},
 		{
 			Name:        "body",
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
-			Description: "New body for the pull request. Leave empty to keep the current body.",
+			Togglable:   true,
+			Description: "New body for the pull request.",
 		},
 		{
 			Name:        "state",
 			Label:       "State",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Description: "Change the pull request state. Leave unset to keep the current state.",
+			Togglable:   true,
+			Description: "Change the pull request state.",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -165,6 +156,7 @@ func (c *UpdatePullRequest) Configuration() []configuration.Field {
 			Label:       "Base Branch",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
+			Togglable:   true,
 			Description: "Retarget the pull request onto a different base branch. Must live in the selected repository.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -178,10 +170,11 @@ func (c *UpdatePullRequest) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "assignees",
-			Label:       "Assignees",
+			Label:       "Replace Assignees",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Non-empty list replaces the full set of assignees on the pull request.",
+			Togglable:   true,
+			Description: "Replace the pull request's assignees with this list. An empty list clears all assignees.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Assignee",
@@ -193,10 +186,11 @@ func (c *UpdatePullRequest) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "labels",
-			Label:       "Labels",
+			Label:       "Replace Labels",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Non-empty list replaces the full set of labels on the pull request.",
+			Togglable:   true,
+			Description: "Replace the pull request's labels with this list. An empty list clears all labels.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",
@@ -215,8 +209,14 @@ func (c *UpdatePullRequest) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := validateUpdatePullRequestSetup(config); err != nil {
+	if err := validateUpdatePullRequestConfiguration(config); err != nil {
 		return err
+	}
+
+	if !common.IsExpression(pullNumberText(config.PullNumber)) {
+		if _, err := parsePullNumber(config.PullNumber); err != nil {
+			return err
+		}
 	}
 
 	return common.EnsureRepoInMetadata(
@@ -233,7 +233,12 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	input, err := buildUpdatePullRequestInput(config)
+	if err := validateUpdatePullRequestConfiguration(config); err != nil {
+		return err
+	}
+
+	repository := strings.TrimSpace(config.Repository)
+	pullNumber, err := parsePullNumber(config.PullNumber)
 	if err != nil {
 		return err
 	}
@@ -246,26 +251,19 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 	//
 	// Title, body, state, and base are updated through the Pulls API.
 	//
-	if input.hasPullRequestFields() {
-		pullRequestUpdate := &github.PullRequest{}
-
-		if input.Title != "" {
-			pullRequestUpdate.Title = &input.Title
+	if hasPullRequestFields(config) {
+		pullRequestUpdate := &github.PullRequest{
+			Title: config.Title,
+			Body:  config.Body,
+			State: config.State,
 		}
 
-		if input.Body != "" {
-			pullRequestUpdate.Body = &input.Body
+		if config.Base != nil {
+			base := strings.TrimSpace(*config.Base)
+			pullRequestUpdate.Base = &github.PullRequestBranch{Ref: &base}
 		}
 
-		if input.State != "" {
-			pullRequestUpdate.State = &input.State
-		}
-
-		if input.Base != "" {
-			pullRequestUpdate.Base = &github.PullRequestBranch{Ref: &input.Base}
-		}
-
-		if _, _, err := client.EditPullRequest(context.Background(), input.Repository, input.PullNumber, pullRequestUpdate); err != nil {
+		if _, _, err := client.EditPullRequest(context.Background(), repository, pullNumber, pullRequestUpdate); err != nil {
 			return fmt.Errorf("failed to update pull request: %w", explainGitHubError(err))
 		}
 	}
@@ -274,18 +272,13 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 	// GitHub models a pull request's labels and assignees on its underlying
 	// issue, so those are updated through the Issues API instead.
 	//
-	if input.hasIssueFields() {
-		issueRequest := &github.IssueRequest{}
-
-		if len(input.Assignees) > 0 {
-			issueRequest.Assignees = &input.Assignees
+	if hasIssueFields(config) {
+		issueRequest := &github.IssueRequest{
+			Assignees: config.Assignees,
+			Labels:    config.Labels,
 		}
 
-		if len(input.Labels) > 0 {
-			issueRequest.Labels = &input.Labels
-		}
-
-		if _, _, err := client.EditIssue(context.Background(), input.Repository, input.PullNumber, issueRequest); err != nil {
+		if _, _, err := client.EditIssue(context.Background(), repository, pullNumber, issueRequest); err != nil {
 			return fmt.Errorf("failed to update pull request labels/assignees: %w", explainGitHubError(err))
 		}
 	}
@@ -294,7 +287,7 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 	// The Issues API response does not carry the full pull request shape, so
 	// the pull request is re-fetched to emit an up-to-date object either way.
 	//
-	pullRequest, _, err := client.GetPullRequest(context.Background(), input.Repository, input.PullNumber)
+	pullRequest, _, err := client.GetPullRequest(context.Background(), repository, pullNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get pull request: %w", explainGitHubError(err))
 	}
@@ -330,7 +323,7 @@ func (c *UpdatePullRequest) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func validateUpdatePullRequestSetup(config UpdatePullRequestConfiguration) error {
+func validateUpdatePullRequestConfiguration(config UpdatePullRequestConfiguration) error {
 	if strings.TrimSpace(config.Repository) == "" {
 		return errors.New("repository is required")
 	}
@@ -343,55 +336,15 @@ func validateUpdatePullRequestSetup(config UpdatePullRequestConfiguration) error
 		return err
 	}
 
-	if err := validateAtLeastOneUpdateField(config); err != nil {
-		return err
-	}
+	return validateAtLeastOneUpdateField(config)
+}
 
-	if common.IsExpression(pullNumberText(config.PullNumber)) {
+func validatePullRequestState(state *string) error {
+	if state == nil {
 		return nil
 	}
 
-	_, err := parsePullNumber(config.PullNumber)
-	return err
-}
-
-func buildUpdatePullRequestInput(config UpdatePullRequestConfiguration) (*updatePullRequestInput, error) {
-	if strings.TrimSpace(config.Repository) == "" {
-		return nil, errors.New("repository is required")
-	}
-
-	pullNumber, err := parsePullNumber(config.PullNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validatePullRequestState(config.State); err != nil {
-		return nil, err
-	}
-
-	if err := validateAtLeastOneUpdateField(config); err != nil {
-		return nil, err
-	}
-
-	return &updatePullRequestInput{
-		Repository: strings.TrimSpace(config.Repository),
-		PullNumber: pullNumber,
-		Title:      config.Title,
-		Body:       config.Body,
-		State:      strings.TrimSpace(config.State),
-		Base:       strings.TrimSpace(config.Base),
-		Assignees:  config.Assignees,
-		Labels:     config.Labels,
-	}, nil
-}
-
-func validatePullRequestState(state string) error {
-	trimmed := strings.TrimSpace(state)
-	if trimmed == "" {
-		return nil
-	}
-
-	switch trimmed {
+	switch strings.TrimSpace(*state) {
 	case pullRequestStateOpen, pullRequestStateClosed:
 		return nil
 	default:
@@ -399,23 +352,23 @@ func validatePullRequestState(state string) error {
 	}
 }
 
+// validateAtLeastOneUpdateField requires at least one togglable field to be
+// toggled on. A field counts as toggled on when its key is present in the
+// submitted configuration (decoded as a non-nil pointer), regardless of
+// whether its value is empty - an empty list for assignees/labels is a valid
+// "clear" instruction, not an unset field.
 func validateAtLeastOneUpdateField(config UpdatePullRequestConfiguration) error {
-	if strings.TrimSpace(config.Title) != "" ||
-		strings.TrimSpace(config.Body) != "" ||
-		strings.TrimSpace(config.State) != "" ||
-		strings.TrimSpace(config.Base) != "" ||
-		len(config.Assignees) > 0 ||
-		len(config.Labels) > 0 {
+	if hasPullRequestFields(config) || hasIssueFields(config) {
 		return nil
 	}
 
 	return errors.New("at least one of title, body, state, base, assignees, or labels is required")
 }
 
-func (i *updatePullRequestInput) hasPullRequestFields() bool {
-	return i.Title != "" || i.Body != "" || i.State != "" || i.Base != ""
+func hasPullRequestFields(config UpdatePullRequestConfiguration) bool {
+	return config.Title != nil || config.Body != nil || config.State != nil || config.Base != nil
 }
 
-func (i *updatePullRequestInput) hasIssueFields() bool {
-	return len(i.Assignees) > 0 || len(i.Labels) > 0
+func hasIssueFields(config UpdatePullRequestConfiguration) bool {
+	return config.Assignees != nil || config.Labels != nil
 }

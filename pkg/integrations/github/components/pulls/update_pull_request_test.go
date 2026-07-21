@@ -68,7 +68,7 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "pull request number must be a positive integer")
 	})
 
-	t.Run("state must be open or closed", func(t *testing.T) {
+	t.Run("state toggled on must be open or closed", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
@@ -78,7 +78,21 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "state must be one of: open, closed")
 	})
 
-	t.Run("at least one field to update is required", func(t *testing.T) {
+	t.Run("state toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"state":      "",
+			},
+		})
+
+		require.ErrorContains(t, err, "state must be one of: open, closed")
+	})
+
+	t.Run("no field toggled on is rejected", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
@@ -135,7 +149,7 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("labels alone are a valid configuration", func(t *testing.T) {
+	t.Run("labels toggled on alone are a valid configuration", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				mocks.GitHubResponse(http.StatusOK, `{
@@ -154,6 +168,31 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 				"repository": "hello",
 				"pullNumber": "42",
 				"labels":     []string{"bug"},
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("labels toggled on with an empty list is a valid configuration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:        httpCtx,
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"labels":     []string{},
 			},
 		})
 
@@ -202,7 +241,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "pull request number must be a positive integer")
 	})
 
-	t.Run("state must be open or closed", func(t *testing.T) {
+	t.Run("state toggled on must be open or closed", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: &contexts.ExecutionStateContext{},
@@ -216,7 +255,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "state must be one of: open, closed")
 	})
 
-	t.Run("at least one field to update is required", func(t *testing.T) {
+	t.Run("no field toggled on is rejected", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
 			ExecutionState: &contexts.ExecutionStateContext{},
@@ -274,6 +313,30 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		pullRequest := payload["data"].(*github.PullRequest)
 		assert.Equal(t, "Updated title", pullRequest.GetTitle())
 		assert.Equal(t, "closed", pullRequest.GetState())
+	})
+
+	t.Run("body toggled on with an empty value clears the body", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"body":       "",
+			},
+		})
+
+		require.NoError(t, err)
+		requestBody := readJSONBody(t, httpCtx.Requests[0])
+		assert.Equal(t, "", requestBody["body"])
 	})
 
 	t.Run("retargets the base branch through the Pulls API", func(t *testing.T) {
@@ -348,7 +411,31 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		assert.Equal(t, "/repos/testhq/hello/pulls/42", getRequest.URL.Path)
 	})
 
-	t.Run("only calls the Pulls API when no labels or assignees are set", func(t *testing.T) {
+	t.Run("labels toggled on with an empty list clears all labels", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42, "labels": []}`),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"labels":     []string{},
+			},
+		})
+
+		require.NoError(t, err)
+		requestBody := readJSONBody(t, httpCtx.Requests[0])
+		assert.Equal(t, []any{}, requestBody["labels"])
+	})
+
+	t.Run("only calls the Pulls API when labels or assignees are not toggled on", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				updatedPullRequestResponse(),
@@ -373,7 +460,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[1].URL.Path)
 	})
 
-	t.Run("only calls the Issues API when no title, body, state, or base are set", func(t *testing.T) {
+	t.Run("only calls the Issues API when title, body, state, and base are not toggled on", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42}`),

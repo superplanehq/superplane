@@ -3329,14 +3329,13 @@ The Update Pull Request component updates an existing pull request in a GitHub r
 
 - **Repository**: Select the GitHub repository containing the pull request
 - **Pull Request Number**: Pull request number to update. Supports expressions.
-- **Title**: New title for the pull request (optional; leaves the title unchanged if empty)
-- **Body**: New body/description for the pull request (optional; leaves the body unchanged if empty)
-- **State**: Change the pull request state to "open" or "closed" (optional; unset leaves the state unchanged)
-- **Base Branch**: Retarget the pull request onto a different base branch (optional)
-- **Assignees**: Non-empty list replaces the full set of assignees on the pull request (optional)
-- **Labels**: Non-empty list replaces the full set of labels on the pull request (optional)
+- **Title**, **Body**, **State**, **Base Branch**, **Replace Assignees**, **Replace Labels**: each field has its own toggle. Only toggled-on fields are changed; toggled-off fields are left untouched on the pull request.
 
-At least one of title, body, state, base, assignees, or labels is required.
+At least one field must be toggled on.
+
+### Replacing labels and assignees
+
+**Replace Assignees** and **Replace Labels** replace the pull request's full set when toggled on, including replacing it with an empty list to clear all assignees or labels.
 
 ### Out of scope
 
@@ -3349,7 +3348,7 @@ The following pull request operations have their own dedicated components:
 ### Implementation notes
 
 - Title, body, state, and base are updated through GitHub's Pulls API.
-- Assignees and labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
+- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
 - GitHub ignores a base branch change in the same request that sets the state to "closed".
 
 ### Output
