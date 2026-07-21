@@ -94,3 +94,26 @@ func TestBrokerMetricsWebhookDelivered(t *testing.T) {
 
 	require.Equal(t, int64(2), collectCounter(t, reader, telemetry.MetricWebhookDeliveries))
 }
+
+func TestBrokerMetricsSetOldestQueuedTaskAge(t *testing.T) {
+	m, reader := testMeter(t)
+	ctx := context.Background()
+
+	m.SetOldestQueuedTaskAge(ctx, "fleet-a", 75*time.Second)
+
+	var rm metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(ctx, &rm))
+	found := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, met := range sm.Metrics {
+			if met.Name != telemetry.MetricOldestQueuedTaskAge {
+				continue
+			}
+			gauge := met.Data.(metricdata.Gauge[float64])
+			require.Len(t, gauge.DataPoints, 1)
+			require.Equal(t, float64(75), gauge.DataPoints[0].Value)
+			found = true
+		}
+	}
+	require.True(t, found)
+}

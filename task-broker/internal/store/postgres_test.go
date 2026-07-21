@@ -173,6 +173,54 @@ func TestPostgresStoreCountTasksByFleet(t *testing.T) {
 	}
 }
 
+func TestPostgresStoreOldestQueuedTaskCreatedAt(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	oldest := now.Add(-2 * time.Minute)
+
+	create := func(id, fleetID string, status models.TaskStatus, createdAt time.Time) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    fleetID,
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  createdAt,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("queued-oldest", "fleet-a", models.StatusQueued, oldest)
+	create("queued-newer", "fleet-a", models.StatusQueued, now.Add(-30*time.Second))
+	create("claimed-older", "fleet-a", models.StatusClaimed, now.Add(-10*time.Minute))
+	create("other-fleet-queued", "fleet-b", models.StatusQueued, now.Add(-20*time.Minute))
+
+	got, err := st.OldestQueuedTaskCreatedAt(ctx, "fleet-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || !got.Equal(oldest) {
+		t.Fatalf("oldest queued task: got %v, want %v", got, oldest)
+	}
+
+	got, err = st.OldestQueuedTaskCreatedAt(ctx, "fleet-missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatalf("missing fleet oldest queued task: got %v, want nil", got)
+	}
+
+	if _, err := st.OldestQueuedTaskCreatedAt(ctx, ""); err == nil {
+		t.Fatalf("expected error for empty fleet id")
+	}
+}
+
 func TestPostgresStoreClaimedRunnerIDsByFleet(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()

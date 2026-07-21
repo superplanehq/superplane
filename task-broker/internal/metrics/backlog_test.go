@@ -37,6 +37,28 @@ func gaugeValue(t *testing.T, reader *metric.ManualReader, name, fleetID string)
 	return 0, false
 }
 
+func floatGaugeValue(t *testing.T, reader *metric.ManualReader, name, fleetID string) (float64, bool) {
+	t.Helper()
+	var rm metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(context.Background(), &rm))
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != name {
+				continue
+			}
+			gauge := m.Data.(metricdata.Gauge[float64])
+			for _, dp := range gauge.DataPoints {
+				for _, attr := range dp.Attributes.ToSlice() {
+					if attr.Key == "fleet_id" && attr.Value.AsString() == fleetID {
+						return dp.Value, true
+					}
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
 func TestSampleTaskBacklog(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
@@ -50,20 +72,20 @@ func TestSampleTaskBacklog(t *testing.T) {
 		ID: "fleet-b", Provisioner: "local", Arch: "arm64", Size: "local", CreatedAt: now,
 	}))
 
-	create := func(id, fleetID string, status models.TaskStatus) {
+	create := func(id, fleetID string, status models.TaskStatus, createdAt time.Time) {
 		t.Helper()
 		require.NoError(t, st.CreateTask(ctx, &models.Task{
 			ID: id, FleetID: fleetID, Command: []string{"echo"},
-			WebhookURL: "https://example.com/hook", Status: status, CreatedAt: now,
+			WebhookURL: "https://example.com/hook", Status: status, CreatedAt: createdAt,
 		}))
 	}
-	create("a-q1", "fleet-a", models.StatusQueued)
-	create("a-q2", "fleet-a", models.StatusQueued)
-	create("a-c1", "fleet-a", models.StatusClaimed)
-	create("b-c1", "fleet-b", models.StatusClaimed)
+	create("a-q1", "fleet-a", models.StatusQueued, now.Add(-75*time.Second))
+	create("a-q2", "fleet-a", models.StatusQueued, now.Add(-30*time.Second))
+	create("a-c1", "fleet-a", models.StatusClaimed, now.Add(-90*time.Second))
+	create("b-c1", "fleet-b", models.StatusClaimed, now.Add(-60*time.Second))
 
 	m, reader := testMeter(t)
-	require.NoError(t, SampleTaskBacklog(ctx, st, m))
+	require.NoError(t, sampleTaskBacklogAt(ctx, st, m, now))
 
 	q, ok := gaugeValue(t, reader, telemetry.MetricTasksQueued, "fleet-a")
 	require.True(t, ok)
@@ -80,4 +102,20 @@ func TestSampleTaskBacklog(t *testing.T) {
 	c, ok = gaugeValue(t, reader, telemetry.MetricTasksClaimed, "fleet-b")
 	require.True(t, ok)
 	require.Equal(t, int64(1), c)
+
+	oldestAge, ok := floatGaugeValue(t, reader, telemetry.MetricOldestQueuedTaskAge, "fleet-a")
+	require.True(t, ok)
+	require.InDelta(t, 75, oldestAge, 0.01)
+
+	oldestAge, ok = floatGaugeValue(t, reader, telemetry.MetricOldestQueuedTaskAge, "fleet-b")
+	require.True(t, ok)
+	require.Equal(t, float64(0), oldestAge)
+}
+
+func TestOldestQueuedAgeNeverNegative(t *testing.T) {
+	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
+	futureQueuedAt := now.Add(time.Minute)
+
+	require.Equal(t, time.Duration(0), oldestQueuedAge(now, nil))
+	require.Equal(t, time.Duration(0), oldestQueuedAge(now, &futureQueuedAt))
 }

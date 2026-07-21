@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -72,6 +73,27 @@ func (s *PostgresStore) CountTasksByFleet(ctx context.Context, fleetID string) (
 		return 0, 0, err
 	}
 	return int(queued), int(claimed), nil
+}
+
+func (s *PostgresStore) OldestQueuedTaskCreatedAt(ctx context.Context, fleetID string) (*time.Time, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for oldest queued task")
+	}
+	var oldest sql.NullTime
+	err := s.db.WithContext(ctx).
+		Model(&brokermodels.Task{}).
+		Select("MIN(created_at)").
+		Where("fleet_id = ? AND status = ?", fleetID, string(models.StatusQueued)).
+		Scan(&oldest).Error
+	if err != nil {
+		return nil, err
+	}
+	if !oldest.Valid {
+		return nil, nil
+	}
+	t := oldest.Time.UTC()
+	return &t, nil
 }
 
 func (s *PostgresStore) ClaimedRunnerIDsByFleet(ctx context.Context, fleetID string) ([]string, error) {
