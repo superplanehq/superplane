@@ -190,7 +190,7 @@ func (m *OnMRDiffNote) isDiffNoteComment(logger *log.Entry, data map[string]any)
 		return false
 	}
 
-	if action, _ := attrs["action"].(string); action != "create" {
+	if action, ok := attrs["action"].(string); ok && action != "create" {
 		logger.Infof("Comment action is %q, not create - ignoring", action)
 		return false
 	}
