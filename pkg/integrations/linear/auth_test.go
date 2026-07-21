@@ -113,11 +113,13 @@ func Test__Auth__HandleCallback(t *testing.T) {
 		require.ErrorContains(t, err, "invalid state")
 	})
 
+	// An integration whose state was never generated must reject every callback,
+	// even one carrying an attacker-supplied non-empty state.
 	t.Run("empty expected state never matches", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/callback?code=c&state=", nil)
+		request := httptest.NewRequest(http.MethodGet, "/callback?code=c&state=attacker-state", nil)
 
 		_, err := auth.HandleCallback(request, testClientID, testClientSecret, "", "https://cb")
-		require.ErrorContains(t, err, "missing code or state")
+		require.ErrorContains(t, err, "invalid state")
 	})
 
 	t.Run("valid callback exchanges the code", func(t *testing.T) {

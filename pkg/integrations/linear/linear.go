@@ -333,12 +333,19 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	//
+	// The tokens are stored and a resync is scheduled at this point, so a
+	// metadata failure must not strand the user on a bare error page: surface
+	// it through the integration state and send them back to settings, where
+	// a manual or scheduled sync retries with the saved tokens.
+	//
 	if err := l.updateMetadata(core.SyncContext{
 		HTTP:        ctx.HTTP,
 		Integration: ctx.Integration,
 	}); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to update metadata: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Integration.Error(fmt.Sprintf("connected, but failed to load workspace data: %v", err))
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 		return
 	}
 

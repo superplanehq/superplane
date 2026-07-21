@@ -55,8 +55,8 @@ func (i *OnIssue) Documentation() string {
 ## Webhook Setup
 
 This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only lets **workspace admins** manage webhooks, so the API key connected
-to this integration must belong to an admin and carry the **Admin** permission.`
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.`
 }
 
 func (i *OnIssue) Icon() string {

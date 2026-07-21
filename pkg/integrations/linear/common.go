@@ -34,7 +34,7 @@ type NodeMetadata struct {
 }
 
 // requireTeam resolves a team ID against the integration metadata populated
-// during sync, so setup fails fast on a team the API key cannot reach.
+// during sync, so setup fails fast on a team the connection cannot reach.
 func requireTeam(integration core.IntegrationContext, teamID string) (*Team, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {

@@ -169,6 +169,54 @@ func Test__Linear__Sync(t *testing.T) {
 		assert.Equal(t, "application/x-www-form-urlencoded", tokenRequest.Header.Get("Content-Type"))
 	})
 
+	t.Run("access token without refresh token routes back to authorization", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegration()
+		delete(integrationContext.CurrentSecrets, OAuthRefreshToken)
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			HTTP:          &contexts.HTTPContext{},
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		require.ErrorContains(t, err, "no refresh token")
+
+		// The dead-end access token is cleared, so the next
+		// sync shows the authorize button again.
+		accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+		assert.Empty(t, accessToken)
+	})
+
+	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegration()
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"access_token":"new-access","refresh_token":"new-refresh","token_type":"Bearer","expires_in":86399}`),
+				jsonResponse(`{"errors":[{"message":"Authentication required, not authenticated"}]}`),
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			HTTP:          httpContext,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		// Sync reports the failure through the integration state, keeping the
+		// refreshed tokens for the next attempt.
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "error verifying Linear credentials")
+
+		accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+		assert.Equal(t, "new-access", accessToken)
+	})
+
 	t.Run("refresh failure clears tokens and errors", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegration()
 
@@ -261,6 +309,50 @@ func Test__Linear__HandleRequest(t *testing.T) {
 		assert.Equal(t, "authorization_code", form.Get("grant_type"))
 		assert.Equal(t, "auth-code", form.Get("code"))
 		assert.True(t, strings.HasSuffix(form.Get("redirect_uri"), "/callback"))
+	})
+
+	t.Run("metadata failure after token storage redirects with an error state", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     testClientID,
+				"clientSecret": testClientSecret,
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"access_token":"cb-access","refresh_token":"cb-refresh","token_type":"Bearer","expires_in":86399}`),
+				jsonResponse(`{"errors":[{"message":"workspace temporarily unavailable"}]}`),
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		// The user lands back on the settings page instead of a bare 500,
+		// with the failure surfaced through the integration state.
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "failed to load workspace data")
+
+		// The token pair survives, so the scheduled resync can recover alone.
+		accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, OAuthRefreshToken)
+		assert.Equal(t, "cb-access", accessToken)
+		assert.Equal(t, "cb-refresh", refreshToken)
+		require.Len(t, integrationContext.ResyncRequests, 1)
 	})
 
 	t.Run("state mismatch does not store tokens", func(t *testing.T) {
