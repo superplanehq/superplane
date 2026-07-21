@@ -39,6 +39,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
+  <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
@@ -1191,6 +1192,66 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerBash.finished"
+}
+```
+
+<a id="run-claude-code"></a>
+
+## Run Claude Code
+
+**Component key:** `runnerClaudeCode`
+
+Runs [Claude Code](https://code.claude.com/docs/en/headless) in non-interactive mode on a fleet runner.
+
+### Prerequisites
+- The `claude` CLI is installed on the runner machine and available on `PATH`.
+- An Anthropic API key stored as a SuperPlane secret.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — a Claude Code turn. Later prompts continue the same session.
+
+Example:
+
+1. bash — `git clone …`
+2. prompt — implement the feature
+3. prompt — run tests and fix failures
+4. bash — `git push`
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Anthropic API Key**: SuperPlane secret used as `ANTHROPIC_API_KEY`.
+- **Model**: Optional model id or alias (for example `sonnet`).
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output
+Prompt steps stream agent activity to **View logs**. The finished event includes the latest Claude `result`.
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "session_id": "session-123",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerClaudeCode.finished"
 }
 ```
 

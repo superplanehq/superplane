@@ -62,7 +62,8 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     return details;
   }
   const c = configuration as Record<string, unknown>;
-  const machineType = typeof c.machine_type === "string" ? c.machine_type.trim() : "";
+  const machineTypeRaw = c.machineType ?? c.machine_type;
+  const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
   if (machineType) {
     details["Machine type"] = machineTypeDisplayName(machineType);
   }
@@ -76,7 +77,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
   if (image) {
     details["Container image"] = image;
   }
-  const timeoutRaw = c.execution_timeout_seconds;
+  const timeoutRaw = c.executionTimeoutSeconds ?? c.execution_timeout_seconds;
   const timeoutLabel = (value: number | string) => {
     const parsed = typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
     if (!Number.isFinite(parsed) || parsed <= 0) {
