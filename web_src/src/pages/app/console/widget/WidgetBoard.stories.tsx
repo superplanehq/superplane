@@ -13,7 +13,7 @@ const meta = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <MockConsoleProvider>
+      <MockConsoleProvider value={{ canvasId: "" }}>
         <Story />
       </MockConsoleProvider>
     ),

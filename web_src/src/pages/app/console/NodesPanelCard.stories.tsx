@@ -27,7 +27,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <MockConsoleProvider>
+      <MockConsoleProvider value={{ canvasId: "" }}>
         <PanelFrame height={260}>
           <Story />
         </PanelFrame>
