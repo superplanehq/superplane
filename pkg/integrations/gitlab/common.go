@@ -150,6 +150,31 @@ func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContex
 	})
 }
 
+// matchesNoteContentFilter checks whether a Note Hook payload's comment body
+// matches the given regex filter. An empty filter always matches.
+func matchesNoteContentFilter(filter string, data map[string]any) (bool, error) {
+	if filter == "" {
+		return true, nil
+	}
+
+	attrs, ok := data["object_attributes"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+
+	note, ok := attrs["note"].(string)
+	if !ok {
+		return false, nil
+	}
+
+	matched, err := regexp.MatchString(filter, note)
+	if err != nil {
+		return false, fmt.Errorf("invalid content filter pattern: %w", err)
+	}
+
+	return matched, nil
+}
+
 // parseUserIDs converts a list of stringified GitLab user IDs (as produced by
 // member resource selectors) into ints, skipping any that are not numeric.
 func parseUserIDs(ids []string) []int {
