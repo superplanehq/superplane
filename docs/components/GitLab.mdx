@@ -11,6 +11,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to branch creation events from GitLab" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events from GitLab" />
+  <LinkCard title="On MR Diff Note" href="#on-mr-diff-note" description="Listen to merge request diff (inline code review) comment events from GitLab" />
   <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
@@ -25,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Accept Merge Request" href="#accept-merge-request" description="Merge an open GitLab merge request" />
+  <LinkCard title="Add Merge Request Reviewers" href="#add-merge-request-reviewers" description="Add reviewers to a GitLab merge request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add an award emoji reaction to a GitLab merge request or comment" />
   <LinkCard title="Approve Merge Request" href="#approve-merge-request" description="Approve a GitLab merge request" />
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a deployment for a GitLab environment" />
@@ -32,10 +35,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitLab issue" />
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
+  <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
+  <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
 </CardGrid>
@@ -56,6 +61,7 @@ To connect with a **Personal Access Token**:
 **Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
 
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
+- **Create Merge Request**, **Add Merge Request Reviewers**, and **Remove Merge Request Reviewers** require at least the **Developer** role on the project. These use the `api` scope, which is already included in the scopes above.
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
 - **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
 - **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
@@ -240,6 +246,250 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   },
   "timestamp": "2026-02-05T14:00:00.000000000Z",
   "type": "gitlab.issue"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `gitlab.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is added to an issue in a GitLab project.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in issue comments (e.g., `/sp-investigate` to trigger an agent that investigates whether the issue is worth fixing and rates its urgency)
+- **Bot interactions**: Respond to issue comments with automated actions
+- **Notification systems**: Notify teams when important issue comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/sp-investigate` to only trigger on comments containing "/sp-investigate")
+
+### Event Data
+
+Each comment event includes:
+- **object_attributes**: Comment information including note body, author, and URL
+- **issue**: Issue the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Issue IID: `root().data.issue.iid`
+- Issue title: `root().data.issue.title`
+- Comment body: `root().data.object_attributes.note`
+- Comment URL: `root().data.object_attributes.url`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "issue": {
+      "author_id": 1,
+      "created_at": "2026-02-10 09:00:00 UTC",
+      "description": "Steps to reproduce: submit the login form with a wrong password.",
+      "id": 45,
+      "iid": 8,
+      "labels": [
+        "bug"
+      ],
+      "state": "opened",
+      "title": "Login page throws 500 on invalid credentials",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8"
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "created_at": "2026-02-12 20:40:00 UTC",
+      "discussion_id": "6c2bb44bdc7f5c8f21b9ff8422f3d60cc0e5e719",
+      "id": 1355,
+      "note": "/sp-investigate",
+      "noteable_id": 45,
+      "noteable_type": "Issue",
+      "project_id": 1,
+      "system": false,
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8#note_1355"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.issueComment"
+}
+```
+
+<a id="on-mr-diff-note"></a>
+
+## On MR Diff Note
+
+**Trigger key:** `gitlab.onMRDiffNote`
+
+The On MR Diff Note trigger starts a workflow execution when an inline comment is added to a merge request's diff in a GitLab project.
+
+Diff notes (also known as inline comments) are comments left on a specific line of a merge request's changes, as opposed to a regular top-level merge request comment. Use `gitlab.onMergeComment` if you want to react to regular merge request discussion comments instead.
+
+### Use Cases
+
+- **Review triage**: Have an agent triage a merge request review by reading the diff note together with the file and line it was left on
+- **Command processing**: Process slash commands left as inline review comments (e.g., /fix, /explain)
+- **Notification systems**: Notify teams when important inline review comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/fix` to only trigger on comments containing "/fix")
+
+### Event Data
+
+Each diff note event includes:
+- **object_attributes**: Comment information including note body, author, URL, and the diff **position** (file paths, line numbers, and commit SHAs the comment is anchored to)
+- **merge_request**: Merge request the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Merge request IID: `root().data.merge_request.iid`
+- Merge request title: `root().data.merge_request.title`
+- Comment body: `root().data.object_attributes.note`
+- Diff file path: `root().data.object_attributes.position.new_path`
+- Diff line number: `root().data.object_attributes.position.new_line`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "merge_request": {
+      "author_id": 1,
+      "created_at": "2026-02-12 18:30:00 UTC",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "draft": false,
+      "id": 93,
+      "iid": 12,
+      "last_commit": {
+        "author": {
+          "email": "agarcia@example.com",
+          "name": "Alex Garcia"
+        },
+        "id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "message": "Add merge request trigger",
+        "timestamp": "2026-02-12T18:25:00Z",
+        "url": "https://gitlab.example.com/group/example/-/commit/372fa8f809fe161ee0f22e04d1a4074e0be6ac47"
+      },
+      "merge_status": "can_be_merged",
+      "source_branch": "feature/merge-request-trigger",
+      "source_project_id": 1,
+      "state": "opened",
+      "target_branch": "main",
+      "target_project_id": 1,
+      "title": "Add merge request trigger",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12",
+      "work_in_progress": false
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "commit_id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+      "created_at": "2026-02-13 10:15:00 UTC",
+      "discussion_id": "b4f2a7d4c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9",
+      "id": 1401,
+      "line_code": "a5cc2925ca8258af241be7e5b0381edf30266302_10_10",
+      "note": "This variable name is misleading, can we rename it?",
+      "noteable_id": 93,
+      "noteable_type": "MergeRequest",
+      "position": {
+        "base_sha": "1234567890abcdef1234567890abcdef12345678",
+        "head_sha": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "new_line": 10,
+        "new_path": "src/handlers/login.go",
+        "old_line": 10,
+        "old_path": "src/handlers/login.go",
+        "position_type": "text",
+        "start_sha": "234567890abcdef1234567890abcdef123456789"
+      },
+      "project_id": 1,
+      "system": false,
+      "type": "DiffNote",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12#note_1401"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-13T10:15:00.000000000Z",
+  "type": "gitlab.mrDiffNote"
 }
 ```
 
@@ -1073,6 +1323,99 @@ Returns the merged merge request object, including state, merge commit SHA, sour
 }
 ```
 
+<a id="add-merge-request-reviewers"></a>
+
+## Add Merge Request Reviewers
+
+**Component key:** `gitlab.addMergeRequestReviewers`
+
+The Add Merge Request Reviewers component requests reviews from additional users on an existing GitLab merge request. Existing reviewers are kept.
+
+### Use Cases
+
+- **Automated review assignment**: Add reviewers after a merge request is opened as part of a workflow
+- **Escalation**: Add a senior reviewer when checks fail or a change touches sensitive areas
+- **Round-robin**: Assign reviewers from a rotation once a merge request is ready
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to request a review from. These are added to any existing reviewers.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its full reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      },
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/ghi789",
+        "id": 31,
+        "name": "Sam Chen",
+        "state": "active",
+        "username": "schen",
+        "web_url": "https://gitlab.example.com/schen"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:30:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:30:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
 <a id="add-reaction"></a>
 
 ## Add Reaction
@@ -1547,6 +1890,112 @@ Returns the created note object, including:
 }
 ```
 
+<a id="create-merge-request"></a>
+
+## Create Merge Request
+
+**Component key:** `gitlab.createMergeRequest`
+
+The Create Merge Request component opens a new merge request in a specified GitLab project.
+
+### Use Cases
+
+- **Automated fixes**: An agent commits a fix on a branch and opens a merge request for review
+- **Dependency updates**: Open a merge request when a dependency or changelog bump is generated
+- **Release automation**: Open a merge request to promote a branch into a release branch
+
+### Configuration
+
+- **Project** (required): The GitLab project where the merge request will be created
+- **Source Branch** (required): The branch containing the changes (supports expressions)
+- **Target Branch** (required): The branch you want the changes merged into (e.g. main)
+- **Title** (required): The title of the new merge request
+- **Description** (optional): The description/body of the merge request
+- **Assignees** (optional): Users to assign the merge request to
+- **Reviewers** (optional): Users to request a review from
+- **Labels** (optional): Labels to apply to the merge request
+- **Milestone** (optional): Milestone to associate with the merge request
+- **Remove Source Branch** (optional): Remove the source branch when the merge request is merged
+- **Squash** (optional): Squash commits into a single commit when merging
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to create a merge request.
+
+### Output
+
+The component outputs the created merge request object, including:
+- **iid**: The project-relative ID of the merge request
+- **web_url**: The URL to view the merge request in GitLab
+- **source_branch** and **target_branch**: The branches involved
+- **state**: The current state of the merge request (opened)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 22,
+        "name": "Jamie Rivera",
+        "state": "active",
+        "username": "jrivera",
+        "web_url": "https://gitlab.example.com/jrivera"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T08:46:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T08:46:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -1797,6 +2246,91 @@ The Get Test Report Summary component fetches the test report summary for a GitL
   },
   "timestamp": "2026-02-13T19:26:01.000Z",
   "type": "gitlab.testReportSummary"
+}
+```
+
+<a id="remove-merge-request-reviewers"></a>
+
+## Remove Merge Request Reviewers
+
+**Component key:** `gitlab.removeMergeRequestReviewers`
+
+The Remove Merge Request Reviewers component removes reviewers from an existing GitLab merge request. Reviewers that are not listed are kept.
+
+### Use Cases
+
+- **Automated cleanup**: Remove a reviewer once their review is no longer needed
+- **Reassignment**: Remove a reviewer before adding a different one as part of a workflow
+- **Rotation**: Drop an out-of-office reviewer from an open merge request
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to remove from the merge request's reviewers. Reviewers not listed are kept.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its remaining reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:45:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:45:00.000Z",
+  "type": "gitlab.mergeRequest"
 }
 ```
 
