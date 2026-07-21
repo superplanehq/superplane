@@ -1,0 +1,123 @@
+import { forwardRef, useMemo } from "react";
+import { exprLangAdapter, type ExpressionAdapter } from "@/lib/expression";
+import { AutoCompleteInput, type AutoCompleteInputProps } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { getExpressionDialectAdapter } from "./expressionDialectRegistry";
+import type { ExpressionEditorDialect, ExpressionEditorProps, ExpressionSyntaxProfile } from "./types";
+
+interface ProfileDefaults {
+  expressionMode: AutoCompleteInputProps["expressionMode"];
+  startWord?: string;
+  prefix?: string;
+  suffix?: string;
+}
+
+const PROFILE: Record<ExpressionSyntaxProfile, ProfileDefaults> = {
+  wrapped: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
+  singleWrapped: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
+  raw: { expressionMode: "raw" },
+  pathOrRaw: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
+};
+
+const QUICK_TIP: Record<ExpressionEditorDialect, Record<ExpressionSyntaxProfile, string>> = {
+  "expr-lang": {
+    wrapped: "Tip: type `{{` to start an expression.",
+    singleWrapped: "Tip: enter a literal or one full `{{ … }}` expression.",
+    raw: "Tip: type `$` to browse node payloads.",
+    pathOrRaw: "Tip: type `{{` to switch to an expression.",
+  },
+  cel: {
+    wrapped: "Tip: type `{{` to start a CEL expression.",
+    singleWrapped: "Tip: enter a literal or one full `{{ … }}` CEL expression.",
+    raw: "Tip: reference row fields directly (e.g. `field.name`).",
+    pathOrRaw: "Tip: type `{{` to switch to a CEL expression.",
+  },
+};
+
+const CEL_ADAPTER_NOT_REGISTERED = "CEL expression adapter is not registered";
+const unconfiguredCelAdapter: ExpressionAdapter = {
+  id: "cel",
+  evaluate: () => ({ ok: false, error: CEL_ADAPTER_NOT_REGISTERED }),
+  evaluatePathLiteral: () => ({ ok: false, error: CEL_ADAPTER_NOT_REGISTERED }),
+  resolveSuggestionValue: () => undefined,
+  formatResult: (value) => String(value ?? ""),
+};
+
+export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditorProps>(
+  function ExpressionEditorRender(props, forwardedRef) {
+    const {
+      dialect = "expr-lang",
+      expressionAdapter,
+      syntaxProfile = "wrapped",
+      expressionMode,
+      startWord,
+      prefix,
+      suffix,
+      quickTip,
+      includeTopLevelGlobals,
+      includeFunctions,
+      excludedSuggestions,
+      ...rest
+    } = props;
+
+    const resolvedAdapter = useMemo(
+      () =>
+        expressionAdapter ??
+        getExpressionDialectAdapter(dialect) ??
+        (dialect === "expr-lang" ? exprLangAdapter : unconfiguredCelAdapter),
+      [dialect, expressionAdapter],
+    );
+
+    const profile = PROFILE[syntaxProfile];
+    // Widget CEL fields address the row context directly (`payload.foo`), so
+    // include plain-name completions in every CEL suggestion list.
+    const resolvedIncludeTopLevelGlobals = includeTopLevelGlobals ?? dialect === "cel";
+    // Only `pathOrRaw` fields expect suggestions to fire outside `{{ … }}` —
+    // wrapped-only fields (markdown/HTML title & body) treat prose as literal
+    // text and must not open the suggestion dropdown there.
+    const pathModeOutsideWrapper = syntaxProfile === "pathOrRaw";
+    // The built-in function catalog and the `memory` namespace are expr-lang
+    // specific — hide them from CEL fields so authors don't insert identifiers
+    // the CEL runtime doesn't understand.
+    const resolvedIncludeFunctions = includeFunctions ?? dialect !== "cel";
+    // Widget CEL's `$` selector maps to the internal `__runNodes__` map on the
+    // row, so route env-key completion (`$` / `$["…"]`) to node names when the
+    // caller's `exampleObj` actually carries that map (widget forms).
+    const hasRunNodes = hasRunNodesMap(rest.exampleObj);
+    const envKeySource = dialect === "cel" && hasRunNodes ? "__runNodes__" : undefined;
+    const resolvedExcludedSuggestions = useMemo(() => {
+      if (dialect !== "cel") return excludedSuggestions;
+      const base = excludedSuggestions ?? [];
+      const celOnlySuggestions = hasRunNodes ? ["memory"] : ["memory", "$"];
+      return celOnlySuggestions.reduce(
+        (excluded, suggestion) => (excluded.includes(suggestion) ? excluded : [...excluded, suggestion]),
+        base,
+      );
+    }, [dialect, excludedSuggestions, hasRunNodes]);
+
+    return (
+      <AutoCompleteInput
+        ref={forwardedRef}
+        expressionAdapter={resolvedAdapter}
+        expressionMode={expressionMode ?? profile.expressionMode}
+        startWord={startWord ?? profile.startWord}
+        prefix={prefix ?? profile.prefix}
+        suffix={suffix ?? profile.suffix}
+        quickTip={quickTip ?? QUICK_TIP[dialect][syntaxProfile]}
+        includeTopLevelGlobals={resolvedIncludeTopLevelGlobals}
+        includeFunctions={resolvedIncludeFunctions}
+        pathModeOutsideWrapper={pathModeOutsideWrapper}
+        singleWrappedExpression={syntaxProfile === "singleWrapped"}
+        envKeySource={envKeySource}
+        excludedSuggestions={resolvedExcludedSuggestions}
+        {...rest}
+      />
+    );
+  },
+);
+
+function hasRunNodesMap(exampleObj: unknown): boolean {
+  if (!exampleObj || typeof exampleObj !== "object") return false;
+  const record = exampleObj as Record<string, unknown>;
+  const map = record.__runNodes__;
+  return !!map && typeof map === "object";
+}

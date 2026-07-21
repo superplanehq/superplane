@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import {
@@ -25,11 +26,13 @@ const NONE_VALUE = "__none__";
 export function ChartTopControls({
   value,
   onChange,
-  fieldListId,
+  sampleRow,
+  seriesFieldListId,
 }: {
   value: ChartPanelContent;
   onChange: (next: ChartPanelContent) => void;
-  fieldListId: string | undefined;
+  sampleRow: Record<string, unknown>;
+  seriesFieldListId: string | undefined;
 }) {
   const seriesField = value.render.seriesField ?? "";
   const updateSeriesField = (next: string) => {
@@ -66,10 +69,11 @@ export function ChartTopControls({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">X-axis field</Label>
-          <Input
-            list={fieldListId}
+          <ConsoleExpressionEditor
+            syntaxProfile="pathOrRaw"
             value={value.render.xField}
-            onChange={(e) => onChange({ ...value, render: { ...value.render, xField: e.target.value } })}
+            onChange={(next) => onChange({ ...value, render: { ...value.render, xField: next } })}
+            exampleObj={sampleRow}
             placeholder='e.g. status or {{ formatDate(createdAt, "MM/dd") }}'
             data-testid="chart-x-field"
           />
@@ -100,7 +104,7 @@ export function ChartTopControls({
         <div className="space-y-1.5 col-span-2">
           <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Stack by field (optional)</Label>
           <Input
-            list={fieldListId}
+            list={seriesFieldListId}
             value={seriesField}
             onChange={(e) => updateSeriesField(e.target.value)}
             placeholder="e.g. service (pivots rows into one series per value)"
@@ -111,7 +115,7 @@ export function ChartTopControls({
           </p>
         </div>
       </div>
-      <ChartSortRow value={value} onChange={onChange} fieldListId={fieldListId} />
+      <ChartSortRow value={value} onChange={onChange} sampleRow={sampleRow} />
     </div>
   );
 }
@@ -208,11 +212,11 @@ function AxisFormatSelect({
 function ChartSortRow({
   value,
   onChange,
-  fieldListId,
+  sampleRow,
 }: {
   value: ChartPanelContent;
   onChange: (next: ChartPanelContent) => void;
-  fieldListId: string | undefined;
+  sampleRow: Record<string, unknown>;
 }) {
   const sort = value.render.sort;
   const sortField = sort?.field ?? "";
@@ -244,10 +248,11 @@ function ChartSortRow({
     <div className="grid grid-cols-3 gap-3">
       <div className="space-y-1.5 col-span-2">
         <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
-        <Input
-          list={fieldListId}
+        <ConsoleExpressionEditor
+          syntaxProfile="pathOrRaw"
           value={sortField}
-          onChange={(e) => updateField(e.target.value)}
+          onChange={(next) => updateField(next)}
+          exampleObj={sampleRow}
           placeholder="e.g. createdAt or {{ expr }} (blank = unsorted)"
           data-testid="chart-sort-field"
         />

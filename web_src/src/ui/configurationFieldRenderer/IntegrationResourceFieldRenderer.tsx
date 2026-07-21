@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
-import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -220,17 +220,13 @@ export const IntegrationResourceFieldRenderer = ({
     );
 
     const expressionInput = (
-      <AutoCompleteInput
+      <ExpressionEditor
         exampleObj={autocompleteExampleObj}
         value={expressionValue}
         onChange={(nextValue) => onChange(nextValue || (field.togglable ? "" : undefined))}
         placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
-        startWord="{{"
-        prefix="{{ "
-        suffix=" }}"
         inputSize="md"
         showValuePreview
-        quickTip="Tip: type {{ to start an expression."
         className=""
       />
     );

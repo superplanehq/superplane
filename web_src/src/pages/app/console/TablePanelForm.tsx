@@ -13,8 +13,7 @@ import {
 } from "./tablePanelForm/TablePanelFormSections";
 import { useTablePanelFormActions } from "./tablePanelForm/useTablePanelFormActions";
 import { useTablePanelPayloadDrafts } from "./tablePanelForm/useTablePanelPayloadDrafts";
-import { staticFieldsForDataSource } from "./widget/staticFieldCatalogs";
-import { sampleRowFromFields, useMemoryCatalog, type MemoryFieldSummary } from "./widget/useMemoryCatalog";
+import { useWidgetExpressionContext } from "./widget/useWidgetExpressionContext";
 
 interface TablePanelFormProps {
   value: TablePanelContent;
@@ -28,11 +27,12 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   // dropdown only exposes triggers the backend will actually accept —
   // `TYPE_TRIGGER` nodes whose component is in the manual-run allowlist.
   const triggerNodes = (ctx?.nodes ?? []).filter(isManualRunNode);
-  const namespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : "";
-  const { fields: memoryFields } = useMemoryCatalog(canvasId, namespace);
-  const fields = resolveFieldCatalog(value, memoryFields);
+  const { row: sampleRow, fields } = useWidgetExpressionContext({
+    canvasId: canvasId ?? "",
+    dataSource: value.dataSource,
+    render: value.render,
+  });
   const fieldOptions = fields.map((f) => f.field);
-  const sampleRow = sampleRowFromFields(fields);
   const payloadDrafts = useTablePanelPayloadDrafts(value);
   const actions = useTablePanelFormActions({ value, onChange, fields, triggerNodes, payloadDrafts });
 
@@ -45,10 +45,16 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
         loadAllWhenBlank
       />
       <TablePanelMemorySourcePicker value={value} canvasId={canvasId} onChange={onChange} />
-      <TablePanelColumnsSection value={value} fields={fields} fieldOptions={fieldOptions} actions={actions} />
-      <TablePanelFiltersSection value={value} fieldOptions={fieldOptions} actions={actions} />
-      <TablePanelRowStylesSection value={value} fieldOptions={fieldOptions} actions={actions} />
-      <TablePanelSortSection value={value} fieldOptions={fieldOptions} actions={actions} />
+      <TablePanelColumnsSection
+        value={value}
+        fields={fields}
+        fieldOptions={fieldOptions}
+        sampleRow={sampleRow}
+        actions={actions}
+      />
+      <TablePanelFiltersSection value={value} sampleRow={sampleRow} actions={actions} />
+      <TablePanelRowStylesSection value={value} sampleRow={sampleRow} actions={actions} />
+      <TablePanelSortSection value={value} sampleRow={sampleRow} actions={actions} />
       <TablePanelRowActionsSection
         value={value}
         triggerNodes={triggerNodes}
@@ -57,32 +63,6 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
         payloadDrafts={payloadDrafts}
         actions={actions}
       />
-      {fieldOptions.length > 0 ? (
-        <datalist id="table-field-options">
-          {fieldOptions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
-      ) : null}
-      {fieldOptions.length > 0 ? (
-        <datalist id="table-href-field-options">
-          {fieldOptions.map((f) => (
-            <option key={f} value={`{{ ${f} }}`} />
-          ))}
-        </datalist>
-      ) : null}
     </div>
   );
-}
-
-/**
- * Pick the right field catalog for the configured data source. Memory rows
- * are dynamic (discovered from the live canvas memory), while executions
- * and runs have fixed shapes — see `staticFieldsForDataSource` for the
- * hard-coded catalogs. Returns an empty list when no suggestions are
- * available, so the form falls back to free-text input cleanly.
- */
-function resolveFieldCatalog(value: TablePanelContent, memoryFields: MemoryFieldSummary[]): MemoryFieldSummary[] {
-  if (value.dataSource.kind === "memory") return memoryFields;
-  return staticFieldsForDataSource(value.dataSource.kind);
 }
