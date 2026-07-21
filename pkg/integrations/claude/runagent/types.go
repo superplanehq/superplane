@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"strings"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 )
 
 const (
@@ -52,6 +54,15 @@ type Spec struct {
 	// PersistSession keeps the Managed Agents session after the run finishes so
 	// its transcript stays readable in the Anthropic Console.
 	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`
+	// OutputSchema is a JSON Schema the agent is asked (via a prompt suffix, not
+	// a server-enforced constraint) to match in its final message.
+	OutputSchema string `json:"outputSchema" mapstructure:"outputSchema"`
+}
+
+// RunAgentNodeMetadata is node-level metadata surfaced in the UI so configured
+// options are visible on the node without opening it.
+type RunAgentNodeMetadata struct {
+	StructuredOutput bool `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
 // SecretBinding maps a SuperPlane secret to an environment variable in the agent session.
@@ -85,6 +96,9 @@ type OutputPayload struct {
 	LastMessage string            `json:"lastMessage"`
 	Messages    []string          `json:"messages"`
 	Artifacts   []SessionArtifact `json:"artifacts,omitempty"`
+	// Parsed is the JSON object extracted from LastMessage when Structured
+	// Output is configured and the session completed normally.
+	Parsed any `json:"parsed,omitempty"`
 }
 
 // SessionArtifact is a file the agent generated during the session (written to
@@ -203,6 +217,34 @@ func buildOutputFromSessionMessages(status, sessionID string, sm *SessionMessage
 		out.Messages = sm.Messages
 	}
 	return out
+}
+
+// applyStructuredOutput sets out.Parsed by best-effort extracting JSON from
+// the agent's final message, when a schema is configured and the session
+// completed normally ("idle"). There is no server-side schema enforcement for
+// Managed Agents sessions (unlike output_config.format on the Messages API),
+// so this is prompt-guided and best-effort — a "terminated" session may have
+// errored or been interrupted mid-task, so its message is not trusted either.
+func applyStructuredOutput(out *OutputPayload, status string, schema map[string]any) {
+	if schema == nil || status != sessionStatusIdle || out.LastMessage == "" {
+		return
+	}
+	if parsed, ok := structuredoutput.ExtractJSON(out.LastMessage); ok {
+		out.Parsed = parsed
+	}
+}
+
+// schemaFromConfiguration re-derives the parsed output schema from the node's
+// raw configuration for the async poll path, where the schema was already
+// validated at Setup/Execute — a decode or parse failure here is tolerated as
+// "no schema" rather than failing an otherwise-complete run.
+func schemaFromConfiguration(config any) map[string]any {
+	spec, err := decodeSpec(config)
+	if err != nil {
+		return nil
+	}
+	schema, _ := structuredoutput.Parse(spec.OutputSchema)
+	return schema
 }
 
 func buildOutput(status, sessionID string, lastMessage ...string) OutputPayload {
