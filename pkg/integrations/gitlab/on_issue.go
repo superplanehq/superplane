@@ -44,8 +44,12 @@ func (i *OnIssue) Documentation() string {
 ## Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
+- **Actions** (required): Select which issue actions to listen for. Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
+
+## Actions
+
+GitLab reports issue changes with only four raw actions (` + "`open`, `close`, `reopen`, `update`" + `). Labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, locked, unlocked and edited are derived from the ` + "`changes`" + ` field of an update event, to match the granularity of GitHub's equivalent trigger.
 
 ## Outputs
 
@@ -90,6 +94,15 @@ func (i *OnIssue) Configuration() []configuration.Field {
 						{Label: "Closed", Value: "close"},
 						{Label: "Reopened", Value: "reopen"},
 						{Label: "Updated", Value: "update"},
+						{Label: "Edited", Value: "edited"},
+						{Label: "Assigned", Value: "assigned"},
+						{Label: "Unassigned", Value: "unassigned"},
+						{Label: "Labeled", Value: "labeled"},
+						{Label: "Unlabeled", Value: "unlabeled"},
+						{Label: "Locked", Value: "locked"},
+						{Label: "Unlocked", Value: "unlocked"},
+						{Label: "Milestoned", Value: "milestoned"},
+						{Label: "Demilestoned", Value: "demilestoned"},
 					},
 				},
 			},
@@ -193,34 +206,79 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 		return false
 	}
 
-	if !slices.Contains(allowedActions, action) {
-		logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
-		return false
-	}
-
 	//
-	// If not an update action, just return true,
-	// since it's in the allowed list.
+	// If not an update action, it must be in the allowed list as-is.
 	//
 	if action != "update" {
+		if !slices.Contains(allowedActions, action) {
+			logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
+			return false
+		}
 		return true
 	}
 
 	//
-	// Otherwise, we are dealing with an update,
-	// and for those, we only accept if the issue is opened.
+	// GitLab reports every other issue change (labels, assignees, milestone,
+	// locking, title/description) as a single "update" action, so the
+	// finer-grained actions below are derived from the `changes` field.
 	//
-	state, ok := attrs["state"].(string)
-	if !ok {
-		return false
+	if slices.Contains(allowedActions, "update") {
+		if state, _ := attrs["state"].(string); state == "opened" {
+			return true
+		}
 	}
 
-	if state != "opened" {
-		logger.Infof("Received update for issue in non-opened state: %s - ignoring", state)
-		return false
+	changes, _ := data["changes"].(map[string]any)
+	derived := issueDerivedActions(changes)
+	for _, derivedAction := range derived {
+		if slices.Contains(allowedActions, derivedAction) {
+			return true
+		}
 	}
 
-	return true
+	logger.Infof("Update action (derived: %v) is not in the allowed list: %v", derived, allowedActions)
+	return false
+}
+
+// issueDerivedActions inspects an issue webhook's `changes` field to derive
+// finer-grained actions for an "update" event (GitLab does not report these
+// as distinct `object_attributes.action` values the way GitHub does).
+func issueDerivedActions(changes map[string]any) []string {
+	if changes == nil {
+		return nil
+	}
+
+	var derived []string
+
+	if listGrew(changes, "labels", "id") {
+		derived = append(derived, "labeled")
+	}
+	if listShrank(changes, "labels", "id") {
+		derived = append(derived, "unlabeled")
+	}
+	if listGrew(changes, "assignees", "id") {
+		derived = append(derived, "assigned")
+	}
+	if listShrank(changes, "assignees", "id") {
+		derived = append(derived, "unassigned")
+	}
+	if changedFromNilToValue(changes, "milestone_id") {
+		derived = append(derived, "milestoned")
+	}
+	if changedFromValueToNil(changes, "milestone_id") {
+		derived = append(derived, "demilestoned")
+	}
+	if changedBoolTo(changes, "discussion_locked", true) {
+		derived = append(derived, "locked")
+	}
+	if changedBoolTo(changes, "discussion_locked", false) {
+		derived = append(derived, "unlocked")
+	}
+	if changedField(changes, "title") || changedField(changes, "description") {
+		derived = append(derived, "edited")
+	}
+
+	return derived
 }
 
 func (i *OnIssue) hasWhitelistedLabel(logger *log.Entry, data map[string]any, allowedLabels []configuration.Predicate) bool {
