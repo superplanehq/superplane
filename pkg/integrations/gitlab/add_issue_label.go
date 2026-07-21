@@ -98,10 +98,11 @@ func (c *AddIssueLabel) Configuration() []configuration.Field {
 			Description: "The internal ID (IID) of the issue to add labels to",
 		},
 		{
-			Name:     "labels",
-			Label:    "Labels",
-			Type:     configuration.FieldTypeList,
-			Required: true,
+			Name:        "labels",
+			Label:       "Labels",
+			Type:        configuration.FieldTypeList,
+			Required:    true,
+			Description: "Labels to add to the issue's existing labels",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",

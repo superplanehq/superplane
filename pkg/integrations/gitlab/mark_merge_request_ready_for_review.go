@@ -16,10 +16,7 @@ import (
 //go:embed example_output_mark_merge_request_ready_for_review.json
 var exampleOutputMarkMergeRequestReadyForReview []byte
 
-// readyQuickAction is the GitLab quick action that clears a merge request's
-// draft status. There is no dedicated field for this on the Update MR REST
-// endpoint, so it is applied the same way the GitLab UI does it: as a note.
-// See https://docs.gitlab.com/user/project/quick_actions/
+// readyQuickAction is the GitLab quick action that clears a merge request's draft status.
 const readyQuickAction = "/ready"
 
 type MarkMergeRequestReadyForReview struct{}
@@ -173,6 +170,10 @@ func (c *MarkMergeRequestReadyForReview) Execute(ctx core.ExecutionContext) erro
 		mergeRequest, err = client.GetMergeRequest(context.Background(), config.Project, config.MergeRequestIID)
 		if err != nil {
 			return fmt.Errorf("failed to get merge request: %w", err)
+		}
+
+		if mergeRequest.Draft {
+			return errors.New("merge request is still marked as draft after applying the /ready quick action")
 		}
 	}
 

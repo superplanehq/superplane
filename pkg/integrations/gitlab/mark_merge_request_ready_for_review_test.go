@@ -217,6 +217,28 @@ func Test__MarkMergeRequestReadyForReview__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to get merge request")
 	})
 
+	t.Run("fails when the merge request is still draft after the ready quick action", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				draftMergeRequestResponse(),
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"wip_event":"ready"},"summary":["Marked this merge request as ready."]}`),
+				draftMergeRequestResponse(),
+			},
+		}
+
+		err := c.Execute(core.ExecutionContext{
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"project":         "123",
+				"mergeRequestIid": "42",
+			},
+		})
+
+		require.ErrorContains(t, err, "still marked as draft")
+	})
+
 	t.Run("fails when the ready quick action cannot be applied", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
