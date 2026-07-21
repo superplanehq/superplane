@@ -71,6 +71,9 @@ func UpdateAPIKey(ctx context.Context, req *pb.UpdateAPIKeyRequest) (*pb.UpdateA
 	user.UpdatedAt = time.Now()
 	err = db.Save(user).Error
 	if err != nil {
+		if conflict := mapAPIKeyNameConflict(user.Name, err); conflict != err {
+			return nil, conflict
+		}
 		return nil, grpcerrors.Internal(err, "failed to update API key")
 	}
 

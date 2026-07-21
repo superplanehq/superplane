@@ -104,6 +104,9 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	})
 
 	if err != nil {
+		if conflict := mapAPIKeyNameConflict(name, err); conflict != err {
+			return nil, conflict
+		}
 		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 

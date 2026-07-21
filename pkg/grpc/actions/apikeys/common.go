@@ -1,17 +1,34 @@
 package apikeys
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
+
+// mapAPIKeyNameConflict translates a duplicate-name unique-constraint violation
+// into a client-visible AlreadyExists error, leaving any other error untouched.
+// It accepts both the typed sentinel and a raw driver error (e.g. from a direct
+// db.Save that has not passed through the model classifier).
+func mapAPIKeyNameConflict(name string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(models.MapAPIKeyNameUniqueConstraintError(err), models.ErrAPIKeyNameAlreadyExists) {
+		return grpcerrors.AlreadyExists(err, fmt.Sprintf("an API key with the name %q already exists in this organization", name))
+	}
+
+	return err
+}
 
 func serializeAPIKey(apiKey *models.User, creator *models.User) *pb.APIKey {
 	out := &pb.APIKey{
