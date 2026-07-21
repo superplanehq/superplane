@@ -96,8 +96,9 @@ type Config struct {
 	HotInstanceCount int
 	// Headroom > 0 enables dynamic scaling: want = queued + claimed + Headroom each tick.
 	Headroom int
-	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK in runner user-data;
-	// fleet-manager then terminates the EC2 instance after one task.
+	// RunnerTerminateAfterEachTask: one-shot mode — runner exits after one task, user-data
+	// poweroffs the host, and InstanceInitiatedShutdownBehavior=terminate turns that into
+	// EC2 termination. Health sweep is the backstop if the runner never starts.
 	RunnerTerminateAfterEachTask bool
 	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in runner user-data (optional).
 	RunnerCloudWatchLogGroup string
@@ -291,6 +292,9 @@ func (l *Launcher) runInstancesInput(count int32, encodedUserData, subnetID stri
 	}
 	if l.Config.RunnersIAMProfName != "" {
 		in.IamInstanceProfile = &types.IamInstanceProfileSpecification{Name: aws.String(l.Config.RunnersIAMProfName)}
+	}
+	if l.Config.RunnerTerminateAfterEachTask {
+		in.InstanceInitiatedShutdownBehavior = types.ShutdownBehaviorTerminate
 	}
 	return in
 }

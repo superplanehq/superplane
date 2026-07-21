@@ -170,6 +170,50 @@ func TestRunInstancesInputTagsRunnerArchitecture(t *testing.T) {
 	t.Fatal("missing runner architecture tag")
 }
 
+func TestRunInstancesInputShutdownBehavior(t *testing.T) {
+	cfg := Config{
+		AMI:              "ami-1234567890abcdef0",
+		InstanceType:     "t3.micro",
+		SubnetIDs:        []string{"subnet-1234567890abcdef0"},
+		SecurityGroupIDs: []string{"sg-1234567890abcdef0"},
+	}
+	oneShot := cfg
+	oneShot.RunnerTerminateAfterEachTask = true
+	if got := (&Launcher{Config: oneShot}).runInstancesInput(1, "ud", cfg.SubnetIDs[0]).InstanceInitiatedShutdownBehavior; got != types.ShutdownBehaviorTerminate {
+		t.Fatalf("one-shot: got %q want terminate", got)
+	}
+	if got := (&Launcher{Config: cfg}).runInstancesInput(1, "ud", cfg.SubnetIDs[0]).InstanceInitiatedShutdownBehavior; got != "" {
+		t.Fatalf("persistent: got %q want empty", got)
+	}
+}
+
+func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
+	base := Config{
+		RunnerS3URI:            "s3://bucket/runner-linux-amd64",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}
+	oneShot := base
+	oneShot.RunnerTerminateAfterEachTask = true
+	script, err := userDataScript(oneShot, 1700000000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"self-terminate.conf", "poweroff", "amazon-cloudwatch-agent"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("one-shot user-data missing %q", want)
+		}
+	}
+	script, err = userDataScript(base, 1700000000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(script, "poweroff") {
+		t.Fatal("persistent user-data should not poweroff")
+	}
+}
+
 func TestConfigFromEnvUsesFleetID(t *testing.T) {
 	setRequiredProvisionEnv(t)
 	t.Setenv(envFleetID, "my-amd64-fleet")
