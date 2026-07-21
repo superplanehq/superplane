@@ -11,6 +11,12 @@ image:
 workers:
   replicas: 1
   dbPoolSize: 5
+  # Embed the runner task broker in the workers process (shared DB, port 8081).
+  taskBroker:
+    enabled: false
+    listenAddr: ":8081"
+    authToken: ""
+    baseURL: ""
   resources:
     limits:
       cpu: 100m
