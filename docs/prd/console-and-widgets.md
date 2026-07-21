@@ -126,7 +126,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?`, inline presentation fields |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `board` | Render rows as kanban lanes grouped by a scalar field | `title?`, `dataSource`, `render.kind: "board"` |
@@ -966,6 +966,9 @@ Per-entry fields:
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
 | `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
 | `formMode` | How the parameter form is presented. `"modal"` (default) opens `NodeRunConfirmDialog` on Run; `"inline"` renders `StartRunParameterFields` plus a submit button directly in the panel body — prompt-submission style. Only honored when the entry resolves to a manual-run Start trigger whose selected template exposes at least one `parameters[]` entry; otherwise the entry falls back to the modal path. `promptConfirmation` is ignored while inline mode is active — the form itself is the confirmation. |
+| `showNodeLabel` | Inline presentation only. Set `false` to remove the resolved node name / entry `label` above the form. Defaults to `true`. |
+| `showFieldLabels` | Inline presentation only. Set `false` to visually hide parameter labels for a compact prompt form. Labels remain associated with inputs for assistive technology; configure useful trigger parameter placeholders when using this mode. Defaults to `true`. |
+| `submitLabel` | Inline presentation only. Optional submit-button copy; blank / omitted falls back to `"Run"`. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
 
@@ -978,7 +981,7 @@ Non-inline paths remain the default:
 - Row entries whose resolved template has no `parameters[]` render the Run button and fire immediately (or open the bare "Run X?" confirmation when `promptConfirmation: true`).
 - Row entries pointing at non-manual-run triggers (event triggers such as `github.onPullRequest`) never surface a Run affordance, inline or otherwise.
 
-Inline mode is intended for a single prompt-submission panel per console (agent-oriented workflow start, task submission, one-off backfill, etc.); pair with the `text` parameter type on the Start trigger for multi-line prompt inputs.
+Inline mode is intended for a single prompt-submission panel per console (agent-oriented workflow start, task submission, one-off backfill, etc.); pair with the `text` parameter type on the Start trigger for multi-line prompt inputs. For the least verbose layout, use the standard panel `title`, set `showNodeLabel: false` and `showFieldLabels: false`, configure the parameter placeholder on the Start trigger, and give `submitLabel` domain-specific copy such as `"Create task"`.
 
 ## YAML Import And Export
 

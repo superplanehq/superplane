@@ -48,6 +48,15 @@ export interface NodesPanelNode {
    * falls back to the modal path.
    */
   formMode?: NodesPanelFormMode;
+  /** Show the node/entry heading above an inline form. Defaults to true. */
+  showNodeLabel?: boolean;
+  /**
+   * Show parameter labels above inline inputs. Defaults to true. When false,
+   * labels remain available to assistive technology.
+   */
+  showFieldLabels?: boolean;
+  /** Optional inline submit-button copy. Defaults to "Run". */
+  submitLabel?: string;
 }
 
 export interface NodesPanelContent {
@@ -125,6 +134,9 @@ function validateNodesEntry(raw: unknown, index: number): string | null {
     optionalBooleanError(`${prefix}.showRun`, entry.showRun) ??
     optionalStringError(`${prefix}.triggerName`, entry.triggerName) ??
     optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation) ??
+    optionalBooleanError(`${prefix}.showNodeLabel`, entry.showNodeLabel) ??
+    optionalBooleanError(`${prefix}.showFieldLabels`, entry.showFieldLabels) ??
+    optionalStringError(`${prefix}.submitLabel`, entry.submitLabel) ??
     optionalFormModeError(`${prefix}.formMode`, entry.formMode)
   );
 }

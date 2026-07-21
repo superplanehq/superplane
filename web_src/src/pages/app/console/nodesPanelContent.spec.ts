@@ -23,3 +23,33 @@ describe("validateNodesContent formMode", () => {
     expect(error).toMatch(/formMode/);
   });
 });
+
+describe("validateNodesContent inline presentation", () => {
+  it("accepts concise inline-form presentation overrides", () => {
+    expect(
+      validateNodesContent({
+        nodes: [
+          {
+            node: "start",
+            formMode: "inline",
+            showNodeLabel: false,
+            showFieldLabels: false,
+            submitLabel: "Create task",
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it.each(["showNodeLabel", "showFieldLabels"])("rejects a non-boolean %s", (field) => {
+    expect(validateNodesContent({ nodes: [{ node: "start", [field]: "no" }] })).toMatch(
+      new RegExp(`content\\.nodes\\[0\\]\\.${field}`),
+    );
+  });
+
+  it("rejects a non-string submitLabel", () => {
+    expect(validateNodesContent({ nodes: [{ node: "start", submitLabel: 42 }] })).toMatch(
+      /content\.nodes\[0\]\.submitLabel/,
+    );
+  });
+});

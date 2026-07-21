@@ -1716,6 +1716,61 @@ func TestValidateConsoleContent_AcceptsNodesPanelWithFormMode(t *testing.T) {
 	}
 }
 
+func TestValidateConsoleContent_AcceptsNodesPanelInlinePresentation(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "prompt",
+			Type: ConsolePanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{
+						"node":            "start",
+						"formMode":        ConsoleNodesPanelFormModeInline,
+						"showNodeLabel":   false,
+						"showFieldLabels": false,
+						"submitLabel":     "Create task",
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, ValidateConsoleContent(panels, nil))
+}
+
+func TestValidateConsoleContent_RejectsNodesPanelInlinePresentationWithWrongTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		field    string
+		value    any
+		expected string
+	}{
+		{name: "node label visibility", field: "showNodeLabel", value: "no", expected: "showNodeLabel must be a boolean"},
+		{name: "field label visibility", field: "showFieldLabels", value: "no", expected: "showFieldLabels must be a boolean"},
+		{name: "submit label", field: "submitLabel", value: 42, expected: "submitLabel must be a string"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			panels := []ConsolePanel{
+				{
+					ID:   "prompt",
+					Type: ConsolePanelTypeNodes,
+					Content: map[string]any{
+						"nodes": []any{
+							map[string]any{"node": "start", tt.field: tt.value},
+						},
+					},
+				},
+			}
+
+			err := ValidateConsoleContent(panels, nil)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expected)
+		})
+	}
+}
+
 func TestValidateConsoleContent_RejectsNodesPanelWithUnknownFormMode(t *testing.T) {
 	panels := []ConsolePanel{
 		{

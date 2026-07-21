@@ -22,6 +22,7 @@ interface NodesPanelInlineRunFormProps {
   disabled: boolean;
   disabledTitle?: string;
   submitLabel?: string;
+  showFieldLabels?: boolean;
   testIdPrefix: string;
   /** Shared lock instance from the parent panel. Reused to disable the
    * submit button while an equivalent run is already in flight, matching
@@ -49,6 +50,7 @@ export function NodesPanelInlineRunForm({
   disabled,
   disabledTitle,
   submitLabel,
+  showFieldLabels = true,
   testIdPrefix,
   lock,
   triggerNodeId,
@@ -86,6 +88,7 @@ export function NodesPanelInlineRunForm({
         parameters={parameters}
         parameterValues={parameterValues}
         onParameterValuesChange={setParameterValues}
+        showLabels={showFieldLabels}
       />
       <div className="flex justify-end">
         <LoadingButton
@@ -99,7 +102,7 @@ export function NodesPanelInlineRunForm({
           data-testid={`${testIdPrefix}-inline-submit`}
         >
           <Play className="mr-1 h-3 w-3" />
-          {submitLabel ?? "Run"}
+          {submitLabel?.trim() || "Run"}
         </LoadingButton>
       </div>
     </div>

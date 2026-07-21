@@ -127,9 +127,11 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
 
   return (
     <div className={styles.container}>
-      <div className={styles.header} data-testid="node-panel-name">
-        {displayName}
-      </div>
+      {entry.showNodeLabel !== false ? (
+        <div className={styles.header} data-testid="node-panel-name">
+          {displayName}
+        </div>
+      ) : null}
       {entry.description ? (
         <p className={styles.description} title={entry.description}>
           {entry.description}
@@ -179,9 +181,11 @@ function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTr
   return (
     <li className={styles.row} data-testid="nodes-panel-row">
       <div className={styles.text}>
-        <div className={styles.name} data-testid="nodes-panel-row-name">
-          {displayName}
-        </div>
+        {entry.showNodeLabel !== false ? (
+          <div className={styles.name} data-testid="nodes-panel-row-name">
+            {displayName}
+          </div>
+        ) : null}
         {entry.description ? (
           <p className={styles.description} title={entry.description}>
             {entry.description}
@@ -289,6 +293,8 @@ function NodesPanelRunControl({
         running={running}
         disabled={disabled}
         disabledTitle={disabledTitleFor(disabledReason)}
+        submitLabel={entry.submitLabel}
+        showFieldLabels={entry.showFieldLabels !== false}
         testIdPrefix={testIds.button}
         lock={lock}
         triggerNodeId={resolved?.node?.id}
@@ -380,6 +386,9 @@ function normalizeEntry(raw: unknown): NodesPanelNode | null {
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
     promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
     formMode: normalizeFormMode(obj.formMode),
+    showNodeLabel: typeof obj.showNodeLabel === "boolean" ? obj.showNodeLabel : undefined,
+    showFieldLabels: typeof obj.showFieldLabels === "boolean" ? obj.showFieldLabels : undefined,
+    submitLabel: typeof obj.submitLabel === "string" ? obj.submitLabel : undefined,
   };
 }
 

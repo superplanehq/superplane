@@ -17,10 +17,13 @@ export function StartRunParameterFields({
   parameters,
   parameterValues,
   onParameterValuesChange,
+  showLabels = true,
 }: {
   parameters: StartTemplateParameter[];
   parameterValues: Record<string, string | number | boolean>;
   onParameterValuesChange: React.Dispatch<React.SetStateAction<Record<string, string | number | boolean>>>;
+  /** Visually show labels. Hidden labels remain associated for accessibility. */
+  showLabels?: boolean;
 }) {
   return (
     <div className="min-w-0 space-y-3">
@@ -42,13 +45,15 @@ export function StartRunParameterFields({
                     }))
                   }
                 />
-                <Label htmlFor={id} className="min-w-0 cursor-pointer">
+                <Label htmlFor={id} className={showLabels ? "min-w-0 cursor-pointer" : "sr-only"}>
                   {label}
                 </Label>
               </div>
             ) : param.type === "select" ? (
               <>
-                <Label htmlFor={id}>{label}</Label>
+                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                  {label}
+                </Label>
                 <Select
                   value={String(parameterValues[param.name] ?? "")}
                   onValueChange={(val) =>
@@ -75,7 +80,9 @@ export function StartRunParameterFields({
               </>
             ) : param.type === "text" ? (
               <>
-                <Label htmlFor={id}>{label}</Label>
+                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                  {label}
+                </Label>
                 <Textarea
                   id={id}
                   placeholder={parameterInputPlaceholder(param, label)}
@@ -91,7 +98,9 @@ export function StartRunParameterFields({
               </>
             ) : (
               <>
-                <Label htmlFor={id}>{label}</Label>
+                <Label htmlFor={id} className={showLabels ? undefined : "sr-only"}>
+                  {label}
+                </Label>
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}

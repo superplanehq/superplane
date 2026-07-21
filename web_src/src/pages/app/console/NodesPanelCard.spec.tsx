@@ -415,6 +415,24 @@ describe("NodesPanelCard — inline form mode", () => {
     const submit = screen.getByTestId("node-panel-run-inline-submit");
     expect(submit).toBeDisabled();
   });
+
+  it("supports a concise personalized inline form", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({
+        formMode: "inline",
+        showNodeLabel: false,
+        showFieldLabels: false,
+        submitLabel: "Create task",
+      }),
+    });
+
+    expect(screen.queryByTestId("node-panel-name")).toBeNull();
+    expect(screen.getByLabelText("branch")).toBeInTheDocument();
+    expect(screen.getByText("branch", { selector: "label" })).toHaveClass("sr-only");
+    expect(screen.getByTestId("node-panel-run-inline-submit")).toHaveTextContent("Create task");
+  });
 });
 
 describe("NodesPanelCard — multi-entry layout", () => {

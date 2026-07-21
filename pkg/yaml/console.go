@@ -616,19 +616,17 @@ func validateNodesPanelEntry(panelID string, index int, raw any) error {
 	if strings.TrimSpace(node) == "" {
 		return fmt.Errorf("panel %q content.nodes[%d].node must be a non-empty string", panelID, index)
 	}
-	for _, key := range []string{"label", "description", "triggerName"} {
+	for _, key := range []string{"label", "description", "triggerName", "submitLabel"} {
 		if err := validateOptionalString(panelID, fmt.Sprintf("content.nodes[%d].%s", index, key), entry[key]); err != nil {
 			return err
 		}
 	}
-	if rawShowRun, present := entry["showRun"]; present && rawShowRun != nil {
-		if _, ok := rawShowRun.(bool); !ok {
-			return fmt.Errorf("panel %q content.nodes[%d].showRun must be a boolean", panelID, index)
-		}
-	}
-	if rawPrompt, present := entry["promptConfirmation"]; present && rawPrompt != nil {
-		if _, ok := rawPrompt.(bool); !ok {
-			return fmt.Errorf("panel %q content.nodes[%d].promptConfirmation must be a boolean", panelID, index)
+	for _, key := range []string{"showRun", "promptConfirmation", "showNodeLabel", "showFieldLabels"} {
+		rawValue, present := entry[key]
+		if present && rawValue != nil {
+			if _, ok := rawValue.(bool); !ok {
+				return fmt.Errorf("panel %q content.nodes[%d].%s must be a boolean", panelID, index, key)
+			}
 		}
 	}
 	if rawFormMode, present := entry["formMode"]; present && rawFormMode != nil {

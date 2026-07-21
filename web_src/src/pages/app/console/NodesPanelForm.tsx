@@ -198,27 +198,32 @@ function NodesPanelRunFormOptions({
         />
       </div>
       {canOfferInlineForm ? (
-        <div className="space-y-1.5">
-          <Label htmlFor={formModeId} className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
-            Run form
-          </Label>
-          <Select
-            value={currentFormMode}
-            onValueChange={(v) => onChange({ formMode: v === "inline" ? "inline" : undefined })}
-          >
-            <SelectTrigger id={formModeId} className="h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="modal">Modal (open Run dialog)</SelectItem>
-              <SelectItem value="inline">Inline (render form in widget)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-[11px] text-slate-500 dark:text-gray-400">
-            Inline renders the template's parameter form directly in the widget body — best for prompt-submission style
-            widgets.
-          </p>
-        </div>
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor={formModeId} className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
+              Run form
+            </Label>
+            <Select
+              value={currentFormMode}
+              onValueChange={(v) => onChange({ formMode: v === "inline" ? "inline" : undefined })}
+            >
+              <SelectTrigger id={formModeId} className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="modal">Modal (open Run dialog)</SelectItem>
+                <SelectItem value="inline">Inline (render form in widget)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-500 dark:text-gray-400">
+              Inline renders the template's parameter form directly in the widget body — best for prompt-submission
+              style widgets.
+            </p>
+          </div>
+          {currentFormMode === "inline" ? (
+            <NodesPanelInlinePresentationOptions entry={entry} onChange={onChange} />
+          ) : null}
+        </>
       ) : null}
       {currentFormMode === "modal" ? (
         <div className="flex items-center gap-2">
@@ -234,5 +239,69 @@ function NodesPanelRunFormOptions({
         </div>
       ) : null}
     </>
+  );
+}
+
+function NodesPanelInlinePresentationOptions({
+  entry,
+  onChange,
+}: {
+  entry: NodesPanelNode;
+  onChange: (patch: Partial<NodesPanelNode>) => void;
+}) {
+  const showNodeLabelId = useId();
+  const showFieldLabelsId = useId();
+
+  return (
+    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
+      <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Inline presentation</Label>
+      <InlineVisibilityOption
+        id={showNodeLabelId}
+        label="Show node label above form"
+        checked={entry.showNodeLabel !== false}
+        onCheckedChange={(checked) => onChange({ showNodeLabel: checked ? undefined : false })}
+      />
+      <InlineVisibilityOption
+        id={showFieldLabelsId}
+        label="Show field labels"
+        checked={entry.showFieldLabels !== false}
+        onCheckedChange={(checked) => onChange({ showFieldLabels: checked ? undefined : false })}
+      />
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-slate-600 dark:text-gray-400">Submit label (optional)</Label>
+        <Input
+          value={entry.submitLabel ?? ""}
+          onChange={(e) => onChange({ submitLabel: e.target.value || undefined })}
+          placeholder="Run"
+          className="h-8"
+        />
+      </div>
+    </div>
+  );
+}
+
+function InlineVisibilityOption({
+  id,
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+        className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+      />
+      <Label htmlFor={id} className="text-xs text-slate-700 dark:text-gray-300">
+        {label}
+      </Label>
+    </div>
   );
 }
