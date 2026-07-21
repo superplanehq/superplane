@@ -22,7 +22,8 @@ import {
   type InternalAccordionPreferences,
   type StatusPill,
 } from "./RunInspectorTimelineTypes";
-import { hasObjectValue, type RunInspectorNodeSection, type RunInspectorUpstreamSection } from "./runNodeDetailModel";
+import { hasObjectValue } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection, RunInspectorUpstreamSection } from "./types";
 
 const INPUT_TRIGGERED_STATUS: StatusPill = {
   dotClassName: "bg-violet-400",

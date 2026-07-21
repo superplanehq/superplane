@@ -6,7 +6,7 @@ interface GroupFieldRendererProps {
   field: ConfigurationField;
   value: string;
   onChange: (value: string | undefined) => void;
-  domainId: string;
+  organizationId: string;
   allValues?: Record<string, unknown>;
   readOnly?: boolean;
 }
@@ -14,12 +14,12 @@ interface GroupFieldRendererProps {
 export const GroupFieldRenderer = ({
   value,
   onChange,
-  domainId,
+  organizationId,
   allValues,
   readOnly = false,
 }: GroupFieldRendererProps) => {
   // Fetch groups from the organization
-  const { data: groups, isLoading, error } = useOrganizationGroups(domainId);
+  const { data: groups, isLoading, error } = useOrganizationGroups(organizationId);
   const approvalContext = getApprovalListContext(allValues);
   const usedGroups = new Set<string>();
 
@@ -31,10 +31,6 @@ export const GroupFieldRenderer = ({
         usedGroups.add(record.group);
       }
     });
-  }
-
-  if (!domainId || domainId.trim() === "") {
-    return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>;
   }
 
   if (error) {

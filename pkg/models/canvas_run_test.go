@@ -14,7 +14,59 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__FindOpenCanvasRunWorkInTransaction__PendingOutputEvent(t *testing.T) {
+func Test__CanvasRun__DeleteChain__DeletesAllData(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+
+	childEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "node-1", "default", &execution.ID)
+	require.NoError(t, database.Conn().Model(childEvent).Update("state", models.CanvasEventStateRouted).Error)
+
+	queueItem := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
+	queueItem.RunID = run.ID
+	require.NoError(t, database.Conn().Save(queueItem).Error)
+
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(database.Conn(), run.WorkflowID, "node-1", execution.ID, "test-key", "test-value"))
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  run.WorkflowID,
+		NodeID:      "node-1",
+		ExecutionID: &execution.ID,
+		State:       models.NodeExecutionRequestStateCompleted,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{ActionName: "test", Parameters: map[string]any{}},
+		}),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	var summary *models.RunDeletionSummary
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		summary, err = run.DeleteChain(tx)
+		return err
+	}))
+
+	require.Equal(t, &models.RunDeletionSummary{
+		Runs:             1,
+		Events:           2,
+		NodeExecutions:   1,
+		NodeRequests:     1,
+		NodeExecutionKVs: 1,
+		NodeQueueItems:   1,
+	}, summary)
+
+	var runCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	require.Equal(t, int64(0), runCount)
+
+	support.VerifyCanvasEventsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionsCount(t, run.WorkflowID, 0)
+	support.VerifyNodeQueueCount(t, run.WorkflowID, 0)
+	support.VerifyNodeExecutionKVCount(t, run.WorkflowID, 0)
+	support.VerifyNodeRequestCount(t, run.WorkflowID, 0)
+}
+
+func Test__CanvasRun__FindOpenWork__PendingOutputEvent(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 
 	_, err := execution.Pass(map[string][]any{
@@ -22,7 +74,8 @@ func Test__FindOpenCanvasRunWorkInTransaction__PendingOutputEvent(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	openWork := findOpenCanvasRunWork(t, run.ID)
+	openWork, err := run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.True(t, openWork.HasPendingEvents)
 	assert.False(t, openWork.HasActiveExecutions)
 	assert.False(t, openWork.HasQueueItems)
@@ -35,13 +88,14 @@ func Test__FindOpenCanvasRunWorkInTransaction__PendingOutputEvent(t *testing.T) 
 	assert.Equal(t, run.ID, outputEvent.RunID)
 
 	require.NoError(t, outputEvent.Routed())
-	openWork = findOpenCanvasRunWork(t, run.ID)
+	openWork, err = run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.False(t, openWork.HasPendingEvents)
 	assert.False(t, openWork.HasActiveExecutions)
 	assert.False(t, openWork.HasQueueItems)
 }
 
-func Test__FindOpenCanvasRunWorkInTransaction__QueueItem(t *testing.T) {
+func Test__CanvasRun__FindOpenWork__QueueItem(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -53,19 +107,21 @@ func Test__FindOpenCanvasRunWorkInTransaction__QueueItem(t *testing.T) {
 	queueItem.RunID = run.ID
 	require.NoError(t, database.Conn().Save(queueItem).Error)
 
-	openWork := findOpenCanvasRunWork(t, run.ID)
+	openWork, err := run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.True(t, openWork.HasQueueItems)
 	assert.False(t, openWork.HasActiveExecutions)
 	assert.False(t, openWork.HasPendingEvents)
 
 	require.NoError(t, queueItem.Delete(database.Conn()))
-	openWork = findOpenCanvasRunWork(t, run.ID)
+	openWork, err = run.FindOpenWork(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.False(t, openWork.HasQueueItems)
 	assert.False(t, openWork.HasActiveExecutions)
 	assert.False(t, openWork.HasPendingEvents)
 }
 
-func Test__FindOpenCanvasRunWorkInTransaction__ActiveExecution(t *testing.T) {
+func Test__CanvasRun__FindOpenWork__ActiveExecution(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 
 	for _, state := range []string{
@@ -77,14 +133,15 @@ func Test__FindOpenCanvasRunWorkInTransaction__ActiveExecution(t *testing.T) {
 			"updated_at": time.Now(),
 		}).Error)
 
-		openWork := findOpenCanvasRunWork(t, run.ID)
+		openWork, err := run.FindOpenWork(database.DB(t.Context()))
+		require.NoError(t, err)
 		assert.True(t, openWork.HasActiveExecutions, "expected active execution for state %s", state)
 		assert.False(t, openWork.HasQueueItems)
 		assert.False(t, openWork.HasPendingEvents)
 	}
 }
 
-func Test__CalculateCanvasRunResultInTransaction__FailedTakesPrecedenceOverCancelled(t *testing.T) {
+func Test__CanvasRun__CalculateResult__FailedTakesPrecedenceOverCancelled(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -99,11 +156,12 @@ func Test__CalculateCanvasRunResultInTransaction__FailedTakesPrecedenceOverCance
 		"updated_at": time.Now(),
 	}).Error)
 
-	result := calculateCanvasRunResult(t, run.ID)
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultFailed, result)
 }
 
-func Test__CalculateCanvasRunResultInTransaction__Cancelled(t *testing.T) {
+func Test__CanvasRun__CalculateResult__Cancelled(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -111,11 +169,12 @@ func Test__CalculateCanvasRunResultInTransaction__Cancelled(t *testing.T) {
 		"updated_at": time.Now(),
 	}).Error)
 
-	result := calculateCanvasRunResult(t, run.ID)
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
 
-func Test__CalculateCanvasRunResultInTransaction__Passed(t *testing.T) {
+func Test__CanvasRun__CalculateResult__Passed(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -123,7 +182,8 @@ func Test__CalculateCanvasRunResultInTransaction__Passed(t *testing.T) {
 		"updated_at": time.Now(),
 	}).Error)
 
-	result := calculateCanvasRunResult(t, run.ID)
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultPassed, result)
 }
 
@@ -171,6 +231,7 @@ func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string
 	run := models.CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: workflowID,
+		NodeID:     "trigger",
 		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
@@ -216,6 +277,7 @@ func createRunForRootEvent(t *testing.T, rootEvent *models.CanvasEvent) *models.
 		return rootEvent.RoutedInTransaction(tx)
 	}))
 
+	require.Equal(t, "trigger", run.NodeID)
 	return run
 }
 
@@ -237,14 +299,186 @@ func createExecutionForRun(t *testing.T, run *models.CanvasRun, rootEventID uuid
 	return &execution
 }
 
-func findOpenCanvasRunWork(t *testing.T, runID uuid.UUID) *models.OpenCanvasRunWork {
-	openWork, err := models.FindOpenCanvasRunWorkInTransaction(database.Conn(), runID)
-	require.NoError(t, err)
-	return openWork
+func subRunTestCanvasNodes(entrypoints ...string) []models.CanvasNode {
+	nodes := []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger},
+	}
+	for _, nodeID := range entrypoints {
+		nodes = append(nodes, models.CanvasNode{
+			NodeID: nodeID,
+			Type:   models.NodeTypeComponent,
+		})
+	}
+	return nodes
 }
 
-func calculateCanvasRunResult(t *testing.T, runID uuid.UUID) string {
-	result, err := models.CalculateCanvasRunResultInTransaction(database.Conn(), runID)
+func Test__ValidateSubRunCreationInTransaction__SameWorkflowDoesNotIncreaseCrossWorkflowDepth(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("run1", "run2"),
+		nil,
+	)
+
+	parentRun := createSubRun(t, canvas.ID, "run1", nil, nil, nil)
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"run2",
+		8,
+	)
 	require.NoError(t, err)
-	return result
+}
+
+func Test__ValidateSubRunCreationInTransaction__CrossWorkflowDepthAcrossApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runA"),
+		nil,
+	)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runB"),
+		nil,
+	)
+	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runC"),
+		nil,
+	)
+
+	runA := createSubRun(t, canvasA.ID, "runA", nil, nil, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		uuid.New(),
+		"runD",
+		8,
+	)
+	require.NoError(t, err)
+
+	err = models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		uuid.New(),
+		"runD",
+		2,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunCrossWorkflowDepthExceeded)
+}
+
+func Test__ValidateSubRunCreationInTransaction__WorkflowCycleAcrossApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runA"),
+		nil,
+	)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runB"),
+		nil,
+	)
+	canvasC, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("runC"),
+		nil,
+	)
+
+	runA := createSubRun(t, canvasA.ID, "", nil, nil, nil)
+	runB := createSubRun(t, canvasB.ID, "runB", &runA.ID, &canvasA.ID, nil)
+	runC := createSubRun(t, canvasC.ID, "runC", &runB.ID, &canvasB.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		runC.ID,
+		canvasA.ID,
+		"runA",
+		8,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunWorkflowCycle)
+}
+
+func Test__ValidateSubRunCreationInTransaction__EntrypointCycleWithinWorkflow(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("run1", "run2"),
+		nil,
+	)
+
+	rootRun := createSubRun(t, canvas.ID, "", nil, nil, nil)
+	run2InChain := createSubRun(t, canvas.ID, "run2", &rootRun.ID, &canvas.ID, nil)
+	parentRun := createSubRun(t, canvas.ID, "run1", &run2InChain.ID, &canvas.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"run2",
+		8,
+	)
+	require.ErrorIs(t, err, models.ErrSubRunEntrypointCycle)
+}
+
+func Test__ValidateSubRunCreationInTransaction__SiblingSubRunsAllowRepeatedEntrypoint(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		subRunTestCanvasNodes("forEach", "item"),
+		nil,
+	)
+
+	parentRun := createSubRun(t, canvas.ID, "forEach", nil, nil, nil)
+	createSubRun(t, canvas.ID, "item", &parentRun.ID, &canvas.ID, nil)
+
+	err := models.ValidateSubRunCreation(
+		database.Conn(),
+		parentRun.ID,
+		canvas.ID,
+		"item",
+		8,
+	)
+	require.NoError(t, err)
+}
+
+func createSubRun(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	parentRunID *uuid.UUID,
+	parentWorkflowID *uuid.UUID,
+	parentExecutionID *uuid.UUID,
+) *models.CanvasRun {
+	t.Helper()
+
+	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+	require.NoError(t, err)
+
+	effectiveNodeID := nodeID
+	if effectiveNodeID == "" {
+		effectiveNodeID = "trigger"
+	}
+
+	run := models.CanvasRun{
+		ID:                uuid.New(),
+		WorkflowID:        workflowID,
+		NodeID:            effectiveNodeID,
+		VersionID:         liveVersion.ID,
+		ParentRunID:       parentRunID,
+		ParentWorkflowID:  parentWorkflowID,
+		ParentExecutionID: parentExecutionID,
+		State:             models.CanvasRunStatePending,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return &run
 }

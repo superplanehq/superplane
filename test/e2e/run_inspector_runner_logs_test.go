@@ -143,6 +143,7 @@ func (s *runInspectorRunnerLogsSteps) givenAFinishedRunnerRun(taskID string) {
 	run := &models.CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: s.canvas.WorkflowID,
+		NodeID:     runnerLogsStartNodeID,
 		VersionID:  liveVersion.ID,
 		State:      models.CanvasRunStateFinished,
 		Result:     models.CanvasRunResultPassed,

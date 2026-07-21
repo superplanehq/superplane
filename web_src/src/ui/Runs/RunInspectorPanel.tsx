@@ -17,15 +17,10 @@ import { RunInspectorHeader } from "./RunInspectorHeader";
 import { ResizeHandle } from "./RunInspectorResize";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
 import { buildNodeMap, buildRunPresentation, type RUN_STATUS_META } from "./runPresentation";
-import {
-  buildRunInspectorNodeSections,
-  findRunInspectorErrorSummaries,
-  type RunInspectorCurrentUser,
-  type RunInspectorErrorSummary,
-  type RunInspectorNodeSection,
-} from "./runNodeDetailModel";
+import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 import { useRunInspectorActions } from "./useRunInspectorActions";
+import { buildRunInspectorNodeSections, findRunInspectorErrorSummaries } from "./runNodeDetailModel";
 
 export interface RunInspectorPanelProps {
   canvasId: string;
@@ -92,9 +87,21 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         run={run}
         title={model.presentation.title}
         stepCount={model.sections.length || run.executions?.length || 0}
-        onAction={() => (model.presentation.status === "running" ? model.actions.stop() : model.actions.rerun())}
-        actionPending={model.presentation.status === "running" ? model.actions.stopPending : model.actions.rerunPending}
-        actionDisabled={model.presentation.status === "running" ? model.actions.stopDisabled : !run.rootEvent?.id}
+        onAction={() =>
+          model.presentation.status === "running" || model.presentation.status === "cancelling"
+            ? model.actions.stop()
+            : model.actions.rerun()
+        }
+        actionPending={
+          model.presentation.status === "running" || model.presentation.status === "cancelling"
+            ? model.actions.stopPending
+            : model.actions.rerunPending
+        }
+        actionDisabled={
+          model.presentation.status === "running" || model.presentation.status === "cancelling"
+            ? model.actions.stopDisabled
+            : !run.rootEvent?.id
+        }
       />
 
       <RunInspectorContent

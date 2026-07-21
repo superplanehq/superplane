@@ -6,7 +6,11 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type {
+  SuperplaneComponentsNode as ComponentsNode,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasRunRef,
+} from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -260,10 +264,12 @@ import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
+import { runAppMapper, RUN_APP_STATE_REGISTRY } from "./runApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
+import { onRunTriggerRenderer } from "./messages/on_run";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
@@ -276,6 +282,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   webhook: webhookTriggerRenderer,
   start: startTriggerRenderer,
   onBroadcast: onBroadcastTriggerRenderer,
+  onRun: onRunTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -295,12 +302,14 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runnerJS: runnerMapper,
   runnerBash: runnerMapper,
   runnerPython: runnerMapper,
+  runnerClaudeCode: runnerMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   forEach: forEachMapper,
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
+  runApp: runAppMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -456,6 +465,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   runnerJS: RUNNER_STATE_REGISTRY,
   runnerBash: RUNNER_STATE_REGISTRY,
   runnerPython: RUNNER_STATE_REGISTRY,
+  runnerClaudeCode: RUNNER_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   forEach: FOR_EACH_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
@@ -463,6 +473,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
+  runApp: RUN_APP_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
@@ -590,6 +601,7 @@ export function getExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
+  childRuns?: CanvasesCanvasRunRef[],
 ): Record<string, unknown> | undefined {
   const mapper = findRegisteredComponentMapper(componentName);
   if (!mapper) {
@@ -597,7 +609,7 @@ export function getExecutionDetails(
   }
 
   return createSafeComponentMapper(mapper, componentName).getExecutionDetails({
-    execution: buildExecutionInfo(execution),
+    execution: buildExecutionInfo(execution, { runs: childRuns }),
     node: buildNodeInfo(node),
     nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
   });

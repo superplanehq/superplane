@@ -672,7 +672,16 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid,
+    node_id character varying(128),
+    parent_run_id uuid,
+    parent_workflow_id uuid,
+    parent_execution_id uuid,
+    callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    input jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result_message text
 );
 
 
@@ -1558,6 +1567,13 @@ CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_
 
 
 --
+-- Name: idx_workflow_node_requests_completed_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_completed_updated_at ON public.workflow_node_requests USING btree (updated_at) WHERE ((state)::text = 'completed'::text);
+
+
+--
 -- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1579,6 +1595,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_cancelling; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1590,6 +1613,13 @@ CREATE INDEX idx_workflow_runs_version_id ON public.workflow_runs USING btree (v
 --
 
 CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING btree (workflow_id, created_at DESC);
+
+
+--
+-- Name: idx_workflow_runs_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_node_id ON public.workflow_runs USING btree (workflow_id, node_id);
 
 
 --
@@ -1854,6 +1884,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
+-- Name: workflow_runs fk_workflow_runs_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT fk_workflow_runs_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2094,6 +2132,38 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.users(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_execution_id_fkey FOREIGN KEY (parent_execution_id) REFERENCES public.workflow_node_executions(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.workflow_runs(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_parent_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_workflow_id_fkey FOREIGN KEY (parent_workflow_id) REFERENCES public.workflows(id);
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2205,7 +2275,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260716230544	f
+20260720144835	f
 \.
 
 

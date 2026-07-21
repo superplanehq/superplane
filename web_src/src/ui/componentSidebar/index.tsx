@@ -15,7 +15,6 @@ import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import type {
-  AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
@@ -141,7 +140,6 @@ interface ComponentSidebarProps {
   ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
-  domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
@@ -202,7 +200,6 @@ export const ComponentSidebar = ({
   onNodeConfigSave,
   onNodeConfigCancel,
   domainId,
-  domainType,
   customField,
   integrationName,
   integrationRef,
@@ -718,7 +715,6 @@ export const ComponentSidebar = ({
                     onSave={onNodeConfigSave || (() => {})}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
-                    domainType={domainType}
                     customField={customField}
                     integrationName={integrationName}
                     integrationRef={integrationRef}
