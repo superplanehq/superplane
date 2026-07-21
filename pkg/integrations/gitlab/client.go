@@ -289,12 +289,15 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 	}
 	defer resp.Body.Close()
 
-	//
-	// A note whose body is only quick actions (e.g. "/close") has no visible
-	// comment content, so GitLab returns 202 instead of 201, with a summary
-	// of the applied commands instead of a Note body.
-	//
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
+
+	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
@@ -596,6 +599,13 @@ type Note struct {
 	NoteableType string `json:"noteable_type,omitempty"`
 }
 
+// quickActionNoteResponse is what GitLab returns instead of a Note when a
+// note's body is only quick actions (e.g. "/ready") and has no visible
+// comment content: status 202 with a summary of the applied commands.
+type quickActionNoteResponse struct {
+	Summary []string `json:"summary"`
+}
+
 type CreateNoteRequest struct {
 	Body string `json:"body"`
 }
@@ -620,13 +630,15 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 	}
 	defer resp.Body.Close()
 
-	//
-	// A note whose body is only quick actions (e.g. "/ready") has no visible
-	// comment content, so GitLab returns 202 instead of 201, with a summary
-	// of the applied commands instead of a Note body. This is the response
-	// markMergeRequestReadyForReview gets when it posts "/ready".
-	//
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
+
+	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 

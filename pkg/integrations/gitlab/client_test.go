@@ -1329,8 +1329,10 @@ func Test__Client__CreateIssueNote(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		_, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/close"})
+		result, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/close"})
 		require.NoError(t, err)
+		assert.Equal(t, "Closed this issue.", result.Body)
+		assert.Equal(t, 0, result.ID)
 	})
 }
 
@@ -1376,8 +1378,10 @@ func Test__Client__CreateMergeRequestNote(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		_, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/ready"})
+		result, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/ready"})
 		require.NoError(t, err)
+		assert.Equal(t, "Marked this merge request as ready.", result.Body)
+		assert.Equal(t, 0, result.ID)
 	})
 
 	t.Run("failure", func(t *testing.T) {
