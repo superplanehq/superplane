@@ -72,7 +72,7 @@ const SETUP_STEPS = [
   {
     railLabel: "Preview",
     title: "Preview",
-    detail: "Confirm your setup before creating the Software Factory.",
+    detail: "Confirm the factory setup",
   },
 ] as const;
 
@@ -1380,7 +1380,6 @@ function PreviewStepContent({
     id: string;
     title: string;
     detail: string;
-    accent: string;
     icon: ReactNode;
   }[] = [
     {
@@ -1389,7 +1388,6 @@ function PreviewStepContent({
       detail: planning
         ? `${labelForOption(modelOptions, planning.modelId)} · ${shortMachineLabel(planning.machineType)}`
         : "Create an implementation plan",
-      accent: "from-sky-500/15 to-transparent",
       icon: <ListTodo className="h-4 w-4" aria-hidden />,
     },
     {
@@ -1398,7 +1396,6 @@ function PreviewStepContent({
       detail: implementation
         ? `${labelForOption(modelOptions, implementation.modelId)} · ${implementation.steps.length} steps · opens ${prNoun}`
         : `Codes and opens a ${prNoun}`,
-      accent: "from-slate-500/20 to-transparent",
       icon: <Terminal className="h-4 w-4" aria-hidden />,
     },
     {
@@ -1407,7 +1404,6 @@ function PreviewStepContent({
       detail: prLoop
         ? `${labelForOption(modelOptions, prLoop.modelId)} · max ${prLoop.maxRetries ?? DEFAULT_PR_LOOP_MAX_RETRIES} retries`
         : "Addresses checks and comments",
-      accent: "from-orange-500/20 to-transparent",
       icon: <RefreshCw className="h-4 w-4" aria-hidden />,
     },
   ];
@@ -1442,15 +1438,19 @@ function PreviewStepContent({
                   key={trigger.id}
                   className="rounded-lg bg-white/90 px-3 py-3 shadow-sm outline outline-slate-950/10 backdrop-blur-sm dark:bg-gray-900/90 dark:outline-gray-700/70"
                 >
-                  <div className="flex items-center gap-2">
-                    {trigger.integrationName ? (
-                      <IntegrationIcon integrationName={trigger.integrationName} className="h-4 w-4" size={16} />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 text-slate-500" aria-hidden />
-                    )}
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{trigger.title}</p>
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-gray-100 dark:text-slate-900">
+                      {trigger.integrationName ? (
+                        <IntegrationIcon integrationName={trigger.integrationName} className="h-4 w-4" size={16} />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" aria-hidden />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{trigger.title}</p>
+                      <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{trigger.detail}</p>
+                    </div>
                   </div>
-                  <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{trigger.detail}</p>
                 </div>
               ))}
             </div>
@@ -1463,16 +1463,8 @@ function PreviewStepContent({
           {stages.map((stage, index) => (
             <div key={stage.id}>
               {index > 0 ? <WorkflowConnector /> : null}
-              <div
-                className={cn(
-                  "relative overflow-hidden rounded-lg bg-white shadow-sm outline outline-slate-950/10",
-                  "dark:bg-gray-900 dark:outline-gray-700/70",
-                )}
-              >
-                <div
-                  className={cn("pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b", stage.accent)}
-                />
-                <div className="flex items-start gap-3 px-4 py-3.5 pl-4">
+              <div className="relative overflow-hidden rounded-lg bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
+                <div className="flex items-start gap-3 px-4 py-3.5">
                   <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-gray-100 dark:text-slate-900">
                     {stage.icon}
                   </span>
@@ -1792,9 +1784,8 @@ function RequiredIntegrationsPanel({
       className={cn(
         "rounded-lg p-4 outline transition-[outline-color]",
         sticky && "sticky top-8",
-        emphasize
-          ? "bg-[linear-gradient(to_bottom,var(--color-orange-100)_0%,white_60px)] outline-orange-500 dark:bg-[linear-gradient(to_bottom,rgb(255_237_213_/_0.2)_0%,var(--color-gray-900)_60px)]"
-          : "bg-white outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/60",
+        emphasize ? "outline-orange-500" : "outline-slate-950/10 dark:outline-gray-700/60",
+        "bg-white dark:bg-gray-900",
       )}
     >
       {emphasize ? (

@@ -285,7 +285,7 @@ describe("FreshOrgLanding story smoke", () => {
     await advanceFromTriggersToFinalStep(user);
 
     expect(
-      screen.getByRole("heading", { name: /Confirm your setup before creating the Software Factory/i }),
+      screen.getByRole("heading", { name: /Confirm the factory setup/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("GitHub Issues")).toBeInTheDocument();
     expect(screen.getByText(/Assign @superplane on the GitHub issue/i)).toBeInTheDocument();
@@ -315,7 +315,7 @@ describe("FreshOrgLanding story smoke", () => {
 
     await user.click(doneButton);
     expect(await screen.findByText("Software Factory", {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.queryByText(/Confirm your setup before creating the Software Factory/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Confirm the factory setup/i)).not.toBeInTheDocument();
   });
 
   it("lets users edit component settings and agent steps", async () => {
