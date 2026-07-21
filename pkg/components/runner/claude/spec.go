@@ -30,13 +30,13 @@ type ClaudeCodeStep struct {
 
 // RunClaudeCodeSpec is persisted runnerClaudeCode node configuration.
 type RunClaudeCodeSpec struct {
-	MachineType             string                       `mapstructure:"machine_type"`
+	MachineType             string                       `mapstructure:"machineType"`
 	Steps                   []ClaudeCodeStep             `mapstructure:"steps"`
 	AnthropicAPIKey         configuration.SecretKeyRef   `mapstructure:"anthropicApiKey"`
 	Model                   string                       `mapstructure:"model"`
 	WorkingDirectory        string                       `mapstructure:"workingDirectory"`
 	Environment             []runner.EnvironmentVariable `mapstructure:"environment"`
-	ExecutionTimeoutSeconds int                          `mapstructure:"execution_timeout_seconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
+	ExecutionTimeoutSeconds int                          `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
 
 	// Legacy fields — migrated into Steps when Steps is empty.
 	Prompt              string `mapstructure:"prompt"`

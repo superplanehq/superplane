@@ -20,7 +20,7 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
-		"machine_type": testRunnerMachineType,
+		"machineType": testRunnerMachineType,
 		"steps": []map[string]any{
 			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
 		},
@@ -40,7 +40,7 @@ func TestDecodeRunClaudeCodeSpecMigratesLegacyFields(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
-		"machine_type":          testRunnerMachineType,
+		"machineType":           testRunnerMachineType,
 		"prompt":                "implement the issue",
 		"enable_setup_commands": true,
 		"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",

@@ -43,7 +43,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"machine_type": testRunnerMachineType,
+			"machineType": testRunnerMachineType,
 			"model":        "sonnet",
 			"steps": []map[string]any{
 				{"name": "Clone", "type": "bash", "command": "git clone https://github.com/acme/widgets.git /tmp/repo"},
@@ -124,7 +124,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"machine_type":          testRunnerMachineType,
+			"machineType":           testRunnerMachineType,
 			"prompt":                "implement the issue",
 			"enable_setup_commands": true,
 			"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",
@@ -176,7 +176,7 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"machine_type": testRunnerMachineType,
+			"machineType": testRunnerMachineType,
 			"steps": []map[string]any{
 				{"name": "Hello", "type": "prompt", "prompt": "hello"},
 			},

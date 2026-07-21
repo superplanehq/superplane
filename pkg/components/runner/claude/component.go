@@ -94,7 +94,7 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 func (c *RunClaudeCode) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     runner.MachineTypeFieldName,
+			Name:     "machineType",
 			Label:    "Machine type",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
@@ -261,7 +261,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "execution_timeout_seconds",
+			Name:        "executionTimeoutSeconds",
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,

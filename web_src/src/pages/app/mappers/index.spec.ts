@@ -136,7 +136,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerClaudeCode",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machineType: "aws-standard-1",
           prompt: "Fix the failing tests",
         },
         metadata: {},
