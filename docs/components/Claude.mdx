@@ -251,10 +251,13 @@ The **Run Managed Agent** component uses [Claude Managed Agents](https://platfor
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
 - **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
+- **Structured Output** (optional): A JSON Schema the agent is asked to match in its final message. Managed Agents sessions have no server-enforced equivalent to the Messages API's `output_config.format` used by Text Prompt, so this works by appending instructions to the task asking the agent to include a JSON code block matching the schema, then best-effort parsing it from the final message. Treat the result as best-effort, not a guarantee — validate before relying on it downstream.
 
 ### Output
 
 Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
+
+When Structured Output is configured, **parsed** carries the JSON object extracted from the final message — only when the session finished normally (idle), never on a timeout, error, or terminated session.
 
 Files the agent saves under `/mnt/session/outputs/` are emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only). Instruct the agent in the task to save its deliverables there.
 
@@ -313,9 +316,15 @@ The setting applies only to runs that **finish** — including ones that fail or
 
 Kept sessions and environments are not reclaimed automatically, so delete them yourself once you're done debugging.
 
+### Structured Output
+
+Optional: a JSON Schema the agent is asked to match in its final message, in addition to the PR it opens. Managed Agents sessions have no server-enforced equivalent to the Messages API's `output_config.format` used by Text Prompt, so this works by appending instructions to the task asking the agent to include a JSON code block matching the schema, then best-effort parsing it from the final message. Treat the result as best-effort, not a guarantee — validate before relying on it downstream.
+
 ### Output
 
 Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
+
+When Structured Output is configured, **parsed** carries the JSON object extracted from the final message — only when the session finished normally (idle), never on a timeout, error, or terminated session.
 
 Files the agent saves under `/mnt/session/outputs/` are additionally emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only).
 

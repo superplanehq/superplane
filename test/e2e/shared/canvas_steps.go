@@ -219,6 +219,39 @@ func (s *CanvasSteps) SelectVersionInHistorySidebar(versionLabel string) {
 	s.session.Sleep(300)
 }
 
+// AssertPreviewingPreviousVersionBarVisible verifies the previous-version preview chrome is shown.
+func (s *CanvasSteps) AssertPreviewingPreviousVersionBarVisible() {
+	s.session.AssertVisible(q.TestID("canvas-mode-floating-bar"))
+	s.session.AssertText("Previewing previous version")
+	s.session.AssertVisible(q.TestID("canvas-mode-floating-bar-action"))
+}
+
+// ClickSeeCurrentVersionFromPreviewBar returns to the live version from previous-version preview.
+func (s *CanvasSteps) ClickSeeCurrentVersionFromPreviewBar() {
+	s.session.Click(q.TestID("canvas-mode-floating-bar-action"))
+}
+
+// WaitForCanvasDraftLoadingToFinish waits for the edit-session draft loading overlay to disappear.
+func (s *CanvasSteps) WaitForCanvasDraftLoadingToFinish() {
+	loading := q.Text("Loading canvas...").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := loading.IsVisible()
+		return err == nil && !visible
+	}, 30*time.Second, 200*time.Millisecond, "canvas draft loading overlay did not disappear")
+}
+
+// AssertEditSessionReady verifies the canvas finished bootstrapping an active edit session.
+func (s *CanvasSteps) AssertEditSessionReady() {
+	s.WaitForCanvasDraftLoadingToFinish()
+	s.session.AssertHidden(q.TestID("canvas-mode-floating-bar"))
+	s.waitForEnabledExitEditButton()
+	s.AssertEditModeTabChrome()
+	// Building blocks stay collapsed when the canvas already has nodes; edit controls
+	// on the right rail are the reliable signal that live edit mode is active again.
+	s.session.AssertVisible(q.TestID("canvas-add-component-button"))
+	s.AssertStagingActionsVisibleAndDisabled()
+}
+
 func (s *CanvasSteps) waitForVisible(query q.Query, timeout time.Duration) {
 	locator := query.Run(s.session)
 	require.Eventually(s.t, func() bool {

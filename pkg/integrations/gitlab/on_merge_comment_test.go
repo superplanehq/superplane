@@ -169,6 +169,32 @@ func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
+func Test__OnMergeComment__HandleWebhook__DiffNoteComment(t *testing.T) {
+	trigger := &OnMergeComment{}
+
+	body, _ := json.Marshal(map[string]any{
+		"object_attributes": map[string]any{
+			"note":          "This variable name is misleading, can we rename it?",
+			"noteable_type": "MergeRequest",
+			"type":          "DiffNote",
+		},
+	})
+
+	events := &contexts.EventContext{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+		Headers:       gitlabHeaders("Note Hook", "token"),
+		Body:          body,
+		Configuration: map[string]any{"project": "123"},
+		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
+		Events:        events,
+		Logger:        log.NewEntry(log.New()),
+	})
+
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+	assert.Zero(t, events.Count())
+}
+
 func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
 	trigger := &OnMergeComment{}
 
