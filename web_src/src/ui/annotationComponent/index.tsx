@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
-import { Copy, Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
@@ -9,41 +8,14 @@ import { CopyButton } from "@/ui/CopyButton";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
+import { NOTE_COLORS, type AnnotationColor } from "./noteColors";
+import { NoteActionsToolbar } from "./noteActionsToolbar";
 import type { ComponentActionsProps } from "../types/componentActions";
 
 const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 200;
 const MIN_WIDTH = 200;
 const MIN_HEIGHT = 120;
-
-type AnnotationColor = "yellow" | "blue" | "green" | "purple";
-
-const NOTE_COLORS: Record<AnnotationColor, { label: string; container: string; background: string; dot: string }> = {
-  yellow: {
-    label: "Yellow",
-    container: "bg-yellow-100 dark:bg-yellow-900 dark:outline dark:outline-1 dark:outline-yellow-950/80",
-    background: "bg-yellow-100 dark:bg-yellow-900",
-    dot: "bg-yellow-200 border-yellow-500 dark:bg-yellow-800 dark:border-yellow-500",
-  },
-  blue: {
-    label: "Sky",
-    container: "bg-sky-100 dark:bg-sky-900 dark:outline dark:outline-1 dark:outline-sky-950/80",
-    background: "bg-sky-100 dark:bg-sky-900",
-    dot: "bg-sky-200 border-sky-500 dark:bg-sky-800 dark:border-sky-500",
-  },
-  green: {
-    label: "Green",
-    container: "bg-green-100 dark:bg-green-900 dark:outline dark:outline-1 dark:outline-green-950/80",
-    background: "bg-green-100 dark:bg-green-900",
-    dot: "bg-green-200 border-green-500 dark:bg-green-800 dark:border-green-500",
-  },
-  purple: {
-    label: "Purple",
-    container: "bg-purple-100 dark:bg-purple-900 dark:outline dark:outline-1 dark:outline-purple-950/80",
-    background: "bg-purple-100 dark:bg-purple-900",
-    dot: "bg-purple-200 border-purple-500 dark:bg-purple-800 dark:border-purple-500",
-  },
-};
 
 const noteDrafts = new Map<string, string>();
 
@@ -176,15 +148,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     debouncedTextUpdate.flush();
   };
 
-  const colorOptions = useMemo(
-    () =>
-      (Object.keys(NOTE_COLORS) as AnnotationColor[]).map((value) => ({
-        value,
-        dot: NOTE_COLORS[value].dot,
-      })),
-    [],
-  );
-
   // Update local state during resize for real-time visual feedback
   const handleResize = useCallback((_event: unknown, params: ResizeParams) => {
     setDimensions({ width: Math.round(params.width), height: Math.round(params.height) });
@@ -286,66 +249,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           ) : (
             <>
               {showNoteActions && (
-                <>
-                  <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
-                  <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-                    <div className="group/swatch relative flex items-center px-0.5 py-0.5">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
-                        aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
-                      />
-                      <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
-                        {colorOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              onAnnotationUpdate?.({ color: option.value });
-                            }}
-                            className={cn("h-4 w-4 rounded-full border transition", option.dot)}
-                            aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    {onDuplicate && (
-                      <button
-                        type="button"
-                        data-testid="node-action-duplicate"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onDuplicate();
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
-                        aria-label="Duplicate note"
-                      >
-                        <Copy size={16} />
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onDelete();
-                        }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
-                        aria-label="Delete note"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                </>
+                <NoteActionsToolbar
+                  activeColor={activeColor}
+                  onColorChange={(color) => onAnnotationUpdate?.({ color })}
+                  onDuplicate={onDuplicate}
+                  onDelete={onDelete}
+                />
               )}
 
               <div className="flex-1 overflow-hidden px-3 pb-3 relative">
