@@ -289,7 +289,12 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	//
+	// A note whose body is only quick actions (e.g. "/close") has no visible
+	// comment content, so GitLab returns 202 instead of 201, with a summary
+	// of the applied commands instead of a Note body.
+	//
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
@@ -615,7 +620,13 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	//
+	// A note whose body is only quick actions (e.g. "/ready") has no visible
+	// comment content, so GitLab returns 202 instead of 201, with a summary
+	// of the applied commands instead of a Note body. This is the response
+	// markMergeRequestReadyForReview gets when it posts "/ready".
+	//
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 

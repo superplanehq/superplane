@@ -1314,4 +1314,88 @@ func Test__Client__CreateIssueNote(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create issue note")
 	})
+
+	t.Run("quick-action-only body returns 202 Accepted", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"state_event":"close"},"summary":["Closed this issue."]}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/close"})
+		require.NoError(t, err)
+	})
+}
+
+func Test__Client__CreateMergeRequestNote(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 55, "body": "Great work!", "noteable_type": "MergeRequest"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "Great work!"})
+
+		require.NoError(t, err)
+		assert.Equal(t, 55, result.ID)
+		assert.Equal(t, "Great work!", result.Body)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/merge_requests/5/notes", mockClient.Requests[0].URL.String())
+	})
+
+	// GitLab confirmed live: a note whose body is only the "/ready" quick
+	// action returns 202 with a commands summary, not a Note object.
+	t.Run("quick-action-only body returns 202 Accepted", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"wip_event":"ready"},"summary":["Marked this merge request as ready."]}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/ready"})
+		require.NoError(t, err)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Merge Request Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestNote(context.Background(), "1", "999", &CreateNoteRequest{Body: "x"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create merge request note")
+	})
 }
