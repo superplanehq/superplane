@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -113,6 +114,63 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 	}
 	if out == "" || !strings.Contains(out, "hello") {
 		t.Fatalf("expected hello in output: %q", out)
+	}
+}
+
+func TestHostShellDirectivesExitAliasKeepsShell(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; echo hello; exit 1; echo there", work, work),
+		`printf 'mark=%s cwd=%s\n' "$RUNNER_EXIT_MARK" "$(pwd -P)"`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	// First command should fail cleanly via aliased exit→return (not kill the PTY shell).
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got code=%d err=%v out=%q", code, err, out)
+	}
+	if err == nil || !strings.Contains(err.Error(), "exit code") {
+		t.Fatalf("expected exit-code error from end marker, got %v", err)
+	}
+	if strings.Contains(err.Error(), "shell closed") {
+		t.Fatalf("exit killed the PTY shell: %v", err)
+	}
+	if strings.Contains(out, "there") {
+		t.Fatalf("expected fail-fast before echo there; out=%q", out)
+	}
+	if !strings.Contains(out, "hello") {
+		t.Fatalf("expected hello before exit; out=%q", out)
+	}
+
+	// Because the list stops on failure, the second command does not run.
+	// Verify state would have persisted by exercising the wrap in-process:
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	step := filepath.Join(dir, "step.sh")
+	body := wrapSourcedDirective(fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; exit 0", work, work))
+	if err := os.WriteFile(step, []byte(body+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i", "-c",
+		fmt.Sprintf(`set +e; source %s; printf 'mark=%%s cwd=%%s\n' "$RUNNER_EXIT_MARK" "$(pwd -P)"`, bashSingleQuotedPath(step)),
+	)
+	follow, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("follow-up bash: %v out=%q", err, follow)
+	}
+	text := string(follow)
+	if !strings.Contains(text, "mark=kept") || !strings.Contains(text, "/work") {
+		t.Fatalf("cd/export should persist after aliased exit; out=%q", text)
 	}
 }
 

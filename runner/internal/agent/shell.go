@@ -51,3 +51,18 @@ func directivesFromCommands(commands models.CommandList) []shellDirective {
 func errEmptyCommands() error {
 	return errors.New("empty commands")
 }
+
+// wrapSourcedDirective prepares a command_list entry for `source` in the shared
+// interactive PTY shell.
+//
+// A top-level `exit` in user code would otherwise terminate that shell before the
+// runner can write its end marker. Aliasing `exit` to `return` turns those into
+// a normal non-zero source status while keeping cwd, exports, and background jobs.
+func wrapSourcedDirective(shell string) string {
+	var b strings.Builder
+	b.WriteString("shopt -s expand_aliases\n")
+	b.WriteString("alias exit=return\n")
+	b.WriteString(strings.TrimRight(shell, "\n"))
+	b.WriteString("\n")
+	return b.String()
+}
