@@ -332,6 +332,17 @@ func validateUpdatePullRequestConfiguration(config UpdatePullRequestConfiguratio
 		return errors.New("pull request number is required")
 	}
 
+	// Unlike body, an empty title or base is never a valid "clear" instruction:
+	// GitHub rejects an empty pull request title outright, and an empty base
+	// branch cannot resolve to a real branch to retarget onto.
+	if config.Title != nil && strings.TrimSpace(*config.Title) == "" {
+		return errors.New("title cannot be empty")
+	}
+
+	if config.Base != nil && strings.TrimSpace(*config.Base) == "" {
+		return errors.New("base branch cannot be empty")
+	}
+
 	if err := validatePullRequestState(config.State); err != nil {
 		return err
 	}

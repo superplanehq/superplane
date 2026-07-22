@@ -92,6 +92,34 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "state must be one of: open, closed")
 	})
 
+	t.Run("title toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"title":      "",
+			},
+		})
+
+		require.ErrorContains(t, err, "title cannot be empty")
+	})
+
+	t.Run("base toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"base":       "",
+			},
+		})
+
+		require.ErrorContains(t, err, "base branch cannot be empty")
+	})
+
 	t.Run("no field toggled on is rejected", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration: &contexts.IntegrationContext{},
@@ -253,6 +281,34 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "state must be one of: open, closed")
+	})
+
+	t.Run("title toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"title":      "",
+			},
+		})
+
+		require.ErrorContains(t, err, "title cannot be empty")
+	})
+
+	t.Run("base toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"base":       "",
+			},
+		})
+
+		require.ErrorContains(t, err, "base branch cannot be empty")
 	})
 
 	t.Run("no field toggled on is rejected", func(t *testing.T) {
