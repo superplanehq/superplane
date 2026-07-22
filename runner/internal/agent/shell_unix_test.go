@@ -320,6 +320,48 @@ func TestRunShellPTYSessionLiveStreamsIncrementally(t *testing.T) {
 	}
 }
 
+func TestRunShellPTYSessionWritesCommandEndWhenContextCanceled(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	live := &syncLiveWriter{}
+	done := make(chan struct{})
+	var code int
+	var runErr error
+	go func() {
+		code, _, runErr = runShellPTYSession(ctx, 128*1024, cmd, directivesFromStrings([]string{
+			`printf '\x72\x75\x6e\x6e\x65\x72\x2d\x62\x65\x66\x6f\x72\x65\x2d\x6f\x75\x74\x70\x75\x74\n'; sleep 30; printf '\x72\x75\x6e\x6e\x65\x72\x2d\x61\x66\x74\x65\x72\x2d\x6f\x75\x74\x70\x75\x74\n'`,
+		}), live, "")
+		close(done)
+	}()
+
+	if !live.waitContains("runner-before-output", 2*time.Second) {
+		t.Fatalf("live log did not receive command output; live=%q", live.String())
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("runShellPTYSession did not stop after context cancellation; live=%q", live.String())
+	}
+
+	if code != 1 || runErr == nil {
+		t.Fatalf("runShellPTYSession: code=%d err=%v live=%q", code, runErr, live.String())
+	}
+	if !strings.Contains(live.String(), `"type":"cmd_end"`) || !strings.Contains(live.String(), `"status":"failed"`) {
+		t.Fatalf("expected failed cmd_end in live log; live=%q", live.String())
+	}
+	if strings.Contains(live.String(), "runner-after-output") {
+		t.Fatalf("command continued after cancellation; live=%q", live.String())
+	}
+}
+
 // TestHostShellPipeBundleEcho covers RUNNER_SHELL_USE_PIPE only: non-PTY bundle execution.
 // Production EC2 workers should not set that env; this is an explicit escape hatch + regression test.
 func TestHostShellPipeBundleEcho(t *testing.T) {

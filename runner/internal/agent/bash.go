@@ -87,6 +87,8 @@ func runBashHost(
 
 	cmd := exec.CommandContext(ctx, bash, files.scriptPath)
 	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)
 	setPayloadEnv(cmd, files.payloadPath)
 

@@ -55,6 +55,8 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
 	cmd.Dir = h.TaskWorkDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)
 	var buf bytes.Buffer
 	if live != nil {
