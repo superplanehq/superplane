@@ -92,9 +92,9 @@ Sequential shell directives; fail-fast on first non-zero exit. Same Bash sourcin
 {
   "payload_kind": "command_list",
   "commands": [
-    "echo \"branch=$GIT_BRANCH\"",
-    "npm ci",
-    "npm test"
+    {"command": "echo \"branch=$GIT_BRANCH\""},
+    {"command": "npm ci"},
+    {"command": "npm test"}
   ],
   "webhook_url": "https://example.com/hook",
   "execution_mode": "host"
