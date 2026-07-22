@@ -76,9 +76,9 @@ The following pull request operations have their own dedicated components:
 
 ## Implementation notes
 
-- Title, body, state, and base are updated through GitHub's Pulls API. Base is sent in its own request before title/body/state, so toggling on both a retarget and a close in the same run applies both instead of GitHub silently dropping the retarget.
+- Title, body, state, and base are updated through GitHub's Pulls API. Base is always sent in its own request, separate from title/body/state, since GitHub silently drops a base change bundled with a request that also closes the pull request. When both are toggled on, the order adapts to the direction: reopening happens before the retarget (a closed pull request can't be retargeted), and closing happens after it.
 - Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue. A leading "@" on an assignee username is stripped automatically.
-- GitHub rejects retargeting a pull request that is already closed - if the pull request is closed from a previous run, toggle it open again before retargeting.
+- GitHub rejects retargeting a pull request that is already closed and state isn't being toggled on in the same run - toggle state to "open" alongside the retarget, or run it in a separate step after reopening.
 
 ## Output
 
@@ -255,28 +255,45 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return nil
 	}
 
-	//
-	// Base is sent in its own request, before title/body/state: GitHub's Pulls
-	// API silently drops a base change bundled with a request that also closes
-	// the pull request, and separately rejects retargeting a pull request that
-	// is already closed. Applying the retarget first, while the pull request
-	// is still in its current state, avoids both.
-	//
+	// Base is always sent in its own request, separate from title/body/state:
+	// GitHub's Pulls API silently drops a base change bundled with a request
+	// that also closes the pull request, and separately rejects retargeting a
+	// pull request that is closed. Whether the base request runs before or
+	// after the title/body/state request depends on which direction the pull
+	// request is moving: reopening must happen before the retarget (since a
+	// closed pull request can't be retargeted), while closing must happen
+	// after it (since retargeting is silently dropped from a closing request).
+	var baseUpdate *github.PullRequest
 	if config.Base != nil {
 		base := strings.TrimSpace(*config.Base)
-		if err := editPullRequest(&github.PullRequest{Base: &github.PullRequestBranch{Ref: &base}}); err != nil {
-			return err
-		}
+		baseUpdate = &github.PullRequest{Base: &github.PullRequestBranch{Ref: &base}}
 	}
 
+	var titleBodyStateUpdate *github.PullRequest
 	if config.Title != nil || config.Body != nil || config.State != nil {
-		update := &github.PullRequest{
+		titleBodyStateUpdate = &github.PullRequest{
 			Title: config.Title,
 			Body:  config.Body,
 			State: config.State,
 		}
+	}
 
-		if err := editPullRequest(update); err != nil {
+	reopening := config.State != nil && strings.TrimSpace(*config.State) == pullRequestStateOpen
+
+	if reopening && titleBodyStateUpdate != nil {
+		if err := editPullRequest(titleBodyStateUpdate); err != nil {
+			return err
+		}
+	}
+
+	if baseUpdate != nil {
+		if err := editPullRequest(baseUpdate); err != nil {
+			return err
+		}
+	}
+
+	if !reopening && titleBodyStateUpdate != nil {
+		if err := editPullRequest(titleBodyStateUpdate); err != nil {
 			return err
 		}
 	}

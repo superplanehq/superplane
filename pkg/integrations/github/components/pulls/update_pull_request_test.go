@@ -464,6 +464,47 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		assert.Equal(t, http.MethodGet, getRequest.Method)
 	})
 
+	t.Run("reopening and retargeting together reopens before the retarget", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"base":       "release",
+				"state":      "open",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 3)
+
+		stateRequest := httpCtx.Requests[0]
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", stateRequest.URL.Path)
+		stateBody := readJSONBody(t, stateRequest)
+		assert.Equal(t, "open", stateBody["state"])
+		assert.NotContains(t, stateBody, "base")
+
+		baseRequest := httpCtx.Requests[1]
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", baseRequest.URL.Path)
+		baseBody := readJSONBody(t, baseRequest)
+		assert.Equal(t, "release", baseBody["base"])
+		assert.NotContains(t, baseBody, "state")
+
+		getRequest := httpCtx.Requests[2]
+		assert.Equal(t, http.MethodGet, getRequest.Method)
+	})
+
 	t.Run("updates labels and assignees through the Issues API", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
