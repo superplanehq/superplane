@@ -1147,7 +1147,9 @@ func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[
 	s.session.Click(startTemplateRun)
 
 	for paramName, value := range parameters {
-		s.session.FillIn(q.Locator("#start-run-param-"+paramName), value)
+		// The element id carries a React useId prefix (unique per rendered
+		// form), so target the stable data-testid hook instead.
+		s.session.FillIn(q.Locator(`[data-testid="start-run-param-`+paramName+`"]`), value)
 	}
 
 	s.session.Click(q.TestID("emit-event-submit-button"))

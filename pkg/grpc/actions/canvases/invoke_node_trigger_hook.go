@@ -117,6 +117,7 @@ func InvokeNodeTriggerHook(
 	hookCtx.Logger = logger
 	result, err := hookProvider.HandleHook(hookCtx)
 	if err != nil {
+		logger.Errorf("trigger hook %q execution failed: %v", hookName, err)
 		return nil, grpcerrors.InvalidArgument(err, "hook execution failed")
 	}
 
@@ -210,7 +211,7 @@ func defaultsFromTemplateParameters(template map[string]any) map[string]any {
 			if value, exists := parameter["defaultBoolean"]; exists && value != nil {
 				parameters[name] = value
 			}
-		case configuration.FieldTypeString, configuration.FieldTypeSelect:
+		case configuration.FieldTypeString, configuration.FieldTypeText, configuration.FieldTypeSelect:
 			if value, exists := parameter["defaultString"]; exists && value != nil {
 				if textValue, isString := value.(string); isString && textValue == "" {
 					continue
