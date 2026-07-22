@@ -34,7 +34,7 @@ export const homeModalOverlayClassName = "fixed inset-0 bg-gray-950/20 dark:bg-b
 
 export const homeModalPanelClassName = cn(
   "relative z-10 w-[calc(100vw-2rem)] max-w-3xl rounded-xl bg-white shadow-2xl dark:bg-gray-900",
-  appDarkModeClasses.modalEdge,
+  "dark:border dark:border-gray-700/70",
 );
 
 export const homeModalHeaderEdgeClassName =

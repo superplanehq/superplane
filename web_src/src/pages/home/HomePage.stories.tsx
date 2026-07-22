@@ -8,6 +8,7 @@ import { emptyHomePageFixture } from "./__fixtures__/homePageResponses";
  * Mounts the real org home routes against an in-process fixture backend.
  * Use **Current** for the populated homepage baseline, and **FreshOrg** for the
  * empty-org create / onboarding screen (what a new org lands on today).
+ * **Fresh Org Landing** is a Storybook-only POC for factory-first onboarding.
  *
  * **Current** shares a router with AppPage: clicking Software Factory opens the
  * live canvas surface (same as Pages/AppPage → Live Canvas).
@@ -39,4 +40,13 @@ export const Current: Story = {
 export const FreshOrg: Story = {
   name: "Fresh Org",
   render: () => <HomePageHarness fixture={emptyHomePageFixture} />,
+};
+
+/**
+ * Storybook POC: factory-first empty-org landing (Software Factory hero + subtle
+ * blank / browse-starter secondary paths). Does not change production Fresh Org.
+ */
+export const FreshOrgLanding: Story = {
+  name: "Fresh Org Landing",
+  render: () => <HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/welcome" />,
 };
