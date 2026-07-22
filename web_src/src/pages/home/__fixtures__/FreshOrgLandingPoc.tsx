@@ -79,22 +79,39 @@ const SETUP_STEPS = [
 function FactorySetupStepNav({ currentIndex }: { currentIndex: number }) {
   return (
     <nav aria-label="Setup progress">
-      <ol className="space-y-1">
+      <ol className="relative space-y-0">
         {SETUP_STEPS.map((step, index) => {
           const isCurrent = index === currentIndex;
           const isComplete = index < currentIndex;
+          const isLast = index === SETUP_STEPS.length - 1;
           return (
-            <li key={step.railLabel}>
+            <li key={step.railLabel} className="relative flex gap-3">
+              {!isLast ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute left-[3px] top-[12px] -bottom-[12px] w-px bg-slate-400 dark:bg-gray-500",
+                  )}
+                />
+              ) : null}
+              <span
+                aria-hidden
+                className={cn(
+                  "relative z-10 mt-2 size-[7px] shrink-0 rounded-full",
+                  isCurrent && "bg-slate-800 dark:bg-gray-100",
+                  !isCurrent && "border border-slate-600 bg-slate-100 dark:border-gray-400 dark:bg-gray-900",
+                )}
+              />
               <span
                 className={cn(
-                  "inline-flex items-baseline gap-1.5 text-sm",
+                  "pb-2 text-sm leading-6",
+                  isLast && "pb-0",
                   isCurrent && "font-medium text-gray-800 dark:text-gray-100",
                   isComplete && "text-gray-600 dark:text-gray-400",
-                  !isCurrent && !isComplete && "text-gray-400 dark:text-gray-500",
+                  !isCurrent && !isComplete && "text-gray-500 dark:text-gray-400",
                 )}
                 aria-current={isCurrent ? "step" : undefined}
               >
-                <span className="tabular-nums">{index + 1}.</span>
                 {step.railLabel}
               </span>
             </li>
@@ -809,7 +826,7 @@ function FactorySetupWizard({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-8 py-14">
-      <h1 className="text-2xl font-medium text-gray-800 dark:text-gray-100">Software Factory setup</h1>
+      <h1 className="text-2xl font-medium text-gray-800 dark:text-gray-100">Software factory app setup</h1>
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_2fr] lg:gap-16">
         <div className="sticky top-8 min-w-0 space-y-6">
           <FactorySetupStepNav currentIndex={stepIndex} />
@@ -1021,7 +1038,7 @@ function TriggerStepContent({
                       strokeWidth={3}
                     />
                   </span>
-                  <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{source.title}</span>
+                  <span className="text-base font-medium text-slate-900 dark:text-gray-100">{source.title}</span>
                 </button>
                 {selected ? (
                   <div className="border-t border-slate-200 px-3 pb-3 pt-3 dark:border-gray-700">{subsection}</div>
@@ -1054,7 +1071,7 @@ function TriggerStepContent({
                     strokeWidth={3}
                   />
                 </span>
-                <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{source.title}</span>
+                <span className="text-base font-medium text-slate-900 dark:text-gray-100">{source.title}</span>
               </button>
             )}
           </div>
@@ -1186,7 +1203,7 @@ function CodingAgentStepContent({
         const label = (
           <>
             <IntegrationIcon integrationName={harness.integrationName} className="h-4 w-4" size={16} />
-            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{harness.label}</span>
+            <span className="text-base font-medium text-slate-900 dark:text-gray-100">{harness.label}</span>
           </>
         );
 
@@ -1439,7 +1456,7 @@ function PreviewStepContent({
                   className="rounded-lg bg-white/90 px-3 py-3 shadow-sm outline outline-slate-950/10 backdrop-blur-sm dark:bg-gray-900/90 dark:outline-gray-700/70"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-gray-100 dark:text-slate-900">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-slate-900">
                       {trigger.integrationName ? (
                         <IntegrationIcon integrationName={trigger.integrationName} className="h-4 w-4" size={16} />
                       ) : (
@@ -1727,11 +1744,11 @@ function AgentSettingsStepContent({
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="xs" onClick={() => addStep(component.id, "prompt")}>
+            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "prompt")}>
               <Plus className="h-3.5 w-3.5" />
               Add prompt
             </Button>
-            <Button type="button" variant="outline" size="xs" onClick={() => addStep(component.id, "bash")}>
+            <Button type="button" variant="outline" size="sm" onClick={() => addStep(component.id, "bash")}>
               <Terminal className="h-3.5 w-3.5" />
               Add bash
             </Button>
@@ -1790,12 +1807,12 @@ function RequiredIntegrationsPanel({
     >
       {emphasize ? (
         <p role="status" className="mb-3 text-sm font-medium text-orange-500">
-          Hey, make sure you connect all the required tools.
+          Connect the required tools first.
         </p>
       ) : null}
       <h3 className="text-sm font-medium text-slate-900 dark:text-gray-100">Required integrations</h3>
       <p className="mt-1 text-[13px] leading-normal text-gray-500 dark:text-gray-400">
-        {emphasize ? "Connect before finishing setup." : "Integrations to connect."}
+        Connect before finishing setup.
       </p>
 
       {requiredIntegrations.length > 0 && (
@@ -1817,7 +1834,7 @@ function RequiredIntegrationsPanel({
                   </span>
                 </div>
                 {!isConnected && (
-                  <Button type="button" size="xs" onClick={() => onConnect(item)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => onConnect(item)}>
                     Connect
                   </Button>
                 )}
@@ -1975,7 +1992,7 @@ function ChoiceGroup({
                 />
               </span>
               <IntegrationIcon integrationName={choice.integrationName} className="h-4 w-4" size={16} />
-              <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">{choice.label}</span>
+              <span className="text-base font-medium text-slate-900 dark:text-gray-100">{choice.label}</span>
             </button>
           );
         })}

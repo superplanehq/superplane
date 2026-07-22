@@ -136,7 +136,7 @@ describe("FreshOrgLanding story smoke", () => {
 
     await startFactorySetup(user);
 
-    expect(screen.getByText("Software Factory setup")).toBeInTheDocument();
+    expect(screen.getByText("Software factory app setup")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Required integrations" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Manual prompt/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Assign SuperPlane bot to your issue/i })).toBeInTheDocument();
@@ -302,7 +302,7 @@ describe("FreshOrgLanding story smoke", () => {
     const panel = screen.getByRole("complementary");
     expect(panel).toHaveAttribute("data-emphasize", "true");
     expect(within(panel).getAllByText("Not connected").length).toBeGreaterThan(0);
-    expect(screen.getByRole("status")).toHaveTextContent(/Hey, make sure you connect all the required tools/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/Connect the required tools first/i);
 
     // Connect GitHub, then Claude (two required integrations for this path).
     await connectRequiredIntegration(user, "GitHub", "github-connection");
