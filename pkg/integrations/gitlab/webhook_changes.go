@@ -72,7 +72,7 @@ func listShrank(changes map[string]any, field, idKey string) bool {
 	return false
 }
 
-// changedToValue reports the field now holding a non-nil value, whether it was previously nil or a different value.
+// changedToValue reports the field now holding a non-nil value that differs from its previous value.
 func changedToValue(changes map[string]any, field string) bool {
 	change, ok := changes[field].(map[string]any)
 	if !ok {
@@ -80,9 +80,10 @@ func changedToValue(changes map[string]any, field string) bool {
 	}
 
 	current, hasCurrent := change["current"]
-	return hasCurrent && current != nil
+	return hasCurrent && current != nil && current != change["previous"]
 }
 
+// changedToNil reports the field being cleared from a non-nil previous value.
 func changedToNil(changes map[string]any, field string) bool {
 	change, ok := changes[field].(map[string]any)
 	if !ok {
@@ -90,7 +91,7 @@ func changedToNil(changes map[string]any, field string) bool {
 	}
 
 	current, hasCurrent := change["current"]
-	return hasCurrent && current == nil
+	return hasCurrent && current == nil && change["previous"] != nil
 }
 
 // changedBoolTo reports current == target, but only if previous actually differed (guards against no-op entries).

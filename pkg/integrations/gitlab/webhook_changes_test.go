@@ -84,6 +84,10 @@ func Test__ChangedToValue(t *testing.T) {
 	}, "milestone_id"))
 
 	assert.False(t, changedToValue(map[string]any{}, "milestone_id"))
+
+	assert.False(t, changedToValue(map[string]any{
+		"milestone_id": map[string]any{"previous": float64(1), "current": float64(1)},
+	}, "milestone_id"))
 }
 
 func Test__ChangedToNil(t *testing.T) {
@@ -93,6 +97,10 @@ func Test__ChangedToNil(t *testing.T) {
 
 	assert.False(t, changedToNil(map[string]any{
 		"milestone_id": map[string]any{"previous": nil, "current": float64(1)},
+	}, "milestone_id"))
+
+	assert.False(t, changedToNil(map[string]any{
+		"milestone_id": map[string]any{"previous": nil, "current": nil},
 	}, "milestone_id"))
 }
 

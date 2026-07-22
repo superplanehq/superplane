@@ -350,6 +350,13 @@ func Test__IssueDerivedActions(t *testing.T) {
 		}
 		assert.Empty(t, issueDerivedActions(changes))
 	})
+
+	t.Run("no-op milestone entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(7), "current": float64(7)},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
 }
 
 func Test__OnIssue__HandleWebhook__DerivedActions(t *testing.T) {
