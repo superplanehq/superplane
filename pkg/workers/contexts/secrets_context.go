@@ -2,12 +2,12 @@ package contexts
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
 )
 
@@ -53,17 +53,5 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 }
 
 func (c *SecretsContext) decryptSecretData(secret *models.Secret) (map[string]string, error) {
-	plain, err := c.encryptor.Decrypt(context.Background(), secret.Data, []byte(secret.Name))
-	if err != nil {
-		return nil, err
-	}
-
-	var data map[string]string
-	if len(plain) == 0 {
-		return make(map[string]string), nil
-	}
-	if err := json.Unmarshal(plain, &data); err != nil {
-		return nil, err
-	}
-	return data, nil
+	return secretstore.DecryptLocalData(context.Background(), c.encryptor, *secret)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -29,7 +30,18 @@ func Test__UpdateSecretName(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	t.Run("renamed secret data decrypts with new name", func(t *testing.T) {
+	createIDEncryptedSecret := func(t *testing.T, name string, data map[string]string) *models.Secret {
+		t.Helper()
+		secret := models.Secret{ID: uuid.New(), Name: name}
+		encrypted, err := secrets.EncryptLocalData(context.Background(), encryptor, secret, data)
+		require.NoError(t, err)
+
+		created, err := models.CreateSecretWithID(secret.ID, name, secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+		require.NoError(t, err)
+		return created
+	}
+
+	t.Run("renaming legacy data migrates encryption to secret ID", func(t *testing.T) {
 		oldName := support.RandomName("secret")
 		newName := support.RandomName("secret-renamed")
 		plainData := map[string]string{"key": "value"}
@@ -77,6 +89,24 @@ func Test__UpdateSecretName(t *testing.T) {
 
 		secret, err := models.FindSecretByName(models.DomainTypeOrganization, r.Organization.ID, name)
 		require.NoError(t, err)
+
+		decrypted, err := decryptSecretData(context.Background(), encryptor, *secret)
+		require.NoError(t, err)
+		assert.Equal(t, plainData, decrypted)
+	})
+
+	t.Run("renaming ID-bound data does not re-encrypt", func(t *testing.T) {
+		oldName := support.RandomName("secret")
+		newName := support.RandomName("secret-renamed")
+		plainData := map[string]string{"key": "value"}
+		created := createIDEncryptedSecret(t, oldName, plainData)
+
+		_, err := UpdateSecretName(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), oldName, newName)
+		require.NoError(t, err)
+
+		secret, err := models.FindSecretByName(models.DomainTypeOrganization, r.Organization.ID, newName)
+		require.NoError(t, err)
+		assert.Equal(t, created.Data, secret.Data)
 
 		decrypted, err := decryptSecretData(context.Background(), encryptor, *secret)
 		require.NoError(t, err)

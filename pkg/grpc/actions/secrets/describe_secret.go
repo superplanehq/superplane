@@ -2,13 +2,14 @@ package secrets
 
 import (
 	"context"
-	"encoding/json"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -65,13 +66,7 @@ func serializeSecret(ctx context.Context, encryptor crypto.Encryptor, secret mod
 }
 
 func serializeLocalSecretData(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (*pb.Secret_Local, error) {
-	data, err := encryptor.Decrypt(ctx, secret.Data, []byte(secret.Name))
-	if err != nil {
-		return nil, err
-	}
-
-	var values map[string]string
-	err = json.Unmarshal(data, &values)
+	values, err := secretstore.DecryptLocalData(ctx, encryptor, secret)
 	if err != nil {
 		return nil, err
 	}

@@ -62,3 +62,42 @@ func Test__UpdateSecret(t *testing.T) {
 		require.Equal(t, map[string]string{"test": "***", "test2": "***"}, response.Secret.Spec.Local.Data)
 	})
 }
+
+func Test__UpdateSecretMigratesLocalDataToIDAssociatedData(t *testing.T) {
+	r := support.SetupWithOptions(t, support.SetupOptions{})
+	encryptor := crypto.NewAESGCMEncryptor([]byte("1234567890abcdefghijklmnopqrstuv"))
+	name := support.RandomName("secret")
+	legacyData := map[string]string{"test": "test"}
+	raw, err := json.Marshal(legacyData)
+	require.NoError(t, err)
+
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(name))
+	require.NoError(t, err)
+
+	secret, err := models.CreateSecret(name, secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+	require.NoError(t, err)
+
+	updatedData := map[string]string{"test": "updated"}
+	spec := &protos.Secret{
+		Metadata: &protos.Secret_Metadata{Name: name},
+		Spec: &protos.Secret_Spec{
+			Provider: protos.Secret_PROVIDER_LOCAL,
+			Local:    &protos.Secret_Local{Data: updatedData},
+		},
+	}
+
+	_, err = UpdateSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), name, spec)
+	require.NoError(t, err)
+
+	updated, err := models.FindSecretByID(models.DomainTypeOrganization, r.Organization.ID, secret.ID.String())
+	require.NoError(t, err)
+
+	decrypted, err := encryptor.Decrypt(context.Background(), updated.Data, []byte(updated.ID.String()))
+	require.NoError(t, err)
+	var actual map[string]string
+	require.NoError(t, json.Unmarshal(decrypted, &actual))
+	require.Equal(t, updatedData, actual)
+
+	_, err = encryptor.Decrypt(context.Background(), updated.Data, []byte(updated.Name))
+	require.Error(t, err)
+}

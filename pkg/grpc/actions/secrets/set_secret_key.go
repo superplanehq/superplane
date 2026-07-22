@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 )
 
 func SetSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, keyName, value string) (*pb.SetSecretKeyResponse, error) {
@@ -37,7 +38,7 @@ func SetSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 	}
 	data[keyName] = value
 
-	encrypted, err := encryptSecretData(ctx, encryptor, secret.Name, data)
+	encrypted, err := secretstore.EncryptLocalData(ctx, encryptor, *secret, data)
 	if err != nil {
 		return nil, err
 	}
