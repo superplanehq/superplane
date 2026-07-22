@@ -10,10 +10,12 @@ import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
 import { isManualRunNode } from "./manualRunTriggers";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
+import { NodesPanelInlineRunForm } from "./NodesPanelInlineRunForm";
+import { resolveStartTemplate } from "./consoleTriggerParameters";
 import { useConsoleRunTrigger } from "./useConsoleRunTrigger";
 import { useConsoleTriggerLock, type ConsoleTriggerLock } from "./useConsoleTriggerLock";
-import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
-import { nodesPanelContentFromLegacyNode } from "./nodesPanelContent";
+import type { NodesPanelContent, NodesPanelNode, NodesPanelFormMode } from "./nodesPanelContent";
+import { NODES_PANEL_FORM_MODES, nodesPanelContentFromLegacyNode } from "./nodesPanelContent";
 import { NodesPanelForm } from "./NodesPanelForm";
 
 interface NodesPanelCardProps {
@@ -108,7 +110,7 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
  */
 function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
-  if (!entry.node) {
+  if (!entry.node.trim()) {
     return (
       <WidgetEmptyState
         icon={CircleDot}
@@ -120,17 +122,18 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node || "—";
   const canManualRun = isManualRunNode(resolved?.node);
+  const useInlineLayout = isInlineLayout(entry, canManualRun);
+  const styles = singleNodeLayoutStyles(useInlineLayout);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <div className="text-[13px] font-semibold text-slate-800 dark:text-gray-100" data-testid="node-panel-name">
-        {displayName}
-      </div>
+    <div className={styles.container}>
+      {entry.showNodeLabel !== false ? (
+        <div className={styles.header} data-testid="node-panel-name">
+          {displayName}
+        </div>
+      ) : null}
       {entry.description ? (
-        <p
-          className="max-w-full truncate text-center text-[13px] text-slate-500 dark:text-gray-400"
-          title={entry.description}
-        >
+        <p className={styles.description} title={entry.description}>
           {entry.description}
         </p>
       ) : null}
@@ -142,7 +145,7 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
           testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
         />
       ) : null}
-      {!resolved && entry.node ? (
+      {!resolved ? (
         <p className="text-[13px] text-amber-600 dark:text-amber-400">
           Node {JSON.stringify(entry.node)} not found in this canvas.
         </p>
@@ -151,27 +154,50 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
   );
 }
 
+function isInlineLayout(entry: NodesPanelNode, canManualRun: boolean): boolean {
+  return entry.formMode === "inline" && Boolean(entry.showRun) && canManualRun;
+}
+
+function singleNodeLayoutStyles(useInlineLayout: boolean) {
+  return {
+    container: useInlineLayout
+      ? "flex h-full flex-col items-stretch gap-3 p-4"
+      : "flex h-full flex-col items-center justify-center gap-3 p-4",
+    header: "text-[13px] font-semibold text-slate-800 dark:text-gray-100",
+    description: useInlineLayout
+      ? "text-[13px] text-slate-500 dark:text-gray-400"
+      : "max-w-full truncate text-center text-[13px] text-slate-500 dark:text-gray-400",
+  };
+}
+
 function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
+  const configured = entry.node.trim().length > 0;
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
   const canManualRun = isManualRunNode(resolved?.node);
+  const useInlineLayout = isInlineLayout(entry, canManualRun);
+  const styles = rowLayoutStyles(useInlineLayout);
 
   return (
-    <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
-      <div className="min-w-0 flex-1">
-        <div
-          className="truncate text-[13px] font-medium text-slate-800 dark:text-gray-100"
-          data-testid="nodes-panel-row-name"
-        >
-          {displayName}
-        </div>
+    <li className={styles.row} data-testid="nodes-panel-row">
+      <div className={styles.text}>
+        {entry.showNodeLabel !== false ? (
+          <div className={styles.name} data-testid="nodes-panel-row-name">
+            {displayName}
+          </div>
+        ) : null}
         {entry.description ? (
-          <p className="truncate text-[13px] text-slate-500 dark:text-gray-400" title={entry.description}>
+          <p className={styles.description} title={entry.description}>
             {entry.description}
           </p>
         ) : null}
-        {!resolved ? (
+        {!configured ? (
+          <p className="truncate text-[13px] text-slate-400 dark:text-gray-500">
+            Pick a node from the editor to display it here.
+          </p>
+        ) : null}
+        {configured && !resolved ? (
           <p className="truncate text-[13px] text-amber-600 dark:text-amber-400">
             Node {JSON.stringify(entry.node)} not found in this canvas.
           </p>
@@ -183,11 +209,24 @@ function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTr
           resolved={resolved}
           lock={lock}
           testIds={{ button: "nodes-panel-row-run", dialog: "nodes-panel-row-run-dialog" }}
-          buttonClassName="shrink-0"
+          buttonClassName={useInlineLayout ? undefined : "shrink-0"}
         />
       ) : null}
     </li>
   );
+}
+
+function rowLayoutStyles(useInlineLayout: boolean) {
+  return {
+    row: useInlineLayout ? "flex flex-col gap-2 px-3 py-3" : "flex items-center gap-3 px-3 py-2",
+    text: useInlineLayout ? "min-w-0" : "min-w-0 flex-1",
+    name: useInlineLayout
+      ? "text-[13px] font-medium text-slate-800 dark:text-gray-100"
+      : "truncate text-[13px] font-medium text-slate-800 dark:text-gray-100",
+    description: useInlineLayout
+      ? "text-[13px] text-slate-500 dark:text-gray-400"
+      : "truncate text-[13px] text-slate-500 dark:text-gray-400",
+  };
 }
 
 interface RunControlTestIds {
@@ -197,6 +236,8 @@ interface RunControlTestIds {
 
 function disabledTitleFor(reason: string | null): string | undefined {
   switch (reason) {
+    case "uncommitted-canvas-changes":
+      return "Commit canvas changes before running this node.";
     case "no-perm":
       return "You do not have permission to run this node";
     case "not-manual-run":
@@ -221,6 +262,13 @@ function disabledTitleFor(reason: string | null): string | undefined {
  * the pipeline is still executing. The lock is shared across the panel and
  * keyed per trigger node, so sibling entries targeting the same trigger
  * lock together as soon as any of them submits.
+ *
+ * When `entry.formMode === "inline"` and the resolved template has input
+ * fields, the parameter form is rendered inline via
+ * {@link NodesPanelInlineRunForm} instead of the modal — the confirm
+ * dialog is still mounted (hidden) to keep behavior identical when inline
+ * mode is not applicable, e.g. schedule triggers or parameter-less
+ * templates.
  */
 function NodesPanelRunControl({
   entry,
@@ -242,6 +290,26 @@ function NodesPanelRunControl({
       promptConfirmation: entry.promptConfirmation,
       lock,
     });
+
+  const inlineTemplate = useInlineFormTemplate(entry, resolved);
+
+  if (inlineTemplate) {
+    return (
+      <NodesPanelInlineRunForm
+        template={inlineTemplate}
+        onSubmit={runTrigger}
+        running={running}
+        disabled={disabled}
+        disabledTitle={disabledTitleFor(disabledReason)}
+        disabledMessage={disabledReason === "uncommitted-canvas-changes" ? disabledTitleFor(disabledReason) : undefined}
+        submitLabel={entry.submitLabel}
+        showFieldLabels={entry.showFieldLabels !== false}
+        testIdPrefix={testIds.button}
+        lock={lock}
+        triggerNodeId={resolved?.node?.id}
+      />
+    );
+  }
 
   return (
     <>
@@ -276,6 +344,26 @@ function NodesPanelRunControl({
 }
 
 /**
+ * True when the entry opts into inline mode AND the resolved trigger is a
+ * manual-run Start with a parameterized template — the only case where the
+ * inline widget can render anything useful. Returns the resolved template
+ * so the caller can render it directly, or `undefined` to fall back to the
+ * modal path.
+ */
+function useInlineFormTemplate(
+  entry: NodesPanelNode,
+  resolved: ReturnType<typeof resolveConsoleNode>,
+): ReturnType<typeof resolveStartTemplate> {
+  if (entry.formMode !== "inline") return undefined;
+  if (!resolved?.node) return undefined;
+  if (!isManualRunNode(resolved.node)) return undefined;
+  const template = resolveStartTemplate(resolved.node, entry.triggerName);
+  if (!template) return undefined;
+  if ((template.parameters?.length ?? 0) === 0) return undefined;
+  return template;
+}
+
+/**
  * Accept both the modern `type: "nodes"` shape and the legacy `type: "node"`
  * shape (still present in old canvases and YAML imports). Legacy content is
  * folded into a one-entry `nodes` list so the merged renderer treats both
@@ -306,5 +394,14 @@ function normalizeEntry(raw: unknown): NodesPanelNode | null {
     showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
     promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
+    formMode: normalizeFormMode(obj.formMode),
+    showNodeLabel: typeof obj.showNodeLabel === "boolean" ? obj.showNodeLabel : undefined,
+    showFieldLabels: typeof obj.showFieldLabels === "boolean" ? obj.showFieldLabels : undefined,
+    submitLabel: typeof obj.submitLabel === "string" ? obj.submitLabel : undefined,
   };
+}
+
+function normalizeFormMode(raw: unknown): NodesPanelFormMode | undefined {
+  if (typeof raw !== "string") return undefined;
+  return (NODES_PANEL_FORM_MODES as readonly string[]).includes(raw) ? (raw as NodesPanelFormMode) : undefined;
 }

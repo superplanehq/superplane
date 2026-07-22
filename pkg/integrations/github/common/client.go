@@ -172,6 +172,10 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, c.owner, repository, pullNumber)
 }
 
+func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
+	return c.underlying.PullRequests.Edit(ctx, c.owner, repository, pullNumber, pullRequest)
+}
+
 // MarkPullRequestReadyForReview takes a pull request out of the draft state.
 // GitHub exposes this only through the GraphQL API, so it is the one pull
 // request operation that cannot delegate to the REST client. It takes the pull
