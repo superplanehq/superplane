@@ -10,7 +10,8 @@ import { Checkbox } from "@/ui/checkbox";
 
 import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
 import { isManualRunNode } from "./manualRunTriggers";
-import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
+import { resolveStartTemplate } from "./consoleTriggerParameters";
+import type { NodesPanelContent, NodesPanelNode, NodesPanelFormMode } from "./nodesPanelContent";
 
 interface NodesPanelFormProps {
   value: NodesPanelContent;
@@ -85,7 +86,6 @@ function NodesPanelEntryRow({
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const showRunId = useId();
-  const promptConfirmationId = useId();
   const resolved = resolveConsoleNode(ctx, entry.node);
   const canManualRun = isManualRunNode(resolved?.node);
 
@@ -154,38 +154,154 @@ function NodesPanelEntryRow({
               Show a manual "Run" button (requires run permission).
             </Label>
           </div>
-          {entry.showRun ? (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
-                  Trigger template (optional)
-                </Label>
-                <Input
-                  value={entry.triggerName ?? ""}
-                  onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
-                  placeholder="e.g. manual"
-                  className="h-8"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={promptConfirmationId}
-                  checked={Boolean(entry.promptConfirmation)}
-                  onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
-                  className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
-                />
-                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
-                  Prompt confirmation before running (templates with input fields always prompt).
-                </Label>
-              </div>
-            </>
-          ) : null}
+          {entry.showRun ? <NodesPanelRunFormOptions entry={entry} resolved={resolved} onChange={onChange} /> : null}
         </>
       ) : entry.node && resolved ? (
         <p className="text-[11px] text-slate-500 dark:text-gray-400">
           Only trigger nodes with a manual run can be fired from the console. Pick the trigger that starts your flow.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Run-controls section of {@link NodesPanelEntryRow} — trigger template
+ * override, form-mode selector, and (in modal mode) the prompt-
+ * confirmation checkbox. Extracted so the parent function stays inside
+ * the shared lint budget.
+ */
+function NodesPanelRunFormOptions({
+  entry,
+  resolved,
+  onChange,
+}: {
+  entry: NodesPanelNode;
+  resolved: ReturnType<typeof resolveConsoleNode>;
+  onChange: (patch: Partial<NodesPanelNode>) => void;
+}) {
+  const promptConfirmationId = useId();
+  const formModeId = useId();
+  const templateForInline = resolved?.node ? resolveStartTemplate(resolved.node, entry.triggerName) : undefined;
+  const canOfferInlineForm = (templateForInline?.parameters?.length ?? 0) > 0;
+  const currentFormMode: NodesPanelFormMode = entry.formMode ?? "modal";
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Trigger template (optional)</Label>
+        <Input
+          value={entry.triggerName ?? ""}
+          onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
+          placeholder="e.g. manual"
+          className="h-8"
+        />
+      </div>
+      {canOfferInlineForm ? (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor={formModeId} className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
+              Run form
+            </Label>
+            <Select
+              value={currentFormMode}
+              onValueChange={(v) => onChange({ formMode: v === "inline" ? "inline" : undefined })}
+            >
+              <SelectTrigger id={formModeId} className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="modal">Modal (open Run dialog)</SelectItem>
+                <SelectItem value="inline">Inline (render form in widget)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-500 dark:text-gray-400">
+              Inline renders the template's parameter form directly in the widget body — best for prompt-submission
+              style widgets.
+            </p>
+          </div>
+          {currentFormMode === "inline" ? (
+            <NodesPanelInlinePresentationOptions entry={entry} onChange={onChange} />
+          ) : null}
+        </>
+      ) : null}
+      {currentFormMode === "modal" ? (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={promptConfirmationId}
+            checked={Boolean(entry.promptConfirmation)}
+            onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
+            className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+          />
+          <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
+            Prompt confirmation before running (templates with input fields always prompt).
+          </Label>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function NodesPanelInlinePresentationOptions({
+  entry,
+  onChange,
+}: {
+  entry: NodesPanelNode;
+  onChange: (patch: Partial<NodesPanelNode>) => void;
+}) {
+  const showNodeLabelId = useId();
+  const showFieldLabelsId = useId();
+
+  return (
+    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
+      <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Inline presentation</Label>
+      <InlineVisibilityOption
+        id={showNodeLabelId}
+        label="Show node label above form"
+        checked={entry.showNodeLabel !== false}
+        onCheckedChange={(checked) => onChange({ showNodeLabel: checked ? undefined : false })}
+      />
+      <InlineVisibilityOption
+        id={showFieldLabelsId}
+        label="Show field labels"
+        checked={entry.showFieldLabels !== false}
+        onCheckedChange={(checked) => onChange({ showFieldLabels: checked ? undefined : false })}
+      />
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-slate-600 dark:text-gray-400">Submit label (optional)</Label>
+        <Input
+          value={entry.submitLabel ?? ""}
+          onChange={(e) => onChange({ submitLabel: e.target.value || undefined })}
+          placeholder="Run"
+          className="h-8"
+        />
+      </div>
+    </div>
+  );
+}
+
+function InlineVisibilityOption({
+  id,
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+        className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+      />
+      <Label htmlFor={id} className="text-xs text-slate-700 dark:text-gray-300">
+        {label}
+      </Label>
     </div>
   );
 }
