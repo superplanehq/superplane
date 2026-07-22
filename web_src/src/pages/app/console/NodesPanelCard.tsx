@@ -110,7 +110,7 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
  */
 function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
-  if (!entry.node) {
+  if (!entry.node.trim()) {
     return (
       <WidgetEmptyState
         icon={CircleDot}
@@ -172,6 +172,7 @@ function singleNodeLayoutStyles(useInlineLayout: boolean) {
 
 function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
+  const configured = entry.node.trim().length > 0;
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
   const canManualRun = isManualRunNode(resolved?.node);
@@ -191,7 +192,12 @@ function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTr
             {entry.description}
           </p>
         ) : null}
-        {!resolved ? (
+        {!configured ? (
+          <p className="truncate text-[13px] text-slate-400 dark:text-gray-500">
+            Pick a node from the editor to display it here.
+          </p>
+        ) : null}
+        {configured && !resolved ? (
           <p className="truncate text-[13px] text-amber-600 dark:text-amber-400">
             Node {JSON.stringify(entry.node)} not found in this canvas.
           </p>

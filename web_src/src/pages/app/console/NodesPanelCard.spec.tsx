@@ -511,6 +511,25 @@ describe("NodesPanelCard — multi-entry layout", () => {
     expect(new Set(ids).size).toBe(2);
   });
 
+  it("shows a neutral hint instead of the not-found warning for an empty placeholder entry", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE],
+      panel: multiNodePanel([{ node: "deploy-prod" }, { node: "" }]),
+    });
+    expect(screen.getByText(/pick a node from the editor/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not found in this canvas/i)).toBeNull();
+  });
+
+  it("still warns when a configured node reference cannot be resolved", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE],
+      panel: multiNodePanel([{ node: "deploy-prod" }, { node: "renamed-node" }]),
+    });
+    expect(screen.getByText(/node "renamed-node" not found in this canvas/i)).toBeInTheDocument();
+  });
+
   it("hides row Run buttons for non-manual-runnable trigger nodes", () => {
     renderPanel({
       canRunNodes: true,
