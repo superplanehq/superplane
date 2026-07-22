@@ -7,7 +7,7 @@ import { emptyHomePageFixture } from "./__fixtures__/homePageResponses";
 /**
  * Mounts the real org home routes against an in-process fixture backend.
  * Use **Current** for the populated homepage baseline, and **FreshOrg** for the
- * empty-org create / onboarding screen (what a new org lands on today).
+ * empty-org factory-first create screen (what a new org lands on).
  *
  * **Current** shares a router with AppPage: clicking Software Factory opens the
  * live canvas surface (same as Pages/AppPage → Live Canvas).
@@ -33,8 +33,8 @@ export const Current: Story = {
 };
 
 /**
- * Fresh organization: no apps or folders. Matches production — HomePage redirects
- * to `/apps/new`, which renders today's ZeroState create / catalog onboarding UI.
+ * Fresh organization: no apps or folders. HomePage redirects to `/apps/new`, which
+ * renders the factory-first landing (Setup Factory primary; blank/catalog secondary).
  */
 export const FreshOrg: Story = {
   name: "Fresh Org",
