@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -428,6 +429,32 @@ func TestUnclaimTask(t *testing.T) {
 	}
 }
 
+func TestUnclaimTaskDoesNotRequeueTerminationPendingTask(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	unclaimed, err := st.UnclaimTask(ctx, taskID, "runner-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unclaimed {
+		t.Fatal("termination-pending task should not be unclaimed")
+	}
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusClaimed || got.RunnerID != "runner-1" || got.RunnerTerminationRequestedAt == nil {
+		t.Fatalf("task after unclaim: %#v", got)
+	}
+}
+
 func TestCompleteTaskRequeuesRunnerInfraFailureOnce(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
@@ -634,62 +661,117 @@ func TestCompleteTaskTreatsSameRunnerTerminalCompletionAsIdempotent(t *testing.T
 	}
 }
 
-func TestRecoverLostRunnerTasksFailsRunnerLossWithoutRetry(t *testing.T) {
+func TestMarkLostRunnerTasksTerminatingLeavesTaskClaimed(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
 
 	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
-	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	terminations, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(recoveries) != 1 {
-		t.Fatalf("recoveries: %#v", recoveries)
+	if len(terminations) != 1 {
+		t.Fatalf("terminations: %#v", terminations)
 	}
-	if recoveries[0].ID != taskID || recoveries[0].RunnerID != "runner-1" || recoveries[0].Status != models.StatusFailed {
-		t.Fatalf("recovery: %#v", recoveries[0])
+	if terminations[0].ID != taskID || terminations[0].RunnerID != "runner-1" {
+		t.Fatalf("termination: %#v", terminations[0])
 	}
 
 	got, err := st.GetTask(ctx, taskID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != models.StatusFailed {
-		t.Fatalf("status: got %s want failed", got.Status)
-	}
-	if got.InfraRetryCount != 0 {
-		t.Fatalf("infra retry count: got %d want 0", got.InfraRetryCount)
-	}
-	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
-		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
-			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
-	}
-	if got.ErrorMessage != "runner lost before completion" {
-		t.Fatalf("error message: %q", got.ErrorMessage)
-	}
-	if len(got.Environment) != 0 {
-		t.Fatalf("expected environment cleared, got %#v", got.Environment)
+	if got.Status != models.StatusClaimed || got.RunnerID != "runner-1" || got.RunnerTerminationRequestedAt == nil {
+		t.Fatalf("task after mark: %#v", got)
 	}
 }
 
-func TestRecoverLostRunnerTasksFailsAfterPreviousInfraRetry(t *testing.T) {
+func TestTerminationPendingTaskIsNotRequeuedByLeaseReaper(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	taskID := uuid.NewString()
+	if err := st.CreateTask(ctx, &models.Task{
+		ID:                           taskID,
+		FleetID:                      "fleet-retry",
+		Status:                       models.StatusClaimed,
+		CreatedAt:                    now,
+		ClaimedAt:                    &now,
+		LeaseUntil:                   ptrTime(now.Add(-time.Minute)),
+		RunnerID:                     "runner-1",
+		WebhookURL:                   "https://example.com/hook",
+		Commands:                     models.CommandList{{Command: "echo hi"}},
+		RunnerTerminationRequestedAt: &now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	requeued, canceled, err := st.ReapExpiredLeases(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(requeued) != 0 || len(canceled) != 0 {
+		t.Fatalf("reaped termination pending task: requeued=%#v canceled=%#v", requeued, canceled)
+	}
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusClaimed || got.RunnerID != "runner-1" || got.RunnerTerminationRequestedAt == nil {
+		t.Fatalf("task after reap: %#v", got)
+	}
+}
+
+func TestTerminationPendingTaskRejectsLateCompletion(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
 
 	taskID := createClaimedTask(t, ctx, st, "runner-1", 1)
-	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:       taskID,
+		RunnerID: "runner-1",
+		ExitCode: 0,
+	})
+	if err == nil || !strings.Contains(err.Error(), "termination pending") {
+		t.Fatalf("complete error: %v", err)
+	}
+
+	got, err := st.GetTask(ctx, taskID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(recoveries) != 1 {
+	if got.Status != models.StatusClaimed || got.RunnerID != "runner-1" || got.RunnerTerminationRequestedAt == nil {
+		t.Fatalf("task after late completion: %#v", got)
+	}
+	if got.ExitCode != nil {
+		t.Fatalf("exit code should remain nil: %#v", got.ExitCode)
+	}
+}
+
+func TestFinalizeTerminatedRunnerTasksFailsPendingTask(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 1)
+	if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+	recoveries, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveries) != 1 || recoveries[0].ID != taskID || recoveries[0].Status != models.StatusFailed {
 		t.Fatalf("recoveries: %#v", recoveries)
 	}
-	if recoveries[0].ID != taskID || recoveries[0].Status != models.StatusFailed {
-		t.Fatalf("recovery: %#v", recoveries[0])
-	}
-
 	got, err := st.GetTask(ctx, taskID)
 	if err != nil {
 		t.Fatal(err)
@@ -703,6 +785,9 @@ func TestRecoverLostRunnerTasksFailsAfterPreviousInfraRetry(t *testing.T) {
 	if got.ErrorMessage != "runner lost before completion" {
 		t.Fatalf("error message: %q", got.ErrorMessage)
 	}
+	if got.RunnerTerminationRequestedAt != nil {
+		t.Fatalf("termination marker should be cleared: %v", got.RunnerTerminationRequestedAt)
+	}
 	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
 		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
 			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
@@ -712,7 +797,7 @@ func TestRecoverLostRunnerTasksFailsAfterPreviousInfraRetry(t *testing.T) {
 	}
 }
 
-func TestRecoverLostRunnerTasksCancelsStopPendingTask(t *testing.T) {
+func TestFinalizeTerminatedRunnerTasksCancelsStopPendingTask(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -725,8 +810,10 @@ func TestRecoverLostRunnerTasksCancelsStopPendingTask(t *testing.T) {
 	if outcome != taskstore.CancelOutcomeCancelRequested {
 		t.Fatalf("cancel outcome: got %s want %s", outcome, taskstore.CancelOutcomeCancelRequested)
 	}
-
-	recoveries, err := st.RecoverLostRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+	recoveries, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,6 +842,34 @@ func TestRecoverLostRunnerTasksCancelsStopPendingTask(t *testing.T) {
 	}
 }
 
+func TestFinalizeTerminatedRunnerTasksIsIdempotent(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-1"}); err != nil {
+		t.Fatal(err)
+	}
+	recoveries, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recoveries) != 0 {
+		t.Fatalf("second finalize should be empty: %#v", recoveries)
+	}
+	got, err := st.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusFailed || got.ErrorMessage != "runner lost before completion" {
+		t.Fatalf("task after second finalize: %#v", got)
+	}
+}
+
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
 	t.Helper()
 	taskID := uuid.NewString()
@@ -779,4 +894,8 @@ func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.Postgres
 		t.Fatal("expected task to be claimed")
 	}
 	return taskID
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }

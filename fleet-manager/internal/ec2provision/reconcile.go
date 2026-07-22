@@ -197,7 +197,7 @@ func (l *Launcher) scaleDownExcess(ctx context.Context, instances []managedInsta
 		return nil
 	}
 
-	drainedIDs, err := l.drainTerminationCandidates(ctx, ids, api.DrainReasonScaleDown)
+	drainedIDs, err := l.drainTerminationCandidates(ctx, ids, api.DrainReasonScaleDown, false)
 	if err != nil {
 		return fmt.Errorf("drain runners: %w", err)
 	}
@@ -235,7 +235,7 @@ func (l *Launcher) logBusyScaleDownSkipped(have, want int) {
 		slog.String("fleet_id", l.Config.RunnerFleetID))
 }
 
-func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string, reason api.DrainReason) ([]string, error) {
+func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string, reason api.DrainReason, terminationConfirmed bool) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -243,9 +243,10 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string,
 		return ids, nil
 	}
 	resp, err := l.BrokerClient.DrainRunners(ctx, api.DrainRunnersRequest{
-		FleetID:   l.Config.RunnerFleetID,
-		RunnerIDs: ids,
-		Reason:    reason,
+		FleetID:              l.Config.RunnerFleetID,
+		RunnerIDs:            ids,
+		Reason:               reason,
+		TerminationConfirmed: terminationConfirmed,
 	})
 	if err != nil {
 		return nil, err
@@ -273,7 +274,7 @@ func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string,
 			slog.Any("active_task_ids", busyTaskIDs))
 	}
 	if l.Log != nil && reason == api.DrainReasonUnhealthy && len(resp.RecoveredTasks) > 0 {
-		l.Log.Warn("ec2 unhealthy busy runners recovered before termination",
+		l.Log.Warn("ec2 unhealthy runner tasks finalized after termination",
 			slog.String("fleet_id", l.Config.RunnerFleetID),
 			slog.Any("tasks", resp.RecoveredTasks))
 	}

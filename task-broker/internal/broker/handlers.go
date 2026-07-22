@@ -168,10 +168,10 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 	recoveredTasks := []api.RunnerTaskRecovery(nil)
 	if reason == api.DrainReasonUnhealthy {
 		var err error
-		statuses, recoveredTasks, err = s.recoverUnhealthyBusyRunners(r.Context(), req.FleetID, statuses)
+		statuses, recoveredTasks, err = s.handleUnhealthyDrain(r.Context(), req.FleetID, req.RunnerIDs, statuses, req.TerminationConfirmed)
 		if err != nil {
-			s.logErr("recover unhealthy runner tasks", err)
-			writeError(w, http.StatusInternalServerError, "could not recover unhealthy runner tasks")
+			s.logErr("handle unhealthy runner drain", err)
+			writeError(w, http.StatusInternalServerError, "could not drain unhealthy runner tasks")
 			return
 		}
 	}
@@ -232,13 +232,59 @@ func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int)
 	return drained, busy
 }
 
-func (s *Server) recoverUnhealthyBusyRunners(ctx context.Context, fleetID string, statuses []api.DrainRunnerStatus) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+func (s *Server) handleUnhealthyDrain(ctx context.Context, fleetID string, runnerIDs []string, statuses []api.DrainRunnerStatus, terminationConfirmed bool) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
 	busyRunnerIDs, activeTaskIDs := busyRunnerRecoveryInputs(statuses)
 	if len(busyRunnerIDs) == 0 {
 		return statuses, nil, nil
 	}
+	if terminationConfirmed {
+		return s.finalizeTerminatedRunnerTasks(ctx, fleetID, runnerIDs, statuses, activeTaskIDs)
+	}
+	return s.markRunnerTasksTerminating(ctx, fleetID, statuses, busyRunnerIDs, activeTaskIDs)
+}
 
-	recoveries, err := s.Store.RecoverLostRunnerTasks(ctx, fleetID, busyRunnerIDs)
+func (s *Server) markRunnerTasksTerminating(ctx context.Context, fleetID string, statuses []api.DrainRunnerStatus, busyRunnerIDs []string, activeTaskIDs map[string]string) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+	terminations, err := s.Store.MarkLostRunnerTasksTerminating(ctx, fleetID, busyRunnerIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	terminatingRunnerIDs := make(map[string]struct{}, len(terminations))
+	for _, task := range terminations {
+		terminatingRunnerIDs[task.RunnerID] = struct{}{}
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.CompleteTask(task.RunnerID, task.ID)
+		}
+		if s.RunnerCancel != nil {
+			if !s.RunnerCancel.PushCancel(task.RunnerID, task.ID) && s.Log != nil {
+				s.Log.Debug("lost runner cancel ws push not delivered",
+					slog.String("runner_id", task.RunnerID),
+					slog.String("task_id", task.ID))
+			}
+		}
+	}
+
+	if s.RunnerDrain != nil {
+		for runnerID, taskID := range activeTaskIDs {
+			if _, ok := terminatingRunnerIDs[runnerID]; ok {
+				continue
+			}
+			s.RunnerDrain.CompleteTask(runnerID, taskID)
+		}
+	}
+
+	statuses = markTerminatingBusyRunnersDrained(statuses, activeTaskIDs, terminatingRunnerIDs)
+	if s.Log != nil {
+		s.Log.Info("lost_runner_tasks_marked_terminating",
+			slog.String("fleet_id", fleetID),
+			slog.Int("task_count", len(terminations)),
+			slog.Any("tasks", terminations))
+	}
+	return statuses, nil, nil
+}
+
+func (s *Server) finalizeTerminatedRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string, statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+	recoveries, err := s.Store.FinalizeTerminatedRunnerTasks(ctx, fleetID, runnerIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -267,9 +313,9 @@ func (s *Server) recoverUnhealthyBusyRunners(ctx context.Context, fleetID string
 		}
 	}
 
-	statuses = markRecoveredBusyRunnersDrained(statuses, activeTaskIDs, recoveredRunnerIDs)
+	statuses = markTerminatingBusyRunnersDrained(statuses, activeTaskIDs, recoveredRunnerIDs)
 	if s.Log != nil {
-		s.Log.Info("lost_runner_tasks_recovered",
+		s.Log.Info("lost_runner_tasks_finalized_after_termination",
 			slog.String("fleet_id", fleetID),
 			slog.Int("task_count", len(out)),
 			slog.Any("tasks", out))
@@ -296,7 +342,7 @@ func busyRunnerRecoveryInputs(statuses []api.DrainRunnerStatus) ([]string, map[s
 	return runnerIDs, activeTaskIDs
 }
 
-func markRecoveredBusyRunnersDrained(statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string, recoveredRunnerIDs map[string]struct{}) []api.DrainRunnerStatus {
+func markTerminatingBusyRunnersDrained(statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string, recoveredRunnerIDs map[string]struct{}) []api.DrainRunnerStatus {
 	out := make([]api.DrainRunnerStatus, len(statuses))
 	copy(out, statuses)
 	for i := range out {
@@ -592,7 +638,10 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 
 	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "wrong runner") {
+		if strings.Contains(err.Error(), "not found") ||
+			strings.Contains(err.Error(), "wrong runner") ||
+			strings.Contains(err.Error(), "not claimed") ||
+			strings.Contains(err.Error(), "termination pending") {
 			writeError(w, http.StatusConflict, "cannot complete task")
 			return
 		}

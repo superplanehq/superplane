@@ -35,9 +35,10 @@ type FleetTaskCountsResponse struct {
 }
 
 type DrainRunnersRequest struct {
-	FleetID   string      `json:"fleet_id"`
-	RunnerIDs []string    `json:"runner_ids"`
-	Reason    DrainReason `json:"reason,omitempty"`
+	FleetID              string      `json:"fleet_id"`
+	RunnerIDs            []string    `json:"runner_ids"`
+	Reason               DrainReason `json:"reason,omitempty"`
+	TerminationConfirmed bool        `json:"termination_confirmed,omitempty"`
 }
 
 type DrainReason string

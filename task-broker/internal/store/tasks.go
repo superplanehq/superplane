@@ -214,7 +214,7 @@ UPDATE tasks SET
 	claimed_at  = NULL,
 	lease_until = NULL,
 	runner_id   = NULL
-WHERE id = ? AND status = ? AND runner_id = ?`,
+WHERE id = ? AND status = ? AND runner_id = ? AND runner_termination_requested_at IS NULL`,
 		string(models.StatusQueued), taskID, string(models.StatusClaimed), runnerID,
 	)
 	if res.Error != nil {
@@ -320,7 +320,7 @@ UPDATE tasks SET
 	error_message = ?,
 	cancel_requested = false,
 	environment_json = NULL
-WHERE id = ? AND runner_id = ? AND status = ?`,
+WHERE id = ? AND runner_id = ? AND status = ? AND runner_termination_requested_at IS NULL`,
 		string(final), req.ExitCode, nullIfEmpty(req.ResultJSON), nullIfEmpty(req.ErrorMessage),
 		req.ID, req.RunnerID, string(models.StatusClaimed),
 	)
@@ -348,6 +348,9 @@ func (s *PostgresStore) completeTaskNoRows(ctx context.Context, req CompleteTask
 	if task.RunnerID != req.RunnerID {
 		return nil, fmt.Errorf("wrong runner for task %s", req.ID)
 	}
+	if task.RunnerTerminationRequestedAt != nil {
+		return nil, fmt.Errorf("task termination pending: %s", req.ID)
+	}
 	if terminalTaskStatus(task.Status) {
 		return &CompleteTaskResult{Task: task, Outcome: CompleteTaskOutcomeAlreadyTerminal}, nil
 	}
@@ -373,7 +376,7 @@ UPDATE tasks SET
 	error_message = NULL,
 	cancel_requested = false,
 	infra_retry_count = infra_retry_count + 1
-WHERE id = ? AND runner_id = ? AND status = ? AND cancel_requested = false AND infra_retry_count < ?
+WHERE id = ? AND runner_id = ? AND status = ? AND cancel_requested = false AND infra_retry_count < ? AND runner_termination_requested_at IS NULL
 RETURNING id`,
 		string(models.StatusQueued), req.ID, req.RunnerID, string(models.StatusClaimed), maxInfraRetries,
 	).Scan(&rows).Error
@@ -386,10 +389,59 @@ RETURNING id`,
 	return s.GetTask(ctx, rows[0].ID)
 }
 
-func (s *PostgresStore) RecoverLostRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error) {
+func (s *PostgresStore) MarkLostRunnerTasksTerminating(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskTermination, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {
-		return nil, fmt.Errorf("fleet_id required for lost runner recovery")
+		return nil, fmt.Errorf("fleet_id required for lost runner termination")
+	}
+	runnerIDs = compactRunnerIDs(runnerIDs)
+	if len(runnerIDs) == 0 {
+		return []LostRunnerTaskTermination{}, nil
+	}
+
+	type row struct {
+		ID       string
+		FleetID  string
+		RunnerID string
+	}
+	var rows []row
+	now := time.Now().UTC()
+	err := s.db.WithContext(ctx).Raw(`
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ?
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		runner_termination_requested_at = COALESCE(t.runner_termination_requested_at, ?)
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id
+)
+SELECT id, fleet_id, runner_id FROM updated ORDER BY runner_id ASC, id ASC`,
+		fleetID, string(models.StatusClaimed), runnerIDs, now,
+	).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]LostRunnerTaskTermination, 0, len(rows))
+	for _, row := range rows {
+		tasks = append(tasks, LostRunnerTaskTermination{
+			ID:       row.ID,
+			FleetID:  row.FleetID,
+			RunnerID: row.RunnerID,
+		})
+	}
+	return tasks, nil
+}
+
+func (s *PostgresStore) FinalizeTerminatedRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for terminated runner finalization")
 	}
 	runnerIDs = compactRunnerIDs(runnerIDs)
 	if len(runnerIDs) == 0 {
@@ -402,7 +454,7 @@ func (s *PostgresStore) RecoverLostRunnerTasks(ctx context.Context, fleetID stri
 WITH candidates AS (
 	SELECT id, fleet_id, runner_id
 	FROM tasks
-	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = true
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = true AND runner_termination_requested_at IS NOT NULL
 	FOR UPDATE
 ),
 updated AS (
@@ -412,6 +464,7 @@ updated AS (
 		claimed_at = NULL,
 		lease_until = NULL,
 		runner_id = NULL,
+		runner_termination_requested_at = NULL,
 		exit_code = ?,
 		output = ?,
 		result_json = NULL,
@@ -434,7 +487,7 @@ SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id A
 WITH candidates AS (
 	SELECT id, fleet_id, runner_id
 	FROM tasks
-	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false AND runner_termination_requested_at IS NOT NULL
 	FOR UPDATE
 ),
 updated AS (
@@ -443,6 +496,7 @@ updated AS (
 		claimed_at = NULL,
 		lease_until = NULL,
 		runner_id = NULL,
+		runner_termination_requested_at = NULL,
 		exit_code = 1,
 		output = '',
 		result_json = NULL,
@@ -515,7 +569,7 @@ UPDATE tasks SET
 	output = ?,
 	result_json = NULL,
 	error_message = NULL
-WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = true
+WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = true AND runner_termination_requested_at IS NULL
 RETURNING id`,
 		string(models.StatusCanceled), exitCanceled, msgCanceledLeaseReap,
 		string(models.StatusClaimed), now,
@@ -544,7 +598,7 @@ UPDATE tasks SET
 	claimed_at = NULL,
 	lease_until = NULL,
 	runner_id = NULL
-WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = false
+WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = false AND runner_termination_requested_at IS NULL
 RETURNING id, fleet_id`,
 		string(models.StatusQueued), string(models.StatusClaimed), now,
 	).Scan(&requeuedRows).Error

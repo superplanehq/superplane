@@ -12,14 +12,17 @@ import (
 )
 
 type fakeBrokerClient struct {
-	counts       api.FleetTaskCountsResponse
-	err          error
-	drain        api.DrainRunnersResponse
-	drainErr     error
-	calls        int
-	drainCalls   int
-	gotID        string
-	drainRequest api.DrainRunnersRequest
+	counts         api.FleetTaskCountsResponse
+	err            error
+	drain          api.DrainRunnersResponse
+	drainErr       error
+	drainResponses []api.DrainRunnersResponse
+	drainErrs      []error
+	calls          int
+	drainCalls     int
+	gotID          string
+	drainRequest   api.DrainRunnersRequest
+	drainRequests  []api.DrainRunnersRequest
 }
 
 func (f *fakeBrokerClient) FleetTaskCounts(_ context.Context, fleetID string) (api.FleetTaskCountsResponse, error) {
@@ -31,6 +34,14 @@ func (f *fakeBrokerClient) FleetTaskCounts(_ context.Context, fleetID string) (a
 func (f *fakeBrokerClient) DrainRunners(_ context.Context, req api.DrainRunnersRequest) (api.DrainRunnersResponse, error) {
 	f.drainCalls++
 	f.drainRequest = req
+	f.drainRequests = append(f.drainRequests, req)
+	index := f.drainCalls - 1
+	if index < len(f.drainErrs) && f.drainErrs[index] != nil {
+		return api.DrainRunnersResponse{}, f.drainErrs[index]
+	}
+	if index < len(f.drainResponses) {
+		return f.drainResponses[index], nil
+	}
 	return f.drain, f.drainErr
 }
 
@@ -240,7 +251,7 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonScaleDown)
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonScaleDown, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +268,9 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 	if fake.drainRequest.Reason != api.DrainReasonScaleDown {
 		t.Fatalf("drain reason: got %q want %q", fake.drainRequest.Reason, api.DrainReasonScaleDown)
 	}
+	if fake.drainRequest.TerminationConfirmed {
+		t.Fatal("scale-down drain should not confirm termination")
+	}
 }
 
 func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T) {
@@ -266,7 +280,7 @@ func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T
 		BrokerClient: fake,
 	}
 
-	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, api.DrainReasonScaleDown); err == nil {
+	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, api.DrainReasonScaleDown, false); err == nil {
 		t.Fatal("expected drain error")
 	}
 }
@@ -288,7 +302,7 @@ func TestDrainTerminationCandidates_UsesUnhealthyDrainReason(t *testing.T) {
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonUnhealthy)
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonUnhealthy, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,6 +312,9 @@ func TestDrainTerminationCandidates_UsesUnhealthyDrainReason(t *testing.T) {
 	}
 	if fake.drainRequest.Reason != api.DrainReasonUnhealthy {
 		t.Fatalf("drain reason: got %q want %q", fake.drainRequest.Reason, api.DrainReasonUnhealthy)
+	}
+	if !fake.drainRequest.TerminationConfirmed {
+		t.Fatal("expected confirmed unhealthy drain")
 	}
 }
 
@@ -314,7 +331,7 @@ func TestDrainTerminationCandidates_TerminatesBrokerDrainedUnhealthyRunner(t *te
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-stale"}, api.DrainReasonUnhealthy)
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-stale"}, api.DrainReasonUnhealthy, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +354,7 @@ func TestDrainTerminationCandidates_DefersBrokerBusyUnhealthyRunner(t *testing.T
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-claiming"}, api.DrainReasonUnhealthy)
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-claiming"}, api.DrainReasonUnhealthy, false)
 	if err != nil {
 		t.Fatal(err)
 	}
