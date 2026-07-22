@@ -25,8 +25,8 @@ const (
 
 const (
 	appSetupDescription = `
-- Click **Continue** to open Linear's OAuth application form.
-- Click **Create** at the bottom of the form.
+- Click **Continue** to open Linear's OAuth application form prefilled with the required information.
+- Once on Linear, click **Create** at the bottom of the form which will take you to the credentials page.
 - Copy the **Client ID** and **Client Secret** into the fields below and click **Save**.
 `
 
@@ -50,14 +50,8 @@ type Metadata struct {
 const installationInstructions = `
 SuperPlane connects to Linear with OAuth.
 
-1. Click **Connect** below to start the setup wizard. 
-2. On the connection wizard that opens, click **Connect** which will open Linear's OAuth application form pre-filled with everything SuperPlane needs.
-3. Click **Create** on Linear, then copy the **Client ID** and **Client Secret** in the input fields provided on SuperPlane.
-4. Click **Save**, then once saved, click **Continue** on the integration configuration to authorize SuperPlane in your Linear workspace.
+1. Click **Connect** below with client id and secret empty to start the setup wizard. 
 
-**Permissions:** SuperPlane requests the read, write and admin scopes. The admin scope is required because the On Issue trigger registers Linear webhooks, and Linear only allows webhook management with admin access — so connect as a **workspace admin**.
-
-**Note:** actions performed by SuperPlane are attributed to the user who authorized the connection, and the integration stops working if that user leaves the workspace.
 `
 
 func (l *Linear) Name() string {
