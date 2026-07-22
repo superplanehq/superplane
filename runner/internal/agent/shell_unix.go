@@ -292,7 +292,8 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 	// we do not treat the marker as a substring inside the echoed `echo '…'` line.
 	// Alias exit→return once for the whole session (shared across all sourced commands).
 	bootDeadline := time.Now().Add(30 * time.Second)
-	if err := sess.writeLine(fmt.Sprintf(`%s; echo '%s'`, ptyExitAliasBootstrap, bootMarker)); err != nil {
+	bootCmd := fmt.Sprintf(`%s; echo '%s'`, ptyExitAliasBootstrap, bootMarker)
+	if err := sess.writeLine(bootCmd); err != nil {
 		return 1, truncateString(sess.out.String(), max), err
 	}
 	buf := make([]byte, 4096)
