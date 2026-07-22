@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func skipPTYIntegrationOnCI(t *testing.T) {
@@ -119,9 +121,9 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 
 func TestHostShellDirectivesExitAliasKeepsShell(t *testing.T) {
 	skipPTYIntegrationOnCI(t)
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Fatalf("bash required: %v", err)
-	}
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -133,28 +135,19 @@ func TestHostShellDirectivesExitAliasKeepsShell(t *testing.T) {
 	t.Logf("code=%d out=%q err=%v", code, out, err)
 
 	// Session-boot alias makes top-level exit→return: clean status, shell stays up.
-	if code != 1 {
-		t.Fatalf("expected exit code 1, got code=%d err=%v out=%q", code, err, out)
-	}
-	if err == nil || !strings.Contains(err.Error(), "exit code") {
-		t.Fatalf("expected exit-code error from end marker, got %v", err)
-	}
-	if strings.Contains(err.Error(), "shell closed") {
-		t.Fatalf("exit killed the PTY shell: %v", err)
-	}
-	if strings.Contains(out, "there") {
-		t.Fatalf("expected fail-fast before echo there; out=%q", out)
-	}
-	if !strings.Contains(out, "hello") {
-		t.Fatalf("expected hello before exit; out=%q", out)
-	}
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit code")
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "hello")
+	assert.NotContains(t, out, "there")
 }
 
 func TestHostShellDirectivesExitAliasPersistsAcrossCommands(t *testing.T) {
 	skipPTYIntegrationOnCI(t)
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Fatalf("bash required: %v", err)
-	}
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -167,18 +160,13 @@ func TestHostShellDirectivesExitAliasPersistsAcrossCommands(t *testing.T) {
 		`printf 'mark=%s cwd=%s\n' "$RUNNER_EXIT_MARK" "$(pwd -P)"; echo hello; exit 1; echo there`,
 	}, nil, nil, "")
 	t.Logf("code=%d out=%q err=%v", code, out, err)
-	if code != 1 {
-		t.Fatalf("expected second-command exit code 1, got code=%d err=%v out=%q", code, err, out)
-	}
-	if strings.Contains(err.Error(), "shell closed") {
-		t.Fatalf("exit on later command killed the PTY shell: %v", err)
-	}
-	if !strings.Contains(out, "mark=kept") || !strings.Contains(out, "/work") {
-		t.Fatalf("cd/export should persist across commands; out=%q", out)
-	}
-	if strings.Contains(out, "there") {
-		t.Fatalf("expected aliased exit to stop second command; out=%q", out)
-	}
+
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "mark=kept")
+	assert.Contains(t, out, "/work")
+	assert.NotContains(t, out, "there")
 }
 
 func TestEndMarkerStreamHoldback(t *testing.T) {

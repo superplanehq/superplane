@@ -1,20 +1,15 @@
 package agent
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPtyExitAliasBootstrap(t *testing.T) {
 	t.Parallel()
 
-	if !strings.Contains(ptyExitAliasBootstrap, "shopt -s expand_aliases") {
-		t.Fatalf("bootstrap missing expand_aliases: %q", ptyExitAliasBootstrap)
-	}
-	if !strings.Contains(ptyExitAliasBootstrap, "alias exit=return") {
-		t.Fatalf("bootstrap missing exit alias: %q", ptyExitAliasBootstrap)
-	}
-	if strings.Contains(ptyExitAliasBootstrap, "\n") {
-		t.Fatalf("bootstrap should be a single shell line: %q", ptyExitAliasBootstrap)
-	}
+	assert.Contains(t, ptyExitAliasBootstrap, "shopt -s expand_aliases")
+	assert.Contains(t, ptyExitAliasBootstrap, "alias exit=return")
+	assert.NotContains(t, ptyExitAliasBootstrap, "\n")
 }
