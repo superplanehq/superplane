@@ -27,16 +27,16 @@ func (f *fakeLister) FleetID() string { return f.fleetID }
 
 func TestAggregateManagedRunners_ConcatenatesAcrossPools(t *testing.T) {
 	a := &fakeLister{
-		fleetID: "aws-amd64",
+		fleetID: "e1-tiny-amd64",
 		rows: []ec2provision.ManagedRunnerSummary{
-			{FleetID: "aws-amd64", InstanceID: "i-1", State: "running"},
-			{FleetID: "aws-amd64", InstanceID: "i-2", State: "pending"},
+			{FleetID: "e1-tiny-amd64", InstanceID: "i-1", State: "running"},
+			{FleetID: "e1-tiny-amd64", InstanceID: "i-2", State: "pending"},
 		},
 	}
 	b := &fakeLister{
-		fleetID: "aws-arm64",
+		fleetID: "e1-tiny-arm64",
 		rows: []ec2provision.ManagedRunnerSummary{
-			{FleetID: "aws-arm64", InstanceID: "i-3", State: "running"},
+			{FleetID: "e1-tiny-arm64", InstanceID: "i-3", State: "running"},
 		},
 	}
 
@@ -48,8 +48,8 @@ func TestAggregateManagedRunners_ConcatenatesAcrossPools(t *testing.T) {
 	if a.calls != 1 || b.calls != 1 {
 		t.Errorf("each launcher called once: a=%d b=%d", a.calls, b.calls)
 	}
-	if out[0].FleetID != "aws-amd64" || out[1].FleetID != "aws-amd64" || out[2].FleetID != "aws-arm64" {
-		t.Errorf("fleet ids in output rows = [%s %s %s], want [aws-amd64 aws-amd64 aws-arm64]",
+	if out[0].FleetID != "e1-tiny-amd64" || out[1].FleetID != "e1-tiny-amd64" || out[2].FleetID != "e1-tiny-arm64" {
+		t.Errorf("fleet ids in output rows = [%s %s %s], want [e1-tiny-amd64 e1-tiny-amd64 e1-tiny-arm64]",
 			out[0].FleetID, out[1].FleetID, out[2].FleetID)
 	}
 	if out[0].InstanceID != "i-1" || out[1].InstanceID != "i-2" || out[2].InstanceID != "i-3" {

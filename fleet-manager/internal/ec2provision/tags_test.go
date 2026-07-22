@@ -8,7 +8,7 @@ import (
 )
 
 func TestManagedRunInstancesTags_IncludesFleetIDPartitionKey(t *testing.T) {
-	tags := managedRunInstancesTags("aws-arm64", "arm64")
+	tags := managedRunInstancesTags("e1-tiny-arm64", "arm64")
 
 	got := map[string]string{}
 	for _, tg := range tags {
@@ -21,8 +21,8 @@ func TestManagedRunInstancesTags_IncludesFleetIDPartitionKey(t *testing.T) {
 	if got[TagKeyManaged] != "true" {
 		t.Errorf("%s = %q, want true", TagKeyManaged, got[TagKeyManaged])
 	}
-	if got[TagKeyFleetID] != "aws-arm64" {
-		t.Errorf("%s = %q, want aws-arm64", TagKeyFleetID, got[TagKeyFleetID])
+	if got[TagKeyFleetID] != "e1-tiny-arm64" {
+		t.Errorf("%s = %q, want e1-tiny-arm64", TagKeyFleetID, got[TagKeyFleetID])
 	}
 	if got[TagKeyArch] != "arm64" {
 		t.Errorf("%s = %q, want arm64", TagKeyArch, got[TagKeyArch])
@@ -33,7 +33,7 @@ func TestManagedRunInstancesTags_IncludesFleetIDPartitionKey(t *testing.T) {
 }
 
 func TestManagedDescribeFilters_ScopesByManagedAndFleetIDAndStates(t *testing.T) {
-	filters := managedDescribeFilters("aws-amd64", []string{"pending", "running"})
+	filters := managedDescribeFilters("e1-tiny-amd64", []string{"pending", "running"})
 
 	got := map[string][]string{}
 	for _, f := range filters {
@@ -43,8 +43,8 @@ func TestManagedDescribeFilters_ScopesByManagedAndFleetIDAndStates(t *testing.T)
 	if v := got["tag:"+TagKeyManaged]; len(v) != 1 || v[0] != "true" {
 		t.Errorf("tag:%s = %v, want [true]", TagKeyManaged, v)
 	}
-	if v := got["tag:"+TagKeyFleetID]; len(v) != 1 || v[0] != "aws-amd64" {
-		t.Errorf("tag:%s = %v, want [aws-amd64]", TagKeyFleetID, v)
+	if v := got["tag:"+TagKeyFleetID]; len(v) != 1 || v[0] != "e1-tiny-amd64" {
+		t.Errorf("tag:%s = %v, want [e1-tiny-amd64]", TagKeyFleetID, v)
 	}
 	if v := got["instance-state-name"]; len(v) != 2 || v[0] != "pending" || v[1] != "running" {
 		t.Errorf("instance-state-name = %v, want [pending running]", v)
@@ -57,8 +57,8 @@ func TestManagedDescribeFilters_ScopesByManagedAndFleetIDAndStates(t *testing.T)
 func TestManagedDescribeFilters_DifferentFleetIDsProduceDifferentFilters(t *testing.T) {
 	// Two pools inside one fleet-manager process must produce mutually-exclusive
 	// Describe filters so they don't reconcile each other's instances.
-	a := managedDescribeFilters("aws-amd64", []string{"pending", "running"})
-	b := managedDescribeFilters("aws-arm64", []string{"pending", "running"})
+	a := managedDescribeFilters("e1-tiny-amd64", []string{"pending", "running"})
+	b := managedDescribeFilters("e1-tiny-arm64", []string{"pending", "running"})
 
 	fleetTag := func(fs []types.Filter) string {
 		for _, f := range fs {
@@ -68,10 +68,10 @@ func TestManagedDescribeFilters_DifferentFleetIDsProduceDifferentFilters(t *test
 		}
 		return ""
 	}
-	if got := fleetTag(a); got != "aws-amd64" {
-		t.Errorf("pool A fleet-id filter = %q, want aws-amd64", got)
+	if got := fleetTag(a); got != "e1-tiny-amd64" {
+		t.Errorf("pool A fleet-id filter = %q, want e1-tiny-amd64", got)
 	}
-	if got := fleetTag(b); got != "aws-arm64" {
-		t.Errorf("pool B fleet-id filter = %q, want aws-arm64", got)
+	if got := fleetTag(b); got != "e1-tiny-arm64" {
+		t.Errorf("pool B fleet-id filter = %q, want e1-tiny-arm64", got)
 	}
 }

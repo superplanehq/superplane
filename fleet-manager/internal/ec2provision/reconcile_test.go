@@ -174,9 +174,9 @@ func TestTickAll_TicksEveryLauncherInOrder(t *testing.T) {
 		seen = append(seen, l.Config.RunnerFleetID)
 	}
 	launchers := []*Launcher{
-		{Config: Config{RunnerFleetID: "aws-amd64"}},
-		{Config: Config{RunnerFleetID: "aws-arm64"}},
-		{Config: Config{RunnerFleetID: "aws-gpu"}},
+		{Config: Config{RunnerFleetID: "e1-tiny-amd64"}},
+		{Config: Config{RunnerFleetID: "e1-tiny-arm64"}},
+		{Config: Config{RunnerFleetID: "e1-large-amd64"}},
 	}
 
 	tickAll(context.Background(), nil, launchers, spy)
@@ -184,8 +184,8 @@ func TestTickAll_TicksEveryLauncherInOrder(t *testing.T) {
 	if len(seen) != 3 {
 		t.Fatalf("expected 3 ticks, got %d (%v)", len(seen), seen)
 	}
-	if seen[0] != "aws-amd64" || seen[1] != "aws-arm64" || seen[2] != "aws-gpu" {
-		t.Errorf("tick order = %v, want [aws-amd64 aws-arm64 aws-gpu]", seen)
+	if seen[0] != "e1-tiny-amd64" || seen[1] != "e1-tiny-arm64" || seen[2] != "e1-large-amd64" {
+		t.Errorf("tick order = %v, want [e1-tiny-amd64 e1-tiny-arm64 e1-large-amd64]", seen)
 	}
 }
 
