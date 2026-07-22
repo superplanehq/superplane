@@ -229,7 +229,7 @@ async function runLiveLogSession({
 export function useLiveLogStream(executionId: string, executionInFlight: boolean) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
-  const [state, setState] = useState<LogState>(initialLogState);
+  const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isStreaming: true }));
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -257,6 +257,7 @@ export function useLiveLogStream(executionId: string, executionInFlight: boolean
 
   useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
+      setState((prev) => ({ ...prev, isStreaming: false }));
       return;
     }
 
