@@ -6,6 +6,8 @@ import { LiveLogStreamView } from "./LiveLogStreamView";
 const useLiveLogStreamMock = vi.fn();
 
 vi.mock("./useLiveLogStream", () => ({
+  terminalCommandStatusForExecution: vi.fn(() => null),
+  terminalTimeMsForExecution: vi.fn(() => null),
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
 
