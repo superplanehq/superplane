@@ -109,6 +109,11 @@ describe("coerceParameterValue", () => {
     expect(coerceParameterValue({ name: "s", type: "string" }, 1)).toBe("1");
     expect(coerceParameterValue({ name: "p", type: "select" }, "openai")).toBe("openai");
   });
+
+  it("treats text values as strings and preserves newlines", () => {
+    expect(coerceParameterValue({ name: "prompt", type: "text" }, "line 1\nline 2")).toBe("line 1\nline 2");
+    expect(coerceParameterValue({ name: "prompt", type: "text" }, null)).toBe("");
+  });
 });
 
 describe("selectOptionValues", () => {
@@ -152,12 +157,19 @@ describe("parameterDefaultValue", () => {
     expect(parameterDefaultValue({ name: "a", type: "string", defaultString: "" })).toBeUndefined();
     expect(parameterDefaultValue({ name: "b", type: "boolean", defaultBoolean: null })).toBeUndefined();
   });
+
+  it("reads defaultString for text parameters", () => {
+    expect(parameterDefaultValue({ name: "prompt", type: "text", defaultString: "hello" })).toBe("hello");
+    expect(parameterDefaultValue({ name: "prompt", type: "text", defaultString: "" })).toBeUndefined();
+  });
 });
 
 describe("initialParameterValue", () => {
   it("uses configured parameter defaults", () => {
     expect(initialParameterValue({ name: "count", type: "number", defaultNumber: 1 })).toBe(1);
     expect(initialParameterValue({ name: "redundancy", type: "string", defaultString: "dual" })).toBe("dual");
+    expect(initialParameterValue({ name: "prompt", type: "text", defaultString: "hi\nthere" })).toBe("hi\nthere");
+    expect(initialParameterValue({ name: "prompt", type: "text" })).toBe("");
     expect(
       initialParameterValue({
         name: "provider",

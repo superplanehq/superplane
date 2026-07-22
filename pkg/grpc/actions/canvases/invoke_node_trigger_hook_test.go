@@ -353,6 +353,69 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		assert.Equal(t, "Hello from hook parameter", inner["message"])
 	})
 
+	t.Run("run resolves multiline text template parameters from an inline form payload", func(t *testing.T) {
+		expressionNodeID := "start-node-text-parameter"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   "Submit task",
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "task",
+								"parameters": []any{
+									map[string]any{
+										"name":        "prompt",
+										"title":       "Task",
+										"type":        "text",
+										"placeholder": "Describe a small test task…",
+									},
+								},
+								"payload": map[string]any{
+									"title": `{{ parameters["prompt"] }}`,
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "task",
+				"prompt":   "debug prompt",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "debug prompt", inner["title"])
+	})
+
 	t.Run("run resolves template payload expressions using configured template parameter defaults", func(t *testing.T) {
 		expressionNodeID := "start-node-expression-parameter-default"
 		expressionCanvas, _ := support.CreateCanvas(
