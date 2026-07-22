@@ -423,6 +423,47 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		assert.Equal(t, "release", requestBody["base"])
 	})
 
+	t.Run("retargeting and closing together are sent as two separate requests", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"base":       "release",
+				"state":      "closed",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 3)
+
+		baseRequest := httpCtx.Requests[0]
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", baseRequest.URL.Path)
+		baseBody := readJSONBody(t, baseRequest)
+		assert.Equal(t, "release", baseBody["base"])
+		assert.NotContains(t, baseBody, "state")
+
+		stateRequest := httpCtx.Requests[1]
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", stateRequest.URL.Path)
+		stateBody := readJSONBody(t, stateRequest)
+		assert.Equal(t, "closed", stateBody["state"])
+		assert.NotContains(t, stateBody, "base")
+
+		getRequest := httpCtx.Requests[2]
+		assert.Equal(t, http.MethodGet, getRequest.Method)
+	})
+
 	t.Run("updates labels and assignees through the Issues API", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
@@ -465,6 +506,30 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		getRequest := httpCtx.Requests[1]
 		assert.Equal(t, http.MethodGet, getRequest.Method)
 		assert.Equal(t, "/repos/testhq/hello/pulls/42", getRequest.URL.Path)
+	})
+
+	t.Run("strips a leading @ from assignee usernames", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42}`),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"assignees":  []string{"@octocat"},
+			},
+		})
+
+		require.NoError(t, err)
+		requestBody := readJSONBody(t, httpCtx.Requests[0])
+		assert.Equal(t, []any{"octocat"}, requestBody["assignees"])
 	})
 
 	t.Run("labels toggled on with an empty list clears all labels", func(t *testing.T) {
