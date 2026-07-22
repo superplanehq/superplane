@@ -85,9 +85,10 @@ func TestDrainRunners_OK(t *testing.T) {
 
 	c := New(ts.URL, "tok")
 	out, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
-		FleetID:   "fleet-a",
-		RunnerIDs: []string{"i-idle", "i-busy"},
-		Reason:    api.DrainReasonUnhealthy,
+		FleetID:              "fleet-a",
+		RunnerIDs:            []string{"i-idle", "i-busy"},
+		Reason:               api.DrainReasonUnhealthy,
+		TerminationConfirmed: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +99,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	if gotAuth != "Bearer tok" {
 		t.Fatalf("auth: %q", gotAuth)
 	}
-	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 || gotBody.Reason != api.DrainReasonUnhealthy {
+	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 || gotBody.Reason != api.DrainReasonUnhealthy || !gotBody.TerminationConfirmed {
 		t.Fatalf("body: %#v", gotBody)
 	}
 	if len(out.Runners) != 2 {

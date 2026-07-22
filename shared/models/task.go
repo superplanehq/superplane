@@ -60,6 +60,9 @@ type Task struct {
 	InfraRetryCount int
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
+	// RunnerTerminationRequestedAt is set internally when fleet-manager is terminating
+	// the runner before the task can be finalized safely.
+	RunnerTerminationRequestedAt *time.Time
 }
 
 // EnvironmentVariable is one task-scoped environment variable.

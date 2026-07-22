@@ -49,8 +49,15 @@ type Launcher struct {
 	healthMu       sync.Mutex
 	healthFailures map[string]int // instance id -> consecutive health probe failures
 
+	unhealthyTerminationMu      sync.Mutex
+	unhealthyTerminationPending map[string]struct{} // instance ids awaiting EC2 terminated confirmation
+
 	// runInstancesHook, when set, replaces Client.RunInstances (tests only).
 	runInstancesHook func(context.Context, *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error)
+
+	// terminateInstancesHook and describeInstancesHook replace EC2 calls in tests.
+	terminateInstancesHook func(context.Context, *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
+	describeInstancesHook  func(context.Context, *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 }
 
 // FleetID returns the broker fleet id this launcher manages (the partition key used in
@@ -139,6 +146,9 @@ const (
 
 	maxLaunch          = 50
 	defaultLaunchBatch = 5
+
+	terminatedWaitTimeout  = 2 * time.Minute
+	terminatedPollInterval = 2 * time.Second
 )
 
 // managedRunInstancesTags returns the tags applied at launch to every managed runner instance.
