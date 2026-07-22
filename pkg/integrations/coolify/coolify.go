@@ -38,10 +38,6 @@ func (c *Coolify) Icon() string {
 	return "coolify"
 }
 
-func (c *Coolify) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (c *Coolify) Description() string {
 	return "List and control Coolify applications and services, and trigger deployments"
 }

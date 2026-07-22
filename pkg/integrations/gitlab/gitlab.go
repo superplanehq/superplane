@@ -76,10 +76,6 @@ type ProjectMetadata struct {
 	URL  string `mapstructure:"url" json:"url"`
 }
 
-func (g *GitLab) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (g *GitLab) Name() string {
 	return "gitlab"
 }

@@ -161,6 +161,17 @@ service Organizations {
     };
   }
 
+  rpc ListIntegrationTools(ListIntegrationToolsRequest) returns (ListIntegrationToolsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/integrations/{integration_id}/tools"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integration tools";
+      description: "Lists tools for an integration";
+      tags: "Organization";
+    };
+  }
+
   rpc CallIntegrationTool(CallIntegrationToolRequest) returns (CallIntegrationToolResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/integrations/{integration_id}/tools"
@@ -410,6 +421,22 @@ message DescribeIntegrationRequest {
 
 message DescribeIntegrationResponse {
   Integration integration = 1;
+}
+
+message ListIntegrationToolsRequest {
+  string id = 1;
+  string integration_id = 2;
+}
+
+message ListIntegrationToolsResponse {
+  repeated IntegrationTool tools = 1;
+}
+
+message IntegrationTool {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+  repeated Configuration.Field parameters = 4;
 }
 
 message CallIntegrationToolRequest {

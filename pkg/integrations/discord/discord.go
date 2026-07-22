@@ -23,10 +23,6 @@ type Metadata struct {
 	Username string `json:"username" mapstructure:"username"`
 }
 
-func (d *Discord) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (d *Discord) Name() string {
 	return "discord"
 }

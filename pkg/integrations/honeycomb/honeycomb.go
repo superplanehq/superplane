@@ -23,10 +23,6 @@ type Configuration struct {
 	EnvironmentSlug string `json:"environmentSlug" mapstructure:"environmentSlug"`
 }
 
-func (h *Honeycomb) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (h *Honeycomb) Name() string {
 	return "honeycomb"
 }

@@ -28,10 +28,6 @@ func (i *Cursor) Label() string {
 	return "Cursor"
 }
 
-func (i *Cursor) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (i *Cursor) Icon() string {
 	return "cpu"
 }

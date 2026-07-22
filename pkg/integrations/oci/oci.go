@@ -36,10 +36,6 @@ type IntegrationMetadata struct {
 	CompartmentRules map[string]string `json:"compartmentRules,omitempty" mapstructure:"compartmentRules"`
 }
 
-func (o *OCI) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (o *OCI) Name() string {
 	return "oci"
 }

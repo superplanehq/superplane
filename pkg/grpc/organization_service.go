@@ -109,6 +109,11 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 	return organizations.ListIntegrationResources(ctx, s.registry, orgID, req.IntegrationId, req.Parameters)
 }
 
+func (s *OrganizationService) ListIntegrationTools(ctx context.Context, req *pb.ListIntegrationToolsRequest) (*pb.ListIntegrationToolsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListIntegrationTools(ctx, s.registry, orgID, req.IntegrationId)
+}
+
 func (s *OrganizationService) CallIntegrationTool(ctx context.Context, req *pb.CallIntegrationToolRequest) (*pb.CallIntegrationToolResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.CallIntegrationTool(ctx, s.registry, orgID, req.IntegrationId, req.ToolName, req.Parameters)

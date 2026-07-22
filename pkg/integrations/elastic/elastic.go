@@ -33,10 +33,6 @@ func (e *Elastic) Name() string {
 	return "elastic"
 }
 
-func (e *Elastic) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (e *Elastic) Label() string {
 	return "Elastic"
 }

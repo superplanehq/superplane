@@ -21,6 +21,39 @@ func NewPanicableAction(a core.Action) core.Action {
 	return &PanicableAction{underlying: a}
 }
 
+func UnderlyingAction(action core.Action) core.Action {
+	if wrapped, ok := action.(*PanicableAction); ok {
+		return wrapped.underlying
+	}
+
+	return action
+}
+
+func AsIntegrationTool(action core.Action) (core.IntegrationTool, bool) {
+	tool, ok := UnderlyingAction(action).(core.IntegrationTool)
+	return tool, ok
+}
+
+func CallActionTool(action core.Action, ctx core.IntegrationToolContext) (output any, err error) {
+	tool, ok := AsIntegrationTool(action)
+	if !ok {
+		return nil, fmt.Errorf("action %s is not a tool", action.Name())
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Errorf("Action %s panicked in Call(): %v\nStack: %s",
+					action.Name(), r, debug.Stack())
+			}
+			output = nil
+			err = fmt.Errorf("action %s panicked in Call(): %v", action.Name(), r)
+		}
+	}()
+
+	return tool.Call(ctx)
+}
+
 /*
  * Non-panicking methods.
  * These are mostly definition methods, so they won't panic.
@@ -168,23 +201,4 @@ func (s *PanicableAction) OnIntegrationMessage(ctx core.IntegrationMessageContex
 	}
 
 	return integrationAction.OnIntegrationMessage(ctx)
-}
-
-func (s *PanicableAction) Call(ctx core.IntegrationToolContext) (output any, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Action %s panicked in Call(): %v\nStack: %s",
-				s.underlying.Name(), r, debug.Stack())
-			output = nil
-			err = fmt.Errorf("action %s panicked in Call(): %v",
-				s.underlying.Name(), r)
-		}
-	}()
-
-	action, ok := s.underlying.(core.IntegrationTool)
-	if !ok {
-		return nil, fmt.Errorf("action %s is not a tool", s.underlying.Name())
-	}
-
-	return action.Call(ctx)
 }

@@ -27,10 +27,6 @@ type Metadata struct {
 	// No metadata needed for the base integration.
 }
 
-func (s *SendGrid) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (s *SendGrid) Name() string {
 	return "sendgrid"
 }

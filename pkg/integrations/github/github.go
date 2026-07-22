@@ -77,10 +77,6 @@ type Configuration struct {
 	Organization string `mapstructure:"organization" json:"organization"`
 }
 
-func (g *GitHub) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (g *GitHub) Name() string {
 	return "github"
 }

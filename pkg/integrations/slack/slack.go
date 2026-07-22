@@ -51,10 +51,6 @@ type Metadata struct {
 	BotID  string `mapstructure:"bot_id" json:"bot_id"`
 }
 
-func (s *Slack) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (s *Slack) Name() string {
 	return "slack"
 }

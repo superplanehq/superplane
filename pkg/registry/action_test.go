@@ -41,6 +41,47 @@ func (p *panickingAction) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (p *panickingAction) Cancel(ctx core.ExecutionContext) error { panic("cancel panic") }
 func (p *panickingAction) Cleanup(ctx core.SetupContext) error    { panic("cleanup panic") }
 
+func TestAsIntegrationTool_UsesUnderlyingNotWrapper(t *testing.T) {
+	nonTool := NewPanicableAction(&panickingAction{name: "regular-action"})
+	_, ok := AsIntegrationTool(nonTool)
+	assert.False(t, ok)
+
+	toolAction := &integrationToolAction{name: "tool-action"}
+	wrappedTool := NewPanicableAction(toolAction)
+	tool, ok := AsIntegrationTool(wrappedTool)
+	require.True(t, ok)
+	assert.Equal(t, toolAction, tool)
+}
+
+type integrationToolAction struct {
+	name string
+}
+
+func (a *integrationToolAction) Name() string                                   { return a.name }
+func (a *integrationToolAction) Label() string                                  { return "Tool Action" }
+func (a *integrationToolAction) Description() string                            { return "description" }
+func (a *integrationToolAction) Documentation() string                          { return "" }
+func (a *integrationToolAction) Icon() string                                   { return "icon" }
+func (a *integrationToolAction) Color() string                                  { return "red" }
+func (a *integrationToolAction) ExampleOutput() map[string]any                  { return nil }
+func (a *integrationToolAction) Configuration() []configuration.Field           { return nil }
+func (a *integrationToolAction) Hooks() []core.Hook                             { return nil }
+func (a *integrationToolAction) OutputChannels(config any) []core.OutputChannel { return nil }
+func (a *integrationToolAction) Setup(ctx core.SetupContext) error              { return nil }
+func (a *integrationToolAction) Execute(ctx core.ExecutionContext) error        { return nil }
+func (a *integrationToolAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return nil, nil
+}
+func (a *integrationToolAction) HandleHook(ctx core.ActionHookContext) error { return nil }
+func (a *integrationToolAction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (a *integrationToolAction) Cancel(ctx core.ExecutionContext) error { return nil }
+func (a *integrationToolAction) Cleanup(ctx core.SetupContext) error    { return nil }
+func (a *integrationToolAction) Call(ctx core.IntegrationToolContext) (any, error) {
+	return map[string]any{"ok": true}, nil
+}
+
 func TestPanicableAction_Setup_CatchesPanic(t *testing.T) {
 	action := &panickingAction{name: "panicking-action"}
 	panicable := NewPanicableAction(action)

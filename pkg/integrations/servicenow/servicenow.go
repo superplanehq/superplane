@@ -31,10 +31,6 @@ type Configuration struct {
 	ClientSecret *string `json:"clientSecret"`
 }
 
-func (s *ServiceNow) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (s *ServiceNow) Name() string {
 	return "servicenow"
 }

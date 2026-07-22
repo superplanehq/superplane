@@ -27,10 +27,6 @@ type Metadata struct {
 	SupportsQueryAPI       bool   `json:"supportsQueryApi"`
 }
 
-func (l *Logfire) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (l *Logfire) Name() string {
 	return "logfire"
 }

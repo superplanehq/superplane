@@ -84,10 +84,6 @@ type Metadata struct {
 	Installed bool   `json:"installed,omitempty" mapstructure:"installed,omitempty"`
 }
 
-func (t *Teams) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (t *Teams) Name() string {
 	return "teams"
 }

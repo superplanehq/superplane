@@ -57,10 +57,6 @@ func (t *DummyIntegration) Description() string {
 	return "Just a dummy application used in unit tests"
 }
 
-func (t *DummyIntegration) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (t *DummyIntegration) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }

@@ -19,10 +19,6 @@ func (h *Harness) Name() string {
 	return "harness"
 }
 
-func (h *Harness) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (h *Harness) Label() string {
 	return "Harness"
 }

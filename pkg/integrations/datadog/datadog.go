@@ -30,10 +30,6 @@ type Configuration struct {
 	Site   string `json:"site"`
 }
 
-func (d *Datadog) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (d *Datadog) Name() string {
 	return "datadog"
 }

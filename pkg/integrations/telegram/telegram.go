@@ -38,10 +38,6 @@ type SubscriptionConfiguration struct {
 	EventTypes []string `json:"eventTypes" mapstructure:"eventTypes"`
 }
 
-func (t *Telegram) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (t *Telegram) Name() string {
 	return "telegram"
 }

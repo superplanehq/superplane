@@ -28,10 +28,6 @@ type Metadata struct {
 	NotificationChannelID string `json:"notificationChannelId" mapstructure:"notificationChannelId"`
 }
 
-func (d *Dash0) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (d *Dash0) Name() string {
 	return "dash0"
 }

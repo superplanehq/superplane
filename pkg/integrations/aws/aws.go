@@ -72,10 +72,6 @@ func (a *AWS) Instructions() string {
 	return "Initially, you can leave the **\"IAM Role ARN\"** field empty, as you will be guided through the identity provider and IAM role creation process."
 }
 
-func (a *AWS) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (a *AWS) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -26,10 +26,6 @@ type Metadata struct {
 	Services []Service `json:"services"`
 }
 
-func (r *Rootly) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (r *Rootly) Name() string {
 	return "rootly"
 }

@@ -24,10 +24,6 @@ type Metadata struct {
 	AccountUUID  string `json:"accountUUID"`
 }
 
-func (d *DigitalOcean) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (d *DigitalOcean) Name() string {
 	return "digitalocean"
 }

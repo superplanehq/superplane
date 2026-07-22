@@ -39,10 +39,6 @@ func (g *Grafana) Label() string {
 	return "Grafana"
 }
 
-func (g *Grafana) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (g *Grafana) Icon() string {
 	return "grafana"
 }

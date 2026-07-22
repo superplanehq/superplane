@@ -45,10 +45,6 @@ type Configuration struct {
 	LicenseKey string `json:"licenseKey" mapstructure:"licenseKey"`
 }
 
-func (n *NewRelic) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (n *NewRelic) Name() string {
 	return "newrelic"
 }

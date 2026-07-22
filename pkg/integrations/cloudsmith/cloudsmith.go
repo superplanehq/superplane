@@ -41,10 +41,6 @@ func (c *Cloudsmith) Description() string {
 	return "Automate repository, package, and artifact management on Cloudsmith"
 }
 
-func (c *Cloudsmith) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (c *Cloudsmith) Instructions() string {
 	return `## Cloudsmith Service Account API Key
 

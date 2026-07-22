@@ -53,10 +53,6 @@ type WorkspaceMetadata struct {
 	Slug string `json:"slug" mapstructure:"slug"`
 }
 
-func (b *Bitbucket) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (b *Bitbucket) Name() string {
 	return "bitbucket"
 }

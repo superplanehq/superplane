@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"slices"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -21,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CallIntegrationTool(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, toolName string, parameters map[string]string) (*pb.CallIntegrationToolResponse, error) {
+func CallIntegrationTool(ctx context.Context, reg *registry.Registry, orgID string, integrationID string, toolName string, parameters map[string]string) (*pb.CallIntegrationToolResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
@@ -47,49 +44,28 @@ func CallIntegrationTool(ctx context.Context, registry *registry.Registry, orgID
 		return nil, grpcerrors.FailedPrecondition(nil, "integration is in error state")
 	}
 
-	integration, err := registry.GetIntegration(instance.AppName)
-	if err != nil {
-		return nil, grpcerrors.FailedPrecondition(nil, fmt.Sprintf("integration %s is unavailable", instance.AppName))
-	}
-
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
 		instance,
-		registry.Encryptor,
-		registry,
+		reg.Encryptor,
+		reg,
 		nil,
 	)
 
-	allTools := integration.CustomTools()
-	i := slices.IndexFunc(allTools, func(t core.CustomIntegrationTool) bool {
-		return t.Name() == toolName
-	})
-
-	if i != -1 {
-		logger.Infof("Executing custom tool: %s", toolName)
-		return executeCustomTool(registry, logger, integrationCtx, allTools[i], parameters)
-	}
-
-	logger.Infof("Executing action-based tool: %s", toolName)
-	return executeActionBasedTool(registry, logger, integrationCtx, toolName, parameters)
-}
-
-func executeActionBasedTool(registry *registry.Registry, logger *logrus.Entry, integrationCtx core.IntegrationContext, toolName string, parameters map[string]string) (*pb.CallIntegrationToolResponse, error) {
-	action, err := registry.GetAction(toolName)
+	action, err := reg.GetAction(toolName)
 	if err != nil {
 		return nil, grpcerrors.FailedPrecondition(err, "action not found")
 	}
 
-	tool, ok := action.(core.IntegrationTool)
-	if !ok {
+	if _, ok := registry.AsIntegrationTool(action); !ok {
 		return nil, grpcerrors.FailedPrecondition(nil, "action is not a tool")
 	}
 
 	logger.Infof("Executing tool: %s", toolName)
-	output, err := tool.Call(core.IntegrationToolContext{
+	output, err := registry.CallActionTool(action, core.IntegrationToolContext{
 		Logger:        logger,
-		HTTP:          registry.HTTPContext(),
+		HTTP:          reg.HTTPContext(),
 		Integration:   integrationCtx,
 		Configuration: parameters,
 	})
@@ -115,40 +91,6 @@ func executeActionBasedTool(registry *registry.Registry, logger *logrus.Entry, i
 	if err != nil {
 		logger.WithError(err).Error("failed to convert tool output to struct")
 		return nil, grpcerrors.FailedPrecondition(err, "failed to convert tool output to struct")
-	}
-
-	return &pb.CallIntegrationToolResponse{
-		Output: structOutput,
-	}, nil
-}
-
-func executeCustomTool(registry *registry.Registry, logger *logrus.Entry, integrationCtx core.IntegrationContext, tool core.CustomIntegrationTool, parameters map[string]string) (*pb.CallIntegrationToolResponse, error) {
-	output, err := tool.Call(core.IntegrationToolContext{
-		Logger:        logger,
-		HTTP:          registry.HTTPContext(),
-		Integration:   integrationCtx,
-		Configuration: parameters,
-	})
-
-	if err != nil {
-		return nil, grpcerrors.FailedPrecondition(err, "failed to execute tool")
-	}
-
-	outputData, err := json.Marshal(output)
-	if err != nil {
-		logger.WithError(err).Error("failed to marshal tool output")
-		return nil, grpcerrors.FailedPrecondition(err, "failed to marshal tool output")
-	}
-
-	var outputMap map[string]any
-	if err := json.Unmarshal(outputData, &outputMap); err != nil {
-		logger.WithError(err).Error("failed to unmarshal tool output")
-		return nil, grpcerrors.FailedPrecondition(err, "failed to unmarshal tool output")
-	}
-
-	structOutput, err := structpb.NewStruct(outputMap)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to convert tool output to struct")
 	}
 
 	return &pb.CallIntegrationToolResponse{

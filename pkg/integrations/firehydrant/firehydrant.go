@@ -31,10 +31,6 @@ func (f *FireHydrant) Name() string {
 	return "firehydrant"
 }
 
-func (f *FireHydrant) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (f *FireHydrant) Label() string {
 	return "FireHydrant"
 }

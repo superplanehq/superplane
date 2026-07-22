@@ -68,11 +68,6 @@ type Integration interface {
 	HandleHook(ctx IntegrationHookContext) error
 
 	/*
-	 * Integrations can define custom tools.
-	 */
-	CustomTools() []CustomIntegrationTool
-
-	/*
 	 * List resources of a given type.
 	 */
 	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)
@@ -301,14 +296,6 @@ type WebhookContext interface {
 	GetMetadata() any
 	GetConfiguration() any
 	SetSecret([]byte) error
-}
-
-type CustomIntegrationTool interface {
-	Name() string
-	Label() string
-	Description() string
-	Configuration() []configuration.Field
-	Call(ctx IntegrationToolContext) (any, error)
 }
 
 type IntegrationToolContext struct {

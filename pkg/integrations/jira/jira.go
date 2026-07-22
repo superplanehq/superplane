@@ -30,10 +30,6 @@ To connect Jira to SuperPlane:
 5. Paste the generated **API Token**.
 `
 
-func (j *Jira) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (j *Jira) Name() string {
 	return "jira"
 }

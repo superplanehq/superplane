@@ -44,10 +44,6 @@ func (a *AzureIntegration) Description() string {
 	return "Manage and automate Microsoft Azure resources and services"
 }
 
-func (a *AzureIntegration) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (a *AzureIntegration) Instructions() string {
 	return `## Azure Workload Identity Federation Setup
 

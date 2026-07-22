@@ -20,10 +20,6 @@ type Configuration struct {
 	BaseURL string `json:"baseURL"`
 }
 
-func (s *Statuspage) CustomTools() []core.CustomIntegrationTool {
-	return []core.CustomIntegrationTool{}
-}
-
 func (s *Statuspage) Name() string {
 	return "statuspage"
 }
