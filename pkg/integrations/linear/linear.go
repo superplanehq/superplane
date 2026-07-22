@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -21,6 +22,14 @@ const (
 	// scope is needed because the On Issue trigger manages webhooks, which
 	// Linear restricts to workspace admins or OAuth tokens with admin scope.
 	scopeList = "read,write,admin"
+
+	// tokenRefreshMargin is how much of the access token lifetime is left when
+	// it gets refreshed. Linear rotates refresh tokens, so only the most
+	// recently issued one keeps working: refreshing on every sync lets two
+	// overlapping runs - a scheduled resync racing a manual sync - spend the
+	// same refresh token, and the loser would tear down credentials that the
+	// winner just renewed. Refreshing only near expiration keeps them apart.
+	tokenRefreshMargin = 2 * time.Hour
 )
 
 const (
@@ -40,11 +49,12 @@ func init() {
 type Linear struct{}
 
 type Metadata struct {
-	State        *string `json:"state,omitempty" mapstructure:"state,omitempty"`
-	User         *User   `json:"user,omitempty" mapstructure:"user,omitempty"`
-	Teams        []Team  `json:"teams" mapstructure:"teams"`
-	Organization string  `json:"organization,omitempty" mapstructure:"organization,omitempty"`
-	URLKey       string  `json:"urlKey,omitempty" mapstructure:"urlKey,omitempty"`
+	State                *string `json:"state,omitempty" mapstructure:"state,omitempty"`
+	User                 *User   `json:"user,omitempty" mapstructure:"user,omitempty"`
+	Teams                []Team  `json:"teams" mapstructure:"teams"`
+	Organization         string  `json:"organization,omitempty" mapstructure:"organization,omitempty"`
+	URLKey               string  `json:"urlKey,omitempty" mapstructure:"urlKey,omitempty"`
+	AccessTokenExpiresAt string  `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
 }
 
 const installationInstructions = `
@@ -203,9 +213,10 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackUR
 	return nil
 }
 
-// refreshToken exchanges the stored refresh token for a fresh token pair.
-// Linear rotates refresh tokens, so both secrets are replaced on success and
-// cleared on failure to route the user back to the authorize step.
+// refreshToken exchanges the stored refresh token for a fresh token pair once
+// the access token is close to expiring. Linear rotates refresh tokens, so both
+// secrets are replaced on success, and cleared only when the access token is
+// already unusable, to route the user back to the authorize step.
 func (l *Linear) refreshToken(ctx core.SyncContext, clientID, clientSecret string) error {
 	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
 	if refreshToken == "" {
@@ -218,10 +229,31 @@ func (l *Linear) refreshToken(ctx core.SyncContext, clientID, clientSecret strin
 		return fmt.Errorf("no refresh token stored - re-authorize the integration")
 	}
 
+	//
+	// Connections authorized before expirations were recorded have no
+	// expiration stored, so they refresh on the next sync and record one.
+	//
+	remaining, known := accessTokenValidity(ctx.Integration)
+	if known && remaining > tokenRefreshMargin {
+		ctx.Logger.Info("Linear access token is still valid, skipping refresh")
+		return ctx.Integration.ScheduleResync(remaining - tokenRefreshMargin)
+	}
+
 	ctx.Logger.Info("Refreshing Linear token")
 	auth := NewAuth(ctx.HTTP)
 	tokenResponse, err := auth.RefreshToken(clientID, clientSecret, refreshToken)
 	if err != nil {
+		//
+		// A refresh also fails when a concurrent sync already rotated the token,
+		// and then the stored pair is the fresh one and has to survive. Keep the
+		// credentials while the access token still works and retry before it
+		// expires, and only give up on them once it cannot be used at all.
+		//
+		if known && remaining > 0 {
+			ctx.Logger.Errorf("Failed to refresh token, retrying before expiration: %v", err)
+			return ctx.Integration.ScheduleResync(refreshRetryInterval(remaining))
+		}
+
 		_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
 		_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
 		return fmt.Errorf("failed to refresh token: %v", err)
@@ -233,6 +265,34 @@ func (l *Linear) refreshToken(ctx core.SyncContext, clientID, clientSecret strin
 
 	ctx.Logger.Info("Token refreshed successfully")
 	return ctx.Integration.ScheduleResync(tokenResponse.GetExpiration())
+}
+
+// accessTokenValidity reports how long the stored access token remains usable.
+// The second return is false when no expiration was recorded.
+func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bool) {
+	metadata := readMetadata(integration)
+	if metadata.AccessTokenExpiresAt == "" {
+		return 0, false
+	}
+
+	expiresAt, err := time.Parse(time.RFC3339, metadata.AccessTokenExpiresAt)
+	if err != nil {
+		return 0, false
+	}
+
+	return time.Until(expiresAt), true
+}
+
+// refreshRetryInterval spreads a few retries over what is left of the access
+// token lifetime, so a transient token endpoint failure recovers on its own.
+func refreshRetryInterval(remaining time.Duration) time.Duration {
+	return max(remaining/4, time.Minute)
+}
+
+func readMetadata(integration core.IntegrationContext) Metadata {
+	metadata := Metadata{}
+	_ = mapstructure.Decode(integration.GetMetadata(), &metadata)
+	return metadata
 }
 
 func storeTokens(integration core.IntegrationContext, tokenResponse *TokenResponse) error {
@@ -247,6 +307,17 @@ func storeTokens(integration core.IntegrationContext, tokenResponse *TokenRespon
 			return fmt.Errorf("failed to save refresh token: %v", err)
 		}
 	}
+
+	//
+	// The expiration decides when the next sync refreshes, so it is recorded
+	// next to the tokens rather than derived from when the sync last ran.
+	//
+	metadata := readMetadata(integration)
+	metadata.AccessTokenExpiresAt = ""
+	if expiresAt := tokenResponse.ExpiresAt(); !expiresAt.IsZero() {
+		metadata.AccessTokenExpiresAt = expiresAt.Format(time.RFC3339)
+	}
+	integration.SetMetadata(metadata)
 
 	return nil
 }
@@ -267,11 +338,16 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing teams: %v", err)
 	}
 
+	//
+	// The recorded token expiration carries over, since it drives when the next
+	// sync refreshes and is unrelated to the workspace data loaded here.
+	//
 	ctx.Integration.SetMetadata(Metadata{
-		User:         viewer.User,
-		Teams:        teams,
-		Organization: viewer.Organization.Name,
-		URLKey:       viewer.Organization.URLKey,
+		User:                 viewer.User,
+		Teams:                teams,
+		Organization:         viewer.Organization.Name,
+		URLKey:               viewer.Organization.URLKey,
+		AccessTokenExpiresAt: readMetadata(ctx.Integration).AccessTokenExpiresAt,
 	})
 
 	return nil

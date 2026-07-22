@@ -53,6 +53,15 @@ func (t *TokenResponse) GetExpiration() time.Duration {
 	return time.Hour
 }
 
+// ExpiresAt returns when the access token stops working, or the zero time when
+// Linear did not report a lifetime.
+func (t *TokenResponse) ExpiresAt() time.Time {
+	if t.ExpiresIn <= 0 {
+		return time.Time{}
+	}
+	return time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+}
+
 func (a *Auth) ExchangeCode(clientID, clientSecret, code, redirectURI string) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")

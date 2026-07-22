@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -162,11 +163,90 @@ func Test__Linear__Sync(t *testing.T) {
 		require.Len(t, metadata.Teams, 1)
 		assert.Equal(t, "ENG", metadata.Teams[0].Key)
 
+		// The expiration is recorded, so later syncs know when to refresh again.
+		expiresAt, parseErr := time.Parse(time.RFC3339, metadata.AccessTokenExpiresAt)
+		require.NoError(t, parseErr)
+		assert.WithinDuration(t, time.Now().Add(86399*time.Second), expiresAt, time.Minute)
+
 		// The refresh request went to the token endpoint, form-encoded.
 		require.GreaterOrEqual(t, len(httpContext.Requests), 1)
 		tokenRequest := httpContext.Requests[0]
 		assert.Equal(t, TokenURL, tokenRequest.URL.String())
 		assert.Equal(t, "application/x-www-form-urlencoded", tokenRequest.Header.Get("Content-Type"))
+	})
+
+	t.Run("access token far from expiration is not refreshed", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			AccessTokenExpiresAt: time.Now().Add(20 * time.Hour).Format(time.RFC3339),
+		})
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"viewer":{"id":"u1","name":"Jane Doe"},"organization":{"id":"o1","name":"Acme","urlKey":"acme"}}}`),
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ENG","name":"Engineering"}],"pageInfo":{"hasNextPage":false}}}}`),
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			HTTP:          httpContext,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		// Linear rotates refresh tokens, so a sync that finds a fresh access
+		// token leaves the stored pair alone instead of spending it again.
+		require.GreaterOrEqual(t, len(httpContext.Requests), 1)
+		assert.NotEqual(t, TokenURL, httpContext.Requests[0].URL.String())
+
+		accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, OAuthRefreshToken)
+		assert.Equal(t, testAccessToken, accessToken)
+		assert.Equal(t, "lin_oauth_test_refresh_token", refreshToken)
+
+		// The resync lands on the refresh point instead of the expiration.
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Less(t, integrationContext.ResyncRequests[0], 20*time.Hour-tokenRefreshMargin+time.Minute)
+	})
+
+	t.Run("refresh failure keeps a still valid access token", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			AccessTokenExpiresAt: time.Now().Add(time.Hour).Format(time.RFC3339),
+		})
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: http.NoBody},
+				jsonResponse(`{"data":{"viewer":{"id":"u1","name":"Jane Doe"},"organization":{"id":"o1","name":"Acme","urlKey":"acme"}}}`),
+				jsonResponse(`{"data":{"teams":{"nodes":[{"id":"t1","key":"ENG","name":"Engineering"}],"pageInfo":{"hasNextPage":false}}}}`),
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			HTTP:          httpContext,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		// A concurrent sync that already rotated the token fails this refresh,
+		// so the credentials it stored survive and the retry stays ahead of the
+		// expiration.
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, OAuthRefreshToken)
+		assert.Equal(t, testAccessToken, accessToken)
+		assert.Equal(t, "lin_oauth_test_refresh_token", refreshToken)
+
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Less(t, integrationContext.ResyncRequests[0], time.Hour)
 	})
 
 	t.Run("access token without refresh token routes back to authorization", func(t *testing.T) {
