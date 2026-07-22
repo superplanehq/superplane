@@ -337,6 +337,13 @@ func Test__IssueDerivedActions(t *testing.T) {
 		assert.Equal(t, []string{"edited"}, issueDerivedActions(changes))
 	})
 
+	t.Run("no-op title entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"title": map[string]any{"previous": "same", "current": "same"},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
+
 	t.Run("unrelated change yields no derived actions", func(t *testing.T) {
 		changes := map[string]any{
 			"updated_at": map[string]any{"previous": "t1", "current": "t2"},

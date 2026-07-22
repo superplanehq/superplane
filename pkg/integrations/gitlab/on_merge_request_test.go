@@ -189,6 +189,13 @@ func Test__MergeRequestDerivedActions(t *testing.T) {
 		}
 		assert.Equal(t, []string{"edited"}, mergeRequestDerivedActions(map[string]any{}, changes))
 	})
+
+	t.Run("no-op title entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"title": map[string]any{"previous": "same", "current": "same"},
+		}
+		assert.Empty(t, mergeRequestDerivedActions(map[string]any{}, changes))
+	})
 }
 
 func Test__OnMergeRequest__HandleWebhook__DerivedActions(t *testing.T) {

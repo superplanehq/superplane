@@ -129,4 +129,9 @@ func Test__ChangedField(t *testing.T) {
 	}
 	assert.True(t, changedField(changes, "title"))
 	assert.False(t, changedField(changes, "description"))
+
+	noop := map[string]any{
+		"title": map[string]any{"previous": "same", "current": "same"},
+	}
+	assert.False(t, changedField(noop, "title"))
 }

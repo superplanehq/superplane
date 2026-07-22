@@ -110,7 +110,12 @@ func changedBoolTo(changes map[string]any, field string, target bool) bool {
 	return !ok || previous != target
 }
 
+// changedField reports the field being present in changes with a value that actually differs.
 func changedField(changes map[string]any, field string) bool {
-	_, ok := changes[field]
-	return ok
+	change, ok := changes[field].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	return change["previous"] != change["current"]
 }
