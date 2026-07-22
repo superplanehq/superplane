@@ -3,6 +3,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/ui/checkbox";
 
 import {
@@ -16,16 +17,20 @@ export function StartRunParameterFields({
   parameters,
   parameterValues,
   onParameterValuesChange,
+  showLabels = true,
 }: {
   parameters: StartTemplateParameter[];
   parameterValues: Record<string, string | number | boolean>;
   onParameterValuesChange: React.Dispatch<React.SetStateAction<Record<string, string | number | boolean>>>;
+  /** Visually show labels. Hidden labels remain associated for accessibility. */
+  showLabels?: boolean;
 }) {
+  const idPrefix = React.useId();
   return (
     <div className="min-w-0 space-y-3">
       {parameters.map((param) => {
         if (!param.name || !param.type) return null;
-        const id = `start-run-param-${param.name}`;
+        const id = `${idPrefix}-start-run-param-${param.name}`;
         const label = parameterDisplayLabel(param);
         return (
           <div key={param.name} className="min-w-0 space-y-1.5">
@@ -41,13 +46,15 @@ export function StartRunParameterFields({
                     }))
                   }
                 />
-                <Label htmlFor={id} className="min-w-0 cursor-pointer">
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels, "min-w-0 cursor-pointer")}>
                   {label}
                 </Label>
               </div>
             ) : param.type === "select" ? (
               <>
-                <Label htmlFor={id}>{label}</Label>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
+                  {label}
+                </Label>
                 <Select
                   value={String(parameterValues[param.name] ?? "")}
                   onValueChange={(val) =>
@@ -72,9 +79,29 @@ export function StartRunParameterFields({
                   </SelectContent>
                 </Select>
               </>
+            ) : param.type === "text" ? (
+              <>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
+                  {label}
+                </Label>
+                <Textarea
+                  id={id}
+                  placeholder={parameterInputPlaceholder(param, label)}
+                  value={String(parameterValues[param.name] ?? "")}
+                  rows={5}
+                  onChange={(e) =>
+                    onParameterValuesChange((prev) => ({
+                      ...prev,
+                      [param.name]: e.target.value,
+                    }))
+                  }
+                />
+              </>
             ) : (
               <>
-                <Label htmlFor={id}>{label}</Label>
+                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
+                  {label}
+                </Label>
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}
@@ -94,4 +121,8 @@ export function StartRunParameterFields({
       })}
     </div>
   );
+}
+
+function parameterLabelClassName(showLabels: boolean, visibleClassName?: string): string | undefined {
+  return showLabels ? visibleClassName : "sr-only";
 }

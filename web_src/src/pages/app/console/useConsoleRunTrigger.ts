@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
-import { useConsoleContext, type resolveConsoleNode } from "./ConsoleContext";
+import { useConsoleContext, type ConsoleRunDisabledReason, type resolveConsoleNode } from "./ConsoleContext";
 import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
 import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 import { isManualRunNode } from "./manualRunTriggers";
@@ -36,7 +36,14 @@ export interface UseConsoleRunTriggerResult {
    * Explains a `disabled` state so the button can surface a helpful
    * tooltip. `null` when the button is enabled.
    */
-  disabledReason: null | "no-perm" | "no-resolved-node" | "not-manual-run" | "run-in-flight" | "submitting";
+  disabledReason:
+    | null
+    | ConsoleRunDisabledReason
+    | "no-perm"
+    | "no-resolved-node"
+    | "not-manual-run"
+    | "run-in-flight"
+    | "submitting";
   dialogOpen: boolean;
   setDialogOpen: (next: boolean) => void;
   handleClick: () => void;
@@ -85,6 +92,7 @@ export function useConsoleRunTrigger({
 
   const disabledReason = resolveDisabledReason({
     canRunNodes: ctx?.canRunNodes ?? false,
+    runNodesDisabledReason: ctx?.runNodesDisabledReason,
     hasResolved,
     isManualRun,
     submitting: running || submitting,
@@ -102,6 +110,7 @@ export function useConsoleRunTrigger({
     (parameters: Record<string, unknown>) => {
       const nodeId = resolved?.node?.id;
       if (!nodeId) return;
+      if (!ctx?.canRunNodes) return;
       if (runningRef.current) return;
       // A confirm dialog can outlive the state that opened it — e.g. another
       // widget fires the same trigger while the dialog is up. Re-check the
@@ -144,17 +153,20 @@ export function useConsoleRunTrigger({
 
 function resolveDisabledReason({
   canRunNodes,
+  runNodesDisabledReason,
   hasResolved,
   isManualRun,
   submitting,
   runInFlight,
 }: {
   canRunNodes: boolean;
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   hasResolved: boolean;
   isManualRun: boolean;
   submitting: boolean;
   runInFlight: boolean;
 }): UseConsoleRunTriggerResult["disabledReason"] {
+  if (runNodesDisabledReason) return runNodesDisabledReason;
   if (!canRunNodes) return "no-perm";
   if (!hasResolved) return "no-resolved-node";
   if (!isManualRun) return "not-manual-run";
