@@ -35,7 +35,7 @@ const (
   - **Name**: SuperPlane
   - **Redirect URI**: ` + "`%s`" + `
   - **Scopes**: %s
-- Copy the **Client ID** and **Client Secret**, and paste them in the fields below.
+- Copy the **Application ID** and **Secret**, and paste them in the fields below.
 - Click **Save** to complete the setup.
 `
 
@@ -97,7 +97,7 @@ func (g *GitLab) Instructions() string {
 **Setup steps:**
 1. Optionally set a **Group ID** (ID or full path, e.g. `+"`my-org/my-subgroup`"+`) to work with a group's projects. Leave it empty to use your personal projects.
 2. Pick an **Auth Type** and connect:
-   - **App OAuth**: leave **Client ID** and **Client Secret** empty and click **Save** to start the setup wizard.
+   - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
    - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) with scopes %s (the link prefills them), paste it into **Access Token**, and click **Save**.
 
 **Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating or merging merge requests, approving, and deploying follow the project's roles and protected branch/environment rules.
@@ -135,19 +135,19 @@ func (g *GitLab) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "clientId",
-			Label:       "Client ID",
+			Label:       "Application ID",
 			Type:        configuration.FieldTypeString,
-			Description: "OAuth Client ID from your GitLab app",
+			Description: "Application ID from your GitLab OAuth application",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeAppOAuth}},
 			},
 		},
 		{
 			Name:        "clientSecret",
-			Label:       "Client Secret",
+			Label:       "Secret",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "OAuth Client Secret from your GitLab app",
+			Description: "Secret from your GitLab OAuth application",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeAppOAuth}},
 			},
