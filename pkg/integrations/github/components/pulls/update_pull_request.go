@@ -289,6 +289,17 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 	// issue, so those are updated through the Issues API instead.
 	//
 	if hasIssueFields(config) {
+		// The Issues API succeeds on any issue number, whether or not it's
+		// actually a pull request. When no Pulls API call happened above,
+		// nothing has confirmed pullNumber refers to a pull request yet, so
+		// check first rather than mutating a plain issue's labels/assignees
+		// only to fail once the pull request re-fetch below 404s.
+		if titleBodyStateUpdate == nil && baseUpdate == nil {
+			if _, _, err := client.GetPullRequest(context.Background(), repository, pullNumber); err != nil {
+				return fmt.Errorf("failed to get pull request: %w", explainGitHubError(err))
+			}
+		}
+
 		issueRequest := &github.IssueRequest{
 			Labels: config.Labels,
 		}

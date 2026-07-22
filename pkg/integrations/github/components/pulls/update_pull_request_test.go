@@ -509,6 +509,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				updatedPullRequestResponse(),
 				mocks.GitHubResponse(http.StatusOK, `{
 					"id": 101,
 					"number": 42,
@@ -534,9 +535,13 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 3)
 
-		issueRequest := httpCtx.Requests[0]
+		precheckRequest := httpCtx.Requests[0]
+		assert.Equal(t, http.MethodGet, precheckRequest.Method)
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", precheckRequest.URL.Path)
+
+		issueRequest := httpCtx.Requests[1]
 		assert.Equal(t, http.MethodPatch, issueRequest.Method)
 		assert.Equal(t, "/repos/testhq/hello/issues/42", issueRequest.URL.Path)
 
@@ -544,7 +549,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		assert.Equal(t, []any{"bug"}, requestBody["labels"])
 		assert.Equal(t, []any{"octocat"}, requestBody["assignees"])
 
-		getRequest := httpCtx.Requests[1]
+		getRequest := httpCtx.Requests[2]
 		assert.Equal(t, http.MethodGet, getRequest.Method)
 		assert.Equal(t, "/repos/testhq/hello/pulls/42", getRequest.URL.Path)
 	})
@@ -552,6 +557,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 	t.Run("strips a leading @ from assignee usernames", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				updatedPullRequestResponse(),
 				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42}`),
 				updatedPullRequestResponse(),
 			},
@@ -569,13 +575,14 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		requestBody := readJSONBody(t, httpCtx.Requests[0])
+		requestBody := readJSONBody(t, httpCtx.Requests[1])
 		assert.Equal(t, []any{"octocat"}, requestBody["assignees"])
 	})
 
 	t.Run("labels toggled on with an empty list clears all labels", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				updatedPullRequestResponse(),
 				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42, "labels": []}`),
 				updatedPullRequestResponse(),
 			},
@@ -593,7 +600,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		requestBody := readJSONBody(t, httpCtx.Requests[0])
+		requestBody := readJSONBody(t, httpCtx.Requests[1])
 		assert.Equal(t, []any{}, requestBody["labels"])
 	})
 
@@ -625,6 +632,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 	t.Run("only calls the Issues API when title, body, state, and base are not toggled on", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				updatedPullRequestResponse(),
 				mocks.GitHubResponse(http.StatusOK, `{"id": 101, "number": 42}`),
 				updatedPullRequestResponse(),
 			},
@@ -642,9 +650,10 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 2)
-		assert.Equal(t, "/repos/testhq/hello/issues/42", httpCtx.Requests[0].URL.Path)
-		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[1].URL.Path)
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[0].URL.Path)
+		assert.Equal(t, "/repos/testhq/hello/issues/42", httpCtx.Requests[1].URL.Path)
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[2].URL.Path)
 	})
 
 	t.Run("fails when the Pulls API returns an error", func(t *testing.T) {
@@ -672,6 +681,7 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 	t.Run("fails when the Issues API returns an error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				updatedPullRequestResponse(),
 				mocks.GitHubResponse(http.StatusUnprocessableEntity, `{"message": "Validation Failed"}`),
 			},
 		}
@@ -689,6 +699,30 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 
 		require.ErrorContains(t, err, "failed to update pull request labels/assignees")
 		require.ErrorContains(t, err, "Validation Failed")
+	})
+
+	t.Run("fails without mutating the issue when pullNumber is not a pull request", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message": "Not Found"}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"pullNumber": "42",
+				"labels":     []string{"bug"},
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to get pull request")
+		require.ErrorContains(t, err, "Not Found")
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[0].URL.Path)
 	})
 
 	t.Run("fails when the pull request cannot be re-fetched", func(t *testing.T) {
