@@ -150,6 +150,42 @@ describe("WidgetBoard sort", () => {
     const titles = cards.map((c) => within(c).getByText(/First|Second|Third/).textContent);
     expect(titles).toEqual(["Second", "Third", "First"]);
   });
+
+  it("sorts each lane independently instead of globally", () => {
+    renderBoard({
+      rows: [
+        { id: "t1", title: "Todo old", status: "Todo", updatedAt: 100 },
+        { id: "d1", title: "Done new", status: "Done", updatedAt: 400 },
+        { id: "t2", title: "Todo new", status: "Todo", updatedAt: 300 },
+        { id: "d2", title: "Done old", status: "Done", updatedAt: 200 },
+      ],
+      render: baseRender({ sort: { field: "updatedAt", order: "desc" } }),
+    });
+    const lanes = screen.getAllByTestId("widget-board-lane");
+    const laneTitles = (lane: HTMLElement) =>
+      within(lane)
+        .getAllByTestId("widget-board-card")
+        .map((c) => within(c).getByText(/Todo|Done/).textContent);
+    expect(laneTitles(lanes[0])).toEqual(["Todo new", "Todo old"]);
+    expect(laneTitles(lanes[2])).toEqual(["Done new", "Done old"]);
+  });
+
+  it("does not let a global sort plus displayCount starve other lanes", () => {
+    // Loaded order interleaves lanes; a global desc sort before the display
+    // slice would keep only the Todo rows and leave Done looking empty.
+    renderBoard({
+      rows: [
+        { id: "t1", title: "Todo card", status: "Todo", updatedAt: 100 },
+        { id: "d1", title: "Done card", status: "Done", updatedAt: 50 },
+        { id: "t2", title: "Todo hidden", status: "Todo", updatedAt: 300 },
+      ],
+      render: baseRender({ sort: { field: "updatedAt", order: "desc" } }),
+      displayCount: 2,
+    });
+    expect(screen.getByText("Todo card")).toBeInTheDocument();
+    expect(screen.getByText("Done card")).toBeInTheDocument();
+    expect(screen.queryByText("Todo hidden")).toBeNull();
+  });
 });
 
 describe("WidgetBoard card fields", () => {

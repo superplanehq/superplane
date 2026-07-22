@@ -59,11 +59,12 @@ export function WidgetBoard({
     [rows],
   );
 
-  const filteredAll = useMemo(() => {
-    const afterWhere = applyTableWhere(recordRows, render.where);
-    return applySort(afterWhere, render.sort);
-  }, [recordRows, render.where, render.sort]);
+  const filteredAll = useMemo(() => applyTableWhere(recordRows, render.where), [recordRows, render.where]);
 
+  // Slice the progressive window on loaded order, *before* sorting: `sort`
+  // orders cards inside each lane (see WidgetBoardRender), so it must not
+  // act as a global selection criterion that starves lanes whose rows sort
+  // lower than the window cutoff.
   const filtered = useMemo(() => {
     if (displayCount == null || displayCount >= filteredAll.length) return filteredAll;
     return filteredAll.slice(0, displayCount);
@@ -285,6 +286,11 @@ function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRend
   }
 
   if (otherBucket) buckets.push(otherBucket);
+  // `sort` orders cards within each lane, per the board schema/PRD — it never
+  // decides which rows make it onto the board.
+  for (const bucket of buckets) {
+    bucket.rows = applySort(bucket.rows, render.sort);
+  }
   return buckets;
 }
 
