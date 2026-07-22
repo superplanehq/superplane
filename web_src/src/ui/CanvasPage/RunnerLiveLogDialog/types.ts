@@ -7,7 +7,9 @@ export type RunnerLiveLogDialogProps = {
 };
 
 export function isExecutionInFlight(execution: ExecutionInfo): boolean {
-  return execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED";
+  return (
+    execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED" || execution.state === "STATE_CANCELLING"
+  );
 }
 
 export type LiveLogRecord =

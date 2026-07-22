@@ -1,9 +1,10 @@
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
+import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 
 const RECONNECT_DELAY_MS = 2000;
 
@@ -16,6 +17,54 @@ const initialLogState: LogState = {
 
 function hasRunningCommand(state: LogState): boolean {
   return state.sections.some((section) => section.status === "running");
+}
+
+export function terminalCommandStatusForExecution(execution: ExecutionInfo): "passed" | "failed" | null {
+  if (execution.state !== "STATE_FINISHED") {
+    return null;
+  }
+
+  return execution.result === "RESULT_PASSED" ? "passed" : "failed";
+}
+
+export function terminalTimeMsForExecution(execution: ExecutionInfo): number | null {
+  const timestamp = execution.updatedAt || execution.createdAt;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function finalizeRunningCommandSections(
+  state: LogState,
+  status: "passed" | "failed",
+  endedAtMs: number | null,
+): LogState {
+  if (!hasRunningCommand(state)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    sections: state.sections.map((section) => {
+      if (section.status !== "running") {
+        return section;
+      }
+
+      return {
+        ...section,
+        status,
+        duration_ms: commandSectionFinalDuration(section, endedAtMs),
+        collapsed: status === "passed",
+      };
+    }),
+  };
+}
+
+function commandSectionFinalDuration(section: CommandSection, endedAtMs: number | null): number {
+  if (section.started_at === null || endedAtMs === null) {
+    return section.duration_ms ?? 0;
+  }
+
+  return Math.max(0, endedAtMs - section.started_at);
 }
 
 function applyStreamFailure(state: LogState, message: string, executionInFlight: boolean): LogState {
@@ -165,8 +214,9 @@ type LiveLogSessionParams = {
   canvasId: string;
   executionId: string;
   executionInFlight: boolean;
+  terminalCommandStatus: "passed" | "failed" | null;
+  terminalAtMs: number | null;
   sessionAbort: AbortController;
-  stateRef: { current: LogState };
   setState: Dispatch<SetStateAction<LogState>>;
   setActiveStream: (stream: LiveLogStream | null) => void;
 };
@@ -176,8 +226,9 @@ async function runLiveLogSession({
   canvasId,
   executionId,
   executionInFlight,
+  terminalCommandStatus,
+  terminalAtMs,
   sessionAbort,
-  stateRef,
   setState,
   setActiveStream,
 }: LiveLogSessionParams): Promise<void> {
@@ -206,7 +257,10 @@ async function runLiveLogSession({
       return;
     }
 
-    if (!executionInFlight && !hasRunningCommand(stateRef.current)) {
+    if (!executionInFlight) {
+      if (terminalCommandStatus) {
+        setState((prev) => finalizeRunningCommandSections(prev, terminalCommandStatus, terminalAtMs));
+      }
       return;
     }
 
@@ -226,12 +280,15 @@ async function runLiveLogSession({
   }
 }
 
-export function useLiveLogStream(executionId: string, executionInFlight: boolean) {
+export function useLiveLogStream(
+  executionId: string,
+  executionInFlight: boolean,
+  terminalCommandStatus: "passed" | "failed" | null,
+  terminalAtMs: number | null,
+) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
   const [state, setState] = useState<LogState>(initialLogState);
-  const stateRef = useRef(state);
-  stateRef.current = state;
 
   const scrollTrigger = useMemo(() => {
     const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
@@ -269,8 +326,9 @@ export function useLiveLogStream(executionId: string, executionInFlight: boolean
       canvasId,
       executionId,
       executionInFlight,
+      terminalCommandStatus,
+      terminalAtMs,
       sessionAbort,
-      stateRef,
       setState,
       setActiveStream: (stream) => {
         activeStream = stream;
@@ -285,7 +343,7 @@ export function useLiveLogStream(executionId: string, executionInFlight: boolean
       sessionAbort.abort();
       activeStream?.stop();
     };
-  }, [organizationId, canvasId, executionId, executionInFlight]);
+  }, [organizationId, canvasId, executionId, executionInFlight, terminalCommandStatus, terminalAtMs]);
 
   return { ...state, toggleSection, scrollRef };
 }
