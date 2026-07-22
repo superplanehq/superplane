@@ -359,10 +359,8 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		end := randomMark("e")
 		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').
 		// No trailing `| sh`: under PTY+interactive bash that pipeline correlated with early slave close on Darwin.
-		// set +e around source so a non-zero sourced script (including aliased exit→return)
-		// cannot skip the end marker if a previous command left errexit enabled.
 		instr := fmt.Sprintf(
-			`echo $'\001 %s\n'; set +e; source %s; AGENT_CMD_RESULT=$?; set +e; echo $'\001 %s '"$AGENT_CMD_RESULT"`,
+			`echo $'\001 %s\n'; source %s; AGENT_CMD_RESULT=$?; echo $'\001 %s '"$AGENT_CMD_RESULT"`,
 			start,
 			bashSingleQuotedPath(dPath),
 			end,
