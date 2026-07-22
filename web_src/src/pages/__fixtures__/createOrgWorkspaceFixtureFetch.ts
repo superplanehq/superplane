@@ -1,9 +1,11 @@
 import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   fixtureResponse,
+  matchFactorySetupFixture,
   matchHomePageFixture,
   requestMethod,
   type HomePageFixture,
+  type StorybookOrgIntegration,
 } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 
@@ -39,13 +41,16 @@ export function createOrgWorkspaceFixtureFetch(
 ): typeof fetch {
   const homeFixture = options?.homeFixture ?? defaultHomePageFixture;
   const appFixture = options?.appFixture;
+  const orgIntegrations: StorybookOrgIntegration[] = [];
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = requestMethod(input, init);
     const body = parseRequestBody(init);
+    const factoryResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
     // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
     const resolved =
+      factoryResolved ??
       matchHomePageFixture(url, method, homeFixture) ??
       matchCanvasAppFixture(url, appFixture, method, body) ??
       emptyOrgWorkspaceCatchAll(url);
