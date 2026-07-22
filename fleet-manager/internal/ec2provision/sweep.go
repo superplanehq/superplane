@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/superplane/runner/shared/api"
 )
 
 type managedInstance struct {
@@ -137,7 +138,7 @@ func (l *Launcher) terminateUnhealthyRunners(ctx context.Context, ids []string) 
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	drained, err := l.drainTerminationCandidates(ctx, ids, "unhealthy")
+	drained, err := l.drainTerminationCandidates(ctx, ids, api.DrainReasonUnhealthy)
 	if err != nil {
 		return nil, fmt.Errorf("drain unhealthy runners: %w", err)
 	}

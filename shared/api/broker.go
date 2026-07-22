@@ -35,9 +35,17 @@ type FleetTaskCountsResponse struct {
 }
 
 type DrainRunnersRequest struct {
-	FleetID   string   `json:"fleet_id"`
-	RunnerIDs []string `json:"runner_ids"`
+	FleetID   string      `json:"fleet_id"`
+	RunnerIDs []string    `json:"runner_ids"`
+	Reason    DrainReason `json:"reason,omitempty"`
 }
+
+type DrainReason string
+
+const (
+	DrainReasonScaleDown DrainReason = "scale_down"
+	DrainReasonUnhealthy DrainReason = "unhealthy"
+)
 
 type DrainRunnerState string
 
@@ -53,12 +61,8 @@ type DrainRunnerStatus struct {
 }
 
 type DrainRunnersResponse struct {
-	Runners []DrainRunnerStatus `json:"runners"`
-}
-
-type RecoverLostRunnersRequest struct {
-	FleetID   string   `json:"fleet_id"`
-	RunnerIDs []string `json:"runner_ids"`
+	Runners        []DrainRunnerStatus  `json:"runners"`
+	RecoveredTasks []RunnerTaskRecovery `json:"recovered_tasks,omitempty"`
 }
 
 type RunnerTaskRecoveryState string
@@ -73,8 +77,4 @@ type RunnerTaskRecovery struct {
 	RunnerID string                  `json:"runner_id"`
 	TaskID   string                  `json:"task_id"`
 	State    RunnerTaskRecoveryState `json:"state"`
-}
-
-type RecoverLostRunnersResponse struct {
-	Tasks []RunnerTaskRecovery `json:"tasks"`
 }

@@ -60,7 +60,6 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Post("/tasks/{id}/cancel", s.cancelTask)
 			r.Post("/tasks/{id}/complete", s.completeTask)
 			r.Post("/runners/drain", s.drainRunners)
-			r.Post("/runners/recover-lost", s.recoverLostRunners)
 			r.Get("/runners/stream", s.runnerStream)
 		})
 	})

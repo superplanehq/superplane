@@ -76,6 +76,9 @@ func TestDrainRunners_OK(t *testing.T) {
 				{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
 				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
 			},
+			RecoveredTasks: []api.RunnerTaskRecovery{
+				{RunnerID: "i-idle", TaskID: "task-2", State: api.RunnerTaskRecoveryStateRequeued},
+			},
 		})
 	}))
 	defer ts.Close()
@@ -84,6 +87,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	out, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
 		FleetID:   "fleet-a",
 		RunnerIDs: []string{"i-idle", "i-busy"},
+		Reason:    api.DrainReasonUnhealthy,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +98,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	if gotAuth != "Bearer tok" {
 		t.Fatalf("auth: %q", gotAuth)
 	}
-	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 {
+	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 || gotBody.Reason != api.DrainReasonUnhealthy {
 		t.Fatalf("body: %#v", gotBody)
 	}
 	if len(out.Runners) != 2 {
@@ -105,6 +109,12 @@ func TestDrainRunners_OK(t *testing.T) {
 	}
 	if out.Runners[1].RunnerID != "i-busy" || out.Runners[1].State != api.DrainRunnerStateBusy || out.Runners[1].ActiveTaskID != "task-1" {
 		t.Fatalf("second runner: %#v", out.Runners[1])
+	}
+	if len(out.RecoveredTasks) != 1 ||
+		out.RecoveredTasks[0].RunnerID != "i-idle" ||
+		out.RecoveredTasks[0].TaskID != "task-2" ||
+		out.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateRequeued {
+		t.Fatalf("recovered tasks: %#v", out.RecoveredTasks)
 	}
 }
 
@@ -140,84 +150,6 @@ func TestDrainRunners_BadInput(t *testing.T) {
 	if _, err := empty.DrainRunners(context.Background(), api.DrainRunnersRequest{
 		FleetID:   "fleet-a",
 		RunnerIDs: []string{"i-idle"},
-	}); err == nil {
-		t.Fatal("expected error for empty base url")
-	}
-}
-
-func TestRecoverLostRunners_OK(t *testing.T) {
-	var gotMethod, gotPath, gotAuth string
-	var gotBody api.RecoverLostRunnersRequest
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path
-		gotAuth = r.Header.Get("Authorization")
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Errorf("decode body: %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(api.RecoverLostRunnersResponse{
-			Tasks: []api.RunnerTaskRecovery{
-				{RunnerID: "i-busy", TaskID: "task-1", State: api.RunnerTaskRecoveryStateRequeued},
-			},
-		})
-	}))
-	defer ts.Close()
-
-	c := New(ts.URL, "tok")
-	out, err := c.RecoverLostRunners(context.Background(), api.RecoverLostRunnersRequest{
-		FleetID:   "fleet-a",
-		RunnerIDs: []string{"i-busy"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotMethod != http.MethodPost || gotPath != "/v1/runners/recover-lost" {
-		t.Fatalf("method/path: %s %q", gotMethod, gotPath)
-	}
-	if gotAuth != "Bearer tok" {
-		t.Fatalf("auth: %q", gotAuth)
-	}
-	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 1 || gotBody.RunnerIDs[0] != "i-busy" {
-		t.Fatalf("body: %#v", gotBody)
-	}
-	if len(out.Tasks) != 1 || out.Tasks[0].TaskID != "task-1" || out.Tasks[0].State != api.RunnerTaskRecoveryStateRequeued {
-		t.Fatalf("tasks: %#v", out.Tasks)
-	}
-}
-
-func TestRecoverLostRunners_NonOK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"error":"recovery unavailable"}`))
-	}))
-	defer ts.Close()
-
-	c := New(ts.URL, "tok")
-	if _, err := c.RecoverLostRunners(context.Background(), api.RecoverLostRunnersRequest{
-		FleetID:   "fleet-a",
-		RunnerIDs: []string{"i-busy"},
-	}); err == nil {
-		t.Fatal("expected error for non-2xx recover response")
-	}
-}
-
-func TestRecoverLostRunners_BadInput(t *testing.T) {
-	c := New("http://example", "tok")
-	if _, err := c.RecoverLostRunners(context.Background(), api.RecoverLostRunnersRequest{
-		RunnerIDs: []string{"i-busy"},
-	}); err == nil {
-		t.Fatal("expected error for empty fleet id")
-	}
-	if _, err := c.RecoverLostRunners(context.Background(), api.RecoverLostRunnersRequest{
-		FleetID: "fleet-a",
-	}); err == nil {
-		t.Fatal("expected error for empty runner ids")
-	}
-	empty := New("", "tok")
-	if _, err := empty.RecoverLostRunners(context.Background(), api.RecoverLostRunnersRequest{
-		FleetID:   "fleet-a",
-		RunnerIDs: []string{"i-busy"},
 	}); err == nil {
 		t.Fatal("expected error for empty base url")
 	}

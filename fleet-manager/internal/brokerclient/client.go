@@ -118,52 +118,6 @@ func (c *Client) DrainRunners(ctx context.Context, req api.DrainRunnersRequest) 
 	return out, nil
 }
 
-// RecoverLostRunners asks task-broker to release or terminate tasks claimed by
-// runners fleet-manager has declared unhealthy and is about to terminate.
-func (c *Client) RecoverLostRunners(ctx context.Context, req api.RecoverLostRunnersRequest) (api.RecoverLostRunnersResponse, error) {
-	var out api.RecoverLostRunnersResponse
-	if c == nil {
-		return out, fmt.Errorf("brokerclient: nil client")
-	}
-	if c.baseURL == "" {
-		return out, fmt.Errorf("brokerclient: empty base url")
-	}
-	req.FleetID = strings.TrimSpace(req.FleetID)
-	if req.FleetID == "" {
-		return out, fmt.Errorf("brokerclient: fleet_id required")
-	}
-	if len(req.RunnerIDs) == 0 {
-		return out, fmt.Errorf("brokerclient: runner_ids required")
-	}
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return out, fmt.Errorf("brokerclient: encode recover lost runners request: %w", err)
-	}
-	endpoint := c.baseURL + "/v1/runners/recover-lost"
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return out, fmt.Errorf("brokerclient: build recover lost runners request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.authToken != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.authToken)
-	}
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return out, fmt.Errorf("brokerclient: recover lost runners http: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return out, fmt.Errorf("brokerclient: recover lost runners http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return out, fmt.Errorf("brokerclient: decode recover lost runners response: %w", err)
-	}
-	return out, nil
-}
-
 // RegisterFleet calls POST /v1/fleets to register or upsert a fleet. Non-2xx responses become errors.
 func (c *Client) RegisterFleet(ctx context.Context, req api.RegisterFleetRequest) (api.FleetResponse, error) {
 	var out api.FleetResponse
