@@ -66,7 +66,7 @@ function BoardPanelBody({ content }: { content: BoardPanelContent }) {
 }
 
 function BoardPanelDataBound({ content, canvasId }: { content: BoardPanelContent; canvasId: string }) {
-  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore } = useWidgetData(
+  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore, displayCount } = useWidgetData(
     canvasId,
     content.dataSource,
     renderNeedsRunNodeOutputs(content.render),
@@ -81,6 +81,7 @@ function BoardPanelDataBound({ content, canvasId }: { content: BoardPanelContent
       hasMore={hasMore}
       isFetchingMore={isFetchingMore}
       onLoadMore={loadMore}
+      displayCount={displayCount}
     />
   );
 }

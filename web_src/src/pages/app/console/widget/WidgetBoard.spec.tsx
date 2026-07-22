@@ -118,6 +118,20 @@ describe("WidgetBoard grouping", () => {
     fireEvent.click(screen.getByTestId("widget-table-load-more-button"));
     expect(onLoadMore).toHaveBeenCalledOnce();
   });
+
+  it("renders only the progressive display window after grouping", () => {
+    renderBoard({
+      rows: [
+        { id: "1", title: "First", status: "Todo" },
+        { id: "2", title: "Second", status: "Done" },
+        { id: "3", title: "Third", status: "Todo" },
+      ],
+      displayCount: 2,
+    });
+    expect(screen.getByText("First")).toBeInTheDocument();
+    expect(screen.getByText("Second")).toBeInTheDocument();
+    expect(screen.queryByText("Third")).toBeNull();
+  });
 });
 
 describe("WidgetBoard sort", () => {

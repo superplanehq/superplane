@@ -26,6 +26,7 @@ interface WidgetBoardProps {
   hasMore?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
+  displayCount?: number;
 }
 
 interface LaneBucket {
@@ -42,7 +43,15 @@ interface LaneBucket {
 /** Stable react key + data attribute value for the trailing "Other" lane. */
 const OTHER_LANE_KEY = "__other__";
 
-export function WidgetBoard({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetBoardProps) {
+export function WidgetBoard({
+  render,
+  rows,
+  isLoading,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  displayCount,
+}: WidgetBoardProps) {
   const ctx = useConsoleContext();
 
   const recordRows = useMemo(
@@ -50,10 +59,15 @@ export function WidgetBoard({ render, rows, isLoading, hasMore, isFetchingMore, 
     [rows],
   );
 
-  const filtered = useMemo(() => {
+  const filteredAll = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
     return applySort(afterWhere, render.sort);
   }, [recordRows, render.where, render.sort]);
+
+  const filtered = useMemo(() => {
+    if (displayCount == null || displayCount >= filteredAll.length) return filteredAll;
+    return filteredAll.slice(0, displayCount);
+  }, [filteredAll, displayCount]);
 
   const lanes = useMemo(() => groupIntoLanes(filtered, render), [filtered, render]);
 
