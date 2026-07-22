@@ -40,7 +40,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerBash",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: 'echo \'{"ok":true}\' > "$SUPERPLANE_RESULT_FILE"',
         },
         metadata: {},
@@ -72,7 +72,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerJS",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: "function main() { return { ok: true }; }",
         },
         metadata: {},
@@ -104,7 +104,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerPython",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: 'def main(payload):\n    return {"ok": True}',
         },
         metadata: {},
@@ -136,7 +136,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerClaudeCode",
         isCollapsed: false,
         configuration: {
-          machineType: "aws-standard-1",
+          machineType: "e1-large-amd64",
           prompt: "Fix the failing tests",
         },
         metadata: {},
