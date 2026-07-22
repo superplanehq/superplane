@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type * as SdkGen from "@/api-client/sdk.gen";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IntegrationSetup } from ".";
 
 const { integrationsListIntegrations, organizationsDescribeIntegration, organizationsListIntegrations } = vi.hoisted(
@@ -24,7 +24,9 @@ vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
   };
 });
 
-function renderIntegrationSetup() {
+type TestInitialEntry = string | { pathname: string; state?: unknown };
+
+function renderIntegrationSetup(initialEntry: TestInitialEntry = "/org-123/settings/integrations/setup/github") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -34,11 +36,15 @@ function renderIntegrationSetup() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/org-123/settings/integrations/setup/github"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
             path="/:organizationId/settings/integrations/setup/:integrationName"
             element={<IntegrationSetup organizationId="org-123" />}
+          />
+          <Route
+            path="/:organizationId/settings/integrations/:integrationId"
+            element={<div data-testid="integration-details">Integration details</div>}
           />
         </Routes>
       </MemoryRouter>
@@ -57,6 +63,10 @@ describe("PreCreateIntegrationSetup", () => {
     organizationsDescribeIntegration.mockResolvedValue({ data: { integration: null } });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("lets users clear the default instance name before typing a replacement", async () => {
     const user = userEvent.setup();
     renderIntegrationSetup();
@@ -68,5 +78,61 @@ describe("PreCreateIntegrationSetup", () => {
     await user.type(input, "production");
 
     expect(input).toHaveValue("production");
+  });
+
+  it("polls redirect prompt setup state and navigates when setup completes", async () => {
+    organizationsDescribeIntegration
+      .mockResolvedValueOnce({
+        data: {
+          integration: {
+            metadata: {
+              id: "integration-123",
+              name: "github",
+              integrationName: "github",
+              updatedAt: "2026-05-06T20:32:18Z",
+            },
+            status: {
+              state: "pending",
+              setupState: {
+                currentStep: {
+                  name: "create-github-app",
+                  type: "REDIRECT_PROMPT",
+                  label: "Create GitHub App",
+                  instructions: "Create the GitHub App in GitHub, then return to SuperPlane.",
+                  redirectPrompt: {
+                    url: "https://github.com/settings/apps/new",
+                    method: "GET",
+                  },
+                },
+                previousSteps: [],
+              },
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          integration: {
+            metadata: {
+              id: "integration-123",
+              name: "github",
+              integrationName: "github",
+              updatedAt: "2026-05-06T20:33:18Z",
+            },
+            status: {
+              state: "ready",
+            },
+          },
+        },
+      });
+
+    renderIntegrationSetup({
+      pathname: "/org-123/settings/integrations/setup/github",
+      state: { integrationId: "integration-123" },
+    });
+
+    expect(await screen.findByRole("button", { name: /continue/i })).toBeInTheDocument();
+    await waitFor(() => expect(organizationsDescribeIntegration).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByTestId("integration-details")).toBeInTheDocument());
   });
 });
