@@ -51,3 +51,9 @@ func directivesFromCommands(commands models.CommandList) []shellDirective {
 func errEmptyCommands() error {
 	return errors.New("empty commands")
 }
+
+// ptyExitAliasBootstrap configures the shared interactive PTY shell once per
+// session so top-level `exit` in sourced command_list entries becomes `return`.
+// That keeps the shell alive for end markers while preserving cwd, exports, and
+// background jobs. Applied at session boot, not before every command.
+const ptyExitAliasBootstrap = `shopt -s expand_aliases; alias exit=return`

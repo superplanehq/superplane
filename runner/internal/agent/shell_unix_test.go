@@ -9,12 +9,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func skipPTYIntegrationOnCI(t *testing.T) {
@@ -114,6 +117,56 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 	if out == "" || !strings.Contains(out, "hello") {
 		t.Fatalf("expected hello in output: %q", out)
 	}
+}
+
+func TestHostShellDirectivesExitAliasKeepsShell(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; echo hello; exit 1; echo there", work, work),
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	// Session-boot alias makes top-level exit→return: clean status, shell stays up.
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit code")
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "hello")
+	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesExitAliasPersistsAcrossCommands(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	// Alias is installed once at session boot; a later command must still see exit→return,
+	// and cd/export from a prior successful command must persist.
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; exit 0", work, work),
+		`printf 'mark=%s cwd=%s\n' "$RUNNER_EXIT_MARK" "$(pwd -P)"; echo hello; exit 1; echo there`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "mark=kept")
+	assert.Contains(t, out, "/work")
+	assert.NotContains(t, out, "there")
 }
 
 func TestEndMarkerStreamHoldback(t *testing.T) {
