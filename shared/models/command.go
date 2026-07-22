@@ -8,7 +8,7 @@ import (
 )
 
 // CommandSpec is one shell directive in a command_list task.
-// JSON accepts either a plain string or {"name","command"}.
+// JSON must be {"name","command"} (name optional).
 type CommandSpec struct {
 	Name    string `json:"name,omitempty"`
 	Command string `json:"command"`
@@ -27,7 +27,7 @@ func (c CommandSpec) ShellLine() string {
 	return strings.TrimSpace(c.Command)
 }
 
-// CommandList unmarshals create-task / stored commands that may be strings or objects.
+// CommandList unmarshals create-task / stored commands as objects only.
 type CommandList []CommandSpec
 
 // NewCommandList builds unnamed command specs from shell lines (tests and adapters).
@@ -87,11 +87,7 @@ func parseCommandSpecJSON(item json.RawMessage) (CommandSpec, error) {
 	}
 
 	if item[0] == '"' {
-		var line string
-		if err := json.Unmarshal(item, &line); err != nil {
-			return CommandSpec{}, err
-		}
-		return CommandSpec{Command: strings.TrimSpace(line)}, nil
+		return CommandSpec{}, fmt.Errorf(`must be an object with "command"`)
 	}
 
 	var raw map[string]json.RawMessage

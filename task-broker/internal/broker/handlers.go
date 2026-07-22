@@ -393,7 +393,7 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	var req api.BrokerCreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if strings.TrimSpace(req.WebhookURL) == "" {

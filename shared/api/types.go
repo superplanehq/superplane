@@ -36,8 +36,8 @@ type CreateTaskRequest struct {
 	MessageChain json.RawMessage `json:"message_chain,omitempty"`
 	// Command is argv for one process. Omit when using Commands or Script.
 	Command []string `json:"command,omitempty"`
-	// Commands are shell directives. Each entry may be a plain string or
-	// {"name","command"}. The runner uses Bash on a PTY and sources each directive
+	// Commands are shell directives. Each entry is {"name","command"} (name optional).
+	// The runner uses Bash on a PTY and sources each directive
 	// from a tempfile, stopping at the first failing directive ($? after source).
 	// Omit when using Command.
 	Commands models.CommandList `json:"commands,omitempty"`

@@ -233,7 +233,7 @@ export AUTH_TOKEN=dev-local-token
 curl -X POST http://127.0.0.1:8080/v1/tasks \
   -H 'Content-Type: application/json' \
   -d '{
-    "commands": ["echo hello", "echo \"$COMMIT_AUTHOR\""],
+    "commands": [{"command": "echo hello"}, {"command": "echo \"$COMMIT_AUTHOR\""}],
     "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"
   }'
@@ -275,7 +275,7 @@ curl -X POST http://127.0.0.1:8081/v1/tasks \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
     "fleet_id": "e1-tiny-arm64",
-    "commands": ["uname -m", "echo \"$COMMIT_AUTHOR\""],
+    "commands": [{"command": "uname -m"}, {"command": "echo \"$COMMIT_AUTHOR\""}],
     "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"
   }'
