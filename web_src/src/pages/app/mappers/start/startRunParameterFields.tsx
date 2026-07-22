@@ -31,6 +31,9 @@ export function StartRunParameterFields({
       {parameters.map((param) => {
         if (!param.name || !param.type) return null;
         const id = `${idPrefix}-start-run-param-${param.name}`;
+        // Stable hook for E2E tests; `id` carries a `useId` prefix so that
+        // multiple forms on one page never share duplicate element ids.
+        const testId = `start-run-param-${param.name}`;
         const label = parameterDisplayLabel(param);
         return (
           <div key={param.name} className="min-w-0 space-y-1.5">
@@ -38,6 +41,7 @@ export function StartRunParameterFields({
               <div className="flex min-w-0 items-center gap-2">
                 <Checkbox
                   id={id}
+                  data-testid={testId}
                   checked={Boolean(parameterValues[param.name])}
                   onCheckedChange={(checked) =>
                     onParameterValuesChange((prev) => ({
@@ -65,7 +69,7 @@ export function StartRunParameterFields({
                   }
                   disabled={selectOptionValues(param).length === 0}
                 >
-                  <SelectTrigger id={id} className="w-full min-w-0">
+                  <SelectTrigger id={id} data-testid={testId} className="w-full min-w-0">
                     <SelectValue
                       placeholder={selectOptionValues(param).length === 0 ? "No options configured" : `Select ${label}`}
                     />
@@ -86,6 +90,7 @@ export function StartRunParameterFields({
                 </Label>
                 <Textarea
                   id={id}
+                  data-testid={testId}
                   placeholder={parameterInputPlaceholder(param, label)}
                   value={String(parameterValues[param.name] ?? "")}
                   rows={5}
@@ -104,6 +109,7 @@ export function StartRunParameterFields({
                 </Label>
                 <Input
                   id={id}
+                  data-testid={testId}
                   type={param.type === "number" ? "number" : "text"}
                   placeholder={parameterInputPlaceholder(param, label)}
                   value={String(parameterValues[param.name] ?? "")}
