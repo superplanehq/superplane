@@ -25,19 +25,6 @@ const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
 const EXECUTION_MODE_DOCKER = "docker";
 const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
 
-/** User-facing machine type names; values in config are task-broker fleet IDs. */
-const MACHINE_TYPE_LABELS: Record<string, string> = {
-  "aws-standard-1": "e1-large-amd64",
-  "aws-arm64-1": "e1-large-arm64",
-  "e1-tiny-amd64": "e1-tiny-amd64",
-  "e1-tiny-arm64": "e1-tiny-arm64",
-};
-
-function machineTypeDisplayName(fleetID: string): string {
-  const trimmed = fleetID.trim();
-  return MACHINE_TYPE_LABELS[trimmed] ?? trimmed;
-}
-
 /** Mirrors `resolvedDockerImageRef` in pkg/components/runner/spec.go for execution summaries. */
 function resolvedContainerImageRef(c: Record<string, unknown>): string {
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
@@ -65,7 +52,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
   const machineTypeRaw = c.machineType ?? c.machine_type;
   const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
   if (machineType) {
-    details["Machine type"] = machineTypeDisplayName(machineType);
+    details["Machine type"] = machineType;
   }
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
   if (rawMode === EXECUTION_MODE_DOCKER) {
