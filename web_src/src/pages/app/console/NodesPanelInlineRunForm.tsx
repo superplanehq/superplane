@@ -21,6 +21,7 @@ interface NodesPanelInlineRunFormProps {
   running: boolean;
   disabled: boolean;
   disabledTitle?: string;
+  disabledMessage?: string;
   submitLabel?: string;
   showFieldLabels?: boolean;
   testIdPrefix: string;
@@ -49,6 +50,7 @@ export function NodesPanelInlineRunForm({
   running,
   disabled,
   disabledTitle,
+  disabledMessage,
   submitLabel,
   showFieldLabels = true,
   testIdPrefix,
@@ -105,6 +107,14 @@ export function NodesPanelInlineRunForm({
           {submitLabel?.trim() || "Run"}
         </LoadingButton>
       </div>
+      {disabledMessage ? (
+        <p
+          className="text-right text-[11px] text-amber-600 dark:text-amber-400"
+          data-testid={`${testIdPrefix}-inline-disabled-message`}
+        >
+          {disabledMessage}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -295,6 +295,7 @@ function NodesPanelRunControl({
         running={running}
         disabled={disabled}
         disabledTitle={disabledTitleFor(disabledReason)}
+        disabledMessage={disabledReason === "uncommitted-canvas-changes" ? disabledTitleFor(disabledReason) : undefined}
         submitLabel={entry.submitLabel}
         showFieldLabels={entry.showFieldLabels !== false}
         testIdPrefix={testIds.button}

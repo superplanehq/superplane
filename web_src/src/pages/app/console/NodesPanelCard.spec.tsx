@@ -452,6 +452,19 @@ describe("NodesPanelCard — inline form mode", () => {
     expect(screen.getByText("branch", { selector: "label" })).toHaveClass("sr-only");
     expect(screen.getByTestId("node-panel-run-inline-submit")).toHaveTextContent("Create task");
   });
+
+  it("visibly explains why a draft inline form cannot submit", () => {
+    renderPanel({
+      canRunNodes: false,
+      runNodesDisabledReason: "uncommitted-canvas-changes",
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    expect(screen.getByTestId("node-panel-run-inline-submit")).toBeDisabled();
+    expect(screen.getByTestId("node-panel-run-inline-disabled-message")).toHaveTextContent(
+      "Commit canvas changes before running this node.",
+    );
+  });
 });
 
 describe("NodesPanelCard — multi-entry layout", () => {

@@ -132,6 +132,38 @@ export const PersonalizedInlineForm: Story = {
   },
 };
 
+/** Draft node/template changes must be committed before runtime actions use them. */
+export const InlineFormWithUncommittedCanvasChanges: Story = {
+  render: (args) => (
+    <MockConsoleProvider
+      value={{
+        canvasId: "",
+        canRunNodes: false,
+        runNodesDisabledReason: "uncommitted-canvas-changes",
+      }}
+    >
+      <NodesPanelCard {...args} />
+    </MockConsoleProvider>
+  ),
+  args: {
+    panel: panel({
+      title: "Create work item",
+      nodes: [
+        {
+          node: "deploy-prod",
+          description: "Turn a short prompt into a queued delivery task.",
+          showRun: true,
+          triggerName: "manual",
+          formMode: "inline",
+          showNodeLabel: false,
+          showFieldLabels: false,
+          submitLabel: "Create task",
+        },
+      ],
+    }),
+  },
+};
+
 export const NodeNotFound: Story = {
   args: {
     panel: panel({

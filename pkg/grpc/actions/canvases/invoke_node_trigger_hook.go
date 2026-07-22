@@ -117,6 +117,7 @@ func InvokeNodeTriggerHook(
 	hookCtx.Logger = logger
 	result, err := hookProvider.HandleHook(hookCtx)
 	if err != nil {
+		logger.Errorf("trigger hook %q execution failed: %v", hookName, err)
 		return nil, grpcerrors.InvalidArgument(err, "hook execution failed")
 	}
 
