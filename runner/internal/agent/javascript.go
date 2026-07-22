@@ -99,6 +99,8 @@ func runJavaScriptHost(
 
 	cmd := exec.CommandContext(ctx, node, programPath)
 	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)
 
 	var buf bytes.Buffer

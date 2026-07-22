@@ -122,6 +122,8 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 
 	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
 	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)
 	max := maxOut
 	if max <= 0 {
@@ -236,16 +238,8 @@ func randomMark(prefix string) string {
 	return fmt.Sprintf("%s-%016x-%016x", prefix, rand.Uint64(), rand.Uint64())
 }
 
-// killShellProcess tears down the PTY bash process only (same as cmd/ptyprobe). We avoid
-// syscall.Kill(-pid) here: negative PGID kills interact badly with creack/pty Setsid/session
-// leadership on Darwin and some CI environments, yielding EOF/EIO on the PTY master mid-session.
-// EC2/Linux workloads that spawn detached children should use RUNNER_SHELL_USE_PIPE or rely on
-// bash job control; broader group-kill can be revisited if needed.
 func killShellProcess(shellCmd *exec.Cmd) {
-	if shellCmd == nil || shellCmd.Process == nil {
-		return
-	}
-	_ = shellCmd.Process.Kill()
+	killTaskProcessGroup(shellCmd)
 }
 
 func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []shellDirective, live io.Writer, resultHostPath string) (_ int, out string, err error) {
@@ -374,8 +368,9 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		if err := discardThroughStartMarker(ctx, sess, start, readerErr, 90*time.Second); err != nil {
 			return 1, truncateString(sess.out.String(), max), err
 		}
-		code, perr := readThroughEndMarker(ctx, sess, end, readerErr, 8*time.Minute)
+		code, perr := readThroughEndMarker(ctx, sess, end, readerErr)
 		if perr != nil {
+			writeLiveLogCommandEnd(sess.live, i, code, time.Since(commandStart))
 			return code, truncateString(sess.out.String(), max), perr
 		}
 		writeLiveLogCommandEnd(sess.live, i, code, time.Since(commandStart))
@@ -442,17 +437,13 @@ func discardThroughStartMarker(ctx context.Context, sess *shellSession, startMar
 	}
 }
 
-func readThroughEndMarker(ctx context.Context, sess *shellSession, endMark string, readerErr <-chan error, deadline time.Duration) (int, error) {
+func readThroughEndMarker(ctx context.Context, sess *shellSession, endMark string, readerErr <-chan error) (int, error) {
 	re := regexp.MustCompile(`\x01\s*` + regexp.QuoteMeta(endMark) + `\s+(\d+)\r?\n`)
-	timer := time.NewTimer(deadline)
-	defer timer.Stop()
 	streamed := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return 1, ctx.Err()
-		case <-timer.C:
-			return 1, fmt.Errorf("timeout waiting for end marker")
 		case r := <-readerErr:
 			if r == io.EOF {
 				return 1, fmt.Errorf("shell closed before end marker")
