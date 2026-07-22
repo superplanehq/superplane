@@ -1,7 +1,11 @@
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { buildExecutionInfo } from "@/pages/app/utils";
 import { isExecutionInFlight } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
-import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import {
+  terminalCommandStatusForExecution,
+  terminalTimeMsForExecution,
+  useLiveLogStream,
+} from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
 import type { RunInspectorNodeSection } from "./types";
@@ -38,6 +42,8 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
   const { sections, orphanLines, error, isStreaming, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
+    terminalCommandStatusForExecution(executionInfo),
+    terminalTimeMsForExecution(executionInfo),
   );
   const lines = runnerLogLines(orphanLines, sections);
   const isWaiting = lines.length === 0 && !error && (executionInFlight || isStreaming);
