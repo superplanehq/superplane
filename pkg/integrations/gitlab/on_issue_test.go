@@ -247,6 +247,187 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 
 }
 
+func Test__IssueDerivedActions(t *testing.T) {
+	t.Run("nil changes", func(t *testing.T) {
+		assert.Nil(t, issueDerivedActions(nil))
+	})
+
+	t.Run("label added", func(t *testing.T) {
+		changes := map[string]any{
+			"labels": map[string]any{
+				"previous": []any{map[string]any{"id": float64(206), "title": "API"}},
+				"current": []any{
+					map[string]any{"id": float64(206), "title": "API"},
+					map[string]any{"id": float64(205), "title": "Platform"},
+				},
+			},
+		}
+		assert.Equal(t, []string{"labeled"}, issueDerivedActions(changes))
+	})
+
+	t.Run("label removed", func(t *testing.T) {
+		changes := map[string]any{
+			"labels": map[string]any{
+				"previous": []any{
+					map[string]any{"id": float64(206), "title": "API"},
+					map[string]any{"id": float64(205), "title": "Platform"},
+				},
+				"current": []any{map[string]any{"id": float64(205), "title": "Platform"}},
+			},
+		}
+		assert.Equal(t, []string{"unlabeled"}, issueDerivedActions(changes))
+	})
+
+	t.Run("assignee added and removed", func(t *testing.T) {
+		changes := map[string]any{
+			"assignees": map[string]any{
+				"previous": []any{map[string]any{"id": float64(1)}},
+				"current":  []any{map[string]any{"id": float64(2)}},
+			},
+		}
+		assert.ElementsMatch(t, []string{"assigned", "unassigned"}, issueDerivedActions(changes))
+	})
+
+	t.Run("milestoned", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": nil, "current": float64(7)},
+		}
+		assert.Equal(t, []string{"milestoned"}, issueDerivedActions(changes))
+	})
+
+	t.Run("demilestoned", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(7), "current": nil},
+		}
+		assert.Equal(t, []string{"demilestoned"}, issueDerivedActions(changes))
+	})
+
+	t.Run("milestone swapped", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(7), "current": float64(8)},
+		}
+		assert.Equal(t, []string{"milestoned"}, issueDerivedActions(changes))
+	})
+
+	t.Run("locked", func(t *testing.T) {
+		changes := map[string]any{
+			"discussion_locked": map[string]any{"previous": false, "current": true},
+		}
+		assert.Equal(t, []string{"locked"}, issueDerivedActions(changes))
+	})
+
+	t.Run("unlocked", func(t *testing.T) {
+		changes := map[string]any{
+			"discussion_locked": map[string]any{"previous": true, "current": false},
+		}
+		assert.Equal(t, []string{"unlocked"}, issueDerivedActions(changes))
+	})
+
+	t.Run("edited title", func(t *testing.T) {
+		changes := map[string]any{
+			"title": map[string]any{"previous": "old", "current": "new"},
+		}
+		assert.Equal(t, []string{"edited"}, issueDerivedActions(changes))
+	})
+
+	t.Run("edited description", func(t *testing.T) {
+		changes := map[string]any{
+			"description": map[string]any{"previous": "old", "current": "new"},
+		}
+		assert.Equal(t, []string{"edited"}, issueDerivedActions(changes))
+	})
+
+	t.Run("unrelated change yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"updated_at": map[string]any{"previous": "t1", "current": "t2"},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
+
+	t.Run("no-op lock entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"discussion_locked": map[string]any{"previous": false, "current": false},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
+
+	t.Run("no-op milestone entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(7), "current": float64(7)},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
+}
+
+func Test__OnIssue__HandleWebhook__DerivedActions(t *testing.T) {
+	trigger := &OnIssue{}
+
+	headers := http.Header{}
+	headers.Set("X-Gitlab-Event", "Issue Hook")
+	headers.Set("X-Gitlab-Token", "token")
+	webhookCtx := &contexts.NodeWebhookContext{Secret: "token"}
+
+	t.Run("labeled matches even though update and state are not selected", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		data := map[string]any{
+			"object_attributes": map[string]any{
+				"state":  "closed",
+				"action": "update",
+			},
+			"changes": map[string]any{
+				"labels": map[string]any{
+					"previous": []any{},
+					"current":  []any{map[string]any{"id": float64(1), "title": "bug"}},
+				},
+			},
+		}
+		body, _ := json.Marshal(data)
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       headers,
+			Body:          body,
+			Configuration: map[string]any{"project": "123", "actions": []string{"labeled"}},
+			Webhook:       webhookCtx,
+			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventsCtx.Count())
+	})
+
+	t.Run("no match when derived action is not selected", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+		data := map[string]any{
+			"object_attributes": map[string]any{
+				"state":  "opened",
+				"action": "update",
+			},
+			"changes": map[string]any{
+				"labels": map[string]any{
+					"previous": []any{},
+					"current":  []any{map[string]any{"id": float64(1), "title": "bug"}},
+				},
+			},
+		}
+		body, _ := json.Marshal(data)
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       headers,
+			Body:          body,
+			Configuration: map[string]any{"project": "123", "actions": []string{"assigned"}},
+			Webhook:       webhookCtx,
+			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventsCtx.Count())
+	})
+}
+
 func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
 	trigger := &OnIssue{}
 
