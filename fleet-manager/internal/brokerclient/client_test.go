@@ -76,6 +76,9 @@ func TestDrainRunners_OK(t *testing.T) {
 				{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
 				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
 			},
+			RecoveredTasks: []api.RunnerTaskRecovery{
+				{RunnerID: "i-idle", TaskID: "task-2", State: api.RunnerTaskRecoveryStateFailed},
+			},
 		})
 	}))
 	defer ts.Close()
@@ -84,6 +87,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	out, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
 		FleetID:   "fleet-a",
 		RunnerIDs: []string{"i-idle", "i-busy"},
+		Reason:    api.DrainReasonUnhealthy,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +98,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	if gotAuth != "Bearer tok" {
 		t.Fatalf("auth: %q", gotAuth)
 	}
-	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 {
+	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 || gotBody.Reason != api.DrainReasonUnhealthy {
 		t.Fatalf("body: %#v", gotBody)
 	}
 	if len(out.Runners) != 2 {
@@ -105,6 +109,12 @@ func TestDrainRunners_OK(t *testing.T) {
 	}
 	if out.Runners[1].RunnerID != "i-busy" || out.Runners[1].State != api.DrainRunnerStateBusy || out.Runners[1].ActiveTaskID != "task-1" {
 		t.Fatalf("second runner: %#v", out.Runners[1])
+	}
+	if len(out.RecoveredTasks) != 1 ||
+		out.RecoveredTasks[0].RunnerID != "i-idle" ||
+		out.RecoveredTasks[0].TaskID != "task-2" ||
+		out.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateFailed {
+		t.Fatalf("recovered tasks: %#v", out.RecoveredTasks)
 	}
 }
 

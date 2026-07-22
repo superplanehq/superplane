@@ -240,7 +240,7 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 		BrokerClient: fake,
 	}
 
-	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, "test")
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonScaleDown)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,6 +254,9 @@ func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T
 	if fake.drainRequest.FleetID != "fleet-a" || len(fake.drainRequest.RunnerIDs) != 2 {
 		t.Fatalf("drain request: %#v", fake.drainRequest)
 	}
+	if fake.drainRequest.Reason != api.DrainReasonScaleDown {
+		t.Fatalf("drain reason: got %q want %q", fake.drainRequest.Reason, api.DrainReasonScaleDown)
+	}
 }
 
 func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T) {
@@ -263,8 +266,84 @@ func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T
 		BrokerClient: fake,
 	}
 
-	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, "test"); err == nil {
+	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}, api.DrainReasonScaleDown); err == nil {
 		t.Fatal("expected drain error")
+	}
+}
+
+func TestDrainTerminationCandidates_UsesUnhealthyDrainReason(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
+				{RunnerID: "i-busy", State: api.DrainRunnerStateDrained},
+			},
+			RecoveredTasks: []api.RunnerTaskRecovery{
+				{RunnerID: "i-busy", TaskID: "task-1", State: api.RunnerTaskRecoveryStateFailed},
+			},
+		},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"}, api.DrainReasonUnhealthy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 2 || got[0] != "i-idle" || got[1] != "i-busy" {
+		t.Fatalf("drained ids: got %#v want [i-idle i-busy]", got)
+	}
+	if fake.drainRequest.Reason != api.DrainReasonUnhealthy {
+		t.Fatalf("drain reason: got %q want %q", fake.drainRequest.Reason, api.DrainReasonUnhealthy)
+	}
+}
+
+func TestDrainTerminationCandidates_TerminatesBrokerDrainedUnhealthyRunner(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-stale", State: api.DrainRunnerStateDrained},
+			},
+		},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-stale"}, api.DrainReasonUnhealthy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || got[0] != "i-stale" {
+		t.Fatalf("drained ids: got %#v want [i-stale]", got)
+	}
+}
+
+func TestDrainTerminationCandidates_DefersBrokerBusyUnhealthyRunner(t *testing.T) {
+	fake := &fakeBrokerClient{
+		drain: api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-claiming", State: api.DrainRunnerStateBusy},
+			},
+		},
+	}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-claiming"}, api.DrainReasonUnhealthy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 0 {
+		t.Fatalf("drained ids: got %#v want none", got)
 	}
 }
 

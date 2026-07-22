@@ -114,6 +114,40 @@ func (s *PostgresStore) ClaimedRunnerIDsByFleet(ctx context.Context, fleetID str
 	return runnerIDs, nil
 }
 
+func (s *PostgresStore) ClaimedTaskIDsByRunners(ctx context.Context, fleetID string, runnerIDs []string) (map[string]string, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for claimed task ids")
+	}
+	runnerIDs = compactRunnerIDs(runnerIDs)
+	if len(runnerIDs) == 0 {
+		return map[string]string{}, nil
+	}
+
+	var rows []struct {
+		RunnerID string
+		TaskID   string
+	}
+	err := s.db.WithContext(ctx).
+		Model(&brokermodels.Task{}).
+		Select("runner_id, id AS task_id").
+		Where("fleet_id = ? AND status = ? AND runner_id IN ?", fleetID, string(models.StatusClaimed), runnerIDs).
+		Order("runner_id ASC, created_at ASC, id ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]string, len(rows))
+	for _, row := range rows {
+		if _, ok := out[row.RunnerID]; ok {
+			continue
+		}
+		out[row.RunnerID] = row.TaskID
+	}
+	return out, nil
+}
+
 func (s *PostgresStore) ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {
@@ -154,6 +188,23 @@ RETURNING id`,
 	return s.GetTask(ctx, id)
 }
 
+func compactRunnerIDs(ids []string) []string {
+	out := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
 // UnclaimTask re-queues a claimed task so another runner can pick it up.
 // Returns unclaimed=false when the task is not claimed by runnerID.
 func (s *PostgresStore) UnclaimTask(ctx context.Context, taskID, runnerID string) (bool, error) {
@@ -182,10 +233,12 @@ func terminalTaskStatus(st models.TaskStatus) bool {
 }
 
 const (
-	msgCanceledQueued    = "canceled before execution"
-	msgCanceledLeaseReap = "canceled (lease expired while stop pending)"
-	exitCanceled         = 130
-	maxInfraRetries      = 1
+	msgCanceledQueued     = "canceled before execution"
+	msgCanceledLeaseReap  = "canceled (lease expired while stop pending)"
+	msgCanceledRunnerLost = "canceled (runner lost while stop pending)"
+	msgRunnerLost         = "runner lost before completion"
+	exitCanceled          = 130
+	maxInfraRetries       = 1
 )
 
 func (s *PostgresStore) RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error) {
@@ -331,6 +384,111 @@ RETURNING id`,
 		return nil, nil
 	}
 	return s.GetTask(ctx, rows[0].ID)
+}
+
+func (s *PostgresStore) RecoverLostRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for lost runner recovery")
+	}
+	runnerIDs = compactRunnerIDs(runnerIDs)
+	if len(runnerIDs) == 0 {
+		return []LostRunnerTaskRecovery{}, nil
+	}
+
+	var recoveries []LostRunnerTaskRecovery
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		canceled, err := recoverLostRunnerTasks(tx, `
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = true
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		status = ?,
+		cancel_requested = false,
+		claimed_at = NULL,
+		lease_until = NULL,
+		runner_id = NULL,
+		exit_code = ?,
+		output = ?,
+		result_json = NULL,
+		error_message = NULL,
+		environment_json = ''
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id, t.status
+)
+SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs,
+			string(models.StatusCanceled), exitCanceled, msgCanceledRunnerLost,
+		)
+		if err != nil {
+			return err
+		}
+		recoveries = append(recoveries, canceled...)
+
+		failed, err := recoverLostRunnerTasks(tx, `
+WITH candidates AS (
+	SELECT id, fleet_id, runner_id
+	FROM tasks
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false
+	FOR UPDATE
+),
+updated AS (
+	UPDATE tasks t SET
+		status = ?,
+		claimed_at = NULL,
+		lease_until = NULL,
+		runner_id = NULL,
+		exit_code = 1,
+		output = '',
+		result_json = NULL,
+		error_message = ?,
+		cancel_requested = false,
+		environment_json = ''
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id, t.fleet_id, c.runner_id, t.status
+)
+	SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs,
+			string(models.StatusFailed), msgRunnerLost,
+		)
+		if err != nil {
+			return err
+		}
+		recoveries = append(recoveries, failed...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return recoveries, nil
+}
+
+func recoverLostRunnerTasks(tx *gorm.DB, query string, args ...any) ([]LostRunnerTaskRecovery, error) {
+	var rows []struct {
+		ID       string
+		FleetID  string
+		RunnerID string
+		Status   string
+	}
+	if err := tx.Raw(query, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	recoveries := make([]LostRunnerTaskRecovery, 0, len(rows))
+	for _, row := range rows {
+		recoveries = append(recoveries, LostRunnerTaskRecovery{
+			ID:       row.ID,
+			FleetID:  row.FleetID,
+			RunnerID: row.RunnerID,
+			Status:   models.TaskStatus(row.Status),
+		})
+	}
+	return recoveries, nil
 }
 
 func nullIfEmpty(s string) *string {

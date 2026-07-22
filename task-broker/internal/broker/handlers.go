@@ -138,6 +138,12 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.FleetID = strings.TrimSpace(req.FleetID)
+	req.RunnerIDs = compactRunnerIDs(req.RunnerIDs)
+	reason, ok := drainReason(req.Reason)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid drain reason")
+		return
+	}
 	if req.FleetID == "" {
 		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
@@ -151,7 +157,24 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claimedTaskIDs, err := s.Store.ClaimedTaskIDsByRunners(r.Context(), req.FleetID, req.RunnerIDs)
+	if err != nil {
+		s.logErr("claimed task ids by runners", err)
+		writeError(w, http.StatusInternalServerError, "could not load claimed runner tasks")
+		return
+	}
 	statuses := s.RunnerDrain.Drain(req.FleetID, req.RunnerIDs)
+	statuses = mergePersistedClaimedTasks(statuses, claimedTaskIDs)
+	recoveredTasks := []api.RunnerTaskRecovery(nil)
+	if reason == api.DrainReasonUnhealthy {
+		var err error
+		statuses, recoveredTasks, err = s.recoverUnhealthyBusyRunners(r.Context(), req.FleetID, statuses)
+		if err != nil {
+			s.logErr("recover unhealthy runner tasks", err)
+			writeError(w, http.StatusInternalServerError, "could not recover unhealthy runner tasks")
+			return
+		}
+	}
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
@@ -159,10 +182,42 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		drained, busy := drainStatusCounts(statuses)
 		s.Log.Info("runner_drain",
 			slog.String("fleet_id", req.FleetID),
+			slog.String("reason", string(reason)),
 			slog.Int("drained_count", drained),
-			slog.Int("busy_count", busy))
+			slog.Int("busy_count", busy),
+			slog.Int("recovered_task_count", len(recoveredTasks)))
 	}
-	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses})
+	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses, RecoveredTasks: recoveredTasks})
+}
+
+func drainReason(reason api.DrainReason) (api.DrainReason, bool) {
+	switch reason {
+	case "", api.DrainReasonScaleDown:
+		return api.DrainReasonScaleDown, true
+	case api.DrainReasonUnhealthy:
+		return api.DrainReasonUnhealthy, true
+	default:
+		return "", false
+	}
+}
+
+func mergePersistedClaimedTasks(statuses []api.DrainRunnerStatus, claimedTaskIDs map[string]string) []api.DrainRunnerStatus {
+	if len(claimedTaskIDs) == 0 {
+		return statuses
+	}
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		taskID, ok := claimedTaskIDs[out[i].RunnerID]
+		if !ok {
+			continue
+		}
+		out[i].State = api.DrainRunnerStateBusy
+		if out[i].ActiveTaskID == "" {
+			out[i].ActiveTaskID = taskID
+		}
+	}
+	return out
 }
 
 func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int) {
@@ -175,6 +230,107 @@ func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int)
 		}
 	}
 	return drained, busy
+}
+
+func (s *Server) recoverUnhealthyBusyRunners(ctx context.Context, fleetID string, statuses []api.DrainRunnerStatus) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+	busyRunnerIDs, activeTaskIDs := busyRunnerRecoveryInputs(statuses)
+	if len(busyRunnerIDs) == 0 {
+		return statuses, nil, nil
+	}
+
+	recoveries, err := s.Store.RecoverLostRunnerTasks(ctx, fleetID, busyRunnerIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := make([]api.RunnerTaskRecovery, 0, len(recoveries))
+	recoveredRunnerIDs := make(map[string]struct{}, len(recoveries))
+	for _, recovery := range recoveries {
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.CompleteTask(recovery.RunnerID, recovery.ID)
+		}
+		recoveredRunnerIDs[recovery.RunnerID] = struct{}{}
+		state := recoveryState(recovery.Status)
+		out = append(out, api.RunnerTaskRecovery{
+			RunnerID: recovery.RunnerID,
+			TaskID:   recovery.ID,
+			State:    state,
+		})
+		s.afterLostRunnerRecovery(ctx, recovery, state)
+	}
+	if s.RunnerDrain != nil {
+		for runnerID, taskID := range activeTaskIDs {
+			if _, recovered := recoveredRunnerIDs[runnerID]; recovered {
+				continue
+			}
+			s.RunnerDrain.CompleteTask(runnerID, taskID)
+		}
+	}
+
+	statuses = markRecoveredBusyRunnersDrained(statuses, activeTaskIDs, recoveredRunnerIDs)
+	if s.Log != nil {
+		s.Log.Info("lost_runner_tasks_recovered",
+			slog.String("fleet_id", fleetID),
+			slog.Int("task_count", len(out)),
+			slog.Any("tasks", out))
+	}
+	return statuses, out, nil
+}
+
+func busyRunnerRecoveryInputs(statuses []api.DrainRunnerStatus) ([]string, map[string]string) {
+	runnerIDs := make([]string, 0)
+	activeTaskIDs := make(map[string]string)
+	for _, status := range statuses {
+		if status.State != api.DrainRunnerStateBusy {
+			continue
+		}
+		runnerID := strings.TrimSpace(status.RunnerID)
+		if runnerID == "" {
+			continue
+		}
+		runnerIDs = append(runnerIDs, runnerID)
+		if taskID := strings.TrimSpace(status.ActiveTaskID); taskID != "" {
+			activeTaskIDs[runnerID] = taskID
+		}
+	}
+	return runnerIDs, activeTaskIDs
+}
+
+func markRecoveredBusyRunnersDrained(statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string, recoveredRunnerIDs map[string]struct{}) []api.DrainRunnerStatus {
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		if out[i].State != api.DrainRunnerStateBusy {
+			continue
+		}
+		_, recovered := recoveredRunnerIDs[out[i].RunnerID]
+		activeTaskID := strings.TrimSpace(activeTaskIDs[out[i].RunnerID])
+		if !recovered && activeTaskID == "" {
+			continue
+		}
+		out[i].State = api.DrainRunnerStateDrained
+		out[i].ActiveTaskID = ""
+	}
+	return out
+}
+
+func recoveryState(status models.TaskStatus) api.RunnerTaskRecoveryState {
+	switch status {
+	case models.StatusCanceled:
+		return api.RunnerTaskRecoveryStateCanceled
+	default:
+		return api.RunnerTaskRecoveryStateFailed
+	}
+}
+
+func (s *Server) afterLostRunnerRecovery(ctx context.Context, recovery taskstore.LostRunnerTaskRecovery, state api.RunnerTaskRecoveryState) {
+	task, err := s.Store.GetTask(ctx, recovery.ID)
+	if err != nil {
+		s.logErr("get recovered lost runner task", err)
+		return
+	}
+	s.recordTaskCompleted(ctx, task)
+	go s.DeliverWebhook(task)
 }
 
 func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {

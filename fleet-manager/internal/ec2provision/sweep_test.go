@@ -7,10 +7,10 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-func TestTerminateUnhealthyRunnersDefersBusyRunners(t *testing.T) {
+func TestTerminateUnhealthyRunnersDefersInProgressClaim(t *testing.T) {
 	fake := &fakeBrokerClient{drain: api.DrainRunnersResponse{
 		Runners: []api.DrainRunnerStatus{
-			{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
+			{RunnerID: "i-busy", State: api.DrainRunnerStateBusy},
 		},
 	}}
 	l := &Launcher{
