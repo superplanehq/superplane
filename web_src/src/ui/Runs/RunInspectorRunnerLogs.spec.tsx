@@ -85,6 +85,40 @@ describe("RunInspector runner logs", () => {
     expect(screen.queryByRole("button", { name: /Logs/i })).not.toBeInTheDocument();
     expect(useLiveLogStreamMock).not.toHaveBeenCalled();
   });
+
+  it("shows a loading message while finished-execution logs are still streaming in", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: null,
+      isStreaming: true,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
+    expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows the empty message only after streaming settles with no lines", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByText("No log lines yet.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs...")).not.toBeInTheDocument();
+  });
 });
 
 function renderRunnerInspector() {

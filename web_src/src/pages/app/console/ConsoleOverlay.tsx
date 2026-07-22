@@ -39,6 +39,8 @@ export type ConsoleOverlayProps = {
    * rules; the same backend rules apply even if the UI is bypassed.
    */
   canRunNodes: boolean;
+  /** Explains a temporary runtime-action block that is not an authorization failure. */
+  runNodesDisabledReason?: ConsoleContextValue["runNodesDisabledReason"];
   consoleQuery: CanvasConsoleQueryResult;
   updateConsoleMutation: UpdateCanvasConsoleMutationResult;
   addPanelDialogOpen: boolean;
@@ -73,6 +75,7 @@ export function ConsoleOverlay({
   readOnly,
   canImportYaml,
   canRunNodes,
+  runNodesDisabledReason,
   consoleQuery,
   updateConsoleMutation,
   addPanelDialogOpen,
@@ -172,6 +175,7 @@ export function ConsoleOverlay({
       nodesLoading={canvasNodesLoading}
       nodeStatuses={nodeStatuses}
       canRunNodes={canRunNodes}
+      runNodesDisabledReason={runNodesDisabledReason}
       onTriggerNode={canRunNodes ? onTriggerNode : undefined}
     >
       {overlayContent}
