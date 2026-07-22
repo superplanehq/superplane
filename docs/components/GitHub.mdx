@@ -3347,9 +3347,9 @@ The following pull request operations have their own dedicated components:
 
 ### Implementation notes
 
-- Title, body, state, and base are updated through GitHub's Pulls API.
-- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
-- GitHub ignores a base branch change in the same request that sets the state to "closed".
+- Title, body, state, and base are updated through GitHub's Pulls API. Base is sent in its own request before title/body/state, so toggling on both a retarget and a close in the same run applies both instead of GitHub silently dropping the retarget.
+- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue. A leading "@" on an assignee username is stripped automatically.
+- GitHub rejects retargeting a pull request that is already closed - if the pull request is closed from a previous run, toggle it open again before retargeting.
 
 ### Output
 

@@ -76,9 +76,9 @@ The following pull request operations have their own dedicated components:
 
 ## Implementation notes
 
-- Title, body, state, and base are updated through GitHub's Pulls API.
-- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue.
-- GitHub ignores a base branch change in the same request that sets the state to "closed".
+- Title, body, state, and base are updated through GitHub's Pulls API. Base is sent in its own request before title/body/state, so toggling on both a retarget and a close in the same run applies both instead of GitHub silently dropping the retarget.
+- Replace Assignees and Replace Labels are updated through GitHub's Issues API, since GitHub models a pull request's labels and assignees on its underlying issue. A leading "@" on an assignee username is stripped automatically.
+- GitHub rejects retargeting a pull request that is already closed - if the pull request is closed from a previous run, toggle it open again before retargeting.
 
 ## Output
 
@@ -248,23 +248,36 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	editPullRequest := func(update *github.PullRequest) error {
+		if _, _, err := client.EditPullRequest(context.Background(), repository, pullNumber, update); err != nil {
+			return fmt.Errorf("failed to update pull request: %w", explainGitHubError(err))
+		}
+		return nil
+	}
+
 	//
-	// Title, body, state, and base are updated through the Pulls API.
+	// Base is sent in its own request, before title/body/state: GitHub's Pulls
+	// API silently drops a base change bundled with a request that also closes
+	// the pull request, and separately rejects retargeting a pull request that
+	// is already closed. Applying the retarget first, while the pull request
+	// is still in its current state, avoids both.
 	//
-	if hasPullRequestFields(config) {
-		pullRequestUpdate := &github.PullRequest{
+	if config.Base != nil {
+		base := strings.TrimSpace(*config.Base)
+		if err := editPullRequest(&github.PullRequest{Base: &github.PullRequestBranch{Ref: &base}}); err != nil {
+			return err
+		}
+	}
+
+	if config.Title != nil || config.Body != nil || config.State != nil {
+		update := &github.PullRequest{
 			Title: config.Title,
 			Body:  config.Body,
 			State: config.State,
 		}
 
-		if config.Base != nil {
-			base := strings.TrimSpace(*config.Base)
-			pullRequestUpdate.Base = &github.PullRequestBranch{Ref: &base}
-		}
-
-		if _, _, err := client.EditPullRequest(context.Background(), repository, pullNumber, pullRequestUpdate); err != nil {
-			return fmt.Errorf("failed to update pull request: %w", explainGitHubError(err))
+		if err := editPullRequest(update); err != nil {
+			return err
 		}
 	}
 
@@ -274,8 +287,12 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 	//
 	if hasIssueFields(config) {
 		issueRequest := &github.IssueRequest{
-			Assignees: config.Assignees,
-			Labels:    config.Labels,
+			Labels: config.Labels,
+		}
+
+		if config.Assignees != nil {
+			assignees := common.SanitizeAssignees(*config.Assignees)
+			issueRequest.Assignees = &assignees
 		}
 
 		if _, _, err := client.EditIssue(context.Background(), repository, pullNumber, issueRequest); err != nil {
