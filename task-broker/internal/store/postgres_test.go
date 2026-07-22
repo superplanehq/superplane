@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -725,7 +724,7 @@ func TestTerminationPendingTaskIsNotRequeuedByLeaseReaper(t *testing.T) {
 	}
 }
 
-func TestTerminationPendingTaskRejectsLateCompletion(t *testing.T) {
+func TestTerminationPendingTaskAcceptsLateCompletion(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -735,24 +734,30 @@ func TestTerminationPendingTaskRejectsLateCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
 		ID:       taskID,
 		RunnerID: "runner-1",
 		ExitCode: 0,
 	})
-	if err == nil || !strings.Contains(err.Error(), "termination pending") {
-		t.Fatalf("complete error: %v", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
 	}
 
 	got, err := st.GetTask(ctx, taskID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != models.StatusClaimed || got.RunnerID != "runner-1" || got.RunnerTerminationRequestedAt == nil {
-		t.Fatalf("task after late completion: %#v", got)
+	if got.Status != models.StatusSucceeded {
+		t.Fatalf("status: got %s want succeeded", got.Status)
 	}
-	if got.ExitCode != nil {
-		t.Fatalf("exit code should remain nil: %#v", got.ExitCode)
+	if got.ExitCode == nil || *got.ExitCode != 0 {
+		t.Fatalf("exit code: %#v", got.ExitCode)
+	}
+	if got.RunnerTerminationRequestedAt != nil {
+		t.Fatalf("termination marker should be cleared: %v", got.RunnerTerminationRequestedAt)
 	}
 }
 

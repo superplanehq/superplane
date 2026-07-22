@@ -319,8 +319,9 @@ UPDATE tasks SET
 	result_json = ?,
 	error_message = ?,
 	cancel_requested = false,
-	environment_json = NULL
-WHERE id = ? AND runner_id = ? AND status = ? AND runner_termination_requested_at IS NULL`,
+	environment_json = NULL,
+	runner_termination_requested_at = NULL
+WHERE id = ? AND runner_id = ? AND status = ?`,
 		string(final), req.ExitCode, nullIfEmpty(req.ResultJSON), nullIfEmpty(req.ErrorMessage),
 		req.ID, req.RunnerID, string(models.StatusClaimed),
 	)
@@ -348,9 +349,6 @@ func (s *PostgresStore) completeTaskNoRows(ctx context.Context, req CompleteTask
 	if task.RunnerID != req.RunnerID {
 		return nil, fmt.Errorf("wrong runner for task %s", req.ID)
 	}
-	if task.RunnerTerminationRequestedAt != nil {
-		return nil, fmt.Errorf("task termination pending: %s", req.ID)
-	}
 	if terminalTaskStatus(task.Status) {
 		return &CompleteTaskResult{Task: task, Outcome: CompleteTaskOutcomeAlreadyTerminal}, nil
 	}
@@ -375,8 +373,9 @@ UPDATE tasks SET
 	result_json = NULL,
 	error_message = NULL,
 	cancel_requested = false,
+	runner_termination_requested_at = NULL,
 	infra_retry_count = infra_retry_count + 1
-WHERE id = ? AND runner_id = ? AND status = ? AND cancel_requested = false AND infra_retry_count < ? AND runner_termination_requested_at IS NULL
+WHERE id = ? AND runner_id = ? AND status = ? AND cancel_requested = false AND infra_retry_count < ?
 RETURNING id`,
 		string(models.StatusQueued), req.ID, req.RunnerID, string(models.StatusClaimed), maxInfraRetries,
 	).Scan(&rows).Error
