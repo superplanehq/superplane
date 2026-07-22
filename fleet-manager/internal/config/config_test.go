@@ -36,7 +36,7 @@ func validConfigJSON() string {
 		},
 		"pools": [
 			{
-				"fleet_id": "aws-amd64",
+				"fleet_id": "e1-tiny-amd64",
 				"ami": "ami-amd64-aaaa",
 				"instance_type": "t3.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-amd64",
@@ -44,7 +44,7 @@ func validConfigJSON() string {
 				"headroom": 2
 			},
 			{
-				"fleet_id": "aws-arm64",
+				"fleet_id": "e1-tiny-arm64",
 				"ami": "ami-arm64-bbbb",
 				"instance_type": "t4g.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-arm64",
@@ -76,7 +76,7 @@ func TestLoad_HappyPath(t *testing.T) {
 	if len(f.Pools) != 2 {
 		t.Fatalf("expected 2 pools, got %d", len(f.Pools))
 	}
-	if f.Pools[0].FleetID != "aws-amd64" || f.Pools[1].FleetID != "aws-arm64" {
+	if f.Pools[0].FleetID != "e1-tiny-amd64" || f.Pools[1].FleetID != "e1-tiny-arm64" {
 		t.Errorf("pool fleet ids = %q, %q", f.Pools[0].FleetID, f.Pools[1].FleetID)
 	}
 }
@@ -155,7 +155,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 			return strings.Replace(s,
 				`"pools": [
 			{
-				"fleet_id": "aws-amd64",
+				"fleet_id": "e1-tiny-amd64",
 				"ami": "ami-amd64-aaaa",
 				"instance_type": "t3.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-amd64",
@@ -163,7 +163,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 				"headroom": 2
 			},
 			{
-				"fleet_id": "aws-arm64",
+				"fleet_id": "e1-tiny-arm64",
 				"ami": "ami-arm64-bbbb",
 				"instance_type": "t4g.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-arm64",
@@ -173,7 +173,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 		]`, `"pools": []`, 1)
 		}, "pools[]"},
 		{"missing_fleet_id", func(s string) string {
-			return strings.Replace(s, `"fleet_id": "aws-amd64",`, `"fleet_id": "",`, 1)
+			return strings.Replace(s, `"fleet_id": "e1-tiny-amd64",`, `"fleet_id": "",`, 1)
 		}, "fleet_id"},
 		{"missing_ami", func(s string) string {
 			return strings.Replace(s, `"ami": "ami-amd64-aaaa",`, `"ami": "",`, 1)
@@ -189,7 +189,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 		}, "bucket/key"},
 		{"duplicate_fleet_id", func(s string) string {
 			// Two pools with the same fleet_id.
-			return strings.Replace(s, `"fleet_id": "aws-arm64",`, `"fleet_id": "aws-amd64",`, 1)
+			return strings.Replace(s, `"fleet_id": "e1-tiny-arm64",`, `"fleet_id": "e1-tiny-amd64",`, 1)
 		}, "duplicated"},
 		{"negative_hot_instance_count", func(s string) string {
 			return strings.Replace(s, `"hot_instance_count": 3,`, `"hot_instance_count": -1,`, 1)
@@ -334,7 +334,7 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	if cfg.RunnerS3URI != "s3://superplane-artifacts/runner-linux-arm64" {
 		t.Errorf("RunnerS3URI = %q", cfg.RunnerS3URI)
 	}
-	if cfg.RunnerFleetID != "aws-arm64" {
+	if cfg.RunnerFleetID != "e1-tiny-arm64" {
 		t.Errorf("RunnerFleetID = %q", cfg.RunnerFleetID)
 	}
 	if cfg.HotInstanceCount != 2 {
