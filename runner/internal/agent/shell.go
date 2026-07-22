@@ -57,3 +57,23 @@ func errEmptyCommands() error {
 // That keeps the shell alive for end markers while preserving cwd, exports, and
 // background jobs. Applied at session boot, not before every command.
 const ptyExitAliasBootstrap = `shopt -s expand_aliases; alias exit=return`
+
+// wrapSourcedDirective enables fail-fast for a command_list entry without
+// letting `set -e` kill the shared interactive PTY shell.
+//
+// An ERR trap converts the first failing command into `return` from the sourced
+// script so the runner still gets an end-marker status. A RETURN trap always
+// clears errexit/ERR afterwards — important when user code (or alias exit→return)
+// returns early and would otherwise skip the trailing cleanup lines.
+func wrapSourcedDirective(shell string) string {
+	var b strings.Builder
+	b.WriteString("set +e\n")
+	b.WriteString("trap 'trap - ERR RETURN; set +e' RETURN\n")
+	b.WriteString("trap '_sp_runner_err=$?; trap - ERR; set +e; return \"$_sp_runner_err\"' ERR\n")
+	b.WriteString("set -e\n")
+	b.WriteString(strings.TrimRight(shell, "\n"))
+	b.WriteString("\n")
+	b.WriteString("trap - ERR RETURN\n")
+	b.WriteString("set +e\n")
+	return b.String()
+}

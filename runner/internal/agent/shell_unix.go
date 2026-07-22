@@ -351,7 +351,7 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 
 	for i, dir := range directives {
 		dPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
-		if err := os.WriteFile(dPath, []byte(dir.Shell+"\n"), 0600); err != nil {
+		if err := os.WriteFile(dPath, []byte(wrapSourcedDirective(dir.Shell)+"\n"), 0600); err != nil {
 			return 1, truncateString(sess.out.String(), max), err
 		}
 		commandStart := time.Now()
@@ -360,8 +360,10 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		end := randomMark("e")
 		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').
 		// No trailing `| sh`: under PTY+interactive bash that pipeline correlated with early slave close on Darwin.
+		// set +e around source so a non-zero sourced script cannot skip the end marker
+		// if a previous command left errexit enabled.
 		instr := fmt.Sprintf(
-			`echo $'\001 %s\n'; source %s; AGENT_CMD_RESULT=$?; echo $'\001 %s '"$AGENT_CMD_RESULT"`,
+			`echo $'\001 %s\n'; set +e; source %s; AGENT_CMD_RESULT=$?; set +e; echo $'\001 %s '"$AGENT_CMD_RESULT"`,
 			start,
 			bashSingleQuotedPath(dPath),
 			end,
