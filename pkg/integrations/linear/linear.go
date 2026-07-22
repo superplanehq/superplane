@@ -50,7 +50,7 @@ type Metadata struct {
 const installationInstructions = `
 SuperPlane connects to Linear with OAuth.
 
-1. Click **Connect** below with client id and secret empty to start the setup wizard. 
+1. Click the **Connect** button with client id and secret empty to start the setup wizard. 
 
 `
 
