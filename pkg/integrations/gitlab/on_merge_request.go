@@ -215,12 +215,7 @@ func (m *OnMergeRequest) whitelistedAction(logger *log.Entry, data map[string]an
 		return true
 	}
 
-	//
-	// GitLab reports most merge request changes (labels, assignees,
-	// milestone, draft toggling, reviewers, auto-merge, new commits, etc.)
-	// as a single "update" action, so the finer-grained actions below are
-	// derived from `object_attributes`/`changes` on an update event.
-	//
+	// GitLab reports most merge request changes as a single "update" action; derive the finer-grained ones below.
 	if action != "update" {
 		logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
 		return false
@@ -237,10 +232,7 @@ func (m *OnMergeRequest) whitelistedAction(logger *log.Entry, data map[string]an
 	return false
 }
 
-// mergeRequestDerivedActions inspects an update event's `object_attributes`
-// and `changes` fields to derive finer-grained actions (GitLab does not
-// report these as distinct `object_attributes.action` values the way GitHub
-// does for pull requests).
+// mergeRequestDerivedActions derives GitHub-equivalent actions from an update event's object_attributes/changes.
 func mergeRequestDerivedActions(attrs map[string]any, rawChanges any) []string {
 	var derived []string
 

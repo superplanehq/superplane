@@ -206,9 +206,7 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 		return false
 	}
 
-	//
 	// If not an update action, it must be in the allowed list as-is.
-	//
 	if action != "update" {
 		if !slices.Contains(allowedActions, action) {
 			logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
@@ -217,11 +215,7 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 		return true
 	}
 
-	//
-	// GitLab reports every other issue change (labels, assignees, milestone,
-	// locking, title/description) as a single "update" action, so the
-	// finer-grained actions below are derived from the `changes` field.
-	//
+	// GitLab reports every other issue change as a single "update" action; derive the finer-grained ones below.
 	if slices.Contains(allowedActions, "update") {
 		if state, _ := attrs["state"].(string); state == "opened" {
 			return true
@@ -240,9 +234,7 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 	return false
 }
 
-// issueDerivedActions inspects an issue webhook's `changes` field to derive
-// finer-grained actions for an "update" event (GitLab does not report these
-// as distinct `object_attributes.action` values the way GitHub does).
+// issueDerivedActions derives GitHub-equivalent actions from an update event's `changes` field.
 func issueDerivedActions(changes map[string]any) []string {
 	if changes == nil {
 		return nil
