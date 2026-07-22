@@ -91,9 +91,17 @@ export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | u
   const entry: NodesPanelNode = {
     node,
     label: typeof obj.label === "string" ? obj.label : undefined,
+    description: typeof obj.description === "string" ? obj.description : undefined,
     showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
     promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
+    formMode:
+      typeof obj.formMode === "string" && NODES_PANEL_FORM_MODES.includes(obj.formMode as NodesPanelFormMode)
+        ? (obj.formMode as NodesPanelFormMode)
+        : undefined,
+    showNodeLabel: typeof obj.showNodeLabel === "boolean" ? obj.showNodeLabel : undefined,
+    showFieldLabels: typeof obj.showFieldLabels === "boolean" ? obj.showFieldLabels : undefined,
+    submitLabel: typeof obj.submitLabel === "string" ? obj.submitLabel : undefined,
   };
   // Always fold into exactly one entry — even when the legacy node is
   // unset — so the merged renderer keeps the compact single-node layout

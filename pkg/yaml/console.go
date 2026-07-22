@@ -1051,6 +1051,20 @@ var AllowedBoardLaneColors = []string{
 	"purple",
 }
 
+var allowedBoardCardFormats = []string{
+	"text",
+	"number",
+	"percent",
+	"date",
+	"datetime",
+	"relative",
+	"duration",
+	"status",
+	"badge",
+	"code",
+	"link",
+}
+
 // validateBoardPanelContent enforces the shape of a `board` (kanban) panel.
 // Structure mirrors `validateBoardContent` in
 // `web_src/src/pages/app/console/boardPanelContent.ts` so the frontend and
@@ -1101,6 +1115,7 @@ func validateBoardLanes(panelID string, raw any) error {
 	if !ok || len(lanes) == 0 {
 		return fmt.Errorf("panel %q render.lanes must be a non-empty array", panelID)
 	}
+	seenValues := map[string]struct{}{}
 	for i, rawLane := range lanes {
 		lane, ok := rawLane.(map[string]any)
 		if !ok || lane == nil {
@@ -1110,6 +1125,11 @@ func validateBoardLanes(panelID string, raw any) error {
 		if !ok || strings.TrimSpace(value) == "" {
 			return fmt.Errorf("panel %q render.lanes[%d].value must be a non-empty string", panelID, i)
 		}
+		normalizedValue := strings.ToLower(strings.TrimSpace(value))
+		if _, exists := seenValues[normalizedValue]; exists {
+			return fmt.Errorf("panel %q render.lanes[%d].value must be unique after trimming and case folding", panelID, i)
+		}
+		seenValues[normalizedValue] = struct{}{}
 		if err := validateOptionalString(panelID, fmt.Sprintf("render.lanes[%d].label", i), lane["label"]); err != nil {
 			return err
 		}
@@ -1155,6 +1175,12 @@ func validateBoardCardFields(panelID string, raw any) error {
 		for _, key := range []string{"label", "href", "show", "format"} {
 			if err := validateOptionalString(panelID, fmt.Sprintf("render.card.fields[%d].%s", i, key), field[key]); err != nil {
 				return err
+			}
+		}
+		if rawFormat, ok := field["format"]; ok && rawFormat != nil {
+			format := rawFormat.(string)
+			if !slices.Contains(allowedBoardCardFormats, format) {
+				return fmt.Errorf("panel %q render.card.fields[%d].format must be one of %s", panelID, i, strings.Join(allowedBoardCardFormats, "/"))
 			}
 		}
 	}

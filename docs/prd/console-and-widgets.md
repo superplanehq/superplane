@@ -462,7 +462,7 @@ content:
 | `lanes` | Required, at least one entry. Each lane has `value` (required, non-empty), optional `label` (defaults to `value`), and optional `color` from the shared palette: `neutral`, `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`. |
 | `otherLane` | Optional boolean. When `true`, rows whose `groupBy` value does not match any configured lane render in a trailing **Other** lane instead of being hidden. Defaults to hiding unmatched rows. |
 | `card.titleField` | Required. Row field rendered as the card title. Falls back to the `groupBy` value (or row `id`) when the field resolves to an empty value. |
-| `card.fields` | Optional list. Each entry reuses `WidgetTableColumn` semantics (`field`, `label?`, `format?`, `show?`, `href?`) and renders as a compact meta line under the title. Unlabelled fields render the value alone. |
+| `card.fields` | Optional list. Each entry reuses compact `WidgetTableColumn` semantics (`field`, `label?`, `format?`, `show?`, `href?`) and renders as a meta line under the title. Supported formats are `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, and `link`; table-only `avatar`, `progress`, and `trend` formats are not supported. Unlabelled fields render the value alone. |
 | `where` | Optional list of structured filters. Same operators as the table panel (`eq`, `neq`, `contains`, `not_contains`, `gt`, `lt`, `exists`, `not_exists`). |
 | `sort` | Optional widget-level sort applied inside each lane. Same shape as the table sort. |
 | `rowActions` | Optional list of trigger actions rendered as compact buttons on each card. Same rules as the table row actions — manual-run gating, per-row `show`, confirm dialogs, and lock accounting via the shared per-widget action lock. |
@@ -1025,14 +1025,14 @@ Rules:
 - Maximum panel payload size is 1 MiB.
 - Import replaces the whole console.
 
-Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and validation lives in `canvas_dashboard_yml.go`. Keep error behavior and accepted shapes aligned.
+Frontend YAML parsing lives in `consoleYaml.ts`. Backend YAML parsing and validation lives in `pkg/yaml/console.go`. Keep error behavior and accepted shapes aligned.
 
 ## Bundling A Console With An Installable App
 
 Apps installed from a public GitHub repository (`POST /apps/install`) can ship an optional `console.yaml` alongside `canvas.yaml`. When present, the install flow loads it from the same ref and writes it as the new canvas's console.
 
 - File path: `console.yaml` at the repo root, same branch (`main` or `master`) that `canvas.yaml` is read from.
-- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `models.DashboardFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
+- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `yaml.ConsoleFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
 - Optional: a missing file is fine — the new canvas just starts with an empty console.
 - Replace-all on install: `metadata.canvasId` is ignored; the panels and layout become the canvas's full console.
 

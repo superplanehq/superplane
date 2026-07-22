@@ -70,6 +70,14 @@ describe("validateBoardContent — rejections", () => {
     expect(validateBoardContent(body)).toMatch(/render\.lanes\[0\]\.value/);
   });
 
+  it("rejects duplicate lane values after trimming and case folding", () => {
+    const body = {
+      ...validBoardBody(),
+      render: { ...validBoardBody().render, lanes: [{ value: "Todo" }, { value: " todo " }] },
+    };
+    expect(validateBoardContent(body)).toMatch(/render\.lanes\[1\]\.value must be unique/);
+  });
+
   it("rejects unknown lane colors", () => {
     const body = {
       ...validBoardBody(),
@@ -97,6 +105,17 @@ describe("validateBoardContent — rejections", () => {
       },
     };
     expect(validateBoardContent(body)).toMatch(/render\.card\.fields\[0\]\.field/);
+  });
+
+  it("rejects table-only card field formats", () => {
+    const body = {
+      ...validBoardBody(),
+      render: {
+        ...validBoardBody().render,
+        card: { titleField: "title", fields: [{ field: "author", format: "avatar" }] },
+      },
+    };
+    expect(validateBoardContent(body)).toMatch(/render\.card\.fields\[0\]\.format must be one of/);
   });
 
   it("rejects an unrecognized where op", () => {
@@ -141,6 +160,21 @@ describe("normalizeBoardPanelContent", () => {
     ]);
     expect(normalized.render.card.fields).toEqual([
       { field: "pr_url", format: "link", label: undefined, show: undefined, href: undefined },
+    ]);
+  });
+
+  it("drops table-only card field formats during normalization", () => {
+    const normalized = normalizeBoardPanelContent({
+      dataSource: { kind: "memory", namespace: "tasks" },
+      render: {
+        kind: "board",
+        groupBy: "status",
+        lanes: [{ value: "Todo" }],
+        card: { titleField: "title", fields: [{ field: "author", format: "avatar" }] },
+      },
+    });
+    expect(normalized.render.card.fields).toEqual([
+      { field: "author", format: undefined, label: undefined, show: undefined, href: undefined },
     ]);
   });
 

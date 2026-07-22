@@ -15,6 +15,7 @@
  */
 
 import { asObject, optionalStringError } from "./panelContentValidation";
+import { normalizeTableDataSource } from "./runDataSourceFilterSchema";
 import type { TablePanelDataSource } from "./panelTypes";
 import { validateDataSource, validateSort } from "./panelTypes";
 import {
@@ -24,11 +25,26 @@ import {
   type WidgetBoardLane,
   type WidgetBoardLaneColor,
   type WidgetBoardRender,
+  type WidgetColumnFormat,
   type WidgetRowAction,
   type WidgetTableColumn,
   type WidgetTableFilter,
 } from "./widget/types";
 import { normalizeRowAction } from "./widget/types";
+
+export const WIDGET_BOARD_CARD_FORMATS: WidgetColumnFormat[] = [
+  "text",
+  "number",
+  "percent",
+  "date",
+  "datetime",
+  "relative",
+  "duration",
+  "status",
+  "badge",
+  "code",
+  "link",
+];
 
 export interface BoardPanelContent {
   title?: string;
@@ -63,7 +79,7 @@ export function normalizeBoardPanelContent(raw: Record<string, unknown> | undefi
 
   return {
     title: typeof r.title === "string" ? r.title : "",
-    dataSource: normalizeBoardDataSource(r.dataSource),
+    dataSource: normalizeTableDataSource(r.dataSource),
     render: {
       kind: "board",
       groupBy: typeof renderRaw.groupBy === "string" ? renderRaw.groupBy : "",
@@ -76,29 +92,6 @@ export function normalizeBoardPanelContent(raw: Record<string, unknown> | undefi
       emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
     },
   };
-}
-
-function normalizeBoardDataSource(raw: unknown): TablePanelDataSource {
-  const obj = asObject(raw);
-  if (!obj) return { kind: "memory", namespace: "" };
-  switch (obj.kind) {
-    case "memory":
-      return {
-        kind: "memory",
-        namespace: typeof obj.namespace === "string" ? obj.namespace : "",
-        fieldPath: typeof obj.fieldPath === "string" ? obj.fieldPath : undefined,
-      };
-    case "executions":
-      return {
-        kind: "executions",
-        node: typeof obj.node === "string" ? obj.node : undefined,
-        limit: typeof obj.limit === "number" ? obj.limit : undefined,
-      };
-    case "runs":
-      return { kind: "runs", limit: typeof obj.limit === "number" ? obj.limit : undefined };
-    default:
-      return { kind: "memory", namespace: "" };
-  }
 }
 
 function normalizeLanes(raw: unknown): WidgetBoardLane[] {
@@ -140,7 +133,10 @@ function normalizeCardFields(raw: unknown): WidgetTableColumn[] | undefined {
     out.push({
       field,
       label: typeof obj.label === "string" ? obj.label : undefined,
-      format: typeof obj.format === "string" ? (obj.format as WidgetTableColumn["format"]) : undefined,
+      format:
+        typeof obj.format === "string" && WIDGET_BOARD_CARD_FORMATS.includes(obj.format as WidgetColumnFormat)
+          ? (obj.format as WidgetColumnFormat)
+          : undefined,
       show: typeof obj.show === "string" ? obj.show : undefined,
       href: typeof obj.href === "string" ? obj.href : undefined,
     });
@@ -228,12 +224,18 @@ function validateOtherLane(value: unknown): string | null {
 
 function validateLanes(raw: unknown): string | null {
   if (!Array.isArray(raw) || raw.length === 0) return "render.lanes must be a non-empty array.";
+  const seenValues = new Set<string>();
   for (let i = 0; i < raw.length; i += 1) {
     const lane = asObject(raw[i]);
     if (!lane) return `render.lanes[${i}] must be an object.`;
     if (typeof lane.value !== "string" || lane.value.trim() === "") {
       return `render.lanes[${i}].value must be a non-empty string.`;
     }
+    const normalizedValue = normalizeBoardLaneValue(lane.value);
+    if (seenValues.has(normalizedValue)) {
+      return `render.lanes[${i}].value must be unique after trimming and case folding.`;
+    }
+    seenValues.add(normalizedValue);
     const labelError = optionalStringError(`render.lanes[${i}].label`, lane.label);
     if (labelError) return labelError;
     if (lane.color !== undefined && lane.color !== null) {
@@ -243,6 +245,11 @@ function validateLanes(raw: unknown): string | null {
     }
   }
   return null;
+}
+
+export function normalizeBoardLaneValue(value: unknown): string {
+  if (value == null) return "";
+  return String(value).trim().toLowerCase();
 }
 
 function validateCard(raw: unknown): string | null {
@@ -265,9 +272,17 @@ function validateCard(raw: unknown): string | null {
       if (hrefError) return hrefError;
       const showError = optionalStringError(`render.card.fields[${i}].show`, field.show);
       if (showError) return showError;
+      const formatError = validateBoardCardFormat(i, field.format);
+      if (formatError) return formatError;
     }
   }
   return null;
+}
+
+function validateBoardCardFormat(index: number, value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && WIDGET_BOARD_CARD_FORMATS.includes(value as WidgetColumnFormat)) return null;
+  return `render.card.fields[${index}].format must be one of ${WIDGET_BOARD_CARD_FORMATS.join(", ")}.`;
 }
 
 function validateBoardWhere(where: unknown): string | null {

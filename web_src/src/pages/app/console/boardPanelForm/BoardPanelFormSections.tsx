@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
-import type { BoardPanelContent } from "../boardPanelContent";
+import { WIDGET_BOARD_CARD_FORMATS, type BoardPanelContent } from "../boardPanelContent";
 import { ActionRow } from "../TablePanelFormActionRow";
 import { ColumnRow, FilterRow } from "../TablePanelFormRows";
 import type { RowActionPayloadDrafts } from "../tablePanelForm/useRowActionPayloadDrafts";
@@ -52,7 +52,7 @@ export function BoardHeaderFields({
           value={value.render.groupBy}
           onChange={(e) => onChange({ ...value, render: { ...value.render, groupBy: e.target.value } })}
           placeholder="e.g. status or {{ payload.state }}"
-          list={fieldOptions.length > 0 ? "board-field-options" : undefined}
+          list={fieldOptions.length > 0 ? "table-field-options" : undefined}
           data-testid="board-groupby-field"
         />
         <p className="text-[11px] text-slate-500 dark:text-gray-400">
@@ -203,7 +203,7 @@ export function BoardCardSection({
             })
           }
           placeholder="e.g. title or {{ payload.name }}"
-          list={fieldOptions.length > 0 ? "board-field-options" : undefined}
+          list={fieldOptions.length > 0 ? "table-field-options" : undefined}
           data-testid="board-card-title-field"
         />
       </div>
@@ -213,6 +213,7 @@ export function BoardCardSection({
             key={idx}
             col={col}
             fieldOptions={fieldOptions}
+            formats={WIDGET_BOARD_CARD_FORMATS}
             onChange={(patch) => actions.updateCardField(idx, patch)}
             onRemove={() => actions.removeCardField(idx)}
           />
@@ -370,12 +371,12 @@ export function BoardFieldDatalists({ fieldOptions }: { fieldOptions: string[] }
   if (fieldOptions.length === 0) return null;
   return (
     <>
-      <datalist id="board-field-options">
+      <datalist id="table-field-options">
         {fieldOptions.map((f) => (
           <option key={f} value={f} />
         ))}
       </datalist>
-      <datalist id="board-href-field-options">
+      <datalist id="table-href-field-options">
         {fieldOptions.map((f) => (
           <option key={f} value={`{{ ${f} }}`} />
         ))}

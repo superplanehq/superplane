@@ -2155,6 +2155,15 @@ func TestValidateConsoleContent_RejectsBoardWithBlankLaneValue(t *testing.T) {
 	assert.Contains(t, err.Error(), "render.lanes[0].value must be a non-empty string")
 }
 
+func TestValidateConsoleContent_RejectsBoardWithDuplicateLaneValues(t *testing.T) {
+	panel := boardPanel(map[string]any{
+		"lanes": []any{map[string]any{"value": "Todo"}, map[string]any{"value": " todo "}},
+	})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.lanes[1].value must be unique")
+}
+
 func TestValidateConsoleContent_RejectsBoardWithUnknownLaneColor(t *testing.T) {
 	panel := boardPanel(map[string]any{"lanes": []any{map[string]any{"value": "Todo", "color": "fuchsia"}}})
 	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
@@ -2186,6 +2195,18 @@ func TestValidateConsoleContent_RejectsBoardWithBadCardField(t *testing.T) {
 	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render.card.fields[0].field must be a non-empty string")
+}
+
+func TestValidateConsoleContent_RejectsBoardWithTableOnlyCardFormat(t *testing.T) {
+	panel := boardPanel(map[string]any{
+		"card": map[string]any{
+			"titleField": "title",
+			"fields":     []any{map[string]any{"field": "author", "format": "avatar"}},
+		},
+	})
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.card.fields[0].format must be one of")
 }
 
 func TestValidateConsoleContent_RejectsBoardWithNonBooleanOtherLane(t *testing.T) {

@@ -25,11 +25,12 @@ export function StartRunParameterFields({
   /** Visually show labels. Hidden labels remain associated for accessibility. */
   showLabels?: boolean;
 }) {
+  const idPrefix = React.useId();
   return (
     <div className="min-w-0 space-y-3">
       {parameters.map((param) => {
         if (!param.name || !param.type) return null;
-        const id = `start-run-param-${param.name}`;
+        const id = `${idPrefix}-start-run-param-${param.name}`;
         const label = parameterDisplayLabel(param);
         return (
           <div key={param.name} className="min-w-0 space-y-1.5">

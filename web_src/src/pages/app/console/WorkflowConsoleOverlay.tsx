@@ -6,6 +6,7 @@ type WorkflowConsoleOverlayProps = Omit<
 > & {
   isConsoleMode: boolean;
   canActOnCanvas: boolean;
+  editSessionUiReady: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
   // Hides authoring affordances (panel edit/delete, drag/resize, YAML import)
   // when the app is in read mode.
@@ -15,6 +16,7 @@ type WorkflowConsoleOverlayProps = Omit<
 export function WorkflowConsoleOverlay({
   isConsoleMode,
   canActOnCanvas,
+  editSessionUiReady,
   hasUncommittedCanvasDraftChanges,
   editLocked,
   ...consoleProps
@@ -24,7 +26,8 @@ export function WorkflowConsoleOverlay({
   // Console-only edits do not affect workflow_nodes and remain safe to make
   // while invoking runtime actions. Canvas draft edits can make the rendered
   // node/template differ from the live node used by InvokeNodeTriggerHook.
-  const hasDraftLiveMismatch = hasUncommittedCanvasDraftChanges;
+  const draftStatusPending = consoleProps.showConsoleEditControls && !editSessionUiReady;
+  const hasDraftLiveMismatch = draftStatusPending || hasUncommittedCanvasDraftChanges;
   const runLocked = !canActOnCanvas || hasDraftLiveMismatch;
   return (
     <ConsoleOverlay

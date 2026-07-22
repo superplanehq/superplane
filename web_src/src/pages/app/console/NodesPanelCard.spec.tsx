@@ -103,6 +103,7 @@ function renderPanel({
   panel?: ConsolePanel;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let currentNodes = nodes;
   // Fresh element per call — reusing the same element reference would let
   // React bail out of re-rendering, hiding `mockInFlight` changes.
   const buildUi = () => (
@@ -110,7 +111,7 @@ function renderPanel({
       <ConsoleContextProvider
         canvasId="canvas-1"
         organizationId="org-1"
-        nodes={nodes}
+        nodes={currentNodes}
         canRunNodes={canRunNodes}
         runNodesDisabledReason={runNodesDisabledReason}
         onTriggerNode={onTriggerNode}
@@ -122,7 +123,10 @@ function renderPanel({
   const view = render(buildUi());
   // Re-render the same tree — lets tests mutate `mockInFlight` mid-test to
   // simulate a run starting elsewhere while a dialog is already open.
-  const rerenderPanel = () => view.rerender(buildUi());
+  const rerenderPanel = (nextNodes = currentNodes) => {
+    currentNodes = nextNodes;
+    view.rerender(buildUi());
+  };
   return { ...view, rerenderPanel };
 }
 
@@ -453,6 +457,20 @@ describe("NodesPanelCard — inline form mode", () => {
     expect(screen.getByTestId("node-panel-run-inline-submit")).toHaveTextContent("Create task");
   });
 
+  it("preserves an inline draft when a query refetch replaces the node objects", () => {
+    const { rerenderPanel } = renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+    const input = screen.getByLabelText("branch");
+    fireEvent.change(input, { target: { value: "feature/board" } });
+
+    rerenderPanel([{ ...NODE, configuration: structuredClone(NODE.configuration) }]);
+
+    expect(screen.getByLabelText("branch")).toHaveValue("feature/board");
+  });
+
   it("visibly explains why a draft inline form cannot submit", () => {
     renderPanel({
       canRunNodes: false,
@@ -478,6 +496,19 @@ describe("NodesPanelCard — multi-entry layout", () => {
     renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE, NODE_ACTION], panel: MULTI_PANEL });
     expect(screen.getAllByTestId("nodes-panel-row")).toHaveLength(2);
     expect(screen.getByTestId("nodes-panel-row-run")).toBeInTheDocument();
+  });
+
+  it("uses unique field ids for multiple inline forms", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE],
+      panel: multiNodePanel([
+        { node: "deploy-prod", showRun: true, formMode: "inline" },
+        { node: "deploy-prod", showRun: true, formMode: "inline" },
+      ]),
+    });
+    const ids = screen.getAllByLabelText("branch").map((input) => input.id);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it("hides row Run buttons for non-manual-runnable trigger nodes", () => {

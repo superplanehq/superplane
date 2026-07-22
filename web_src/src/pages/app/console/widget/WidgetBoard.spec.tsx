@@ -55,7 +55,12 @@ function renderBoard(
           canRunNodes={canRunNodes}
           onTriggerNode={() => undefined}
         >
-          <WidgetBoard render={mergedRender} rows={mergedRows} isLoading={false} />
+          <WidgetBoard
+            {...boardProps}
+            render={mergedRender}
+            rows={mergedRows}
+            isLoading={boardProps.isLoading ?? false}
+          />
         </ConsoleContextProvider>
       </QueryClientProvider>
     </MemoryRouter>,
@@ -97,6 +102,21 @@ describe("WidgetBoard grouping", () => {
   it("renders the empty message when no rows are present", () => {
     renderBoard({ rows: [], render: baseRender({ emptyMessage: "Nothing yet" }) });
     expect(screen.getByTestId("widget-board-empty").textContent).toBe("Nothing yet");
+  });
+
+  it("renders the empty message when no rows match a configured lane", () => {
+    renderBoard({
+      rows: [{ id: "stray", title: "Stray task", status: "Unknown" }],
+      render: baseRender({ emptyMessage: "No matching tasks" }),
+    });
+    expect(screen.getByTestId("widget-board-empty").textContent).toBe("No matching tasks");
+  });
+
+  it("loads more progressive rows from the board footer", () => {
+    const onLoadMore = vi.fn();
+    renderBoard({ hasMore: true, onLoadMore });
+    fireEvent.click(screen.getByTestId("widget-table-load-more-button"));
+    expect(onLoadMore).toHaveBeenCalledOnce();
   });
 });
 

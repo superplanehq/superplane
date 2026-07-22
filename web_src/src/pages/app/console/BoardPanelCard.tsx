@@ -66,14 +66,23 @@ function BoardPanelBody({ content }: { content: BoardPanelContent }) {
 }
 
 function BoardPanelDataBound({ content, canvasId }: { content: BoardPanelContent; canvasId: string }) {
-  const { rows, isLoading, error } = useWidgetData(
+  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore } = useWidgetData(
     canvasId,
     content.dataSource,
     renderNeedsRunNodeOutputs(content.render),
     true,
   );
   if (error) return <PanelError message={error} />;
-  return <WidgetBoard render={content.render} rows={rows} isLoading={isLoading} />;
+  return (
+    <WidgetBoard
+      render={content.render}
+      rows={rows}
+      isLoading={isLoading}
+      hasMore={hasMore}
+      isFetchingMore={isFetchingMore}
+      onLoadMore={loadMore}
+    />
+  );
 }
 
 function PanelError({ message }: { message: string }) {

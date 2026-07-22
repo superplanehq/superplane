@@ -135,7 +135,7 @@ export function WidgetTable({
           {render.emptyMessage ?? "No data to display."}
         </div>
         {hasMore && onLoadMore ? (
-          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+          <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
         ) : null}
       </div>
     );
@@ -255,13 +255,19 @@ function WidgetTableGrid({
         </tbody>
       </table>
       {hasMore && onLoadMore ? (
-        <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
       ) : null}
     </div>
   );
 }
 
-function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
+export function WidgetLoadMoreFooter({
+  isFetchingMore,
+  onLoadMore,
+}: {
+  isFetchingMore: boolean;
+  onLoadMore: () => void;
+}) {
   return (
     <div
       className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/60"

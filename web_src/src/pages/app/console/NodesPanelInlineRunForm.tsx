@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -7,9 +7,8 @@ import { showErrorToast } from "@/lib/toast";
 import type { ConsoleTriggerLock } from "./useConsoleTriggerLock";
 import { StartRunParameterFields } from "../mappers/start/startRunParameterFields";
 import {
-  coerceParameterValue,
+  buildParameterFormPayload,
   initialParameterValue,
-  parameterDisplayLabel,
   type StartTemplate,
   type StartTemplateParameter,
 } from "../mappers/start/templatePayload";
@@ -61,27 +60,26 @@ export function NodesPanelInlineRunForm({
   const [parameterValues, setParameterValues] = useState<Record<string, string | number | boolean>>(() =>
     seedParameterValues(parameters),
   );
+  const parameterConfiguration = JSON.stringify({ template: template.name, parameters });
+  const previousParameterConfiguration = useRef(parameterConfiguration);
 
-  // Re-seed when the template identity changes (e.g. editor picks a
-  // different one) so stale inputs don't leak across templates.
+  // Re-seed for actual template configuration changes, but preserve drafts
+  // when query refetches only replace the template/parameters references.
   useEffect(() => {
+    if (previousParameterConfiguration.current === parameterConfiguration) return;
+    previousParameterConfiguration.current = parameterConfiguration;
     setParameterValues(seedParameterValues(parameters));
-  }, [parameters]);
+  }, [parameterConfiguration, parameters]);
 
   const runInFlight = Boolean(triggerNodeId && lock.runInFlightIds.has(triggerNodeId));
 
   const handleSubmit = () => {
-    const out: Record<string, unknown> = { template: template.name };
-    for (const param of parameters) {
-      if (!param.name || !param.type) continue;
-      const coerced = coerceParameterValue(param, parameterValues[param.name]);
-      if (param.type === "number" && typeof coerced === "number" && Number.isNaN(coerced)) {
-        showErrorToast(`"${parameterDisplayLabel(param)}" must be a valid number`);
-        return;
-      }
-      out[param.name] = coerced;
+    const result = buildParameterFormPayload(parameters, parameterValues);
+    if ("error" in result) {
+      showErrorToast(result.error);
+      return;
     }
-    onSubmit(out);
+    onSubmit({ template: template.name, ...result.payload });
   };
 
   return (

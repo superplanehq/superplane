@@ -23,6 +23,7 @@ vi.mock("./ConsoleOverlay", () => ({
 
 const requiredProps = {
   isConsoleMode: true,
+  editSessionUiReady: true,
   editLocked: false,
   consoleQuery: {} as CanvasConsoleQueryResult,
   updateConsoleMutation: {} as UpdateCanvasConsoleMutationResult,
@@ -43,6 +44,22 @@ describe("WorkflowConsoleOverlay runtime actions", () => {
 
   it("blocks actions when the rendered canvas differs from the live canvas", () => {
     render(<WorkflowConsoleOverlay {...requiredProps} canActOnCanvas hasUncommittedCanvasDraftChanges />);
+
+    const state = screen.getByTestId("console-run-state");
+    expect(state).toHaveAttribute("data-can-run", "false");
+    expect(state).toHaveAttribute("data-disabled-reason", "uncommitted-canvas-changes");
+  });
+
+  it("blocks actions while edit-session draft baselines are loading", () => {
+    render(
+      <WorkflowConsoleOverlay
+        {...requiredProps}
+        canActOnCanvas
+        editSessionUiReady={false}
+        showConsoleEditControls
+        hasUncommittedCanvasDraftChanges={false}
+      />,
+    );
 
     const state = screen.getByTestId("console-run-state");
     expect(state).toHaveAttribute("data-can-run", "false");

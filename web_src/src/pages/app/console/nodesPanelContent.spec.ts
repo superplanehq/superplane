@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { NODES_PANEL_FORM_MODES, validateNodesContent } from "./nodesPanelContent";
+import { NODES_PANEL_FORM_MODES, nodesPanelContentFromLegacyNode, validateNodesContent } from "./nodesPanelContent";
+
+describe("nodesPanelContentFromLegacyNode", () => {
+  it("preserves inline form presentation fields", () => {
+    expect(
+      nodesPanelContentFromLegacyNode({
+        node: "start",
+        formMode: "inline",
+        showNodeLabel: false,
+        showFieldLabels: false,
+        submitLabel: "Create task",
+      }).nodes[0],
+    ).toMatchObject({
+      node: "start",
+      formMode: "inline",
+      showNodeLabel: false,
+      showFieldLabels: false,
+      submitLabel: "Create task",
+    });
+  });
+});
 
 describe("validateNodesContent formMode", () => {
   it("accepts entries without a formMode (defaults to modal)", () => {

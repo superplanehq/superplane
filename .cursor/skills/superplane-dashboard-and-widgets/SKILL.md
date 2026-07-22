@@ -152,7 +152,7 @@ Helpers live in `widget/scorecardMath.ts` (`extractScorecardSeries`, `pickChange
 
 ```yaml
 apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
   canvasId: <uuid>   # export only; ignored on import
   name: <display>
@@ -161,8 +161,8 @@ spec:
   layout: [{ i, x, y, w, h, minW?, minH? }]
 ```
 
-- FE: `dashboardYaml.ts` — parse/serialize + `validatePanelContent`
-- BE: `DashboardFromYML` / `DashboardToYML` in `canvas_dashboard_yml.go`
+- FE: `consoleYaml.ts` — parse/serialize + `validatePanelContent`
+- BE: `ConsoleFromYML` / `VersionToConsoleYML` in `pkg/yaml/console.go`
 - Unknown fields rejected; missing `panels`/`layout` → empty lists
 
 ---

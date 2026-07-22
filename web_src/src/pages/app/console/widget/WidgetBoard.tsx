@@ -3,6 +3,7 @@ import { Kanban, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import { normalizeBoardLaneValue } from "../boardPanelContent";
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { isManualRunNode } from "../manualRunTriggers";
 import { WidgetEmptyState } from "../WidgetEmptyState";
@@ -14,6 +15,7 @@ import { applySort } from "./widgetData";
 import { WidgetBoardCardField } from "./WidgetBoardCardField";
 import { WidgetRowActionButton } from "./WidgetRowActionButton";
 import { rowKeyForRow } from "./rowKey";
+import { WidgetLoadMoreFooter } from "./WidgetTable";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import type { WidgetBoardLane, WidgetBoardRender, WidgetRowAction } from "./types";
 
@@ -21,6 +23,9 @@ interface WidgetBoardProps {
   render: WidgetBoardRender;
   rows: unknown[];
   isLoading: boolean;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 interface LaneBucket {
@@ -37,7 +42,7 @@ interface LaneBucket {
 /** Stable react key + data attribute value for the trailing "Other" lane. */
 const OTHER_LANE_KEY = "__other__";
 
-export function WidgetBoard({ render, rows, isLoading }: WidgetBoardProps) {
+export function WidgetBoard({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetBoardProps) {
   const ctx = useConsoleContext();
 
   const recordRows = useMemo(
@@ -88,18 +93,32 @@ export function WidgetBoard({ render, rows, isLoading }: WidgetBoardProps) {
       />
     );
   }
-  if (filtered.length === 0) {
+  const hasVisibleRows = lanes.some((lane) => lane.rows.length > 0);
+  if (!hasVisibleRows) {
     return (
-      <div className="p-4 text-center text-xs text-slate-500 dark:text-gray-400" data-testid="widget-board-empty">
-        {render.emptyMessage ?? "No data to display."}
+      <div className="flex h-full flex-col">
+        <div
+          className="flex-1 p-4 text-center text-xs text-slate-500 dark:text-gray-400"
+          data-testid="widget-board-empty"
+        >
+          {render.emptyMessage ?? "No data to display."}
+        </div>
+        {hasMore && onLoadMore ? (
+          <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
       </div>
     );
   }
 
   return (
-    <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-      <BoardLanes lanes={lanes} rowActions={rowActions} render={render} />
-    </WidgetTableActionLockProvider>
+    <div className="flex h-full min-h-0 flex-col">
+      <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
+        <BoardLanes lanes={lanes} rowActions={rowActions} render={render} />
+      </WidgetTableActionLockProvider>
+      {hasMore && onLoadMore ? (
+        <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+      ) : null}
+    </div>
   );
 }
 
@@ -226,13 +245,6 @@ function cardTitle(row: Record<string, unknown>, render: WidgetBoardRender): str
   return "(no title)";
 }
 
-function normalizeGroupValue(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value.trim().toLowerCase();
-  if (typeof value === "number" || typeof value === "boolean") return String(value).toLowerCase();
-  return String(value).toLowerCase();
-}
-
 function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRender): LaneBucket[] {
   const buckets: LaneBucket[] = render.lanes.map((lane) => ({
     lane,
@@ -241,7 +253,7 @@ function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRend
   }));
   const laneByNormalizedValue = new Map<string, LaneBucket>();
   for (const bucket of buckets) {
-    laneByNormalizedValue.set(normalizeGroupValue(bucket.lane.value), bucket);
+    laneByNormalizedValue.set(normalizeBoardLaneValue(bucket.lane.value), bucket);
   }
 
   const otherBucket: LaneBucket | undefined = render.otherLane
@@ -250,7 +262,7 @@ function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRend
 
   for (const row of rows) {
     const groupValue = resolveCellValue(render.groupBy, row);
-    const bucket = laneByNormalizedValue.get(normalizeGroupValue(groupValue));
+    const bucket = laneByNormalizedValue.get(normalizeBoardLaneValue(groupValue));
     if (bucket) {
       bucket.rows.push(row);
       continue;

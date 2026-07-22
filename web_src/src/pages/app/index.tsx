@@ -4121,6 +4121,7 @@ export function AppPage() {
           urlViewFlags={urlViewFlags}
           console={{
             canActOnCanvas,
+            editSessionUiReady: isEditSessionUiReady,
             hasUncommittedCanvasDraftChanges,
             editLocked: isReadOnly,
             showConsoleEditControls: isEditing,
