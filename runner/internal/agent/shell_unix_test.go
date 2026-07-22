@@ -27,6 +27,22 @@ func skipPTYIntegrationOnCI(t *testing.T) {
 	}
 }
 
+func skipUnlessBash4Plus(t *testing.T) {
+	t.Helper()
+	out, err := exec.Command("bash", "-c", "printf '%s' \"${BASH_VERSINFO[0]}\"").Output()
+	require.NoError(t, err)
+	major := 0
+	for _, r := range string(out) {
+		if r < '0' || r > '9' {
+			break
+		}
+		major = major*10 + int(r-'0')
+	}
+	if major < 4 {
+		t.Skipf("sourced ERR-trap wrap needs Bash 4+ (fleet images); got Bash %s", string(out))
+	}
+}
+
 // TestHostShellDirectivesEcho exercises the default production path: Bash + PTY + marker protocol.
 // It requires a working PTY (typical Linux runners and normal macOS terminals). Sandboxed IDEs
 // often break PTY reads; many CI builders return EIO on /dev/ptmx — skipped when env CI is set.
@@ -167,6 +183,51 @@ func TestHostShellDirectivesExitAliasPersistsAcrossCommands(t *testing.T) {
 	assert.Contains(t, out, "mark=kept")
 	assert.Contains(t, out, "/work")
 	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesErrexitFailFastKeepsShell(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	skipUnlessBash4Plus(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	code, out, err := runHostShellDirectives(ctx, 128*1024, t.TempDir(), []string{
+		`echo hello; false; echo there`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit code")
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "hello")
+	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesErrexitPreservesStateAcrossCommands(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	skipUnlessBash4Plus(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_ERR_MARK=kept", work, work),
+		`printf 'mark=%s cwd=%s\n' "$RUNNER_ERR_MARK" "$(pwd -P)"`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Contains(t, out, "mark=kept")
+	assert.Contains(t, out, "/work")
 }
 
 func TestEndMarkerStreamHoldback(t *testing.T) {
