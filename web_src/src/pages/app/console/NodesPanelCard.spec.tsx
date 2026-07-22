@@ -6,7 +6,7 @@ import type { ConsolePanel } from "@/hooks/useCanvasData";
 import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
-import type { ConsoleTriggerOptions } from "./ConsoleContext";
+import type { ConsoleRunDisabledReason, ConsoleTriggerOptions } from "./ConsoleContext";
 import { NodesPanelCard } from "./NodesPanelCard";
 
 // The run button lock now subscribes to the runs query, so tests need a
@@ -91,16 +91,19 @@ function multiNodePanel(entries: Array<Record<string, unknown>>): ConsolePanel {
 
 function renderPanel({
   canRunNodes,
+  runNodesDisabledReason,
   onTriggerNode,
   nodes = [NODE],
   panel = singleNodePanel(),
 }: {
   canRunNodes: boolean;
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   onTriggerNode?: (nodeId: string, options?: ConsoleTriggerOptions) => void;
   nodes?: SuperplaneComponentsNode[];
   panel?: ConsolePanel;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let currentNodes = nodes;
   // Fresh element per call — reusing the same element reference would let
   // React bail out of re-rendering, hiding `mockInFlight` changes.
   const buildUi = () => (
@@ -108,8 +111,9 @@ function renderPanel({
       <ConsoleContextProvider
         canvasId="canvas-1"
         organizationId="org-1"
-        nodes={nodes}
+        nodes={currentNodes}
         canRunNodes={canRunNodes}
+        runNodesDisabledReason={runNodesDisabledReason}
         onTriggerNode={onTriggerNode}
       >
         <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
@@ -119,7 +123,10 @@ function renderPanel({
   const view = render(buildUi());
   // Re-render the same tree — lets tests mutate `mockInFlight` mid-test to
   // simulate a run starting elsewhere while a dialog is already open.
-  const rerenderPanel = () => view.rerender(buildUi());
+  const rerenderPanel = (nextNodes = currentNodes) => {
+    currentNodes = nextNodes;
+    view.rerender(buildUi());
+  };
   return { ...view, rerenderPanel };
 }
 
@@ -204,6 +211,22 @@ describe("NodesPanelCard — single-entry layout", () => {
     renderPanel({ canRunNodes: false, onTriggerNode: onTrigger });
     const runButton = screen.getByTestId("node-panel-run");
     expect(runButton).toBeDisabled();
+    fireEvent.click(runButton);
+    expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("tells the operator to commit canvas changes before running a draft node", () => {
+    const onTrigger = vi.fn();
+    renderPanel({
+      canRunNodes: false,
+      runNodesDisabledReason: "uncommitted-canvas-changes",
+      onTriggerNode: onTrigger,
+    });
+
+    const runButton = screen.getByTestId("node-panel-run");
+    expect(runButton).toBeDisabled();
+    expect(runButton).toHaveAttribute("data-disabled-reason", "uncommitted-canvas-changes");
+    expect(runButton).toHaveAttribute("title", "Commit canvas changes before running this node.");
     fireEvent.click(runButton);
     expect(onTrigger).not.toHaveBeenCalled();
   });
@@ -353,6 +376,115 @@ describe("NodesPanelCard — in-flight lock", () => {
   });
 });
 
+describe("NodesPanelCard — inline form mode", () => {
+  it("renders the parameter form inline and submits without opening the modal", async () => {
+    const onTrigger = vi.fn();
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: onTrigger,
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    // Modal must NOT be present; inline form and submit are.
+    expect(screen.queryByTestId("node-panel-run-dialog-submit")).toBeNull();
+    expect(screen.getByTestId("node-panel-run-inline-form")).toBeInTheDocument();
+
+    const branch = screen.getByLabelText("branch") as HTMLInputElement;
+    fireEvent.change(branch, { target: { value: "release/inline" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("node-panel-run-inline-submit"));
+    });
+    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
+    expect(onTrigger).toHaveBeenCalledWith("node-1", {
+      hookName: "run",
+      templateName: "manual",
+      parameters: { template: "manual", branch: "release/inline" },
+    });
+  });
+
+  it("falls back to the modal path for parameter-less templates even with formMode inline", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      nodes: [NODE_NO_PARAMS],
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    expect(screen.queryByTestId("node-panel-run-inline-form")).toBeNull();
+    expect(screen.getByTestId("node-panel-run")).toBeInTheDocument();
+  });
+
+  it("falls back to the modal path when the resolved node is not manual-runnable", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      nodes: [PR_TRIGGER],
+      panel: multiNodePanel([{ node: "on-pr", showRun: true, formMode: "inline" }]),
+    });
+
+    // Non-manual trigger — Run affordance is hidden entirely, and the inline
+    // form must not appear.
+    expect(screen.queryByTestId("nodes-panel-row-run-inline-form")).toBeNull();
+    expect(screen.queryByTestId("nodes-panel-row-run")).toBeNull();
+  });
+
+  it("disables the inline submit button while the same trigger has a run in flight", () => {
+    mockInFlight = new Set(["node-1"]);
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+    const submit = screen.getByTestId("node-panel-run-inline-submit");
+    expect(submit).toBeDisabled();
+  });
+
+  it("supports a concise personalized inline form", () => {
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({
+        formMode: "inline",
+        showNodeLabel: false,
+        showFieldLabels: false,
+        submitLabel: "Create task",
+      }),
+    });
+
+    expect(screen.queryByTestId("node-panel-name")).toBeNull();
+    expect(screen.getByLabelText("branch")).toBeInTheDocument();
+    expect(screen.getByText("branch", { selector: "label" })).toHaveClass("sr-only");
+    expect(screen.getByTestId("node-panel-run-inline-submit")).toHaveTextContent("Create task");
+  });
+
+  it("preserves an inline draft when a query refetch replaces the node objects", () => {
+    const { rerenderPanel } = renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+    const input = screen.getByLabelText("branch");
+    fireEvent.change(input, { target: { value: "feature/board" } });
+
+    rerenderPanel([{ ...NODE, configuration: structuredClone(NODE.configuration) }]);
+
+    expect(screen.getByLabelText("branch")).toHaveValue("feature/board");
+  });
+
+  it("visibly explains why a draft inline form cannot submit", () => {
+    renderPanel({
+      canRunNodes: false,
+      runNodesDisabledReason: "uncommitted-canvas-changes",
+      panel: singleNodePanel({ formMode: "inline" }),
+    });
+
+    expect(screen.getByTestId("node-panel-run-inline-submit")).toBeDisabled();
+    expect(screen.getByTestId("node-panel-run-inline-disabled-message")).toHaveTextContent(
+      "Commit canvas changes before running this node.",
+    );
+  });
+});
+
 describe("NodesPanelCard — multi-entry layout", () => {
   const MULTI_PANEL = multiNodePanel([
     { node: "deploy-prod", description: "Deploys production", showRun: true, triggerName: "manual" },
@@ -364,6 +496,19 @@ describe("NodesPanelCard — multi-entry layout", () => {
     renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE, NODE_ACTION], panel: MULTI_PANEL });
     expect(screen.getAllByTestId("nodes-panel-row")).toHaveLength(2);
     expect(screen.getByTestId("nodes-panel-row-run")).toBeInTheDocument();
+  });
+
+  it("uses unique field ids for multiple inline forms", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE],
+      panel: multiNodePanel([
+        { node: "deploy-prod", showRun: true, formMode: "inline" },
+        { node: "deploy-prod", showRun: true, formMode: "inline" },
+      ]),
+    });
+    const ids = screen.getAllByLabelText("branch").map((input) => input.id);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it("hides row Run buttons for non-manual-runnable trigger nodes", () => {

@@ -6,10 +6,14 @@
  * there so callers keep importing through a single entry point.
  *
  * Keep this in lockstep with `validateNodesPanelContent` in
- * `pkg/models/canvas_dashboard_yml.go`.
+ * `pkg/yaml/console.go`.
  */
 
 import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+
+/** Accepted values for `NodesPanelNode.formMode`. */
+export const NODES_PANEL_FORM_MODES = ["modal", "inline"] as const;
+export type NodesPanelFormMode = (typeof NODES_PANEL_FORM_MODES)[number];
 
 /**
  * One entry in a {@link NodesPanelContent} list. The minimum required field
@@ -34,6 +38,25 @@ export interface NodesPanelNode {
    * template fires immediately; templates with input fields always prompt.
    */
   promptConfirmation?: boolean;
+  /**
+   * How the run parameter form is presented. Default `"modal"` reproduces
+   * today's behavior (Run button opens {@link NodeRunConfirmDialog}).
+   * `"inline"` renders {@link StartRunParameterFields} plus a submit button
+   * directly in the panel body for prompt-submission style widgets. Only
+   * honored when the entry resolves to a manual-run Start trigger whose
+   * selected template exposes at least one parameter; otherwise the entry
+   * falls back to the modal path.
+   */
+  formMode?: NodesPanelFormMode;
+  /** Show the node/entry heading above an inline form. Defaults to true. */
+  showNodeLabel?: boolean;
+  /**
+   * Show parameter labels above inline inputs. Defaults to true. When false,
+   * labels remain available to assistive technology.
+   */
+  showFieldLabels?: boolean;
+  /** Optional inline submit-button copy. Defaults to "Run". */
+  submitLabel?: string;
 }
 
 export interface NodesPanelContent {
@@ -68,9 +91,17 @@ export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | u
   const entry: NodesPanelNode = {
     node,
     label: typeof obj.label === "string" ? obj.label : undefined,
+    description: typeof obj.description === "string" ? obj.description : undefined,
     showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
     promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
+    formMode:
+      typeof obj.formMode === "string" && NODES_PANEL_FORM_MODES.includes(obj.formMode as NodesPanelFormMode)
+        ? (obj.formMode as NodesPanelFormMode)
+        : undefined,
+    showNodeLabel: typeof obj.showNodeLabel === "boolean" ? obj.showNodeLabel : undefined,
+    showFieldLabels: typeof obj.showFieldLabels === "boolean" ? obj.showFieldLabels : undefined,
+    submitLabel: typeof obj.submitLabel === "string" ? obj.submitLabel : undefined,
   };
   // Always fold into exactly one entry — even when the legacy node is
   // unset — so the merged renderer keeps the compact single-node layout
@@ -110,6 +141,18 @@ function validateNodesEntry(raw: unknown, index: number): string | null {
     optionalStringError(`${prefix}.description`, entry.description) ??
     optionalBooleanError(`${prefix}.showRun`, entry.showRun) ??
     optionalStringError(`${prefix}.triggerName`, entry.triggerName) ??
-    optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation)
+    optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation) ??
+    optionalBooleanError(`${prefix}.showNodeLabel`, entry.showNodeLabel) ??
+    optionalBooleanError(`${prefix}.showFieldLabels`, entry.showFieldLabels) ??
+    optionalStringError(`${prefix}.submitLabel`, entry.submitLabel) ??
+    optionalFormModeError(`${prefix}.formMode`, entry.formMode)
   );
+}
+
+function optionalFormModeError(path: string, value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !NODES_PANEL_FORM_MODES.includes(value as NodesPanelFormMode)) {
+    return `${path} must be one of ${NODES_PANEL_FORM_MODES.map((m) => JSON.stringify(m)).join(", ")}.`;
+  }
+  return null;
 }
