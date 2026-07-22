@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 import { isExecutionInFlight, type CommandSection } from "./types";
-import { useLiveLogStream } from "./useLiveLogStream";
+import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
 
 export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
   const executionInFlight = isExecutionInFlight(execution);
-  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(execution.id, executionInFlight);
+  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(
+    execution.id,
+    executionInFlight,
+    terminalCommandStatusForExecution(execution),
+    terminalTimeMsForExecution(execution),
+  );
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
   const waitingForLogs = executionInFlight && !hasAnyLogs && !error;
