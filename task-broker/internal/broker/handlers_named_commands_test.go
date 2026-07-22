@@ -114,8 +114,14 @@ func TestCreateTaskRejectsPlainStringCommands(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
-	if !strings.Contains(string(respBody), `must be an object with "command"`) {
+	var errBody struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(respBody, &errBody); err != nil {
 		t.Fatalf("body=%s", strings.TrimSpace(string(respBody)))
+	}
+	if !strings.Contains(errBody.Error, `must be an object with "command"`) {
+		t.Fatalf("error=%q", errBody.Error)
 	}
 }
 
