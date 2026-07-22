@@ -290,8 +290,9 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 
 	// Boot synchronously (no concurrent master reader): wait for a full line equal to bootMarker so
 	// we do not treat the marker as a substring inside the echoed `echo '…'` line.
+	// Alias exit→return once for the whole session (shared across all sourced commands).
 	bootDeadline := time.Now().Add(30 * time.Second)
-	if err := sess.writeLine(fmt.Sprintf(`echo '%s'`, bootMarker)); err != nil {
+	if err := sess.writeLine(fmt.Sprintf(`%s; echo '%s'`, ptyExitAliasBootstrap, bootMarker)); err != nil {
 		return 1, truncateString(sess.out.String(), max), err
 	}
 	buf := make([]byte, 4096)
@@ -349,7 +350,7 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 
 	for i, dir := range directives {
 		dPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
-		if err := os.WriteFile(dPath, []byte(wrapSourcedDirective(dir.Shell)+"\n"), 0600); err != nil {
+		if err := os.WriteFile(dPath, []byte(dir.Shell+"\n"), 0600); err != nil {
 			return 1, truncateString(sess.out.String(), max), err
 		}
 		commandStart := time.Now()
