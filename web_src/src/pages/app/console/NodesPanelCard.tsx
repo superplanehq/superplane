@@ -230,6 +230,8 @@ interface RunControlTestIds {
 
 function disabledTitleFor(reason: string | null): string | undefined {
   switch (reason) {
+    case "uncommitted-canvas-changes":
+      return "Commit canvas changes before running this node.";
     case "no-perm":
       return "You do not have permission to run this node";
     case "not-manual-run":

@@ -3,7 +3,7 @@ import { ExternalLink, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { useConsoleContext, resolveConsoleNode, type ConsoleRunDisabledReason } from "../ConsoleContext";
 import { isManualRunNode } from "../manualRunTriggers";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
@@ -119,7 +119,14 @@ const ACTION_ICONS = {
   "external-link": ExternalLink,
 } as const;
 
-type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;
+type ActionDisabledReason =
+  | ConsoleRunDisabledReason
+  | "no-perm"
+  | "no-node"
+  | "not-manual-run"
+  | "run-in-flight"
+  | "submitting"
+  | null;
 
 type ResolvedNode = NonNullable<ReturnType<typeof resolveConsoleNode>>;
 
@@ -134,7 +141,14 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
     triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
   );
   const submitting = lock.pendingRowKeys.has(rowKey);
-  const reason = disabledReasonFor(canRun, Boolean(resolved), isManualRun, runInFlight, submitting);
+  const reason = disabledReasonFor({
+    canRun,
+    runNodesDisabledReason: ctx?.runNodesDisabledReason,
+    hasResolvedNode: Boolean(resolved),
+    isManualRun,
+    runInFlight,
+    submitting,
+  });
   return {
     resolved,
     isManualRun,
@@ -167,7 +181,7 @@ function useRowActionFire({
   const [pending, setPending] = useState(false);
 
   const fire = async () => {
-    if (!ctx?.onTriggerNode || !resolved?.node.id) return;
+    if (!ctx?.canRunNodes || !ctx.onTriggerNode || !resolved?.node.id) return;
     const triggerNodeId = resolved.node.id;
     setError(undefined);
     setPending(true);
@@ -198,13 +212,22 @@ function useRowActionFire({
 // hide non-manual-run actions upstream. This branch covers the transient
 // case before the trigger catalog resolves — the action then renders
 // disabled rather than as a button that would fail server-side.
-function disabledReasonFor(
-  canRun: boolean,
-  hasResolvedNode: boolean,
-  isManualRun: boolean,
-  runInFlight: boolean,
-  submitting: boolean,
-): ActionDisabledReason {
+function disabledReasonFor({
+  canRun,
+  runNodesDisabledReason,
+  hasResolvedNode,
+  isManualRun,
+  runInFlight,
+  submitting,
+}: {
+  canRun: boolean;
+  runNodesDisabledReason: ConsoleRunDisabledReason | undefined;
+  hasResolvedNode: boolean;
+  isManualRun: boolean;
+  runInFlight: boolean;
+  submitting: boolean;
+}): ActionDisabledReason {
+  if (runNodesDisabledReason) return runNodesDisabledReason;
   if (!canRun) return "no-perm";
   if (!hasResolvedNode) return "no-node";
   if (!isManualRun) return "not-manual-run";
@@ -215,6 +238,8 @@ function disabledReasonFor(
 
 function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
   switch (reason) {
+    case "uncommitted-canvas-changes":
+      return "Commit canvas changes before running console actions.";
     case "no-perm":
       return "You do not have permission to run actions in this canvas";
     case "no-node":

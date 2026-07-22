@@ -1,8 +1,12 @@
 import { ConsoleOverlay, type ConsoleOverlayProps } from "./ConsoleOverlay";
 
-type WorkflowConsoleOverlayProps = Omit<ConsoleOverlayProps, "readOnly" | "canImportYaml" | "canRunNodes"> & {
+type WorkflowConsoleOverlayProps = Omit<
+  ConsoleOverlayProps,
+  "readOnly" | "canImportYaml" | "canRunNodes" | "runNodesDisabledReason"
+> & {
   isConsoleMode: boolean;
   canActOnCanvas: boolean;
+  hasUncommittedCanvasDraftChanges: boolean;
   // Hides authoring affordances (panel edit/delete, drag/resize, YAML import)
   // when the app is in read mode.
   editLocked: boolean;
@@ -11,16 +15,24 @@ type WorkflowConsoleOverlayProps = Omit<ConsoleOverlayProps, "readOnly" | "canIm
 export function WorkflowConsoleOverlay({
   isConsoleMode,
   canActOnCanvas,
+  hasUncommittedCanvasDraftChanges,
   editLocked,
   ...consoleProps
 }: WorkflowConsoleOverlayProps) {
   if (!isConsoleMode) return null;
 
-  // Runtime triggers (widget row actions, Node panel Run button) only depend
-  // on permission/template state — not on edit mode. The in-flight run lock
-  // handles disabling while a run is already executing.
-  const runLocked = !canActOnCanvas;
+  // Console-only edits do not affect workflow_nodes and remain safe to make
+  // while invoking runtime actions. Canvas draft edits can make the rendered
+  // node/template differ from the live node used by InvokeNodeTriggerHook.
+  const hasDraftLiveMismatch = hasUncommittedCanvasDraftChanges;
+  const runLocked = !canActOnCanvas || hasDraftLiveMismatch;
   return (
-    <ConsoleOverlay readOnly={editLocked} canImportYaml={!editLocked} canRunNodes={!runLocked} {...consoleProps} />
+    <ConsoleOverlay
+      readOnly={editLocked}
+      canImportYaml={!editLocked}
+      canRunNodes={!runLocked}
+      runNodesDisabledReason={canActOnCanvas && hasDraftLiveMismatch ? "uncommitted-canvas-changes" : undefined}
+      {...consoleProps}
+    />
   );
 }

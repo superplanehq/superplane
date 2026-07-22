@@ -6,7 +6,7 @@ import type { ConsolePanel } from "@/hooks/useCanvasData";
 import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
-import type { ConsoleTriggerOptions } from "./ConsoleContext";
+import type { ConsoleRunDisabledReason, ConsoleTriggerOptions } from "./ConsoleContext";
 import { NodesPanelCard } from "./NodesPanelCard";
 
 // The run button lock now subscribes to the runs query, so tests need a
@@ -91,11 +91,13 @@ function multiNodePanel(entries: Array<Record<string, unknown>>): ConsolePanel {
 
 function renderPanel({
   canRunNodes,
+  runNodesDisabledReason,
   onTriggerNode,
   nodes = [NODE],
   panel = singleNodePanel(),
 }: {
   canRunNodes: boolean;
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   onTriggerNode?: (nodeId: string, options?: ConsoleTriggerOptions) => void;
   nodes?: SuperplaneComponentsNode[];
   panel?: ConsolePanel;
@@ -110,6 +112,7 @@ function renderPanel({
         organizationId="org-1"
         nodes={nodes}
         canRunNodes={canRunNodes}
+        runNodesDisabledReason={runNodesDisabledReason}
         onTriggerNode={onTriggerNode}
       >
         <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
@@ -204,6 +207,22 @@ describe("NodesPanelCard — single-entry layout", () => {
     renderPanel({ canRunNodes: false, onTriggerNode: onTrigger });
     const runButton = screen.getByTestId("node-panel-run");
     expect(runButton).toBeDisabled();
+    fireEvent.click(runButton);
+    expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("tells the operator to commit canvas changes before running a draft node", () => {
+    const onTrigger = vi.fn();
+    renderPanel({
+      canRunNodes: false,
+      runNodesDisabledReason: "uncommitted-canvas-changes",
+      onTriggerNode: onTrigger,
+    });
+
+    const runButton = screen.getByTestId("node-panel-run");
+    expect(runButton).toBeDisabled();
+    expect(runButton).toHaveAttribute("data-disabled-reason", "uncommitted-canvas-changes");
+    expect(runButton).toHaveAttribute("title", "Commit canvas changes before running this node.");
     fireEvent.click(runButton);
     expect(onTrigger).not.toHaveBeenCalled();
   });
