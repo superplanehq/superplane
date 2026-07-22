@@ -5,15 +5,24 @@ import (
 	"slices"
 )
 
+// changedListField handles both list-diff shapes GitLab sends: the common {previous, current}
+// object (labels, assignees) and the bare [previous, current] pair GitLab uses for reviewers.
 func changedListField(changes map[string]any, field string) (previous, current []any, ok bool) {
-	change, ok := changes[field].(map[string]any)
-	if !ok {
+	switch change := changes[field].(type) {
+	case map[string]any:
+		previous, _ = change["previous"].([]any)
+		current, _ = change["current"].([]any)
+		return previous, current, true
+	case []any:
+		if len(change) != 2 {
+			return nil, nil, false
+		}
+		previous, _ = change[0].([]any)
+		current, _ = change[1].([]any)
+		return previous, current, true
+	default:
 		return nil, nil, false
 	}
-
-	previous, _ = change["previous"].([]any)
-	current, _ = change["current"].([]any)
-	return previous, current, true
 }
 
 // listItemKeys extracts the object key (e.g. "id") from each item, or the item itself for scalar lists.
@@ -63,26 +72,28 @@ func listShrank(changes map[string]any, field, idKey string) bool {
 	return false
 }
 
-func changedFromNilToValue(changes map[string]any, field string) bool {
+// changedToValue reports the field now holding a non-nil value, whether it was previously nil or a different value.
+func changedToValue(changes map[string]any, field string) bool {
 	change, ok := changes[field].(map[string]any)
 	if !ok {
 		return false
 	}
 
 	current, hasCurrent := change["current"]
-	return change["previous"] == nil && hasCurrent && current != nil
+	return hasCurrent && current != nil
 }
 
-func changedFromValueToNil(changes map[string]any, field string) bool {
+func changedToNil(changes map[string]any, field string) bool {
 	change, ok := changes[field].(map[string]any)
 	if !ok {
 		return false
 	}
 
-	previous, hasPrevious := change["previous"]
-	return hasPrevious && previous != nil && change["current"] == nil
+	current, hasCurrent := change["current"]
+	return hasCurrent && current == nil
 }
 
+// changedBoolTo reports current == target, but only if previous actually differed (guards against no-op entries).
 func changedBoolTo(changes map[string]any, field string, target bool) bool {
 	change, ok := changes[field].(map[string]any)
 	if !ok {
@@ -90,11 +101,12 @@ func changedBoolTo(changes map[string]any, field string, target bool) bool {
 	}
 
 	current, ok := change["current"].(bool)
-	if !ok {
+	if !ok || current != target {
 		return false
 	}
 
-	return current == target
+	previous, ok := change["previous"].(bool)
+	return !ok || previous != target
 }
 
 func changedField(changes map[string]any, field string) bool {

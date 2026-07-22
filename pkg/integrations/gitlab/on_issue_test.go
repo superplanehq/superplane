@@ -302,6 +302,13 @@ func Test__IssueDerivedActions(t *testing.T) {
 		assert.Equal(t, []string{"demilestoned"}, issueDerivedActions(changes))
 	})
 
+	t.Run("milestone swapped", func(t *testing.T) {
+		changes := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(7), "current": float64(8)},
+		}
+		assert.Equal(t, []string{"milestoned"}, issueDerivedActions(changes))
+	})
+
 	t.Run("locked", func(t *testing.T) {
 		changes := map[string]any{
 			"discussion_locked": map[string]any{"previous": false, "current": true},
@@ -333,6 +340,13 @@ func Test__IssueDerivedActions(t *testing.T) {
 	t.Run("unrelated change yields no derived actions", func(t *testing.T) {
 		changes := map[string]any{
 			"updated_at": map[string]any{"previous": "t1", "current": "t2"},
+		}
+		assert.Empty(t, issueDerivedActions(changes))
+	})
+
+	t.Run("no-op lock entry yields no derived actions", func(t *testing.T) {
+		changes := map[string]any{
+			"discussion_locked": map[string]any{"previous": false, "current": false},
 		}
 		assert.Empty(t, issueDerivedActions(changes))
 	})

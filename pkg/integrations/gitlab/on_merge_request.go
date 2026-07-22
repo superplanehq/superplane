@@ -257,16 +257,16 @@ func mergeRequestDerivedActions(attrs map[string]any, rawChanges any) []string {
 	if listShrank(changes, "assignees", "id") {
 		derived = append(derived, "unassigned")
 	}
-	if listGrew(changes, "reviewer_ids", "") {
+	if listGrew(changes, "reviewers", "id") {
 		derived = append(derived, "review_requested")
 	}
-	if listShrank(changes, "reviewer_ids", "") {
+	if listShrank(changes, "reviewers", "id") {
 		derived = append(derived, "review_request_removed")
 	}
-	if changedFromNilToValue(changes, "milestone_id") {
+	if changedToValue(changes, "milestone_id") {
 		derived = append(derived, "milestoned")
 	}
-	if changedFromValueToNil(changes, "milestone_id") {
+	if changedToNil(changes, "milestone_id") {
 		derived = append(derived, "demilestoned")
 	}
 	if changedBoolTo(changes, "draft", false) {

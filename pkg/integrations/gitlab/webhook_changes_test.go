@@ -27,14 +27,14 @@ func Test__ListGrew(t *testing.T) {
 		assert.False(t, listGrew(changes, "labels", "id"))
 	})
 
-	t.Run("scalar list", func(t *testing.T) {
+	t.Run("reviewers pair shape", func(t *testing.T) {
 		changes := map[string]any{
-			"reviewer_ids": map[string]any{
-				"previous": []any{float64(1)},
-				"current":  []any{float64(1), float64(2)},
+			"reviewers": []any{
+				[]any{map[string]any{"id": float64(1)}},
+				[]any{map[string]any{"id": float64(1)}, map[string]any{"id": float64(2)}},
 			},
 		}
-		assert.True(t, listGrew(changes, "reviewer_ids", ""))
+		assert.True(t, listGrew(changes, "reviewers", "id"))
 	})
 
 	t.Run("field missing", func(t *testing.T) {
@@ -62,26 +62,36 @@ func Test__ListShrank(t *testing.T) {
 		}
 		assert.False(t, listShrank(changes, "assignees", "id"))
 	})
+
+	t.Run("reviewers pair shape", func(t *testing.T) {
+		changes := map[string]any{
+			"reviewers": []any{
+				[]any{map[string]any{"id": float64(1)}, map[string]any{"id": float64(2)}},
+				[]any{map[string]any{"id": float64(1)}},
+			},
+		}
+		assert.True(t, listShrank(changes, "reviewers", "id"))
+	})
 }
 
-func Test__ChangedFromNilToValue(t *testing.T) {
-	assert.True(t, changedFromNilToValue(map[string]any{
+func Test__ChangedToValue(t *testing.T) {
+	assert.True(t, changedToValue(map[string]any{
 		"milestone_id": map[string]any{"previous": nil, "current": float64(1)},
 	}, "milestone_id"))
 
-	assert.False(t, changedFromNilToValue(map[string]any{
+	assert.True(t, changedToValue(map[string]any{
 		"milestone_id": map[string]any{"previous": float64(1), "current": float64(2)},
 	}, "milestone_id"))
 
-	assert.False(t, changedFromNilToValue(map[string]any{}, "milestone_id"))
+	assert.False(t, changedToValue(map[string]any{}, "milestone_id"))
 }
 
-func Test__ChangedFromValueToNil(t *testing.T) {
-	assert.True(t, changedFromValueToNil(map[string]any{
+func Test__ChangedToNil(t *testing.T) {
+	assert.True(t, changedToNil(map[string]any{
 		"milestone_id": map[string]any{"previous": float64(1), "current": nil},
 	}, "milestone_id"))
 
-	assert.False(t, changedFromValueToNil(map[string]any{
+	assert.False(t, changedToNil(map[string]any{
 		"milestone_id": map[string]any{"previous": nil, "current": float64(1)},
 	}, "milestone_id"))
 }
@@ -93,6 +103,16 @@ func Test__ChangedBoolTo(t *testing.T) {
 	assert.True(t, changedBoolTo(changes, "draft", false))
 	assert.False(t, changedBoolTo(changes, "draft", true))
 	assert.False(t, changedBoolTo(changes, "missing", false))
+
+	noop := map[string]any{
+		"draft": map[string]any{"previous": false, "current": false},
+	}
+	assert.False(t, changedBoolTo(noop, "draft", false))
+
+	noPrevious := map[string]any{
+		"discussion_locked": map[string]any{"current": true},
+	}
+	assert.True(t, changedBoolTo(noPrevious, "discussion_locked", true))
 }
 
 func Test__ChangedField(t *testing.T) {

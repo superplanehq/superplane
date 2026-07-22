@@ -132,9 +132,9 @@ func Test__MergeRequestDerivedActions(t *testing.T) {
 
 	t.Run("review requested and removed", func(t *testing.T) {
 		changes := map[string]any{
-			"reviewer_ids": map[string]any{
-				"previous": []any{float64(1)},
-				"current":  []any{float64(2)},
+			"reviewers": []any{
+				[]any{map[string]any{"id": float64(1)}},
+				[]any{map[string]any{"id": float64(2)}},
 			},
 		}
 		assert.ElementsMatch(t, []string{"review_requested", "review_request_removed"}, mergeRequestDerivedActions(map[string]any{}, changes))
@@ -176,6 +176,11 @@ func Test__MergeRequestDerivedActions(t *testing.T) {
 			"milestone_id": map[string]any{"previous": float64(3), "current": nil},
 		}
 		assert.Equal(t, []string{"demilestoned"}, mergeRequestDerivedActions(map[string]any{}, demilestoned))
+
+		swapped := map[string]any{
+			"milestone_id": map[string]any{"previous": float64(3), "current": float64(4)},
+		}
+		assert.Equal(t, []string{"milestoned"}, mergeRequestDerivedActions(map[string]any{}, swapped))
 	})
 
 	t.Run("edited", func(t *testing.T) {

@@ -254,10 +254,10 @@ func issueDerivedActions(changes map[string]any) []string {
 	if listShrank(changes, "assignees", "id") {
 		derived = append(derived, "unassigned")
 	}
-	if changedFromNilToValue(changes, "milestone_id") {
+	if changedToValue(changes, "milestone_id") {
 		derived = append(derived, "milestoned")
 	}
-	if changedFromValueToNil(changes, "milestone_id") {
+	if changedToNil(changes, "milestone_id") {
 		derived = append(derived, "demilestoned")
 	}
 	if changedBoolTo(changes, "discussion_locked", true) {
