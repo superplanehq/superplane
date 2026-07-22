@@ -316,8 +316,6 @@ func markRecoveredBusyRunnersDrained(statuses []api.DrainRunnerStatus, activeTas
 
 func recoveryState(status models.TaskStatus) api.RunnerTaskRecoveryState {
 	switch status {
-	case models.StatusQueued:
-		return api.RunnerTaskRecoveryStateRequeued
 	case models.StatusCanceled:
 		return api.RunnerTaskRecoveryStateCanceled
 	default:
@@ -326,10 +324,6 @@ func recoveryState(status models.TaskStatus) api.RunnerTaskRecoveryState {
 }
 
 func (s *Server) afterLostRunnerRecovery(ctx context.Context, recovery taskstore.LostRunnerTaskRecovery, state api.RunnerTaskRecoveryState) {
-	if state == api.RunnerTaskRecoveryStateRequeued {
-		s.recordTaskUnclaimed(ctx, recovery.FleetID)
-		return
-	}
 	task, err := s.Store.GetTask(ctx, recovery.ID)
 	if err != nil {
 		s.logErr("get recovered lost runner task", err)

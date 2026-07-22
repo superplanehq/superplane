@@ -634,7 +634,7 @@ func TestCompleteTaskTreatsSameRunnerTerminalCompletionAsIdempotent(t *testing.T
 	}
 }
 
-func TestRecoverLostRunnerTasksRequeuesFirstInfraLoss(t *testing.T) {
+func TestRecoverLostRunnerTasksFailsRunnerLossWithoutRetry(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -647,7 +647,7 @@ func TestRecoverLostRunnerTasksRequeuesFirstInfraLoss(t *testing.T) {
 	if len(recoveries) != 1 {
 		t.Fatalf("recoveries: %#v", recoveries)
 	}
-	if recoveries[0].ID != taskID || recoveries[0].RunnerID != "runner-1" || recoveries[0].Status != models.StatusQueued {
+	if recoveries[0].ID != taskID || recoveries[0].RunnerID != "runner-1" || recoveries[0].Status != models.StatusFailed {
 		t.Fatalf("recovery: %#v", recoveries[0])
 	}
 
@@ -655,32 +655,25 @@ func TestRecoverLostRunnerTasksRequeuesFirstInfraLoss(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != models.StatusQueued {
-		t.Fatalf("status: got %s want queued", got.Status)
+	if got.Status != models.StatusFailed {
+		t.Fatalf("status: got %s want failed", got.Status)
 	}
-	if got.InfraRetryCount != 1 {
-		t.Fatalf("infra retry count: got %d want 1", got.InfraRetryCount)
+	if got.InfraRetryCount != 0 {
+		t.Fatalf("infra retry count: got %d want 0", got.InfraRetryCount)
 	}
 	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
 		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
 			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
 	}
-	if len(got.Environment) != 1 ||
-		got.Environment[0].Name != "BASE_URL" ||
-		got.Environment[0].Value != "http://example.test" {
-		t.Fatalf("expected environment preserved on requeue, got %#v", got.Environment)
+	if got.ErrorMessage != "runner lost before completion" {
+		t.Fatalf("error message: %q", got.ErrorMessage)
 	}
-
-	retried, err := st.ClaimTask(ctx, "runner-2", "fleet-retry", 5*time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if retried == nil || retried.ID != taskID {
-		t.Fatalf("retried task: %#v", retried)
+	if len(got.Environment) != 0 {
+		t.Fatalf("expected environment cleared, got %#v", got.Environment)
 	}
 }
 
-func TestRecoverLostRunnerTasksFailsAfterInfraRetry(t *testing.T) {
+func TestRecoverLostRunnerTasksFailsAfterPreviousInfraRetry(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()

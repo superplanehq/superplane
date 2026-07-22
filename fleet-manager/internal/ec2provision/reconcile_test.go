@@ -279,7 +279,7 @@ func TestDrainTerminationCandidates_UsesUnhealthyDrainReason(t *testing.T) {
 				{RunnerID: "i-busy", State: api.DrainRunnerStateDrained},
 			},
 			RecoveredTasks: []api.RunnerTaskRecovery{
-				{RunnerID: "i-busy", TaskID: "task-1", State: api.RunnerTaskRecoveryStateRequeued},
+				{RunnerID: "i-busy", TaskID: "task-1", State: api.RunnerTaskRecoveryStateFailed},
 			},
 		},
 	}

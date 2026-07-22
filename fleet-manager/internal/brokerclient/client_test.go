@@ -77,7 +77,7 @@ func TestDrainRunners_OK(t *testing.T) {
 				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
 			},
 			RecoveredTasks: []api.RunnerTaskRecovery{
-				{RunnerID: "i-idle", TaskID: "task-2", State: api.RunnerTaskRecoveryStateRequeued},
+				{RunnerID: "i-idle", TaskID: "task-2", State: api.RunnerTaskRecoveryStateFailed},
 			},
 		})
 	}))
@@ -113,7 +113,7 @@ func TestDrainRunners_OK(t *testing.T) {
 	if len(out.RecoveredTasks) != 1 ||
 		out.RecoveredTasks[0].RunnerID != "i-idle" ||
 		out.RecoveredTasks[0].TaskID != "task-2" ||
-		out.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateRequeued {
+		out.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateFailed {
 		t.Fatalf("recovered tasks: %#v", out.RecoveredTasks)
 	}
 }

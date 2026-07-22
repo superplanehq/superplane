@@ -68,7 +68,6 @@ type DrainRunnersResponse struct {
 type RunnerTaskRecoveryState string
 
 const (
-	RunnerTaskRecoveryStateRequeued RunnerTaskRecoveryState = "requeued"
 	RunnerTaskRecoveryStateFailed   RunnerTaskRecoveryState = "failed"
 	RunnerTaskRecoveryStateCanceled RunnerTaskRecoveryState = "canceled"
 )

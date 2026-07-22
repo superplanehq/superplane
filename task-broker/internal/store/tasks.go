@@ -430,43 +430,11 @@ SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id A
 		}
 		recoveries = append(recoveries, canceled...)
 
-		requeued, err := recoverLostRunnerTasks(tx, `
-WITH candidates AS (
-	SELECT id, fleet_id, runner_id
-	FROM tasks
-	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false AND infra_retry_count < ?
-	FOR UPDATE
-),
-updated AS (
-	UPDATE tasks t SET
-		status = ?,
-		claimed_at = NULL,
-		lease_until = NULL,
-		runner_id = NULL,
-		exit_code = NULL,
-		output = '',
-		result_json = NULL,
-		error_message = NULL,
-		cancel_requested = false,
-		infra_retry_count = infra_retry_count + 1
-	FROM candidates c
-	WHERE t.id = c.id
-	RETURNING t.id, t.fleet_id, c.runner_id, t.status
-)
-SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
-			fleetID, string(models.StatusClaimed), runnerIDs, maxInfraRetries,
-			string(models.StatusQueued),
-		)
-		if err != nil {
-			return err
-		}
-		recoveries = append(recoveries, requeued...)
-
 		failed, err := recoverLostRunnerTasks(tx, `
 WITH candidates AS (
 	SELECT id, fleet_id, runner_id
 	FROM tasks
-	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false AND infra_retry_count >= ?
+	WHERE fleet_id = ? AND status = ? AND runner_id IN ? AND cancel_requested = false
 	FOR UPDATE
 ),
 updated AS (
@@ -485,8 +453,8 @@ updated AS (
 	WHERE t.id = c.id
 	RETURNING t.id, t.fleet_id, c.runner_id, t.status
 )
-SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
-			fleetID, string(models.StatusClaimed), runnerIDs, maxInfraRetries,
+	SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
+			fleetID, string(models.StatusClaimed), runnerIDs,
 			string(models.StatusFailed), msgRunnerLost,
 		)
 		if err != nil {

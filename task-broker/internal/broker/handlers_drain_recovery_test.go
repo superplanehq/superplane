@@ -16,7 +16,7 @@ import (
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
-func TestDrainRunnersUnhealthyRequeuesLostRunnerTask(t *testing.T) {
+func TestDrainRunnersUnhealthyFailsLostRunnerTask(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 
@@ -38,7 +38,7 @@ func TestDrainRunnersUnhealthyRequeuesLostRunnerTask(t *testing.T) {
 	if len(got.RecoveredTasks) != 1 ||
 		got.RecoveredTasks[0].RunnerID != "runner-1" ||
 		got.RecoveredTasks[0].TaskID != taskID ||
-		got.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateRequeued {
+		got.RecoveredTasks[0].State != api.RunnerTaskRecoveryStateFailed {
 		t.Fatalf("recovered tasks: %#v", got.RecoveredTasks)
 	}
 
@@ -46,12 +46,12 @@ func TestDrainRunnersUnhealthyRequeuesLostRunnerTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.Status != models.StatusQueued || task.RunnerID != "" || task.InfraRetryCount != 1 {
+	if task.Status != models.StatusFailed || task.RunnerID != "" || task.InfraRetryCount != 0 {
 		t.Fatalf("task after recovery: %#v", task)
 	}
 }
 
-func TestDrainRunnersUnhealthyFailsLostRunnerTaskAfterRetry(t *testing.T) {
+func TestDrainRunnersUnhealthyFailsLostRunnerTaskAfterPreviousRetry(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 
