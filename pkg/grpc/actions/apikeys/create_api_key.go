@@ -36,17 +36,20 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
-	validRoles := map[string]bool{
-		models.RoleOrgAdmin:  true,
-		models.RoleOrgViewer: true,
-	}
-
 	if req.Role == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "role is required")
 	}
 
-	if !validRoles[req.Role] {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; must be org_admin or org_viewer")
+	// org_owner is reserved for human users and must never be assignable to an
+	// API key / service account to prevent privilege escalation.
+	if req.Role == models.RoleOrgOwner {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; org_owner cannot be assigned")
+	}
+
+	// Accept any role that exists in this organization (built-in or custom).
+	// A lookup error means the role is not valid for this organization.
+	if _, err := authService.GetRoleDefinition(ctx, req.Role, models.DomainTypeOrganization, orgID); err != nil {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; role does not exist in this organization")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)
