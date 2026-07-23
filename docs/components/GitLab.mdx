@@ -43,6 +43,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitLab issue" />
+  <LinkCard title="Update Merge Request" href="#update-merge-request" description="Update an existing merge request in a GitLab project" />
 </CardGrid>
 
 ## Instructions
@@ -53,7 +55,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
    - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) with scopes api, read_user, read_api, write_repository, read_repository (the link prefills them), paste it into **Access Token**, and click **Save**.
 
-**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating or merging merge requests, approving, and deploying follow the project's roles and protected branch/environment rules.
+**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating, updating, or merging merge requests, approving, deploying, and editing issue comments follow the project's roles and protected branch/environment rules.
 
 <a id="on-branch-created"></a>
 
@@ -2466,6 +2468,174 @@ Returns the updated issue object.
   },
   "timestamp": "2023-01-01T10:05:00.000Z",
   "type": "gitlab.updateIssue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `gitlab.updateIssueComment`
+
+The Update Issue Comment component edits an existing comment (note) on a GitLab issue.
+
+### Use Cases
+
+- **Status updates**: Update a summary comment on an issue instead of posting new comments on every run
+- **Living reports**: Keep a single comment with the latest deployment status, test results, or remediation steps
+- **Avoid spam**: Update one comment instead of flooding an issue with repeated bot comments
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue the comment belongs to (supports expressions)
+- **Comment ID** (required): The numeric ID of the comment (note) to update (supports expressions)
+- **Body** (required): The new comment text (supports Markdown and expressions)
+
+### Permissions
+
+The connected user must be the comment's author, or have at least the **Maintainer** role on the project, to edit it.
+
+### Output
+
+Returns the updated note object, including its ID, body, author, and timestamps.
+
+### Notes
+
+- The comment ID is returned in the output of `gitlab.createIssueComment` as `id`
+- You can store the comment ID in canvas memory on the first run, then reuse it for subsequent updates
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "body": "Updated: deployment finished successfully at 10:15 UTC",
+    "confidential": false,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 302,
+    "internal": false,
+    "noteable_id": 1,
+    "noteable_iid": 1,
+    "noteable_type": "Issue",
+    "project_id": 1,
+    "resolvable": false,
+    "system": false,
+    "updated_at": "2023-01-01T10:15:00.000Z"
+  },
+  "timestamp": "2023-01-01T10:15:00.000Z",
+  "type": "gitlab.updateIssueComment"
+}
+```
+
+<a id="update-merge-request"></a>
+
+## Update Merge Request
+
+**Component key:** `gitlab.updateMergeRequest`
+
+The Update Merge Request component modifies an existing GitLab merge request: its title, description, target branch, state, labels, or assignees.
+
+### Use Cases
+
+- **Retitle/redescribe automation**: Update a merge request's title or description as a workflow progresses
+- **Open/close automation**: Close a merge request when it is superseded, or reopen one automatically
+- **Retargeting**: Change the target branch a merge request merges into
+- **Label and assignee management**: Replace a merge request's labels or assignees from a workflow
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request to update (supports expressions)
+- **Title** (toggle): New title for the merge request
+- **Description** (toggle): New description for the merge request
+- **Target Branch** (toggle): Retarget the merge request onto a different branch
+- **State** (toggle): Close or reopen the merge request
+- **Labels** (toggle): Labels to set, replacing any existing labels
+- **Assignees** (toggle): Users to assign, replacing any existing assignees
+
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling Labels or Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project (or be the merge request author) to update a merge request.
+
+### Output
+
+Returns the updated merge request object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support and MFA",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 155,
+    "iid": 42,
+    "labels": [
+      "feature",
+      "needs-review"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "develop",
+    "title": "feat: add login page (updated)",
+    "updated_at": "2026-02-14T09:12:33.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-14T09:12:33.000Z",
+  "type": "gitlab.mergeRequest"
 }
 ```
 
