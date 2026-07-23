@@ -57,16 +57,19 @@ export function IntegrationsSection({
   organizationId,
   selections,
   onSelectionsChange,
+  variant = "select",
 }: {
   integrations: string[];
   organizationId: string;
   selections: IntegrationSelections;
   onSelectionsChange: (selections: IntegrationSelections) => void;
+  /** `select` shows an instance picker; `status` shows Connected / Not connected rows. */
+  variant?: "select" | "status";
 }) {
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
-  const { data: availableIntegrations = [] } = useAvailableIntegrations();
+  const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
@@ -107,23 +110,25 @@ export function IntegrationsSection({
   return (
     <>
       <div className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-gray-700/70 dark:border-gray-700/70">
-        {integrationData.map((data) => (
-          <IntegrationRow
-            key={data.name}
-            data={data}
-            selectedId={selections[data.name]?.id}
-            onSelect={(id, name) => onSelectionsChange({ ...selections, [data.name]: { id, name } })}
-            onConfigure={setConfigureIntegrationId}
-            onCreateNew={() => {
-              const pending = data.allInstances.find((i) => i.status?.state !== "ready");
-              if (pending?.metadata?.id && data.readyInstances.length === 0) {
-                setConfigureIntegrationId(pending.metadata.id);
-                return;
-              }
-              openConnectDialog(data.name);
-            }}
-          />
-        ))}
+        {integrationData.map((data) =>
+          variant === "status" ? (
+            <HomeIntegrationConnectRow
+              key={data.name}
+              name={data.name}
+              connected={Boolean(selections[data.name])}
+              onConnect={() => openConnectDialog(data.name)}
+            />
+          ) : (
+            <IntegrationRow
+              key={data.name}
+              data={data}
+              selectedId={selections[data.name]?.id}
+              onSelect={(id, name) => onSelectionsChange({ ...selections, [data.name]: { id, name } })}
+              onConfigure={setConfigureIntegrationId}
+              onCreateNew={() => openConnectDialog(data.name)}
+            />
+          ),
+        )}
       </div>
 
       <ConfigureIntegrationDialog
@@ -301,7 +306,7 @@ function StatusDot({ state }: { state?: string }) {
   return <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />;
 }
 
-export function HomeIntegrationConnectRow({
+function HomeIntegrationConnectRow({
   name,
   connected,
   onConnect,
