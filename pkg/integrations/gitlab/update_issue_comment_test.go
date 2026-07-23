@@ -48,14 +48,24 @@ func Test__UpdateIssueComment__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "comment ID is required")
 	})
 
-	t.Run("missing body", func(t *testing.T) {
+	t.Run("body not enabled", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{"project": "123", "issueIid": "1", "commentId": "302"},
 			Metadata:      &contexts.MetadataContext{},
 		}
 		err := c.Setup(ctx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "body is required")
+		assert.Contains(t, err.Error(), "at least one field must be enabled")
+	})
+
+	t.Run("body toggled on but empty is rejected", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{"project": "123", "issueIid": "1", "commentId": "302", "body": ""},
+			Metadata:      &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "body cannot be empty")
 	})
 
 	t.Run("valid configuration", func(t *testing.T) {
@@ -143,5 +153,35 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update issue comment")
+	})
+
+	t.Run("body not enabled", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{"project": "123", "issueIid": "1", "commentId": "302"},
+			Integration:   integration,
+			HTTP:          &contexts.HTTPContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least one field must be enabled")
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		assert.Empty(t, httpCtx.Requests, "no request should be sent when no field is enabled")
+	})
+
+	t.Run("body toggled on but empty is rejected", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{"project": "123", "issueIid": "1", "commentId": "302", "body": ""},
+			Integration:   integration,
+			HTTP:          &contexts.HTTPContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "body cannot be empty")
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		assert.Empty(t, httpCtx.Requests, "no request should be sent when the body is empty")
 	})
 }

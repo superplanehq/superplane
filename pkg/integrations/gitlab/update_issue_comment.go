@@ -25,6 +25,27 @@ type UpdateIssueCommentConfiguration struct {
 	Body      string `mapstructure:"body"`
 }
 
+// updateIssueCommentToggles tracks which optional fields were explicitly turned
+// on via their UI toggle. Body is GitLab's only editable note field, so it is
+// the single togglable field. See update_merge_request.go for the pattern.
+type updateIssueCommentToggles struct {
+	Body bool
+}
+
+func newUpdateIssueCommentToggles(raw map[string]any) updateIssueCommentToggles {
+	enabled := func(field string) bool {
+		v, ok := raw[field]
+		return ok && v != nil
+	}
+	return updateIssueCommentToggles{
+		Body: enabled("body"),
+	}
+}
+
+func (t updateIssueCommentToggles) hasUpdates() bool {
+	return t.Body
+}
+
 func (c *UpdateIssueComment) Name() string {
 	return "gitlab.updateIssueComment"
 }
@@ -51,7 +72,7 @@ func (c *UpdateIssueComment) Documentation() string {
 - **Project** (required): The GitLab project containing the issue
 - **Issue IID** (required): The internal ID (IID) of the issue the comment belongs to (supports expressions)
 - **Comment ID** (required): The numeric ID of the comment (note) to update (supports expressions)
-- **Body** (required): The new comment text (supports Markdown and expressions)
+- **Body** (toggle): The new comment text (supports Markdown and expressions). It is the only editable field on a GitLab note, so it must be enabled for the update to change anything, and cannot be empty when enabled.
 
 ## Permissions
 
@@ -118,7 +139,8 @@ func (c *UpdateIssueComment) Configuration() []configuration.Field {
 			Name:        "body",
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
-			Required:    true,
+			Required:    false,
+			Togglable:   true,
 			Description: "The new comment text. Supports Markdown formatting.",
 		},
 	}
@@ -142,8 +164,8 @@ func (c *UpdateIssueComment) Setup(ctx core.SetupContext) error {
 		return errors.New("comment ID is required")
 	}
 
-	if config.Body == "" {
-		return errors.New("body is required")
+	if err := validateUpdateIssueComment(ctx.Configuration, config); err != nil {
+		return err
 	}
 
 	return ensureProjectInMetadata(
@@ -159,8 +181,8 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Body == "" {
-		return errors.New("body is required")
+	if err := validateUpdateIssueComment(ctx.Configuration, config); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -178,6 +200,20 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		"gitlab.updateIssueComment",
 		[]any{note},
 	)
+}
+
+func validateUpdateIssueComment(rawConfig any, config UpdateIssueCommentConfiguration) error {
+	raw, _ := rawConfig.(map[string]any)
+	toggles := newUpdateIssueCommentToggles(raw)
+	if !toggles.hasUpdates() {
+		return errors.New("at least one field must be enabled to update")
+	}
+
+	if toggles.Body && config.Body == "" {
+		return errors.New("body cannot be empty")
+	}
+
+	return nil
 }
 
 func (c *UpdateIssueComment) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
