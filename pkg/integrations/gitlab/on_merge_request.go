@@ -46,6 +46,10 @@ func (m *OnMergeRequest) Documentation() string {
 - **Project** (required): GitLab project to monitor
 - **Actions** (required): Select which merge request actions to listen for (open, close, reopen, update, approved, merge, etc.). Default: open.
 
+## Actions
+
+GitLab reports most merge request changes (labels, assignees, milestone, draft toggling, reviewers, auto-merge, new commits pushed) under a single ` + "`update`" + ` action. Labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, synchronize, ready for review, converted to draft, review requested, review request removed, auto merge enabled/disabled and edited are derived from the ` + "`object_attributes`/`changes`" + ` fields of an update event, to match the granularity of GitHub's equivalent trigger.
+
 ## Event Data
 
 Each merge request event includes:
@@ -111,6 +115,20 @@ func (m *OnMergeRequest) Configuration() []configuration.Field {
 						{Label: "Approval Removed", Value: "unapproval"},
 						{Label: "Unapproved", Value: "unapproved"},
 						{Label: "Merged", Value: "merge"},
+						{Label: "Edited", Value: "edited"},
+						{Label: "Assigned", Value: "assigned"},
+						{Label: "Unassigned", Value: "unassigned"},
+						{Label: "Labeled", Value: "labeled"},
+						{Label: "Unlabeled", Value: "unlabeled"},
+						{Label: "Synchronize", Value: "synchronize"},
+						{Label: "Milestoned", Value: "milestoned"},
+						{Label: "Demilestoned", Value: "demilestoned"},
+						{Label: "Ready for review", Value: "ready_for_review"},
+						{Label: "Converted to draft", Value: "converted_to_draft"},
+						{Label: "Review requested", Value: "review_requested"},
+						{Label: "Review request removed", Value: "review_request_removed"},
+						{Label: "Auto merge enabled", Value: "auto_merge_enabled"},
+						{Label: "Auto merge disabled", Value: "auto_merge_disabled"},
 					},
 				},
 			},
@@ -193,10 +211,79 @@ func (m *OnMergeRequest) whitelistedAction(logger *log.Entry, data map[string]an
 		return false
 	}
 
-	if !slices.Contains(allowedActions, action) {
+	if slices.Contains(allowedActions, action) {
+		return true
+	}
+
+	// GitLab reports most merge request changes as a single "update" action; derive the finer-grained ones below.
+	if action != "update" {
 		logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
 		return false
 	}
 
-	return true
+	derived := mergeRequestDerivedActions(attrs, data["changes"])
+	for _, derivedAction := range derived {
+		if slices.Contains(allowedActions, derivedAction) {
+			return true
+		}
+	}
+
+	logger.Infof("Update action (derived: %v) is not in the allowed list: %v", derived, allowedActions)
+	return false
+}
+
+// mergeRequestDerivedActions derives GitHub-equivalent actions from an update event's object_attributes/changes.
+func mergeRequestDerivedActions(attrs map[string]any, rawChanges any) []string {
+	var derived []string
+
+	if oldRev, ok := attrs["oldrev"].(string); ok && oldRev != "" {
+		derived = append(derived, "synchronize")
+	}
+
+	changes, ok := rawChanges.(map[string]any)
+	if !ok {
+		return derived
+	}
+
+	if listGrew(changes, "labels", "id") {
+		derived = append(derived, "labeled")
+	}
+	if listShrank(changes, "labels", "id") {
+		derived = append(derived, "unlabeled")
+	}
+	if listGrew(changes, "assignees", "id") {
+		derived = append(derived, "assigned")
+	}
+	if listShrank(changes, "assignees", "id") {
+		derived = append(derived, "unassigned")
+	}
+	if listGrew(changes, "reviewers", "id") {
+		derived = append(derived, "review_requested")
+	}
+	if listShrank(changes, "reviewers", "id") {
+		derived = append(derived, "review_request_removed")
+	}
+	if changedToValue(changes, "milestone_id") {
+		derived = append(derived, "milestoned")
+	}
+	if changedToNil(changes, "milestone_id") {
+		derived = append(derived, "demilestoned")
+	}
+	if changedBoolTo(changes, "draft", false) {
+		derived = append(derived, "ready_for_review")
+	}
+	if changedBoolTo(changes, "draft", true) {
+		derived = append(derived, "converted_to_draft")
+	}
+	if changedBoolTo(changes, "merge_when_pipeline_succeeds", true) {
+		derived = append(derived, "auto_merge_enabled")
+	}
+	if changedBoolTo(changes, "merge_when_pipeline_succeeds", false) {
+		derived = append(derived, "auto_merge_disabled")
+	}
+	if changedField(changes, "title") || changedField(changes, "description") {
+		derived = append(derived, "edited")
+	}
+
+	return derived
 }
