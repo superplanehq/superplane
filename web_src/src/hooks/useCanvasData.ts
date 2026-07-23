@@ -196,16 +196,28 @@ function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
 }
 
 export function invalidateStagedCanvasCaches(queryClient: QueryClient, canvasId: string): void {
-  queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-  queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey;
-      return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
+  // `cancelRefetch: false` prevents TanStack Query from cancelling in-flight
+  // fetches when this runs from a WebSocket `staging_updated` event. Cancelling
+  // an in-flight fetch rejects its retryer promise with a `CancelledError`, and
+  // because these `invalidateQueries` promises are intentionally not awaited,
+  // that rejection escapes as an unhandled promise rejection (see issue #5945).
+  // Leaving the running fetch in place still refreshes the data once it settles.
+  // `cancelRefetch` belongs to the second (options) argument of
+  // `invalidateQueries`; passing it inside the filters object is a silent no-op.
+  const noCancelRefetch = { cancelRefetch: false } as const;
+  queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) }, noCancelRefetch);
+  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) }, noCancelRefetch);
+  queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) }, noCancelRefetch);
+  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) }, noCancelRefetch);
+  queryClient.invalidateQueries(
+    {
+      predicate: (query) => {
+        const key = query.queryKey;
+        return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
+      },
     },
-  });
+    noCancelRefetch,
+  );
 }
 
 function isVersionScopedRepositoryQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
