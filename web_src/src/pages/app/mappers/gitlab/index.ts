@@ -6,6 +6,7 @@ import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";
 import { addReactionMapper } from "./add_reaction";
 import { approveMergeRequestMapper } from "./approve_merge_request";
 import { createMergeRequestMapper } from "./create_merge_request";
+import { updateMergeRequestMapper } from "./update_merge_request";
 import { removeMergeRequestReviewersMapper } from "./remove_merge_request_reviewers";
 import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
@@ -29,6 +30,7 @@ import { onVulnerabilityTriggerRenderer } from "./on_vulnerability";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./run_pipeline";
 import { pipelineLookupMapper, testReportSummaryMapper } from "./pipeline_actions";
 import { updateIssueMapper } from "./update_issue";
+import { updateIssueCommentMapper } from "./update_issue_comment";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createIssue: buildActionStateRegistry("created"),
@@ -39,6 +41,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createMergeComment: buildActionStateRegistry("created"),
   addReaction: buildActionStateRegistry("added"),
   createMergeRequest: buildActionStateRegistry("created"),
+  updateMergeRequest: buildActionStateRegistry("updated"),
   addMergeRequestReviewers: buildActionStateRegistry("updated"),
   removeMergeRequestReviewers: buildActionStateRegistry("updated"),
   acceptMergeRequest: buildActionStateRegistry("merged"),
@@ -48,6 +51,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getIssue: buildActionStateRegistry("retrieved"),
   updateIssue: buildActionStateRegistry("updated"),
   createIssueComment: buildActionStateRegistry("created"),
+  updateIssueComment: buildActionStateRegistry("updated"),
   addIssueLabel: buildActionStateRegistry("added"),
   markMergeRequestReadyForReview: buildActionStateRegistry("marked ready"),
 };
@@ -61,6 +65,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createMergeComment: createMergeCommentMapper,
   addReaction: addReactionMapper,
   createMergeRequest: createMergeRequestMapper,
+  updateMergeRequest: updateMergeRequestMapper,
   addMergeRequestReviewers: addMergeRequestReviewersMapper,
   removeMergeRequestReviewers: removeMergeRequestReviewersMapper,
   acceptMergeRequest: acceptMergeRequestMapper,
@@ -70,6 +75,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getIssue: getIssueMapper,
   updateIssue: updateIssueMapper,
   createIssueComment: createIssueCommentMapper,
+  updateIssueComment: updateIssueCommentMapper,
   addIssueLabel: addIssueLabelMapper,
   markMergeRequestReadyForReview: markMergeRequestReadyForReviewMapper,
 };
