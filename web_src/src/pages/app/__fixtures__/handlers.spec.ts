@@ -52,8 +52,12 @@ describe("createFixtureFetch repository routes", () => {
     const response = await fixtureFetch("http://localhost/api/v1/canvases/any/repository/file?path=console.yaml");
     const text = await response.text();
     expect(text).toContain("kind: Console");
-    expect(text).toContain("markdown-showcase");
-    expect(text).toContain("Software Factory");
+    expect(text).toContain("submit-task");
+    expect(text).toContain("how-it-works");
+    expect(text).toContain("pipeline-board");
+    expect(text).toContain("Create a task");
+    expect(text).toContain("How it works");
+    expect(text).toContain("PR pipeline");
   });
 
   it("honors an explicit repositoryFilePaths override", async () => {

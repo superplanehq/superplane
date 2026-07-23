@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/ui/checkbox";
 
 import {
@@ -18,16 +19,25 @@ export function StartRunParameterFields({
   parameterValues,
   onParameterValuesChange,
   showLabels = true,
+  fillAvailableHeight = false,
 }: {
   parameters: StartTemplateParameter[];
   parameterValues: Record<string, string | number | boolean>;
   onParameterValuesChange: React.Dispatch<React.SetStateAction<Record<string, string | number | boolean>>>;
   /** Visually show labels. Hidden labels remain associated for accessibility. */
   showLabels?: boolean;
+  /**
+   * Stretch `text` parameters to fill leftover vertical space (inline console
+   * forms). Modal / compact embeds leave this false so rows stay content-sized.
+   */
+  fillAvailableHeight?: boolean;
 }) {
   const idPrefix = React.useId();
   return (
-    <div className="min-w-0 space-y-3">
+    <div
+      className={cn("min-w-0", fillAvailableHeight ? "flex h-full min-h-0 flex-col gap-3" : "space-y-3")}
+      data-fill-available-height={fillAvailableHeight || undefined}
+    >
       {parameters.map((param) => {
         if (!param.name || !param.type) return null;
         const id = `${idPrefix}-start-run-param-${param.name}`;
@@ -35,8 +45,9 @@ export function StartRunParameterFields({
         // multiple forms on one page never share duplicate element ids.
         const testId = `start-run-param-${param.name}`;
         const label = parameterDisplayLabel(param);
+        const stretchText = fillAvailableHeight && param.type === "text";
         return (
-          <div key={param.name} className="min-w-0 space-y-1.5">
+          <div key={param.name} className={cn("min-w-0 space-y-1.5", stretchText && "flex min-h-0 flex-1 flex-col")}>
             {param.type === "boolean" ? (
               <div className="flex min-w-0 items-center gap-2">
                 <Checkbox
@@ -85,7 +96,10 @@ export function StartRunParameterFields({
               </>
             ) : param.type === "text" ? (
               <>
-                <Label htmlFor={id} className={parameterLabelClassName(showLabels)}>
+                <Label
+                  htmlFor={id}
+                  className={parameterLabelClassName(showLabels, stretchText ? "shrink-0" : undefined)}
+                >
                   {label}
                 </Label>
                 <Textarea
@@ -93,7 +107,8 @@ export function StartRunParameterFields({
                   data-testid={testId}
                   placeholder={parameterInputPlaceholder(param, label)}
                   value={String(parameterValues[param.name] ?? "")}
-                  rows={5}
+                  rows={stretchText ? undefined : 5}
+                  className={stretchText ? "min-h-0 flex-1 resize-none [field-sizing:fixed]" : undefined}
                   onChange={(e) =>
                     onParameterValuesChange((prev) => ({
                       ...prev,

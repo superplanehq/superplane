@@ -53,6 +53,9 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingC
         readOnly={readOnly}
         onEdit={() => setEditingState(true)}
         onDelete={onDelete}
+        // Keep the body a flex column so inline prompt forms can stretch the
+        // textarea to the panel height with the submit button pinned below.
+        bodyClassName="flex min-h-0 flex-col overflow-hidden"
       >
         <NodesPanelBody content={content} />
       </TypedPanelShell>
@@ -138,12 +141,14 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
         </p>
       ) : null}
       {entry.showRun && canManualRun ? (
-        <NodesPanelRunControl
-          entry={entry}
-          resolved={resolved}
-          lock={lock}
-          testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
-        />
+        <div className={styles.runControl}>
+          <NodesPanelRunControl
+            entry={entry}
+            resolved={resolved}
+            lock={lock}
+            testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
+          />
+        </div>
       ) : null}
       {!resolved ? (
         <p className="text-[13px] text-amber-600 dark:text-amber-400">
@@ -161,12 +166,13 @@ function isInlineLayout(entry: NodesPanelNode, canManualRun: boolean): boolean {
 function singleNodeLayoutStyles(useInlineLayout: boolean) {
   return {
     container: useInlineLayout
-      ? "flex h-full flex-col items-stretch gap-3 p-4"
+      ? "flex h-full min-h-0 flex-col items-stretch gap-3 p-4"
       : "flex h-full flex-col items-center justify-center gap-3 p-4",
-    header: "text-[13px] font-semibold text-slate-800 dark:text-gray-100",
+    header: "shrink-0 text-[13px] font-semibold text-slate-800 dark:text-gray-100",
     description: useInlineLayout
-      ? "text-[13px] text-slate-500 dark:text-gray-400"
+      ? "shrink-0 text-[13px] text-slate-500 dark:text-gray-400"
       : "max-w-full truncate text-center text-[13px] text-slate-500 dark:text-gray-400",
+    runControl: useInlineLayout ? "flex min-h-0 flex-1 flex-col" : undefined,
   };
 }
 
