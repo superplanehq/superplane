@@ -41,6 +41,28 @@ function resolveMultiSelectLabels(field: ConfigurationField, values: string[]): 
   });
 }
 
+function formatIntegrationValue(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return EMPTY_DISPLAY_VALUE;
+  }
+
+  const record = value as { name?: string };
+  if (record.name?.trim()) {
+    return record.name.trim();
+  }
+
+  return EMPTY_DISPLAY_VALUE;
+}
+
+function formatSecretRefValue(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return EMPTY_DISPLAY_VALUE;
+  }
+
+  const record = value as { secret?: string };
+  return record.secret?.trim() || EMPTY_DISPLAY_VALUE;
+}
+
 function formatSecretKeyValue(value: unknown): string {
   if (!value || typeof value !== "object") {
     return EMPTY_DISPLAY_VALUE;
@@ -139,6 +161,10 @@ function formatTypedFieldValue(value: unknown, field: ConfigurationField): Forma
       return formatMultiValueField(field, value);
     case "secret-key":
       return { kind: "text", displayText: formatSecretKeyValue(value) };
+    case "integration":
+      return { kind: "text", displayText: formatIntegrationValue(value) };
+    case "secret":
+      return { kind: "text", displayText: formatSecretRefValue(value) };
     case "expression":
       return {
         kind: "expression",
