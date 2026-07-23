@@ -1,6 +1,6 @@
 import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 
-import type { CanvasAppFixture } from "./handlers";
+import { defaultCanvasAppFixture, type CanvasAppFixture } from "./handlers";
 
 interface AppPageHarnessProps {
   /** Query string appended to the AppPage route (without the leading `?`). */
@@ -22,7 +22,11 @@ interface AppPageHarnessProps {
  * router with HomePage so the header Homepage control returns to the org home
  * surface used by the HomePage stories.
  */
-export function AppPageHarness({ query = "", fixture, openAgentSidebar = false }: AppPageHarnessProps) {
+export function AppPageHarness({
+  query = "",
+  fixture = defaultCanvasAppFixture,
+  openAgentSidebar = false,
+}: AppPageHarnessProps) {
   return (
     <OrgWorkspaceHarness startAt="app" appFixture={fixture} appQuery={query} openAgentSidebar={openAgentSidebar} />
   );
