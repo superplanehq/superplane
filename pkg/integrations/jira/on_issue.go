@@ -1,7 +1,6 @@
 package jira
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,6 +31,7 @@ type OnIssueConfiguration struct {
 type OnIssueMetadata struct {
 	Project    *Project `json:"project,omitempty" mapstructure:"project,omitempty"`
 	WebhookURL string   `json:"webhookUrl" mapstructure:"webhookUrl"`
+	WebhookID  *int64   `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
 // IssueWebhookPayload is the shape Jira Cloud sends for issue event webhooks
@@ -95,12 +95,7 @@ func (t *OnIssue) Documentation() string {
 
 ## Webhook Setup
 
-Jira Cloud's dynamic webhook registration API is only available to Connect/OAuth apps, not to accounts authenticated with an API token, so this webhook cannot be provisioned automatically. After saving this trigger to generate its webhook URL, connect it on the Jira side using one of:
-
-1. **Jira Administration → System → WebHooks** (requires Jira site admin access): create a WebHook with the generated URL, tick the Issue **created**/**updated**/**deleted** events you want, and optionally scope it with a JQL filter such as ` + "`project = YOUR_PROJECT_KEY`" + `.
-2. **Project settings → Automation** (no site admin access required): create a rule with an Issue created/updated/deleted trigger and a **Send web request** action pointing at the generated URL, with a JSON body shaped like ` + "`{\"webhookEvent\": \"jira:issue_created\", \"issue\": {...}}`" + `.
-
-Jira's native webhook delivery has no support for custom headers, so requests aren't signed by default. If you can add a custom header (for example from an Automation rule), set the **Webhook Shared Secret** field on the Jira integration and send it as ` + "`Authorization: Bearer <secret>`" + ` to have SuperPlane verify each request.
+This is provisioned automatically. Jira's dynamic webhook registration API (` + "`POST /rest/api/3/webhook`" + `) is only reachable by Connect/OAuth apps, not accounts authenticated with an API token - since this integration connects via OAuth 2.0 (3LO), SuperPlane registers the webhook directly on save (scoped to the selected project via a JQL filter) and removes it automatically when the trigger is deleted.
 
 ## Output
 
@@ -186,9 +181,38 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to setup webhook: %w", err)
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	//
+	// Reconcile: tear down a previously-registered webhook before creating a
+	// fresh one, so editing the project/events doesn't leak orphaned
+	// registrations on the Jira side.
+	//
+	existing := OnIssueMetadata{}
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if existing.WebhookID != nil {
+		if delErr := client.DeleteIssueWebhooks([]int64{*existing.WebhookID}); delErr != nil {
+			ctx.Logger.Warnf("failed to remove previous Jira webhook: %v", delErr)
+		}
+	}
+
+	nativeEvents := make([]string, 0, len(config.Events))
+	for _, event := range config.Events {
+		nativeEvents = append(nativeEvents, issueEventWebhookName(event))
+	}
+
+	webhookID, err := client.CreateIssueWebhook(webhookURL, fmt.Sprintf("project = %q", project.Key), nativeEvents)
+	if err != nil {
+		return fmt.Errorf("failed to create Jira webhook: %w", err)
+	}
+
 	return ctx.Metadata.Set(OnIssueMetadata{
 		Project:    project,
 		WebhookURL: webhookURL,
+		WebhookID:  &webhookID,
 	})
 }
 
@@ -209,10 +233,6 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	metadata := OnIssueMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if code, err := verifyOnIssueWebhookAuth(ctx); err != nil {
-		return code, nil, err
 	}
 
 	payload := IssueWebhookPayload{}
@@ -258,6 +278,22 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
+	metadata := OnIssueMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return nil
+	}
+	if metadata.WebhookID == nil {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil
+	}
+
+	if err := client.DeleteIssueWebhooks([]int64{*metadata.WebhookID}); err != nil {
+		ctx.Logger.Warnf("failed to delete Jira webhook during cleanup: %v", err)
+	}
 	return nil
 }
 
@@ -276,6 +312,21 @@ func issueEventAction(webhookEvent string) (string, bool) {
 	}
 }
 
+// issueEventWebhookName maps a short action name (as used in this trigger's
+// configuration) to the native Jira webhookEvent value.
+func issueEventWebhookName(action string) string {
+	switch action {
+	case "created":
+		return issueEventCreated
+	case "updated":
+		return issueEventUpdated
+	case "deleted":
+		return issueEventDeleted
+	default:
+		return action
+	}
+}
+
 func issueProjectKey(issue *Issue) string {
 	if issue == nil || issue.Fields == nil {
 		return ""
@@ -286,40 +337,4 @@ func issueProjectKey(issue *Issue) string {
 	}
 	key, _ := project["key"].(string)
 	return key
-}
-
-// verifyOnIssueWebhookAuth enforces the optional "webhookSharedSecret" integration
-// config as a Bearer token. Jira's native Admin Webhooks can't send custom
-// headers, so verification is skipped entirely when no secret is configured.
-func verifyOnIssueWebhookAuth(ctx core.WebhookRequestContext) (int, error) {
-	if ctx.Integration == nil {
-		return http.StatusOK, nil
-	}
-
-	secret, err := optionalIntegrationConfig(ctx.Integration, "webhookSharedSecret")
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to read webhook shared secret: %w", err)
-	}
-	if secret == "" {
-		return http.StatusOK, nil
-	}
-
-	authorization := ctx.Headers.Get("Authorization")
-	token, hasBearer := strings.CutPrefix(authorization, "Bearer ")
-	if !hasBearer || subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
-		return http.StatusForbidden, fmt.Errorf("invalid or missing webhook authorization")
-	}
-
-	return http.StatusOK, nil
-}
-
-func optionalIntegrationConfig(integration core.IntegrationContext, name string) (string, error) {
-	value, err := integration.GetConfig(name)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return "", nil
-		}
-		return "", err
-	}
-	return string(value), nil
 }

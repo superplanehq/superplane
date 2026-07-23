@@ -9,115 +9,74 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 const (
-	testSiteURL  = "https://your-domain.atlassian.net"
-	testEmail    = "user@example.com"
-	testAPIToken = "test-api-token"
+	testSiteURL     = "https://your-domain.atlassian.net"
+	testCloudID     = "35273b54-3f06-40d2-880f-dd28cf6daafa"
+	testAccessToken = "test-access-token"
 )
 
-// newAuthorizedIntegration returns an IntegrationContext that has Basic Auth
-// credentials and integration metadata already populated, simulating a
-// successfully-configured integration.
+// newAuthorizedIntegration returns an IntegrationContext that has an OAuth
+// connection (cloud id + access token) and integration metadata already
+// populated, simulating a successfully-connected integration.
 func newAuthorizedIntegration() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  testSiteURL,
-			"email":    testEmail,
-			"apiToken": testAPIToken,
+		CurrentProperties: map[string]any{
+			PropertyCloudID: testCloudID,
+			PropertySiteURL: testSiteURL,
+		},
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)},
 		},
 		Metadata: Metadata{},
 	}
 }
 
 func newAuthorizedIntegrationWithMetadata(metadata Metadata) *contexts.IntegrationContext {
-	return &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  testSiteURL,
-			"email":    testEmail,
-			"apiToken": testAPIToken,
-		},
-		Metadata: metadata,
-	}
+	appCtx := newAuthorizedIntegration()
+	appCtx.Metadata = metadata
+	return appCtx
+}
+
+// testProxyURL builds the expected OAuth API proxy URL for a REST path, mirroring Client.apiURL.
+func testProxyURL(path string) string {
+	return atlassianAPIProxyHost + "/" + testCloudID + path
 }
 
 func Test__NewClient(t *testing.T) {
-	t.Run("missing site URL -> error", func(t *testing.T) {
+	t.Run("missing cloud id -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"email":    testEmail,
-				"apiToken": testAPIToken,
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)},
 			},
 		}
 
 		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "site URL")
+		assert.Contains(t, err.Error(), "cloud id")
 	})
 
-	t.Run("missing email -> error", func(t *testing.T) {
+	t.Run("missing access token -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  testSiteURL,
-				"apiToken": testAPIToken,
+			CurrentProperties: map[string]any{
+				PropertyCloudID: testCloudID,
 			},
 		}
 
 		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "email")
-	})
-
-	t.Run("missing API token -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": testSiteURL,
-				"email":   testEmail,
-			},
-		}
-
-		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "API token")
-	})
-
-	t.Run("empty site URL -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  "",
-				"email":    testEmail,
-				"apiToken": testAPIToken,
-			},
-		}
-
-		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "missing Jira site URL")
+		assert.Contains(t, err.Error(), "access token")
 	})
 
 	t.Run("successful client creation", func(t *testing.T) {
 		client, err := NewClient(&contexts.HTTPContext{}, newAuthorizedIntegration())
 
 		require.NoError(t, err)
-		assert.Equal(t, testSiteURL, client.SiteURL)
-		assert.Equal(t, testEmail, client.Email)
-		assert.Equal(t, testAPIToken, client.Token)
-	})
-
-	t.Run("trailing slash on site URL is trimmed", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  testSiteURL + "/",
-				"email":    testEmail,
-				"apiToken": testAPIToken,
-			},
-		}
-
-		client, err := NewClient(&contexts.HTTPContext{}, appCtx)
-		require.NoError(t, err)
-		assert.Equal(t, testSiteURL, client.SiteURL)
+		assert.Equal(t, testCloudID, client.CloudID)
+		assert.Equal(t, testAccessToken, client.AccessToken)
 	})
 }
 
@@ -141,8 +100,8 @@ func Test__Client__GetCurrentUser(t *testing.T) {
 		assert.Equal(t, "123", user.AccountID)
 		assert.Equal(t, "Test User", user.DisplayName)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/myself")
-		assert.True(t, strings.HasPrefix(httpContext.Requests[0].Header.Get("Authorization"), "Basic "))
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/myself"))
+		assert.Equal(t, "Bearer "+testAccessToken, httpContext.Requests[0].Header.Get("Authorization"))
 	})
 
 	t.Run("auth failure -> error", func(t *testing.T) {
@@ -184,7 +143,7 @@ func Test__Client__ListProjects(t *testing.T) {
 		require.Len(t, projects, 2)
 		assert.Equal(t, "TEST", projects[0].Key)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/project")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/project"))
 	})
 }
 
@@ -208,7 +167,7 @@ func Test__Client__GetIssue(t *testing.T) {
 		assert.Equal(t, "10001", issue.ID)
 		assert.Equal(t, "TEST-123", issue.Key)
 		assert.Equal(t, "Test issue", issue.Fields["summary"])
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/TEST-123")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/issue/TEST-123"))
 	})
 
 	t.Run("issue not found -> error", func(t *testing.T) {
@@ -256,7 +215,7 @@ func Test__Client__CreateIssue(t *testing.T) {
 		assert.Equal(t, "10002", response.ID)
 		assert.Equal(t, "TEST-124", response.Key)
 		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/issue"))
 	})
 
 	t.Run("issue creation failure -> error", func(t *testing.T) {
@@ -298,7 +257,7 @@ func Test__Client__UpdateIssue(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/TEST-1")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/issue/TEST-1"))
 	})
 
 	t.Run("update error", func(t *testing.T) {
@@ -385,7 +344,7 @@ func Test__Client__GetProjectIssueTypes(t *testing.T) {
 		assert.Equal(t, "Task", types[0].Name)
 		assert.Equal(t, "Bug", types[1].Name)
 		assert.True(t, types[2].Subtask)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/createmeta/TEST/issuetypes")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/issue/createmeta/TEST/issuetypes"))
 	})
 
 	t.Run("project not found -> error", func(t *testing.T) {
@@ -508,36 +467,6 @@ func Test__WrapInADF(t *testing.T) {
 	})
 }
 
-func Test__Client__FetchCloudID(t *testing.T) {
-	t.Run("successful tenant_info", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"abc-123"}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		client, err := NewClient(httpContext, appCtx)
-		require.NoError(t, err)
-
-		id, err := client.FetchCloudID()
-		require.NoError(t, err)
-		assert.Equal(t, "abc-123", id)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/_edge/tenant_info")
-	})
-}
-
 func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
 	t.Run("list service desks", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
@@ -549,9 +478,8 @@ func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
 			},
 		}
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 		client, err := NewClient(httpContext, appCtx)
 		require.NoError(t, err)
@@ -572,9 +500,8 @@ func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
 			},
 		}
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 		client, err := NewClient(httpContext, appCtx)
 		require.NoError(t, err)
@@ -600,9 +527,8 @@ func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
 			},
 		}
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 		client, err := NewClient(httpContext, appCtx)
 		require.NoError(t, err)
@@ -648,11 +574,8 @@ func Test__Client__IncidentsAPI(t *testing.T) {
 		}
 
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 
 		client, err := NewClient(httpContext, appCtx)
@@ -681,11 +604,8 @@ func Test__Client__IncidentsAPI(t *testing.T) {
 		}
 
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 
 		client, err := NewClient(httpContext, appCtx)
@@ -709,11 +629,8 @@ func Test__Client__IncidentsAPI(t *testing.T) {
 		}
 
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 
 		client, err := NewClient(httpContext, appCtx)
@@ -731,11 +648,8 @@ func Test__Client__HeartbeatsAPI(t *testing.T) {
 	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
 
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "test@example.com",
-			"apiToken": "test-token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	t.Run("list ops teams array response", func(t *testing.T) {
@@ -936,9 +850,8 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 	t.Run("numeric passthrough", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{}}
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 		client, err := NewClient(httpContext, appCtx)
 		require.NoError(t, err)
@@ -958,9 +871,8 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 			},
 		}
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
-			},
+			CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+			CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		}
 		client, err := NewClient(httpContext, appCtx)
 		require.NoError(t, err)
@@ -1024,11 +936,8 @@ func Test__GetWorkflowStatusesByName(t *testing.T) {
 func Test__Client__OpsAlertsAPI(t *testing.T) {
 	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "test@example.com",
-			"apiToken": "test-token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	t.Run("create alert", func(t *testing.T) {

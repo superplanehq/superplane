@@ -2,6 +2,8 @@ package jira
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -9,7 +11,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("jira", &Jira{})
+	registry.RegisterIntegrationWithOptions("jira", &Jira{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: &SetupProvider{},
+	})
 }
 
 type Jira struct{}
@@ -19,16 +23,6 @@ type Metadata struct {
 	Projects []Project `json:"projects" mapstructure:"projects"`
 	CloudID  string    `json:"cloudId,omitempty" mapstructure:"cloudId,omitempty"`
 }
-
-const installationInstructions = `
-To connect Jira to SuperPlane:
-
-1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-2. Click **Create API token**, give it a recognizable label, and copy the generated token.
-3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like ` + "`https://your-domain.atlassian.net`" + `.
-4. Paste the Atlassian account **Email** that owns the API token.
-5. Paste the generated **API Token**.
-`
 
 func (j *Jira) Name() string {
 	return "jira"
@@ -46,45 +40,18 @@ func (j *Jira) Description() string {
 	return "Manage issues in Jira"
 }
 
+// Instructions is unused: this proof of concept connects Jira exclusively
+// through the OAuth 2.0 (3LO) SetupProvider flow (see setup_provider.go),
+// whose steps carry their own instructions.
 func (j *Jira) Instructions() string {
-	return installationInstructions
+	return ""
 }
 
+// Configuration is empty: OAuth connection details (client id/secret, cloud
+// id, tokens) are collected and stored through the SetupProvider flow
+// instead of a static config form.
 func (j *Jira) Configuration() []configuration.Field {
-	return []configuration.Field{
-		{
-			Name:        "siteUrl",
-			Label:       "Site URL",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The base URL of your Jira Cloud site",
-			Placeholder: "https://your-domain.atlassian.net",
-		},
-		{
-			Name:        "email",
-			Label:       "Email",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Atlassian account email associated with the API token",
-			Placeholder: "you@example.com",
-		},
-		{
-			Name:        "apiToken",
-			Label:       "API Token",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Required:    true,
-			Description: "API token from https://id.atlassian.com/manage-profile/security/api-tokens",
-		},
-		{
-			Name:        "webhookSharedSecret",
-			Label:       "Webhook Shared Secret",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Required:    false,
-			Description: "Optional secret used to verify inbound issue-webhook requests (e.g. from a Jira Automation rule sending a custom Authorization: Bearer header). Leave empty if your setup can't send custom headers, such as native Jira Admin Webhooks.",
-		},
-	}
+	return []configuration.Field{}
 }
 
 func (j *Jira) Actions() []core.Action {
@@ -131,23 +98,127 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error verifying Jira credentials: %v", err)
 	}
 
-	cloudID, err := client.FetchCloudID()
-	if err != nil {
-		return fmt.Errorf("error resolving cloud id: %v", err)
-	}
-
 	projects, err := client.ListProjects()
 	if err != nil {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{User: user, Projects: projects, CloudID: cloudID})
+	ctx.Integration.SetMetadata(Metadata{User: user, Projects: projects, CloudID: client.CloudID})
 	ctx.Integration.Ready()
 	return nil
 }
 
 func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op
+	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
+		j.afterOAuthRedirect(ctx)
+		return
+	}
+
+	ctx.Logger.Warnf("unknown path: %s", ctx.Request.URL.Path)
+	ctx.Response.WriteHeader(http.StatusNotFound)
+}
+
+// afterOAuthRedirect handles Atlassian's callback after the user authorizes
+// the app: it exchanges the authorization code for tokens, resolves which
+// Jira site(s) were granted, and stores everything needed for NewClient to
+// build an authenticated Client from then on.
+func (j *Jira) afterOAuthRedirect(ctx core.HTTPRequestContext) {
+	code := ctx.Request.URL.Query().Get("code")
+	state := ctx.Request.URL.Query().Get("state")
+	if code == "" || state == "" {
+		ctx.Logger.Errorf("missing code or state")
+		http.Error(ctx.Response, "missing code or state", http.StatusBadRequest)
+		return
+	}
+
+	expectedState, err := ctx.Integration.Properties().GetString(PropertyOAuthState)
+	if err != nil || expectedState == "" || expectedState != state {
+		ctx.Logger.Errorf("invalid OAuth state")
+		http.Error(ctx.Response, "invalid OAuth state", http.StatusBadRequest)
+		return
+	}
+
+	clientID, err := ctx.Integration.Properties().GetString(PropertyClientID)
+	if err != nil {
+		ctx.Logger.Errorf("failed to read client id: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	clientSecret, err := ctx.Integration.Secrets().Get(SecretOAuthClientSecret)
+	if err != nil {
+		ctx.Logger.Errorf("failed to read client secret: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := exchangeCodeForToken(ctx.HTTP, clientID, clientSecret, code, redirectURI(ctx.BaseURL, ctx.Integration.ID().String()))
+	if err != nil {
+		ctx.Logger.Errorf("failed to exchange code for token: %v", err)
+		http.Error(ctx.Response, "failed to exchange code for token", http.StatusInternalServerError)
+		return
+	}
+
+	resources, err := fetchAccessibleResources(ctx.HTTP, token.AccessToken)
+	if err != nil {
+		ctx.Logger.Errorf("failed to fetch accessible resources: %v", err)
+		http.Error(ctx.Response, "failed to fetch accessible Jira sites", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// PoC simplification: connect the first accessible site. A production
+	// implementation would add a "select site" step when the grant spans
+	// more than one.
+	//
+	site := resources[0]
+
+	err = ctx.Integration.Properties().CreateMany([]core.IntegrationPropertyDefinition{
+		{Name: PropertyCloudID, Label: "Jira Cloud ID", Type: core.IntegrationPropertyTypeString, Value: site.ID, Editable: false},
+		{Name: PropertySiteURL, Label: "Jira Site URL", Type: core.IntegrationPropertyTypeString, Value: site.URL, Editable: false},
+		{Name: PropertySiteName, Label: "Jira Site Name", Type: core.IntegrationPropertyTypeString, Value: site.Name, Editable: false},
+	})
+	if err != nil {
+		ctx.Logger.Errorf("failed to save site properties: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = ctx.Integration.Secrets().CreateMany([]core.IntegrationSecretDefinition{
+		{Name: SecretOAuthAccessToken, Label: "OAuth Access Token", Value: token.AccessToken, Editable: false},
+		{Name: SecretOAuthRefreshToken, Label: "OAuth Refresh Token", Value: token.RefreshToken, Editable: false},
+	})
+	if err != nil {
+		ctx.Logger.Errorf("failed to save OAuth tokens: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// Best-effort immediate sync so the integration doesn't sit in a
+	// "connected but unverified" state until the next scheduled Sync().
+	//
+	if client, err := NewClient(ctx.HTTP, ctx.Integration); err == nil {
+		if user, err := client.GetCurrentUser(); err == nil {
+			projects, _ := client.ListProjects()
+			ctx.Integration.SetMetadata(Metadata{User: user, Projects: projects, CloudID: site.ID})
+		}
+	}
+	ctx.Integration.Ready()
+
+	err = ctx.IntegrationSetup.SetStep(core.SetupStep{
+		Type:         core.SetupStepTypeDone,
+		Name:         "done",
+		Label:        "Jira connection completed successfully",
+		Instructions: fmt.Sprintf("Connected to **%s** (%s).", site.Name, site.URL),
+	})
+	if err != nil {
+		ctx.Logger.Errorf("failed to finish setup: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(ctx.Response, ctx.Request, ctx.BaseURL, http.StatusSeeOther)
 }
 
 func (j *Jira) Hooks() []core.Hook {

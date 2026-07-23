@@ -398,11 +398,8 @@ func Test__Jira__ListResources__serviceDesk(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "a@b.com",
-			"apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("serviceDesk", core.ListResourcesContext{
@@ -427,11 +424,8 @@ func Test__Jira__ListResources__serviceDeskRequestType(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "a@b.com",
-			"apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("serviceDeskRequestType", core.ListResourcesContext{
@@ -447,9 +441,8 @@ func Test__Jira__ListResources__serviceDeskRequestType(t *testing.T) {
 func Test__Jira__ListResources__serviceDeskRequestType_emptyDesk(t *testing.T) {
 	j := &Jira{}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 	resources, err := j.ListResources("serviceDeskRequestType", core.ListResourcesContext{
 		HTTP:        &contexts.HTTPContext{},
@@ -480,9 +473,8 @@ func Test__Jira__ListResources__impact(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("impact", core.ListResourcesContext{
@@ -527,9 +519,8 @@ func Test__Jira__ListResources__urgency__fieldOptionsFallback(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("urgency", core.ListResourcesContext{
@@ -576,11 +567,8 @@ func Test__Jira__ListResources__issue(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "a@b.com",
-			"apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("issue", core.ListResourcesContext{
@@ -618,11 +606,8 @@ func Test__Jira__ListResources__issue_deskEmptyFallsBackToSearch(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "a@b.com",
-			"apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("issue", core.ListResourcesContext{
@@ -649,11 +634,8 @@ func Test__Jira__ListResources__issue_noProject(t *testing.T) {
 		},
 	}
 	appCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "a@b.com",
-			"apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	}
 
 	resources, err := j.ListResources("issue", core.ListResourcesContext{
@@ -729,9 +711,8 @@ func Test__requestTypeFieldResources__createmetaFallback(t *testing.T) {
 		},
 	}
 	client, err := NewClient(httpContext, &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 	})
 	require.NoError(t, err)
 
