@@ -3,29 +3,25 @@ package runner
 import (
 	"fmt"
 	"strings"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 // RunPythonSpec is persisted runnerPython node configuration.
 type RunPythonSpec struct {
-	MachineType             string                `mapstructure:"machine_type"`
-	Script                  string                `mapstructure:"script"`
-	EnableSetupCommands     bool                  `mapstructure:"enable_setup_commands"`
-	SetupCommands           string                `mapstructure:"setup_commands"`
-	Environment             []EnvironmentVariable `mapstructure:"environment"`
-	ExecutionMode           string                `mapstructure:"execution_mode"`
-	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
-	DockerImage             string                `mapstructure:"docker_image"`
-	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
+	MachineType             string                 `mapstructure:"machine_type"`
+	Script                  string                 `mapstructure:"script"`
+	EnableSetupCommands     bool                   `mapstructure:"enable_setup_commands"`
+	SetupCommands           string                 `mapstructure:"setup_commands"`
+	EnvironmentFrom         []EnvironmentFromEntry `mapstructure:"environmentFrom"`
+	Environment             []EnvironmentVariable  `mapstructure:"environment"`
+	ExecutionMode           string                 `mapstructure:"execution_mode"`
+	DockerImagePreset       string                 `mapstructure:"docker_image_preset"`
+	DockerImage             string                 `mapstructure:"docker_image"`
+	ExecutionTimeoutSeconds int                    `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
 }
 
 func decodeRunPythonSpec(raw any) (RunPythonSpec, error) {
 	var spec RunPythonSpec
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		WeaklyTypedInput: true,
-	})
+	dec, err := NewSpecDecoder(&spec)
 	if err != nil {
 		return RunPythonSpec{}, fmt.Errorf("runnerPython spec decoder: %w", err)
 	}
@@ -68,7 +64,11 @@ func validateRunPythonSpec(spec RunPythonSpec) error {
 		return err
 	}
 
-	if err := validateEnvironment(spec.Environment); err != nil {
+	if err := ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
+		return err
+	}
+
+	if err := ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
 
