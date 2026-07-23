@@ -61,7 +61,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 				{"name": "Open PR", "type": "prompt", "prompt": "Open a pull request"},
 				{"name": "Status", "type": "bash", "command": "git -C /tmp/repo status"},
 			},
-			"credentials": credentialsSecret("anthropic", "api_key"),
+			"credentials":      credentialsSecret("anthropic", "api_key"),
 			"workingDirectory": "/tmp",
 		},
 		HTTP: httpContext,
@@ -137,7 +137,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 			"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",
 			"enable_after_commands": true,
 			"after_commands":        "git push",
-			"credentials": credentialsSecret("anthropic", "api_key"),
+			"credentials":           credentialsSecret("anthropic", "api_key"),
 		},
 		HTTP: httpContext,
 		Secrets: &contexts.SecretsContext{

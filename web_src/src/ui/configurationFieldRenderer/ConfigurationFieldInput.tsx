@@ -190,10 +190,6 @@ export function ConfigurationFieldInput({
     );
   }
 
-  if (field.type === "object") {
-    return <ObjectFieldRenderer {...commonProps} />;
-  }
-
   return renderStandardField({ commonProps });
 }
 
@@ -247,6 +243,10 @@ function renderPrincipalField({
 
 function renderStandardField({ commonProps }: { commonProps: FieldRendererProps }) {
   const { field } = commonProps;
+
+  if (field.type === "object") {
+    return <ObjectFieldRenderer {...commonProps} />;
+  }
 
   if (isTextField(field.type)) {
     return renderTextField(commonProps);

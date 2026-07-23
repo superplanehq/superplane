@@ -456,18 +456,21 @@ export const ConfigurationFieldRenderer = ({
 };
 
 function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
+  const types = [
+    "list",
+    "select",
+    "multi-select",
+    "user",
+    "role",
+    "group",
+    "app",
+    "app-canvas-node",
+    "integration",
+    "secret",
+    "run-parameters",
+  ];
+
   return (
-    field.type === "list" ||
-    field.type === "select" ||
-    field.type === "multi-select" ||
-    field.type === "user" ||
-    field.type === "role" ||
-    field.type === "group" ||
-    field.type === "app" ||
-    field.type === "app-canvas-node" ||
-    field.type === "integration" ||
-    field.type === "secret" ||
-    field.type === "run-parameters" ||
-    (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
+    types.includes(field.type ?? "") || (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
   );
 }
