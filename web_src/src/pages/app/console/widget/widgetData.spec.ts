@@ -5,6 +5,7 @@ import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import {
   aggregateNumber,
   aggregateNumberPerSource,
+  applyFilters,
   applySort,
   buildChartData,
   combinePartials,
@@ -23,6 +24,36 @@ const entries: CanvasMemoryEntry[] = [
   { id: "4", namespace: "tests", values: { name: "b" }, source: "node" },
   { id: "5", namespace: "tests", values: { name: "c" }, source: "node" },
 ];
+
+describe("applyFilters", () => {
+  it("returns rows unchanged when no filters are set", () => {
+    const rows = [{ amount: 1 }, { amount: 2 }];
+    expect(applyFilters(rows, undefined)).toBe(rows);
+    expect(applyFilters(rows, [])).toBe(rows);
+  });
+
+  it("keeps rows matching legacy mini-expression filters", () => {
+    const rows = [{ amount: 5 }, { amount: 20 }];
+    expect(applyFilters(rows, ["row.amount > 10"])).toEqual([{ amount: 20 }]);
+  });
+
+  it("ANDs multiple filters together", () => {
+    const rows = [
+      { amount: 20, status: "ok" },
+      { amount: 20, status: "bad" },
+    ];
+    expect(applyFilters(rows, ["row.amount > 10", 'status == "ok"'])).toEqual([{ amount: 20, status: "ok" }]);
+  });
+
+  it("supports CEL-style arithmetic + builtin filters (regression for #6233)", () => {
+    const rows = [
+      { createdAt: new Date().toISOString() },
+      { createdAt: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
+    ];
+    const filtered = applyFilters(rows, ["epochMs(createdAt) > (float(now) - 604800.0) * 1000.0"]);
+    expect(filtered).toEqual([rows[0]]);
+  });
+});
 
 describe("aggregateNumber", () => {
   it("skips null and blank values instead of coercing them to 0", () => {

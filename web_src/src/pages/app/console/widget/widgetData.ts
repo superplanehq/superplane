@@ -4,7 +4,7 @@ import { buildEnv } from "./celExpr";
 import { getValueAtPath } from "./fieldPath";
 import { flattenMemoryEntries } from "./memoryRow";
 import { compileFieldResolver } from "./resolveCellValue";
-import { evaluateShow } from "./showExpression";
+import { evaluateRowShow } from "./rowVisibility";
 import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
 import type { WidgetNumberAggregation, WidgetSort } from "./types";
 
@@ -14,10 +14,15 @@ import type { WidgetNumberAggregation, WidgetSort } from "./types";
  * are kept. Expressions that fail to parse are treated as `false` so that
  * authoring mistakes don't accidentally hide data — they keep the row in the
  * dataset for visibility.
+ *
+ * Filters share the row `show` evaluator so authors get the same expression
+ * vocabulary everywhere: `{{ CEL }}` templates, legacy `field == "value"`,
+ * the dashboard mini language, and bare CEL expressions (arithmetic +
+ * builtins like `epochMs(createdAt) > (float(now) - 604800.0) * 1000.0`).
  */
 export function applyFilters<T>(rows: T[], filters: string[] | undefined): T[] {
   if (!filters || filters.length === 0) return rows;
-  return rows.filter((row) => filters.every((expr) => evaluateShow(expr, row, false)));
+  return rows.filter((row) => filters.every((expr) => evaluateRowShow(expr, row, false)));
 }
 
 /**
