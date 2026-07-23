@@ -15,13 +15,18 @@ import { useCreateApp } from "./useCreateApp";
 interface FreshOrgLandingProps {
   folder?: CanvasFolderData;
   folderContextPending?: boolean;
+  title?: string;
 }
 
 /**
  * Factory-first new-app landing: Setup Factory primary CTA, with quiet escape
  * hatches for blank apps and the starter catalog (catalog hidden until Browse).
  */
-export function FreshOrgLanding({ folder, folderContextPending = false }: FreshOrgLandingProps) {
+export function FreshOrgLanding({
+  folder,
+  folderContextPending = false,
+  title = "Create a new app",
+}: FreshOrgLandingProps) {
   const { createApp, isSaving } = useCreateApp({ folder });
   const [showFactorySetup, setShowFactorySetup] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -55,7 +60,7 @@ export function FreshOrgLanding({ folder, folderContextPending = false }: FreshO
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-14 lg:py-20">
-      <h1 className={cn(homePageTitleClassName, "text-2xl text-gray-800")}>Create a new app</h1>
+      <h1 className={cn(homePageTitleClassName, "text-2xl text-gray-800")}>{title}</h1>
       <p className={cn(homePageSubtitleClassName, "mt-3 max-w-lg font-normal leading-normal text-gray-600")}>
         Set up a Software Factory to automate coding work with agents, from trigger to pull request. Or start from a
         blank app or starter template instead.
@@ -82,9 +87,11 @@ export function FreshOrgLanding({ folder, folderContextPending = false }: FreshO
         <FactorySetupPanel
           busy={busy}
           onCancel={() => setShowFactorySetup(false)}
-          onInstall={() => {
+          onInstall={(selections, repository) => {
             if (busy) return;
-            void createApp("Software Factory");
+            void createApp("Software Factory", {
+              factorySetup: { repository, integrations: selections },
+            });
           }}
           onPreviewWithoutConnecting={() => {
             if (busy) return;
@@ -99,26 +106,28 @@ export function FreshOrgLanding({ folder, folderContextPending = false }: FreshO
 
       {!inFocusedSetup && (
         <p className="mt-8 text-sm font-normal text-gray-600 dark:text-gray-400">
-          <button
+          <Button
             type="button"
+            variant="link"
             disabled={busy}
             onClick={() => {
               if (busy) return;
               void createApp(generateCanvasName());
             }}
-            className="font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 disabled:opacity-50 dark:text-gray-200 dark:decoration-gray-600"
+            className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
           >
             Create a blank app
-          </button>
+          </Button>
           {" or "}
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => setShowCatalog((open) => !open)}
-            className="font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+            className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
             aria-expanded={showCatalog}
           >
             {showCatalog ? "Hide starter apps" : "Browse starter apps"}
-          </button>
+          </Button>
         </p>
       )}
 

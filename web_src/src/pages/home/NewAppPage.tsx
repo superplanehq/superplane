@@ -7,14 +7,14 @@ import { useNewAppFolderContext } from "./useNewAppFolderContext";
 
 export function NewAppPage() {
   const { folder, folderContextPending } = useNewAppFolderContext();
-  const title = folder ? `Create New App in ${folder.title} Folder` : "Create New App";
+  const title = folder ? `Create New App in ${folder.title} Folder` : "Create a new app";
   usePageTitle([title]);
   useReportPageReady(true);
 
   return (
     <RequirePermission resource="canvases" action="create">
       <HomePageShell>
-        <FreshOrgLanding folder={folder} folderContextPending={folderContextPending} />
+        <FreshOrgLanding folder={folder} folderContextPending={folderContextPending} title={title} />
       </HomePageShell>
     </RequirePermission>
   );

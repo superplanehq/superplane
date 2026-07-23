@@ -207,14 +207,15 @@ function InstallActions({
           Cancel
         </Button>
       </div>
-      <button
+      <Button
         type="button"
+        variant="link"
         disabled={!canSkip}
         onClick={onSkip}
-        className="ml-4 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 disabled:opacity-50 dark:text-gray-200 dark:decoration-gray-600"
+        className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
       >
         Let me preview the app without connecting
-      </button>
+      </Button>
     </div>
   );
 }

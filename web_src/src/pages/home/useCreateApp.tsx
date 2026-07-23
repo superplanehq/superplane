@@ -10,11 +10,31 @@ import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useC
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { appPath } from "@/lib/appPaths";
 import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
+import type { IntegrationSelections } from "./InstallIntegrationsSection";
 import type { CanvasFolderData } from "./types";
 
 interface UseCreateAppOptions {
   folder?: CanvasFolderData;
   onCreated?: () => void;
+}
+
+export interface CreateAppOptions {
+  factorySetup?: {
+    repository: string;
+    integrations: IntegrationSelections;
+  };
+}
+
+function buildFactoryBootMessage(repository: string, integrations: IntegrationSelections): string {
+  const github = integrations.github;
+  const claude = integrations.claude;
+  const parts = [
+    `Set up a Software Factory for the GitHub repository "${repository}".`,
+    github ? `Use the existing GitHub integration "${github.name}" (id: ${github.id}).` : null,
+    claude ? `Use the existing Claude integration "${claude.name}" (id: ${claude.id}).` : null,
+    "Automate delivery from trigger to pull request.",
+  ];
+  return parts.filter((part): part is string => Boolean(part)).join(" ");
 }
 
 export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
@@ -31,7 +51,7 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
   const isSaving = createCanvasMutation.isPending || updateCanvasFolderMembershipMutation.isPending;
 
   const createApp = useCallback(
-    async (name: string) => {
+    async (name: string, options?: CreateAppOptions) => {
       if (!organizationId || !canCreateCanvases || isSaving) {
         return;
       }
@@ -62,8 +82,15 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
           writeCanvasAgentSidebarOpen(canvasId, true);
           writeCanvasRunsSidebarOpen(canvasId, false);
           localStorage.setItem("canvasSidebarOpen", "false");
-          setAgentBootContext(canvasId, "blank");
-          sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+          if (options?.factorySetup) {
+            setAgentBootContext(
+              canvasId,
+              buildFactoryBootMessage(options.factorySetup.repository, options.factorySetup.integrations),
+            );
+          } else {
+            setAgentBootContext(canvasId, "blank");
+            sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+          }
           navigate(appPath(organizationId, canvasId, "?edit=1"));
         }
       } catch (error) {

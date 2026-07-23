@@ -1,5 +1,6 @@
 import type { OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -107,13 +108,15 @@ export function IntegrationsSection({
     <>
       <div className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-gray-700/70 dark:border-gray-700/70">
         {integrationData.map((data) => (
-          <HomeIntegrationConnectRow
+          <IntegrationRow
             key={data.name}
-            name={data.name}
-            connected={Boolean(selections[data.name])}
-            onConnect={() => {
+            data={data}
+            selectedId={selections[data.name]?.id}
+            onSelect={(id, name) => onSelectionsChange({ ...selections, [data.name]: { id, name } })}
+            onConfigure={setConfigureIntegrationId}
+            onCreateNew={() => {
               const pending = data.allInstances.find((i) => i.status?.state !== "ready");
-              if (pending?.metadata?.id) {
+              if (pending?.metadata?.id && data.readyInstances.length === 0) {
                 setConfigureIntegrationId(pending.metadata.id);
                 return;
               }
@@ -213,6 +216,89 @@ function useCreateDialogProps(
   );
 
   return { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName };
+}
+
+function IntegrationRow({
+  data,
+  selectedId,
+  onSelect,
+  onConfigure,
+  onCreateNew,
+}: {
+  data: IntegrationInstanceSummary;
+  selectedId?: string;
+  onSelect: (id: string, name: string) => void;
+  onConfigure: (id: string) => void;
+  onCreateNew: () => void;
+}) {
+  const displayName =
+    getIntegrationTypeDisplayName(undefined, data.name) || data.name.charAt(0).toUpperCase() + data.name.slice(1);
+
+  const handleInstanceSelect = (instanceId: string) => {
+    const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
+    if (!instance?.metadata?.id) return;
+    if (instance.status?.state !== "ready") {
+      onConfigure(instance.metadata.id);
+      return;
+    }
+    if (instance.metadata.name) {
+      onSelect(instance.metadata.id, instance.metadata.name);
+    }
+  };
+
+  return (
+    <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">
+      <IntegrationIcon integrationName={data.name} className="h-4 w-4 shrink-0" size={16} />
+      <span className="shrink-0 truncate text-sm font-medium text-slate-900 dark:text-gray-100">{displayName}</span>
+      {data.allInstances.length > 0 ? (
+        <>
+          <Select value={selectedId || ""} onValueChange={handleInstanceSelect}>
+            <SelectTrigger className="h-7 min-w-0 flex-1 text-xs">
+              <SelectValue placeholder={`Select ${displayName}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {data.allInstances.map((instance) => (
+                <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
+                  <span className="flex items-center gap-1.5">
+                    <span>{instance.metadata?.name || instance.metadata?.id}</span>
+                    <StatusDot state={instance.status?.state} />
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="link"
+            size="xs"
+            onClick={onCreateNew}
+            className="h-auto shrink-0 p-0 text-xs font-normal"
+          >
+            or create new
+          </Button>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 text-xs font-medium text-gray-400 dark:text-gray-500">Not connected</span>
+          <Button type="button" variant="outline" size="xs" className="shrink-0" onClick={onCreateNew}>
+            Connect
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+const STATUS_DOT_COLORS: Record<string, string> = {
+  ready: "bg-emerald-500",
+  pending: "bg-amber-500",
+  error: "bg-red-500",
+};
+
+function StatusDot({ state }: { state?: string }) {
+  const color = state ? STATUS_DOT_COLORS[state] : undefined;
+  if (!color) return null;
+  return <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />;
 }
 
 export function HomeIntegrationConnectRow({

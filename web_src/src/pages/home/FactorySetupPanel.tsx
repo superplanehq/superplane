@@ -2,10 +2,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useAvailableIntegrations, useCreateIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import {
+  useAvailableIntegrations,
+  useConnectedIntegrations,
+  useCreateIntegration,
+  useIntegrationResources,
+} from "@/hooks/useIntegrations";
+import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { HomeIntegrationConnectRow, type IntegrationSelections } from "./InstallIntegrationsSection";
 import { homeInstallPanelClassName } from "./homePageStyles";
@@ -30,16 +37,49 @@ export function FactorySetupPanel({
   const routeOrgId = useOrganizationId();
   const organizationId = propOrgId || routeOrgId || "";
   const [selections, setSelections] = useState<IntegrationSelections>({});
-  const [connectedTools, setConnectedTools] = useState<Set<string>>(new Set());
   const [repository, setRepository] = useState("");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
+  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
 
+  const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
+    enabled: !!organizationId,
+  });
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
 
-  const githubConnected = connectedTools.has("github");
-  const allConnected = FACTORY_INTEGRATIONS.every((name) => connectedTools.has(name));
+  const existingIntegrationNames = useMemo(
+    () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
+    [connected],
+  );
+
+  useEffect(() => {
+    let changed = false;
+    const next = { ...selections };
+
+    for (const name of FACTORY_INTEGRATIONS) {
+      if (next[name]) {
+        const selected = connected.find((i) => i.metadata?.id === next[name].id);
+        if (selected && selected.status?.state !== "ready") {
+          delete next[name];
+          changed = true;
+        }
+      }
+
+      if (!next[name]) {
+        const firstReady = connected.find((i) => i.metadata?.integrationName === name && i.status?.state === "ready");
+        if (firstReady?.metadata?.id && firstReady.metadata.name) {
+          next[name] = { id: firstReady.metadata.id, name: firstReady.metadata.name };
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) setSelections(next);
+  }, [connected, selections]);
+
+  const githubConnected = Boolean(selections.github);
+  const allConnected = FACTORY_INTEGRATIONS.every((name) => selections[name]);
   const canInstall = !busy && allConnected && repository.trim() !== "";
 
   const dialogDefinition = useMemo(
@@ -47,12 +87,38 @@ export function FactorySetupPanel({
     [availableIntegrations, dialogIntegrationName],
   );
 
-  const defaultDialogName = useMemo(
-    () => (dialogIntegrationName ? getNextIntegrationName(dialogIntegrationName, new Set()) : ""),
-    [dialogIntegrationName],
+  const dialogPendingInstance = useMemo(
+    () =>
+      dialogIntegrationName
+        ? connected.find((i) => i.metadata?.integrationName === dialogIntegrationName && i.status?.state !== "ready")
+        : undefined,
+    [dialogIntegrationName, connected],
   );
 
-  const openConnectDialog = (integrationName: string) => {
+  const initialWebhookSetup = useMemo(() => {
+    const webhookUrl = getIntegrationWebhookUrl(dialogPendingInstance?.status?.metadata);
+    if (!webhookUrl || !dialogPendingInstance?.metadata?.id) return undefined;
+    return {
+      id: dialogPendingInstance.metadata.id,
+      webhookUrl,
+      config: { ...(dialogPendingInstance.spec?.configuration ?? {}) },
+    };
+  }, [dialogPendingInstance]);
+
+  const defaultDialogName = useMemo(() => {
+    if (dialogPendingInstance?.metadata?.name) return dialogPendingInstance.metadata.name;
+    if (!dialogIntegrationName) return "";
+    return getNextIntegrationName(dialogIntegrationName, existingIntegrationNames);
+  }, [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames]);
+
+  const openConnect = (integrationName: string) => {
+    const pending = connected.find(
+      (i) => i.metadata?.integrationName === integrationName && i.status?.state !== "ready",
+    );
+    if (pending?.metadata?.id) {
+      setConfigureIntegrationId(pending.metadata.id);
+      return;
+    }
     pendingConnectKeyRef.current = integrationName;
     setDialogIntegrationName(integrationName);
   };
@@ -72,8 +138,8 @@ export function FactorySetupPanel({
             <HomeIntegrationConnectRow
               key={name}
               name={name}
-              connected={connectedTools.has(name)}
-              onConnect={() => openConnectDialog(name)}
+              connected={Boolean(selections[name])}
+              onConnect={() => openConnect(name)}
             />
           ))}
         </div>
@@ -105,15 +171,25 @@ export function FactorySetupPanel({
             Cancel
           </Button>
         </div>
-        <button
+        <Button
           type="button"
+          variant="link"
           disabled={busy}
           onClick={onPreviewWithoutConnecting}
-          className="ml-4 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 disabled:opacity-50 dark:text-gray-200 dark:decoration-gray-600"
+          className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
         >
           Let me preview the app without connecting
-        </button>
+        </Button>
       </div>
+
+      <ConfigureIntegrationDialog
+        integrationId={configureIntegrationId}
+        organizationId={organizationId}
+        onClose={() => {
+          setConfigureIntegrationId(null);
+          void refetch();
+        }}
+      />
 
       <IntegrationCreateDialog
         open={!!dialogIntegrationName}
@@ -136,7 +212,6 @@ export function FactorySetupPanel({
           const key = pendingConnectKeyRef.current;
           pendingConnectKeyRef.current = null;
           if (key) {
-            setConnectedTools((prev) => new Set(prev).add(key));
             setSelections((prev) => ({
               ...prev,
               [key]: { id: integrationId, name: instanceName },
@@ -146,7 +221,12 @@ export function FactorySetupPanel({
             }
           }
           setDialogIntegrationName(null);
+          void refetch();
         }}
+        initialBrowserAction={dialogPendingInstance?.status?.browserAction}
+        initialCreatedIntegrationId={dialogPendingInstance?.metadata?.id}
+        initialWebhookSetup={initialWebhookSetup}
+        initialConfiguration={dialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined}
       />
     </div>
   );
@@ -163,7 +243,12 @@ function FactoryRepositorySelect({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const { data: resources = [], isLoading } = useIntegrationResources(organizationId, integrationId, "repository");
+  const {
+    data: resources = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useIntegrationResources(organizationId, integrationId, "repository");
   const options = useMemo(
     () =>
       resources
@@ -175,6 +260,25 @@ function FactoryRepositorySelect({
         .filter((option): option is { value: string; label: string } => option !== null),
     [resources],
   );
+
+  if (isError) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-red-600 dark:text-red-400">Couldn't load repositories. Try again.</p>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (!isLoading && options.length === 0) {
+    return (
+      <p className="text-xs text-slate-500 dark:text-gray-400">
+        No repositories found for this GitHub connection. Check access, then try again.
+      </p>
+    );
+  }
 
   return (
     <Select value={value || undefined} onValueChange={onChange} disabled={isLoading || options.length === 0}>
