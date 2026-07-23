@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -190,12 +189,6 @@ func getAuthToken(baseURL, runnerID, fleetID string) string {
 	if token != "" {
 		return token
 	}
-	tokenFile := strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN_FILE"))
-	if tokenFile != "" {
-		if raw, err := os.ReadFile(tokenFile); err == nil && strings.TrimSpace(string(raw)) != "" {
-			return strings.TrimSpace(string(raw))
-		}
-	}
 	registrationToken := strings.TrimSpace(os.Getenv("RUNNER_REGISTRATION_TOKEN"))
 	if registrationToken == "" {
 		log.Error("RUNNER_ACCESS_TOKEN or RUNNER_REGISTRATION_TOKEN is required")
@@ -207,16 +200,6 @@ func getAuthToken(baseURL, runnerID, fleetID string) string {
 	if err != nil {
 		log.Error("runner registration failed", slog.Any("err", err))
 		os.Exit(1)
-	}
-	if tokenFile != "" {
-		if err := os.MkdirAll(filepath.Dir(tokenFile), 0700); err != nil {
-			log.Error("create runner token directory", slog.Any("err", err))
-			os.Exit(1)
-		}
-		if err := os.WriteFile(tokenFile, []byte(token+"\n"), 0600); err != nil {
-			log.Error("persist runner access token", slog.Any("err", err))
-			os.Exit(1)
-		}
 	}
 	return token
 }

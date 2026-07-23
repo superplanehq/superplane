@@ -13,40 +13,39 @@ import (
 
 var ErrInvalidRunnerRegistration = errors.New("invalid runner registration")
 
-func (s *PostgresStore) CreateRunnerRegistration(ctx context.Context, registration *brokermodels.RunnerRegistration) error {
-	return s.db.WithContext(ctx).Create(registration).Error
-}
-
-func (s *PostgresStore) ExchangeRunnerRegistration(
+// RegisterRunnerWithJTI consumes a registration JWT jti (single-use) and issues a runner credential.
+func (s *PostgresStore) RegisterRunnerWithJTI(
 	ctx context.Context,
-	registrationHash, runnerID, fleetID, accessTokenHash string,
+	jti, runnerID, fleetID, accessTokenHash string,
 	now time.Time,
 ) error {
+	jti = strings.TrimSpace(jti)
+	runnerID = strings.TrimSpace(runnerID)
+	fleetID = strings.TrimSpace(fleetID)
+	if jti == "" || runnerID == "" || fleetID == "" || accessTokenHash == "" {
+		return ErrInvalidRunnerRegistration
+	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var registration brokermodels.RunnerRegistration
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			First(&registration, "token_hash = ?", registrationHash).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrInvalidRunnerRegistration
+		used := brokermodels.UsedRegistrationJTI{
+			JTI:        jti,
+			FleetID:    fleetID,
+			ConsumedAt: now,
 		}
-		if err != nil {
-			return err
+		res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&used)
+		if res.Error != nil {
+			return res.Error
 		}
-		if registration.ConsumedAt != nil || !registration.ExpiresAt.After(now) ||
-			registration.FleetID != strings.TrimSpace(fleetID) {
+		if res.RowsAffected == 0 {
 			return ErrInvalidRunnerRegistration
 		}
 
 		credential := brokermodels.RunnerCredential{
-			RunnerID:        strings.TrimSpace(runnerID),
-			FleetID:         registration.FleetID,
+			RunnerID:        runnerID,
+			FleetID:         fleetID,
 			AccessTokenHash: accessTokenHash,
 			CreatedAt:       now,
 		}
-		if err := tx.Create(&credential).Error; err != nil {
-			return err
-		}
-		return tx.Model(&registration).Update("consumed_at", now).Error
+		return tx.Create(&credential).Error
 	})
 }
 

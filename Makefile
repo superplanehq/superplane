@@ -64,10 +64,8 @@ register-local-fleet:
 runner: build
 	@set -e; n="$(N)"; i=1; \
 	while [ "$$i" -le "$$n" ]; do \
-	  reg=$$(curl -fsS -X POST "$(LOCAL_BROKER_URL)/v1/runners/registrations" \
-	    -H "Content-Type: application/json" \
-	    -H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
-	    -d '{"fleet_id":"$(LOCAL_FLEET_ID)"}' | jq -r .registration_token); \
+	  reg=$$(go run ./scripts/mint-runner-registration \
+	    -fleet "$(LOCAL_FLEET_ID)" -secret "$(LOCAL_STACK_AUTH_TOKEN)"); \
 	  ( cd "$(CURDIR)" && \
 	    TASK_BROKER_URL="$(LOCAL_BROKER_URL)" \
 	    RUNNER_FLEET_ID="$(LOCAL_FLEET_ID)" \

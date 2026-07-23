@@ -47,7 +47,7 @@ func (s *PostgresStore) migrate() error {
 	if err := s.db.AutoMigrate(
 		&brokermodels.Fleet{},
 		&brokermodels.Task{},
-		&brokermodels.RunnerRegistration{},
+		&brokermodels.UsedRegistrationJTI{},
 		&brokermodels.RunnerCredential{},
 	); err != nil {
 		return err
@@ -59,6 +59,7 @@ func (s *PostgresStore) migrate() error {
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS labels`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS type`,
 		`DROP TABLE IF EXISTS broker_tasks`,
+		`DROP TABLE IF EXISTS runner_registrations`,
 	} {
 		if err := s.db.Exec(stmt).Error; err != nil {
 			return err
@@ -78,7 +79,7 @@ func (s *PostgresStore) Close() error {
 // Truncate removes all rows (for tests).
 func (s *PostgresStore) Truncate(ctx context.Context) error {
 	return s.db.WithContext(ctx).Exec(
-		"TRUNCATE TABLE fleets, tasks, runner_registrations, runner_credentials RESTART IDENTITY CASCADE",
+		"TRUNCATE TABLE fleets, tasks, used_registration_jtis, runner_credentials RESTART IDENTITY CASCADE",
 	).Error
 }
 

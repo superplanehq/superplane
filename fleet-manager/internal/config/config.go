@@ -26,11 +26,11 @@ type File struct {
 	// --- global infra / broker / HTTP ---
 	AWSRegion     string `json:"aws_region"`
 	TaskBrokerURL string `json:"task_broker_url"`
-	// TaskBrokerAuthToken is the control-plane bearer used by fleet-manager.
-	// It is never placed on runner VMs.
-	// FM uses it for task-counts polling; FM also injects it into runner user-data so runner
-	// VMs use the same value when claiming tasks. Distinct from AuthToken below (which is
-	// THIS fleet-manager's inbound /v1/* bearer).
+	// TaskBrokerAuthToken is the control-plane bearer used by fleet-manager for broker
+	// APIs (task-counts, drain, fleet register). It is also the HMAC secret used to mint
+	// single-use runner registration JWTs. It is never placed on runner VMs — only the
+	// short-lived registration JWT is. Distinct from AuthToken below (which is THIS
+	// fleet-manager's inbound /v1/* bearer).
 	TaskBrokerAuthToken  string `json:"task_broker_auth_token"`
 	ListenAddr           string `json:"listen_addr"`
 	AuthToken            string `json:"auth_token"`
@@ -159,6 +159,9 @@ func (f *File) validate() error {
 	if strings.TrimSpace(f.TaskBrokerURL) == "" {
 		return fmt.Errorf("task_broker_url is required")
 	}
+	if strings.TrimSpace(f.TaskBrokerAuthToken) == "" {
+		return fmt.Errorf("task_broker_auth_token is required")
+	}
 	if len(f.resolvedSubnetIDs()) == 0 {
 		return fmt.Errorf("subnet_id or subnet_ids is required")
 	}
@@ -266,6 +269,7 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 		RunnerInstallAWSRegion:          f.AWSRegion,
 		TaskBrokerURL:                   f.TaskBrokerURL,
 		RunnerFleetID:                   p.FleetID,
+		RunnerRegistrationSecret:        f.TaskBrokerAuthToken,
 		KeyName:                         f.KeyName,
 		RunnersIAMProfName:              f.IAMInstanceProfile,
 		HotInstanceCount:                p.HotInstanceCount,

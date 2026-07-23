@@ -32,6 +32,9 @@ type Server struct {
 	RunnerCancel *RunnerCancelHub
 	RunnerDrain  *RunnerDrainHub
 
+	// AuthToken is the control-plane bearer and HMAC secret for registration JWTs.
+	AuthToken string
+
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
 	TaskCloudWatchRegion          string

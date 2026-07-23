@@ -11,11 +11,12 @@ import (
 
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/runnerregistrationtoken"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
-func TestOpaqueRunnerRegistrationClaimAndComplete(t *testing.T) {
+func TestRunnerRegistrationJWTClaimAndComplete(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -34,8 +35,22 @@ func TestOpaqueRunnerRegistrationClaimAndComplete(t *testing.T) {
 	ts := httptest.NewServer(NewRouter(&Server{Store: st}, RouterOptions{AuthToken: "control"}))
 	defer ts.Close()
 
-	registration := createTestRegistration(t, ts.URL, "control", "fleet-a")
+	registration := createTestRegistration(t, "control", "fleet-a")
 	accessToken := registerTestRunner(t, ts.URL, registration, "i-runner", "fleet-a")
+
+	// Same registration JWT must not work twice.
+	reuseBody, _ := json.Marshal(api.RegisterRunnerRequest{RunnerID: "i-other", FleetID: "fleet-a"})
+	reuseReq, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/runners/register", bytes.NewReader(reuseBody))
+	reuseReq.Header.Set("Authorization", "Bearer "+registration)
+	reuseReq.Header.Set("Content-Type", "application/json")
+	reuseResp, err := http.DefaultClient.Do(reuseReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = reuseResp.Body.Close()
+	if reuseResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("reuse registration status = %d, want 401", reuseResp.StatusCode)
+	}
 
 	claimBody, _ := json.Marshal(api.ClaimTaskRequest{
 		RunnerID: "i-runner", FleetID: "fleet-a", LeaseSeconds: 60,
@@ -107,25 +122,13 @@ func TestOpaqueRunnerRegistrationClaimAndComplete(t *testing.T) {
 	}
 }
 
-func createTestRegistration(t *testing.T, baseURL, controlToken, fleetID string) string {
+func createTestRegistration(t *testing.T, secret, fleetID string) string {
 	t.Helper()
-	body, _ := json.Marshal(api.CreateRunnerRegistrationRequest{FleetID: fleetID})
-	req, _ := http.NewRequest(http.MethodPost, baseURL+"/v1/runners/registrations", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer "+controlToken)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	token, err := runnerregistrationtoken.Mint(fleetID, secret, time.Now().UTC().Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("create registration status = %d", resp.StatusCode)
-	}
-	var out api.CreateRunnerRegistrationResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatal(err)
-	}
-	return out.RegistrationToken
+	return token
 }
 
 func registerTestRunner(t *testing.T, baseURL, registrationToken, runnerID, fleetID string) string {

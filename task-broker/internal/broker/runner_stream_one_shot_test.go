@@ -60,7 +60,7 @@ func oneShotBrokerSetup(t *testing.T) (*httptest.Server, interface {
 
 func dialWS(t *testing.T, ts *httptest.Server, runnerID string) *websocket.Conn {
 	t.Helper()
-	registration := createTestRegistration(t, ts.URL, "token", "fleet-1")
+	registration := createTestRegistration(t, "token", "fleet-1")
 	accessToken := registerTestRunner(t, ts.URL, registration, runnerID, "fleet-1")
 	wsURL := "ws" + ts.URL[4:] + "/v1/runners/stream"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, map[string][]string{

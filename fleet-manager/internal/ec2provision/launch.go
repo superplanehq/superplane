@@ -28,12 +28,12 @@ import (
 
 	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/runnerregistrationtoken"
 )
 
 type TaskCountsClient interface {
 	FleetTaskCounts(ctx context.Context, fleetID string) (api.FleetTaskCountsResponse, error)
 	DrainRunners(ctx context.Context, req api.DrainRunnersRequest) (api.DrainRunnersResponse, error)
-	CreateRunnerRegistration(ctx context.Context, fleetID string) (api.CreateRunnerRegistrationResponse, error)
 }
 
 // Launcher calls EC2 RunInstances with a deterministic cloud-init user-data starter.
@@ -96,6 +96,9 @@ type Config struct {
 	TaskBrokerURL string
 	// RunnerFleetID is this pool's broker fleet id; also the partition value in the superplane_fleet_id EC2 tag.
 	RunnerFleetID string
+	// RunnerRegistrationSecret is the broker AUTH_TOKEN / task_broker_auth_token HMAC secret
+	// used to mint single-use registration JWTs. Never placed on runner VMs.
+	RunnerRegistrationSecret string
 	// KeyName is an optional EC2 key pair name attached to runner VMs.
 	KeyName string
 	// RunnersIAMProfName is the IAM instance profile attached to runner VMs (lets them read S3, ship logs).
@@ -214,8 +217,8 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if len(l.Config.SubnetIDs) == 0 {
 		return nil, fmt.Errorf("no subnet ids configured")
 	}
-	if l.BrokerClient == nil {
-		return nil, fmt.Errorf("broker client required for runner registration")
+	if strings.TrimSpace(l.Config.RunnerRegistrationSecret) == "" {
+		return nil, fmt.Errorf("runner registration secret required")
 	}
 	requestedAt := time.Now().UTC()
 	ids := make([]string, 0, count)
@@ -229,12 +232,18 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	return ids, nil
 }
 
+const runnerRegistrationTTL = 10 * time.Minute
+
 func (l *Launcher) launchOne(ctx context.Context, requestedAt time.Time) (string, error) {
-	registration, err := l.BrokerClient.CreateRunnerRegistration(ctx, l.Config.RunnerFleetID)
+	registrationToken, err := runnerregistrationtoken.Mint(
+		l.Config.RunnerFleetID,
+		l.Config.RunnerRegistrationSecret,
+		requestedAt.Add(runnerRegistrationTTL),
+	)
 	if err != nil {
-		return "", fmt.Errorf("create runner registration: %w", err)
+		return "", fmt.Errorf("mint runner registration: %w", err)
 	}
-	userdata, err := userDataScript(l.Config, requestedAt.Unix(), registration.RegistrationToken)
+	userdata, err := userDataScript(l.Config, requestedAt.Unix(), registrationToken)
 	if err != nil {
 		return "", fmt.Errorf("user-data script: %w", err)
 	}
@@ -380,6 +389,7 @@ const (
 	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
 	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
 	envRunnerFleetID       = "EC2_PROVISION_RUNNER_FLEET_ID"
+	envRegistrationSecret  = "EC2_PROVISION_RUNNER_REGISTRATION_SECRET"
 	envKeyName             = "EC2_PROVISION_KEY_NAME"
 	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
 	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
@@ -539,6 +549,7 @@ func ConfigFromEnv() (Config, error) {
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
 		TaskBrokerURL:                   url,
+		RunnerRegistrationSecret:        strings.TrimSpace(os.Getenv(envRegistrationSecret)),
 		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName:              prof,
 		HotInstanceCount:                hot,

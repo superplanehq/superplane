@@ -107,17 +107,17 @@ func TestUserDataScriptIncludesLaunchRequestedAt(t *testing.T) {
 	}
 }
 
-func TestUserDataContainsOnlyOneTimeRunnerRegistrationToken(t *testing.T) {
+func TestUserDataContainsRunnerRegistrationTokenNotControlSecret(t *testing.T) {
 	script, err := userDataScript(Config{
 		RunnerS3URI:            "s3://bucket/runner",
 		RunnerInstallAWSRegion: "us-east-1",
 		TaskBrokerURL:          "http://broker:8081",
 		RunnerFleetID:          "fleet-a",
-	}, 1700000000, "one-time-registration")
+	}, 1700000000, "registration-jwt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="one-time-registration"`) {
+	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="registration-jwt"`) {
 		t.Fatal("user-data missing registration token")
 	}
 	if strings.Contains(script, "\nAUTH_TOKEN=") {
@@ -338,17 +338,18 @@ func TestLaunch_RetriesNextSubnetOnInsufficientCapacity(t *testing.T) {
 	l := &Launcher{
 		BrokerClient: &fakeBrokerClient{},
 		Config: Config{
-			AMI:                    "ami-test",
-			InstanceType:           "t3.micro",
-			SubnetIDs:              []string{"subnet-a", "subnet-b"},
-			SecurityGroupIDs:       []string{"sg-test"},
-			RunnerS3URI:            "s3://bucket/runner-linux-amd64",
-			RunnerInstallAWSRegion: "us-east-1",
-			TaskBrokerURL:          "http://broker:8081",
-			RunnerFleetID:          "fleet-a",
-			FleetID:                "fleet-a",
-			RunnersIAMProfName:     "profile",
-			VolumeSizeGB:           30,
+			AMI:                      "ami-test",
+			InstanceType:             "t3.micro",
+			SubnetIDs:                []string{"subnet-a", "subnet-b"},
+			SecurityGroupIDs:         []string{"sg-test"},
+			RunnerS3URI:              "s3://bucket/runner-linux-amd64",
+			RunnerInstallAWSRegion:   "us-east-1",
+			TaskBrokerURL:            "http://broker:8081",
+			RunnerFleetID:            "fleet-a",
+			FleetID:                  "fleet-a",
+			RunnersIAMProfName:       "profile",
+			VolumeSizeGB:             30,
+			RunnerRegistrationSecret: "control-secret",
 		},
 		pending: make(map[string]time.Time),
 		runInstancesHook: func(_ context.Context, in *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error) {

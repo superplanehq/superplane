@@ -12,7 +12,7 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-// RegisterRunner exchanges a one-time bootstrap token for a runner-scoped bearer.
+// RegisterRunner exchanges a single-use registration JWT for a runner-scoped bearer.
 func RegisterRunner(ctx context.Context, client *http.Client, baseURL, registrationToken, runnerID, fleetID string) (string, error) {
 	if client == nil {
 		client = http.DefaultClient

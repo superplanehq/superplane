@@ -10,34 +10,6 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-func TestCreateRunnerRegistration_OK(t *testing.T) {
-	var got api.CreateRunnerRegistrationRequest
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/runners/registrations" {
-			t.Errorf("path = %q", r.URL.Path)
-		}
-		if r.Header.Get("Authorization") != "Bearer control-token" {
-			t.Errorf("auth = %q", r.Header.Get("Authorization"))
-		}
-		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
-			t.Fatal(err)
-		}
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(api.CreateRunnerRegistrationResponse{
-			RegistrationToken: "registration-token", ExpiresAt: 123,
-		})
-	}))
-	defer ts.Close()
-
-	out, err := New(ts.URL, "control-token").CreateRunnerRegistration(context.Background(), "fleet-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.FleetID != "fleet-a" || out.RegistrationToken != "registration-token" {
-		t.Fatalf("request=%#v response=%#v", got, out)
-	}
-}
-
 func TestFleetTaskCounts_OK(t *testing.T) {
 	var gotPath, gotAuth string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2,13 +2,12 @@ package models
 
 import "time"
 
-// RunnerRegistration is a short-lived, single-use bootstrap credential.
-type RunnerRegistration struct {
-	TokenHash  string     `gorm:"primaryKey;size:64"`
-	FleetID    string     `gorm:"not null;index"`
-	ExpiresAt  time.Time  `gorm:"not null;index"`
-	ConsumedAt *time.Time `gorm:""`
-	CreatedAt  time.Time  `gorm:"not null"`
+// UsedRegistrationJTI records a registration JWT's jti after first successful use.
+// Presence of a row means the token has been consumed and must not register again.
+type UsedRegistrationJTI struct {
+	JTI        string    `gorm:"primaryKey;size:64"`
+	FleetID    string    `gorm:"not null;index"`
+	ConsumedAt time.Time `gorm:"not null"`
 }
 
 // RunnerCredential is the credential issued to one registered runner.

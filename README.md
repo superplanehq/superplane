@@ -194,7 +194,6 @@ Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, *
 | `RUNNER_FLEET_ID`      | **Required.** Fleet id registered on the broker (`POST /v1/fleets`)                                    |
 | `RUNNER_REGISTRATION_TOKEN` | One-time token exchanged at startup for a runner-scoped bearer. EC2 user-data sets this. |
 | `RUNNER_ACCESS_TOKEN`  | Optional pre-issued runner access token (local/testing only). |
-| `RUNNER_ACCESS_TOKEN_FILE` | Optional path used to persist the exchanged access token across process restarts. |
 | `RUNNER_TRANSPORT`     | Default **WebSocket** (`GET /v1/runners/stream`). Set **`http`**, **`polling`**, or **`legacy`** for **`POST /v1/tasks/claim`** / **`complete`**. |
 | `RUNNER_ID`            | Optional; defaults to host name or a random id (EC2 user-data sets instance id from IMDS)              |
 | `POLL_EMPTY_MS`        | Sleep when no work (default ~1000 ms)                                                                  |
@@ -207,9 +206,10 @@ Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, *
 ```bash
 export TASK_BROKER_URL=http://127.0.0.1:8081
 export RUNNER_FLEET_ID=local
-export RUNNER_REGISTRATION_TOKEN="$(curl -fsS -X POST http://127.0.0.1:8081/v1/runners/registrations \
-  -H 'Authorization: Bearer dev-local-token' -H 'Content-Type: application/json' \
-  -d '{"fleet_id":"local"}' | jq -r .registration_token)"
+# Single-use registration JWT (HMAC with broker AUTH_TOKEN). Fleet-manager mints these
+# locally when launching VMs; for a local runner:
+export RUNNER_REGISTRATION_TOKEN="$(go run ./scripts/mint-runner-registration \
+  -fleet local -secret dev-local-token)"
 ./bin/runner
 ```
 

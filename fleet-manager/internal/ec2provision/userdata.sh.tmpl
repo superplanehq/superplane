@@ -36,7 +36,6 @@ RUNNER_ID=${INSTANCE_ID}
 RUNNER_SHELL=/bin/bash
 RUNNER_HEALTH_ADDR=0.0.0.0:9090
 RUNNER_REGISTRATION_TOKEN={{shellQuote .RunnerRegistrationToken}}
-RUNNER_ACCESS_TOKEN_FILE=/var/lib/superplane-runner/access-token
 RUNNER_TERMINATE_AFTER_EACH_TASK={{.RunnerTerminateAfterEachTask}}
 RUNNER_CLOUDWATCH_LOG_GROUP={{shellQuote .RunnerCloudWatchLogGroup}}
 RUNNER_CLOUDWATCH_REGION={{shellQuote .RunnerInstallAWSRegion}}
@@ -47,7 +46,6 @@ RUNNER_LAUNCH_REQUESTED_AT={{.LaunchRequestedAt}}
 ENVEOF
 
 chmod 600 /etc/default/superplane-runner
-install -d -m 700 -o ubuntu -g ubuntu /var/lib/superplane-runner
 
 #########################################################
 # CloudWatch agent — apply config (agent is pre-installed in the AMI)

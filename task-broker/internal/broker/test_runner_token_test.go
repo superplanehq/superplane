@@ -18,25 +18,13 @@ func mintRunnerAccessToken(t *testing.T, ctx context.Context, st taskstore.Store
 	}); err != nil {
 		t.Fatal(err)
 	}
-	registration, err := opaquetoken.Generate()
-	if err != nil {
-		t.Fatal(err)
-	}
 	access, err := opaquetoken.Generate()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.CreateRunnerRegistration(ctx, &brokermodels.RunnerRegistration{
-		TokenHash: opaquetoken.Hash(registration),
-		FleetID:   fleetID,
-		ExpiresAt: now.Add(time.Minute),
-		CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.ExchangeRunnerRegistration(
+	if err := st.RegisterRunnerWithJTI(
 		ctx,
-		opaquetoken.Hash(registration),
+		"jti-"+runnerID,
 		runnerID,
 		fleetID,
 		opaquetoken.Hash(access),

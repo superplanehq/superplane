@@ -9,58 +9,9 @@ import (
 
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/opaquetoken"
-	brokermodels "github.com/superplane/runner/task-broker/internal/models"
+	"github.com/superplane/runner/shared/runnerregistrationtoken"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
 )
-
-const runnerRegistrationTTL = 10 * time.Minute
-
-func (s *Server) createRunnerRegistration(w http.ResponseWriter, r *http.Request) {
-	var req api.CreateRunnerRegistrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
-		return
-	}
-	fleetID := strings.TrimSpace(req.FleetID)
-	if fleetID == "" {
-		writeError(w, http.StatusBadRequest, "fleet_id required")
-		return
-	}
-	fleet, err := s.Store.GetFleet(r.Context(), fleetID)
-	if err != nil {
-		s.logErr("get fleet for runner registration", err)
-		writeError(w, http.StatusInternalServerError, "could not load fleet")
-		return
-	}
-	if fleet == nil {
-		writeError(w, http.StatusNotFound, "fleet not found")
-		return
-	}
-
-	token, err := opaquetoken.Generate()
-	if err != nil {
-		s.logErr("generate runner registration", err)
-		writeError(w, http.StatusInternalServerError, "could not create registration")
-		return
-	}
-	now := time.Now().UTC()
-	expiresAt := now.Add(runnerRegistrationTTL)
-	err = s.Store.CreateRunnerRegistration(r.Context(), &brokermodels.RunnerRegistration{
-		TokenHash: opaquetoken.Hash(token),
-		FleetID:   fleetID,
-		ExpiresAt: expiresAt,
-		CreatedAt: now,
-	})
-	if err != nil {
-		s.logErr("persist runner registration", err)
-		writeError(w, http.StatusInternalServerError, "could not create registration")
-		return
-	}
-	writeJSON(w, http.StatusCreated, api.CreateRunnerRegistrationResponse{
-		RegistrationToken: token,
-		ExpiresAt:         expiresAt.Unix(),
-	})
-}
 
 func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 	registrationToken := bearerToken(r)
@@ -79,15 +30,20 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "runner_id and fleet_id required")
 		return
 	}
+	claims, err := runnerregistrationtoken.Validate(registrationToken, fleetID, s.AuthToken)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid or expired registration token")
+		return
+	}
 	accessToken, err := opaquetoken.Generate()
 	if err != nil {
 		s.logErr("generate runner credential", err)
 		writeError(w, http.StatusInternalServerError, "could not register runner")
 		return
 	}
-	err = s.Store.ExchangeRunnerRegistration(
+	err = s.Store.RegisterRunnerWithJTI(
 		r.Context(),
-		opaquetoken.Hash(registrationToken),
+		claims.ID,
 		runnerID,
 		fleetID,
 		opaquetoken.Hash(accessToken),
@@ -98,7 +54,7 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.logErr("exchange runner registration", err)
+		s.logErr("register runner", err)
 		writeError(w, http.StatusInternalServerError, "could not register runner")
 		return
 	}

@@ -122,6 +122,9 @@ func TestLoad_RequiredGlobalsMissing(t *testing.T) {
 		{"task_broker_url", func(s string) string {
 			return strings.Replace(s, `"task_broker_url": "http://broker.internal:8081",`, `"task_broker_url": "",`, 1)
 		}, "task_broker_url"},
+		{"task_broker_auth_token", func(s string) string {
+			return strings.Replace(s, `"task_broker_auth_token": "broker-bearer-token",`, `"task_broker_auth_token": "",`, 1)
+		}, "task_broker_auth_token"},
 		{"subnet_id", func(s string) string {
 			return strings.Replace(s, `"subnet_id": "subnet-abc",`, `"subnet_id": "",`, 1)
 		}, "subnet_id or subnet_ids"},
@@ -258,6 +261,7 @@ func TestLoad_DefaultsApplied(t *testing.T) {
 	minimal := `{
 		"aws_region": "us-east-1",
 		"task_broker_url": "http://b:1",
+		"task_broker_auth_token": "secret",
 		"subnet_id": "subnet-x",
 		"security_group_ids": ["sg-x"],
 		"iam_instance_profile": "p",
@@ -336,6 +340,9 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	}
 	if cfg.RunnerFleetID != "e1-tiny-arm64" {
 		t.Errorf("RunnerFleetID = %q", cfg.RunnerFleetID)
+	}
+	if cfg.RunnerRegistrationSecret != "broker-bearer-token" {
+		t.Errorf("RunnerRegistrationSecret = %q", cfg.RunnerRegistrationSecret)
 	}
 	if cfg.HotInstanceCount != 2 {
 		t.Errorf("HotInstanceCount = %d", cfg.HotInstanceCount)

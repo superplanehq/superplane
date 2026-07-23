@@ -37,6 +37,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 		if auth == "" {
 			panic("broker: AuthToken is required — use mandatory AUTH_TOKEN from main")
 		}
+		s.AuthToken = auth
 
 		r.Route("/tasks/{id}/live-logs", func(r chi.Router) {
 			r.Use(liveLogsCORS(opt.LiveLogsCORSOrigins))
@@ -63,7 +64,6 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/tasks", s.listTasks)
 			r.Post("/tasks", s.createTask)
 			r.Post("/tasks/{id}/cancel", s.cancelTask)
-			r.Post("/runners/registrations", s.createRunnerRegistration)
 			r.Post("/runners/drain", s.drainRunners)
 		})
 	})
