@@ -133,9 +133,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, prepare, "node --version")
 
 	cloneScript := requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content
-	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo"), cloneScript)
-	assert.Contains(t, cloneScript, "git clone https://github.com/acme/widgets.git repo\n")
+	assert.Equal(t, "git clone https://github.com/acme/widgets.git repo\n", cloneScript)
 	assert.NotContains(t, cloneScript, "workdir")
+	assert.Contains(t, prepare, "set -euo pipefail\n")
 
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
@@ -146,6 +146,13 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "--continue")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
 	assert.NotContains(t, runScript, "workdir")
+}
+
+func TestBuildClaudeBashStepScriptIsRawUserCommand(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "git clone repo\n", buildClaudeBashStepScript("git clone repo"))
+	assert.Equal(t, "false\necho still\n", buildClaudeBashStepScript("false\necho still\n"))
 }
 
 func TestClaudeStepScriptName(t *testing.T) {

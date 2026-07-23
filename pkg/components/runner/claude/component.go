@@ -64,7 +64,7 @@ func (c *RunClaudeCode) Documentation() string {
 ## Steps
 Configure an ordered list of **bash** and **prompt** steps:
 
-- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **bash** — shell commands sourced on the runner (clone a repo, install deps, run tests, push). A failing command stops that step; later steps are skipped.
 - **prompt** — a Claude Code turn. Later prompts continue the same session.
 
 Example:
