@@ -14,7 +14,7 @@ describe("FreshOrgLanding", () => {
 
   it("renders factory-first landing with blank and browse escape hatches", async () => {
     const user = userEvent.setup();
-    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" />);
+    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" prototypeNewApp />);
 
     expect(await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/set up a software factory to automate coding work/i)).toBeInTheDocument();
@@ -29,7 +29,7 @@ describe("FreshOrgLanding", () => {
 
   it("opens inline Software Factory setup with connect, repo, and gated install", async () => {
     const user = userEvent.setup();
-    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" />);
+    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" prototypeNewApp />);
 
     await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 });
     await user.click(screen.getByRole("button", { name: /setup factory/i }));

@@ -256,7 +256,7 @@ describe("HomePage canvas folders", () => {
 
     renderHome();
 
-    await user.click(screen.getByRole("button", { name: /create a blank app/i }));
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
@@ -278,7 +278,7 @@ describe("HomePage canvas folders", () => {
     expect(screen.getByRole("heading", { name: "Apps" })).toBeInTheDocument();
     expect(screen.getByText("No apps yet")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create new app" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
   });
 
   it("blocks direct navigation to the new app page without create permission", () => {
@@ -289,7 +289,7 @@ describe("HomePage canvas folders", () => {
     renderHome(["/org-123/apps/new"]);
 
     expect(screen.getByRole("heading", { name: "404" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
   });
 
   it("does not install an app without create permission if the install action is invoked", async () => {
@@ -487,7 +487,7 @@ describe("HomePage canvas folders", () => {
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
     expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /create a blank app/i }));
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
@@ -519,7 +519,7 @@ describe("HomePage canvas folders", () => {
     renderHome();
     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
-    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
@@ -543,8 +543,7 @@ describe("HomePage canvas folders", () => {
     });
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click(await screen.findByRole("button", { name: /browse starter apps/i }));
-    await user.click((await screen.findAllByRole("button", { name: "Setup" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Install" }))[0]);
     await user.click(await screen.findByRole("button", { name: "Let me preview the app without connecting" }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
@@ -577,7 +576,7 @@ describe("HomePage canvas folders", () => {
     });
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
 
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to update canvases.");
@@ -593,8 +592,8 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
 
-    expect(await screen.findByRole("button", { name: /create a blank app/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /setup factory/i })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /start from scratch/i })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Install" })[0]).toBeDisabled();
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
   });
 

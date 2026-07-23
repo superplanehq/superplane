@@ -19,8 +19,11 @@ interface FreshOrgLandingProps {
 }
 
 /**
- * Factory-first new-app landing: Setup Factory primary CTA, with quiet escape
- * hatches for blank apps and the starter catalog (catalog hidden until Browse).
+ * Factory-first new-app landing prototype (Storybook only via
+ * `PrototypeNewAppPage`). Production `/apps/new` still uses `ZeroStatePage`.
+ *
+ * Setup Factory primary CTA, with quiet escape hatches for blank apps and the
+ * starter catalog (catalog hidden until Browse).
  */
 export function FreshOrgLanding({
   folder,

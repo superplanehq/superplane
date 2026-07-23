@@ -141,7 +141,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         },
       }),
     },
-    // Catalog install from starter app setup
+    // Catalog install from ZeroStatePage / prototype starter setup
     {
       pattern: re("/apps/install"),
       resolve: () => ({
