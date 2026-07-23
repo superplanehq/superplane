@@ -26,8 +26,9 @@ describe("HomePageHarness story smoke", () => {
   it("redirects a fresh org to the create / onboarding zero state", async () => {
     render(<HomePageHarness fixture={emptyHomePageFixture} />);
 
-    expect(await screen.findByRole("heading", { name: "Create New App" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start from scratch/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a blank app/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /setup factory/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Apps" })).not.toBeInTheDocument();
   });
 });
