@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
@@ -23,7 +23,8 @@ interface FreshOrgLandingProps {
  * `PrototypeNewAppPage`). Production `/apps/new` still uses `ZeroStatePage`.
  *
  * Setup Factory primary CTA, with quiet escape hatches for blank apps and the
- * starter catalog (catalog hidden until Browse).
+ * starter catalog (catalog hidden until Browse). Factory setup requires
+ * integrations, a repository, and a starting task before Run.
  */
 export function FreshOrgLanding({
   folder,
@@ -90,15 +91,11 @@ export function FreshOrgLanding({
         <FactorySetupPanel
           busy={busy}
           onCancel={() => setShowFactorySetup(false)}
-          onInstall={(selections, repository) => {
+          onInstall={(selections, repository, startingTaskPrompt) => {
             if (busy) return;
             void createApp("Software Factory", {
-              factorySetup: { repository, integrations: selections },
+              factorySetup: { repository, integrations: selections, startingTaskPrompt },
             });
-          }}
-          onPreviewWithoutConnecting={() => {
-            if (busy) return;
-            void createApp("Software Factory");
           }}
         />
       )}
@@ -108,52 +105,92 @@ export function FreshOrgLanding({
       )}
 
       {!inFocusedSetup && (
-        <p className="mt-8 text-sm font-normal text-gray-600 dark:text-gray-400">
-          <Button
-            type="button"
-            variant="link"
-            disabled={busy}
-            onClick={() => {
-              if (busy) return;
-              void createApp(generateCanvasName());
-            }}
-            className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
-          >
-            Create a blank app
-          </Button>
-          {" or "}
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => setShowCatalog((open) => !open)}
-            className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
-            aria-expanded={showCatalog}
-          >
-            {showCatalog ? "Hide starter apps" : "Browse starter apps"}
-          </Button>
-        </p>
+        <BlankOrBrowseLinks
+          busy={busy}
+          showCatalog={showCatalog}
+          onCreateBlank={() => {
+            if (busy) return;
+            void createApp(generateCanvasName());
+          }}
+          onToggleCatalog={() => setShowCatalog((open) => !open)}
+        />
       )}
 
       {!inFocusedSetup && showCatalog && (
-        <div className="mt-10 flex flex-col gap-3">
-          <p className="text-xs font-normal text-gray-600 dark:text-gray-400">
-            Automation starters (not Software Factory setup)
-          </p>
-          {visible.map((app) => (
-            <StarterAppListItem
-              key={app.repo}
-              app={app}
-              busy={busy}
-              onSetup={() => {
-                if (busy) return;
-                setShowFactorySetup(false);
-                setInstallingApp(app);
-              }}
-            />
-          ))}
-          {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
-        </div>
+        <StarterAppsCatalog
+          apps={visible}
+          busy={busy}
+          hasMore={visibleCount < APP_CATALOG.length}
+          sentinelRef={sentinelRef}
+          onSetup={(app) => {
+            if (busy) return;
+            setShowFactorySetup(false);
+            setInstallingApp(app);
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+function BlankOrBrowseLinks({
+  busy,
+  showCatalog,
+  onCreateBlank,
+  onToggleCatalog,
+}: {
+  busy: boolean;
+  showCatalog: boolean;
+  onCreateBlank: () => void;
+  onToggleCatalog: () => void;
+}) {
+  return (
+    <p className="mt-8 text-sm font-normal text-gray-600 dark:text-gray-400">
+      <Button
+        type="button"
+        variant="link"
+        disabled={busy}
+        onClick={onCreateBlank}
+        className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+      >
+        Create a blank app
+      </Button>
+      {" or "}
+      <Button
+        type="button"
+        variant="link"
+        onClick={onToggleCatalog}
+        className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+        aria-expanded={showCatalog}
+      >
+        {showCatalog ? "Hide starter apps" : "Browse starter apps"}
+      </Button>
+    </p>
+  );
+}
+
+function StarterAppsCatalog({
+  apps,
+  busy,
+  hasMore,
+  sentinelRef,
+  onSetup,
+}: {
+  apps: AppEntry[];
+  busy: boolean;
+  hasMore: boolean;
+  sentinelRef: RefObject<HTMLDivElement | null>;
+  onSetup: (app: AppEntry) => void;
+}) {
+  return (
+    <div className="mt-10 flex flex-col gap-3">
+      <p className="text-xs font-normal text-gray-600 dark:text-gray-400">
+        Automation starters (not Software Factory setup)
+      </p>
+      {apps.map((app) => (
+        <StarterAppListItem key={app.repo} app={app} busy={busy} onSetup={() => onSetup(app)} />
+      ))}
+      {hasMore && <div ref={sentinelRef} className="h-1" />}
     </div>
   );
 }

@@ -303,6 +303,40 @@ export function createHomeFixtureFetch(
   return impl as typeof fetch;
 }
 
+async function createStorybookOrgIntegration(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  orgIntegrations: StorybookOrgIntegration[],
+): Promise<FixtureResult> {
+  const body = await readRequestJson(input, init);
+  const integrationName =
+    typeof body?.integrationName === "string" && body.integrationName.trim() ? body.integrationName.trim() : "github";
+  const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : `${integrationName}-connection`;
+  const created: StorybookOrgIntegration = {
+    metadata: {
+      id: `storybook-${integrationName}-${orgIntegrations.length + 1}`,
+      name,
+      integrationName,
+    },
+    status: { state: "ready" },
+    spec: { configuration: {} },
+  };
+  orgIntegrations.push(created);
+  return { json: { integration: created } };
+}
+
+function matchOrgIntegrationDetail(
+  url: URL,
+  method: string,
+  orgIntegrations: StorybookOrgIntegration[],
+): FixtureResult {
+  const integrationDetailMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)$/.exec(url.pathname);
+  if (!integrationDetailMatch || method !== "GET") return null;
+  const integration = orgIntegrations.find((item) => item.metadata.id === integrationDetailMatch[2]);
+  if (!integration) return { json: {} };
+  return { json: { integration } };
+}
+
 /** Factory setup mocks for Storybook / vitest (connect + repository picker). */
 export async function matchFactorySetupFixture(
   url: URL,
@@ -316,39 +350,15 @@ export async function matchFactorySetupFixture(
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);
-  if (orgIntegrationsMatch) {
-    if (method === "GET") {
-      return { json: { integrations: orgIntegrations } };
-    }
-    if (method === "POST") {
-      const body = await readRequestJson(input, init);
-      const integrationName =
-        typeof body?.integrationName === "string" && body.integrationName.trim()
-          ? body.integrationName.trim()
-          : "github";
-      const name =
-        typeof body?.name === "string" && body.name.trim() ? body.name.trim() : `${integrationName}-connection`;
-      const created: StorybookOrgIntegration = {
-        metadata: {
-          id: `storybook-${integrationName}-${orgIntegrations.length + 1}`,
-          name,
-          integrationName,
-        },
-        status: { state: "ready" },
-        spec: { configuration: {} },
-      };
-      orgIntegrations.push(created);
-      return { json: { integration: created } };
-    }
+  if (orgIntegrationsMatch && method === "GET") {
+    return { json: { integrations: orgIntegrations } };
+  }
+  if (orgIntegrationsMatch && method === "POST") {
+    return createStorybookOrgIntegration(input, init, orgIntegrations);
   }
 
-  const integrationDetailMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)$/.exec(url.pathname);
-  if (integrationDetailMatch && method === "GET") {
-    const integrationId = integrationDetailMatch[2];
-    const integration = orgIntegrations.find((item) => item.metadata.id === integrationId);
-    if (!integration) return { json: {} };
-    return { json: { integration } };
-  }
+  const detailResolved = matchOrgIntegrationDetail(url, method, orgIntegrations);
+  if (detailResolved) return detailResolved;
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {

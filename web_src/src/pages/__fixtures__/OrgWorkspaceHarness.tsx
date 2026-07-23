@@ -62,22 +62,12 @@ export interface OrgWorkspaceHarnessProps {
   appFixture?: CanvasAppFixture;
 }
 
-/**
- * Shared Storybook shell for org home + app editor so the real React Router
- * links work: logo/Homepage → home, Software Factory card → live canvas.
- */
-export function OrgWorkspaceHarness({
-  startAt = "home",
-  pathSuffix = "",
-  appQuery = "",
-  openAgentSidebar = false,
-  prototypeNewApp = false,
-  homeFixture,
-  appFixture,
-}: OrgWorkspaceHarnessProps) {
-  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
-
+function useOrgWorkspaceFixtureFetch(
+  canvasId: string,
+  openAgentSidebar: boolean,
+  homeFixture?: HomePageFixture,
+  appFixture?: CanvasAppFixture,
+) {
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -100,6 +90,45 @@ export function OrgWorkspaceHarness({
     };
   }, [canvasId, fixtureFetch, openAgentSidebar]);
 
+  return fixtureFetch;
+}
+
+function OrgWorkspaceRoutes({ prototypeNewApp }: { prototypeNewApp: boolean }) {
+  return (
+    <Routes>
+      <Route
+        path=":organizationId"
+        element={
+          <PermissionsProvider>
+            <Outlet />
+          </PermissionsProvider>
+        }
+      >
+        <Route index element={<HomePage />} />
+        <Route path="apps/new" element={prototypeNewApp ? <PrototypeNewAppPage /> : <NewAppPage />} />
+        <Route path="apps/:appId" element={<AppPage />} />
+      </Route>
+    </Routes>
+  );
+}
+
+/**
+ * Shared Storybook shell for org home + app editor so the real React Router
+ * links work: logo/Homepage → home, Software Factory card → live canvas.
+ */
+export function OrgWorkspaceHarness({
+  startAt = "home",
+  pathSuffix = "",
+  appQuery = "",
+  openAgentSidebar = false,
+  prototypeNewApp = false,
+  homeFixture,
+  appFixture,
+}: OrgWorkspaceHarnessProps) {
+  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+  useOrgWorkspaceFixtureFetch(canvasId, openAgentSidebar, homeFixture, appFixture);
+
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
   const initialPath = startAt === "app" ? appPath : homePath;
@@ -113,20 +142,7 @@ export function OrgWorkspaceHarness({
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <Routes>
-                  <Route
-                    path=":organizationId"
-                    element={
-                      <PermissionsProvider>
-                        <Outlet />
-                      </PermissionsProvider>
-                    }
-                  >
-                    <Route index element={<HomePage />} />
-                    <Route path="apps/new" element={prototypeNewApp ? <PrototypeNewAppPage /> : <NewAppPage />} />
-                    <Route path="apps/:appId" element={<AppPage />} />
-                  </Route>
-                </Routes>
+                <OrgWorkspaceRoutes prototypeNewApp={prototypeNewApp} />
               </AccountProvider>
             </MemoryRouter>
           </div>

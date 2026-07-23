@@ -22,10 +22,15 @@ export interface CreateAppOptions {
   factorySetup?: {
     repository: string;
     integrations: IntegrationSelections;
+    startingTaskPrompt: string;
   };
 }
 
-function buildFactoryBootMessage(repository: string, integrations: IntegrationSelections): string {
+function buildFactoryBootMessage(
+  repository: string,
+  integrations: IntegrationSelections,
+  startingTaskPrompt: string,
+): string {
   const github = integrations.github;
   const claude = integrations.claude;
   const parts = [
@@ -33,8 +38,28 @@ function buildFactoryBootMessage(repository: string, integrations: IntegrationSe
     github ? `Use the existing GitHub integration "${github.name}" (id: ${github.id}).` : null,
     claude ? `Use the existing Claude integration "${claude.name}" (id: ${claude.id}).` : null,
     "Automate delivery from trigger to pull request.",
+    `Starting task: ${startingTaskPrompt}`,
   ];
   return parts.filter((part): part is string => Boolean(part)).join(" ");
+}
+
+function applyCreatedAppBootContext(canvasId: string, options?: CreateAppOptions) {
+  writeCanvasAgentSidebarOpen(canvasId, true);
+  writeCanvasRunsSidebarOpen(canvasId, false);
+  localStorage.setItem("canvasSidebarOpen", "false");
+  if (!options?.factorySetup) {
+    setAgentBootContext(canvasId, "blank");
+    sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+    return;
+  }
+  setAgentBootContext(
+    canvasId,
+    buildFactoryBootMessage(
+      options.factorySetup.repository,
+      options.factorySetup.integrations,
+      options.factorySetup.startingTaskPrompt,
+    ),
+  );
 }
 
 export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
@@ -68,31 +93,19 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
         });
 
         const canvasId = result?.data?.canvas?.metadata?.id;
-        if (canvasId) {
-          if (folder) {
-            try {
-              await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
-            } catch (error) {
-              showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-            }
-          }
+        if (!canvasId) return;
 
-          onCreated?.();
-          // A new app always starts with the agent panel open (stored per canvas).
-          writeCanvasAgentSidebarOpen(canvasId, true);
-          writeCanvasRunsSidebarOpen(canvasId, false);
-          localStorage.setItem("canvasSidebarOpen", "false");
-          if (options?.factorySetup) {
-            setAgentBootContext(
-              canvasId,
-              buildFactoryBootMessage(options.factorySetup.repository, options.factorySetup.integrations),
-            );
-          } else {
-            setAgentBootContext(canvasId, "blank");
-            sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+        if (folder) {
+          try {
+            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
+          } catch (error) {
+            showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
           }
-          navigate(appPath(organizationId, canvasId, "?edit=1"));
         }
+
+        onCreated?.();
+        applyCreatedAppBootContext(canvasId, options);
+        navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
         throw error;

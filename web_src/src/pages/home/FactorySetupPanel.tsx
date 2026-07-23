@@ -1,11 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { cn } from "@/lib/utils";
 import { useCallback, useMemo, useState } from "react";
 
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
+import { FACTORY_STARTING_TASKS, type FactoryStartingTaskId } from "./factoryStartingTasks";
 import { homeInstallPanelClassName } from "./homePageStyles";
 
 const FACTORY_INTEGRATIONS = ["github", "claude"] as const;
@@ -14,8 +17,7 @@ interface FactorySetupPanelProps {
   organizationId?: string;
   busy?: boolean;
   onCancel: () => void;
-  onInstall: (selections: IntegrationSelections, repository: string) => void;
-  onPreviewWithoutConnecting: () => void;
+  onInstall: (selections: IntegrationSelections, repository: string, startingTaskPrompt: string) => void;
 }
 
 export function FactorySetupPanel({
@@ -23,16 +25,17 @@ export function FactorySetupPanel({
   busy = false,
   onCancel,
   onInstall,
-  onPreviewWithoutConnecting,
 }: FactorySetupPanelProps) {
   const routeOrgId = useOrganizationId();
   const organizationId = propOrgId || routeOrgId || "";
   const [selections, setSelections] = useState<IntegrationSelections>({});
   const [repository, setRepository] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState<FactoryStartingTaskId | null>(null);
 
   const githubConnected = Boolean(selections.github);
   const allConnected = FACTORY_INTEGRATIONS.every((name) => selections[name]);
-  const canInstall = !busy && allConnected && repository.trim() !== "";
+  const selectedTask = FACTORY_STARTING_TASKS.find((task) => task.id === selectedTaskId) ?? null;
+  const canRun = !busy && allConnected && repository.trim() !== "" && selectedTask !== null;
 
   const handleSelectionsChange = useCallback((next: IntegrationSelections) => {
     setSelections((prev) => {
@@ -79,25 +82,89 @@ export function FactorySetupPanel({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center pt-4">
-        <div className="flex items-center gap-2.5">
-          <Button type="button" disabled={!canInstall} onClick={() => onInstall(selections, repository.trim())}>
-            Install
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
-            Cancel
-          </Button>
-        </div>
+      <StartingTaskSection
+        busy={busy}
+        selectedTaskId={selectedTaskId}
+        onSelectTask={setSelectedTaskId}
+        prompt={selectedTask?.prompt ?? null}
+      />
+
+      <div className="flex flex-wrap items-center gap-2.5 pt-4">
         <Button
           type="button"
-          variant="link"
-          disabled={busy}
-          onClick={onPreviewWithoutConnecting}
-          className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+          disabled={!canRun}
+          onClick={() => {
+            if (!selectedTask) return;
+            onInstall(selections, repository.trim(), selectedTask.prompt);
+          }}
         >
-          Take me to the app without connecting
+          Run
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
+          Cancel
         </Button>
       </div>
+    </div>
+  );
+}
+
+function StartingTaskSection({
+  busy,
+  selectedTaskId,
+  onSelectTask,
+  prompt,
+}: {
+  busy: boolean;
+  selectedTaskId: FactoryStartingTaskId | null;
+  onSelectTask: (id: FactoryStartingTaskId) => void;
+  prompt: string | null;
+}) {
+  return (
+    <div className="mb-5">
+      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Choose starting task</p>
+      <div className="flex flex-wrap gap-2">
+        {FACTORY_STARTING_TASKS.map((task) => {
+          const Icon = task.icon;
+          const selected = task.id === selectedTaskId;
+          return (
+            <Button
+              key={task.id}
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={selected}
+              disabled={busy}
+              onClick={() => onSelectTask(task.id)}
+              className={cn(
+                "h-auto rounded-md px-3 py-2 text-xs font-normal",
+                selected &&
+                  "border-primary/50 bg-primary/5 text-slate-900 dark:border-primary/40 dark:bg-primary/10 dark:text-gray-100",
+              )}
+            >
+              <Icon className={cn("size-3.5 shrink-0", task.iconClassName)} />
+              {task.label}
+            </Button>
+          );
+        })}
+      </div>
+
+      {prompt && (
+        <div className="mt-4">
+          <Label
+            htmlFor="factory-starting-task-prompt"
+            className="mb-2 block text-xs font-semibold text-slate-700 dark:text-gray-300"
+          >
+            Prompt
+          </Label>
+          <Textarea
+            id="factory-starting-task-prompt"
+            readOnly
+            value={prompt}
+            rows={5}
+            className="min-h-28 resize-none text-xs leading-relaxed text-slate-700 dark:text-gray-300"
+          />
+        </div>
+      )}
     </div>
   );
 }

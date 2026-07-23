@@ -47,13 +47,16 @@ export function createOrgWorkspaceFixtureFetch(
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = requestMethod(input, init);
     const body = parseRequestBody(init);
-    const factoryResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
-    // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
-    const resolved =
-      factoryResolved ??
-      matchHomePageFixture(url, method, homeFixture) ??
-      matchCanvasAppFixture(url, appFixture, method, body) ??
-      emptyOrgWorkspaceCatchAll(url);
+    const resolved = await resolveOrgWorkspaceFixture({
+      url,
+      method,
+      input,
+      init,
+      body,
+      homeFixture,
+      appFixture,
+      orgIntegrations,
+    });
     if (!resolved) {
       return fallback(input, init);
     }
@@ -69,4 +72,27 @@ function parseRequestBody(init?: RequestInit): unknown {
   } catch {
     return undefined;
   }
+}
+
+async function resolveOrgWorkspaceFixture(args: {
+  url: URL;
+  method: string;
+  input: RequestInfo | URL;
+  init?: RequestInit;
+  body: unknown;
+  homeFixture: HomePageFixture;
+  appFixture?: CanvasAppFixture;
+  orgIntegrations: StorybookOrgIntegration[];
+}) {
+  const { url, method, input, init, body, homeFixture, appFixture, orgIntegrations } = args;
+  // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
+  const homeResolved = matchHomePageFixture(url, method, homeFixture);
+  const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
+  const factoryResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
+  // AppPageHarness always supplies `appFixture`, so canvas integrations win there.
+  // HomePageHarness omits it, so factory GitHub/Claude stubs stay available for setup.
+  if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture !== undefined) {
+    return canvasResolved ?? factoryResolved ?? homeResolved ?? emptyOrgWorkspaceCatchAll(url);
+  }
+  return factoryResolved ?? homeResolved ?? canvasResolved ?? emptyOrgWorkspaceCatchAll(url);
 }

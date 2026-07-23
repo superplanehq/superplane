@@ -27,7 +27,7 @@ describe("FreshOrgLanding", () => {
     expect(screen.getByText(/automation starters \(not software factory setup\)/i)).toBeInTheDocument();
   });
 
-  it("opens inline Software Factory setup with connect, repo, and gated install", async () => {
+  it("opens inline Software Factory setup with connect, repo, starting task, and gated run", async () => {
     const user = userEvent.setup();
     render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" prototypeNewApp />);
 
@@ -44,13 +44,25 @@ describe("FreshOrgLanding", () => {
     expect(within(panel).getByText("GitHub")).toBeInTheDocument();
     expect(within(panel).getByText("Claude")).toBeInTheDocument();
     expect(within(panel).queryByText("Choose repository")).not.toBeInTheDocument();
-
-    const installButton = within(panel).getByRole("button", { name: /^Install$/i });
-    expect(installButton).toBeDisabled();
-    expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
+    expect(within(panel).getByText("Choose starting task")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /^write test$/i })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /^fix bug$/i })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /^improve agents\.md$/i })).toBeInTheDocument();
+    expect(within(panel).queryByLabelText(/^Prompt$/i)).not.toBeInTheDocument();
     expect(
-      within(panel).getByRole("button", { name: /take me to the app without connecting/i }),
-    ).toBeInTheDocument();
+      within(panel).queryByRole("button", { name: /take me to the app without connecting/i }),
+    ).not.toBeInTheDocument();
+
+    const runButton = within(panel).getByRole("button", { name: /^Run$/i });
+    expect(runButton).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
+    const promptField = within(panel).getByLabelText(/^Prompt$/i);
+    expect(promptField).toHaveAttribute("readonly");
+    expect(promptField).toHaveValue(
+      "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
+    );
 
     const githubRow = within(panel).getByText("GitHub").closest("div");
     expect(githubRow).toBeTruthy();
@@ -68,7 +80,7 @@ describe("FreshOrgLanding", () => {
 
     expect(await within(panel).findByText("Connected")).toBeInTheDocument();
     expect(await within(panel).findByText("Choose repository")).toBeInTheDocument();
-    expect(installButton).toBeDisabled();
+    expect(runButton).toBeDisabled();
 
     const claudeRow = within(panel).getByText("Claude").closest("div");
     expect(claudeRow).toBeTruthy();
