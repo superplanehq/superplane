@@ -67,12 +67,7 @@ export function CommitStagingDialog({ open, pending, onOpenChange, onCommit }: C
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            data-testid="canvas-commit-message-submit"
-          >
+          <Button type="button" onClick={submit} disabled={!canSubmit} data-testid="canvas-commit-message-submit">
             Commit
           </Button>
         </DialogFooter>

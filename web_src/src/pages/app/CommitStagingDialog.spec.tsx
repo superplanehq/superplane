@@ -11,9 +11,7 @@ describe("CommitStagingDialog", () => {
   const renderDialog = (props?: Partial<React.ComponentProps<typeof CommitStagingDialog>>) => {
     const onCommit = vi.fn();
     const onOpenChange = vi.fn();
-    render(
-      <CommitStagingDialog open onOpenChange={onOpenChange} onCommit={onCommit} {...props} />,
-    );
+    render(<CommitStagingDialog open onOpenChange={onOpenChange} onCommit={onCommit} {...props} />);
     return { onCommit, onOpenChange };
   };
 
