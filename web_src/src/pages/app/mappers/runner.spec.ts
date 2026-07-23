@@ -213,7 +213,7 @@ describe("runnerMapper.getExecutionDetails", () => {
     expect(runnerMapper.getExecutionDetails(ctx)).toEqual({
       "Execution mode": "Host",
       "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
-      task_id: "52fa5506-844c-4e46-b1c7-52162b8ac1f7",
+      "Task ID": "52fa5506-844c-4e46-b1c7-52162b8ac1f7",
       Status: "failed",
       "Exit code": "1",
     });
