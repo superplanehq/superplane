@@ -202,7 +202,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 		scriptName := stepSlug + ".sh"
 		return runner.BrokerTaskFile{
 			Path:    "steps/" + scriptName,
-			Content: buildClaudeBashStepScript(command),
+			Content: command,
 			Mode:    "0644",
 		}, claudeBashStepBrokerCommand(step.Name, scriptName)
 	default:
@@ -220,8 +220,6 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 }
 
 func claudePrepareScript(workdir string) string {
-	// Safe with set -e: the host runner wraps sourced command_list scripts so
-	// errexit cannot kill the shared PTY before the end marker.
 	var prepare strings.Builder
 	prepare.WriteString("set -euo pipefail\n")
 	prepare.WriteString(": \"${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}\"\n")
@@ -242,12 +240,6 @@ func claudePrepareScript(workdir string) string {
 	prepare.WriteString("echo \"node=$(node --version 2>/dev/null)\"\n")
 	prepare.WriteString("echo \"cwd=$(pwd -P)\"\n")
 	return prepare.String()
-}
-
-func buildClaudeBashStepScript(command string) string {
-	// Ship the user command unchanged. Fail-fast and PTY end-marker safety are
-	// owned by the host runner's sourced-script wrap, not by this component.
-	return strings.TrimRight(command, "\n") + "\n"
 }
 
 func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
@@ -281,10 +273,6 @@ func claudeStepSlug(stepNumber int, name string) string {
 		slug = "step"
 	}
 	return fmt.Sprintf("%02d-%s", stepNumber, slug)
-}
-
-func claudeStepScriptName(stepNumber int, name string) string {
-	return claudeStepSlug(stepNumber, name) + ".sh"
 }
 
 func slugifyClaudeStepName(name string) string {
