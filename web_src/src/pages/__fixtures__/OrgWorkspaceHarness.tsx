@@ -11,7 +11,6 @@ import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/ha
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
-import { PrototypeNewAppPage } from "@/pages/home/__fixtures__/PrototypeNewAppPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
@@ -53,11 +52,6 @@ export interface OrgWorkspaceHarnessProps {
    * Always written (true/false) so story switches do not leak open state.
    */
   openAgentSidebar?: boolean;
-  /**
-   * Storybook-only: mount the factory-first `FreshOrgLanding` prototype at
-   * `/apps/new` instead of production `NewAppPage` (`ZeroStatePage`).
-   */
-  prototypeNewApp?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
 }
@@ -93,7 +87,7 @@ function useOrgWorkspaceFixtureFetch(
   return fixtureFetch;
 }
 
-function OrgWorkspaceRoutes({ prototypeNewApp }: { prototypeNewApp: boolean }) {
+function OrgWorkspaceRoutes() {
   return (
     <Routes>
       <Route
@@ -105,8 +99,12 @@ function OrgWorkspaceRoutes({ prototypeNewApp }: { prototypeNewApp: boolean }) {
         }
       >
         <Route index element={<HomePage />} />
-        <Route path="apps/new" element={prototypeNewApp ? <PrototypeNewAppPage /> : <NewAppPage />} />
+        <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={<AppPage />} />
+        <Route
+          path="settings/integrations/:integrationName/setup"
+          element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
+        />
       </Route>
     </Routes>
   );
@@ -121,7 +119,6 @@ export function OrgWorkspaceHarness({
   pathSuffix = "",
   appQuery = "",
   openAgentSidebar = false,
-  prototypeNewApp = false,
   homeFixture,
   appFixture,
 }: OrgWorkspaceHarnessProps) {
@@ -142,7 +139,7 @@ export function OrgWorkspaceHarness({
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <OrgWorkspaceRoutes prototypeNewApp={prototypeNewApp} />
+                <OrgWorkspaceRoutes />
               </AccountProvider>
             </MemoryRouter>
           </div>
