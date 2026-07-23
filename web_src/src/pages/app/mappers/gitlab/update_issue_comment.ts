@@ -63,7 +63,10 @@ export const updateIssueCommentMapper: ComponentBaseMapper = {
       details["Comment ID"] = String(note.id);
     }
 
-    details["Updated By"] = note.author?.username || "-";
+    // GitLab's note `author` is the comment's original author and is unchanged
+    // by an edit (a maintainer can edit someone else's note), so this is
+    // labelled "Author", not "Updated By".
+    details["Author"] = note.author?.username || "-";
 
     return details;
   },

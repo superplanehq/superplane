@@ -30,7 +30,7 @@ describe("updateIssueCommentMapper", () => {
     expect(details).toEqual({
       "Updated At": expect.any(String),
       "Comment ID": "302",
-      "Updated By": "root",
+      Author: "root",
     });
   });
 
