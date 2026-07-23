@@ -109,6 +109,11 @@ type TypeOptions struct {
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
 	App              *AppTypeOptions              `json:"app,omitempty"`
 	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
+	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
+}
+
+type IntegrationTypeOptions struct {
+	Integration string `json:"integration"`
 }
 
 type AppTypeOptions struct {

@@ -105,11 +105,58 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "anthropicApiKey",
-			Label:       "Anthropic API Key",
-			Type:        configuration.FieldTypeSecretKey,
+			Name:        "credentials",
+			Label:       "Credentials",
+			Type:        configuration.FieldTypeObject,
 			Required:    true,
-			Description: "SuperPlane secret holding an Anthropic API key. Exposed to the runner as ANTHROPIC_API_KEY.",
+			Description: "Anthropic API key or Claude integration to use.",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:     "source",
+							Label:    "Source",
+							Type:     configuration.FieldTypeSelect,
+							Required: true,
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Secret", Value: "secret"},
+										{Label: "Integration", Value: "integration"},
+									},
+								},
+							},
+						},
+						{
+							Name:  "secret",
+							Label: "Anthropic API Key",
+							Type:  configuration.FieldTypeSecretKey,
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "source", Values: []string{"secret"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "source", Values: []string{"secret"}},
+							},
+						},
+						{
+							Name:  "integration",
+							Label: "Integration",
+							Type:  configuration.FieldTypeIntegration,
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "source", Values: []string{"integration"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "source", Values: []string{"integration"}},
+							},
+							TypeOptions: &configuration.TypeOptions{
+								Integration: &configuration.IntegrationTypeOptions{
+									Integration: "claude",
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "model",
@@ -311,17 +358,10 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if ctx.Secrets == nil {
-		return fmt.Errorf("resolve anthropic API key: secrets context is unavailable")
-	}
-	apiKey, err := ctx.Secrets.GetKey(spec.AnthropicAPIKey.Secret, spec.AnthropicAPIKey.Key)
+	environment, err = c.injectCredentials(ctx, environment, spec.Credentials)
 	if err != nil {
-		return fmt.Errorf("resolve anthropic API key: %w", err)
+		return err
 	}
-	environment = append(environment, runner.BrokerEnvironmentVariable{
-		Name:  envAnthropicAPIKey,
-		Value: string(apiKey),
-	})
 
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
@@ -351,6 +391,36 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
+}
+
+func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials ClaudeCodeCredentials) ([]runner.BrokerEnvironmentVariable, error) {
+	switch credentials.Source {
+	case "secret":
+		apiKey, err := ctx.Secrets.GetKey(credentials.Secret.Secret, credentials.Secret.Key)
+		if err != nil {
+			return nil, fmt.Errorf("resolve anthropic API key: %w", err)
+		}
+
+		return append(environment, runner.BrokerEnvironmentVariable{
+			Name:  envAnthropicAPIKey,
+			Value: string(apiKey),
+		}), nil
+
+	case "integration":
+		keys, err := ctx.Secrets.GetIntegrationKeys(credentials.Integration.Name)
+		if err != nil {
+			return nil, fmt.Errorf("resolve integration: %w", err)
+		}
+		for name, value := range keys {
+			environment = append(environment, runner.BrokerEnvironmentVariable{
+				Name:  name,
+				Value: string(value),
+			})
+		}
+		return environment, nil
+	default:
+		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
+	}
 }
 
 func (c *RunClaudeCode) Hooks() []core.Hook {

@@ -30,7 +30,7 @@ type ClaudeCodeStep struct {
 type RunClaudeCodeSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
 	Steps                   []ClaudeCodeStep              `mapstructure:"steps"`
-	AnthropicAPIKey         configuration.SecretKeyRef    `mapstructure:"anthropicApiKey"`
+	Credentials             ClaudeCodeCredentials         `mapstructure:"credentials"`
 	Model                   string                        `mapstructure:"model"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
@@ -43,6 +43,12 @@ type RunClaudeCodeSpec struct {
 	SetupCommands       string `mapstructure:"setup_commands"`
 	EnableAfterCommands bool   `mapstructure:"enable_after_commands"`
 	AfterCommands       string `mapstructure:"after_commands"`
+}
+
+type ClaudeCodeCredentials struct {
+	Source      string                       `mapstructure:"source"`
+	Secret      configuration.SecretKeyRef   `mapstructure:"secret"`
+	Integration configuration.IntegrationRef `mapstructure:"integration"`
 }
 
 // ClaudeCodeBrokerTask is the ordered broker commands and task files for a run.
@@ -111,8 +117,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if err := validateClaudeCodeSteps(spec.Steps); err != nil {
 		return err
 	}
-	if !spec.AnthropicAPIKey.IsSet() {
-		return fmt.Errorf("anthropic API key is required")
+	if !spec.Credentials.Secret.IsSet() && !spec.Credentials.Integration.IsSet() {
+		return fmt.Errorf("one of anthropic API key or claude integration is required")
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
 		return err
