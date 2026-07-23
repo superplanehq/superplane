@@ -49,7 +49,7 @@ describe("FreshOrgLanding", () => {
     expect(installButton).toBeDisabled();
     expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
     expect(
-      within(panel).getByRole("button", { name: /let me preview the app without connecting/i }),
+      within(panel).getByRole("button", { name: /take me to the app without connecting/i }),
     ).toBeInTheDocument();
 
     const githubRow = within(panel).getByText("GitHub").closest("div");

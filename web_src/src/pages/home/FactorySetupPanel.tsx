@@ -178,7 +178,7 @@ export function FactorySetupPanel({
           onClick={onPreviewWithoutConnecting}
           className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
         >
-          Let me preview the app without connecting
+          Take me to the app without connecting
         </Button>
       </div>
 
