@@ -1045,6 +1045,124 @@ func TestHTTP__HandleHook__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
 	assert.Equal(t, "success on retry", response["body"].(map[string]any)["result"])
 }
 
+// exhaustRetries drives the initial Execute plus one HandleHook per remaining
+// attempt so the retry budget is fully consumed. With maxAttempts=3 the initial
+// request counts as attempt 1, leaving two scheduled retries before the final,
+// terminal attempt.
+func exhaustRetries(t *testing.T, h *HTTP, execCtx core.ExecutionContext, httpCtx core.HTTPContext) *contexts.ExecutionStateContext {
+	t.Helper()
+
+	stateCtx, ok := execCtx.ExecutionState.(*contexts.ExecutionStateContext)
+	require.True(t, ok)
+
+	require.NoError(t, h.Execute(execCtx))
+
+	for attempt := 0; attempt < 3 && !stateCtx.Finished; attempt++ {
+		actionCtx := core.ActionHookContext{
+			Logger:         log.NewEntry(log.StandardLogger()),
+			Name:           "retryRequest",
+			Configuration:  execCtx.Configuration,
+			ExecutionState: stateCtx,
+			Metadata:       execCtx.Metadata,
+			Requests:       &contexts.RequestContext{},
+			HTTP:           httpCtx,
+		}
+
+		require.NoError(t, h.HandleHook(actionCtx))
+	}
+
+	return stateCtx
+}
+
+// A retried request that keeps failing at the transport level (timeout,
+// connection refused, ...) exhausts its attempts with a nil response. The
+// terminal failure handling must emit a failure event instead of panicking on
+// the nil response. Regression test for the inverted retry-exhaustion branch.
+func TestHTTP__HandleHook__RetryRequest_ExhaustedNetworkErrorEmitsFailure(t *testing.T) {
+	h := &HTTP{}
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	httpCtx := &sequenceHTTPClient{
+		errors: []error{
+			errors.New("dial tcp: connection refused"),
+			errors.New("dial tcp: connection refused"),
+			errors.New("dial tcp: connection refused"),
+			errors.New("dial tcp: connection refused"),
+		},
+	}
+
+	execCtx := core.ExecutionContext{
+		Logger:         log.NewEntry(log.StandardLogger()),
+		Configuration:  retryConfig("https://api.example.com"),
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
+	}
+
+	require.NotPanics(t, func() {
+		exhaustRetries(t, h, execCtx, httpCtx)
+	})
+
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "http.request.failure", stateCtx.Type)
+
+	payload := responsePayload(t, stateCtx)
+	assert.Contains(t, payload["error"], "connection refused")
+	assert.NotContains(t, payload, "status")
+
+	metadata := decodeMetadata(t, metadataCtx)
+	require.NotNil(t, metadata.Retry)
+	assert.Nil(t, metadata.Retry.NextRetryAt)
+	assert.Contains(t, metadata.Retry.LastError, "connection refused")
+}
+
+// A retried request that keeps returning an unsuccessful status exhausts its
+// attempts with a non-nil response and must report the last response body and
+// status on the terminal failure.
+func TestHTTP__HandleHook__RetryRequest_ExhaustedUnsuccessfulStatusEmitsFailure(t *testing.T) {
+	h := &HTTP{}
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	response := func() *http.Response {
+		return newResponse(http.StatusInternalServerError, `{"error":"boom"}`, http.Header{
+			"Content-Type": []string{"application/json"},
+		})
+	}
+
+	httpCtx := &sequenceHTTPClient{
+		responses: []*http.Response{response(), response(), response(), response()},
+	}
+
+	execCtx := core.ExecutionContext{
+		Logger:         log.NewEntry(log.StandardLogger()),
+		Configuration:  retryConfig("https://api.example.com"),
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
+	}
+
+	exhaustRetries(t, h, execCtx, httpCtx)
+
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "http.request.failure", stateCtx.Type)
+
+	payload := responsePayload(t, stateCtx)
+	assert.Equal(t, http.StatusInternalServerError, payload["status"])
+	assert.Equal(t, "boom", payload["body"].(map[string]any)["error"])
+
+	metadata := decodeMetadata(t, metadataCtx)
+	require.NotNil(t, metadata.Retry)
+	assert.Nil(t, metadata.Retry.NextRetryAt)
+	require.NotNil(t, metadata.Retry.LastStatus)
+	assert.Equal(t, http.StatusInternalServerError, *metadata.Retry.LastStatus)
+}
+
 func TestHTTP__CalculateNextRetryDelay(t *testing.T) {
 	h := &HTTP{}
 
