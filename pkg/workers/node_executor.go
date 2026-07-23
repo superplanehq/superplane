@@ -375,7 +375,7 @@ func (w *NodeExecutor) executeActionNode(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
 		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),

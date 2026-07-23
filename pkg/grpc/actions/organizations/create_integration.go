@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -55,7 +55,7 @@ func CreateIntegrationWithUsage(
 	//
 	// Check if an integration with this name already exists in the organization
 	//
-	_, err = models.FindIntegrationByName(org, name)
+	_, err = models.FindIntegrationByName(database.Conn(), org, name)
 	if err == nil {
 		return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
 	}

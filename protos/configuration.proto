@@ -35,6 +35,11 @@ message TypeOptions {
   optional TextTypeOptions text = 13;
   optional AppCanvasNodeTypeOptions app_canvas_node = 14;
   optional AppTypeOptions app = 15;
+  optional IntegrationTypeOptions integration = 16;
+}
+
+message IntegrationTypeOptions {
+  string integration = 1;
 }
 
 message AppTypeOptions {
