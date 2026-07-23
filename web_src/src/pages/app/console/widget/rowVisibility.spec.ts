@@ -8,7 +8,7 @@ describe("evaluateRowShow", () => {
     expect(evaluateRowShow('{{ status == "failed" }}', { status: "passed" })).toBe(false);
   });
 
-  it("evaluates simple legacy `field == \"value\"` expressions", () => {
+  it('evaluates simple legacy `field == "value"` expressions', () => {
     expect(evaluateRowShow('status == "failed"', { status: "failed" })).toBe(true);
     expect(evaluateRowShow('status == "failed"', { status: "passed" })).toBe(false);
   });
