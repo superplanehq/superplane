@@ -251,7 +251,7 @@ export function IntegrationCreateDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto border-0 dark:border dark:border-gray-700/70"
         showCloseButton={!isCreatePending && !updateIntegrationMutation.isPending}
       >
         <DialogHeader>

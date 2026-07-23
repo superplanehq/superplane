@@ -135,10 +135,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, prepare, "claude --version")
 	assert.Contains(t, prepare, "node --version")
 
-	cloneScript := requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content
-	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git repo"), cloneScript)
-	assert.Contains(t, cloneScript, "git clone https://github.com/acme/widgets.git repo\n")
-	assert.NotContains(t, cloneScript, "workdir")
+	assert.Equal(t, "git clone https://github.com/acme/widgets.git repo", requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content)
 
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
@@ -151,12 +148,12 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.NotContains(t, runScript, "workdir")
 }
 
-func TestClaudeStepScriptName(t *testing.T) {
+func TestClaudeStepSlug(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "01-clone-repo.sh", claudeStepScriptName(1, "Clone repo"))
-	assert.Equal(t, "02-step.sh", claudeStepScriptName(2, "!!!"))
-	assert.Equal(t, "03-step.sh", claudeStepScriptName(3, "   "))
+	assert.Equal(t, "01-clone-repo", claudeStepSlug(1, "Clone repo"))
+	assert.Equal(t, "02-step", claudeStepSlug(2, "!!!"))
+	assert.Equal(t, "03-step", claudeStepSlug(3, "   "))
 }
 
 func TestShellSingleQuote(t *testing.T) {

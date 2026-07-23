@@ -229,7 +229,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 		scriptName := stepSlug + ".sh"
 		return runner.BrokerTaskFile{
 			Path:    "steps/" + scriptName,
-			Content: buildClaudeBashStepScript(command),
+			Content: command,
 			Mode:    "0644",
 		}, claudeBashStepBrokerCommand(step.Name, scriptName)
 	default:
@@ -269,14 +269,6 @@ func claudePrepareScript(workdir string) string {
 	return prepare.String()
 }
 
-func buildClaudeBashStepScript(command string) string {
-	var b strings.Builder
-	b.WriteString("set -euo pipefail\n")
-	b.WriteString(strings.TrimRight(command, "\n"))
-	b.WriteString("\n")
-	return b.String()
-}
-
 func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name:    claudeStepLabel(stepName, scriptName),
@@ -308,10 +300,6 @@ func claudeStepSlug(stepNumber int, name string) string {
 		slug = "step"
 	}
 	return fmt.Sprintf("%02d-%s", stepNumber, slug)
-}
-
-func claudeStepScriptName(stepNumber int, name string) string {
-	return claudeStepSlug(stepNumber, name) + ".sh"
 }
 
 func slugifyClaudeStepName(name string) string {
