@@ -108,7 +108,8 @@ To connect with a **Personal Access Token**:
 **Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
 
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
-- **Create Merge Request**, **Add Merge Request Reviewers**, and **Remove Merge Request Reviewers** require at least the **Developer** role on the project. These use the `+"`api`"+` scope, which is already included in the scopes above.
+- **Create Merge Request**, **Update Merge Request**, **Add Merge Request Reviewers**, and **Remove Merge Request Reviewers** require at least the **Developer** role on the project (or, for updating, being the merge request author). These use the `+"`api`"+` scope, which is already included in the scopes above.
+- **Update Issue Comment** requires the connected user to be the comment's author, or to have at least the **Maintainer** role on the project.
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
 - **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
 - **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
@@ -186,6 +187,7 @@ func (g *GitLab) Actions() []core.Action {
 		&CreateMergeComment{},
 		&AddReaction{},
 		&CreateMergeRequest{},
+		&UpdateMergeRequest{},
 		&AddMergeRequestReviewers{},
 		&RemoveMergeRequestReviewers{},
 		&AcceptMergeRequest{},
@@ -195,6 +197,7 @@ func (g *GitLab) Actions() []core.Action {
 		&GetIssue{},
 		&UpdateIssue{},
 		&CreateIssueComment{},
+		&UpdateIssueComment{},
 	}
 }
 
