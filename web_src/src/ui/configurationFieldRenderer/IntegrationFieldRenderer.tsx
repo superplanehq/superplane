@@ -18,13 +18,32 @@ interface IntegrationFieldRendererProps {
 
 const CLEAR_OPTION_VALUE = "__none__";
 
-function filterReadyIntegrations(integrations: OrganizationsIntegration[]): OrganizationsIntegration[] {
+function getIntegrationTypeFilter(field: ConfigurationField): string | undefined {
+  return field.typeOptions?.integration?.integration?.trim() || undefined;
+}
+
+function matchesIntegrationType(integration: OrganizationsIntegration, integrationType: string | undefined): boolean {
+  if (!integrationType) {
+    return true;
+  }
+
+  return integration.metadata?.integrationName === integrationType;
+}
+
+function filterReadyIntegrations(
+  integrations: OrganizationsIntegration[],
+  integrationType: string | undefined,
+): OrganizationsIntegration[] {
   return integrations.filter((integration) => {
     if (integration.status?.state !== "ready") {
       return false;
     }
 
-    return Boolean(integration.metadata?.name?.trim());
+    if (!integration.metadata?.name?.trim()) {
+      return false;
+    }
+
+    return matchesIntegrationType(integration, integrationType);
   });
 }
 
@@ -54,14 +73,15 @@ export function IntegrationFieldRenderer({
   organizationId,
   readOnly = false,
 }: IntegrationFieldRendererProps) {
+  const integrationType = getIntegrationTypeFilter(field);
   const { data: integrations = [], isLoading, error } = useConnectedIntegrations(organizationId);
 
   const options = useMemo(
     () =>
-      filterReadyIntegrations(integrations).sort((left, right) =>
+      filterReadyIntegrations(integrations, integrationType).sort((left, right) =>
         getInstallationName(left).localeCompare(getInstallationName(right)),
       ),
-    [integrations],
+    [integrations, integrationType],
   );
 
   const selectedName = value?.name ?? "";
@@ -102,15 +122,13 @@ export function IntegrationFieldRenderer({
             return;
           }
 
-          const integration = integrations.find((item) => getInstallationName(item) === nextValue);
+          const integration = options.find((item) => getInstallationName(item) === nextValue);
           if (!integration) {
             onChange(undefined);
             return;
           }
 
-          const name = getInstallationName(integration);
-
-          onChange({ name });
+          onChange({ name: getInstallationName(integration) });
         }}
         disabled={readOnly}
       >

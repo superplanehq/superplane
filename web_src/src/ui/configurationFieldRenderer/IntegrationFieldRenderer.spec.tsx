@@ -108,6 +108,31 @@ describe("IntegrationFieldRenderer", () => {
     });
   });
 
+  it("filters integrations by field typeOptions.integration", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <IntegrationFieldRenderer
+        field={{
+          ...createField(),
+          typeOptions: {
+            integration: {
+              integration: "semaphore",
+            },
+          },
+        }}
+        isRequired
+        value={undefined}
+        onChange={() => {}}
+        organizationId="org_123"
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    expect(await screen.findByText("my-semaphore")).toBeInTheDocument();
+    expect(screen.queryByText("github")).not.toBeInTheDocument();
+  });
+
   it("shows the installation name as-is with the integration icon", async () => {
     const user = userEvent.setup();
 
