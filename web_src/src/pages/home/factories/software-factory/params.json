@@ -1,0 +1,14 @@
+{
+  "install_params": [
+    {
+      "name": "repository",
+      "type": "integration-resource",
+      "integration": "github",
+      "resourceType": "repository",
+      "useNameAsValue": true,
+      "required": true,
+      "label": "Choose repository",
+      "placeholder": "owner/repo"
+    }
+  ]
+}

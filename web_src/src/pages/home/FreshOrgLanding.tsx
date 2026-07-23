@@ -7,10 +7,12 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { FactorySetupPanel } from "./FactorySetupPanel";
+import { getFactoryDefinition } from "./factories";
 import { homeListCardClassName, homePageSubtitleClassName, homePageTitleClassName } from "./homePageStyles";
 import { InstallProgressPanel } from "./InstallProgressPanel";
 import type { CanvasFolderData } from "./types";
 import { useCreateApp } from "./useCreateApp";
+import { useInstallFactory } from "./useInstallFactory";
 
 interface FreshOrgLandingProps {
   folder?: CanvasFolderData;
@@ -19,25 +21,24 @@ interface FreshOrgLandingProps {
 }
 
 /**
- * Factory-first new-app landing prototype (Storybook only via
- * `PrototypeNewAppPage`). Production `/apps/new` still uses `ZeroStatePage`.
- *
- * Setup Factory primary CTA, with quiet escape hatches for blank apps and the
- * starter catalog (catalog hidden until Browse). Factory setup requires
- * integrations, a repository, and a starting task before Run.
+ * Factory-first new-app landing. Setup Factory primary CTA, with quiet escape
+ * hatches for blank apps and the starter catalog (catalog hidden until Browse).
+ * Factory setup installs a bundled template, then starts the Manual Run.
  */
 export function FreshOrgLanding({
   folder,
   folderContextPending = false,
   title = "Create a new app",
 }: FreshOrgLandingProps) {
+  const factory = getFactoryDefinition();
   const { createApp, isSaving } = useCreateApp({ folder });
+  const { installFactory, isInstalling } = useInstallFactory({ folder });
   const [showFactorySetup, setShowFactorySetup] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
   const [installingApp, setInstallingApp] = useState<AppEntry | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const busy = folderContextPending || isSaving;
+  const busy = folderContextPending || isSaving || isInstalling;
   const inFocusedSetup = showFactorySetup || installingApp !== null;
   const visible = APP_CATALOG.slice(0, visibleCount);
 
@@ -89,13 +90,12 @@ export function FreshOrgLanding({
 
       {showFactorySetup && (
         <FactorySetupPanel
+          factory={factory}
           busy={busy}
           onCancel={() => setShowFactorySetup(false)}
-          onInstall={(selections, repository, startingTaskPrompt) => {
+          onInstall={(result) => {
             if (busy) return;
-            void createApp("Software Factory", {
-              factorySetup: { repository, integrations: selections, startingTaskPrompt },
-            });
+            void installFactory(result);
           }}
         />
       )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Settings, TriangleAlert } from "lucide-react";
+import { ExternalLink, Loader2, Settings, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
@@ -146,11 +146,7 @@ export function ConfigureIntegrationDialog({
             )}
 
             {integration?.status?.browserAction && (
-              <IntegrationInstructions
-                description={integration.status.browserAction.description}
-                onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
-                className="mb-6"
-              />
+              <IntegrationInstructions description={integration.status.browserAction.description} className="mb-6" />
             )}
 
             <form
@@ -194,9 +190,15 @@ export function ConfigureIntegrationDialog({
               )}
 
               <DialogFooter className="gap-2 sm:justify-start pt-4">
+                {integration.status?.browserAction?.url ? (
+                  <Button type="button" onClick={handleBrowserAction} className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Continue on GitHub
+                  </Button>
+                ) : null}
                 <LoadingButton
                   type="submit"
-                  color="blue"
+                  variant={integration.status?.browserAction?.url ? "outline" : "default"}
                   disabled={!name.trim()}
                   loading={updateMutation.isPending}
                   loadingText="Saving..."
