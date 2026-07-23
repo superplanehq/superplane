@@ -389,7 +389,9 @@ Runtime flow:
 Console widgets support two related expression styles:
 
 - `{{ CEL }}` templates use CEL through [`@marcbachmann/cel-js`](https://github.com/marcbachmann/cel-js). The row environment contains row fields and `now` as Unix seconds.
-- Legacy expressions such as `status == "running"` are supported in `show` and some filters.
+- Legacy expressions such as `status == "running"` are supported in `show` and string `filters`.
+
+Row `show` clauses and widget `filters` (`render.filters`) share a single evaluator (`evaluateRowShow`), so both accept the same vocabulary: `{{ CEL }}` templates, legacy `field == "value"` equality, the dashboard mini expression language (`row.count > 5`), and — for anything the mini language can't parse — a **bare CEL expression** without braces (e.g. `epochMs(createdAt) > (float(now) - 604800.0) * 1000.0`). The mini language is tried first so existing `row.`-prefixed filters keep their loose-equality semantics; CEL is the fallback for arithmetic and builtin-function conditions.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
 

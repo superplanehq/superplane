@@ -216,6 +216,29 @@ function normalizeComparableScalar(value: unknown): unknown {
   return Number.isFinite(numberValue) ? numberValue : value;
 }
 
+/** Discriminated result of parsing/evaluating a mini expression. */
+export type ShowEvalResult = { ok: true; value: boolean } | { ok: false; error: string };
+
+/**
+ * Evaluate the mini expression against `row`, surfacing parse/eval failures
+ * instead of swallowing them. Callers that can fall back to a richer evaluator
+ * (e.g. CEL) use this to distinguish "the legacy tokenizer can't parse this"
+ * from "the expression is legitimately false".
+ */
+export function tryEvaluateShow(expression: string, row: unknown): ShowEvalResult {
+  try {
+    const tokens = tokenize(expression);
+    const state: ParserState = { index: 0, tokens };
+    const result = parseOr(state, row);
+    if (state.index < tokens.length) {
+      throw new Error("Trailing tokens after expression");
+    }
+    return { ok: true, value: Boolean(result) };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 /**
  * Evaluate the given expression against a row context. Returns a boolean (the
  * truthiness of the resulting value). On parse error this logs to console and
@@ -224,18 +247,10 @@ function normalizeComparableScalar(value: unknown): unknown {
  */
 export function evaluateShow(expression: string | undefined, row: unknown, defaultValue = true): boolean {
   if (!expression || !expression.trim()) return defaultValue;
-  try {
-    const tokens = tokenize(expression);
-    const state: ParserState = { index: 0, tokens };
-    const result = parseOr(state, row);
-    if (state.index < tokens.length) {
-      throw new Error("Trailing tokens after expression");
-    }
-    return Boolean(result);
-  } catch (err) {
-    if (typeof console !== "undefined") {
-      console.warn(`Dashboard widget expression failed: ${(err as Error).message}`);
-    }
-    return defaultValue;
+  const result = tryEvaluateShow(expression, row);
+  if (result.ok) return result.value;
+  if (typeof console !== "undefined") {
+    console.warn(`Dashboard widget expression failed: ${result.error}`);
   }
+  return defaultValue;
 }
