@@ -36,18 +36,20 @@ type CreateTaskRequest struct {
 	MessageChain json.RawMessage `json:"message_chain,omitempty"`
 	// Command is argv for one process. Omit when using Commands or Script.
 	Command []string `json:"command,omitempty"`
-	// Commands are shell directives. Each entry may be a plain string or
-	// {"name","command"}. The runner uses Bash on a PTY and sources each directive
+	// Commands are shell directives. Each entry is {"name","command"} (name optional).
+	// The runner uses Bash on a PTY and sources each directive
 	// from a tempfile, stopping at the first failing directive ($? after source).
 	// Omit when using Command.
 	Commands models.CommandList `json:"commands,omitempty"`
 	// SetupCommands are optional shell directives run before script execution.
 	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
-	Environment   []EnvironmentVariable `json:"environment,omitempty"`
-	WebhookURL    string                `json:"webhook_url"`
-	ExecutionMode string                `json:"execution_mode"` // "host" | "docker"
-	DockerImage   string                `json:"docker_image,omitempty"`
+	Environment []EnvironmentVariable `json:"environment,omitempty"`
+	// Files are materialized under SUPERPLANE_TASK_DIR before execution (all run modes).
+	Files         []TaskFile `json:"files,omitempty"`
+	WebhookURL    string     `json:"webhook_url"`
+	ExecutionMode string     `json:"execution_mode"` // "host" | "docker"
+	DockerImage   string     `json:"docker_image,omitempty"`
 	// ExecutionTimeoutSeconds is optional wall-clock limit for the runner execution phase (seconds).
 	// Omit to use DefaultExecutionTimeoutSeconds on the runner; if set, must be 1..MaxExecutionTimeoutSecondsRequest.
 	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
@@ -83,6 +85,7 @@ type TaskPayload struct {
 	Commands      models.CommandList    `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
 	SetupCommands []string              `json:"setup_commands,omitempty"`
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
+	Files         []TaskFile            `json:"files,omitempty"`
 	ExecutionMode string                `json:"execution_mode"`
 	DockerImage   string                `json:"docker_image,omitempty"`
 	// ExecutionTimeoutSeconds is nil when unset at create (runner uses default).
@@ -118,6 +121,7 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 		Commands:      t.Commands,
 		SetupCommands: t.SetupCommands,
 		Environment:   CloneEnvironment(t.Environment),
+		Files:         CloneFiles(t.Files),
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,
 	}

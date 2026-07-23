@@ -26,26 +26,27 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		runMode = string(models.RunModeCommandList)
 	}
 	row := &brokermodels.Task{
-		ID:                      t.ID,
-		FleetID:                 t.FleetID,
-		RunMode:                 runMode,
-		CommandJSON:             string(cmdJSON),
-		WebhookURL:              t.WebhookURL,
-		Status:                  string(t.Status),
-		CreatedAt:               t.CreatedAt,
-		RunnerID:                t.RunnerID,
-		ExecutionMode:           string(t.ExecutionMode),
-		DockerImage:             t.DockerImage,
-		Output:                  t.Output,
-		ResultJSON:              t.ResultJSON,
-		ErrorMessage:            t.ErrorMessage,
-		InfraRetryCount:         t.InfraRetryCount,
-		CancelRequested:         t.CancelRequested,
-		ClaimedAt:               t.ClaimedAt,
-		LeaseUntil:              t.LeaseUntil,
-		ExecutionTimeoutSeconds: t.ExecutionTimeoutSeconds,
-		ExitCode:                t.ExitCode,
-		WebhookPayloadSizeLimit: t.WebhookPayloadSizeLimit,
+		ID:                           t.ID,
+		FleetID:                      t.FleetID,
+		RunMode:                      runMode,
+		CommandJSON:                  string(cmdJSON),
+		WebhookURL:                   t.WebhookURL,
+		Status:                       string(t.Status),
+		CreatedAt:                    t.CreatedAt,
+		RunnerID:                     t.RunnerID,
+		ExecutionMode:                string(t.ExecutionMode),
+		DockerImage:                  t.DockerImage,
+		Output:                       t.Output,
+		ResultJSON:                   t.ResultJSON,
+		ErrorMessage:                 t.ErrorMessage,
+		InfraRetryCount:              t.InfraRetryCount,
+		CancelRequested:              t.CancelRequested,
+		WebhookPayloadSizeLimit:      t.WebhookPayloadSizeLimit,
+		RunnerTerminationRequestedAt: t.RunnerTerminationRequestedAt,
+		ClaimedAt:                    t.ClaimedAt,
+		LeaseUntil:                   t.LeaseUntil,
+		ExecutionTimeoutSeconds:      t.ExecutionTimeoutSeconds,
+		ExitCode:                     t.ExitCode,
 	}
 	if strings.TrimSpace(t.Script) != "" {
 		row.ScriptJSON = t.Script
@@ -73,6 +74,13 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 			return nil, err
 		}
 		row.EnvironmentJSON = string(b)
+	}
+	if len(t.Files) > 0 {
+		b, err := json.Marshal(t.Files)
+		if err != nil {
+			return nil, err
+		}
+		row.FilesJSON = string(b)
 	}
 	if row.ExecutionMode == "" {
 		row.ExecutionMode = string(models.ExecutionHost)
@@ -103,32 +111,40 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 			return nil, fmt.Errorf("environment_json: %w", err)
 		}
 	}
+	var files []models.TaskFile
+	if strings.TrimSpace(row.FilesJSON) != "" {
+		if err := json.Unmarshal([]byte(row.FilesJSON), &files); err != nil {
+			return nil, fmt.Errorf("files_json: %w", err)
+		}
+	}
 	t := &models.Task{
-		ID:                      row.ID,
-		FleetID:                 row.FleetID,
-		RunMode:                 models.RunMode(row.RunMode),
-		Script:                  row.ScriptJSON,
-		MessageChainJSON:        row.MessageChainJSON,
-		Command:                 cmd,
-		Commands:                cmds,
-		SetupCommands:           setupCmds,
-		Environment:             env,
-		WebhookURL:              row.WebhookURL,
-		Status:                  models.TaskStatus(row.Status),
-		CreatedAt:               row.CreatedAt.UTC(),
-		RunnerID:                row.RunnerID,
-		ExecutionMode:           models.ExecutionMode(row.ExecutionMode),
-		DockerImage:             row.DockerImage,
-		Output:                  row.Output,
-		ResultJSON:              row.ResultJSON,
-		ErrorMessage:            row.ErrorMessage,
-		InfraRetryCount:         row.InfraRetryCount,
-		CancelRequested:         row.CancelRequested,
-		ClaimedAt:               row.ClaimedAt,
-		LeaseUntil:              row.LeaseUntil,
-		ExecutionTimeoutSeconds: row.ExecutionTimeoutSeconds,
-		ExitCode:                row.ExitCode,
-		WebhookPayloadSizeLimit: row.WebhookPayloadSizeLimit,
+		ID:                           row.ID,
+		FleetID:                      row.FleetID,
+		RunMode:                      models.RunMode(row.RunMode),
+		Script:                       row.ScriptJSON,
+		MessageChainJSON:             row.MessageChainJSON,
+		Command:                      cmd,
+		Commands:                     cmds,
+		SetupCommands:                setupCmds,
+		Environment:                  env,
+		Files:                        files,
+		WebhookURL:                   row.WebhookURL,
+		Status:                       models.TaskStatus(row.Status),
+		CreatedAt:                    row.CreatedAt.UTC(),
+		RunnerID:                     row.RunnerID,
+		ExecutionMode:                models.ExecutionMode(row.ExecutionMode),
+		DockerImage:                  row.DockerImage,
+		Output:                       row.Output,
+		ResultJSON:                   row.ResultJSON,
+		ErrorMessage:                 row.ErrorMessage,
+		InfraRetryCount:              row.InfraRetryCount,
+		CancelRequested:              row.CancelRequested,
+		WebhookPayloadSizeLimit:      row.WebhookPayloadSizeLimit,
+		RunnerTerminationRequestedAt: row.RunnerTerminationRequestedAt,
+		ClaimedAt:                    row.ClaimedAt,
+		LeaseUntil:                   row.LeaseUntil,
+		ExecutionTimeoutSeconds:      row.ExecutionTimeoutSeconds,
+		ExitCode:                     row.ExitCode,
 	}
 	if t.RunMode == "" {
 		t.RunMode = models.InferRunMode(t.Commands, t.Command, t.Script)
@@ -140,6 +156,10 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	if t.LeaseUntil != nil {
 		lt := t.LeaseUntil.UTC()
 		t.LeaseUntil = &lt
+	}
+	if t.RunnerTerminationRequestedAt != nil {
+		rt := t.RunnerTerminationRequestedAt.UTC()
+		t.RunnerTerminationRequestedAt = &rt
 	}
 	return t, nil
 }

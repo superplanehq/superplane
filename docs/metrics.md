@@ -23,7 +23,7 @@ metrics export is disabled (no-op meter provider; local dev unchanged).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `METRICS_SAMPLE_INTERVAL_SEC` | `30` | How often to sample `runner.tasks.queued` / `runner.tasks.claimed` gauges |
+| `METRICS_SAMPLE_INTERVAL_SEC` | `30` | How often to sample queue backlog gauges |
 
 Fleet-manager pool settings live in the JSON config file (`FM_CONFIG_FILE`); OTLP
 export is **not** in that file — set the `OTEL_*` variables on the fleet-manager
@@ -54,6 +54,7 @@ like Dash0. `service.name` (`task-broker` or `fleet-manager`) is set via
 | `runner.task.start_latency` | Histogram (s) | `fleet_id` |
 | `runner.tasks.queued` | Gauge | `fleet_id` |
 | `runner.tasks.claimed` | Gauge | `fleet_id` |
+| `runner.tasks.oldest_queued_age` | Gauge (s) | `fleet_id` |
 | `runner.tasks.unclaimed` | Counter | `fleet_id` |
 | `runner.lease.reaps` | Counter | `fleet_id` |
 | `runner.webhook.deliveries` | Counter | `fleet_id`, `outcome` |
@@ -102,6 +103,12 @@ Attributes: `fleet_id`
 **Tasks claimed**
 Current number of tasks claimed by a runner but not yet terminal (`status = claimed`).
 Sampled periodically. A sustained backlog here can indicate stuck claims or insufficient runners.
+Attributes: `fleet_id`
+
+**Oldest queued task age**
+Current age of the oldest task still waiting for a runner to claim it (`status = queued`).
+Sampled periodically. Use this for alerting when any task has waited longer than
+the acceptable capacity SLO, e.g. `> 60s`.
 Attributes: `fleet_id`
 
 **Tasks unclaimed**

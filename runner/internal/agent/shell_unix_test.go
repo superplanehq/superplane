@@ -9,18 +9,37 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func skipPTYIntegrationOnCI(t *testing.T) {
 	t.Helper()
 	if os.Getenv("CI") != "" {
 		t.Skip("PTY tests need a working pseudo-terminal; skipped when CI is set (often EIO on /dev/ptmx)")
+	}
+}
+
+func skipUnlessBash4Plus(t *testing.T) {
+	t.Helper()
+	out, err := exec.Command("bash", "-c", "printf '%s' \"${BASH_VERSINFO[0]}\"").Output()
+	require.NoError(t, err)
+	major := 0
+	for _, r := range string(out) {
+		if r < '0' || r > '9' {
+			break
+		}
+		major = major*10 + int(r-'0')
+	}
+	if major < 4 {
+		t.Skipf("sourced ERR-trap wrap needs Bash 4+ (fleet images); got Bash %s", string(out))
 	}
 }
 
@@ -116,6 +135,101 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 	}
 }
 
+func TestHostShellDirectivesExitAliasKeepsShell(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; echo hello; exit 1; echo there", work, work),
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	// Session-boot alias makes top-level exit→return: clean status, shell stays up.
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit code")
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "hello")
+	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesExitAliasPersistsAcrossCommands(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	// Alias is installed once at session boot; a later command must still see exit→return,
+	// and cd/export from a prior successful command must persist.
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_EXIT_MARK=kept; exit 0", work, work),
+		`printf 'mark=%s cwd=%s\n' "$RUNNER_EXIT_MARK" "$(pwd -P)"; echo hello; exit 1; echo there`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "mark=kept")
+	assert.Contains(t, out, "/work")
+	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesErrexitFailFastKeepsShell(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	skipUnlessBash4Plus(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	code, out, err := runHostShellDirectives(ctx, 128*1024, t.TempDir(), []string{
+		`echo hello; false; echo there`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	assert.Equal(t, 1, code)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exit code")
+	assert.NotContains(t, err.Error(), "shell closed")
+	assert.Contains(t, out, "hello")
+	assert.NotContains(t, out, "there")
+}
+
+func TestHostShellDirectivesErrexitPreservesStateAcrossCommands(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	skipUnlessBash4Plus(t)
+	_, err := exec.LookPath("bash")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	work := filepath.Join(dir, "work")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, dir, []string{
+		fmt.Sprintf("mkdir -p %s; cd %s; export RUNNER_ERR_MARK=kept", work, work),
+		`printf 'mark=%s cwd=%s\n' "$RUNNER_ERR_MARK" "$(pwd -P)"`,
+	}, nil, nil, "")
+	t.Logf("code=%d out=%q err=%v", code, out, err)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Contains(t, out, "mark=kept")
+	assert.Contains(t, out, "/work")
+}
+
 func TestEndMarkerStreamHoldback(t *testing.T) {
 	t.Parallel()
 	endMark := "e-0123456789abcdef-0123456789abcdef"
@@ -203,6 +317,48 @@ func TestRunShellPTYSessionLiveStreamsIncrementally(t *testing.T) {
 	}
 	if !strings.Contains(live.String(), "line3") {
 		t.Fatalf("expected all lines in live log; live=%q", live.String())
+	}
+}
+
+func TestRunShellPTYSessionWritesCommandEndWhenContextCanceled(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	live := &syncLiveWriter{}
+	done := make(chan struct{})
+	var code int
+	var runErr error
+	go func() {
+		code, _, runErr = runShellPTYSession(ctx, 128*1024, cmd, directivesFromStrings([]string{
+			`printf '\x72\x75\x6e\x6e\x65\x72\x2d\x62\x65\x66\x6f\x72\x65\x2d\x6f\x75\x74\x70\x75\x74\n'; sleep 30; printf '\x72\x75\x6e\x6e\x65\x72\x2d\x61\x66\x74\x65\x72\x2d\x6f\x75\x74\x70\x75\x74\n'`,
+		}), live, "")
+		close(done)
+	}()
+
+	if !live.waitContains("runner-before-output", 2*time.Second) {
+		t.Fatalf("live log did not receive command output; live=%q", live.String())
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("runShellPTYSession did not stop after context cancellation; live=%q", live.String())
+	}
+
+	if code != 1 || runErr == nil {
+		t.Fatalf("runShellPTYSession: code=%d err=%v live=%q", code, runErr, live.String())
+	}
+	if !strings.Contains(live.String(), `"type":"cmd_end"`) || !strings.Contains(live.String(), `"status":"failed"`) {
+		t.Fatalf("expected failed cmd_end in live log; live=%q", live.String())
+	}
+	if strings.Contains(live.String(), "runner-after-output") {
+		t.Fatalf("command continued after cancellation; live=%q", live.String())
 	}
 }
 

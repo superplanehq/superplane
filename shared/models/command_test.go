@@ -2,40 +2,49 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
-func TestCommandListUnmarshalStringsAndObjects(t *testing.T) {
+func TestCommandListUnmarshalObjects(t *testing.T) {
 	t.Parallel()
 
 	var list CommandList
 	err := json.Unmarshal([]byte(`[
-		"echo hi",
 		{"name":"Clone","command":"git clone repo"},
 		{"command":"echo only"},
-		"  ",
 		{"name":"Skip","command":"  "}
 	]`), &list)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 3 {
-		t.Fatalf("len=%d want 3: %#v", len(list), list)
+	if len(list) != 2 {
+		t.Fatalf("len=%d want 2: %#v", len(list), list)
 	}
-	if list[0].Command != "echo hi" || list[0].Name != "" {
+	if list[0].Name != "Clone" || list[0].Command != "git clone repo" {
 		t.Fatalf("list[0]=%#v", list[0])
 	}
-	if list[1].Name != "Clone" || list[1].Command != "git clone repo" {
+	if list[1].Command != "echo only" || list[1].Name != "" {
 		t.Fatalf("list[1]=%#v", list[1])
 	}
-	if list[2].Command != "echo only" {
-		t.Fatalf("list[2]=%#v", list[2])
+	if list[0].DisplayText() != "Clone" {
+		t.Fatalf("display=%q", list[0].DisplayText())
 	}
-	if list[1].DisplayText() != "Clone" {
+	if list[1].DisplayText() != "echo only" {
 		t.Fatalf("display=%q", list[1].DisplayText())
 	}
-	if list[0].DisplayText() != "echo hi" {
-		t.Fatalf("display=%q", list[0].DisplayText())
+}
+
+func TestCommandListUnmarshalRejectsPlainStrings(t *testing.T) {
+	t.Parallel()
+
+	var list CommandList
+	err := json.Unmarshal([]byte(`["echo hi"]`), &list)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), `must be an object with "command"`) {
+		t.Fatalf("err=%v", err)
 	}
 }
 

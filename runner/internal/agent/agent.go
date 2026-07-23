@@ -38,9 +38,12 @@ type Config struct {
 	// task-broker claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
 	MaxExecutionSeconds int
 	// ExitAfterEachTask stops the runner process after one claimed task is handled
-	// (executed and complete attempted), even when complete or the broker ack fails.
+	// only after task completion is acknowledged by the broker.
 	ExitAfterEachTask bool
 	Log               *slog.Logger // optional: fleet_manager_http lines for claim / complete
+	// CompleteRetryBackoff controls HTTP completion fallback retries after
+	// WebSocket completion delivery fails. The first zero value means "try now".
+	CompleteRetryBackoff []time.Duration
 
 	// CloudWatchLogGroup when non-empty streams task stdout/stderr to Amazon CloudWatch Logs
 	// (one log stream per task; see shared/cwstream.TaskLogStream).
@@ -54,8 +57,9 @@ type Config struct {
 // DefaultConfig returns safe defaults.
 func DefaultConfig() Config {
 	return Config{
-		PollEmpty:      time.Second,
-		MaxOutputBytes: 512 * 1024,
+		PollEmpty:            time.Second,
+		MaxOutputBytes:       512 * 1024,
+		CompleteRetryBackoff: defaultCompleteRetryBackoff(),
 	}
 }
 
@@ -112,7 +116,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			continue
 		}
 		execution := a.execute(ctx, base, task, nil)
-		completeErr := a.complete(ctx, base, task.ID, execution)
+		completeErr := a.completeWithRetry(ctx, base, task.ID, execution)
 		if a.Config.ExitAfterEachTask {
 			if completeErr != nil && a.Config.Log != nil {
 				a.Config.Log.Warn("task_broker_http",
@@ -120,12 +124,52 @@ func (a *Agent) Run(ctx context.Context) error {
 					slog.String("task_id", task.ID),
 					slog.Any("complete_err", completeErr))
 			}
-			return nil
+			return completeErr
 		}
 		if completeErr != nil {
 			return completeErr
 		}
 	}
+}
+
+func defaultCompleteRetryBackoff() []time.Duration {
+	return []time.Duration{
+		0,
+		200 * time.Millisecond,
+		500 * time.Millisecond,
+		time.Second,
+		2 * time.Second,
+	}
+}
+
+func (a *Agent) completeWithRetry(ctx context.Context, base, id string, execution taskExecutionResult) error {
+	var lastErr error
+	for _, wait := range a.completeRetryBackoff() {
+		if wait > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+
+		if err := a.complete(ctx, base, id, execution); err != nil {
+			lastErr = err
+			continue
+		}
+		return nil
+	}
+	if lastErr == nil {
+		return fmt.Errorf("complete task %s: no retry attempts configured", id)
+	}
+	return fmt.Errorf("complete task %s after retries: %w", id, lastErr)
+}
+
+func (a *Agent) completeRetryBackoff() []time.Duration {
+	if len(a.Config.CompleteRetryBackoff) > 0 {
+		return a.Config.CompleteRetryBackoff
+	}
+	return defaultCompleteRetryBackoff()
 }
 
 func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error) {

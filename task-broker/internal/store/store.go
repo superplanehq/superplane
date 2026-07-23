@@ -25,11 +25,25 @@ type ReapedLease struct {
 	FleetID string
 }
 
+type LostRunnerTaskRecovery struct {
+	ID       string
+	FleetID  string
+	RunnerID string
+	Status   models.TaskStatus
+}
+
+type LostRunnerTaskTermination struct {
+	ID       string
+	FleetID  string
+	RunnerID string
+}
+
 type CompleteTaskOutcome string
 
 const (
-	CompleteTaskOutcomeTerminal CompleteTaskOutcome = "terminal"
-	CompleteTaskOutcomeRequeued CompleteTaskOutcome = "requeued"
+	CompleteTaskOutcomeTerminal        CompleteTaskOutcome = "terminal"
+	CompleteTaskOutcomeAlreadyTerminal CompleteTaskOutcome = "already_terminal"
+	CompleteTaskOutcomeRequeued        CompleteTaskOutcome = "requeued"
 )
 
 type CompleteTaskRequest struct {
@@ -58,12 +72,16 @@ type Store interface {
 	GetTask(ctx context.Context, id string) (*models.Task, error)
 	ListActiveTasks(ctx context.Context) ([]*models.Task, error)
 	CountTasksByFleet(ctx context.Context, fleetID string) (queued, claimed int, err error)
+	OldestQueuedTaskCreatedAt(ctx context.Context, fleetID string) (*time.Time, error)
 	ClaimedRunnerIDsByFleet(ctx context.Context, fleetID string) ([]string, error)
+	ClaimedTaskIDsByRunners(ctx context.Context, fleetID string, runnerIDs []string) (map[string]string, error)
 	ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error)
 	// UnclaimTask re-queues a claimed task so another runner can pick it up.
 	// Returns unclaimed=true when a row was updated; false when the task was not
 	// claimed by runnerID (no-op).
 	UnclaimTask(ctx context.Context, taskID, runnerID string) (unclaimed bool, err error)
+	MarkLostRunnerTasksTerminating(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskTermination, error)
+	FinalizeTerminatedRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string) ([]LostRunnerTaskRecovery, error)
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)

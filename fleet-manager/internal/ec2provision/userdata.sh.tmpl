@@ -61,6 +61,16 @@ CWEOF
   -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 {{- end}}
 
+{{- if .RunnerTerminateAfterEachTask}}
+# One-shot: on runner exit, let CW flush then poweroff (+ = root). Launch sets
+# InstanceInitiatedShutdownBehavior=terminate so this kills the VM.
+mkdir -p /etc/systemd/system/superplane-runner.service.d
+cat > /etc/systemd/system/superplane-runner.service.d/self-terminate.conf <<'DROPEOF'
+[Service]
+ExecStopPost=+/bin/sh -c 'sleep 7; systemctl stop amazon-cloudwatch-agent.service || true; /usr/sbin/poweroff'
+DROPEOF
+{{- end}}
+
 #########################################################
 # Start the runner (unit is already installed + enabled in the AMI)
 #########################################################

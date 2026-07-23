@@ -138,6 +138,12 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.FleetID = strings.TrimSpace(req.FleetID)
+	req.RunnerIDs = compactRunnerIDs(req.RunnerIDs)
+	reason, ok := drainReason(req.Reason)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid drain reason")
+		return
+	}
 	if req.FleetID == "" {
 		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
@@ -151,7 +157,27 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sticky-drain first so new claims are blocked, then reload persisted claims.
+	// Loading before Drain raced with FinishClaim and let soft-drain treat a
+	// real claim as a stale hub entry (false terminate under unhealthy).
 	statuses := s.RunnerDrain.Drain(req.FleetID, req.RunnerIDs)
+	claimedTaskIDs, err := s.Store.ClaimedTaskIDsByRunners(r.Context(), req.FleetID, req.RunnerIDs)
+	if err != nil {
+		s.logErr("claimed task ids by runners", err)
+		writeError(w, http.StatusInternalServerError, "could not load claimed runner tasks")
+		return
+	}
+	statuses = mergePersistedClaimedTasks(statuses, claimedTaskIDs)
+	recoveredTasks := []api.RunnerTaskRecovery(nil)
+	if reason == api.DrainReasonUnhealthy {
+		var err error
+		statuses, recoveredTasks, err = s.handleUnhealthyDrain(r.Context(), req.FleetID, req.RunnerIDs, statuses, claimedTaskIDs, req.TerminationConfirmed)
+		if err != nil {
+			s.logErr("handle unhealthy runner drain", err)
+			writeError(w, http.StatusInternalServerError, "could not drain unhealthy runner tasks")
+			return
+		}
+	}
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
@@ -159,10 +185,42 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 		drained, busy := drainStatusCounts(statuses)
 		s.Log.Info("runner_drain",
 			slog.String("fleet_id", req.FleetID),
+			slog.String("reason", string(reason)),
 			slog.Int("drained_count", drained),
-			slog.Int("busy_count", busy))
+			slog.Int("busy_count", busy),
+			slog.Int("recovered_task_count", len(recoveredTasks)))
 	}
-	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses})
+	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses, RecoveredTasks: recoveredTasks})
+}
+
+func drainReason(reason api.DrainReason) (api.DrainReason, bool) {
+	switch reason {
+	case "", api.DrainReasonScaleDown:
+		return api.DrainReasonScaleDown, true
+	case api.DrainReasonUnhealthy:
+		return api.DrainReasonUnhealthy, true
+	default:
+		return "", false
+	}
+}
+
+func mergePersistedClaimedTasks(statuses []api.DrainRunnerStatus, claimedTaskIDs map[string]string) []api.DrainRunnerStatus {
+	if len(claimedTaskIDs) == 0 {
+		return statuses
+	}
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		taskID, ok := claimedTaskIDs[out[i].RunnerID]
+		if !ok {
+			continue
+		}
+		out[i].State = api.DrainRunnerStateBusy
+		if out[i].ActiveTaskID == "" {
+			out[i].ActiveTaskID = taskID
+		}
+	}
+	return out
 }
 
 func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int) {
@@ -175,6 +233,148 @@ func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int)
 		}
 	}
 	return drained, busy
+}
+
+func (s *Server) handleUnhealthyDrain(ctx context.Context, fleetID string, runnerIDs []string, statuses []api.DrainRunnerStatus, claimedTaskIDs map[string]string, terminationConfirmed bool) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+	busyRunnerIDs, activeTaskIDs := busyRunnerRecoveryInputs(statuses)
+	if len(busyRunnerIDs) == 0 {
+		return statuses, nil, nil
+	}
+	if terminationConfirmed {
+		return s.finalizeTerminatedRunnerTasks(ctx, fleetID, runnerIDs, statuses, activeTaskIDs)
+	}
+	// Healthz failures under load are not proof the runner is dead. Keep claimed
+	// work busy so fleet-manager defers TerminateInstances; sticky drain already
+	// blocks new claims. Only clear stale hub "busy" with no persisted claim.
+	return s.softDrainUnhealthyBusyRunners(statuses, claimedTaskIDs), nil, nil
+}
+
+func (s *Server) softDrainUnhealthyBusyRunners(statuses []api.DrainRunnerStatus, claimedTaskIDs map[string]string) []api.DrainRunnerStatus {
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		if out[i].State != api.DrainRunnerStateBusy {
+			continue
+		}
+		runnerID := strings.TrimSpace(out[i].RunnerID)
+		if _, hasClaim := claimedTaskIDs[runnerID]; hasClaim {
+			continue
+		}
+		activeTaskID := strings.TrimSpace(out[i].ActiveTaskID)
+		if activeTaskID == "" {
+			// claimInProgress with no task id yet — keep busy so we do not
+			// terminate mid-claim.
+			continue
+		}
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.CompleteTask(runnerID, activeTaskID)
+		}
+		out[i].State = api.DrainRunnerStateDrained
+		out[i].ActiveTaskID = ""
+	}
+	return out
+}
+
+func (s *Server) finalizeTerminatedRunnerTasks(ctx context.Context, fleetID string, runnerIDs []string, statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string) ([]api.DrainRunnerStatus, []api.RunnerTaskRecovery, error) {
+	// Freeze remaining claimed tasks before finalizing so the lease reaper cannot
+	// requeue them while we confirm EC2 termination. Authentic CompleteTask may
+	// still win this race and is accepted by the store.
+	if _, err := s.Store.MarkLostRunnerTasksTerminating(ctx, fleetID, runnerIDs); err != nil {
+		return nil, nil, err
+	}
+	recoveries, err := s.Store.FinalizeTerminatedRunnerTasks(ctx, fleetID, runnerIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := make([]api.RunnerTaskRecovery, 0, len(recoveries))
+	recoveredRunnerIDs := make(map[string]struct{}, len(recoveries))
+	for _, recovery := range recoveries {
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.CompleteTask(recovery.RunnerID, recovery.ID)
+		}
+		recoveredRunnerIDs[recovery.RunnerID] = struct{}{}
+		state := recoveryState(recovery.Status)
+		out = append(out, api.RunnerTaskRecovery{
+			RunnerID: recovery.RunnerID,
+			TaskID:   recovery.ID,
+			State:    state,
+		})
+		s.afterLostRunnerRecovery(ctx, recovery, state)
+	}
+	if s.RunnerDrain != nil {
+		for runnerID, taskID := range activeTaskIDs {
+			if _, recovered := recoveredRunnerIDs[runnerID]; recovered {
+				continue
+			}
+			s.RunnerDrain.CompleteTask(runnerID, taskID)
+		}
+	}
+
+	statuses = markTerminatingBusyRunnersDrained(statuses, activeTaskIDs, recoveredRunnerIDs)
+	if s.Log != nil {
+		s.Log.Info("lost_runner_tasks_finalized_after_termination",
+			slog.String("fleet_id", fleetID),
+			slog.Int("task_count", len(out)),
+			slog.Any("tasks", out))
+	}
+	return statuses, out, nil
+}
+
+func busyRunnerRecoveryInputs(statuses []api.DrainRunnerStatus) ([]string, map[string]string) {
+	runnerIDs := make([]string, 0)
+	activeTaskIDs := make(map[string]string)
+	for _, status := range statuses {
+		if status.State != api.DrainRunnerStateBusy {
+			continue
+		}
+		runnerID := strings.TrimSpace(status.RunnerID)
+		if runnerID == "" {
+			continue
+		}
+		runnerIDs = append(runnerIDs, runnerID)
+		if taskID := strings.TrimSpace(status.ActiveTaskID); taskID != "" {
+			activeTaskIDs[runnerID] = taskID
+		}
+	}
+	return runnerIDs, activeTaskIDs
+}
+
+func markTerminatingBusyRunnersDrained(statuses []api.DrainRunnerStatus, activeTaskIDs map[string]string, recoveredRunnerIDs map[string]struct{}) []api.DrainRunnerStatus {
+	out := make([]api.DrainRunnerStatus, len(statuses))
+	copy(out, statuses)
+	for i := range out {
+		if out[i].State != api.DrainRunnerStateBusy {
+			continue
+		}
+		_, recovered := recoveredRunnerIDs[out[i].RunnerID]
+		activeTaskID := strings.TrimSpace(activeTaskIDs[out[i].RunnerID])
+		if !recovered && activeTaskID == "" {
+			continue
+		}
+		out[i].State = api.DrainRunnerStateDrained
+		out[i].ActiveTaskID = ""
+	}
+	return out
+}
+
+func recoveryState(status models.TaskStatus) api.RunnerTaskRecoveryState {
+	switch status {
+	case models.StatusCanceled:
+		return api.RunnerTaskRecoveryStateCanceled
+	default:
+		return api.RunnerTaskRecoveryStateFailed
+	}
+}
+
+func (s *Server) afterLostRunnerRecovery(ctx context.Context, recovery taskstore.LostRunnerTaskRecovery, state api.RunnerTaskRecoveryState) {
+	task, err := s.Store.GetTask(ctx, recovery.ID)
+	if err != nil {
+		s.logErr("get recovered lost runner task", err)
+		return
+	}
+	s.recordTaskCompleted(ctx, task)
+	go s.DeliverWebhook(task)
 }
 
 func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
@@ -193,7 +393,7 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	var req api.BrokerCreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if strings.TrimSpace(req.WebhookURL) == "" {
@@ -248,6 +448,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		ExecutionMode: mode,
 		DockerImage:   req.DockerImage,
 		Environment:   api.CloneEnvironment(req.Environment),
+		Files:         api.NormalizeFiles(req.Files),
 	}
 	switch kind {
 	case models.RunModeJavaScript, models.RunModePython, models.RunModeBash:
@@ -438,7 +639,10 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 
 	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "wrong runner") {
+		if strings.Contains(err.Error(), "not found") ||
+			strings.Contains(err.Error(), "wrong runner") ||
+			strings.Contains(err.Error(), "not claimed") ||
+			strings.Contains(err.Error(), "termination pending") {
 			writeError(w, http.StatusConflict, "cannot complete task")
 			return
 		}
@@ -520,6 +724,17 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 				slog.String("runner_id", runnerID),
 				slog.String("fleet_id", task.FleetID),
 				slog.Int("infra_retry_count", task.InfraRetryCount),
+			)
+		}
+		return result, nil
+	}
+	if result.Outcome == taskstore.CompleteTaskOutcomeAlreadyTerminal {
+		if s.Log != nil {
+			s.Log.Info("task_complete_duplicate",
+				slog.String("task_id", taskID),
+				slog.String("runner_id", runnerID),
+				slog.String("fleet_id", task.FleetID),
+				slog.String("status", string(task.Status)),
 			)
 		}
 		return result, nil
@@ -663,6 +878,9 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		return msg
 	}
 	if msg := api.ValidateEnvironment(req.Environment); msg != "" {
+		return msg
+	}
+	if msg := api.ValidateFiles(req.Files); msg != "" {
 		return msg
 	}
 	return ""

@@ -38,7 +38,6 @@ func TestCreateTaskAcceptsNamedCommands(t *testing.T) {
 		"fleet_id": "fleet-named",
 		"webhook_url": "https://example.com/hook",
 		"commands": [
-			"echo plain",
 			{"name": "Clone", "command": "git clone repo"},
 			{"command": "echo unnamed-object"}
 		]
@@ -67,20 +66,62 @@ func TestCreateTaskAcceptsNamedCommands(t *testing.T) {
 	if err != nil || task == nil {
 		t.Fatalf("get task: %v %#v", err, task)
 	}
-	if len(task.Commands) != 3 {
+	if len(task.Commands) != 2 {
 		t.Fatalf("commands=%#v", task.Commands)
 	}
-	if task.Commands[0].Command != "echo plain" || task.Commands[0].Name != "" {
+	if task.Commands[0].Name != "Clone" || task.Commands[0].Command != "git clone repo" {
 		t.Fatalf("cmd0=%#v", task.Commands[0])
 	}
-	if task.Commands[1].Name != "Clone" || task.Commands[1].Command != "git clone repo" {
+	if task.Commands[1].Command != "echo unnamed-object" || task.Commands[1].Name != "" {
 		t.Fatalf("cmd1=%#v", task.Commands[1])
 	}
-	if task.Commands[1].DisplayText() != "Clone" {
-		t.Fatalf("display=%q", task.Commands[1].DisplayText())
+}
+
+func TestCreateTaskRejectsPlainStringCommands(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
+		ID:          "fleet-string-cmds",
+		Provisioner: "local",
+		Arch:        "amd64",
+		Size:        "local",
+		CreatedAt:   time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
 	}
-	if task.Commands[2].Command != "echo unnamed-object" {
-		t.Fatalf("cmd2=%#v", task.Commands[2])
+
+	srv := &Server{Store: st, Log: slog.Default()}
+	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "token"}))
+	defer ts.Close()
+
+	body := []byte(`{
+		"fleet_id": "fleet-string-cmds",
+		"webhook_url": "https://example.com/hook",
+		"commands": ["echo plain"]
+	}`)
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/tasks", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	var errBody struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(respBody, &errBody); err != nil {
+		t.Fatalf("body=%s", strings.TrimSpace(string(respBody)))
+	}
+	if !strings.Contains(errBody.Error, `must be an object with "command"`) {
+		t.Fatalf("error=%q", errBody.Error)
 	}
 }
 

@@ -8,6 +8,7 @@ const (
 	MetricTaskStartLatency       = "runner.task.start_latency"
 	MetricTasksQueued            = "runner.tasks.queued"
 	MetricTasksClaimed           = "runner.tasks.claimed"
+	MetricOldestQueuedTaskAge    = "runner.tasks.oldest_queued_age"
 	MetricTasksUnclaimed         = "runner.tasks.unclaimed"
 	MetricLeaseReaps             = "runner.lease.reaps"
 	MetricWebhookDeliveries      = "runner.webhook.deliveries"

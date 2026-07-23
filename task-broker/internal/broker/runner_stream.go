@@ -260,7 +260,10 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		if cerr != nil {
 			code := http.StatusInternalServerError
 			msg := "could not complete task"
-			if strings.Contains(cerr.Error(), "not found") || strings.Contains(cerr.Error(), "wrong runner") {
+			if strings.Contains(cerr.Error(), "not found") ||
+				strings.Contains(cerr.Error(), "wrong runner") ||
+				strings.Contains(cerr.Error(), "not claimed") ||
+				strings.Contains(cerr.Error(), "termination pending") {
 				code = http.StatusConflict
 				msg = "cannot complete task"
 			}

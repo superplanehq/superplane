@@ -104,3 +104,18 @@ func TestTaskPayloadFromClonesEnvironment(t *testing.T) {
 		t.Fatalf("expected cloned environment, got %#v", payload.Environment)
 	}
 }
+
+func TestTaskPayloadFromClonesFiles(t *testing.T) {
+	task := &models.Task{
+		ID:    "task-1",
+		Files: []models.TaskFile{{Path: "a.txt", Content: "one"}},
+	}
+	payload := TaskPayloadFrom(task)
+	if len(payload.Files) != 1 || payload.Files[0].Path != "a.txt" || payload.Files[0].Content != "one" {
+		t.Fatalf("files: %#v", payload.Files)
+	}
+	task.Files[0].Content = "two"
+	if payload.Files[0].Content != "one" {
+		t.Fatalf("expected cloned files, got %#v", payload.Files)
+	}
+}

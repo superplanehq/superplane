@@ -109,6 +109,8 @@ func runPythonHost(
 
 	cmd := exec.CommandContext(ctx, python, programPath)
 	cmd.Dir = workDir
+	prepareTaskProcessGroup(cmd)
+	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)
 
 	var buf bytes.Buffer

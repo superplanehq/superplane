@@ -38,7 +38,9 @@ type Task struct {
 	// SetupCommands are optional shell directives run before script tasks.
 	SetupCommands []string
 	// Environment is a task-scoped process environment sent only to runners.
-	Environment   []EnvironmentVariable
+	Environment []EnvironmentVariable
+	// Files are materialized under SUPERPLANE_TASK_DIR before execution.
+	Files         []TaskFile
 	WebhookURL    string
 	Status        TaskStatus
 	CreatedAt     time.Time
@@ -60,6 +62,9 @@ type Task struct {
 	CancelRequested bool
 	// WebhookPayloadSizeLimit is the maximum accepted webhook POST body in bytes (0 = unlimited).
 	WebhookPayloadSizeLimit int
+	// RunnerTerminationRequestedAt is set internally when fleet-manager is terminating
+	// the runner before the task can be finalized safely.
+	RunnerTerminationRequestedAt *time.Time
 }
 
 // EnvironmentVariable is one task-scoped environment variable.

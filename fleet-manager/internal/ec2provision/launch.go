@@ -46,8 +46,18 @@ type Launcher struct {
 	pendingMu sync.Mutex
 	pending   map[string]time.Time // instance id -> RunInstances request time
 
+	healthMu       sync.Mutex
+	healthFailures map[string]int // instance id -> consecutive health probe failures
+
+	unhealthyTerminationMu      sync.Mutex
+	unhealthyTerminationPending map[string]struct{} // instance ids awaiting EC2 terminated confirmation
+
 	// runInstancesHook, when set, replaces Client.RunInstances (tests only).
 	runInstancesHook func(context.Context, *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error)
+
+	// terminateInstancesHook and describeInstancesHook replace EC2 calls in tests.
+	terminateInstancesHook func(context.Context, *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
+	describeInstancesHook  func(context.Context, *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 }
 
 // FleetID returns the broker fleet id this launcher manages (the partition key used in
@@ -96,8 +106,9 @@ type Config struct {
 	HotInstanceCount int
 	// Headroom > 0 enables dynamic scaling: want = queued + claimed + Headroom each tick.
 	Headroom int
-	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK in runner user-data;
-	// fleet-manager then terminates the EC2 instance after one task.
+	// RunnerTerminateAfterEachTask: one-shot mode — runner exits after one task, user-data
+	// poweroffs the host, and InstanceInitiatedShutdownBehavior=terminate turns that into
+	// EC2 termination. Health sweep is the backstop if the runner never starts.
 	RunnerTerminateAfterEachTask bool
 	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in runner user-data (optional).
 	RunnerCloudWatchLogGroup string
@@ -116,6 +127,11 @@ type Config struct {
 	BootGraceSec int
 	// RunnerHealthPort is the TCP port for GET /healthz on runner private IP (default 9090).
 	RunnerHealthPort int
+	// RunnerHealthTimeoutSec is the timeout for one runner /healthz probe.
+	RunnerHealthTimeoutSec int
+	// RunnerHealthFailureThreshold is the number of consecutive failed health probes
+	// required before the runner becomes an unhealthy termination candidate.
+	RunnerHealthFailureThreshold int
 }
 
 const (
@@ -130,6 +146,9 @@ const (
 
 	maxLaunch          = 50
 	defaultLaunchBatch = 5
+
+	terminatedWaitTimeout  = 2 * time.Minute
+	terminatedPollInterval = 2 * time.Second
 )
 
 // managedRunInstancesTags returns the tags applied at launch to every managed runner instance.
@@ -292,6 +311,9 @@ func (l *Launcher) runInstancesInput(count int32, encodedUserData, subnetID stri
 	if l.Config.RunnersIAMProfName != "" {
 		in.IamInstanceProfile = &types.IamInstanceProfileSpecification{Name: aws.String(l.Config.RunnersIAMProfName)}
 	}
+	if l.Config.RunnerTerminateAfterEachTask {
+		in.InstanceInitiatedShutdownBehavior = types.ShutdownBehaviorTerminate
+	}
 	return in
 }
 
@@ -353,13 +375,17 @@ const (
 	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
 	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
 	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
+	envRunnerHealthTimeout = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
+	envRunnerHealthFails   = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
 	envRunnerHeadroom      = "EC2_PROVISION_RUNNER_HEADROOM"
 
-	defaultInstanceType     = "t3.micro"
-	defaultArch             = "amd64"
-	defaultVolumeSizeGB     = 30
-	defaultBootGraceSec     = 300
-	defaultRunnerHealthPort = 9090
+	defaultInstanceType                 = "t3.micro"
+	defaultArch                         = "amd64"
+	defaultVolumeSizeGB                 = 30
+	defaultBootGraceSec                 = 300
+	defaultRunnerHealthPort             = 9090
+	defaultRunnerHealthTimeoutSec       = 15
+	defaultRunnerHealthFailureThreshold = 3
 )
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -462,6 +488,22 @@ func ConfigFromEnv() (Config, error) {
 		}
 		healthPort = n
 	}
+	healthTimeout := defaultRunnerHealthTimeoutSec
+	if v := strings.TrimSpace(os.Getenv(envRunnerHealthTimeout)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("%s must be a positive integer", envRunnerHealthTimeout)
+		}
+		healthTimeout = n
+	}
+	healthFailures := defaultRunnerHealthFailureThreshold
+	if v := strings.TrimSpace(os.Getenv(envRunnerHealthFails)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("%s must be a positive integer", envRunnerHealthFails)
+		}
+		healthFailures = n
+	}
 	headroom := 0
 	if v := strings.TrimSpace(os.Getenv(envRunnerHeadroom)); v != "" {
 		n, err := strconv.Atoi(v)
@@ -493,6 +535,8 @@ func ConfigFromEnv() (Config, error) {
 		VolumeSizeGB:                    volumeSizeGB,
 		BootGraceSec:                    bootGrace,
 		RunnerHealthPort:                healthPort,
+		RunnerHealthTimeoutSec:          healthTimeout,
+		RunnerHealthFailureThreshold:    healthFailures,
 		Headroom:                        headroom,
 	}, nil
 }

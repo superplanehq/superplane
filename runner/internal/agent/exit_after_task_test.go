@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/superplane/runner/shared/api"
 )
 
-func TestRunHTTP_exitAfterEachTaskWhenCompleteFails(t *testing.T) {
+func TestRunHTTP_exitAfterEachTaskReturnsErrorWhenCompleteFails(t *testing.T) {
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skipf("sh not on PATH: %v", err)
@@ -41,15 +42,20 @@ func TestRunHTTP_exitAfterEachTaskWhenCompleteFails(t *testing.T) {
 	defer cancel()
 
 	a := &Agent{Config: Config{
-		BaseURL:           srv.URL,
-		FleetID:           "test-fleet",
-		RunnerID:          "i-test",
-		Transport:         "http",
-		ExitAfterEachTask: true,
-		TaskWorkDir:       t.TempDir(),
+		BaseURL:              srv.URL,
+		FleetID:              "test-fleet",
+		RunnerID:             "i-test",
+		Transport:            "http",
+		ExitAfterEachTask:    true,
+		TaskWorkDir:          t.TempDir(),
+		CompleteRetryBackoff: []time.Duration{0},
 	}}
-	if err := a.Run(ctx); err != nil {
-		t.Fatalf("Run: %v", err)
+	err = a.Run(ctx)
+	if err == nil {
+		t.Fatal("Run: expected completion error")
+	}
+	if !strings.Contains(err.Error(), "complete task task-one-shot after retries") {
+		t.Fatalf("Run error = %v, want completion retry error", err)
 	}
 	if completeCalls != 1 {
 		t.Fatalf("complete calls = %d, want 1", completeCalls)

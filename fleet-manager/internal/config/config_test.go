@@ -25,6 +25,8 @@ func validConfigJSON() string {
 		"volume_size_gb": 30,
 		"boot_grace_sec": 300,
 		"runner_health_port": 9090,
+		"runner_health_timeout_sec": 15,
+		"runner_health_failure_threshold": 3,
 		"runner_terminate_after_each_task": true,
 		"cloudwatch": {
 			"log_group": "/superplane/runner",
@@ -34,7 +36,7 @@ func validConfigJSON() string {
 		},
 		"pools": [
 			{
-				"fleet_id": "aws-amd64",
+				"fleet_id": "e1-tiny-amd64",
 				"ami": "ami-amd64-aaaa",
 				"instance_type": "t3.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-amd64",
@@ -42,7 +44,7 @@ func validConfigJSON() string {
 				"headroom": 2
 			},
 			{
-				"fleet_id": "aws-arm64",
+				"fleet_id": "e1-tiny-arm64",
 				"ami": "ami-arm64-bbbb",
 				"instance_type": "t4g.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-arm64",
@@ -74,7 +76,7 @@ func TestLoad_HappyPath(t *testing.T) {
 	if len(f.Pools) != 2 {
 		t.Fatalf("expected 2 pools, got %d", len(f.Pools))
 	}
-	if f.Pools[0].FleetID != "aws-amd64" || f.Pools[1].FleetID != "aws-arm64" {
+	if f.Pools[0].FleetID != "e1-tiny-amd64" || f.Pools[1].FleetID != "e1-tiny-arm64" {
 		t.Errorf("pool fleet ids = %q, %q", f.Pools[0].FleetID, f.Pools[1].FleetID)
 	}
 }
@@ -153,7 +155,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 			return strings.Replace(s,
 				`"pools": [
 			{
-				"fleet_id": "aws-amd64",
+				"fleet_id": "e1-tiny-amd64",
 				"ami": "ami-amd64-aaaa",
 				"instance_type": "t3.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-amd64",
@@ -161,7 +163,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 				"headroom": 2
 			},
 			{
-				"fleet_id": "aws-arm64",
+				"fleet_id": "e1-tiny-arm64",
 				"ami": "ami-arm64-bbbb",
 				"instance_type": "t4g.micro",
 				"runner_s3_uri": "s3://superplane-artifacts/runner-linux-arm64",
@@ -171,7 +173,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 		]`, `"pools": []`, 1)
 		}, "pools[]"},
 		{"missing_fleet_id", func(s string) string {
-			return strings.Replace(s, `"fleet_id": "aws-amd64",`, `"fleet_id": "",`, 1)
+			return strings.Replace(s, `"fleet_id": "e1-tiny-amd64",`, `"fleet_id": "",`, 1)
 		}, "fleet_id"},
 		{"missing_ami", func(s string) string {
 			return strings.Replace(s, `"ami": "ami-amd64-aaaa",`, `"ami": "",`, 1)
@@ -187,7 +189,7 @@ func TestLoad_PoolValidation(t *testing.T) {
 		}, "bucket/key"},
 		{"duplicate_fleet_id", func(s string) string {
 			// Two pools with the same fleet_id.
-			return strings.Replace(s, `"fleet_id": "aws-arm64",`, `"fleet_id": "aws-amd64",`, 1)
+			return strings.Replace(s, `"fleet_id": "e1-tiny-arm64",`, `"fleet_id": "e1-tiny-amd64",`, 1)
 		}, "duplicated"},
 		{"negative_hot_instance_count", func(s string) string {
 			return strings.Replace(s, `"hot_instance_count": 3,`, `"hot_instance_count": -1,`, 1)
@@ -223,6 +225,14 @@ func TestLoad_GlobalBoundsValidation(t *testing.T) {
 		{"runner_health_port_too_high", func(s string) string {
 			return strings.Replace(s, `"runner_health_port": 9090,`, `"runner_health_port": 70000,`, 1)
 		}, "runner_health_port"},
+		{"runner_health_timeout_zero_uses_default", nil, ""}, // tested elsewhere
+		{"runner_health_timeout_negative", func(s string) string {
+			return strings.Replace(s, `"runner_health_timeout_sec": 15,`, `"runner_health_timeout_sec": -1,`, 1)
+		}, "runner_health_timeout_sec"},
+		{"runner_health_failure_threshold_zero_uses_default", nil, ""}, // tested elsewhere
+		{"runner_health_failure_threshold_negative", func(s string) string {
+			return strings.Replace(s, `"runner_health_failure_threshold": 3,`, `"runner_health_failure_threshold": -1,`, 1)
+		}, "runner_health_failure_threshold"},
 		{"reconcile_interval_below_min", func(s string) string {
 			return strings.Replace(s, `"reconcile_interval_sec": 60,`, `"reconcile_interval_sec": 5,`, 1)
 		}, "reconcile_interval_sec"},
@@ -279,6 +289,12 @@ func TestLoad_DefaultsApplied(t *testing.T) {
 	if f.RunnerHealthPort != defaultRunnerHealthPort {
 		t.Errorf("RunnerHealthPort default = %d, want %d", f.RunnerHealthPort, defaultRunnerHealthPort)
 	}
+	if f.RunnerHealthTimeoutSec != defaultRunnerHealthTimeoutSec {
+		t.Errorf("RunnerHealthTimeoutSec default = %d, want %d", f.RunnerHealthTimeoutSec, defaultRunnerHealthTimeoutSec)
+	}
+	if f.RunnerHealthFailureThreshold != defaultRunnerHealthFailureThreshold {
+		t.Errorf("RunnerHealthFailureThreshold default = %d, want %d", f.RunnerHealthFailureThreshold, defaultRunnerHealthFailureThreshold)
+	}
 	if f.Pools[0].InstanceType != defaultInstanceType {
 		t.Errorf("pool InstanceType default = %q, want %q", f.Pools[0].InstanceType, defaultInstanceType)
 	}
@@ -318,7 +334,7 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	if cfg.RunnerS3URI != "s3://superplane-artifacts/runner-linux-arm64" {
 		t.Errorf("RunnerS3URI = %q", cfg.RunnerS3URI)
 	}
-	if cfg.RunnerFleetID != "aws-arm64" {
+	if cfg.RunnerFleetID != "e1-tiny-arm64" {
 		t.Errorf("RunnerFleetID = %q", cfg.RunnerFleetID)
 	}
 	if cfg.HotInstanceCount != 2 {
@@ -354,6 +370,12 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	}
 	if cfg.RunnerHealthPort != 9090 {
 		t.Errorf("RunnerHealthPort = %d", cfg.RunnerHealthPort)
+	}
+	if cfg.RunnerHealthTimeoutSec != 15 {
+		t.Errorf("RunnerHealthTimeoutSec = %d", cfg.RunnerHealthTimeoutSec)
+	}
+	if cfg.RunnerHealthFailureThreshold != 3 {
+		t.Errorf("RunnerHealthFailureThreshold = %d", cfg.RunnerHealthFailureThreshold)
 	}
 	if !cfg.RunnerTerminateAfterEachTask {
 		t.Errorf("RunnerTerminateAfterEachTask = false, want true")
