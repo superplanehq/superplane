@@ -16,10 +16,11 @@ import { settingsModalClassName, settingsTableCardClassName } from "./settingsPa
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
+import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 import { ApiKeysContent } from "./ApiKeysContent";
 
 interface APIKeysProps {
@@ -145,8 +146,25 @@ export function APIKeys({ organizationId }: APIKeysProps) {
 
   const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
+  const { data: roles = [] } = useOrganizationRoles(organizationId);
   const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
+
+  // org_owner is reserved for human users and cannot be assigned to an API key.
+  const assignableRoles = useMemo(() => {
+    const builtinNames = new Set(["org_admin", "org_viewer"]);
+    const isBuiltin = (name: string) => builtinNames.has(name);
+    const customRoles = roles
+      .filter((role) => {
+        const name = role.metadata?.name || "";
+        return name !== "org_owner" && !isBuiltin(name);
+      })
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+    const baseRoles = roles
+      .filter((role) => isBuiltin(role.metadata?.name || ""))
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+    return [...customRoles, ...baseRoles];
+  }, [roles]);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -277,8 +295,11 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
-                      <SelectItem value="org_admin">Admin</SelectItem>
+                      {assignableRoles.map((role) => (
+                        <SelectItem key={role.metadata?.name} value={role.metadata?.name || ""}>
+                          {role.spec?.displayName || role.metadata?.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

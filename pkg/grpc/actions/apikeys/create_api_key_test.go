@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -46,6 +47,63 @@ func TestCreateAPIKeyRejectsInvalidCanvasScope(t *testing.T) {
 		Name:      "ci-bot",
 		Role:      models.RoleOrgViewer,
 		CanvasIds: []string{"not-a-canvas-id"},
+	}, r.AuthService)
+
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
+func TestCreateAPIKeyAllowsCustomRole(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+
+	customRole := &authorization.RoleDefinition{
+		Name:       "ci-custom-role",
+		DomainType: models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{
+			{
+				Resource:   "canvases",
+				Action:     "read",
+				DomainType: models.DomainTypeOrganization,
+			},
+		},
+	}
+	require.NoError(t, r.AuthService.CreateCustomRole(orgID, customRole))
+
+	response, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: "ci-custom-role",
+	}, r.AuthService)
+	require.NoError(t, err)
+	require.NotNil(t, response.ApiKey)
+
+	roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), response.ApiKey.Id, orgID)
+	require.NoError(t, err)
+	roleNames := make([]string, len(roles))
+	for i, role := range roles {
+		roleNames[i] = role.Name
+	}
+	require.Contains(t, roleNames, "ci-custom-role")
+}
+
+func TestCreateAPIKeyRejectsOrgOwnerRole(t *testing.T) {
+	r := support.Setup(t)
+
+	_, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: models.RoleOrgOwner,
+	}, r.AuthService)
+
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
+func TestCreateAPIKeyRejectsUnknownRole(t *testing.T) {
+	r := support.Setup(t)
+
+	_, err := CreateAPIKey(apiKeyContext(r), &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: "does-not-exist",
 	}, r.AuthService)
 
 	require.Error(t, err)
