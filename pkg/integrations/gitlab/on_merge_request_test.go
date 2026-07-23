@@ -142,16 +142,30 @@ func Test__MergeRequestDerivedActions(t *testing.T) {
 
 	t.Run("ready for review", func(t *testing.T) {
 		changes := map[string]any{
-			"draft": map[string]any{"previous": true, "current": false},
+			"title": map[string]any{"previous": "Draft: add feature", "current": "add feature"},
 		}
 		assert.Equal(t, []string{"ready_for_review"}, mergeRequestDerivedActions(map[string]any{}, changes))
 	})
 
 	t.Run("converted to draft", func(t *testing.T) {
 		changes := map[string]any{
-			"draft": map[string]any{"previous": false, "current": true},
+			"title": map[string]any{"previous": "add feature", "current": "Draft: add feature"},
 		}
 		assert.Equal(t, []string{"converted_to_draft"}, mergeRequestDerivedActions(map[string]any{}, changes))
+	})
+
+	t.Run("draft toggle does not also derive edited", func(t *testing.T) {
+		changes := map[string]any{
+			"title": map[string]any{"previous": "add feature", "current": "[Draft] add feature"},
+		}
+		assert.Equal(t, []string{"converted_to_draft"}, mergeRequestDerivedActions(map[string]any{}, changes))
+	})
+
+	t.Run("draft toggle combined with a real title edit derives both", func(t *testing.T) {
+		changes := map[string]any{
+			"title": map[string]any{"previous": "(Draft) add feature", "current": "add better feature"},
+		}
+		assert.ElementsMatch(t, []string{"ready_for_review", "edited"}, mergeRequestDerivedActions(map[string]any{}, changes))
 	})
 
 	t.Run("auto merge enabled and disabled", func(t *testing.T) {
@@ -198,6 +212,21 @@ func Test__MergeRequestDerivedActions(t *testing.T) {
 	})
 }
 
+func Test__IsDraftTitle(t *testing.T) {
+	assert.True(t, isDraftTitle("Draft: add feature"))
+	assert.True(t, isDraftTitle("[Draft] add feature"))
+	assert.True(t, isDraftTitle("(Draft) add feature"))
+	assert.True(t, isDraftTitle("draft: lowercase"))
+	assert.False(t, isDraftTitle("add feature"))
+	assert.False(t, isDraftTitle("WIP: add feature"))
+}
+
+func Test__DraftlessTitle(t *testing.T) {
+	assert.Equal(t, "add feature", draftlessTitle("Draft: add feature"))
+	assert.Equal(t, "add feature", draftlessTitle("[Draft] add feature"))
+	assert.Equal(t, "add feature", draftlessTitle("add feature"))
+}
+
 func Test__OnMergeRequest__HandleWebhook__DerivedActions(t *testing.T) {
 	trigger := &OnMergeRequest{}
 	headers := gitlabHeaders("Merge Request Hook", "token")
@@ -208,7 +237,7 @@ func Test__OnMergeRequest__HandleWebhook__DerivedActions(t *testing.T) {
 		body, _ := json.Marshal(map[string]any{
 			"object_attributes": map[string]any{"action": "update"},
 			"changes": map[string]any{
-				"draft": map[string]any{"previous": true, "current": false},
+				"title": map[string]any{"previous": "Draft: add feature", "current": "add feature"},
 			},
 		})
 
@@ -231,7 +260,7 @@ func Test__OnMergeRequest__HandleWebhook__DerivedActions(t *testing.T) {
 		body, _ := json.Marshal(map[string]any{
 			"object_attributes": map[string]any{"action": "update"},
 			"changes": map[string]any{
-				"draft": map[string]any{"previous": true, "current": false},
+				"title": map[string]any{"previous": "Draft: add feature", "current": "add feature"},
 			},
 		})
 

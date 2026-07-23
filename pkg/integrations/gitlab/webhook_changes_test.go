@@ -135,3 +135,20 @@ func Test__ChangedField(t *testing.T) {
 	}
 	assert.False(t, changedField(noop, "title"))
 }
+
+func Test__ChangedTextField(t *testing.T) {
+	previous, current, ok := changedTextField(map[string]any{
+		"title": map[string]any{"previous": "old", "current": "new"},
+	}, "title")
+	assert.True(t, ok)
+	assert.Equal(t, "old", previous)
+	assert.Equal(t, "new", current)
+
+	_, _, ok = changedTextField(map[string]any{
+		"title": map[string]any{"previous": "same", "current": "same"},
+	}, "title")
+	assert.False(t, ok)
+
+	_, _, ok = changedTextField(map[string]any{}, "title")
+	assert.False(t, ok)
+}

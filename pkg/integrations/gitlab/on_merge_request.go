@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
@@ -45,10 +46,6 @@ func (m *OnMergeRequest) Documentation() string {
 
 - **Project** (required): GitLab project to monitor
 - **Actions** (required): Select which merge request actions to listen for (open, close, reopen, update, approved, merge, etc.). Default: open.
-
-## Actions
-
-GitLab reports most merge request changes (labels, assignees, milestone, draft toggling, reviewers, auto-merge, new commits pushed) under a single ` + "`update`" + ` action. Labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, synchronize, ready for review, converted to draft, review requested, review request removed, auto merge enabled/disabled and edited are derived from the ` + "`object_attributes`/`changes`" + ` fields of an update event, to match the granularity of GitHub's equivalent trigger.
 
 ## Event Data
 
@@ -269,21 +266,41 @@ func mergeRequestDerivedActions(attrs map[string]any, rawChanges any) []string {
 	if changedToNil(changes, "milestone_id") {
 		derived = append(derived, "demilestoned")
 	}
-	if changedBoolTo(changes, "draft", false) {
-		derived = append(derived, "ready_for_review")
-	}
-	if changedBoolTo(changes, "draft", true) {
-		derived = append(derived, "converted_to_draft")
-	}
 	if changedBoolTo(changes, "merge_when_pipeline_succeeds", true) {
 		derived = append(derived, "auto_merge_enabled")
 	}
 	if changedBoolTo(changes, "merge_when_pipeline_succeeds", false) {
 		derived = append(derived, "auto_merge_disabled")
 	}
-	if changedField(changes, "title") || changedField(changes, "description") {
+
+	edited := changedField(changes, "description")
+	if titlePrevious, titleCurrent, ok := changedTextField(changes, "title"); ok {
+		previousDraft, currentDraft := isDraftTitle(titlePrevious), isDraftTitle(titleCurrent)
+		switch {
+		case !previousDraft && currentDraft:
+			derived = append(derived, "converted_to_draft")
+		case previousDraft && !currentDraft:
+			derived = append(derived, "ready_for_review")
+		}
+		if draftlessTitle(titlePrevious) != draftlessTitle(titleCurrent) {
+			edited = true
+		}
+	}
+	if edited {
 		derived = append(derived, "edited")
 	}
 
 	return derived
+}
+
+// mergeRequestDraftTitlePrefix matches GitLab's own draft-title marker (Gitlab::Regex::MergeRequests#merge_request_draft),
+// since GitLab tracks draft status by rewriting the MR title rather than reporting it as a `changes.draft` diff.
+var mergeRequestDraftTitlePrefix = regexp.MustCompile(`(?i)^\s*(\[draft\]|\(draft\)|draft:)\s*`)
+
+func isDraftTitle(title string) bool {
+	return mergeRequestDraftTitlePrefix.MatchString(title)
+}
+
+func draftlessTitle(title string) string {
+	return mergeRequestDraftTitlePrefix.ReplaceAllString(title, "")
 }

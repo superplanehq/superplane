@@ -119,3 +119,15 @@ func changedField(changes map[string]any, field string) bool {
 
 	return change["previous"] != change["current"]
 }
+
+// changedTextField returns the previous/current string values of a changed field, or ok=false if unchanged/absent.
+func changedTextField(changes map[string]any, field string) (previous, current string, ok bool) {
+	change, mapOk := changes[field].(map[string]any)
+	if !mapOk {
+		return "", "", false
+	}
+
+	previous, _ = change["previous"].(string)
+	current, _ = change["current"].(string)
+	return previous, current, previous != current
+}

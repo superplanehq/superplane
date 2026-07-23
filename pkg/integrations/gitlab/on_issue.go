@@ -47,10 +47,6 @@ func (i *OnIssue) Documentation() string {
 - **Actions** (required): Select which issue actions to listen for. Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
 
-## Actions
-
-GitLab reports issue changes with only four raw actions (` + "`open`, `close`, `reopen`, `update`" + `). Labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, locked, unlocked and edited are derived from the ` + "`changes`" + ` field of an update event, to match the granularity of GitHub's equivalent trigger.
-
 ## Outputs
 
 - **Default channel**: Emits issue payload including issue IID, title, state, labels, assignees, author, and action type
