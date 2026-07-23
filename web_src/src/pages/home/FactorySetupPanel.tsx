@@ -3,14 +3,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useAvailableIntegrations, useCreateIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
-import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { cn } from "@/lib/utils";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useMemo, useRef, useState } from "react";
 
-import type { IntegrationSelections } from "./InstallIntegrationsSection";
+import { HomeIntegrationConnectRow, type IntegrationSelections } from "./InstallIntegrationsSection";
 import { homeInstallPanelClassName } from "./homePageStyles";
 
 const FACTORY_INTEGRATIONS = ["github", "claude"] as const;
@@ -61,7 +58,7 @@ export function FactorySetupPanel({
   };
 
   return (
-    <div className={cn(homeInstallPanelClassName, "mt-8")} role="region" aria-label="Software Factory setup">
+    <div className={homeInstallPanelClassName} role="region" aria-label="Software Factory setup">
       <div className="mb-5">
         <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">Connect your GitHub and Claude</h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-gray-400">
@@ -72,7 +69,7 @@ export function FactorySetupPanel({
       <div className="mb-5">
         <div className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-gray-700/70 dark:border-gray-700/70">
           {FACTORY_INTEGRATIONS.map((name) => (
-            <FactoryIntegrationRow
+            <HomeIntegrationConnectRow
               key={name}
               name={name}
               connected={connectedTools.has(name)}
@@ -192,37 +189,5 @@ function FactoryRepositorySelect({
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function FactoryIntegrationRow({
-  name,
-  connected,
-  onConnect,
-}: {
-  name: string;
-  connected: boolean;
-  onConnect: () => void;
-}) {
-  const displayName = getIntegrationTypeDisplayName(undefined, name) || name.charAt(0).toUpperCase() + name.slice(1);
-
-  return (
-    <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">
-      <IntegrationIcon integrationName={name} className="h-4 w-4 shrink-0" size={16} />
-      <span className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{displayName}</span>
-      <span
-        className={cn(
-          "min-w-0 flex-1 text-xs font-medium",
-          connected ? "text-emerald-700 dark:text-emerald-300" : "text-gray-400 dark:text-gray-500",
-        )}
-      >
-        {connected ? "Connected" : "Not connected"}
-      </span>
-      {!connected && (
-        <Button type="button" variant="outline" size="xs" className="shrink-0" onClick={onConnect}>
-          Connect
-        </Button>
-      )}
-    </div>
   );
 }

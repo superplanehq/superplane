@@ -1,6 +1,6 @@
 import type { OrganizationsIntegration } from "@/api-client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
@@ -8,6 +8,7 @@ import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { cn } from "@/lib/utils";
 
 export type IntegrationSelections = Record<string, { id: string; name: string }>;
 
@@ -68,6 +69,7 @@ export function IntegrationsSection({
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
+  const pendingConnectKeyRef = useRef<string | null>(null);
 
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
@@ -96,32 +98,27 @@ export function IntegrationsSection({
     existingIntegrationNames,
   );
 
-  const handleCreated = useCallback(
-    (integrationId: string, instanceName: string) => {
-      if (dialogIntegrationName) {
-        onSelectionsChange({
-          ...selections,
-          [dialogIntegrationName]: { id: integrationId, name: instanceName },
-        });
-      }
-      setDialogIntegrationName(null);
-      void refetch();
-    },
-    [dialogIntegrationName, selections, onSelectionsChange, refetch],
-  );
+  const openConnectDialog = (integrationName: string) => {
+    pendingConnectKeyRef.current = integrationName;
+    setDialogIntegrationName(integrationName);
+  };
 
   return (
     <>
-      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Integrations</p>
-      <div className="space-y-2.5">
+      <div className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-gray-700/70 dark:border-gray-700/70">
         {integrationData.map((data) => (
-          <IntegrationRow
+          <HomeIntegrationConnectRow
             key={data.name}
-            data={data}
-            selectedId={selections[data.name]?.id}
-            onSelect={(id, name) => onSelectionsChange({ ...selections, [data.name]: { id, name } })}
-            onConfigure={setConfigureIntegrationId}
-            onCreateNew={() => setDialogIntegrationName(data.name)}
+            name={data.name}
+            connected={Boolean(selections[data.name])}
+            onConnect={() => {
+              const pending = data.allInstances.find((i) => i.status?.state !== "ready");
+              if (pending?.metadata?.id) {
+                setConfigureIntegrationId(pending.metadata.id);
+                return;
+              }
+              openConnectDialog(data.name);
+            }}
           />
         ))}
       </div>
@@ -137,7 +134,12 @@ export function IntegrationsSection({
 
       <IntegrationCreateDialog
         open={!!dialogIntegrationName}
-        onOpenChange={(open) => !open && setDialogIntegrationName(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogIntegrationName(null);
+            createIntegrationMutation.reset();
+          }
+        }}
         integrationDefinition={dialogDefinition ?? null}
         organizationId={organizationId}
         onCreateIntegration={async (payload) => {
@@ -146,7 +148,19 @@ export function IntegrationsSection({
         }}
         onReset={() => createIntegrationMutation.reset()}
         defaultName={defaultDialogName}
-        onCreated={(integrationId, instanceName) => handleCreated(integrationId, instanceName)}
+        onCreated={(integrationId, instanceName) => {
+          // Dialog calls onOpenChange(false) before onCreated; keep the key in a ref across that close.
+          const key = pendingConnectKeyRef.current;
+          pendingConnectKeyRef.current = null;
+          if (key) {
+            onSelectionsChange({
+              ...selections,
+              [key]: { id: integrationId, name: instanceName },
+            });
+          }
+          setDialogIntegrationName(null);
+          void refetch();
+        }}
         initialBrowserAction={dialogPendingInstance?.status?.browserAction}
         initialCreatedIntegrationId={dialogPendingInstance?.metadata?.id}
         initialWebhookSetup={initialWebhookSetup}
@@ -201,75 +215,34 @@ function useCreateDialogProps(
   return { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName };
 }
 
-function IntegrationRow({
-  data,
-  selectedId,
-  onSelect,
-  onConfigure,
-  onCreateNew,
+export function HomeIntegrationConnectRow({
+  name,
+  connected,
+  onConnect,
 }: {
-  data: IntegrationInstanceSummary;
-  selectedId?: string;
-  onSelect: (id: string, name: string) => void;
-  onConfigure: (id: string) => void;
-  onCreateNew: () => void;
+  name: string;
+  connected: boolean;
+  onConnect: () => void;
 }) {
-  const displayName =
-    getIntegrationTypeDisplayName(undefined, data.name) || data.name.charAt(0).toUpperCase() + data.name.slice(1);
-
-  const handleInstanceSelect = (instanceId: string) => {
-    const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
-    if (!instance?.metadata?.id) return;
-    if (instance.status?.state !== "ready") {
-      onConfigure(instance.metadata.id);
-      return;
-    }
-    if (instance.metadata.name) {
-      onSelect(instance.metadata.id, instance.metadata.name);
-    }
-  };
+  const displayName = getIntegrationTypeDisplayName(undefined, name) || name.charAt(0).toUpperCase() + name.slice(1);
 
   return (
-    <div className="flex items-center gap-2">
-      <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-      {data.allInstances.length > 0 ? (
-        <Select value={selectedId || ""} onValueChange={handleInstanceSelect}>
-          <SelectTrigger className="w-56 h-7 text-xs">
-            <SelectValue placeholder={`Select ${displayName}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {data.allInstances.map((instance) => (
-              <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
-                <span className="flex items-center gap-1.5">
-                  <span>{instance.metadata?.name || instance.metadata?.id}</span>
-                  <StatusDot state={instance.status?.state} />
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <span className="text-xs text-slate-400 dark:text-gray-500">Not connected</span>
-      )}
-      <button
-        type="button"
-        onClick={onCreateNew}
-        className="text-xs text-blue-600 hover:text-blue-700 hover:underline shrink-0"
+    <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">
+      <IntegrationIcon integrationName={name} className="h-4 w-4 shrink-0" size={16} />
+      <span className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{displayName}</span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 text-xs font-medium",
+          connected ? "text-emerald-700 dark:text-emerald-300" : "text-gray-400 dark:text-gray-500",
+        )}
       >
-        {data.allInstances.length > 0 ? "or create new" : "create new"}
-      </button>
+        {connected ? "Connected" : "Not connected"}
+      </span>
+      {!connected && (
+        <Button type="button" variant="outline" size="xs" className="shrink-0" onClick={onConnect}>
+          Connect
+        </Button>
+      )}
     </div>
   );
-}
-
-const STATUS_DOT_COLORS: Record<string, string> = {
-  ready: "bg-emerald-500",
-  pending: "bg-amber-500",
-  error: "bg-red-500",
-};
-
-function StatusDot({ state }: { state?: string }) {
-  const color = state ? STATUS_DOT_COLORS[state] : undefined;
-  if (!color) return null;
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />;
 }
