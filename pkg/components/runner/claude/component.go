@@ -121,8 +121,8 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 							TypeOptions: &configuration.TypeOptions{
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
-										{Label: "Secret", Value: "secret"},
-										{Label: "Integration", Value: "integration"},
+										{Label: "Secret", Value: claudeCredentialsSourceSecret},
+										{Label: "Integration", Value: claudeCredentialsSourceIntegration},
 									},
 								},
 							},
@@ -132,10 +132,10 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 							Label: "Anthropic API Key",
 							Type:  configuration.FieldTypeSecretKey,
 							VisibilityConditions: []configuration.VisibilityCondition{
-								{Field: "source", Values: []string{"secret"}},
+								{Field: "source", Values: []string{claudeCredentialsSourceSecret}},
 							},
 							RequiredConditions: []configuration.RequiredCondition{
-								{Field: "source", Values: []string{"secret"}},
+								{Field: "source", Values: []string{claudeCredentialsSourceSecret}},
 							},
 						},
 						{
@@ -143,10 +143,10 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 							Label: "Integration",
 							Type:  configuration.FieldTypeIntegration,
 							VisibilityConditions: []configuration.VisibilityCondition{
-								{Field: "source", Values: []string{"integration"}},
+								{Field: "source", Values: []string{claudeCredentialsSourceIntegration}},
 							},
 							RequiredConditions: []configuration.RequiredCondition{
-								{Field: "source", Values: []string{"integration"}},
+								{Field: "source", Values: []string{claudeCredentialsSourceIntegration}},
 							},
 							TypeOptions: &configuration.TypeOptions{
 								Integration: &configuration.IntegrationTypeOptions{

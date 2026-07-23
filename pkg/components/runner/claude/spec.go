@@ -14,6 +14,9 @@ const (
 	claudeStepPrompt   = "prompt"
 	claudeStepBash     = "bash"
 	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
+
+	claudeCredentialsSourceSecret      = "secret"
+	claudeCredentialsSourceIntegration = "integration"
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -117,8 +120,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if err := validateClaudeCodeSteps(spec.Steps); err != nil {
 		return err
 	}
-	if !spec.Credentials.Secret.IsSet() && !spec.Credentials.Integration.IsSet() {
-		return fmt.Errorf("one of anthropic API key or claude integration is required")
+	if err := validateClaudeCodeCredentials(spec.Credentials); err != nil {
+		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
 		return err
@@ -137,6 +140,25 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 		}
 	}
 	return nil
+}
+
+func validateClaudeCodeCredentials(credentials ClaudeCodeCredentials) error {
+	switch credentials.Source {
+	case claudeCredentialsSourceSecret:
+		if !credentials.Secret.IsSet() {
+			return fmt.Errorf("anthropic API key is required")
+		}
+
+		return nil
+	case claudeCredentialsSourceIntegration:
+		if !credentials.Integration.IsSet() {
+			return fmt.Errorf("claude integration is required")
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("invalid credentials source: %s", credentials.Source)
+	}
 }
 
 func validateClaudeCodeSteps(steps []ClaudeCodeStep) error {

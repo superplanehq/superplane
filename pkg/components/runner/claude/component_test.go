@@ -17,6 +17,16 @@ import (
 
 const testRunnerMachineType = runner.MachineTypeE1LargeAMD64
 
+func credentialsSecret(secret, key string) map[string]any {
+	return map[string]any{
+		"source": "secret",
+		"secret": map[string]any{
+			"secret": secret,
+			"key":    key,
+		},
+	}
+}
+
 type createTaskRequest struct {
 	FleetID       string                             `json:"fleet_id"`
 	RunMode       string                             `json:"run_mode,omitempty"`
@@ -51,10 +61,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 				{"name": "Open PR", "type": "prompt", "prompt": "Open a pull request"},
 				{"name": "Status", "type": "bash", "command": "git -C /tmp/repo status"},
 			},
-			"anthropicApiKey": map[string]any{
-				"secret": "anthropic",
-				"key":    "api_key",
-			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
 			"workingDirectory": "/tmp",
 		},
 		HTTP: httpContext,
@@ -130,10 +137,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 			"setup_commands":        "git clone https://github.com/acme/widgets.git /tmp/repo",
 			"enable_after_commands": true,
 			"after_commands":        "git push",
-			"anthropicApiKey": map[string]any{
-				"secret": "anthropic",
-				"key":    "api_key",
-			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
 		},
 		HTTP: httpContext,
 		Secrets: &contexts.SecretsContext{
@@ -180,10 +184,7 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 			"steps": []map[string]any{
 				{"name": "Hello", "type": "prompt", "prompt": "hello"},
 			},
-			"anthropicApiKey": map[string]any{
-				"secret": "anthropic",
-				"key":    "api_key",
-			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
 		},
 		HTTP:           &contexts.HTTPContext{},
 		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},

@@ -60,6 +60,7 @@ function fieldRequiresOrganizationContext(fieldType: string | undefined): boolea
     fieldType === "app-canvas-node" ||
     fieldType === "run-parameters" ||
     fieldType === "secret-key" ||
+    fieldType === "secret" ||
     fieldType === "integration"
   );
 }
