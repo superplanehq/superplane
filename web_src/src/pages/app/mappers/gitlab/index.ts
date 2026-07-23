@@ -1,6 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { acceptMergeRequestMapper } from "./accept_merge_request";
+import { addIssueLabelMapper } from "./add_issue_label";
 import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";
 import { addReactionMapper } from "./add_reaction";
 import { approveMergeRequestMapper } from "./approve_merge_request";
@@ -13,6 +14,7 @@ import { createIssueMapper } from "./create_issue";
 import { createIssueCommentMapper } from "./create_issue_comment";
 import { createMergeCommentMapper } from "./create_merge_comment";
 import { getIssueMapper } from "./get_issue";
+import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready_for_review";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
@@ -50,6 +52,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateIssue: buildActionStateRegistry("updated"),
   createIssueComment: buildActionStateRegistry("created"),
   updateIssueComment: buildActionStateRegistry("updated"),
+  addIssueLabel: buildActionStateRegistry("added"),
+  markMergeRequestReadyForReview: buildActionStateRegistry("marked ready"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -72,6 +76,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateIssue: updateIssueMapper,
   createIssueComment: createIssueCommentMapper,
   updateIssueComment: updateIssueCommentMapper,
+  addIssueLabel: addIssueLabelMapper,
+  markMergeRequestReadyForReview: markMergeRequestReadyForReviewMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {

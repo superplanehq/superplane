@@ -97,7 +97,7 @@ const defaultConsoleYaml =
     layout: [{ i: "markdown-showcase", x: 0, y: 0, w: 12, h: 20, minW: 4, minH: 4 }],
   });
 
-const defaultFixture = {
+export const defaultCanvasAppFixture = {
   ...capturedFixture,
   consoleYaml: defaultConsoleYaml,
   repositoryFileContents: {
@@ -105,6 +105,8 @@ const defaultFixture = {
     ...capturedFixture.repositoryFileContents,
   },
 } satisfies CanvasAppFixture;
+
+const defaultFixture = defaultCanvasAppFixture;
 
 export const canvasAppIds = {
   organizationId: defaultFixture.organizationId,
