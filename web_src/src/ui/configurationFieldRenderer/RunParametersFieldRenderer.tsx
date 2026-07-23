@@ -1,9 +1,8 @@
 import { useMemo } from "react";
-import type { ConfigurationField, SuperplaneComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { toTestId } from "@/lib/testID";
 import { ConfigurationFieldRenderer } from "./index";
-import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { normalizeRunParameterDefinitions } from "./runParameters";
 
@@ -66,10 +65,11 @@ export function RunParametersFieldRenderer({
     enabled: Boolean(appId),
   });
 
+  const targetNode = useMemo(() => findTargetNode(canvas?.spec?.nodes, nodeId), [canvas?.spec?.nodes, nodeId]);
+
   const parameterDefinitions = useMemo(() => {
-    const targetNode = findTargetNode(canvas?.spec?.nodes, nodeId);
     return normalizeRunParameterDefinitions(targetNode?.configuration?.parameters);
-  }, [canvas?.spec?.nodes, nodeId]);
+  }, [targetNode]);
 
   const parameterValues = useMemo(() => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -78,17 +78,6 @@ export function RunParametersFieldRenderer({
 
     return {};
   }, [value]);
-
-  const fallbackObjectField = useMemo(
-    (): ConfigurationField => ({
-      name: field.name ?? "parameters",
-      label: field.label,
-      description: field.description,
-      type: "object",
-      required: field.required,
-    }),
-    [field.description, field.label, field.name, field.required],
-  );
 
   const baseFieldPath = fieldPath || field.name || "parameters";
 
@@ -120,17 +109,15 @@ export function RunParametersFieldRenderer({
 
   if (parameterDefinitions.length === 0) {
     return (
-      <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
-        <ObjectFieldRenderer
-          field={fallbackObjectField}
-          value={value}
-          onChange={onChange}
-          allValues={allValues}
-          organizationId={organizationId}
-          allowExpressions={allowExpressions}
-          autocompleteExampleObj={autocompleteExampleObj}
-          readOnly={readOnly}
-        />
+      <div
+        data-testid={toTestId(`run-parameters-field-${field.name}`)}
+        className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/40"
+      >
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+        The trigger you selected does not define any parameters.
+        If parameters are needed in your flow, define them in the trigger configuration first.
+        Without parameters, the run will still be triggered, but no additional values will be passed.
+        </p>
       </div>
     );
   }

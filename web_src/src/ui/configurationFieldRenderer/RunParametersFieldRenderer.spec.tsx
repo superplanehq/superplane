@@ -114,7 +114,7 @@ describe("RunParametersFieldRenderer", () => {
     });
   });
 
-  it("falls back to JSON editing when the target node has no parameters", async () => {
+  it("shows an informational message when the target node has no parameters", async () => {
     mockUseCanvas.mockReturnValue({
       data: {
         id: "canvas_target",
@@ -141,7 +141,14 @@ describe("RunParametersFieldRenderer", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("run-parameters-field-parameters")).toBeTruthy();
+      const message = screen.getByTestId("run-parameters-field-parameters");
+      expect(message).toHaveTextContent("The trigger you selected does not define any parameters.");
+      expect(message).toHaveTextContent(
+        "If parameters are needed in your flow, define them in the trigger configuration first.",
+      );
+      expect(message).toHaveTextContent(
+        "Without parameters, the run will still be triggered, but no additional values will be passed.",
+      );
       expect(screen.queryByTestId("string-field-message")).toBeNull();
     });
   });
