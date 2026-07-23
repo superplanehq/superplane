@@ -22,6 +22,7 @@ import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys
 import { useCanvases } from "@/hooks/useCanvasData";
 import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 import { ApiKeysContent } from "./ApiKeysContent";
+import { getAssignableApiKeyRoles } from "./apiKeyRoles";
 
 interface APIKeysProps {
   organizationId: string;
@@ -150,21 +151,9 @@ export function APIKeys({ organizationId }: APIKeysProps) {
   const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
 
-  // org_owner is reserved for human users and cannot be assigned to an API key.
-  const assignableRoles = useMemo(() => {
-    const builtinNames = new Set(["org_admin", "org_viewer"]);
-    const isBuiltin = (name: string) => builtinNames.has(name);
-    const customRoles = roles
-      .filter((role) => {
-        const name = role.metadata?.name || "";
-        return name !== "org_owner" && !isBuiltin(name);
-      })
-      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
-    const baseRoles = roles
-      .filter((role) => isBuiltin(role.metadata?.name || ""))
-      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
-    return [...customRoles, ...baseRoles];
-  }, [roles]);
+  // Custom roles first, then assignable built-in roles. org_owner is reserved
+  // for human users and is never offered here.
+  const assignableRoles = useMemo(() => getAssignableApiKeyRoles(roles), [roles]);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
