@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi } from "vitest";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
+import type { ConsoleRunDisabledReason } from "../ConsoleContext";
 import { ConsoleContextProvider } from "../ConsoleContextProvider";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
@@ -41,9 +42,11 @@ const RENDER: WidgetTableRender = {
 
 function renderTable({
   canRunNodes,
+  runNodesDisabledReason,
   onTriggerNode,
 }: {
   canRunNodes: boolean;
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   onTriggerNode?: (nodeId: string, options?: { hookName?: string; successLabel?: string }) => Promise<void>;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -55,6 +58,7 @@ function renderTable({
           organizationId="org-1"
           nodes={[START_NODE]}
           canRunNodes={canRunNodes}
+          runNodesDisabledReason={runNodesDisabledReason}
           onTriggerNode={onTriggerNode ? (id, opts) => void onTriggerNode(id, opts) : undefined}
         >
           <WidgetTable render={RENDER} rows={ROWS} isLoading={false} />
@@ -316,6 +320,19 @@ describe("WidgetTable row actions — permission gating", () => {
     expect(trigger).toBeDisabled();
     fireEvent.click(trigger);
     expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("explains that canvas changes must be committed before running a row action", () => {
+    renderTable({
+      canRunNodes: false,
+      runNodesDisabledReason: "uncommitted-canvas-changes",
+      onTriggerNode: vi.fn(),
+    });
+
+    const trigger = screen.getByTestId("widget-row-action-start");
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute("data-disabled-reason", "uncommitted-canvas-changes");
+    expect(trigger).toHaveAttribute("title", "Commit canvas changes before running console actions.");
   });
 
   it("evaluates per-row show expressions", () => {

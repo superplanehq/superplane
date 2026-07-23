@@ -15,7 +15,26 @@ export function storyNoop(..._args: unknown[]): void {}
 
 /** Sample canvas nodes used for node-reference resolution in the node panels. */
 export const sampleNodes: SuperplaneComponentsNode[] = [
-  { id: "node-deploy", name: "deploy-prod", type: "TYPE_TRIGGER", component: "deploy" },
+  {
+    id: "node-deploy",
+    name: "deploy-prod",
+    type: "TYPE_TRIGGER",
+    component: "start",
+    configuration: {
+      templates: [
+        {
+          name: "manual",
+          parameters: [
+            {
+              name: "prompt",
+              type: "text",
+              placeholder: "Describe what you want to ship…",
+            },
+          ],
+        },
+      ],
+    },
+  },
   { id: "node-build", name: "build-image", type: "TYPE_ACTION", component: "build" },
   { id: "node-tests", name: "run-tests", type: "TYPE_TRIGGER", component: "tests" },
   { id: "node-notify", name: "notify-slack", type: "TYPE_ACTION", component: "slack" },

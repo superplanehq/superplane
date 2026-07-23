@@ -1,7 +1,11 @@
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { buildExecutionInfo } from "@/pages/app/utils";
 import { isExecutionInFlight } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
-import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import {
+  terminalCommandStatusForExecution,
+  terminalTimeMsForExecution,
+  useLiveLogStream,
+} from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
 import type { RunInspectorNodeSection } from "./types";
@@ -34,13 +38,16 @@ export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspec
 
 function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecution }) {
   const executionInfo = buildExecutionInfo(execution);
-  const { sections, orphanLines, error, scrollRef } = useLiveLogStream(
+  const executionInFlight = isExecutionInFlight(executionInfo);
+  const { sections, orphanLines, error, isStreaming, scrollRef } = useLiveLogStream(
     executionInfo.id,
-    isExecutionInFlight(executionInfo),
+    executionInFlight,
+    terminalCommandStatusForExecution(executionInfo),
+    terminalTimeMsForExecution(executionInfo),
   );
   const lines = runnerLogLines(orphanLines, sections);
-  const isWaiting = isExecutionInFlight(executionInfo) && lines.length === 0 && !error;
-  const hasError = Boolean(error) && !isExecutionInFlight(executionInfo);
+  const isWaiting = lines.length === 0 && !error && (executionInFlight || isStreaming);
+  const hasError = Boolean(error) && !executionInFlight;
 
   if (hasError) {
     return <EmptySectionText>Something went wrong while fetching logs. Please try again later.</EmptySectionText>;
