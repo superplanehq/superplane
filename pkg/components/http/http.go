@@ -929,35 +929,47 @@ func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataWriter, executionSt
 		return fmt.Errorf("failed to decode metadata: %w", decodeErr)
 	}
 
-	metadata.Retry.NextRetryAt = nil
-	metadata.Retry.LastStatus = &resp.StatusCode
-	if reqErr != nil {
-		metadata.Retry.LastError = reqErr.Error()
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	if body != nil {
-		metadata.Retry.LastResponse = string(body)
-	}
-
-	var bodyData any
-	if len(body) > 0 {
-		err := json.Unmarshal(body, &bodyData)
-		if err != nil {
-			bodyData = string(body)
+	if metadata.Retry != nil {
+		metadata.Retry.NextRetryAt = nil
+		if reqErr != nil {
+			metadata.Retry.LastError = reqErr.Error()
 		}
+	}
+
+	errorResponse := map[string]any{}
+
+	//
+	// A transport-level error (timeout, connection refused, DNS failure, ...)
+	// leaves resp nil. Only read response details when a response exists so the
+	// terminal failure of a retried request never dereferences a nil response.
+	//
+	if resp != nil {
+		body, _ := io.ReadAll(resp.Body)
+
+		var bodyData any
+		if len(body) > 0 {
+			if err := json.Unmarshal(body, &bodyData); err != nil {
+				bodyData = string(body)
+			}
+		}
+
+		if metadata.Retry != nil {
+			metadata.Retry.LastStatus = &resp.StatusCode
+			if body != nil {
+				metadata.Retry.LastResponse = string(body)
+			}
+		}
+
+		errorResponse["status"] = resp.StatusCode
+		errorResponse["headers"] = resp.Header
+		errorResponse["body"] = bodyData
 	}
 
 	if err := metadataCtx.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	errorResponse := map[string]any{
-		"status":  resp.StatusCode,
-		"headers": resp.Header,
-		"body":    bodyData,
-		"retry":   metadata.Retry,
-	}
+	errorResponse["retry"] = metadata.Retry
 
 	if reqErr != nil {
 		errorResponse["error"] = reqErr.Error()
@@ -1128,11 +1140,13 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionHookContext) error {
 	//
 	// If we should not retry anymore, fail here.
 	//
+	// Reaching this point means the final attempt did not succeed: either the
+	// request errored at the transport level (err != nil, in which case resp is
+	// nil) or a response came back with a non-success status. Both are terminal
+	// failures, so handleRequestFailure reports them consistently with the retry
+	// metadata attached. It must therefore tolerate a nil response.
+	//
 	if metadata.Retry.Attempts >= metadata.Retry.MaxAttempts {
-		if err != nil {
-			return e.processResponse(ctx.Metadata, ctx.ExecutionState, resp, spec)
-		}
-
 		return e.handleRequestFailure(ctx.Metadata, ctx.ExecutionState, resp, err)
 	}
 
