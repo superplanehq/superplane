@@ -309,7 +309,7 @@ describe("HomePage canvas folders", () => {
       agentInstructions: "",
     });
 
-    await user.click(screen.getByRole("button", { name: "Just take me there" }));
+    await user.click(screen.getByRole("button", { name: "Let me preview the app without connecting" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to create canvases.");
@@ -544,7 +544,7 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
     await user.click((await screen.findAllByRole("button", { name: "Install" }))[0]);
-    await user.click(await screen.findByRole("button", { name: "Just take me there" }));
+    await user.click(await screen.findByRole("button", { name: "Let me preview the app without connecting" }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App installed, but failed to add it to folder");
