@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Software Factory
+  description: Automate coding work with agents, from trigger to pull request.
+spec:
+  nodes:
+    - id: manual-run
+      name: Manual Run
+      type: TYPE_TRIGGER
+      component: start
+      configuration:
+        templates:
+          - name: Run task
+            parameters:
+              - name: prompt
+                placeholder: Describe what the code agent should do (e.g. find and fix an important bug)
+                title: Task prompt
+                type: text
+            payload:
+              prompt: '{{ parameters["prompt"] }}'
+      position:
+        x: 0
+        y: 0
+      isCollapsed: false
+    - id: run-claude-code
+      name: Run Code Agent
+      type: TYPE_ACTION
+      component: claude.runCodeAgent
+      configuration:
+        sourceMode: repository
+        repository: "{{ install_params.repository }}"
+        task: "{{ root().data.prompt }}"
+        githubToken:
+          secret: github-token
+          key: token
+        autoCreatePr: true
+        actAsBot: true
+        networking: unrestricted
+        persistSession: false
+      position:
+        x: 640
+        y: 0
+      isCollapsed: false
+    - id: create-issue
+      name: GitHub Create Issue
+      type: TYPE_ACTION
+      component: github.createIssue
+      configuration:
+        body: |-
+          Automated issue created by the Software Factory template.
+
+          **Task prompt:**
+          {{ root().data.prompt }}
+        repository: "{{ install_params.repository }}"
+        title: 'Code agent task: {{ root().data.prompt }}'
+      position:
+        x: 1280
+        y: 0
+      isCollapsed: false
+  edges:
+    - channel: default
+      sourceId: manual-run
+      targetId: run-claude-code
+    - channel: default
+      sourceId: run-claude-code
+      targetId: create-issue
