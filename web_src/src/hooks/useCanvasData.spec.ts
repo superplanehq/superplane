@@ -1,5 +1,5 @@
 import type { CanvasesCanvasSummary } from "@/api-client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,6 +44,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
 
 import {
   canvasKeys,
+  invalidateStagedCanvasCaches,
   useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
@@ -498,5 +499,61 @@ describe("useUpdateCanvasConsole", () => {
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
     });
+  });
+});
+
+describe("invalidateStagedCanvasCaches", () => {
+  const canvasId = "canvas-1";
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it("reuses in-flight fetches instead of cancelling them (issue #5945)", async () => {
+    const queryKey = canvasKeys.stagedCanvasSpec(canvasId);
+    let queryFnCalls = 0;
+    const resolvers: Array<(value: string) => void> = [];
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: () => {
+        queryFnCalls += 1;
+        return new Promise<string>((resolve) => {
+          resolvers.push(resolve);
+        });
+      },
+      retry: false,
+      staleTime: 0,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+
+    // First read settles so the query holds data. TanStack Query only cancels a
+    // running fetch when the query already has data, which matches the staged
+    // canvas.yaml/console.yaml reads described in the issue.
+    await waitFor(() => expect(queryFnCalls).toBe(1));
+    resolvers[0]("first");
+    await waitFor(() => expect(queryClient.getQueryData(queryKey)).toBe("first"));
+
+    // A second read is now in-flight when the WebSocket `staging_updated` event
+    // arrives and triggers cache invalidation.
+    void queryClient.refetchQueries({ queryKey }).catch(() => {});
+    await waitFor(() => expect(queryFnCalls).toBe(2));
+    expect(queryClient.getQueryCache().find({ queryKey })?.state.fetchStatus).toBe("fetching");
+
+    invalidateStagedCanvasCaches(queryClient, canvasId);
+
+    // The default `cancelRefetch: true` would abort the in-flight fetch and
+    // start a third one (rejecting the second with a CancelledError). The fix
+    // leaves the running fetch untouched, so no extra fetch is started.
+    expect(queryFnCalls).toBe(2);
+
+    resolvers.forEach((resolve) => resolve("done"));
+    unsubscribe();
   });
 });
