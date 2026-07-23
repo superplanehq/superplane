@@ -101,7 +101,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/canvas-folders/[^/]+"),
       resolve: () => ({ json: {} }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
@@ -142,7 +141,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         },
       }),
     },
-    // Catalog install from ZeroStatePage
+    // Catalog install from ZeroStatePage / prototype starter setup
     {
       pattern: re("/apps/install"),
       resolve: () => ({
@@ -197,6 +196,89 @@ export function fixtureResponse(resolved: NonNullable<FixtureResult>): Response 
   });
 }
 
+type StorybookConfigField = {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  label: string;
+  visibilityConditions: unknown[];
+  requiredConditions: unknown[];
+  sensitive: boolean;
+  togglable: boolean;
+};
+
+const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
+  storybookIntegrationDefinition("github", "GitHub", "GitHub repositories, issues, and pull requests", [
+    {
+      name: "organization",
+      type: "string",
+      description:
+        "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+      required: false,
+      label: "Organization",
+      visibilityConditions: [],
+      requiredConditions: [],
+      sensitive: false,
+      togglable: false,
+    },
+  ]),
+  storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
+    {
+      name: "apiKey",
+      type: "string",
+      description: "Claude API key",
+      required: true,
+      label: "API Key",
+      visibilityConditions: [],
+      requiredConditions: [],
+      sensitive: true,
+      togglable: false,
+    },
+    {
+      name: "adminKey",
+      type: "string",
+      description: "Admin API key, required for fetching usage and cost reports.",
+      required: false,
+      label: "Admin API Key",
+      visibilityConditions: [],
+      requiredConditions: [],
+      sensitive: true,
+      togglable: false,
+    },
+  ]),
+];
+
+const STORYBOOK_GITHUB_REPOSITORIES = [
+  { id: "repo_acme_web", name: "acme/web", type: "repository" },
+  { id: "repo_acme_api", name: "acme/api", type: "repository" },
+  { id: "repo_acme_mobile", name: "acme/mobile", type: "repository" },
+  { id: "repo_acme_docs", name: "acme/docs", type: "repository" },
+];
+
+/** Storybook definitions aligned with real integration Configuration() fields. */
+function storybookIntegrationDefinition(
+  name: string,
+  label: string,
+  description: string,
+  configuration: StorybookConfigField[],
+) {
+  return {
+    name,
+    label,
+    icon: name,
+    description,
+    configuration,
+    instructions: "",
+  };
+}
+
+export type StorybookOrgIntegration = {
+  metadata: { id: string; name: string; integrationName: string };
+  status: { state: "ready" | "pending" | "error" };
+  spec?: { configuration?: Record<string, unknown> };
+};
+
 /**
  * Builds a `fetch` implementation that serves the homepage fixture entirely
  * in-process. Same rationale as AppPage's fixture fetch: avoid MSW's Service
@@ -206,15 +288,99 @@ export function createHomeFixtureFetch(
   fallback: typeof fetch,
   fixture: HomePageFixture = defaultHomePageFixture,
 ): typeof fetch {
+  const orgIntegrations: StorybookOrgIntegration[] = [];
+
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
-    const resolved = matchHomePageFixture(url, requestMethod(input, init), fixture) ?? emptyHomeApiCatchAll(url);
+    const method = requestMethod(input, init);
+    const factoryResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
+    const resolved = factoryResolved ?? matchHomePageFixture(url, method, fixture) ?? emptyHomeApiCatchAll(url);
     if (!resolved) {
       return fallback(input, init);
     }
     return fixtureResponse(resolved);
   };
   return impl as typeof fetch;
+}
+
+async function createStorybookOrgIntegration(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  orgIntegrations: StorybookOrgIntegration[],
+): Promise<FixtureResult> {
+  const body = await readRequestJson(input, init);
+  const integrationName =
+    typeof body?.integrationName === "string" && body.integrationName.trim() ? body.integrationName.trim() : "github";
+  const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : `${integrationName}-connection`;
+  const created: StorybookOrgIntegration = {
+    metadata: {
+      id: `storybook-${integrationName}-${orgIntegrations.length + 1}`,
+      name,
+      integrationName,
+    },
+    status: { state: "ready" },
+    spec: { configuration: {} },
+  };
+  orgIntegrations.push(created);
+  return { json: { integration: created } };
+}
+
+function matchOrgIntegrationDetail(
+  url: URL,
+  method: string,
+  orgIntegrations: StorybookOrgIntegration[],
+): FixtureResult {
+  const integrationDetailMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)$/.exec(url.pathname);
+  if (!integrationDetailMatch || method !== "GET") return null;
+  const integration = orgIntegrations.find((item) => item.metadata.id === integrationDetailMatch[2]);
+  if (!integration) return { json: {} };
+  return { json: { integration } };
+}
+
+/** Factory setup mocks for Storybook / vitest (connect + repository picker). */
+export async function matchFactorySetupFixture(
+  url: URL,
+  method: string,
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  orgIntegrations: StorybookOrgIntegration[],
+): Promise<FixtureResult> {
+  if (url.pathname === "/api/v1/integrations" && method === "GET") {
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+  }
+
+  const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);
+  if (orgIntegrationsMatch && method === "GET") {
+    return { json: { integrations: orgIntegrations } };
+  }
+  if (orgIntegrationsMatch && method === "POST") {
+    return createStorybookOrgIntegration(input, init, orgIntegrations);
+  }
+
+  const detailResolved = matchOrgIntegrationDetail(url, method, orgIntegrations);
+  if (detailResolved) return detailResolved;
+
+  const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
+  if (resourcesMatch && method === "GET") {
+    return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
+  }
+
+  return null;
+}
+
+async function readRequestJson(input: RequestInfo | URL, init?: RequestInit): Promise<Record<string, unknown> | null> {
+  try {
+    if (typeof init?.body === "string" && init.body.trim()) {
+      return JSON.parse(init.body) as Record<string, unknown>;
+    }
+    if (typeof input !== "string" && !(input instanceof URL)) {
+      const clone = input.clone();
+      return (await clone.json()) as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function requestUrl(input: RequestInfo | URL): string {
