@@ -61,9 +61,10 @@ On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
 (`BLOCK_SIGNUP=yes`).
 
-If `go mod download` / `go build` fail with missing files under
-`tmp/go/pkg/mod` (often after a disk-full or interrupted download), run
-`make dev.clean.go.cache` then `make dev.setup.go`.
+If `go mod download` / `go build` fail with missing or corrupt files in the Go
+module cache (the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`, often
+after a disk-full or interrupted download), run `make dev.clean.go.cache` then
+`make dev.setup.go`.
 
 ## Build, Test & Lint Commands
 
