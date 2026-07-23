@@ -97,9 +97,29 @@ format.js.check:
 dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
+# Number of attempts used when bringing the dev environment up. Registries such
+# as Docker Hub occasionally time out while fetching base images, which would
+# otherwise abort the whole run (and every CI job, since this runs in the
+# prologue) on a transient network error rather than a real problem. Retrying a
+# couple of times keeps setup reliable without hiding genuine failures.
+DEV_UP_ATTEMPTS ?= 3
+DEV_UP_RETRY_DELAY ?= 5
+
 dev.up:
 	@mkdir -p tmp/screenshots
-	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
+	@attempt=1; \
+	while true; do \
+		if $(COMPOSE) up -d --wait --build --pull always --quiet-pull; then \
+			break; \
+		fi; \
+		if [ $$attempt -ge $(DEV_UP_ATTEMPTS) ]; then \
+			echo "dev.up: failed after $(DEV_UP_ATTEMPTS) attempts" >&2; \
+			exit 1; \
+		fi; \
+		echo "dev.up: attempt $$attempt failed (likely a transient registry/network error), retrying in $(DEV_UP_RETRY_DELAY)s..." >&2; \
+		attempt=$$((attempt+1)); \
+		sleep $(DEV_UP_RETRY_DELAY); \
+	done
 
 dev.setup:
 	@$(MAKE) dev.test.is.running
