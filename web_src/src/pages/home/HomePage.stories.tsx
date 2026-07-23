@@ -7,13 +7,10 @@ import { emptyHomePageFixture } from "./__fixtures__/homePageResponses";
 /**
  * Mounts the real org home routes against an in-process fixture backend.
  * Use **Current** for the populated homepage baseline, and **FreshOrg** for the
- * empty-org create screen.
+ * empty-org create screen (factory-first landing via `NewAppPage`).
  *
  * **Current** shares a router with AppPage: clicking Software Factory opens the
  * live canvas surface (same as Pages/AppPage → Live Canvas).
- *
- * **Fresh Org (Prototype)** mounts the factory-first landing for Storybook only;
- * production `/apps/new` still uses `ZeroStatePage`.
  *
  * Networking is faked by overriding `window.fetch` rather than MSW — same
  * approach and rationale as `AppPage.stories.tsx`.
@@ -36,18 +33,9 @@ export const Current: Story = {
 };
 
 /**
- * Production empty-org path: HomePage redirects to `/apps/new` → `ZeroStatePage`.
+ * Empty-org path: HomePage redirects to `/apps/new` → factory-first landing.
  */
 export const FreshOrg: Story = {
   name: "Fresh Org",
   render: () => <HomePageHarness fixture={emptyHomePageFixture} />,
-};
-
-/**
- * Storybook-only prototype of the factory-first new-app landing. Does not change
- * the production `NewAppPage` route.
- */
-export const FreshOrgPrototype: Story = {
-  name: "Fresh Org (Prototype)",
-  render: () => <HomePageHarness fixture={emptyHomePageFixture} prototypeNewApp />,
 };

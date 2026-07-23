@@ -1,0 +1,36 @@
+{
+  "id": "software-factory",
+  "title": "Software Factory",
+  "description": "Automate coding work with agents, from trigger to pull request.",
+  "integrations": ["github", "claude"],
+  "componentIntegrations": {
+    "claude.runCodeAgent": "claude",
+    "github.createIssue": "github"
+  },
+  "startingTasks": [
+    {
+      "id": "unit-test",
+      "label": "Write test",
+      "prompt": "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes."
+    },
+    {
+      "id": "fix-bug",
+      "label": "Fix bug",
+      "prompt": "Scan through the codebase to identify bugs that look important or impactful. Focus on issues that could affect functionality, performance, or user experience. Once you find a significant bug, create a new branch, implement a fix, write or update tests as needed, and commit the changes with a clear description."
+    },
+    {
+      "id": "improve-agents-md",
+      "label": "Improve AGENTS.md",
+      "prompt": "Review the existing AGENTS.md and improve it to help coding agents work more effectively in this repository. Make the guidance specific to this codebase, preserving useful instructions and removing outdated or generic ones. If AGENTS.md doesn't exist, create it."
+    }
+  ],
+  "run": {
+    "nodeId": "manual-run",
+    "hookName": "run",
+    "template": "Run task",
+    "parameters": {
+      "prompt": { "from": "startingTaskPrompt" }
+    }
+  },
+  "source": { "type": "bundled" }
+}

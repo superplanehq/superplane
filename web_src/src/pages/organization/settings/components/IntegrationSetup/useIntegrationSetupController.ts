@@ -70,12 +70,14 @@ function useIntegrationSetupRoute(organizationId: string) {
   const integrationName = routeIntegrationName || "";
   const integrationsHref = `/${organizationId}/settings/integrations`;
   const routeState = location.state as IntegrationSetupRouteState | null;
+  // Query param supports opening setup in a new tab (location.state does not cross tabs).
+  const integrationIdFromQuery = new URLSearchParams(location.search).get("integrationId") || undefined;
 
   return {
     navigate,
     integrationName,
     integrationsHref,
-    setupIntegrationId: routeState?.integrationId,
+    setupIntegrationId: routeState?.integrationId || integrationIdFromQuery,
   };
 }
 

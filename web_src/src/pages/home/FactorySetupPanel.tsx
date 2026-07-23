@@ -1,89 +1,142 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { cn } from "@/lib/utils";
+import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
+import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/SecretPickerFieldRenderer";
+import { Bug, FilePenLine, TestTube2, type LucideIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
+import { getFactoryDefinition, type FactoryDefinition, type FactoryStartingTask } from "./factories";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
-import { FACTORY_STARTING_TASKS, type FactoryStartingTaskId } from "./factoryStartingTasks";
 import { homeInstallPanelClassName } from "./homePageStyles";
+import type { InstallParam } from "../install/types";
 
-const FACTORY_INTEGRATIONS = ["github", "claude"] as const;
+const STARTING_TASK_ICONS: Record<string, { icon: LucideIcon; iconClassName: string }> = {
+  "unit-test": { icon: TestTube2, iconClassName: "text-amber-500" },
+  "fix-bug": { icon: Bug, iconClassName: "text-red-500" },
+  "improve-agents-md": { icon: FilePenLine, iconClassName: "text-violet-500" },
+};
+
+function normalizeResourceValue(val: string | string[] | undefined): string {
+  if (typeof val === "string") return val;
+  if (Array.isArray(val)) return val[0] ?? "";
+  return "";
+}
+
+function connectHeading(integrations: string[]): string {
+  if (integrations.length === 0) return "Configure your factory";
+  if (integrations.length === 1) return `Connect your ${formatIntegrationLabel(integrations[0]!)}`;
+  if (integrations.length === 2) {
+    return `Connect your ${formatIntegrationLabel(integrations[0]!)} and ${formatIntegrationLabel(integrations[1]!)}`;
+  }
+  return "Connect your integrations";
+}
+
+const INTEGRATION_LABELS: Record<string, string> = {
+  github: "GitHub",
+  claude: "Claude",
+  gitlab: "GitLab",
+  slack: "Slack",
+};
+
+function formatIntegrationLabel(name: string): string {
+  if (!name) return name;
+  return INTEGRATION_LABELS[name] ?? name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+export interface FactorySetupResult {
+  integrations: IntegrationSelections;
+  installParams: Record<string, string>;
+  startingTaskPrompt: string;
+}
 
 interface FactorySetupPanelProps {
+  factory?: FactoryDefinition;
   organizationId?: string;
   busy?: boolean;
   onCancel: () => void;
-  onInstall: (selections: IntegrationSelections, repository: string, startingTaskPrompt: string) => void;
+  onInstall: (result: FactorySetupResult) => void;
 }
 
 export function FactorySetupPanel({
+  factory: factoryProp,
   organizationId: propOrgId,
   busy = false,
   onCancel,
   onInstall,
 }: FactorySetupPanelProps) {
+  const factory = factoryProp ?? getFactoryDefinition();
   const routeOrgId = useOrganizationId();
   const organizationId = propOrgId || routeOrgId || "";
   const [selections, setSelections] = useState<IntegrationSelections>({});
-  const [repository, setRepository] = useState("");
-  const [selectedTaskId, setSelectedTaskId] = useState<FactoryStartingTaskId | null>(null);
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  const githubConnected = Boolean(selections.github);
-  const allConnected = FACTORY_INTEGRATIONS.every((name) => selections[name]);
-  const selectedTask = FACTORY_STARTING_TASKS.find((task) => task.id === selectedTaskId) ?? null;
-  const canRun = !busy && allConnected && repository.trim() !== "" && selectedTask !== null;
+  const selectedTask = factory.startingTasks.find((task) => task.id === selectedTaskId) ?? null;
+  // Allow Run without connections, params, or a starting task — template wires what is available.
+  const canRun = !busy;
 
-  const handleSelectionsChange = useCallback((next: IntegrationSelections) => {
-    setSelections((prev) => {
-      if (prev.github?.id !== next.github?.id) {
-        setRepository("");
-      }
-      return next;
-    });
-  }, []);
+  const visibleParams = useMemo(
+    () =>
+      factory.installParams.filter((param) => {
+        if (param.type !== "integration-resource" || !param.integration) return true;
+        return Boolean(selections[param.integration]);
+      }),
+    [factory.installParams, selections],
+  );
+
+  const handleSelectionsChange = useCallback(
+    (next: IntegrationSelections) => {
+      setSelections((prev) => {
+        for (const param of factory.installParams) {
+          if (param.type !== "integration-resource" || !param.integration) continue;
+          if (prev[param.integration]?.id !== next[param.integration]?.id) {
+            setParamValues((values) => ({ ...values, [param.name]: "" }));
+          }
+        }
+        return next;
+      });
+    },
+    [factory.installParams],
+  );
 
   return (
-    <div className={homeInstallPanelClassName} role="region" aria-label="Software Factory setup">
+    <div className={homeInstallPanelClassName} role="region" aria-label={`${factory.title} setup`}>
       <div className="mb-5">
-        <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">Connect your GitHub and Claude</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-gray-400">
-          This will create software factory that automates your delivery from trigger to pull request.
-        </p>
+        <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">
+          {connectHeading(factory.integrations)}
+        </h3>
+        <p className="mt-1 text-sm text-slate-600 dark:text-gray-400">{factory.description}</p>
       </div>
 
-      <div className="mb-5">
-        <IntegrationsSection
-          integrations={[...FACTORY_INTEGRATIONS]}
-          organizationId={organizationId}
-          selections={selections}
-          onSelectionsChange={handleSelectionsChange}
-          variant="status"
-        />
-      </div>
-
-      {githubConnected && (
-        <div className="mb-5 pt-4">
-          <Label
-            htmlFor="factory-repository"
-            className="mb-2 block text-xs font-semibold text-slate-700 dark:text-gray-300"
-          >
-            Choose repository
-          </Label>
-          <FactoryRepositorySelect
+      {factory.integrations.length > 0 && (
+        <div className="mb-5">
+          <IntegrationsSection
+            integrations={factory.integrations}
             organizationId={organizationId}
-            integrationId={selections.github?.id ?? ""}
-            value={repository}
-            onChange={setRepository}
+            selections={selections}
+            onSelectionsChange={handleSelectionsChange}
+            variant="status"
           />
         </div>
       )}
 
+      {visibleParams.length > 0 && (
+        <FactoryParamsSection
+          params={visibleParams}
+          values={paramValues}
+          onChange={setParamValues}
+          organizationId={organizationId}
+          integrationSelections={selections}
+        />
+      )}
+
       <StartingTaskSection
         busy={busy}
+        tasks={factory.startingTasks}
         selectedTaskId={selectedTaskId}
         onSelectTask={setSelectedTaskId}
         prompt={selectedTask?.prompt ?? null}
@@ -94,8 +147,11 @@ export function FactorySetupPanel({
           type="button"
           disabled={!canRun}
           onClick={() => {
-            if (!selectedTask) return;
-            onInstall(selections, repository.trim(), selectedTask.prompt);
+            onInstall({
+              integrations: selections,
+              installParams: paramValues,
+              startingTaskPrompt: selectedTask?.prompt ?? "",
+            });
           }}
         >
           Run
@@ -108,23 +164,90 @@ export function FactorySetupPanel({
   );
 }
 
+function FactoryParamsSection({
+  params,
+  values,
+  onChange,
+  organizationId,
+  integrationSelections,
+}: {
+  params: InstallParam[];
+  values: Record<string, string>;
+  onChange: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  organizationId: string;
+  integrationSelections: IntegrationSelections;
+}) {
+  return (
+    <div className="mb-5 space-y-3 pt-4">
+      {params.map((param) => (
+        <div key={param.name} className="space-y-1">
+          <Label
+            htmlFor={`factory-param-${param.name}`}
+            className="mb-2 block text-xs font-semibold text-slate-700 dark:text-gray-300"
+          >
+            {param.label}
+            {param.required && <span className="text-red-500 ml-0.5">*</span>}
+          </Label>
+          {param.type === "integration-resource" && param.integration && param.resourceType ? (
+            <IntegrationResourceFieldRenderer
+              field={{
+                name: param.name,
+                label: param.label,
+                type: "integration-resource",
+                placeholder: param.placeholder,
+                required: param.required,
+                typeOptions: { resource: { type: param.resourceType, useNameAsValue: param.useNameAsValue } },
+              }}
+              value={values[param.name]}
+              onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: normalizeResourceValue(val) }))}
+              organizationId={organizationId}
+              integrationId={integrationSelections[param.integration]?.id}
+            />
+          ) : param.type === "secret_picker" ? (
+            <SecretPickerFieldRenderer
+              id={`factory-param-${param.name}`}
+              placeholder={param.placeholder}
+              required={param.required}
+              value={values[param.name]}
+              onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: val }))}
+              organizationId={organizationId}
+            />
+          ) : (
+            <Input
+              id={`factory-param-${param.name}`}
+              value={values[param.name] ?? ""}
+              placeholder={param.placeholder}
+              className="h-8 text-xs"
+              onChange={(e) => onChange((prev) => ({ ...prev, [param.name]: e.target.value }))}
+            />
+          )}
+          {param.description && <p className="text-[10px] text-slate-400 dark:text-gray-500">{param.description}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StartingTaskSection({
   busy,
+  tasks,
   selectedTaskId,
   onSelectTask,
   prompt,
 }: {
   busy: boolean;
-  selectedTaskId: FactoryStartingTaskId | null;
-  onSelectTask: (id: FactoryStartingTaskId) => void;
+  tasks: FactoryStartingTask[];
+  selectedTaskId: string | null;
+  onSelectTask: (id: string) => void;
   prompt: string | null;
 }) {
   return (
     <div className="mb-5">
       <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Choose starting task</p>
       <div className="flex flex-wrap gap-2">
-        {FACTORY_STARTING_TASKS.map((task) => {
-          const Icon = task.icon;
+        {tasks.map((task) => {
+          const iconMeta = STARTING_TASK_ICONS[task.id];
+          const Icon = iconMeta?.icon;
           const selected = task.id === selectedTaskId;
           return (
             <Button
@@ -141,7 +264,7 @@ function StartingTaskSection({
                   "border-primary/50 bg-primary/5 text-slate-900 dark:border-primary/40 dark:bg-primary/10 dark:text-gray-100",
               )}
             >
-              <Icon className={cn("size-3.5 shrink-0", task.iconClassName)} />
+              {Icon && <Icon className={cn("size-3.5 shrink-0", iconMeta.iconClassName)} />}
               {task.label}
             </Button>
           );
@@ -166,69 +289,5 @@ function StartingTaskSection({
         </div>
       )}
     </div>
-  );
-}
-
-function FactoryRepositorySelect({
-  organizationId,
-  integrationId,
-  value,
-  onChange,
-}: {
-  organizationId: string;
-  integrationId: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const {
-    data: resources = [],
-    isLoading,
-    isError,
-    refetch,
-  } = useIntegrationResources(organizationId, integrationId, "repository");
-  const options = useMemo(
-    () =>
-      resources
-        .map((resource) => {
-          const name = resource.name?.trim();
-          if (!name) return null;
-          return { value: name, label: name };
-        })
-        .filter((option): option is { value: string; label: string } => option !== null),
-    [resources],
-  );
-
-  if (isError) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-red-600 dark:text-red-400">Couldn't load repositories. Try again.</p>
-        <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!isLoading && options.length === 0) {
-    return (
-      <p className="text-xs text-slate-500 dark:text-gray-400">
-        No repositories found for this GitHub connection. Check access, then try again.
-      </p>
-    );
-  }
-
-  return (
-    <Select value={value || undefined} onValueChange={onChange} disabled={isLoading || options.length === 0}>
-      <SelectTrigger id="factory-repository" className="w-full">
-        <SelectValue placeholder={isLoading ? "Loading repositories…" : "Select a repository"} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
