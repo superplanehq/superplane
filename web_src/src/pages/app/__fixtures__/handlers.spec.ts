@@ -57,7 +57,7 @@ describe("createFixtureFetch repository routes", () => {
     expect(text).toContain("pipeline-board");
     expect(text).toContain("Create a task");
     expect(text).toContain("How it works");
-    expect(text).toContain("PR pipeline");
+    expect(text).toContain("Your Factory Pipeline");
   });
 
   it("honors an explicit repositoryFilePaths override", async () => {

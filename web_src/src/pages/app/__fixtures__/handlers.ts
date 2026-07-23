@@ -76,7 +76,7 @@ const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml
 const capturedFixture = defaultRaw as CanvasAppFixture;
 
 // Live Canvas / Software Factory console: Create a task (inline) beside a
-// 3-column PR pipeline board. `useCanvasConsole` rejects an empty file.
+// factory pipeline board. `useCanvasConsole` rejects an empty file.
 const defaultConsoleYaml =
   capturedFixture.consoleYaml ??
   materializeConsoleSpec({
@@ -114,7 +114,7 @@ const defaultConsoleYaml =
         id: "pipeline-board",
         type: "board",
         content: {
-          title: "PR pipeline",
+          title: "Your Factory Pipeline",
           dataSource: {
             kind: "runs",
             limit: 100,
@@ -122,9 +122,11 @@ const defaultConsoleYaml =
           },
           render: {
             kind: "board",
+            // Use `"Mark PR Ready" in $` — accessing `$["Mark PR Ready"].state`
+            // throws when the node never ran, which drops In-progress cards.
             groupBy: `{{ status == "passed" ? "Done" :
    status == "failed" || status == "cancelled" ? "Failed" :
-   $["Mark PR Ready"].state != null ? "Human review" :
+   ("Mark PR Ready" in $) ? "Human review" :
    "In progress" }}`,
             lanes: [
               { value: "In progress", color: "blue" },
@@ -162,10 +164,10 @@ const defaultConsoleYaml =
       },
     ],
     layout: [
-      // Left column: prompt + how-it-works (same width). Board matches stacked height.
-      { i: "submit-task", x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 4 },
-      { i: "how-it-works", x: 0, y: 6, w: 3, h: 7, minW: 2, minH: 4 },
-      { i: "pipeline-board", x: 3, y: 0, w: 9, h: 13, minW: 6, minH: 6 },
+      // Left column 50/50 prompt + how-it-works; board matches stacked height.
+      { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
+      { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
+      { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
     ],
   });
 

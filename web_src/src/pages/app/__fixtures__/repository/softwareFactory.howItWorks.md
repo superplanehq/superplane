@@ -1,7 +1,3 @@
-**Software Factory** turns a GitHub issue into a reviewed pull request: plan, implement, open a draft PR, babysit CI, then hand off for human review.
-
-___
-
 > [!SECTION:setup] Quick start
 >
 > 1. Describe the work in **Create a task** and submit.
@@ -9,7 +5,7 @@ ___
 > 3. Or assign the issue to `superplaneagent`.
 > 4. Or mention `@superplaneagent` on an issue.
 >
-> Each path fires the factory and shows up on the **PR pipeline** board.
+> Each path fires the factory and shows up on the **Your Factory Pipeline** board.
 
 > [!SECTION:runbook] How the factory works
 >
