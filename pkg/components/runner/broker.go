@@ -70,7 +70,7 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 // Example request:
 // {
 //   "fleet_id": "e1-large-amd64",
-//   "commands": ["echo \"Hello, World!\""],
+//   "commands": [{"command": "echo \"Hello, World!\""}],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
 //   "webhook_payload_size_limit": 524288,
@@ -108,23 +108,11 @@ type BrokerTaskFile struct {
 	Mode    string `json:"mode,omitempty"`
 }
 
-// BrokerCommand is one command_list entry. JSON is a plain string when Name is
-// empty, or {"name","command"} when Name is set (task-broker accepts both).
+// BrokerCommand is one command_list entry sent as {"name","command"} (name optional).
+// Unmarshal still accepts legacy plain strings for tests/fixtures.
 type BrokerCommand struct {
 	Name    string `json:"name,omitempty"`
 	Command string `json:"command"`
-}
-
-func (c BrokerCommand) MarshalJSON() ([]byte, error) {
-	name := strings.TrimSpace(c.Name)
-	command := strings.TrimSpace(c.Command)
-	if name == "" {
-		return json.Marshal(command)
-	}
-	return json.Marshal(struct {
-		Name    string `json:"name"`
-		Command string `json:"command"`
-	}{Name: name, Command: command})
 }
 
 func (c *BrokerCommand) UnmarshalJSON(data []byte) error {

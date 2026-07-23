@@ -1,6 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type * as LiveLogStreamModule from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { renderInspector, runnerExecution, runnerNode, workflowNodes } from "./RunInspectorPanel.spec.fixtures";
 
 let mockedExecutions: CanvasesCanvasNodeExecution[] = [runnerExecution];
@@ -21,7 +22,8 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: null }),
 }));
 
-vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
+vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", async (importOriginal) => ({
+  ...(await importOriginal<typeof LiveLogStreamModule>()),
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
 
@@ -69,7 +71,12 @@ describe("RunInspector runner logs", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
 
-    expect(useLiveLogStreamMock).toHaveBeenCalledWith("execution-runner-1", false);
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith(
+      "execution-runner-1",
+      false,
+      "passed",
+      Date.parse("2026-05-01T12:00:55Z"),
+    );
     expect(screen.getByText(/\$ npm run build/)).toBeInTheDocument();
     expect(screen.getByText(/vite build/)).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("superplane.runInspector.internalAccordions") || "{}")).toMatchObject({
@@ -84,6 +91,40 @@ describe("RunInspector runner logs", () => {
 
     expect(screen.queryByRole("button", { name: /Logs/i })).not.toBeInTheDocument();
     expect(useLiveLogStreamMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a loading message while finished-execution logs are still streaming in", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: null,
+      isStreaming: true,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
+    expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows the empty message only after streaming settles with no lines", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    renderRunnerInspector();
+    fireEvent.click(screen.getByRole("button", { name: /Logs.*Run Bash/i }));
+
+    expect(screen.getByText("No log lines yet.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs...")).not.toBeInTheDocument();
   });
 });
 
