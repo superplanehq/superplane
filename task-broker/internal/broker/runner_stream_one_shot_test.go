@@ -58,11 +58,13 @@ func oneShotBrokerSetup(t *testing.T) (*httptest.Server, interface {
 	return ts, st
 }
 
-func dialWS(t *testing.T, ts *httptest.Server) *websocket.Conn {
+func dialWS(t *testing.T, ts *httptest.Server, runnerID string) *websocket.Conn {
 	t.Helper()
+	registration := createTestRegistration(t, ts.URL, "token", "fleet-1")
+	accessToken := registerTestRunner(t, ts.URL, registration, runnerID, "fleet-1")
 	wsURL := "ws" + ts.URL[4:] + "/v1/runners/stream"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, map[string][]string{
-		"Authorization": {"Bearer token"},
+		"Authorization": {"Bearer " + accessToken},
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
@@ -79,7 +81,7 @@ func TestOneShotRunnerReceivesExactlyOneTask(t *testing.T) {
 	queueTask(t, ctx, st, "fleet-1", "echo task-1")
 	queueTask(t, ctx, st, "fleet-1", "echo task-2")
 
-	conn := dialWS(t, ts)
+	conn := dialWS(t, ts, "i-oneshot")
 
 	require.NoError(t, conn.WriteJSON(wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
@@ -151,7 +153,7 @@ func TestDrainedRunnerDoesNotReceiveQueuedTask(t *testing.T) {
 	require.Len(t, drainResp.Runners, 1)
 	require.Equal(t, api.DrainRunnerStateDrained, drainResp.Runners[0].State)
 
-	conn := dialWS(t, ts)
+	conn := dialWS(t, ts, "i-drained")
 	require.NoError(t, conn.WriteJSON(wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     "i-drained",
@@ -179,7 +181,7 @@ func TestMultiShotRunnerReceivesMultipleTasks(t *testing.T) {
 	queueTask(t, ctx, st, "fleet-1", "echo task-1")
 	queueTask(t, ctx, st, "fleet-1", "echo task-2")
 
-	conn := dialWS(t, ts)
+	conn := dialWS(t, ts, "i-multishot")
 
 	require.NoError(t, conn.WriteJSON(wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
@@ -217,7 +219,7 @@ func TestInfraFailureRequeueWakesWaitingWebSocketRunner(t *testing.T) {
 
 	queueTask(t, ctx, st, "fleet-1", "echo task-1")
 
-	first := dialWS(t, ts)
+	first := dialWS(t, ts, "i-first")
 	require.NoError(t, first.WriteJSON(wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     "i-first",
@@ -230,7 +232,7 @@ func TestInfraFailureRequeueWakesWaitingWebSocketRunner(t *testing.T) {
 	require.NoError(t, first.ReadJSON(&firstTask))
 	require.NotNil(t, firstTask.Task)
 
-	second := dialWS(t, ts)
+	second := dialWS(t, ts, "i-second")
 	require.NoError(t, second.WriteJSON(wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     "i-second",

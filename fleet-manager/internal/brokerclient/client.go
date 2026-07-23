@@ -25,7 +25,7 @@ type Client struct {
 }
 
 // New returns a Client. baseURL is the task-broker URL (e.g. http://broker:8081),
-// authToken is the broker's bearer token (same value as runner AUTH_TOKEN).
+// authToken is the broker's control-plane bearer token.
 func New(baseURL, authToken string) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -33,6 +33,39 @@ func New(baseURL, authToken string) *Client {
 		baseURL:   strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		authToken: strings.TrimSpace(authToken),
 	}
+}
+
+// CreateRunnerRegistration creates a one-time token for one runner VM.
+func (c *Client) CreateRunnerRegistration(ctx context.Context, fleetID string) (api.CreateRunnerRegistrationResponse, error) {
+	var out api.CreateRunnerRegistrationResponse
+	if c == nil || c.baseURL == "" {
+		return out, fmt.Errorf("brokerclient: client and base url required")
+	}
+	body, err := json.Marshal(api.CreateRunnerRegistrationRequest{FleetID: strings.TrimSpace(fleetID)})
+	if err != nil {
+		return out, err
+	}
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, c.baseURL+"/v1/runners/registrations", bytes.NewReader(body),
+	)
+	if err != nil {
+		return out, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return out, fmt.Errorf("brokerclient: registration http: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return out, fmt.Errorf("brokerclient: registration http %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return out, fmt.Errorf("brokerclient: decode registration: %w", err)
+	}
+	return out, nil
 }
 
 // FleetTaskCounts calls GET /v1/fleets/{id}/task-counts. Non-2xx responses become errors.

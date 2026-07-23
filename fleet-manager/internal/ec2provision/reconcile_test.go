@@ -45,6 +45,10 @@ func (f *fakeBrokerClient) DrainRunners(_ context.Context, req api.DrainRunnersR
 	return f.drain, f.drainErr
 }
 
+func (f *fakeBrokerClient) CreateRunnerRegistration(_ context.Context, _ string) (api.CreateRunnerRegistrationResponse, error) {
+	return api.CreateRunnerRegistrationResponse{RegistrationToken: "test-registration-token"}, nil
+}
+
 func TestDesiredWant_HeadroomOff_UsesHotInstanceCount(t *testing.T) {
 	fake := &fakeBrokerClient{counts: api.FleetTaskCountsResponse{Claimed: 99}}
 	l := &Launcher{

@@ -227,6 +227,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 	runnerCmd.Env = runnerSubprocessEnv(
 		"TASK_BROKER_URL="+baseURL,
 		"RUNNER_FLEET_ID="+stack.FleetID,
+		"RUNNER_REGISTRATION_TOKEN="+stack.RunnerRegistrationToken,
 		"RUNNER_ID=e2e-runner-1",
 		"POLL_EMPTY_MS=20",
 	)

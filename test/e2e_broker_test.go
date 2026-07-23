@@ -43,6 +43,7 @@ func TestBrokerRoutesTaskAndWebhook(t *testing.T) {
 	runnerCmd.Env = runnerSubprocessEnv(
 		"TASK_BROKER_URL="+stack.BrokerURL,
 		"RUNNER_FLEET_ID="+stack.FleetID,
+		"RUNNER_REGISTRATION_TOKEN="+stack.RunnerRegistrationToken,
 		"RUNNER_ID=e2e-broker-runner-1",
 		"POLL_EMPTY_MS=20",
 	)

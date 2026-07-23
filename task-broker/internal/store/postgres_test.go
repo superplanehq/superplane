@@ -8,10 +8,65 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/opaquetoken"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
+
+func TestRunnerRegistrationIsSingleUseAndIssuesScopedCredential(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	registrationToken := "registration-secret"
+	accessToken := "runner-access-secret"
+	if err := st.CreateRunnerRegistration(ctx, &brokermodels.RunnerRegistration{
+		TokenHash: opaquetoken.Hash(registrationToken),
+		FleetID:   "fleet-a",
+		ExpiresAt: now.Add(time.Minute),
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ExchangeRunnerRegistration(
+		ctx,
+		opaquetoken.Hash(registrationToken),
+		"i-012345",
+		"wrong-fleet",
+		opaquetoken.Hash(accessToken),
+		now,
+	); err != taskstore.ErrInvalidRunnerRegistration {
+		t.Fatalf("wrong-fleet exchange error = %v, want invalid registration", err)
+	}
+	if err := st.ExchangeRunnerRegistration(
+		ctx,
+		opaquetoken.Hash(registrationToken),
+		"i-012345",
+		"fleet-a",
+		opaquetoken.Hash(accessToken),
+		now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	credential, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash(accessToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if credential == nil || credential.RunnerID != "i-012345" || credential.FleetID != "fleet-a" {
+		t.Fatalf("credential = %#v", credential)
+	}
+	if err := st.ExchangeRunnerRegistration(
+		ctx,
+		opaquetoken.Hash(registrationToken),
+		"i-other",
+		"fleet-a",
+		opaquetoken.Hash("other-access"),
+		now,
+	); err != taskstore.ErrInvalidRunnerRegistration {
+		t.Fatalf("second exchange error = %v, want invalid registration", err)
+	}
+}
 
 func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)

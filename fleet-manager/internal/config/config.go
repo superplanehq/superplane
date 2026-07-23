@@ -26,7 +26,8 @@ type File struct {
 	// --- global infra / broker / HTTP ---
 	AWSRegion     string `json:"aws_region"`
 	TaskBrokerURL string `json:"task_broker_url"`
-	// TaskBrokerAuthToken is the shared secret used to authenticate against the task-broker.
+	// TaskBrokerAuthToken is the control-plane bearer used by fleet-manager.
+	// It is never placed on runner VMs.
 	// FM uses it for task-counts polling; FM also injects it into runner user-data so runner
 	// VMs use the same value when claiming tasks. Distinct from AuthToken below (which is
 	// THIS fleet-manager's inbound /v1/* bearer).
@@ -265,7 +266,6 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 		RunnerInstallAWSRegion:          f.AWSRegion,
 		TaskBrokerURL:                   f.TaskBrokerURL,
 		RunnerFleetID:                   p.FleetID,
-		RunnersAuthToken:                f.TaskBrokerAuthToken,
 		KeyName:                         f.KeyName,
 		RunnersIAMProfName:              f.IAMInstanceProfile,
 		HotInstanceCount:                p.HotInstanceCount,

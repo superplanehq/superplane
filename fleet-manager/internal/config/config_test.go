@@ -359,9 +359,6 @@ func TestToPoolConfig_MergesGlobalsIntoPerPool(t *testing.T) {
 	if cfg.RunnersIAMProfName != "superplane-runner" {
 		t.Errorf("RunnersIAMProfName = %q", cfg.RunnersIAMProfName)
 	}
-	if cfg.RunnersAuthToken != "broker-bearer-token" {
-		t.Errorf("RunnersAuthToken = %q", cfg.RunnersAuthToken)
-	}
 	if cfg.VolumeSizeGB != 30 {
 		t.Errorf("VolumeSizeGB = %d", cfg.VolumeSizeGB)
 	}

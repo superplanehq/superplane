@@ -33,6 +33,7 @@ import (
 type TaskCountsClient interface {
 	FleetTaskCounts(ctx context.Context, fleetID string) (api.FleetTaskCountsResponse, error)
 	DrainRunners(ctx context.Context, req api.DrainRunnersRequest) (api.DrainRunnersResponse, error)
+	CreateRunnerRegistration(ctx context.Context, fleetID string) (api.CreateRunnerRegistrationResponse, error)
 }
 
 // Launcher calls EC2 RunInstances with a deterministic cloud-init user-data starter.
@@ -95,8 +96,6 @@ type Config struct {
 	TaskBrokerURL string
 	// RunnerFleetID is this pool's broker fleet id; also the partition value in the superplane_fleet_id EC2 tag.
 	RunnerFleetID string
-	// RunnersAuthToken is the bearer token runner VMs (and this Launcher's broker client) use against task-broker.
-	RunnersAuthToken string
 	// KeyName is an optional EC2 key pair name attached to runner VMs.
 	KeyName string
 	// RunnersIAMProfName is the IAM instance profile attached to runner VMs (lets them read S3, ship logs).
@@ -212,37 +211,55 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count > maxLaunch {
 		return nil, fmt.Errorf("count exceeds maximum of %d", maxLaunch)
 	}
-	subnets := l.Config.SubnetIDs
-	if len(subnets) == 0 {
+	if len(l.Config.SubnetIDs) == 0 {
 		return nil, fmt.Errorf("no subnet ids configured")
 	}
-
-	n := int32(count)
+	if l.BrokerClient == nil {
+		return nil, fmt.Errorf("broker client required for runner registration")
+	}
 	requestedAt := time.Now().UTC()
-	userdata, err := userDataScript(l.Config, requestedAt.Unix())
+	ids := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		id, err := l.launchOne(ctx, requestedAt)
+		if err != nil {
+			return ids, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func (l *Launcher) launchOne(ctx context.Context, requestedAt time.Time) (string, error) {
+	registration, err := l.BrokerClient.CreateRunnerRegistration(ctx, l.Config.RunnerFleetID)
 	if err != nil {
-		return nil, fmt.Errorf("user-data script: %w", err)
+		return "", fmt.Errorf("create runner registration: %w", err)
+	}
+	userdata, err := userDataScript(l.Config, requestedAt.Unix(), registration.RegistrationToken)
+	if err != nil {
+		return "", fmt.Errorf("user-data script: %w", err)
 	}
 	encodedUserData := base64.StdEncoding.EncodeToString([]byte(userdata))
-
 	var lastErr error
-	for _, subnetID := range subnets {
-		ids, err := l.launchInSubnet(ctx, n, encodedUserData, subnetID, requestedAt)
+	for _, subnetID := range l.Config.SubnetIDs {
+		ids, err := l.launchInSubnet(ctx, 1, encodedUserData, subnetID, requestedAt)
 		if err == nil {
-			return ids, nil
+			if len(ids) != 1 {
+				return "", fmt.Errorf("RunInstances returned %d instance ids, want 1", len(ids))
+			}
+			return ids[0], nil
 		}
 		lastErr = err
 		if !isInsufficientInstanceCapacity(err) {
-			return nil, err
+			return "", err
 		}
 		if l.Log != nil {
 			l.Log.Info("ec2 RunInstances capacity exhausted, trying next subnet",
 				slog.String("subnet_id", subnetID),
-				slog.Int("count", count),
+				slog.Int("count", 1),
 				slog.Any("err", err))
 		}
 	}
-	return nil, lastErr
+	return "", lastErr
 }
 
 func (l *Launcher) launchInSubnet(ctx context.Context, count int32, encodedUserData, subnetID string, requestedAt time.Time) ([]string, error) {
@@ -363,7 +380,6 @@ const (
 	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
 	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
 	envRunnerFleetID       = "EC2_PROVISION_RUNNER_FLEET_ID"
-	envRunnersAuth         = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
 	envKeyName             = "EC2_PROVISION_KEY_NAME"
 	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
 	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
@@ -523,7 +539,6 @@ func ConfigFromEnv() (Config, error) {
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
 		TaskBrokerURL:                   url,
-		RunnersAuthToken:                strings.TrimSpace(os.Getenv(envRunnersAuth)),
 		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName:              prof,
 		HotInstanceCount:                hot,

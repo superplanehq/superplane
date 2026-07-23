@@ -74,7 +74,7 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 				RunnerCloudWatchLogGroup:        "/superplane/tasks",
 				RunnerCloudWatchLogStreamPrefix: "tasks",
 				RunnerProcessLogGroup:           "/superplane/runners",
-			}, 1700000000)
+			}, 1700000000, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -98,12 +98,30 @@ func TestUserDataScriptIncludesLaunchRequestedAt(t *testing.T) {
 		RunnerInstallAWSRegion: "us-east-1",
 		TaskBrokerURL:          "http://broker:8081",
 		RunnerFleetID:          "fleet-a",
-	}, 1700000000)
+	}, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(script, "RUNNER_LAUNCH_REQUESTED_AT=1700000000") {
 		t.Fatalf("user-data missing launch timestamp: %s", script)
+	}
+}
+
+func TestUserDataContainsOnlyOneTimeRunnerRegistrationToken(t *testing.T) {
+	script, err := userDataScript(Config{
+		RunnerS3URI:            "s3://bucket/runner",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}, 1700000000, "one-time-registration")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="one-time-registration"`) {
+		t.Fatal("user-data missing registration token")
+	}
+	if strings.Contains(script, "\nAUTH_TOKEN=") {
+		t.Fatal("user-data must not contain broker control token")
 	}
 }
 
@@ -196,7 +214,7 @@ func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
 	}
 	oneShot := base
 	oneShot.RunnerTerminateAfterEachTask = true
-	script, err := userDataScript(oneShot, 1700000000)
+	script, err := userDataScript(oneShot, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +223,7 @@ func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
 			t.Fatalf("one-shot user-data missing %q", want)
 		}
 	}
-	script, err = userDataScript(base, 1700000000)
+	script, err = userDataScript(base, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,6 +336,7 @@ func TestIsInsufficientInstanceCapacity(t *testing.T) {
 func TestLaunch_RetriesNextSubnetOnInsufficientCapacity(t *testing.T) {
 	var tried []string
 	l := &Launcher{
+		BrokerClient: &fakeBrokerClient{},
 		Config: Config{
 			AMI:                    "ami-test",
 			InstanceType:           "t3.micro",

@@ -147,6 +147,7 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 	runnerCmd.Env = runnerSubprocessEnv(
 		"TASK_BROKER_URL="+baseURL,
 		"RUNNER_FLEET_ID="+stack.FleetID,
+		"RUNNER_REGISTRATION_TOKEN="+stack.RunnerRegistrationToken,
 		"RUNNER_ID=e2e-cancel-runner",
 		"POLL_EMPTY_MS=20",
 	)

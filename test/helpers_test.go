@@ -26,7 +26,7 @@ func subprocessEnv(extra ...string) []string {
 		out = append(out, kv)
 	}
 	out = append(out, extra...)
-	if !envHasKey(out, "AUTH_TOKEN") {
+	if !envHasKey(out, "AUTH_TOKEN") && !envHasKey(out, "RUNNER_REGISTRATION_TOKEN") {
 		out = append(out, "AUTH_TOKEN="+E2EAuthToken)
 	}
 	return out

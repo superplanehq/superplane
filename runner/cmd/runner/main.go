@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -25,7 +26,7 @@ func main() {
 	cfg.FleetID = getRunnerFleetID()
 	cfg.RunnerID = getRunnerID()
 	cfg.LaunchRequestedAt = getLaunchRequestedAt()
-	cfg.Token = getAuthToken()
+	cfg.Token = getAuthToken(cfg.BaseURL, cfg.RunnerID, cfg.FleetID)
 	cfg.Transport = getTransport()
 
 	if v := os.Getenv("POLL_EMPTY_MS"); v != "" {
@@ -184,11 +185,38 @@ func getLaunchRequestedAt() int64 {
 	return sec
 }
 
-func getAuthToken() string {
-	token := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
-	if token == "" {
-		log.Error("AUTH_TOKEN is required")
+func getAuthToken(baseURL, runnerID, fleetID string) string {
+	token := strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN"))
+	if token != "" {
+		return token
+	}
+	tokenFile := strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN_FILE"))
+	if tokenFile != "" {
+		if raw, err := os.ReadFile(tokenFile); err == nil && strings.TrimSpace(string(raw)) != "" {
+			return strings.TrimSpace(string(raw))
+		}
+	}
+	registrationToken := strings.TrimSpace(os.Getenv("RUNNER_REGISTRATION_TOKEN"))
+	if registrationToken == "" {
+		log.Error("RUNNER_ACCESS_TOKEN or RUNNER_REGISTRATION_TOKEN is required")
 		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	token, err := agent.RegisterRunner(ctx, http.DefaultClient, baseURL, registrationToken, runnerID, fleetID)
+	if err != nil {
+		log.Error("runner registration failed", slog.Any("err", err))
+		os.Exit(1)
+	}
+	if tokenFile != "" {
+		if err := os.MkdirAll(filepath.Dir(tokenFile), 0700); err != nil {
+			log.Error("create runner token directory", slog.Any("err", err))
+			os.Exit(1)
+		}
+		if err := os.WriteFile(tokenFile, []byte(token+"\n"), 0600); err != nil {
+			log.Error("persist runner access token", slog.Any("err", err))
+			os.Exit(1)
+		}
 	}
 	return token
 }

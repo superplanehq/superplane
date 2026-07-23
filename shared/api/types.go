@@ -102,6 +102,28 @@ type CompleteTaskRequest struct {
 	Canceled bool `json:"canceled,omitempty"`
 }
 
+// CreateRunnerRegistrationRequest creates a one-time runner bootstrap credential.
+type CreateRunnerRegistrationRequest struct {
+	FleetID string `json:"fleet_id"`
+}
+
+// CreateRunnerRegistrationResponse returns the plaintext token exactly once.
+type CreateRunnerRegistrationResponse struct {
+	RegistrationToken string `json:"registration_token"`
+	ExpiresAt         int64  `json:"expires_at"`
+}
+
+// RegisterRunnerRequest exchanges a one-time bootstrap credential for a runner credential.
+type RegisterRunnerRequest struct {
+	RunnerID string `json:"runner_id"`
+	FleetID  string `json:"fleet_id"`
+}
+
+// RegisterRunnerResponse returns the runner-scoped bearer exactly once.
+type RegisterRunnerResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
 const (
 	FailureKindRunnerInfra = "runner_infra"
 )

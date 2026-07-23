@@ -20,9 +20,10 @@ import (
 const e2eBrokerAuthToken = E2EAuthToken
 
 type brokerStack struct {
-	BrokerURL string
-	FleetID   string
-	AuthToken string
+	BrokerURL               string
+	FleetID                 string
+	AuthToken               string
+	RunnerRegistrationToken string
 }
 
 func startBrokerStack(t *testing.T, root string, binDir string) brokerStack {
@@ -88,11 +89,31 @@ func startBrokerStack(t *testing.T, root string, binDir string) brokerStack {
 	if regResp.StatusCode != http.StatusCreated {
 		t.Fatalf("register fleet: %s", string(regRespBody))
 	}
+	registrationBody, _ := json.Marshal(api.CreateRunnerRegistrationRequest{FleetID: fleetID})
+	registrationReq, _ := http.NewRequest(
+		http.MethodPost, brokerURL+"/v1/runners/registrations", bytes.NewReader(registrationBody),
+	)
+	registrationReq.Header.Set("Content-Type", "application/json")
+	registrationReq.Header.Set("Authorization", "Bearer "+e2eBrokerAuthToken)
+	registrationResp, err := http.DefaultClient.Do(registrationReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registrationResp.Body.Close()
+	if registrationResp.StatusCode != http.StatusCreated {
+		raw, _ := io.ReadAll(registrationResp.Body)
+		t.Fatalf("create runner registration: %s", raw)
+	}
+	var registration api.CreateRunnerRegistrationResponse
+	if err := json.NewDecoder(registrationResp.Body).Decode(&registration); err != nil {
+		t.Fatal(err)
+	}
 
 	return brokerStack{
-		BrokerURL: brokerURL,
-		FleetID:   fleetID,
-		AuthToken: e2eBrokerAuthToken,
+		BrokerURL:               brokerURL,
+		FleetID:                 fleetID,
+		AuthToken:               e2eBrokerAuthToken,
+		RunnerRegistrationToken: registration.RegistrationToken,
 	}
 }
 

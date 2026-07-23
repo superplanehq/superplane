@@ -39,6 +39,7 @@ func TestCompleteTaskRequeuesInfraFailureOverHTTP(t *testing.T) {
 	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "token"}))
 	t.Cleanup(ts.Close)
 
+	accessToken := mintRunnerAccessToken(t, ctx, st, "fleet-http-retry", "runner-http")
 	body, err := json.Marshal(api.CompleteTaskRequest{
 		RunnerID:    "runner-http",
 		ExitCode:    1,
@@ -48,7 +49,7 @@ func TestCompleteTaskRequeuesInfraFailureOverHTTP(t *testing.T) {
 	require.NoError(t, err)
 	req, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/tasks/"+taskID+"/complete", bytes.NewReader(body))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)

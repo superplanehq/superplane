@@ -86,7 +86,8 @@ func TestUnhealthyDrainAllowsPassedCompletionWhileBusy(t *testing.T) {
 		t.Fatalf("task after drain: %#v", task)
 	}
 
-	postComplete(t, ts, taskID, api.CompleteTaskRequest{
+	accessToken := mintRunnerAccessToken(t, ctx, st, "fleet-a", runnerID)
+	postComplete(t, ts, taskID, accessToken, api.CompleteTaskRequest{
 		RunnerID: runnerID,
 		ExitCode: 0,
 	}, http.StatusNoContent)
@@ -209,7 +210,8 @@ func TestTerminationPendingAcceptsLatePassedCompletion(t *testing.T) {
 	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "tok"}))
 	defer ts.Close()
 
-	postComplete(t, ts, taskID, api.CompleteTaskRequest{
+	accessToken := mintRunnerAccessToken(t, ctx, st, "fleet-a", "runner-1")
+	postComplete(t, ts, taskID, accessToken, api.CompleteTaskRequest{
 		RunnerID: "runner-1",
 		ExitCode: 0,
 	}, http.StatusNoContent)
@@ -473,7 +475,7 @@ func postDrain(t *testing.T, ts *httptest.Server, reqBody api.DrainRunnersReques
 	return got
 }
 
-func postComplete(t *testing.T, ts *httptest.Server, taskID string, reqBody api.CompleteTaskRequest, wantStatus int) {
+func postComplete(t *testing.T, ts *httptest.Server, taskID, accessToken string, reqBody api.CompleteTaskRequest, wantStatus int) {
 	t.Helper()
 	body, err := json.Marshal(reqBody)
 	if err != nil {
@@ -483,7 +485,7 @@ func postComplete(t *testing.T, ts *httptest.Server, taskID string, reqBody api.
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := ts.Client().Do(req)

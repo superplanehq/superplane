@@ -159,6 +159,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 		}
 
 		if a.Config.ExitAfterEachTask {
+			a.revokeCredential(ctx, a.fleetBase())
 			return nil
 		}
 	}
