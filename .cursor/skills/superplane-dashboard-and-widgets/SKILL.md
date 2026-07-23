@@ -120,7 +120,7 @@ Editor memory hints: `MemoryDiscoveryPanel.tsx`, `useMemoryCatalog.ts` (suggesti
 - `content.variables[]` carries named live data refs; body uses `{{ name.field }}` (or `{{ name.$["Node"].data.x }}` for runs).
 - Sources: `{ kind: "memory", namespace, orderBy?, direction?, matches?, mode?, limit? }` (default `mode: single` first-row wins, `orderBy: createdAt desc`) or `{ kind: "run", select: latest | latest_passed | latest_failed }`.
 - `mode: list` resolves the memory variable to the full sorted array of matching rows (optionally capped by `limit`), unlocking CEL list macros (`rows.map(r, ...).filter(...)`) inside `{{ }}`; pair with the `join(list, sep)` builtin in `celExpr.ts` to flatten into Markdown / HTML.
-- Resolution lives in `useMarkdownVariables.ts` (`pickMemoryRows` is the exported helper that branches on mode); interpolation in `markdownInterpolation.ts` (reuses `celExpr.compileTemplate`/`evalTemplate`). Validation: `markdownVariables.ts` (FE, including `validateMarkdownContent`) + `validateMarkdownContent` / `validateHTMLContent` in `pkg/models/console_yml.go` (BE).
+- Resolution lives in `useMarkdownVariables.ts` (`pickMemoryRows` is the exported helper that branches on mode); interpolation in `markdownInterpolation.ts` (reuses `celExpr.compileTemplate`/`evalTemplate`). Validation: `markdownVariables.ts` (FE, including `validateMarkdownContent`) + `validateMarkdownContent` / `validateHTMLContent` in `pkg/yaml/console.go` (BE).
 - Run vars expose `status`, `nodeName`, `payload`, `durationMs`, and a `$` map of node executions (same shape as the table widget).
 
 ### HTML widget safety
