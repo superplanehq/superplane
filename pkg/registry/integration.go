@@ -20,6 +20,16 @@ func NewPanicableIntegration(i core.Integration) core.Integration {
 	return &PanicableIntegration{underlying: i}
 }
 
+// UnwrapIntegration returns the concrete integration implementation, unwrapping panic guards.
+func UnwrapIntegration(i core.Integration) core.Integration {
+	panicable, ok := i.(*PanicableIntegration)
+	if !ok {
+		return i
+	}
+
+	return panicable.underlying
+}
+
 /*
  * Non-panicking methods.
  * These are mostly definition methods, so they won't panic.

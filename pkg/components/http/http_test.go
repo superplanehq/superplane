@@ -116,6 +116,20 @@ func (f *fakeSecretsContext) GetKey(_, _ string) ([]byte, error) {
 	return f.value, nil
 }
 
+func (f *fakeSecretsContext) GetSecretKeys(_ string) (map[string][]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, core.ErrSecretKeyNotFound
+}
+
+func (f *fakeSecretsContext) GetIntegrationKeys(_ string) (map[string][]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, core.ErrSecretKeyNotFound
+}
+
 type sequenceHTTPClient struct {
 	errors    []error
 	responses []*http.Response

@@ -263,9 +263,9 @@ func FindIntegrationInTransaction(tx *gorm.DB, orgID, integrationID uuid.UUID) (
 	return &integration, nil
 }
 
-func FindIntegrationByName(orgID uuid.UUID, integrationName string) (*Integration, error) {
+func FindIntegrationByName(db *gorm.DB, orgID uuid.UUID, integrationName string) (*Integration, error) {
 	var integration Integration
-	err := database.Conn().
+	err := db.
 		Where("organization_id = ?", orgID).
 		Where("installation_name = ?", integrationName).
 		First(&integration).

@@ -34,6 +34,8 @@ const (
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
+	FieldTypeSecret              = "secret"
+	FieldTypeIntegration         = "integration"
 	FieldTypeApp                 = "app"
 	FieldTypeAppCanvasNode       = "app-canvas-node"
 	FieldTypeRunParameters       = "run-parameters"

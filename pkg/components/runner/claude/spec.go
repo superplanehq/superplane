@@ -6,8 +6,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
@@ -30,13 +28,14 @@ type ClaudeCodeStep struct {
 
 // RunClaudeCodeSpec is persisted runnerClaudeCode node configuration.
 type RunClaudeCodeSpec struct {
-	MachineType             string                       `mapstructure:"machineType"`
-	Steps                   []ClaudeCodeStep             `mapstructure:"steps"`
-	AnthropicAPIKey         configuration.SecretKeyRef   `mapstructure:"anthropicApiKey"`
-	Model                   string                       `mapstructure:"model"`
-	WorkingDirectory        string                       `mapstructure:"workingDirectory"`
-	Environment             []runner.EnvironmentVariable `mapstructure:"environment"`
-	ExecutionTimeoutSeconds int                          `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
+	MachineType             string                        `mapstructure:"machineType"`
+	Steps                   []ClaudeCodeStep              `mapstructure:"steps"`
+	AnthropicAPIKey         configuration.SecretKeyRef    `mapstructure:"anthropicApiKey"`
+	Model                   string                        `mapstructure:"model"`
+	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
+	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
+	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
+	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
 
 	// Legacy fields — migrated into Steps when Steps is empty.
 	Prompt              string `mapstructure:"prompt"`
@@ -56,10 +55,7 @@ type ClaudeCodeBrokerTask struct {
 
 func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
 	var spec RunClaudeCodeSpec
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		WeaklyTypedInput: true,
-	})
+	dec, err := runner.NewSpecDecoder(&spec)
 	if err != nil {
 		return RunClaudeCodeSpec{}, fmt.Errorf("runnerClaudeCode spec decoder: %w", err)
 	}
@@ -117,6 +113,9 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	}
 	if !spec.AnthropicAPIKey.IsSet() {
 		return fmt.Errorf("anthropic API key is required")
+	}
+	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
+		return err
 	}
 	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err

@@ -200,6 +200,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			Description: "Optional starting directory.",
 			Placeholder: "/tmp/repo",
 		},
+		runner.EnvironmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -305,7 +306,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
