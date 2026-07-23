@@ -27,6 +27,22 @@ export function CommitStagingDialog({ open, pending, onOpenChange, onCommit }: C
     }
   }, [open]);
 
+  const canSubmit = !pending && commitMessage.trim().length > 0;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    void onCommit(commitMessage);
+  };
+
+  // Submit on Enter (and Cmd/Ctrl+Enter) to match user expectation.
+  // Shift+Enter still inserts a newline for multi-line commit messages.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="border-0 dark:border-0">
@@ -40,6 +56,7 @@ export function CommitStagingDialog({ open, pending, onOpenChange, onCommit }: C
             id="commit-message"
             value={commitMessage}
             onChange={(event) => setCommitMessage(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Update workflow triggers"
             rows={4}
             disabled={pending}
@@ -50,12 +67,7 @@ export function CommitStagingDialog({ open, pending, onOpenChange, onCommit }: C
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={() => void onCommit(commitMessage)}
-            disabled={pending || !commitMessage.trim()}
-            data-testid="canvas-commit-message-submit"
-          >
+          <Button type="button" onClick={submit} disabled={!canSubmit} data-testid="canvas-commit-message-submit">
             Commit
           </Button>
         </DialogFooter>

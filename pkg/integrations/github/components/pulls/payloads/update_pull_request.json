@@ -1,0 +1,45 @@
+{
+  "data": {
+    "id": 1234567890,
+    "node_id": "PR_kwDOABCD12MAAAABCDEFGH",
+    "number": 42,
+    "title": "Add new feature",
+    "body": "Adds the new feature described in the linked issue.",
+    "state": "open",
+    "locked": false,
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "comments_url": "https://api.github.com/repos/acme/widgets/issues/42/comments",
+    "created_at": "2026-04-22T10:00:00Z",
+    "updated_at": "2026-04-22T11:15:00Z",
+    "labels": [
+      {
+        "name": "enhancement",
+        "color": "a2eeef"
+      }
+    ],
+    "assignees": [
+      {
+        "login": "octocat",
+        "id": 1,
+        "html_url": "https://github.com/octocat"
+      }
+    ],
+    "head": {
+      "ref": "feature-branch",
+      "label": "acme:feature-branch"
+    },
+    "base": {
+      "ref": "release",
+      "label": "acme:release"
+    },
+    "user": {
+      "login": "octocat",
+      "id": 1,
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-04-22T11:15:00.000000000Z",
+  "type": "github.pullRequest"
+}

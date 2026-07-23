@@ -84,6 +84,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"incident.onIncident":                 "{{ root().data.incident.name }}",
 	"jfrogArtifactory.onArtifactUploaded": "{{ root().data.name }} in {{ root().data.repo }}",
 	"launchdarkly.onFeatureFlagChange":    "{{ root().data.name }}",
+	"linear.onIssue":                      "{{ root().data.data.identifier }} - {{ root().data.data.title }}",
 	"logfire.onAlertReceived":             "{{ root().data.alertName }}",
 	"newrelic.onIssue":                    "{{ root().data.title }} {{ root().data.state }}",
 	"oci.onComputeInstanceCreated":        "{{ root().data.data.resourceName }}",

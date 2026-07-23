@@ -126,9 +126,10 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?`, inline presentation fields |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
+| `board` | Render rows as kanban lanes grouped by a scalar field | `title?`, `dataSource`, `render.kind: "board"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
 | `number` | Render one aggregate KPI, or several KPIs side-by-side via `metrics[]` | `title?`, (`dataSource` + `render.kind: "number"`) or `metrics[]` |
 
@@ -425,6 +426,55 @@ Note that `field: finishedAt - createdAt` does **not** work directly because bot
 - `field: '{{ epochMs(finishedAt) - epochMs(createdAt) }}', format: duration` — gives you a numeric ms value the column formatter can render and downstream filters can compare against.
 
 Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
+
+## Board Panels
+
+Board panels render the same row shape as the table panel — memory, executions, or runs — as a kanban board grouped by a scalar field. This is a read-only view for surfacing pipeline / workflow state; lane membership is owned by the workflow's data, not by drag-and-drop.
+
+```yaml
+type: board
+content:
+  title: Pipeline
+  dataSource: { kind: memory, namespace: factory_tasks }
+  render:
+    kind: board
+    groupBy: status
+    lanes:
+      - { value: Planning }
+      - { value: In Review, label: Review, color: yellow }
+      - { value: Merged, label: Done, color: green }
+    otherLane: false
+    card:
+      titleField: title
+      fields:
+        - { field: pr_url, format: link, label: PR }
+        - { field: updatedAt, format: relative }
+    where: []
+    sort: { field: updatedAt, order: desc }
+    rowActions: []
+```
+
+### Fields
+
+| Field | Notes |
+| --- | --- |
+| `groupBy` | Required. Row field (dot path or `{{ expr }}`) used to place each row into a lane. Values are matched case-insensitively and trimmed. |
+| `lanes` | Required, at least one entry. Each lane has `value` (required, non-empty), optional `label` (defaults to `value`), and optional `color` from the shared palette: `neutral`, `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`. |
+| `otherLane` | Optional boolean. When `true`, rows whose `groupBy` value does not match any configured lane render in a trailing **Other** lane instead of being hidden. Defaults to hiding unmatched rows. |
+| `card.titleField` | Required. Row field rendered as the card title. Falls back to the `groupBy` value (or row `id`) when the field resolves to an empty value. |
+| `card.fields` | Optional list. Each entry reuses compact `WidgetTableColumn` semantics (`field`, `label?`, `format?`, `show?`, `href?`) and renders as a meta line under the title. Supported formats are `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, and `link`; table-only `avatar`, `progress`, and `trend` formats are not supported. Unlabelled fields render the value alone. |
+| `where` | Optional list of structured filters. Same operators as the table panel (`eq`, `neq`, `contains`, `not_contains`, `gt`, `lt`, `exists`, `not_exists`). |
+| `sort` | Optional widget-level sort applied inside each lane. Same shape as the table sort. |
+| `rowActions` | Optional list of trigger actions rendered as compact buttons on each card. Same rules as the table row actions — manual-run gating, per-row `show`, confirm dialogs, and lock accounting via the shared per-widget action lock. |
+| `emptyMessage` | Optional string rendered when no rows match the current filters. |
+
+### Renderer behavior
+
+- Rows first pass through `where` filters and `sort`, then are grouped by the normalized `groupBy` value.
+- Lanes render in configured order with a count badge in the header and a colored left strip so lanes remain readable when the panel scrolls horizontally.
+- Cards show the title in bold on the first line and card fields underneath. Row actions render at the bottom-right of each card; trigger-node visibility, permission gating, and per-row `show` expressions match the table panel exactly.
+- Horizontal scroll kicks in when lanes overflow the panel width; each lane has its own vertical scroll. An empty lane shows a subtle placeholder row.
+- Live updates come free from `useWidgetData` invalidations — the same memory / run websocket signals that drive the table refresh the board.
 
 ## Chart Panels
 
@@ -915,8 +965,23 @@ Per-entry fields:
 | `showRun` | When true and the resolved node is a manual-run trigger (see [Node Panels](#node-panels)), surface a manual "Run" button. Still gated by `canRunNodes` and the shared in-flight lock. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
 | `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
+| `formMode` | How the parameter form is presented. `"modal"` (default) opens `NodeRunConfirmDialog` on Run; `"inline"` renders `StartRunParameterFields` plus a submit button directly in the panel body — prompt-submission style. Only honored when the entry resolves to a manual-run Start trigger whose selected template exposes at least one `parameters[]` entry; otherwise the entry falls back to the modal path. `promptConfirmation` is ignored while inline mode is active — the form itself is the confirmation. |
+| `showNodeLabel` | Inline presentation only. Set `false` to remove the resolved node name / entry `label` above the form. Defaults to `true`. |
+| `showFieldLabels` | Inline presentation only. Set `false` to visually hide parameter labels for a compact prompt form. Labels remain associated with inputs for assistive technology; configure useful trigger parameter placeholders when using this mode. Defaults to `true`. |
+| `submitLabel` | Inline presentation only. Optional submit-button copy; blank / omitted falls back to `"Run"`. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
+
+### Inline Run Form
+
+When an entry sets `formMode: inline`, `NodesPanelCard` renders `NodesPanelInlineRunForm` instead of the modal-based Run button. The inline form reuses the same `StartRunParameterFields` renderer used inside `NodeRunConfirmDialog`, so string / text (multi-line) / number / boolean / select parameters behave identically in both surfaces. Submissions still flow through `useConsoleRunTrigger` → `InvokeNodeTriggerHook`, so authorization, the shared per-panel `useConsoleTriggerLock`, and the invalidation of run/execution/memory queries are unchanged.
+
+Non-inline paths remain the default:
+
+- Row entries whose resolved template has no `parameters[]` render the Run button and fire immediately (or open the bare "Run X?" confirmation when `promptConfirmation: true`).
+- Row entries pointing at non-manual-run triggers (event triggers such as `github.onPullRequest`) never surface a Run affordance, inline or otherwise.
+
+Inline mode is intended for a single prompt-submission panel per console (agent-oriented workflow start, task submission, one-off backfill, etc.); pair with the `text` parameter type on the Start trigger for multi-line prompt inputs. For the least verbose layout, use the standard panel `title`, set `showNodeLabel: false` and `showFieldLabels: false`, configure the parameter placeholder on the Start trigger, and give `submitLabel` domain-specific copy such as `"Create task"`.
 
 ## YAML Import And Export
 
@@ -960,14 +1025,14 @@ Rules:
 - Maximum panel payload size is 1 MiB.
 - Import replaces the whole console.
 
-Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and validation lives in `canvas_dashboard_yml.go`. Keep error behavior and accepted shapes aligned.
+Frontend YAML parsing lives in `consoleYaml.ts`. Backend YAML parsing and validation lives in `pkg/yaml/console.go`. Keep error behavior and accepted shapes aligned.
 
 ## Bundling A Console With An Installable App
 
 Apps installed from a public GitHub repository (`POST /apps/install`) can ship an optional `console.yaml` alongside `canvas.yaml`. When present, the install flow loads it from the same ref and writes it as the new canvas's console.
 
 - File path: `console.yaml` at the repo root, same branch (`main` or `master`) that `canvas.yaml` is read from.
-- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `models.DashboardFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
+- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `yaml.ConsoleFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
 - Optional: a missing file is fine — the new canvas just starts with an empty console.
 - Replace-all on install: `metadata.canvasId` is ignored; the panels and layout become the canvas's full console.
 

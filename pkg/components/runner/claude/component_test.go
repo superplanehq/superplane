@@ -105,10 +105,10 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	require.Len(t, req.Files, 6)
 	assert.Equal(t, runScript, requireTaskFile(t, req.Files, "run.js").Content)
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, "cd '/tmp'")
-	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git /tmp/repo"), requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
+	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
 	assert.Equal(t, "Fix the failing tests", requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content)
 	assert.Equal(t, "Open a pull request", requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content)
-	assert.Equal(t, buildClaudeBashStepScript("git -C /tmp/repo status"), requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
+	assert.Equal(t, "git -C /tmp/repo status", requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
 }
 
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
@@ -164,9 +164,9 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	}, req.Commands[2])
 	assert.Equal(t, runner.BrokerCommand{Name: "After", Command: `source "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`}, req.Commands[3])
 	require.Len(t, req.Files, 5)
-	assert.Equal(t, buildClaudeBashStepScript("git clone https://github.com/acme/widgets.git /tmp/repo"), requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
+	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
 	assert.Equal(t, "implement the issue", requireTaskFile(t, req.Files, "prompts/02-prompt.txt").Content)
-	assert.Equal(t, buildClaudeBashStepScript("git push"), requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
+	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
 }
 
 func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {

@@ -20,9 +20,17 @@ const (
 	ConsolePanelTypeNode      = "node"
 	ConsolePanelTypeNodes     = "nodes"
 	ConsolePanelTypeTable     = "table"
+	ConsolePanelTypeBoard     = "board"
 	ConsolePanelTypeChart     = "chart"
 	ConsolePanelTypeNumber    = "number"
 	ConsolePanelTypeScorecard = "scorecard"
+
+	// ConsoleNodesPanelFormMode* control whether a `nodes` panel entry
+	// renders its manual-run parameter form as a modal dialog (default)
+	// or inline in the panel body. Keep in lockstep with
+	// `NODES_PANEL_FORM_MODES` in the frontend `nodesPanelContent.ts`.
+	ConsoleNodesPanelFormModeModal  = "modal"
+	ConsoleNodesPanelFormModeInline = "inline"
 
 	MaxConsolePanels       = 50
 	MaxConsolePayloadBytes = 1024 * 1024
@@ -37,6 +45,7 @@ var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeNode,
 	ConsolePanelTypeNodes,
 	ConsolePanelTypeTable,
+	ConsolePanelTypeBoard,
 	ConsolePanelTypeChart,
 	ConsolePanelTypeNumber,
 	ConsolePanelTypeScorecard,
@@ -270,6 +279,8 @@ func validatePanelContent(panel ConsolePanel) error {
 		return validateNodesPanelContent(panel)
 	case ConsolePanelTypeTable:
 		return validateTablePanelContent(panel)
+	case ConsolePanelTypeBoard:
+		return validateBoardPanelContent(panel)
 	case ConsolePanelTypeChart:
 		return validateChartPanelContent(panel)
 	case ConsolePanelTypeNumber:
@@ -605,19 +616,32 @@ func validateNodesPanelEntry(panelID string, index int, raw any) error {
 	if strings.TrimSpace(node) == "" {
 		return fmt.Errorf("panel %q content.nodes[%d].node must be a non-empty string", panelID, index)
 	}
-	for _, key := range []string{"label", "description", "triggerName"} {
+	for _, key := range []string{"label", "description", "triggerName", "submitLabel"} {
 		if err := validateOptionalString(panelID, fmt.Sprintf("content.nodes[%d].%s", index, key), entry[key]); err != nil {
 			return err
 		}
 	}
-	if rawShowRun, present := entry["showRun"]; present && rawShowRun != nil {
-		if _, ok := rawShowRun.(bool); !ok {
-			return fmt.Errorf("panel %q content.nodes[%d].showRun must be a boolean", panelID, index)
+	for _, key := range []string{"showRun", "promptConfirmation", "showNodeLabel", "showFieldLabels"} {
+		rawValue, present := entry[key]
+		if present && rawValue != nil {
+			if _, ok := rawValue.(bool); !ok {
+				return fmt.Errorf("panel %q content.nodes[%d].%s must be a boolean", panelID, index, key)
+			}
 		}
 	}
-	if rawPrompt, present := entry["promptConfirmation"]; present && rawPrompt != nil {
-		if _, ok := rawPrompt.(bool); !ok {
-			return fmt.Errorf("panel %q content.nodes[%d].promptConfirmation must be a boolean", panelID, index)
+	if rawFormMode, present := entry["formMode"]; present && rawFormMode != nil {
+		mode, ok := rawFormMode.(string)
+		if !ok {
+			return fmt.Errorf("panel %q content.nodes[%d].formMode must be a string", panelID, index)
+		}
+		switch mode {
+		case ConsoleNodesPanelFormModeModal, ConsoleNodesPanelFormModeInline:
+		default:
+			return fmt.Errorf(
+				"panel %q content.nodes[%d].formMode must be %q or %q",
+				panelID, index,
+				ConsoleNodesPanelFormModeModal, ConsoleNodesPanelFormModeInline,
+			)
 		}
 	}
 	return nil
@@ -1011,6 +1035,155 @@ func validateTableRowActions(panelID string, raw any) error {
 		}
 	}
 
+	return nil
+}
+
+// AllowedBoardLaneColors mirrors `WIDGET_BOARD_LANE_COLORS` on the FE.
+// Keep in lockstep with `web_src/src/pages/app/console/widget/types.ts`.
+var AllowedBoardLaneColors = []string{
+	"neutral",
+	"gray",
+	"blue",
+	"green",
+	"yellow",
+	"orange",
+	"red",
+	"purple",
+}
+
+var allowedBoardCardFormats = []string{
+	"text",
+	"number",
+	"percent",
+	"date",
+	"datetime",
+	"relative",
+	"duration",
+	"status",
+	"badge",
+	"code",
+	"link",
+}
+
+// validateBoardPanelContent enforces the shape of a `board` (kanban) panel.
+// Structure mirrors `validateBoardContent` in
+// `web_src/src/pages/app/console/boardPanelContent.ts` so the frontend and
+// backend validators can never drift.
+func validateBoardPanelContent(panel ConsolePanel) error {
+	if panel.Content == nil {
+		return fmt.Errorf("panel %q content is required", panel.ID)
+	}
+	if err := validateOptionalString(panel.ID, "content.title", panel.Content["title"]); err != nil {
+		return err
+	}
+	if err := validateDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
+		return err
+	}
+	render, err := validateRender(panel.ID, panel.Content["render"], "board")
+	if err != nil {
+		return err
+	}
+	groupBy, ok := render["groupBy"].(string)
+	if !ok || strings.TrimSpace(groupBy) == "" {
+		return fmt.Errorf("panel %q render.groupBy must be a non-empty string", panel.ID)
+	}
+	if err := validateBoardLanes(panel.ID, render["lanes"]); err != nil {
+		return err
+	}
+	if raw, ok := render["otherLane"]; ok && raw != nil {
+		if _, isBool := raw.(bool); !isBool {
+			return fmt.Errorf("panel %q render.otherLane must be a boolean", panel.ID)
+		}
+	}
+	if err := validateBoardCard(panel.ID, render["card"]); err != nil {
+		return err
+	}
+	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
+		return err
+	}
+	if err := validateSort(panel.ID, render["sort"]); err != nil {
+		return err
+	}
+	if err := validateTableRowActions(panel.ID, render["rowActions"]); err != nil {
+		return err
+	}
+	return validateOptionalString(panel.ID, "render.emptyMessage", render["emptyMessage"])
+}
+
+func validateBoardLanes(panelID string, raw any) error {
+	lanes, ok := raw.([]any)
+	if !ok || len(lanes) == 0 {
+		return fmt.Errorf("panel %q render.lanes must be a non-empty array", panelID)
+	}
+	seenValues := map[string]struct{}{}
+	for i, rawLane := range lanes {
+		lane, ok := rawLane.(map[string]any)
+		if !ok || lane == nil {
+			return fmt.Errorf("panel %q render.lanes[%d] must be an object", panelID, i)
+		}
+		value, ok := lane["value"].(string)
+		if !ok || strings.TrimSpace(value) == "" {
+			return fmt.Errorf("panel %q render.lanes[%d].value must be a non-empty string", panelID, i)
+		}
+		normalizedValue := strings.ToLower(strings.TrimSpace(value))
+		if _, exists := seenValues[normalizedValue]; exists {
+			return fmt.Errorf("panel %q render.lanes[%d].value must be unique after trimming and case folding", panelID, i)
+		}
+		seenValues[normalizedValue] = struct{}{}
+		if err := validateOptionalString(panelID, fmt.Sprintf("render.lanes[%d].label", i), lane["label"]); err != nil {
+			return err
+		}
+		if rawColor, ok := lane["color"]; ok && rawColor != nil {
+			color, isString := rawColor.(string)
+			if !isString || !slices.Contains(AllowedBoardLaneColors, color) {
+				return fmt.Errorf("panel %q render.lanes[%d].color must be one of %s", panelID, i, strings.Join(AllowedBoardLaneColors, "/"))
+			}
+		}
+	}
+	return nil
+}
+
+func validateBoardCard(panelID string, raw any) error {
+	card, ok := raw.(map[string]any)
+	if !ok || card == nil {
+		return fmt.Errorf("panel %q render.card must be an object", panelID)
+	}
+	titleField, ok := card["titleField"].(string)
+	if !ok || strings.TrimSpace(titleField) == "" {
+		return fmt.Errorf("panel %q render.card.titleField must be a non-empty string", panelID)
+	}
+	if raw, ok := card["fields"]; ok && raw != nil {
+		return validateBoardCardFields(panelID, raw)
+	}
+	return nil
+}
+
+func validateBoardCardFields(panelID string, raw any) error {
+	fields, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.card.fields must be an array", panelID)
+	}
+	for i, rawField := range fields {
+		field, ok := rawField.(map[string]any)
+		if !ok || field == nil {
+			return fmt.Errorf("panel %q render.card.fields[%d] must be an object", panelID, i)
+		}
+		name, ok := field["field"].(string)
+		if !ok || strings.TrimSpace(name) == "" {
+			return fmt.Errorf("panel %q render.card.fields[%d].field must be a non-empty string", panelID, i)
+		}
+		for _, key := range []string{"label", "href", "show", "format"} {
+			if err := validateOptionalString(panelID, fmt.Sprintf("render.card.fields[%d].%s", i, key), field[key]); err != nil {
+				return err
+			}
+		}
+		if rawFormat, ok := field["format"]; ok && rawFormat != nil {
+			format := rawFormat.(string)
+			if !slices.Contains(allowedBoardCardFormats, format) {
+				return fmt.Errorf("panel %q render.card.fields[%d].format must be one of %s", panelID, i, strings.Join(allowedBoardCardFormats, "/"))
+			}
+		}
+	}
 	return nil
 }
 
