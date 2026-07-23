@@ -34,6 +34,16 @@ export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined
   return headerMode === "version-live";
 }
 
+/**
+ * True when the runs sidebar (and its toggle icon) may be shown for the given
+ * tab. The runs sidebar is available on the main workflow Canvas tab and on the
+ * Console tab, but not on the Memory or Files surfaces. The Console overlay is
+ * laid out beside the left sidebars, so an open runs sidebar coexists with it.
+ */
+export function allowsRunsSidebar(headerMode: CanvasPageHeaderMode | undefined): boolean {
+  return isCanvasWorkflowTab(headerMode) || headerMode === "console";
+}
+
 const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
 const LEGACY_RUNS_VIEW = "runs";

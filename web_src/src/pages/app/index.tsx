@@ -138,7 +138,7 @@ import {
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
-  isCanvasWorkflowTab,
+  allowsRunsSidebar,
   useWorkflowUrlViewFlags,
   readStoredBoolean,
   clearRunInspectionSearchParams,
@@ -4062,10 +4062,11 @@ export function AppPage() {
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
 
+  // The runs sidebar (and its toggle icon) is available on both the Canvas and
+  // Console tabs, but not on Memory/Files surfaces or during an edit session.
   const showRunsSidebar =
-    isCanvasWorkflowTab(headerMode) &&
+    allowsRunsSidebar(headerMode) &&
     !editSessionActive &&
-    !urlViewFlags.isConsoleMode &&
     !urlViewFlags.isMemoryMode &&
     !urlViewFlags.isFilesMode;
 
