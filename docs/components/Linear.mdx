@@ -1,0 +1,212 @@
+---
+title: "Linear"
+---
+
+Manage and react to issues in Linear
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from Linear" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
+</CardGrid>
+
+## Instructions
+
+SuperPlane connects to Linear with OAuth.
+
+1. Click the **Connect** button with client id and secret empty to start the setup wizard.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+**Trigger key:** `linear.onIssue`
+
+The On Issue trigger starts a workflow execution when issue events occur in a Linear team.
+
+### Use Cases
+
+- **Notify Slack** when an issue is created so the team can triage it
+- **Create a GitHub issue** when a Linear issue is created, for traceability
+- **Update external dashboards** when an issue is completed or deleted
+
+### Configuration
+
+- **Team** (required): Linear team to monitor
+- **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
+- **Labels** (optional): Only trigger for issues carrying specific labels
+
+### Outputs
+
+- **Default channel**: Emits the Linear webhook payload, including `action`, `actor`, the issue
+  `url`, and a `data` object with the issue `identifier`, `title`, `state`, `team` and `labels`.
+
+### Webhook Setup
+
+This trigger registers a Linear webhook automatically when configured, and removes it when the
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe",
+      "type": "user",
+      "url": "https://linear.app/acme/profiles/john"
+    },
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "data": {
+      "assigneeId": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "createdAt": "2026-03-26T19:29:35.841Z",
+      "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "description": "The deploy job fails when retried after a timeout.",
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "labelIds": [
+        "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5"
+      ],
+      "labels": [
+        {
+          "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+          "name": "bug"
+        }
+      ],
+      "number": 142,
+      "parentId": null,
+      "previousIdentifiers": [],
+      "priority": 2,
+      "priorityLabel": "High",
+      "projectId": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "state": {
+        "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+        "name": "Todo",
+        "type": "unstarted"
+      },
+      "stateId": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "subscriberIds": [
+        "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba"
+      ],
+      "team": {
+        "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+        "key": "ENG",
+        "name": "Engineering"
+      },
+      "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "title": "Deploy pipeline fails on retry",
+      "updatedAt": "2026-03-26T19:29:35.841Z"
+    },
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "type": "Issue",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329",
+    "webhookTimestamp": 1774553375841
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+**Component key:** `linear.createIssue`
+
+The Create Issue component creates a new issue in a Linear team.
+
+### Use Cases
+
+- **Bug tracking**: Open a Linear issue when an alert fires or a pipeline fails
+- **Task creation**: Turn incoming requests into tracked work automatically
+- **Traceability**: Mirror an issue from another tracker into Linear
+
+### Configuration
+
+- **Team** (required): The Linear team to create the issue in
+- **Title** (required): The issue title
+- **Description** (optional): Issue description, written in Markdown
+- **Project** (optional): Project to add the issue to
+- **Status** (optional): Workflow state for the new issue. Leave empty to use the team's default — Linear
+  puts new issues in the first Backlog state, or in Triage when the team has triage enabled.
+- **Assignee** (optional): Team member to assign the issue to
+- **Priority** (optional): No priority, Urgent, High, Medium or Low
+- **Labels** (optional): Labels to apply to the issue
+
+### Output
+
+Returns the created issue, including its `identifier` (e.g. ENG-142), `url`, `title`,
+`state`, `team`, `assignee`, `priorityLabel` and `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be a member of the selected team. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "name": "Todo",
+      "type": "unstarted"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-26T19:29:35.841Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
