@@ -207,7 +207,7 @@ func CommitCanvasStaging(
 	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(newLiveVersion, organizationID, ownersByID),
+		Version:        SerializeCanvasVersion(newLiveVersion, organizationID, ownersByID),
 		StagingSummary: buildStagingSummary(canvas, []models.WorkflowStagedFile{}),
 	}, nil
 }

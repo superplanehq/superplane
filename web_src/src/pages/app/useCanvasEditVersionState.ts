@@ -16,7 +16,6 @@ type UseCanvasEditVersionStateOptions = {
   editSessionActive: boolean;
   isEnteringEditSession: boolean;
   activeCanvasVersion: CanvasesCanvasVersion | null;
-  effectiveLiveCanvasVersionId?: string;
   liveCanvasVersionId?: string;
   selectableVersionsById: Map<string, CanvasesCanvasVersion>;
   isRunInspectionMode: boolean;
@@ -29,7 +28,6 @@ export function useCanvasEditVersionState({
   editSessionActive,
   isEnteringEditSession,
   activeCanvasVersion,
-  effectiveLiveCanvasVersionId,
   liveCanvasVersionId,
   selectableVersionsById,
   isRunInspectionMode,
@@ -39,7 +37,6 @@ export function useCanvasEditVersionState({
   const shouldReadStagedCanvasVersionFlag = shouldReadStagedCanvasVersion({
     editSessionActive,
     activeCanvasVersionId,
-    effectiveLiveCanvasVersionId,
     liveCanvasVersionId,
   });
   const stagedVersionMetadataShell = activeCanvasVersion ?? selectableVersionsById.get(activeCanvasVersionId) ?? null;
@@ -97,7 +94,6 @@ export function useCanvasEditVersionState({
   const isViewingCurrentLiveVersion = isViewingCurrentLiveCanvasVersion({
     activeCanvasVersionId,
     selectedCanvasVersion,
-    effectiveLiveCanvasVersionId,
     liveCanvasVersionId,
   });
   const isEditing = editSessionActive && isViewingCurrentLiveVersion;
