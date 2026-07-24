@@ -1,6 +1,13 @@
 import type { OrganizationsIntegration } from "@/api-client";
 
-export type IntegrationSelections = Record<string, { id: string; name: string }>;
+export type IntegrationSelection = {
+  id: string;
+  name: string;
+  /** True only when the selected instance is ready for install/wiring. */
+  ready: boolean;
+};
+
+export type IntegrationSelections = Record<string, IntegrationSelection>;
 
 export type IntegrationInstanceSummary = {
   name: string;
@@ -17,28 +24,55 @@ export type HomeIntegrationStatus = {
   configureId?: string;
 };
 
-/** Derives Connected / Pending / Error / Not connected from instances, not only ready selections. */
-export function resolveHomeIntegrationStatus(data: IntegrationInstanceSummary): HomeIntegrationStatus {
+export function selectionFromInstance(instance: OrganizationsIntegration): IntegrationSelection | null {
+  const id = instance.metadata?.id;
+  const name = instance.metadata?.name;
+  if (!id || !name) return null;
+  return { id, name, ready: instance.status?.state === "ready" };
+}
+
+/** True when every required integration has a ready selection. */
+export function requiredIntegrationsReady(integrations: string[], selections: IntegrationSelections): boolean {
+  return integrations.length === 0 || integrations.every((name) => selections[name]?.ready);
+}
+
+function statusForInstance(instance: OrganizationsIntegration): HomeIntegrationStatus | null {
+  const id = instance.metadata?.id;
+  if (!id) return null;
+  if (instance.status?.state === "ready") return { kind: "ready", label: "Connected" };
+  if (instance.status?.state === "error") return { kind: "error", label: "Error", configureId: id };
+  return { kind: "pending", label: "Pending", configureId: id };
+}
+
+/**
+ * Derives Connected / Pending / Error / Not connected.
+ * When a selection is present, status reflects that instance so a preferred
+ * pending connect is not masked by another ready instance.
+ */
+export function resolveHomeIntegrationStatus(
+  data: IntegrationInstanceSummary,
+  selectedId?: string,
+): HomeIntegrationStatus {
+  if (selectedId) {
+    const selected = data.allInstances.find((instance) => instance.metadata?.id === selectedId);
+    const selectedStatus = selected ? statusForInstance(selected) : null;
+    if (selectedStatus) return selectedStatus;
+  }
+
   if (data.readyInstances.length > 0) {
     return { kind: "ready", label: "Connected" };
   }
 
-  const pending = data.allInstances.find((instance) => instance.status?.state === "pending");
-  if (pending?.metadata?.id) {
-    return { kind: "pending", label: "Pending", configureId: pending.metadata.id };
-  }
-
-  const errored = data.allInstances.find((instance) => instance.status?.state === "error");
-  if (errored?.metadata?.id) {
-    return { kind: "error", label: "Error", configureId: errored.metadata.id };
+  for (const state of ["pending", "error"] as const) {
+    const match = data.allInstances.find((instance) => instance.status?.state === state);
+    const status = match ? statusForInstance(match) : null;
+    if (status) return status;
   }
 
   const incomplete = data.allInstances.find((instance) => instance.metadata?.id);
-  if (incomplete?.metadata?.id) {
-    return { kind: "pending", label: "Pending", configureId: incomplete.metadata.id };
-  }
-
-  return { kind: "none", label: "Not connected" };
+  return incomplete
+    ? (statusForInstance(incomplete) ?? { kind: "none", label: "Not connected" })
+    : { kind: "none", label: "Not connected" };
 }
 
 function applyPreferredInstance(
@@ -47,12 +81,17 @@ function applyPreferredInstance(
   preferredId: string,
 ): boolean {
   const preferred = data.allInstances.find((instance) => instance.metadata?.id === preferredId);
-  const id = preferred?.metadata?.id;
-  const name = preferred?.metadata?.name;
-  if (!id || !name) return false;
-  if (next[data.name]?.id === id) return false;
-  next[data.name] = { id, name };
+  if (!preferred) return false;
+  const selection = selectionFromInstance(preferred);
+  if (!selection) return false;
+  const current = next[data.name];
+  if (current?.id === selection.id && current.ready === selection.ready) return false;
+  next[data.name] = selection;
   return true;
+}
+
+function selectionNeedsUpdate(current: IntegrationSelection | undefined, nextSelection: IntegrationSelection): boolean {
+  return !current || current.id !== nextSelection.id || current.ready !== nextSelection.ready;
 }
 
 /**
@@ -79,16 +118,23 @@ export function syncSelectionsWithInstances(
 
     if (next[data.name]) {
       const selected = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
-      if (selected && selected.status?.state !== "ready") {
+      if (!selected || selected.status?.state !== "ready") {
         delete next[data.name];
         changed = true;
+      } else {
+        const selection = selectionFromInstance(selected);
+        if (selection && selectionNeedsUpdate(next[data.name], selection)) {
+          next[data.name] = selection;
+          changed = true;
+        }
       }
     }
 
     if (!next[data.name] && data.readyInstances.length > 0) {
       const first = data.readyInstances[0];
-      if (first.metadata?.id && first.metadata?.name) {
-        next[data.name] = { id: first.metadata.id, name: first.metadata.name };
+      const selection = selectionFromInstance(first);
+      if (selection) {
+        next[data.name] = selection;
         changed = true;
       }
     }

@@ -9,15 +9,12 @@ import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRendere
 import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/SecretPickerFieldRenderer";
 import { LeadIcon, type AppEntry } from "./AppDetailModal";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
+import { requiredIntegrationsReady } from "./homeIntegrationStatus";
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import { useInstallAction } from "./useInstallAction";
 import type { CanvasFolderData } from "./types";
 import type { InstallParam } from "../install/types";
 import { homeInstallPanelClassName } from "./homePageStyles";
-
-function allIntegrationsSelected(integrations: string[], selections: IntegrationSelections): boolean {
-  return integrations.length === 0 || integrations.every((name) => selections[name]);
-}
 
 function checkRequiredParams(params: InstallParam[], values: Record<string, string>): boolean {
   return params.filter((p) => p.required && !p.default).every((p) => (values[p.name] ?? "").trim() !== "");
@@ -92,7 +89,7 @@ export function InstallProgressPanel({
   const readyToInstall = !!organizationId && !isInstalling && !preview.previewLoading && !preview.previewError;
   const canInstall =
     readyToInstall &&
-    allIntegrationsSelected(integrations, integrationSelections) &&
+    requiredIntegrationsReady(integrations, integrationSelections) &&
     checkRequiredParams(preview.installParams, preview.paramValues);
   const canSkip = readyToInstall;
 

@@ -1,7 +1,7 @@
 import type { OrganizationsCreateIntegrationResponse, OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog, type IntegrationCreatePayload } from "@/ui/IntegrationCreateDialog";
@@ -13,11 +13,12 @@ import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { HomeIntegrationConnectRow, StatusDot } from "./HomeIntegrationConnectRow";
 import {
   resolveHomeIntegrationStatus,
-  syncSelectionsWithInstances,
+  selectionFromInstance,
   type IntegrationInstanceSummary,
   type IntegrationSelections,
 } from "./homeIntegrationStatus";
 import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
+import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useInstallIntegrationSelections";
 
 export type { IntegrationSelections };
 
@@ -58,8 +59,6 @@ export function IntegrationsSection({
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
-  // After "Connect new" / setup-tab flows, prefer this instance over an older selection.
-  const [preferredInstanceIds, setPreferredInstanceIds] = useState<Record<string, string>>({});
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
     [connected],
@@ -72,31 +71,12 @@ export function IntegrationsSection({
       }),
     [integrations, connected],
   );
-
-  const rememberPreferredInstance = (integrationName: string, integrationId: string) => {
-    setPreferredInstanceIds((prev) => ({ ...prev, [integrationName]: integrationId }));
-  };
-
-  useEffect(() => {
-    const synced = syncSelectionsWithInstances(integrationData, selections, preferredInstanceIds);
-    if (synced) onSelectionsChange(synced);
-  }, [integrationData, selections, preferredInstanceIds, onSelectionsChange]);
-
-  // GitHub setup opens in another tab; refresh when the user returns.
-  useEffect(() => {
-    const refresh = () => {
-      void refetch();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [refetch]);
+  const { rememberPreferredInstance } = useInstallIntegrationSelections({
+    integrationData,
+    selections,
+    onSelectionsChange,
+  });
+  useRefetchOnWindowFocus(refetch);
 
   const { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName } = useCreateDialogProps(
     dialogIntegrationName,
@@ -248,9 +228,10 @@ function HomeIntegrationCreateDialog({
         pendingConnectKeyRef.current = null;
         if (key) {
           onPreferInstance(key, integrationId);
+          // Newly created instances are not ready until setup finishes.
           onSelectionsChange({
             ...selections,
-            [key]: { id: integrationId, name: instanceName },
+            [key]: { id: integrationId, name: instanceName, ready: false },
           });
         }
         onClose();
@@ -294,15 +275,20 @@ function IntegrationList({
           <HomeIntegrationConnectRow
             key={data.name}
             name={data.name}
-            status={resolveHomeIntegrationStatus(data)}
+            status={resolveHomeIntegrationStatus(data, selections[data.name]?.id)}
             instances={data.allInstances}
             selectedId={selections[data.name]?.id}
             selectedName={selections[data.name]?.name}
             onConnect={() => onConnect(data.name)}
             onConfigure={onConfigure}
-            onSelect={(id, instanceName) =>
-              onSelectionsChange({ ...selections, [data.name]: { id, name: instanceName } })
-            }
+            onSelect={(id, instanceName) => {
+              const instance = data.allInstances.find((item) => item.metadata?.id === id);
+              const selection = instance ? selectionFromInstance(instance) : null;
+              onSelectionsChange({
+                ...selections,
+                [data.name]: selection ?? { id, name: instanceName, ready: false },
+              });
+            }}
             onCreateNew={() => onCreateNew(data.name)}
           />
         ) : (
@@ -310,7 +296,14 @@ function IntegrationList({
             key={data.name}
             data={data}
             selectedId={selections[data.name]?.id}
-            onSelect={(id, name) => onSelectionsChange({ ...selections, [data.name]: { id, name } })}
+            onSelect={(id, name) => {
+              const instance = data.allInstances.find((item) => item.metadata?.id === id);
+              const selection = instance ? selectionFromInstance(instance) : null;
+              onSelectionsChange({
+                ...selections,
+                [data.name]: selection ?? { id, name, ready: false },
+              });
+            }}
             onConfigure={onConfigure}
             onCreateNew={() => onCreateNew(data.name)}
           />

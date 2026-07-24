@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveHomeIntegrationStatus, syncSelectionsWithInstances } from "./homeIntegrationStatus";
+import {
+  requiredIntegrationsReady,
+  resolveHomeIntegrationStatus,
+  syncSelectionsWithInstances,
+} from "./homeIntegrationStatus";
 import type { OrganizationsIntegration } from "@/api-client";
 
 function instance(
@@ -32,6 +36,19 @@ describe("resolveHomeIntegrationStatus", () => {
     ).toEqual({ kind: "ready", label: "Connected" });
   });
 
+  it("returns Pending for the selected instance even when another is ready", () => {
+    expect(
+      resolveHomeIntegrationStatus(
+        {
+          name: "github",
+          allInstances: [instance("old", "ready"), instance("new", "pending")],
+          readyInstances: [instance("old", "ready")],
+        },
+        "new",
+      ),
+    ).toEqual({ kind: "pending", label: "Pending", configureId: "new" });
+  });
+
   it("returns Pending for pending instances when none are ready", () => {
     expect(
       resolveHomeIntegrationStatus({
@@ -53,6 +70,13 @@ describe("resolveHomeIntegrationStatus", () => {
   });
 });
 
+describe("requiredIntegrationsReady", () => {
+  it("requires ready selections, not just selected ids", () => {
+    expect(requiredIntegrationsReady(["github"], { github: { id: "new", name: "new", ready: false } })).toBe(false);
+    expect(requiredIntegrationsReady(["github"], { github: { id: "new", name: "new", ready: true } })).toBe(true);
+  });
+});
+
 describe("syncSelectionsWithInstances", () => {
   it("auto-selects the first ready instance when none is selected", () => {
     const data = [
@@ -63,7 +87,7 @@ describe("syncSelectionsWithInstances", () => {
       },
     ];
     expect(syncSelectionsWithInstances(data, {})).toEqual({
-      github: { id: "old", name: "old" },
+      github: { id: "old", name: "old", ready: true },
     });
   });
 
@@ -75,8 +99,10 @@ describe("syncSelectionsWithInstances", () => {
         readyInstances: [instance("old", "ready"), instance("new", "ready")],
       },
     ];
-    expect(syncSelectionsWithInstances(data, { github: { id: "old", name: "old" } }, { github: "new" })).toEqual({
-      github: { id: "new", name: "new" },
+    expect(
+      syncSelectionsWithInstances(data, { github: { id: "old", name: "old", ready: true } }, { github: "new" }),
+    ).toEqual({
+      github: { id: "new", name: "new", ready: true },
     });
   });
 
@@ -88,8 +114,10 @@ describe("syncSelectionsWithInstances", () => {
         readyInstances: [instance("old", "ready")],
       },
     ];
-    expect(syncSelectionsWithInstances(data, { github: { id: "old", name: "old" } }, { github: "new" })).toEqual({
-      github: { id: "new", name: "new" },
+    expect(
+      syncSelectionsWithInstances(data, { github: { id: "old", name: "old", ready: true } }, { github: "new" }),
+    ).toEqual({
+      github: { id: "new", name: "new", ready: false },
     });
   });
 });

@@ -21,7 +21,7 @@ function materializeSoftwareFactory() {
       github_token: "github-token",
     },
     integrations: {
-      github: { id: "int-1", name: "acme-github" },
+      github: { id: "int-1", name: "acme-github", ready: true },
     },
   });
 }
@@ -55,7 +55,7 @@ spec:
 `,
       { "github.createIssue": "github" },
       {
-        github: { id: "int-1", name: "acme-github" },
+        github: { id: "int-1", name: "acme-github", ready: true },
       },
     );
 

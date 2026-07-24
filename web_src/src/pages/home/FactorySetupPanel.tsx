@@ -11,6 +11,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { getFactoryDefinition, type FactoryDefinition, type FactoryStartingTask } from "./factories";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
+import { requiredIntegrationsReady } from "./homeIntegrationStatus";
 import { homeInstallPanelClassName } from "./homePageStyles";
 import type { InstallParam } from "../install/types";
 
@@ -96,7 +97,7 @@ export function FactorySetupPanel({
   );
 
   const requiredIntegrationsSatisfied = useMemo(
-    () => factory.integrations.every((name) => Boolean(selections[name])),
+    () => requiredIntegrationsReady(factory.integrations, selections),
     [factory.integrations, selections],
   );
 
