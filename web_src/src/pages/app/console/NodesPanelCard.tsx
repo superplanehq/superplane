@@ -44,6 +44,9 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingC
     setEditing(next);
     onEditingChange?.(next);
   };
+  // Only single-node inline forms need a flex body that can stretch the
+  // textarea. Applying overflow-hidden to multi-node lists would clip rows.
+  const stretchInlineFormBody = content.nodes.length === 1 && content.nodes[0]?.formMode === "inline";
 
   return (
     <>
@@ -53,9 +56,7 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingC
         readOnly={readOnly}
         onEdit={() => setEditingState(true)}
         onDelete={onDelete}
-        // Keep the body a flex column so inline prompt forms can stretch the
-        // textarea to the panel height with the submit button pinned below.
-        bodyClassName="flex min-h-0 flex-col overflow-hidden"
+        bodyClassName={stretchInlineFormBody ? "flex min-h-0 flex-col overflow-hidden" : undefined}
       >
         <NodesPanelBody content={content} />
       </TypedPanelShell>
