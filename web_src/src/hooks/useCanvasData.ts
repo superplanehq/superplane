@@ -55,7 +55,7 @@ import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
 import { analytics } from "../lib/analytics";
 import {
   canvasVersionWithSpecFromYaml,
-  fetchCommittedCanvasVersionWithSpec,
+  fetchCanvasVersionWithSpec,
   fetchStagedCanvasVersionWithSpec,
   fetchCanvasStagingSummary,
   fetchConsoleSpecFromRepository,
@@ -133,11 +133,12 @@ export const canvasKeys = {
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
-  versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
+  versionDescribe: (canvasId: string, versionId: string) =>
+    [...canvasKeys.versions(), canvasId, "describe", versionId] as const,
   // Canvas-scoped staging reads. Staging belongs to the canvas/user, not a version.
   stagedCanvasSpec: (canvasId: string) => [...canvasKeys.all, "stagedCanvasSpec", canvasId] as const,
   canvasStaging: (canvasId: string) => [...canvasKeys.versions(), "staging", canvasId] as const,
@@ -354,19 +355,23 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   });
 };
 
-export const useCanvasVersions = (organizationId: string, canvasId: string) => {
+export const useDescribeCanvasVersion = (
+  canvasId: string,
+  versionId: string | undefined,
+  enabled = true,
+) => {
   return useQuery({
-    queryKey: canvasKeys.versionList(canvasId),
+    queryKey: canvasKeys.versionDescribe(canvasId, versionId ?? ""),
     queryFn: async () => {
-      const response = await canvasesListCanvasVersions(
+      const response = await canvasesDescribeCanvasVersion(
         withOrganizationHeader({
-          path: { canvasId },
-          query: { limit: 1 },
+          path: { canvasId, versionId: versionId! },
         }),
       );
-      return response.data?.versions || [];
+      return response.data?.version;
     },
-    enabled: !!organizationId && !!canvasId,
+    enabled: !!canvasId && !!versionId && enabled,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 };
 
@@ -407,7 +412,7 @@ export const useInfiniteCanvasLiveVersions = (
 export const useCanvasVersion = (organizationId: string, canvasId: string, versionId: string, enabled = true) => {
   return useQuery({
     queryKey: canvasKeys.versionDetail(canvasId, versionId),
-    queryFn: async () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
+    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
     staleTime: Number.POSITIVE_INFINITY,
   });
@@ -478,18 +483,20 @@ export const useCreateCanvas = (organizationId: string) => {
       if (response?.data?.canvas?.metadata?.id) {
         const canvasId = response.data.canvas.metadata.id;
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), response.data.canvas);
-        void queryClient.prefetchQuery({
-          queryKey: canvasKeys.versionList(canvasId),
-          queryFn: async () => {
-            const listResponse = await canvasesListCanvasVersions(
-              withOrganizationHeader({
-                path: { canvasId },
-                query: { limit: 1 },
-              }),
-            );
-            return listResponse.data?.versions || [];
-          },
-        });
+        const liveVersionId = response.data?.canvas?.metadata?.liveVersionId;
+        if (liveVersionId) {
+          void queryClient.prefetchQuery({
+            queryKey: canvasKeys.versionDescribe(canvasId, liveVersionId),
+            queryFn: async () => {
+              const describeResponse = await canvasesDescribeCanvasVersion(
+                withOrganizationHeader({
+                  path: { canvasId, versionId: liveVersionId },
+                }),
+              );
+              return describeResponse.data?.version;
+            },
+          });
+        }
         analytics.canvasCreate(
           canvasId,
           organizationId,
@@ -520,7 +527,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const updatedCanvas = response?.data?.canvas;
@@ -937,7 +943,6 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       }
 
       if (!version) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
         return;
       }
