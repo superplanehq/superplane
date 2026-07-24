@@ -110,11 +110,17 @@ func (c *OnRun) Configuration() []configuration.Field {
 								},
 							},
 							{
+								Name:        "required",
+								Label:       "Required",
+								Description: "Whether the parameter is required",
+								Type:        configuration.FieldTypeBool,
+							},
+							{
 								Name:        "label",
 								Label:       "Label",
 								Description: "The label of the parameter",
 								Type:        configuration.FieldTypeString,
-								Required:    true,
+								Togglable:   true,
 								TypeOptions: &configuration.TypeOptions{
 									String: &configuration.StringTypeOptions{
 										AllowExpressions: new(bool),
@@ -126,18 +132,14 @@ func (c *OnRun) Configuration() []configuration.Field {
 								Label:       "Description",
 								Description: "The description of the parameter",
 								Type:        configuration.FieldTypeText,
-							},
-							{
-								Name:        "required",
-								Label:       "Required",
-								Description: "Whether the parameter is required",
-								Type:        configuration.FieldTypeBool,
+								Togglable:   true,
 							},
 							{
 								Name:        "default",
 								Label:       "Default",
 								Description: "The default value of the parameter",
 								Type:        configuration.FieldTypeString,
+								Togglable:   true,
 								TypeOptions: &configuration.TypeOptions{
 									String: &configuration.StringTypeOptions{
 										AllowExpressions: new(bool),
@@ -178,21 +180,14 @@ func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, erro
 		return nil, fmt.Errorf("on run: decode configuration: %w", err)
 	}
 
-	parameters, ok := ctx.Parameters["parameters"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("on run: parameters not found")
-	}
-
 	sourceApp, ok := ctx.Parameters["app"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("on run: source app not found")
 	}
 
-	if len(config.Parameters) > 0 {
-		err = configuration.ValidateConfiguration(config.Parameters, parameters)
-		if err != nil {
-			return nil, fmt.Errorf("on run: validate configuration: %w", err)
-		}
+	parameters, err := c.validateParameters(config, ctx.Parameters)
+	if err != nil {
+		return nil, fmt.Errorf("on run: validate parameters: %w", err)
 	}
 
 	err = ctx.Events.Emit("app.invocation", map[string]any{
@@ -204,6 +199,28 @@ func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, erro
 	}
 
 	return nil, nil
+}
+
+func (c *OnRun) validateParameters(config OnRunConfiguration, message map[string]any) (map[string]any, error) {
+	//
+	// We only need to parse and validate parameters
+	// if the node configuration defines them.
+	//
+	if len(config.Parameters) == 0 {
+		return map[string]any{}, nil
+	}
+
+	parameters, ok := message["parameters"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("on run: parameters not found")
+	}
+
+	err := configuration.ValidateConfiguration(config.Parameters, parameters)
+	if err != nil {
+		return nil, fmt.Errorf("on run: validate configuration: %w", err)
+	}
+
+	return parameters, nil
 }
 
 func (c *OnRun) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
