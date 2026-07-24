@@ -63,3 +63,41 @@ describe("ZoomSlider auto-focus toggle", () => {
     expect(onAutoFocusToggle).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ZoomSlider layout direction toggle", () => {
+  it("does not render the layout direction toggle when no callback is provided", () => {
+    const { queryByTestId } = render(<ZoomSlider usePanel={false} />);
+
+    expect(queryByTestId("canvas-layout-direction-toggle")).toBeNull();
+  });
+
+  it("marks the toggle as pressed and requests horizontal when vertical is active", async () => {
+    const onSetLayoutDirection = vi.fn();
+    const user = userEvent.setup();
+    const { getByTestId } = render(
+      <ZoomSlider usePanel={false} layoutDirection="vertical" onSetLayoutDirection={onSetLayoutDirection} />,
+    );
+
+    const button = getByTestId("canvas-layout-direction-toggle");
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.getAttribute("aria-label")).toBe("Switch to horizontal auto-layout");
+
+    await user.click(button);
+    expect(onSetLayoutDirection).toHaveBeenCalledWith("horizontal");
+  });
+
+  it("requests vertical layout when horizontal is active", async () => {
+    const onSetLayoutDirection = vi.fn();
+    const user = userEvent.setup();
+    const { getByTestId } = render(
+      <ZoomSlider usePanel={false} layoutDirection="horizontal" onSetLayoutDirection={onSetLayoutDirection} />,
+    );
+
+    const button = getByTestId("canvas-layout-direction-toggle");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(button.getAttribute("aria-label")).toBe("Switch to vertical auto-layout");
+
+    await user.click(button);
+    expect(onSetLayoutDirection).toHaveBeenCalledWith("vertical");
+  });
+});

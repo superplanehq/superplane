@@ -49,6 +49,7 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
+import type { LayoutDirection } from "@/lib/layout";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
@@ -248,6 +249,10 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  /** Current orientation of the auto-layout canvas view. */
+  layoutDirection?: LayoutDirection;
+  /** Switches between the horizontal and vertical auto-layout canvas views. */
+  onSetLayoutDirection?: (direction: LayoutDirection) => void;
   isAutoFocusEnabled?: boolean;
   onToggleAutoFocus?: () => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version";
@@ -1560,6 +1565,8 @@ function CanvasPage(props: CanvasPageProps) {
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
                   autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                  layoutDirection={props.layoutDirection}
+                  onSetLayoutDirection={props.onSetLayoutDirection}
                   isAutoFocusEnabled={props.isAutoFocusEnabled}
                   onToggleAutoFocus={props.onToggleAutoFocus}
                   readOnly={props.readOnly}
@@ -2173,6 +2180,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  layoutDirection,
+  onSetLayoutDirection,
   isAutoFocusEnabled = true,
   onToggleAutoFocus,
   readOnly,
@@ -2229,6 +2238,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  layoutDirection?: LayoutDirection;
+  onSetLayoutDirection?: (direction: LayoutDirection) => void;
   isAutoFocusEnabled?: boolean;
   onToggleAutoFocus?: () => void;
   readOnly?: boolean;
@@ -3317,6 +3328,8 @@ function CanvasContent({
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
                   }
+                  layoutDirection={layoutDirection}
+                  onSetLayoutDirection={onSetLayoutDirection}
                   isAutoFocusEnabled={isAutoFocusEnabled}
                   onAutoFocusToggle={onToggleAutoFocus}
                 >

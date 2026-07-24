@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { DEFAULT_LAYOUT_DIRECTION, type LayoutDirection } from "@/lib/layout/types";
 
 export type WorkflowHeaderMode = "version-live" | "console" | "memory" | "files";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
@@ -89,6 +90,35 @@ export function readStoredBoolean(key: string): boolean {
   } catch {
     return false;
   }
+}
+
+function readStoredString(key: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(key);
+}
+
+const CANVAS_LAYOUT_DIRECTION_STORAGE_KEY = "canvas-layout-direction";
+
+/**
+ * Persists the canvas auto-layout orientation (horizontal vs. vertical) so the
+ * chosen view survives reloads and is shared across canvases.
+ */
+export function useLayoutDirectionPreference() {
+  const [layoutDirection, setLayoutDirectionState] = useState<LayoutDirection>(() =>
+    readStoredString(CANVAS_LAYOUT_DIRECTION_STORAGE_KEY) === "vertical" ? "vertical" : DEFAULT_LAYOUT_DIRECTION,
+  );
+
+  const setLayoutDirection = useCallback((direction: LayoutDirection) => {
+    setLayoutDirectionState(direction);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_LAYOUT_DIRECTION_STORAGE_KEY, direction);
+    }
+  }, []);
+
+  return { layoutDirection, setLayoutDirection };
 }
 
 export function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
