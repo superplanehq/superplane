@@ -9,14 +9,16 @@ import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
+import { ConfirmBlockDialog } from "./ConfirmBlockDialog";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
-import { startImpersonation, toggleAdmin } from "./useAccountActions";
+import { startImpersonation, toggleAdmin, toggleBlock } from "./useAccountActions";
 
 interface AdminAccount {
   id: string;
   name: string;
   email: string;
   installation_admin: boolean;
+  blocked: boolean;
   created_at?: string;
 }
 
@@ -32,6 +34,7 @@ interface AccountsTableProps {
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
   onPromoteDemote: (account: AdminAccount) => void;
+  onBlockUnblock: (account: AdminAccount) => void;
 }
 
 function AccountsTable({
@@ -42,6 +45,7 @@ function AccountsTable({
   sortDirection,
   onSort,
   onPromoteDemote,
+  onBlockUnblock,
 }: AccountsTableProps) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
@@ -81,6 +85,7 @@ function AccountsTable({
               isSelf={acc.id === currentAccountId}
               toggling={togglingAccountId === acc.id}
               onPromoteDemote={() => onPromoteDemote(acc)}
+              onBlockUnblock={() => onBlockUnblock(acc)}
               impersonateButton={
                 <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
                   <span className="flex items-center gap-1">
@@ -106,6 +111,7 @@ const AccountsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<AdminAccount | null>(null);
+  const [blockTarget, setBlockTarget] = useState<AdminAccount | null>(null);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -144,6 +150,13 @@ const AccountsList: React.FC = () => {
     setToggling(null);
   };
 
+  const onToggleBlock = async (acc: AdminAccount) => {
+    setBlockTarget(null);
+    setToggling(acc.id);
+    await toggleBlock(acc, () => fetchAccounts(search, offset, sortBy, sortDirection));
+    setToggling(null);
+  };
+
   const handleSort = (field: SortField) => {
     if (field === sortBy) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -173,6 +186,14 @@ const AccountsList: React.FC = () => {
         accountEmail={confirmTarget?.email ?? ""}
         isPromoting={confirmTarget != null && !confirmTarget.installation_admin}
       />
+      <ConfirmBlockDialog
+        open={blockTarget !== null}
+        onClose={() => setBlockTarget(null)}
+        onConfirm={() => blockTarget && onToggleBlock(blockTarget)}
+        accountName={blockTarget?.name ?? ""}
+        accountEmail={blockTarget?.email ?? ""}
+        isBlocking={blockTarget != null && !blockTarget.blocked}
+      />
       <AdminSearchHeader
         title="Accounts"
         subtitle={`${total} account${total !== 1 ? "s" : ""}`}
@@ -196,6 +217,7 @@ const AccountsList: React.FC = () => {
             sortDirection={sortDirection}
             onSort={handleSort}
             onPromoteDemote={setConfirmTarget}
+            onBlockUnblock={setBlockTarget}
           />
           <AdminPagination
             offset={offset}
