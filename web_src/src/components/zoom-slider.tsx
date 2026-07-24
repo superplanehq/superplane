@@ -2,6 +2,7 @@
 
 import React, { memo, useCallback, useEffect } from "react";
 import {
+  AlignVerticalJustifyStart,
   Camera,
   CircleDot,
   CircleDotDashed,
@@ -92,6 +93,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  onAutoLayoutView,
   isAutoFocusEnabled,
   onAutoFocusToggle,
   usePanel = true,
@@ -107,6 +109,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  onAutoLayoutView?: () => void;
   isAutoFocusEnabled?: boolean;
   onAutoFocusToggle?: () => void;
   usePanel?: boolean;
@@ -323,6 +326,23 @@ export const ZoomSlider = memo(function ZoomSlider({
             </span>
           </TooltipTrigger>
           <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+        </Tooltip>
+      )}
+      {onAutoLayoutView && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7"
+              onClick={onAutoLayoutView}
+              aria-label="Arrange canvas as a vertical auto-layout"
+              data-testid="canvas-auto-layout-view"
+            >
+              <AlignVerticalJustifyStart className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Arrange as vertical auto-layout. Reflows the canvas top-to-bottom.</TooltipContent>
         </Tooltip>
       )}
       {onAutoFocusToggle && (

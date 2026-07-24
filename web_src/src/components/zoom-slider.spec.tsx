@@ -63,3 +63,21 @@ describe("ZoomSlider auto-focus toggle", () => {
     expect(onAutoFocusToggle).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ZoomSlider vertical auto-layout view", () => {
+  it("does not render the auto-layout view button when no callback is provided", () => {
+    const { queryByTestId } = render(<ZoomSlider usePanel={false} />);
+
+    expect(queryByTestId("canvas-auto-layout-view")).toBeNull();
+  });
+
+  it("invokes the callback when the auto-layout view button is clicked", async () => {
+    const onAutoLayoutView = vi.fn();
+    const user = userEvent.setup();
+    const { getByTestId } = render(<ZoomSlider usePanel={false} onAutoLayoutView={onAutoLayoutView} />);
+
+    await user.click(getByTestId("canvas-auto-layout-view"));
+
+    expect(onAutoLayoutView).toHaveBeenCalledTimes(1);
+  });
+});

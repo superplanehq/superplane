@@ -290,6 +290,8 @@ export interface CanvasPageProps {
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
+  /** Reflows the whole canvas into a vertical auto-layout view. */
+  onAutoLayoutView?: () => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   logRuns?: CanvasesCanvasRun[];
   runningRunsCount?: number;
@@ -1535,6 +1537,7 @@ function CanvasPage(props: CanvasPageProps) {
                   onNodesDelete={handleNodesDelete}
                   onDuplicateNodes={props.onDuplicateNodes}
                   onAutoLayoutNodes={props.onAutoLayoutNodes}
+                  onAutoLayoutView={props.onAutoLayoutView}
                   onEdgeCreate={props.onEdgeCreate}
                   onToggleView={handleToggleView}
                   onShowNodeDiff={props.onShowNodeDiff}
@@ -2148,6 +2151,7 @@ function CanvasContent({
   onNodesDelete,
   onDuplicateNodes,
   onAutoLayoutNodes,
+  onAutoLayoutView,
   onEdgeCreate,
   onDuplicate,
   onToggleView,
@@ -2198,6 +2202,7 @@ function CanvasContent({
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
+  onAutoLayoutView?: () => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onDuplicate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -3313,6 +3318,7 @@ function CanvasContent({
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                   isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
                   onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  onAutoLayoutView={isEditMode ? onAutoLayoutView : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip

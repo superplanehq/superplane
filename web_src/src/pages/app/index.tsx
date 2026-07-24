@@ -2874,6 +2874,29 @@ export function AppPage() {
     [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
+  /**
+   * Reflows the entire canvas into a clean, vertically oriented pipeline view.
+   * Unlike the freeform layout, this arranges every node top-to-bottom so complex
+   * canvases stay readable without manual positioning.
+   */
+  const handleAutoLayoutView = useCallback(async () => {
+    if (!canvas || !organizationId || !canvasId) return;
+
+    const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
+      scope: "full-canvas",
+      direction: "vertical",
+      components,
+    });
+
+    analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
+
+    applyLocalWorkflowUpdate(updatedWorkflow);
+
+    if (!isReadOnly) {
+      await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+    }
+  }, [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate]);
+
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -4212,6 +4235,7 @@ export function AppPage() {
           onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
           onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
           onAutoLayoutNodes={!isReadOnly ? handleAutoLayoutNodes : undefined}
+          onAutoLayoutView={!isReadOnly ? handleAutoLayoutView : undefined}
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
           isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
