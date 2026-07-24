@@ -72,6 +72,7 @@ message TextTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
   optional string language = 3;
+  optional bool allow_expressions = 4;
 }
 
 message TimeTypeOptions {

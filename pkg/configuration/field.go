@@ -184,6 +184,9 @@ type TextTypeOptions struct {
 	MaxLength *int `json:"maxLength,omitempty"`
 	// Language is the Monaco editor language id (e.g. "javascript", "python").
 	Language string `json:"language,omitempty"`
+
+	// When false, expressions stay literal and autocomplete is disabled.
+	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 
 /*
