@@ -6,8 +6,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
@@ -16,6 +14,9 @@ const (
 	claudeStepPrompt   = "prompt"
 	claudeStepBash     = "bash"
 	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
+
+	claudeCredentialsSourceSecret      = "secret"
+	claudeCredentialsSourceIntegration = "integration"
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -30,13 +31,14 @@ type ClaudeCodeStep struct {
 
 // RunClaudeCodeSpec is persisted runnerClaudeCode node configuration.
 type RunClaudeCodeSpec struct {
-	MachineType             string                       `mapstructure:"machineType"`
-	Steps                   []ClaudeCodeStep             `mapstructure:"steps"`
-	AnthropicAPIKey         configuration.SecretKeyRef   `mapstructure:"anthropicApiKey"`
-	Model                   string                       `mapstructure:"model"`
-	WorkingDirectory        string                       `mapstructure:"workingDirectory"`
-	Environment             []runner.EnvironmentVariable `mapstructure:"environment"`
-	ExecutionTimeoutSeconds int                          `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
+	MachineType             string                        `mapstructure:"machineType"`
+	Steps                   []ClaudeCodeStep              `mapstructure:"steps"`
+	Credentials             ClaudeCodeCredentials         `mapstructure:"credentials"`
+	Model                   string                        `mapstructure:"model"`
+	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
+	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
+	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
+	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
 
 	// Legacy fields — migrated into Steps when Steps is empty.
 	Prompt              string `mapstructure:"prompt"`
@@ -44,6 +46,12 @@ type RunClaudeCodeSpec struct {
 	SetupCommands       string `mapstructure:"setup_commands"`
 	EnableAfterCommands bool   `mapstructure:"enable_after_commands"`
 	AfterCommands       string `mapstructure:"after_commands"`
+}
+
+type ClaudeCodeCredentials struct {
+	Source      string                       `mapstructure:"source"`
+	Secret      configuration.SecretKeyRef   `mapstructure:"secret"`
+	Integration configuration.IntegrationRef `mapstructure:"integration"`
 }
 
 // ClaudeCodeBrokerTask is the ordered broker commands and task files for a run.
@@ -56,10 +64,7 @@ type ClaudeCodeBrokerTask struct {
 
 func decodeRunClaudeCodeSpec(raw any) (RunClaudeCodeSpec, error) {
 	var spec RunClaudeCodeSpec
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		WeaklyTypedInput: true,
-	})
+	dec, err := runner.NewSpecDecoder(&spec)
 	if err != nil {
 		return RunClaudeCodeSpec{}, fmt.Errorf("runnerClaudeCode spec decoder: %w", err)
 	}
@@ -115,8 +120,11 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if err := validateClaudeCodeSteps(spec.Steps); err != nil {
 		return err
 	}
-	if !spec.AnthropicAPIKey.IsSet() {
-		return fmt.Errorf("anthropic API key is required")
+	if err := validateClaudeCodeCredentials(spec.Credentials); err != nil {
+		return err
+	}
+	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
+		return err
 	}
 	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err
@@ -132,6 +140,25 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 		}
 	}
 	return nil
+}
+
+func validateClaudeCodeCredentials(credentials ClaudeCodeCredentials) error {
+	switch credentials.Source {
+	case claudeCredentialsSourceSecret:
+		if !credentials.Secret.IsSet() {
+			return fmt.Errorf("anthropic API key is required")
+		}
+
+		return nil
+	case claudeCredentialsSourceIntegration:
+		if !credentials.Integration.IsSet() {
+			return fmt.Errorf("claude integration is required")
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("invalid credentials source: %s", credentials.Source)
+	}
 }
 
 func validateClaudeCodeSteps(steps []ClaudeCodeStep) error {

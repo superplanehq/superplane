@@ -930,6 +930,52 @@ func Test__Client__ApproveMergeRequest(t *testing.T) {
 	})
 }
 
+func Test__Client__GetMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "iid": 42, "title": "Test MR", "state": "opened", "draft": true}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetMergeRequest(context.Background(), "456", "42")
+		require.NoError(t, err)
+		assert.Equal(t, 42, result.IID)
+		assert.Equal(t, "Test MR", result.Title)
+		assert.True(t, result.Draft)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Merge Request Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetMergeRequest(context.Background(), "456", "999")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get merge request")
+	})
+}
+
 func Test__Client__ListEnvironments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
@@ -1267,5 +1313,93 @@ func Test__Client__CreateIssueNote(t *testing.T) {
 		_, err := client.CreateIssueNote(context.Background(), "1", "999", &CreateNoteRequest{Body: "x"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create issue note")
+	})
+
+	t.Run("quick-action-only body returns 202 Accepted", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"state_event":"close"},"summary":["Closed this issue."]}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/close"})
+		require.NoError(t, err)
+		assert.Equal(t, "Closed this issue.", result.Body)
+		assert.Equal(t, 0, result.ID)
+	})
+}
+
+func Test__Client__CreateMergeRequestNote(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 55, "body": "Great work!", "noteable_type": "MergeRequest"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "Great work!"})
+
+		require.NoError(t, err)
+		assert.Equal(t, 55, result.ID)
+		assert.Equal(t, "Great work!", result.Body)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/merge_requests/5/notes", mockClient.Requests[0].URL.String())
+	})
+
+	// GitLab confirmed live: a note whose body is only the "/ready" quick
+	// action returns 202 with a commands summary, not a Note object.
+	t.Run("quick-action-only body returns 202 Accepted", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusAccepted, `{"commands_changes":{"wip_event":"ready"},"summary":["Marked this merge request as ready."]}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "/ready"})
+		require.NoError(t, err)
+		assert.Equal(t, "Marked this merge request as ready.", result.Body)
+		assert.Equal(t, 0, result.ID)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Merge Request Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestNote(context.Background(), "1", "999", &CreateNoteRequest{Body: "x"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create merge request note")
 	})
 }

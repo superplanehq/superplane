@@ -213,9 +213,30 @@ describe("runnerMapper.getExecutionDetails", () => {
     expect(runnerMapper.getExecutionDetails(ctx)).toEqual({
       "Execution mode": "Host",
       "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
-      task_id: "52fa5506-844c-4e46-b1c7-52162b8ac1f7",
+      "Task ID": "52fa5506-844c-4e46-b1c7-52162b8ac1f7",
       Status: "failed",
       "Exit code": "1",
     });
+  });
+
+  it("surfaces the payload task_id under the human-readable 'Task ID' label", () => {
+    const node = buildRunnerNode({ execution_mode: "host", commands: "id", execution_timeout_seconds: 0 });
+    const execution = buildExecution({
+      outputs: {
+        passed: [
+          {
+            type: "runner.finished",
+            timestamp: new Date().toISOString(),
+            data: { task_id: "task-from-payload", status: "succeeded", exit_code: 0 },
+          },
+        ],
+      },
+    });
+    const ctx: ExecutionDetailsContext = { nodes: [node], node, execution };
+
+    const details = runnerMapper.getExecutionDetails(ctx);
+
+    expect(details["Task ID"]).toBe("task-from-payload");
+    expect(details).not.toHaveProperty("task_id");
   });
 });

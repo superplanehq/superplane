@@ -1,67 +1,145 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+Guidance for AI coding agents and human contributors working in this repository.
+Read this top-to-bottom: what the project is, how to set it up, how to build and
+test, the conventions to follow, what not to touch, and how to submit changes.
+For UI-specific work, also read [web_src/AGENTS.md](web_src/AGENTS.md).
 
-- Backend (GoLang): cmd/ with pkg/ (GoLang code), and test/.
-- Frontend (TypeScript/React): web_src/ built with Vite.
-- Tooling: Makefile (common tasks), protos/ (protobuf definitions for the API), scripts/ (protobuf generation), db/ (database structure and migrations).
-- Documentation: Markdown files in docs/.
-- gRPC API implementation in in pkg/grpc/actions
-- Database models in pkg/models
-- Integration component implementations: pkg/integrations/<integration>/
-- UI component mappers: web_src/src/pages/app/mappers/<integration>/
+## Project Overview
 
-## Pull Request Guidelines
+SuperPlane is an open-source automation engine for AI-driven engineering. It
+orchestrates workflows across the tools teams already use (Git, LLMs, CI/CD,
+observability, incident, and infrastructure tools) with durable execution,
+approvals, and an operational UI.
 
-- PR titles must follow Conventional Commits and include a release-type prefix: `feat:`, `fix:`, `chore:`, or `docs:` (CI enforces this).
-- All commits must include a DCO sign-off trailer (`Signed-off-by: Name <email>`). Use `git commit -s` or `git commit --amend -s` when creating or updating commits.
+- **Backend**: Go, exposing a gRPC API with a REST/OpenAPI gateway.
+- **Frontend**: TypeScript + React, built with Vite.
+- **Infrastructure**: PostgreSQL (state) and RabbitMQ (messaging), run via Docker.
+- The application name is **SuperPlane** (not "Superplane") in all user-facing text.
 
-## Build, Test, and Development Commands
+## Repository Layout
 
-- Bring up dev containers: `make dev.up`
-- Install deps, codegen, DB: `make dev.setup` after `dev.up` (re-run when protos, Go modules, or frontend deps change). By default only `superplane_dev` is migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need `superplane_test` (E2E; backend CI sets this via the environment). If `go mod download` / `go build` fail with missing files under `tmp/go/pkg/mod`, run `make dev.clean.go.cache` then `make dev.setup.go` (often after disk-full or interrupted downloads).
-- Start API + Vite: `make dev.server` (after `make dev.up`) — UI at http://localhost:8000; use `make dev.server.fg` for foreground logs
-- One-shot backend tests: `make test` (Golang).
+- `cmd/` — Go entrypoints (server, workers, CLI).
+- `pkg/` — Go application code. Notable packages:
+  - `pkg/grpc/actions` — gRPC API implementation.
+  - `pkg/models` — database models.
+  - `pkg/workers` — background workers.
+  - `pkg/integrations/<integration>/` — integration component implementations.
+- `web_src/` — TypeScript/React frontend (Vite). UI component mappers live in
+  `web_src/src/pages/app/mappers/<integration>/`.
+- `protos/` — protobuf definitions for the API.
+- `db/` — database structure and migrations.
+- `scripts/` — codegen, DB, and CI helper scripts.
+- `test/` — backend and end-to-end tests.
+- `docs/` — Markdown documentation (see `docs/contributing/`).
+- `Makefile` — the entrypoint for all common tasks.
+
+## Prerequisites & Setup
+
+The development environment is **entirely Docker-based**: build, lint, test, and
+run commands execute inside containers via `docker compose`. You do not need Go
+or Node installed on the host, only Docker.
+
+- Go `1.26.2` (pinned in `go.mod`; provided by the dev container).
+- Node.js + npm (provided by the dev container; used by Vite/frontend).
+- Docker with a working `docker compose`.
+
+Run these three steps once, in order:
+
+1. `make dev.up` — builds the dev-base image and starts containers (app, db,
+   rabbitmq). The first run builds the image (~3-5 min); later runs reuse it.
+2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
+   codegen, and creates + migrates the databases. Re-run when protos, Go
+   modules, or frontend deps change. By default only `superplane_dev` is
+   migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also
+   need `superplane_test` (E2E; backend CI sets this via the environment).
+3. `make dev.server` — starts the API (Go hot-reload via `air`) and the Vite dev
+   server. UI at http://localhost:8000; health check at
+   http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
+
+On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
+prompted to create an admin account. Open registration is disabled by default
+(`BLOCK_SIGNUP=yes`).
+
+If `go mod download` / `go build` fail with missing or corrupt files in the Go
+module cache (the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`, often
+after a disk-full or interrupted download), run `make dev.clean.go.cache` then
+`make dev.setup.go`.
+
+## Build, Test & Lint Commands
+
+- One-shot backend tests: `make test` (Go).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
-- Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e` (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for one test)
-- For E2E test authoring, see [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
-- For performance profiling of the dev server, see [docs/contributing/profiling.md](docs/contributing/profiling.md)
-- After updating UI code, always run `make check.build.ui` to verify everything is correct
-- After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
-- After editing Golang code, always run `make format.go` to make sure that files are consistently formatted
-- After updating GoLang code, always check it with `make lint && make check.build.app`
-- **NEVER MANUALLY CREATE MIGRATION FILES**. ALWAYS use `make db.migration.create NAME=<name>` to generate DB migrations. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` (requires a running app container from `make dev.up`), where DB_NAME can be `superplane_dev` or `superplane_test`
-- When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
-- When adding a new worker in pkg/workers, always add its startup to `cmd/server/main.go`, and update the docker compose files with the new environment variables that are needed.
-- After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
-- For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
-- For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
-- For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI with `make pb.gen`(requires a running `app` container from `make dev.up`)
-- After removing proto fields, renumber the remaining fields so message field numbers stay contiguous (no gaps), then run `make check.proto.field.numbers`. These protos are used for JSON conversion, not wire compatibility, so do not leave holes or `reserved` markers.
+- Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
+  (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
+- After editing Go code: `make format.go`, then `make lint && make check.build.app`.
+- After editing JS/TS code: `make format.js`, then `make check.build.ui`.
+- After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
+  SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
+  After removing proto fields, renumber remaining fields so message field numbers
+  stay contiguous (no gaps or `reserved` markers — these protos are used for JSON
+  conversion, not wire compatibility), then run `make check.proto.field.numbers`.
+- **NEVER MANUALLY CREATE MIGRATION FILES.** Use `make db.migration.create NAME=<name>`
+  (dashes, not underscores). We do not write rollbacks, so leave `*.down.sql`
+  empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` where
+  `DB_NAME` is `superplane_dev` or `superplane_test` (requires a running app
+  container).
+
+Cross-cutting rules when extending the backend:
+
+- When validating enum fields in protobuf requests, ensure enums are mapped to
+  constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
+  `pkg/grpc/actions/common.go`.
+- When adding a new worker in `pkg/workers`, add its startup to
+  `cmd/server/main.go` and update the docker compose files with any new
+  environment variables.
+- After adding new API endpoints, ensure they are covered in
+  `pkg/authorization/interceptor.go`.
+
+Further reading:
+
+- E2E test authoring: [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
+- Dev server profiling: [docs/contributing/profiling.md](docs/contributing/profiling.md)
+- New components/triggers: [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
+- Component design & quality: [docs/contributing/component-design.md](docs/contributing/component-design.md)
+- UI component workflow: [web_src/AGENTS.md](web_src/AGENTS.md)
 
 ## Coding Style & Naming Conventions
 
-- Always write clean code: work test-first by default, then keep names clear, functions focused, side effects explicit, control flow shallow, and error handling useful.
-- Tests end with \_test.go
-- Always prefer early returns over else blocks when possible
-- GoLang: prefer `any` over `interface{}` types
-- GoLang: when checking for the existence of an item on a list, use `slice.Contains` or `slice.ContainsFunc`
-- When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
-- When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`
-- The name of the application is "SuperPlane", not "Superplane" in all user-facing text (user interfaces, emails, notifications, documentation, etc.).
-- Frontend: do not create or use `web_src/src/utils/*` or `utils.ts` files. Put shared non-React helpers in `web_src/src/lib/`, and put React-specific reusable logic in `web_src/src/hooks/`.
+- Always write clean code: work test-first by default, then keep names clear,
+  functions focused, side effects explicit, control flow shallow, and error
+  handling useful.
+- Tests end with `_test.go`.
+- Always prefer early returns over else blocks when possible.
+- Go: prefer `any` over `interface{}`.
+- Go: to check membership in a slice, use `slices.Contains` or `slices.ContainsFunc`.
+- Avoid variable names like `*Str` or `*UUID`; Go is typed, so types don't belong
+  in variable names.
+- In tests needing specific timestamps, base them off `time.Now()` rather than
+  absolute times from `time.Date`.
+- The name of the application is "SuperPlane", not "Superplane", in all
+  user-facing text (UIs, emails, notifications, documentation).
+- Frontend: do not create or use `web_src/src/utils/*` or `utils.ts` files. Put
+  shared non-React helpers in `web_src/src/lib/`, and React-specific reusable
+  logic in `web_src/src/hooks/`.
 
 ## Database Transaction Guidelines
 
-We are moving away from `database.Conn()` inside `pkg/models` and from the `FindX` / `FindXInTransaction` dual API. CI tracks remaining legacy usage via `make check.models.tx.debt`; do not add new `*InTransaction` definitions or `database.Conn()` call sites in `pkg/models`.
+We are moving away from `database.Conn()` inside `pkg/models` and from the
+`FindX` / `FindXInTransaction` dual API. CI tracks remaining legacy usage via
+`make check.models.tx.debt`; do not add new `*InTransaction` definitions or
+`database.Conn()` call sites in `pkg/models`.
 
 **Why:**
 
-- Calling `database.Conn()` inside model code breaks transaction isolation when the caller already holds a `tx`
-- Conn wrappers plus `*InTransaction` methods duplicate API surface without adding behavior
+- Calling `database.Conn()` inside model code breaks transaction isolation when
+  the caller already holds a `tx`.
+- Conn wrappers plus `*InTransaction` methods duplicate API surface without
+  adding behavior.
 
-**Preferred pattern:** pass an explicit `*gorm.DB` as the first parameter. Callers outside `pkg/models` obtain it with `database.DB(ctx)` (request-scoped, attaches OpenTelemetry trace context).
+**Preferred pattern:** pass an explicit `*gorm.DB` as the first parameter.
+Callers outside `pkg/models` obtain it with `database.DB(ctx)` (request-scoped,
+attaches OpenTelemetry trace context).
 
 ```go
 func FindCanvas(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
@@ -85,28 +163,39 @@ err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 
 Rules:
 
-- **NEVER** call `database.Conn()` inside `pkg/models` — pass the `*gorm.DB` from the caller instead
-- **NEVER** call a model function that uses `database.Conn()` internally while you already hold a `tx`
-- **Always propagate** the `*gorm.DB` through the entire call chain — pass it as the first parameter to functions that need database access
-- **Do not add** new `FindX` + `FindXInTransaction` pairs or conn wrappers; use a single function with an explicit `*gorm.DB` parameter
-- **Context constructors** that perform database queries must accept `tx *gorm.DB` as their first parameter
+- **NEVER** call `database.Conn()` inside `pkg/models` — pass the `*gorm.DB` from
+  the caller instead.
+- **NEVER** call a model function that uses `database.Conn()` internally while you
+  already hold a `tx`.
+- **Always propagate** the `*gorm.DB` through the entire call chain — pass it as
+  the first parameter to functions that need database access.
+- **Do not add** new `FindX` + `FindXInTransaction` pairs or conn wrappers; use a
+  single function with an explicit `*gorm.DB` parameter.
+- **Context constructors** that perform database queries must accept `tx *gorm.DB`
+  as their first parameter.
 
-When touching legacy `*InTransaction` or conn-wrapper code, migrate to the explicit-parameter pattern when practical and update the debt baseline with `make check.models.tx.debt.baseline.update`.
+When touching legacy `*InTransaction` or conn-wrapper code, migrate to the
+explicit-parameter pattern when practical and update the debt baseline with
+`make check.models.tx.debt.baseline.update`.
 
 ### Model file layout (`pkg/models`)
 
 Order declarations in each model file as follows:
 
-1. **Struct** — package constants used by the model, then the struct type
-2. **Constructors** — `New…` functions that build values for the model (including name/ID helpers)
-3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors)
-4. **Database access** — functions whose first parameter is `tx *gorm.DB` (or `db *gorm.DB`)
+1. **Struct** — package constants used by the model, then the struct type.
+2. **Constructors** — `New…` functions that build values for the model (including
+   name/ID helpers).
+3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors).
+4. **Database access** — functions whose first parameter is `tx *gorm.DB` (or
+   `db *gorm.DB`).
 
 Place private helpers after the public API in the file.
 
 ### Models API shape (`pkg/models`)
 
-Choose one style per concern and stick to it. Prefer object style when you already have a model handle; do not invent free functions that re-take IDs you already hold.
+Choose one style per concern and stick to it. Prefer object style when you
+already have a model handle; do not invent free functions that re-take IDs you
+already hold.
 
 | Situation | Prefer | Example |
 | --- | --- | --- |
@@ -116,10 +205,17 @@ Choose one style per concern and stick to it. Prefer object style when you alrea
 
 Rules:
 
-- **Do not** add `models.HardDeleteCanvasNode(tx, orgID, nodeID)` (or similar) when the caller already has `*CanvasNode` — that forces an extra find and mixes procedural style with OO for the same concern.
-- **Do not** hang multi-step cleanup/publish logic as a thick method chain on the aggregate when a dedicated collaborator is clearer (`NodeResourceCleaner`, canvas publisher patterns).
-- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions **orchestrate** (lock → clean → hard-delete); they do not own batched delete queries.
-- Receivers on model methods should use a short name consistent with the type (`c` for `*CanvasNode`, etc.), matching nearby code in the file.
+- **Do not** add `models.HardDeleteCanvasNode(tx, orgID, nodeID)` (or similar)
+  when the caller already has `*CanvasNode` — that forces an extra find and mixes
+  procedural style with OO for the same concern.
+- **Do not** hang multi-step cleanup/publish logic as a thick method chain on the
+  aggregate when a dedicated collaborator is clearer (`NodeResourceCleaner`,
+  canvas publisher patterns).
+- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions
+  **orchestrate** (lock → clean → hard-delete); they do not own batched delete
+  queries.
+- Receivers on model methods should use a short name consistent with the type
+  (`c` for `*CanvasNode`, etc.), matching nearby code in the file.
 
 ```go
 // Good: handle already loaded
@@ -137,25 +233,44 @@ nodes, err := ListDeletedCanvasNodes(tx, before, limit)
 _ = HardDeleteCanvasNode(tx, node.OrganizationID, node.ID)
 ```
 
-## Cursor Cloud specific instructions
+## Files & Directories Not to Modify by Hand
 
-### Environment overview
+- **Generated code — regenerate, never hand-edit** (all produced by `make pb.gen`):
+  - `pkg/protos/` — Go generated from `protos/*.proto`.
+  - `pkg/openapi_client/` — generated Go SDK for the CLI.
+  - `web_src/src/api-client/` — generated TypeScript SDK for the UI.
+  - `api/` — generated OpenAPI/swagger spec.
+  Edit the source (`protos/`) and rerun `make pb.gen` instead.
+- **Database migrations** — never create or edit migration files by hand; use
+  `make db.migration.create NAME=<name>` (see the Build section).
+- **Secrets & local config** — never commit real secrets. `.env.example` and
+  `.env.multi-instance.example` are templates; do not check in a populated
+  `.env`.
+- **Vendored / cached dependencies** — do not edit `web_src/node_modules/` or the
+  Go module cache under `tmp/go/`.
 
-The dev environment is entirely Docker-based. The VM needs Docker installed (with fuse-overlayfs storage driver and iptables-legacy for nested container support). All build, lint, test, and run commands execute inside Docker containers via `docker compose exec`.
+## Commit & Pull Request Guidelines
 
-### Starting the development environment
+- PR titles must follow Conventional Commits with a release-type prefix that CI
+  enforces: `feat:`, `fix:`, `chore:`, or `docs:`.
+- All commits must include a DCO sign-off trailer
+  (`Signed-off-by: Name <email>`). Use `git commit -s` (or `git commit --amend -s`).
+- Before submitting, run the checks relevant to your change:
+  - Backend: `make format.go`, `make lint`, `make check.build.app`, `make test`.
+  - Frontend: `make format.js`, `make check.build.ui`.
+  - Protos: `make pb.gen` and `make check.proto.field.numbers`.
 
-1. `make dev.up` — builds the dev-base Docker image and starts containers (app, db/PostgreSQL, rabbitmq). First run builds the image (~3-5 min); subsequent runs reuse the cached image.
-2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf codegen, creates and migrates both `superplane_dev` and `superplane_test` databases.
-3. `make dev.server` — starts `air` (Go hot-reload) and Vite dev server inside the app container. Health check at `http://localhost:8000/health`.
+## Cursor Cloud Environment Notes
 
-### Key gotchas
+These apply only to Docker-in-Docker cloud VMs (e.g. Cursor Cloud); skip them on
+a normal workstation with Docker already running.
 
-- The `app` container starts with `sleep infinity` by default. You must explicitly run `make dev.server` to start the API + UI stack.
-- All `make` commands must be run from the `/agent/repos/superplane` directory.
-- The Docker daemon must be started manually in cloud VMs: `sudo dockerd &>/tmp/dockerd.log &` — wait ~3-4 seconds before issuing Docker commands.
-- After Docker daemon starts, ensure the socket is accessible: `sudo chmod 666 /var/run/docker.sock`.
-- Owner setup is enabled by default (`OWNER_SETUP_ENABLED=yes`). On first UI load at `http://localhost:8000`, you'll be prompted to create an admin account with email/password.
-- `BLOCK_SIGNUP=yes` is the default, so only the owner setup flow works for account creation (no open registration).
-- If `make dev.setup` fails on `go mod download` with missing files, run `make dev.clean.go.cache` then `make dev.setup.go`.
-- The `make dev.setup` Makefile target already creates and migrates both `superplane_dev` and `superplane_test` databases.
+- Run all `make` commands from the repository root.
+- The Docker daemon must be started manually:
+  `sudo dockerd &>/tmp/dockerd.log &` — wait ~3-4 seconds before issuing Docker
+  commands, then make the socket accessible with
+  `sudo chmod 666 /var/run/docker.sock`.
+- Docker needs the `fuse-overlayfs` storage driver and `iptables-legacy` for
+  nested-container support.
+- The `app` container starts with `sleep infinity`; you must explicitly run
+  `make dev.server` to start the API + UI stack.

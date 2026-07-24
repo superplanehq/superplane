@@ -13,6 +13,11 @@ interface HomePageHarnessProps {
    * Defaults to the org index (`/:organizationId`).
    */
   pathSuffix?: string;
+  /**
+   * Storybook-only: use the factory-first new-app prototype instead of
+   * production `ZeroStatePage` at `/apps/new`.
+   */
+  prototypeNewApp?: boolean;
 }
 
 /**
@@ -20,6 +25,13 @@ interface HomePageHarnessProps {
  * workspace router with AppPage so clicking Software Factory opens the live
  * canvas story surface (and the logo can navigate back home from the app).
  */
-export function HomePageHarness({ fixture, pathSuffix = "" }: HomePageHarnessProps) {
-  return <OrgWorkspaceHarness startAt="home" homeFixture={fixture} pathSuffix={pathSuffix} />;
+export function HomePageHarness({ fixture, pathSuffix = "", prototypeNewApp = false }: HomePageHarnessProps) {
+  return (
+    <OrgWorkspaceHarness
+      startAt="home"
+      homeFixture={fixture}
+      pathSuffix={pathSuffix}
+      prototypeNewApp={prototypeNewApp}
+    />
+  );
 }

@@ -7,20 +7,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
 import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/SecretPickerFieldRenderer";
-import type { AppEntry } from "./AppDetailModal";
-import { IntegrationIcons } from "./AppDetailModal";
+import { LeadIcon, type AppEntry } from "./AppDetailModal";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import { useInstallAction } from "./useInstallAction";
 import type { CanvasFolderData } from "./types";
 import type { InstallParam } from "../install/types";
-import { cn } from "@/lib/utils";
-import {
-  homeInstallPanelClassName,
-  homePanelTitleClassName,
-  homeSectionDividerClassName,
-  homeTagClassName,
-} from "./homePageStyles";
+import { homeInstallPanelClassName } from "./homePageStyles";
 
 function allIntegrationsSelected(integrations: string[], selections: IntegrationSelections): boolean {
   return integrations.length === 0 || integrations.every((name) => selections[name]);
@@ -105,49 +98,56 @@ export function InstallProgressPanel({
 
   return (
     <div className={homeInstallPanelClassName}>
-      <AppInfoHeader app={app} integrations={integrations} />
-
-      {onCanvasNameChange && (
-        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
-          <AppNameSection value={canvasName ?? ""} onChange={onCanvasNameChange} />
+      <div className="flex items-start gap-3">
+        <div className="shrink-0">
+          <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
         </div>
-      )}
+        <div className="min-w-0 flex-1">
+          <AppInfoHeader app={app} />
 
-      {hasIntegrations && (
-        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
-          <IntegrationsSection
-            integrations={integrations}
-            organizationId={organizationId ?? ""}
-            selections={integrationSelections}
-            onSelectionsChange={setIntegrationSelections}
-          />
+          {onCanvasNameChange && (
+            <div className="mb-5">
+              <AppNameSection value={canvasName ?? ""} onChange={onCanvasNameChange} />
+            </div>
+          )}
+
+          {hasIntegrations && (
+            <div className="mb-5">
+              <IntegrationsSection
+                integrations={integrations}
+                organizationId={organizationId ?? ""}
+                selections={integrationSelections}
+                onSelectionsChange={setIntegrationSelections}
+              />
+            </div>
+          )}
+
+          <PreviewStatus loading={preview.previewLoading} error={preview.previewError} />
+
+          {!preview.previewLoading && hasParams && (
+            <div className="mb-5">
+              <ParamsSection
+                params={preview.installParams}
+                values={preview.paramValues}
+                onChange={preview.setParamValues}
+                organizationId={organizationId}
+                integrationSelections={integrationSelections}
+              />
+            </div>
+          )}
+
+          {!preview.previewLoading && (
+            <InstallActions
+              canInstall={canInstall}
+              canSkip={canSkip}
+              isInstalling={isInstalling}
+              onInstall={() => void doInstall(false)}
+              onSkip={() => void doInstall(true)}
+              onClose={onClose}
+            />
+          )}
         </div>
-      )}
-
-      <PreviewStatus loading={preview.previewLoading} error={preview.previewError} />
-
-      {!preview.previewLoading && hasParams && (
-        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
-          <ParamsSection
-            params={preview.installParams}
-            values={preview.paramValues}
-            onChange={preview.setParamValues}
-            organizationId={organizationId}
-            integrationSelections={integrationSelections}
-          />
-        </div>
-      )}
-
-      {!preview.previewLoading && (
-        <InstallActions
-          canInstall={canInstall}
-          canSkip={canSkip}
-          isInstalling={isInstalling}
-          onInstall={() => void doInstall(false)}
-          onSkip={() => void doInstall(true)}
-          onClose={onClose}
-        />
-      )}
+      </div>
     </div>
   );
 }
@@ -157,7 +157,7 @@ export function InstallProgressPanel({
 function PreviewStatus({ loading, error }: { loading: boolean; error: string | null }) {
   if (loading) {
     return (
-      <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
+      <div className="mb-5">
         <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-gray-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Loading configuration...
@@ -167,35 +167,12 @@ function PreviewStatus({ loading, error }: { loading: boolean; error: string | n
   }
   if (error) {
     return (
-      <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
+      <div className="mb-5">
         <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
   return null;
-}
-
-function InstallButton({
-  isInstalling,
-  disabled,
-  onClick,
-}: {
-  isInstalling: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button size="sm" onClick={onClick} disabled={disabled}>
-      {isInstalling ? (
-        <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-          Installing...
-        </>
-      ) : (
-        "Install"
-      )}
-    </Button>
-  );
 }
 
 function InstallActions({
@@ -214,46 +191,53 @@ function InstallActions({
   onClose: () => void;
 }) {
   return (
-    <div className={cn("flex items-center gap-2 pt-4", homeSectionDividerClassName)}>
-      <InstallButton isInstalling={isInstalling} disabled={!canInstall} onClick={onInstall} />
-      <Button variant="outline" size="sm" onClick={onSkip} disabled={!canSkip}>
-        Just take me there
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onClose} disabled={isInstalling}>
-        Cancel
+    <div className="flex flex-wrap items-center pt-4">
+      <div className="flex items-center gap-2.5">
+        <Button type="button" disabled={!canInstall} onClick={onInstall}>
+          {isInstalling ? (
+            <>
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              Installing...
+            </>
+          ) : (
+            "Install"
+          )}
+        </Button>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isInstalling}>
+          Cancel
+        </Button>
+      </div>
+      <Button
+        type="button"
+        variant="link"
+        disabled={!canSkip}
+        onClick={onSkip}
+        className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+      >
+        Take me to the app without connecting
       </Button>
     </div>
   );
 }
 
-function AppInfoHeader({ app, integrations }: { app: AppEntry; integrations: string[] }) {
+function AppInfoHeader({ app }: { app: AppEntry }) {
   return (
     <div className="mb-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={homePanelTitleClassName}>{app.title}</h3>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <IntegrationIcons integrations={integrations} />
-            {app.tags.map((tag) => (
-              <span key={tag} className={homeTagClassName}>
-                {tag}
-              </span>
-            ))}
-          </div>
+          <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">{app.title}</h3>
+          {app.description && <p className="mt-2 text-sm text-slate-600 dark:text-gray-400">{app.description}</p>}
         </div>
         <a
           href={`https://${app.repo}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300"
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
         >
           <ExternalLink className="h-3 w-3" />
           GitHub
         </a>
       </div>
-      {app.description && (
-        <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-gray-400">{app.description}</p>
-      )}
       {app.requirements.length > 0 && <RequirementsList requirements={app.requirements} />}
     </div>
   );
@@ -279,10 +263,10 @@ function AppNameSection({ value, onChange }: { value: string; onChange: (name: s
 
 function RequirementsList({ requirements }: { requirements: string[] }) {
   return (
-    <ul className="mt-2 space-y-0.5">
+    <ul className="mt-4 space-y-0.5 text-sm text-slate-600 dark:text-gray-400">
       {requirements.map((req) => (
-        <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-gray-400">
-          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-gray-600" />
+        <li key={req} className="flex items-start gap-1.5">
+          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-400 dark:bg-gray-500" />
           {req}
         </li>
       ))}

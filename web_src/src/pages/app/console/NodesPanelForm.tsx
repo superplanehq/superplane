@@ -24,6 +24,7 @@ interface NodesPanelFormProps {
  * `max-lines` lint budget.
  */
 export function NodesPanelForm({ value, onChange }: NodesPanelFormProps) {
+  const allowConcurrentRunsId = useId();
   const updateEntry = (index: number, patch: Partial<NodesPanelNode>) => {
     const nodes = value.nodes.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
     onChange({ ...value, nodes });
@@ -44,6 +45,21 @@ export function NodesPanelForm({ value, onChange }: NodesPanelFormProps) {
           onChange={(e) => onChange({ ...value, title: e.target.value })}
           placeholder="Defaults to panel id"
         />
+      </div>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id={allowConcurrentRunsId}
+          checked={value.allowConcurrentRuns === true}
+          onCheckedChange={(checked) =>
+            onChange({ ...value, allowConcurrentRuns: checked === true ? true : undefined })
+          }
+          className="mt-0.5 border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
+          data-testid="nodes-panel-allow-concurrent-runs"
+        />
+        <Label htmlFor={allowConcurrentRunsId} className="text-xs text-slate-700 dark:text-gray-300">
+          Allow concurrent runs — keep Run buttons enabled while a run is in progress so multiple runs can be triggered
+          at once. When off (default), buttons are disabled until the current run finishes.
+        </Label>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">

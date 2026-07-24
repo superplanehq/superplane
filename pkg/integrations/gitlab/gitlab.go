@@ -35,7 +35,7 @@ const (
   - **Name**: SuperPlane
   - **Redirect URI**: ` + "`%s`" + `
   - **Scopes**: %s
-- Copy the **Client ID** and **Client Secret**, and paste them in the fields below.
+- Copy the **Application ID** and **Secret**, and paste them in the fields below.
 - Click **Save** to complete the setup.
 `
 
@@ -95,23 +95,12 @@ func (g *GitLab) Description() string {
 func (g *GitLab) Instructions() string {
 	return fmt.Sprintf(`
 **Setup steps:**
-1. Optionally enter a **Group ID** to work with a group's projects: in GitLab, open your group's page and select **Actions (⋮) → Copy Group ID**. The group path (e.g. `+"`my-org/my-subgroup`"+`) also works. Leave it empty to use your personal projects.
-2. Choose an **Auth Type** and connect:
+1. Optionally set a **Group ID** (ID or full path, e.g. `+"`my-org/my-subgroup`"+`) to work with a group's projects. Leave it empty to use your personal projects.
+2. Pick an **Auth Type** and connect:
+   - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
+   - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) with scopes %s (the link prefills them), paste it into **Access Token**, and click **Save**.
 
-To connect with **App OAuth**:
-1. Leave **Client ID** and **Client Secret** empty and click **Save** to start the setup wizard. It guides you through creating a GitLab OAuth application and authorizing SuperPlane.
-
-To connect with a **Personal Access Token**:
-1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) — the link prefills the name and scopes (%s), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
-2. Paste the token into the **Access Token** field and click **Save**.
-
-**Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
-
-**Component permissions:** components act as the connected user, so that user needs the matching project role:
-- **Create Merge Request**, **Add Merge Request Reviewers**, and **Remove Merge Request Reviewers** require at least the **Developer** role on the project. These use the `+"`api`"+` scope, which is already included in the scopes above.
-- **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
-- **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
-- **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
+**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating or merging merge requests, approving, and deploying follow the project's roles and protected branch/environment rules.
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -146,19 +135,19 @@ func (g *GitLab) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "clientId",
-			Label:       "Client ID",
+			Label:       "Application ID",
 			Type:        configuration.FieldTypeString,
-			Description: "OAuth Client ID from your GitLab app",
+			Description: "Application ID from your GitLab OAuth application",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeAppOAuth}},
 			},
 		},
 		{
 			Name:        "clientSecret",
-			Label:       "Client Secret",
+			Label:       "Secret",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "OAuth Client Secret from your GitLab app",
+			Description: "Secret from your GitLab OAuth application",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypeAppOAuth}},
 			},
@@ -195,6 +184,8 @@ func (g *GitLab) Actions() []core.Action {
 		&GetIssue{},
 		&UpdateIssue{},
 		&CreateIssueComment{},
+		&AddIssueLabel{},
+		&MarkMergeRequestReadyForReview{},
 	}
 }
 

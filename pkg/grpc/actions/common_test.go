@@ -138,6 +138,29 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
+
+	t.Run("roundtrip integration type options preserves field", func(t *testing.T) {
+		field := configuration.Field{
+			Name:  "integration",
+			Label: "Integration",
+			Type:  configuration.FieldTypeIntegration,
+			TypeOptions: &configuration.TypeOptions{
+				Integration: &configuration.IntegrationTypeOptions{
+					Integration: "claude",
+				},
+			},
+		}
+
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions)
+		require.NotNil(t, pbField.TypeOptions.Integration)
+		assert.Equal(t, "claude", pbField.TypeOptions.Integration.Integration)
+
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions)
+		require.NotNil(t, field2.TypeOptions.Integration)
+		assert.Equal(t, "claude", field2.TypeOptions.Integration.Integration)
+	})
 }
 
 func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {

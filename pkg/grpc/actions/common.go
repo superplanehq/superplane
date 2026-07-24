@@ -196,6 +196,16 @@ func appTypeOptionsToProto(opts *configuration.AppTypeOptions) *configpb.AppType
 	}
 }
 
+func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.IntegrationTypeOptions{
+		Integration: opts.Integration,
+	}
+}
+
 func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
@@ -323,6 +333,7 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
 		AppCanvasNode:    appCanvasNodeTypeOptionsToProto(opts.AppCanvasNode),
 		App:              appTypeOptionsToProto(opts.App),
+		Integration:      integrationTypeOptionsToProto(opts.Integration),
 	}
 }
 
@@ -519,6 +530,16 @@ func protoToAppTypeOptions(pbOpts *configpb.AppTypeOptions) *configuration.AppTy
 	}
 }
 
+func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.IntegrationTypeOptions{
+		Integration: pbOpts.Integration,
+	}
+}
+
 func parameterRefsToProto(params []configuration.ParameterRef) []*configpb.ParameterRef {
 	if len(params) == 0 {
 		return nil
@@ -688,6 +709,7 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
 		AppCanvasNode:    protoToAppCanvasNodeTypeOptions(pbOpts.AppCanvasNode),
 		App:              protoToAppTypeOptions(pbOpts.App),
+		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
 	}
 }
 

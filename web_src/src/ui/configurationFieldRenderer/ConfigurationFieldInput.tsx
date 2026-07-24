@@ -20,6 +20,8 @@ import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
+import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
+import { SecretFieldRenderer, type SecretRefValue } from "./SecretFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { TextFieldRenderer } from "./TextFieldRenderer";
@@ -57,7 +59,9 @@ function fieldRequiresOrganizationContext(fieldType: string | undefined): boolea
     fieldType === "app" ||
     fieldType === "app-canvas-node" ||
     fieldType === "run-parameters" ||
-    fieldType === "secret-key"
+    fieldType === "secret-key" ||
+    fieldType === "secret" ||
+    fieldType === "integration"
   );
 }
 
@@ -154,14 +158,36 @@ export function ConfigurationFieldInput({
     );
   }
 
+  if (field.type === "integration") {
+    return (
+      <IntegrationFieldRenderer
+        field={field}
+        isRequired={isRequired}
+        value={value as IntegrationRefValue}
+        onChange={(nextValue) => onChange(nextValue)}
+        organizationId={organizationId!}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "secret") {
+    return (
+      <SecretFieldRenderer
+        field={field}
+        isRequired={isRequired}
+        value={value as SecretRefValue}
+        onChange={(nextValue) => onChange(nextValue)}
+        organizationId={organizationId!}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
   if (field.type === "list") {
     return (
       <ListFieldRenderer {...commonProps} validationErrors={validationErrors} fieldPath={fieldPath || field.name} />
     );
-  }
-
-  if (field.type === "object") {
-    return <ObjectFieldRenderer {...commonProps} />;
   }
 
   return renderStandardField({ commonProps });
@@ -217,6 +243,10 @@ function renderPrincipalField({
 
 function renderStandardField({ commonProps }: { commonProps: FieldRendererProps }) {
   const { field } = commonProps;
+
+  if (field.type === "object") {
+    return <ObjectFieldRenderer {...commonProps} />;
+  }
 
   if (isTextField(field.type)) {
     return renderTextField(commonProps);

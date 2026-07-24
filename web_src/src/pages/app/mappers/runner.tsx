@@ -201,7 +201,7 @@ export const runnerMapper: ComponentBaseMapper = {
 
     const taskID = brokerTaskIDFromExecution(context.execution);
     if (taskID) {
-      details["task_id"] = taskID;
+      details["Task ID"] = taskID;
     }
 
     const payload = firstRunnerPayload(context.execution);

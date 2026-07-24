@@ -23,11 +23,20 @@ describe("HomePageHarness story smoke", () => {
     expect(screen.queryByRole("heading", { name: /create new app/i })).not.toBeInTheDocument();
   });
 
-  it("redirects a fresh org to the create / onboarding zero state", async () => {
+  it("redirects a fresh org to the production ZeroState create screen", async () => {
     render(<HomePageHarness fixture={emptyHomePageFixture} />);
 
     expect(await screen.findByRole("heading", { name: "Create New App" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start from scratch/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /setup factory/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Apps" })).not.toBeInTheDocument();
+  });
+
+  it("can mount the Storybook-only factory-first prototype at apps/new", async () => {
+    render(<HomePageHarness fixture={emptyHomePageFixture} prototypeNewApp pathSuffix="apps/new" />);
+
+    expect(await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /setup factory/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create a blank app/i })).toBeInTheDocument();
   });
 });

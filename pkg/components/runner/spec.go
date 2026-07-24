@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
-
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
@@ -35,21 +34,26 @@ type EnvironmentVariable struct {
 
 // Spec is persisted Runner node configuration.
 type Spec struct {
-	MachineType             string                `mapstructure:"machine_type"`
-	Commands                string                `mapstructure:"commands"`
-	Environment             []EnvironmentVariable `mapstructure:"environment"`
-	ExecutionMode           string                `mapstructure:"execution_mode"`
-	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
-	DockerImage             string                `mapstructure:"docker_image"`
-	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
+	MachineType             string                 `mapstructure:"machine_type"`
+	Commands                string                 `mapstructure:"commands"`
+	EnvironmentFrom         []EnvironmentFromEntry `mapstructure:"environmentFrom"`
+	Environment             []EnvironmentVariable  `mapstructure:"environment"`
+	ExecutionMode           string                 `mapstructure:"execution_mode"`
+	DockerImagePreset       string                 `mapstructure:"docker_image_preset"`
+	DockerImage             string                 `mapstructure:"docker_image"`
+	ExecutionTimeoutSeconds int                    `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
+}
+
+func NewSpecDecoder(result any) (*mapstructure.Decoder, error) {
+	return mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           result,
+		WeaklyTypedInput: true,
+	})
 }
 
 func decodeRunnerSpec(raw any) (Spec, error) {
 	var spec Spec
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		WeaklyTypedInput: true,
-	})
+	dec, err := NewSpecDecoder(&spec)
 	if err != nil {
 		return Spec{}, fmt.Errorf("runner spec decoder: %w", err)
 	}
@@ -103,7 +107,11 @@ func validateRunnerSpec(spec Spec) error {
 		return err
 	}
 
-	if err := validateEnvironment(spec.Environment); err != nil {
+	if err := ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
+		return err
+	}
+
+	if err := ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
 
