@@ -72,6 +72,20 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
 	})
+
+	t.Run("blocked account cookie returns contact-support message", func(t *testing.T) {
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+	})
 }
 
 func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
@@ -200,6 +214,42 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, res.Code)
 		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
 	})
+}
+
+func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+	rawToken, err := crypto.Base64String(32)
+	require.NoError(t, err)
+
+	description := "key owned by a removed member"
+	apiKey, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"removed-member-key",
+		&description,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, apiKey.UpdateTokenHash(crypto.HashToken(rawToken)))
+	require.NoError(t, r.UserModel.Delete())
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		user, ok := GetUserFromContext(req.Context())
+		require.True(t, ok)
+		assert.Equal(t, apiKey.ID, user.ID)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusNoContent, res.Code)
 }
 
 func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {

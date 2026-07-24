@@ -90,7 +90,7 @@ func ClearTokenHashesForAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) e
 // ClearAPIKeyTokenHashesCreatedByAccountInTransaction wipes token hashes on
 // org API keys created by any human user belonging to the given account.
 func ClearAPIKeyTokenHashesCreatedByAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) error {
-	humanIDs := tx.Model(&User{}).Select("id").Where("account_id = ?", accountID)
+	humanIDs := tx.Unscoped().Model(&User{}).Select("id").Where("account_id = ?", accountID)
 	return tx.Model(&User{}).
 		Where("type = ?", UserTypeAPIKey).
 		Where("created_by IN (?)", humanIDs).
@@ -176,7 +176,7 @@ func FindUnscopedUserByID(id string) (*User, error) {
 		return nil, err
 	}
 
-	err = database.Conn().Where("id = ?", userUUID).First(&user).Error
+	err = database.Conn().Unscoped().Where("id = ?", userUUID).First(&user).Error
 	return &user, err
 }
 

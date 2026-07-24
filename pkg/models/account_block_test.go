@@ -27,6 +27,7 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	apiKey, err := CreateAPIKey(database.Conn(), org.ID, "org-key", &description, human.ID, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, apiKey.UpdateTokenHash("api-key-token-hash"))
+	require.NoError(t, human.Delete())
 
 	require.NoError(t, BlockAccount(account.ID.String()))
 
@@ -36,7 +37,7 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	require.NotNil(t, blocked.BlockedAt)
 	require.NotNil(t, blocked.PasswordChangedAt)
 
-	refreshedHuman, err := FindActiveUserByID(org.ID.String(), human.ID.String())
+	refreshedHuman, err := FindMaybeDeletedUserByID(org.ID.String(), human.ID.String())
 	require.NoError(t, err)
 	assert.Empty(t, refreshedHuman.TokenHash)
 

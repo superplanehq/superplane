@@ -242,6 +242,10 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			//
 			user, impersonationInfo, err := authenticateUserByCookie(ctx, jwtSigner, r)
 			if err != nil {
+				if errors.Is(err, models.ErrAccountBlocked) {
+					http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+					return
+				}
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
 					return
@@ -360,6 +364,9 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 
 	account, err := getValidatedAccountFromCookie(r, jwtSigner)
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			return nil, nil, err
+		}
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
