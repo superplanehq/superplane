@@ -152,4 +152,48 @@ describe("RunParametersFieldRenderer", () => {
       expect(screen.queryByTestId("string-field-message")).toBeNull();
     });
   });
+
+  it("clears stale parameter values when the target node has no parameters", async () => {
+    mockUseCanvas.mockReturnValue({
+      data: {
+        id: "canvas_target",
+        spec: {
+          nodes: [
+            {
+              id: "on-run-empty",
+              name: "Run",
+              type: "TYPE_TRIGGER",
+              component: "onRun",
+              configuration: {
+                parameters: [],
+              },
+            },
+          ],
+        },
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCanvas>);
+
+    renderWithTheme(
+      <ControlledRenderer initialValue={{ custom: true }} allValues={{ app: "canvas_target", node: "on-run-empty" }} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe("{}");
+    });
+  });
+
+  it("removes stale parameter keys when the target node defines different parameters", async () => {
+    renderWithTheme(
+      <ControlledRenderer
+        initialValue={{ message: "hello", obsolete: "drop-me" }}
+        allValues={{ app: "canvas_target", node: "on-run" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe('{"message":"hello"}');
+    });
+  });
 });

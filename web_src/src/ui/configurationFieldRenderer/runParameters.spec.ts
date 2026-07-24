@@ -1,6 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeRunParameterDefinitions } from "./runParameters";
+import { coerceRunParameterValues, getSyncedRunParameterValues, normalizeRunParameterDefinitions } from "./runParameters";
+
+describe("coerceRunParameterValues", () => {
+  it("returns an empty object for missing or invalid input", () => {
+    expect(coerceRunParameterValues(undefined)).toEqual({});
+    expect(coerceRunParameterValues(null)).toEqual({});
+    expect(coerceRunParameterValues([])).toEqual({});
+    expect(coerceRunParameterValues("value")).toEqual({});
+  });
+
+  it("returns object values unchanged", () => {
+    expect(coerceRunParameterValues({ message: "hello" })).toEqual({ message: "hello" });
+  });
+});
+
+describe("getSyncedRunParameterValues", () => {
+  it("clears values when no parameter definitions exist", () => {
+    expect(getSyncedRunParameterValues({ custom: true }, [])).toEqual({});
+    expect(getSyncedRunParameterValues({}, [])).toBeNull();
+  });
+
+  it("removes keys that are not defined on the target trigger", () => {
+    const definitions = normalizeRunParameterDefinitions([{ type: "string", name: "message" }]);
+
+    expect(getSyncedRunParameterValues({ message: "hello", obsolete: true }, definitions)).toEqual({
+      message: "hello",
+    });
+    expect(getSyncedRunParameterValues({ message: "hello" }, definitions)).toBeNull();
+  });
+});
 
 describe("normalizeRunParameterDefinitions", () => {
   it("returns an empty list for missing or invalid input", () => {
