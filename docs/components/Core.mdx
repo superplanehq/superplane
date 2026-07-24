@@ -41,6 +41,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run OpenCode" href="#run-open-code" description="Runs OpenCode on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -1306,6 +1307,69 @@ function main() {
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerJS.finished"
+}
+```
+
+<a id="run-open-code"></a>
+
+## Run OpenCode
+
+**Component key:** `runnerOpenCode`
+
+Runs [OpenCode](https://opencode.ai/docs/cli/) in non-interactive mode on a fleet runner.
+
+OpenCode is provider-agnostic: point it at any supported `provider/model` (OpenAI, Anthropic, Google, OpenRouter, Groq, and more) and supply the matching provider API key.
+
+### Prerequisites
+- The `opencode` CLI is installed on the runner machine and available on `PATH` (see the [OpenCode install docs](https://opencode.ai/docs/)).
+- `node` is available on `PATH` (used to format live logs).
+- A provider API key stored as a SuperPlane secret.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — an OpenCode turn. Later prompts continue the same session.
+
+Example:
+
+1. bash — `git clone …`
+2. prompt — implement the feature
+3. prompt — run tests and fix failures
+4. bash — `git push`
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Model**: Required `provider/model` (for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4-5`).
+- **Provider API keys**: One or more curated providers, each mapped to a SuperPlane secret. OpenCode reads each key from its well-known environment variable.
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output
+Prompt steps stream agent activity to **View logs**. The finished event includes the latest OpenCode result and session id.
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit) or OpenCode reported an error.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "session_id": "ses_123",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerOpenCode.finished"
 }
 ```
 
