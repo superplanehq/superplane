@@ -3,6 +3,7 @@ package jira
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -19,6 +20,16 @@ func newLogger() *logrus.Entry {
 	return logrus.NewEntry(logger)
 }
 
+// fakeIntegrationSetupContext is a minimal core.IntegrationSetupContext fake that records the last step set.
+type fakeIntegrationSetupContext struct {
+	LastStep *core.SetupStep
+}
+
+func (f *fakeIntegrationSetupContext) SetStep(step core.SetupStep) error {
+	f.LastStep = &step
+	return nil
+}
+
 func Test__Jira__Sync(t *testing.T) {
 	j := &Jira{}
 
@@ -30,10 +41,6 @@ func Test__Jira__Sync(t *testing.T) {
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"35273b54-3f06-40d2-880f-dd28cf6daafa"}`)),
 				},
 				{
 					StatusCode: http.StatusOK,
@@ -55,7 +62,7 @@ func Test__Jira__Sync(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, meta.User)
 		assert.Equal(t, "acct-1", meta.User.AccountID)
-		assert.Equal(t, "35273b54-3f06-40d2-880f-dd28cf6daafa", meta.CloudID)
+		assert.Equal(t, testCloudID, meta.CloudID)
 		require.Len(t, meta.Projects, 1)
 		assert.Equal(t, "TEST", meta.Projects[0].Key)
 	})
@@ -82,13 +89,8 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, err.Error(), "verifying Jira credentials")
 	})
 
-	t.Run("missing site URL -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"email":    testEmail,
-				"apiToken": testAPIToken,
-			},
-		}
+	t.Run("missing OAuth connection -> error", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{}
 
 		err := j.Sync(core.SyncContext{
 			HTTP:        &contexts.HTTPContext{},
@@ -97,6 +99,92 @@ func Test__Jira__Sync(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "site URL")
+		assert.Contains(t, err.Error(), "cloud id")
+	})
+}
+
+func Test__Jira__HandleRequest_OAuthRedirect(t *testing.T) {
+	j := &Jira{}
+
+	newIntegrationWithState := func(state string) *contexts.IntegrationContext {
+		appCtx := &contexts.IntegrationContext{}
+		require.NoError(t, appCtx.Properties().Create(core.IntegrationPropertyDefinition{Name: PropertyOAuthState, Value: state}))
+		require.NoError(t, appCtx.Properties().Create(core.IntegrationPropertyDefinition{Name: PropertyClientID, Value: "client-1"}))
+		require.NoError(t, appCtx.Secrets().Create(core.IntegrationSecretDefinition{Name: SecretOAuthClientSecret, Value: "secret-1"}))
+		return appCtx
+	}
+
+	t.Run("completes the OAuth connection", func(t *testing.T) {
+		appCtx := newIntegrationWithState("state-1")
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"access-1","refresh_token":"refresh-1","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+		setupCtx := &fakeIntegrationSetupContext{}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/int-1/redirect?code=code-1&state=state-1", nil)
+		rec := httptest.NewRecorder()
+
+		j.HandleRequest(core.HTTPRequestContext{
+			Logger:           newLogger(),
+			Request:          req,
+			Response:         rec,
+			BaseURL:          "https://superplane.example.com",
+			HTTP:             httpCtx,
+			Integration:      appCtx,
+			IntegrationSetup: setupCtx,
+		})
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://superplane.example.com", rec.Header().Get("Location"))
+
+		cloudID, err := appCtx.Properties().GetString(PropertyCloudID)
+		require.NoError(t, err)
+		assert.Equal(t, "cloud-1", cloudID)
+
+		accessToken, err := appCtx.Secrets().Get(SecretOAuthAccessToken)
+		require.NoError(t, err)
+		assert.Equal(t, "access-1", accessToken)
+
+		require.NotNil(t, setupCtx.LastStep)
+		assert.Equal(t, core.SetupStepTypeDone, setupCtx.LastStep.Type)
+		assert.Equal(t, "ready", appCtx.State)
+	})
+
+	t.Run("rejects a state mismatch", func(t *testing.T) {
+		appCtx := newIntegrationWithState("expected-state")
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/int-1/redirect?code=code-1&state=wrong-state", nil)
+		rec := httptest.NewRecorder()
+
+		j.HandleRequest(core.HTTPRequestContext{
+			Logger:      newLogger(),
+			Request:     req,
+			Response:    rec,
+			Integration: appCtx,
+		})
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("rejects a missing code", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/int-1/redirect?state=state-1", nil)
+		rec := httptest.NewRecorder()
+
+		j.HandleRequest(core.HTTPRequestContext{
+			Logger:      newLogger(),
+			Request:     req,
+			Response:    rec,
+			Integration: &contexts.IntegrationContext{},
+		})
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 }

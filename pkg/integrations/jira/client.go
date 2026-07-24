@@ -2,7 +2,6 @@ package jira
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,84 +14,134 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// Client speaks to Jira Cloud directly using the user's site URL and Basic
-// Auth (email + API token). Endpoints resolve to `{siteUrl}/rest/api/3/...`.
+// Client speaks to Jira Cloud through Atlassian's OAuth API proxy (api.atlassian.com/ex/jira/{cloudId}/...).
 type Client struct {
-	SiteURL string
-	Email   string
-	Token   string
-	http    core.HTTPContext
+	CloudID     string
+	AccessToken string
+	http        core.HTTPContext
+	integration core.IntegrationContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	siteURL, err := ctx.GetConfig("siteUrl")
-	if err != nil {
-		return nil, fmt.Errorf("error reading site URL: %v", err)
+	cloudID, err := ctx.Properties().GetString(PropertyCloudID)
+	if err != nil || cloudID == "" {
+		return nil, fmt.Errorf("missing Jira cloud id; connect Jira via OAuth first")
 	}
 
-	email, err := ctx.GetConfig("email")
-	if err != nil {
-		return nil, fmt.Errorf("error reading email: %v", err)
-	}
-
-	token, err := ctx.GetConfig("apiToken")
-	if err != nil {
-		return nil, fmt.Errorf("error reading API token: %v", err)
-	}
-
-	if len(siteURL) == 0 {
-		return nil, fmt.Errorf("missing Jira site URL")
-	}
-	if len(email) == 0 {
-		return nil, fmt.Errorf("missing Jira email")
-	}
-	if len(token) == 0 {
-		return nil, fmt.Errorf("missing API token")
+	accessToken, err := ctx.Secrets().Get(SecretOAuthAccessToken)
+	if err != nil || accessToken == "" {
+		return nil, fmt.Errorf("missing Jira OAuth access token; connect Jira via OAuth first")
 	}
 
 	return &Client{
-		SiteURL: strings.TrimRight(string(siteURL), "/"),
-		Email:   string(email),
-		Token:   string(token),
-		http:    httpCtx,
+		CloudID:     cloudID,
+		AccessToken: accessToken,
+		http:        httpCtx,
+		integration: ctx,
 	}, nil
 }
 
 func (c *Client) apiURL(path string) string {
-	return c.SiteURL + path
+	return atlassianAPIProxyHost + "/" + c.CloudID + path
 }
 
-func (c *Client) basicAuthHeader() string {
-	creds := c.Email + ":" + c.Token
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
-}
+// execRequest sends the request with a Bearer token, refreshing once and retrying on a 401.
+func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading request body: %v", err)
+		}
+	}
 
-func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, url, body)
+	responseBody, status, err := c.doRequest(method, requestURL, bodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
+		return nil, err
+	}
+
+	if status == http.StatusUnauthorized {
+		if refreshErr := c.refresh(); refreshErr != nil {
+			return nil, fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+		}
+		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
+func (c *Client) doRequest(method, requestURL string, body []byte) ([]byte, int, error) {
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, requestURL, reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error building request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.basicAuthHeader())
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
+		return nil, 0, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, 0, fmt.Errorf("error reading body: %v", err)
 	}
 
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	return responseBody, res.StatusCode, nil
+}
+
+// refresh exchanges the stored refresh token for a new access/refresh token pair and persists them.
+func (c *Client) refresh() error {
+	if c.integration == nil {
+		return fmt.Errorf("no integration context available to refresh the OAuth token")
 	}
 
-	return responseBody, nil
+	clientID, err := c.integration.Properties().GetString(PropertyClientID)
+	if err != nil {
+		return fmt.Errorf("error reading OAuth client id: %w", err)
+	}
+	clientSecret, err := c.integration.Secrets().Get(SecretOAuthClientSecret)
+	if err != nil {
+		return fmt.Errorf("error reading OAuth client secret: %w", err)
+	}
+	refreshToken, err := c.integration.Secrets().Get(SecretOAuthRefreshToken)
+	if err != nil {
+		return fmt.Errorf("error reading OAuth refresh token: %w", err)
+	}
+
+	token, err := refreshAccessToken(c.http, clientID, clientSecret, refreshToken)
+	if err != nil {
+		return err
+	}
+
+	if err := c.integration.Secrets().Update(SecretOAuthAccessToken, token.AccessToken); err != nil {
+		return fmt.Errorf("error storing refreshed access token: %w", err)
+	}
+	if token.RefreshToken != "" {
+		if err := c.integration.Secrets().Update(SecretOAuthRefreshToken, token.RefreshToken); err != nil {
+			return fmt.Errorf("error storing refreshed refresh token: %w", err)
+		}
+	}
+
+	c.AccessToken = token.AccessToken
+	return nil
 }
 
 type User struct {
@@ -758,6 +807,90 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
+// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic webhook registration request.
+type IssueWebhookRegistration struct {
+	JQLFilter string   `json:"jqlFilter,omitempty"`
+	Events    []string `json:"events"`
+}
+
+type createIssueWebhookRequest struct {
+	URL      string                     `json:"url"`
+	Webhooks []IssueWebhookRegistration `json:"webhooks"`
+}
+
+type createIssueWebhookResult struct {
+	CreatedWebhookID *int64   `json:"createdWebhookId,omitempty"`
+	Errors           []string `json:"errors,omitempty"`
+}
+
+// createIssueWebhookResponse wraps results under "webhookRegistrationResult", not a bare array.
+type createIssueWebhookResponse struct {
+	WebhookRegistrationResult []createIssueWebhookResult `json:"webhookRegistrationResult"`
+}
+
+// CreateIssueWebhook registers a dynamic webhook for issue events, scoped by an optional JQL filter.
+func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []string) (int64, error) {
+	req := createIssueWebhookRequest{
+		URL: callbackURL,
+		Webhooks: []IssueWebhookRegistration{
+			{JQLFilter: jqlFilter, Events: events},
+		},
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return 0, fmt.Errorf("marshal create webhook request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body))
+	if err != nil {
+		return 0, err
+	}
+
+	results, err := parseCreateIssueWebhookResponse(responseBody)
+	if err != nil {
+		return 0, err
+	}
+	if len(results[0].Errors) > 0 {
+		return 0, fmt.Errorf("failed to create webhook: %s", strings.Join(results[0].Errors, "; "))
+	}
+	if results[0].CreatedWebhookID == nil {
+		return 0, fmt.Errorf("create webhook response missing createdWebhookId: %s", string(responseBody))
+	}
+
+	return *results[0].CreatedWebhookID, nil
+}
+
+// parseCreateIssueWebhookResponse accepts either the wrapped shape or a bare array.
+func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookResult, error) {
+	var wrapped createIssueWebhookResponse
+	if err := json.Unmarshal(responseBody, &wrapped); err == nil && len(wrapped.WebhookRegistrationResult) > 0 {
+		return wrapped.WebhookRegistrationResult, nil
+	}
+
+	var results []createIssueWebhookResult
+	if err := json.Unmarshal(responseBody, &results); err == nil && len(results) > 0 {
+		return results, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
+}
+
+// DeleteIssueWebhooks removes previously-registered dynamic webhooks by id.
+func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
+	if len(webhookIDs) == 0 {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string][]int64{"webhookIds": webhookIDs})
+	if err != nil {
+		return fmt.Errorf("marshal delete webhook request: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodDelete, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body))
+	return err
+}
+
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -872,8 +1005,7 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 		return empty, fmt.Errorf("marshal search body: %w", err)
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
-	u := fmt.Sprintf("%s/rest/api/3/search", base)
+	u := c.apiURL("/rest/api/3/search")
 	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return empty, err
@@ -963,7 +1095,7 @@ func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTota
 		maxTotal = 500
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	const limit = 100
 	var out []CustomerRequestListed
 	start := 0
@@ -1014,7 +1146,7 @@ type CustomerRequest struct {
 }
 
 func (c *Client) GetCustomerRequest(issueKey string) (*CustomerRequest, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s", base, url.PathEscape(issueKey))
 	responseBody, err := c.execRequest(http.MethodGet, u, nil)
 	if err != nil {
@@ -1049,7 +1181,7 @@ type approvalsPage struct {
 }
 
 func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []Approval
 	start := 0
 	const pageSize = 50
@@ -1081,7 +1213,7 @@ func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
 }
 
 func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (*Approval, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf(
 		"%s/rest/servicedeskapi/request/%s/approval/%s",
 		base,
@@ -1107,7 +1239,7 @@ func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (
 }
 
 func (c *Client) AddCustomerRequestComment(issueKey, body string, public bool) error {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/comment", base, url.PathEscape(issueKey))
 
 	requestBody, err := json.Marshal(map[string]any{
@@ -1128,28 +1260,6 @@ func jqlQuotedProjectKey(projectKey string) string {
 }
 
 const atlassianIncidentAPIHost = "https://api.atlassian.com"
-
-type tenantInfoResponse struct {
-	CloudID string `json:"cloudId"`
-}
-
-// FetchCloudID returns the Atlassian cloud id for the configured Jira site (required for the JSM Incidents API).
-func (c *Client) FetchCloudID() (string, error) {
-	tenantURL := strings.TrimSuffix(c.SiteURL, "/") + "/_edge/tenant_info"
-	responseBody, err := c.execRequest(http.MethodGet, tenantURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("fetch tenant_info: %w", err)
-	}
-
-	var info tenantInfoResponse
-	if err := json.Unmarshal(responseBody, &info); err != nil {
-		return "", fmt.Errorf("parse tenant_info: %w", err)
-	}
-	if info.CloudID == "" {
-		return "", fmt.Errorf("tenant_info response missing cloudId")
-	}
-	return info.CloudID, nil
-}
 
 // ServiceDesk is returned by GET /rest/servicedeskapi/servicedesk (Jira Service Management).
 type ServiceDesk struct {
@@ -1172,7 +1282,7 @@ type pagedServiceDesks struct {
 
 // ListServiceDesks returns service desks the authenticated user can access.
 func (c *Client) ListServiceDesks() ([]ServiceDesk, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []ServiceDesk
 	start := 0
 	const pageSize = 50
@@ -1205,7 +1315,7 @@ type pagedRequestTypes struct {
 
 // ListRequestTypes returns customer request types for a service desk.
 func (c *Client) ListRequestTypes(serviceDeskID string) ([]RequestType, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestType
 	start := 0
 	const pageSize = 50
@@ -1323,7 +1433,7 @@ type requestTypeFieldsResponse struct {
 
 // ListRequestTypeFields returns fields for a service desk request type (including hidden fields).
 func (c *Client) ListRequestTypeFields(serviceDeskID, requestTypeID string) ([]RequestTypeField, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf(
 		"%s/rest/servicedeskapi/servicedesk/%s/requesttype/%s/field",
 		base,
@@ -1444,7 +1554,7 @@ func (c *Client) listCustomFieldOptionsDirect(fieldID string) []RequestTypeField
 		return nil
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestTypeFieldValue
 	startAt := 0
 	const pageSize = 100
@@ -1482,7 +1592,7 @@ func (c *Client) listCustomFieldOptionsDirect(fieldID string) []RequestTypeField
 }
 
 func (c *Client) listCustomFieldOptionsFromContexts(fieldID string) []RequestTypeFieldValue {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var contexts []customFieldContext
 	startAt := 0
 	const pageSize = 50
@@ -1555,7 +1665,7 @@ func contextIncludesProject(ctx customFieldContext, projectID string) bool {
 }
 
 func (c *Client) listCustomFieldOptionsForContext(fieldID, contextID string) []RequestTypeFieldValue {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestTypeFieldValue
 	startAt := 0
 	const pageSize = 100
@@ -1617,7 +1727,7 @@ func pageValuesToFieldOptions(values []customFieldOption) []RequestTypeFieldValu
 
 // ListFields returns all fields visible to the integration (Jira REST API v3).
 func (c *Client) ListFields() ([]JiraFieldInfo, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	body, err := c.execRequest(http.MethodGet, base+"/rest/api/3/field", nil)
 	if err != nil {
 		return nil, err
@@ -1688,7 +1798,7 @@ func (c *Client) listFieldAllowedValuesFromCreateMetaModern(projectKey, fieldLab
 		return nil, ""
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	issueTypesURL := fmt.Sprintf("%s/rest/api/3/issue/createmeta/%s/issuetypes", base, url.PathEscape(projectKey))
 	body, status, err := c.execRequestWithStatus(http.MethodGet, issueTypesURL, nil)
 	if err != nil || status < 200 || status >= 300 {
@@ -1732,7 +1842,7 @@ func (c *Client) listFieldAllowedValuesFromCreateMetaLegacy(projectKey, fieldLab
 		return nil, ""
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	q := url.Values{}
 	q.Set("projectKeys", projectKey)
 	q.Set("expand", "projects.issuetypes.fields")
@@ -1801,7 +1911,7 @@ func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.basicAuthHeader())
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -1819,7 +1929,7 @@ func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader
 
 // GetRequestType returns one request type, optionally expanded (always requests expand=practice).
 func (c *Client) GetRequestType(serviceDeskID, requestTypeID string) (*RequestType, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	q := url.Values{}
 	q.Add("expand", "practice")
 	u := fmt.Sprintf(

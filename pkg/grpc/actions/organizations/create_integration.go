@@ -95,7 +95,7 @@ func CreateIntegrationWithUsage(
 			return nil, grpcerrors.Internal(err, "failed to get setup provider")
 		}
 
-		return setupIntegration(registry, setupProvider, newIntegration)
+		return setupIntegration(registry, setupProvider, newIntegration, baseURL, webhooksBaseURL)
 	}
 
 	//
@@ -124,19 +124,21 @@ func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capabil
 	return capabilities
 }
 
-func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration) (*pb.CreateIntegrationResponse, error) {
+func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration, baseURL, webhooksBaseURL string) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
 		logging.ForIntegration(*newIntegration).WithField("source", "integration_create_first_step").Info("Integration operation may write secrets")
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
-			IntegrationID:  newIntegration.ID,
-			OrganizationID: newIntegration.OrganizationID.String(),
-			HTTP:           registry.HTTPContextInTransaction(tx),
-			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
-			Capabilities:   capabilityCtx,
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
+			IntegrationID:   newIntegration.ID,
+			OrganizationID:  newIntegration.OrganizationID.String(),
+			BaseURL:         baseURL,
+			WebhooksBaseURL: webhooksBaseURL,
+			HTTP:            registry.HTTPContextInTransaction(tx),
+			Properties:      contexts.NewIntegrationPropertyStorage(newIntegration),
+			Capabilities:    capabilityCtx,
+			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{

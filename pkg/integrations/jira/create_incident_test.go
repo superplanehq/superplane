@@ -15,11 +15,8 @@ import (
 
 func jiraTestIntegration() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"siteUrl":  "https://test.atlassian.net",
-			"email":    "test@example.com",
-			"apiToken": "test-token",
-		},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
 		Metadata: Metadata{
 			CloudID:  "35273b54-3f06-40d2-880f-dd28cf6daafa",
 			Projects: []Project{{ID: "1", Key: "IT", Name: "IT"}},
@@ -247,8 +244,9 @@ func Test__incidentAlertIDsFromSpec__empty(t *testing.T) {
 
 func Test__cloudIDFromIntegration__errors(t *testing.T) {
 	app := &contexts.IntegrationContext{
-		Configuration: map[string]any{"siteUrl": "https://x.net", "email": "a@b.com", "apiToken": "t"},
-		Metadata:      Metadata{Projects: []Project{}},
+		CurrentProperties: map[string]any{PropertyCloudID: testCloudID},
+		CurrentSecrets:    map[string]core.IntegrationSecret{SecretOAuthAccessToken: {Name: SecretOAuthAccessToken, Value: []byte(testAccessToken)}},
+		Metadata:          Metadata{Projects: []Project{}},
 	}
 	_, err := cloudIDFromIntegration(app)
 	require.Error(t, err)
