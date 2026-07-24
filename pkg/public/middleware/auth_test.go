@@ -366,14 +366,16 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
-		req := httptest.NewRequest(http.MethodGet, "/account", nil)
-		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		for _, path := range []string{"/account", "/account/experimental-features", "/admin/api/accounts"} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 
-		res := httptest.NewRecorder()
-		handler.ServeHTTP(res, req)
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusForbidden, res.Code)
-		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+			assert.Equal(t, http.StatusForbidden, res.Code, path)
+			assert.Contains(t, res.Body.String(), models.AccountBlockedMessage, path)
+		}
 	})
 }
 
