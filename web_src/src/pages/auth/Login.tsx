@@ -85,7 +85,13 @@ interface LoginProps {
   mode?: AuthMode;
 }
 
+const ACCOUNT_BLOCKED_MESSAGE = "Your account has been blocked. Please contact support.";
+
 const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: SignupUnavailableReason) => {
+  if (authError === "account_blocked") {
+    return ACCOUNT_BLOCKED_MESSAGE;
+  }
+
   if (authError === "signup_required") {
     if (signupUnavailableReason === "waitlist") {
       return "No account exists for that provider yet. Join the waitlist to request access.";
@@ -192,7 +198,10 @@ const getMagicCodeVerifyError = async (response: Response) => {
   }
 
   if (response.status === 403) {
-    const errorText = await response.text();
+    const errorText = (await response.text()).trim();
+    if (errorText === ACCOUNT_BLOCKED_MESSAGE) {
+      return ACCOUNT_BLOCKED_MESSAGE;
+    }
     return errorText || "Sign-up is not allowed.";
   }
 
@@ -581,7 +590,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 403) {
+          const errorText = (await response.text()).trim();
+          setFormError(errorText || ACCOUNT_BLOCKED_MESSAGE);
+        } else if (response.status === 401) {
           setFormError("Invalid email or password");
         } else {
           setFormError("Login failed. Please try again.");

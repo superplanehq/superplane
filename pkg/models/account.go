@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,18 +10,27 @@ import (
 	"gorm.io/gorm"
 )
 
+const AccountBlockedMessage = "Your account has been blocked. Please contact support."
+
+var ErrAccountBlocked = errors.New(AccountBlockedMessage)
+
 type Account struct {
 	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Email             string
 	Name              string
 	InstallationAdmin bool `gorm:"default:false"`
 	PasswordChangedAt *time.Time
+	BlockedAt         *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 }
 
 func (a *Account) IsInstallationAdmin() bool {
 	return a.InstallationAdmin
+}
+
+func (a *Account) IsBlocked() bool {
+	return a != nil && a.BlockedAt != nil
 }
 
 // IsSessionFresh reports whether a token issued at the given Unix timestamp
@@ -61,6 +71,70 @@ func DemoteFromInstallationAdmin(accountID string) error {
 		Where("id = ?", accountID).
 		Update("installation_admin", false).
 		Error
+}
+
+// BlockAccountInTransaction marks the account blocked, invalidates sessions via
+// password_changed_at, and clears personal tokens plus org API keys created by
+// that account's users.
+func BlockAccountInTransaction(tx *gorm.DB, account *Account, now time.Time) error {
+	if account == nil {
+		return errors.New("account is required")
+	}
+
+	err := tx.Model(account).Update("blocked_at", now).Error
+	if err != nil {
+		return err
+	}
+	account.BlockedAt = &now
+
+	if err := account.MarkPasswordChangedInTransaction(tx, now); err != nil {
+		return err
+	}
+	if err := ClearTokenHashesForAccountInTransaction(tx, account.ID); err != nil {
+		return err
+	}
+	return ClearAPIKeyTokenHashesCreatedByAccountInTransaction(tx, account.ID)
+}
+
+// UnblockAccountInTransaction clears the blocked flag. Existing sessions remain
+// invalid; the user must sign in again.
+func UnblockAccountInTransaction(tx *gorm.DB, account *Account) error {
+	if account == nil {
+		return errors.New("account is required")
+	}
+
+	err := tx.Model(account).Update("blocked_at", nil).Error
+	if err != nil {
+		return err
+	}
+	account.BlockedAt = nil
+	return nil
+}
+
+func BlockAccount(accountID string) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		var account Account
+		if err := tx.Where("id = ?", accountID).First(&account).Error; err != nil {
+			return err
+		}
+		if account.IsBlocked() {
+			return nil
+		}
+		return BlockAccountInTransaction(tx, &account, time.Now())
+	})
+}
+
+func UnblockAccount(accountID string) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		var account Account
+		if err := tx.Where("id = ?", accountID).First(&account).Error; err != nil {
+			return err
+		}
+		if !account.IsBlocked() {
+			return nil
+		}
+		return UnblockAccountInTransaction(tx, &account)
+	})
 }
 
 func CreateAccount(name, email string) (*Account, error) {
