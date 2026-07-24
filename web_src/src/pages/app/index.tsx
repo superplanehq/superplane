@@ -858,7 +858,6 @@ export function AppPage() {
       return;
     }
 
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
     if (isViewingLiveVersion) {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
@@ -3989,7 +3988,6 @@ export function AppPage() {
     setRemoteCanvasUpdatePending(false);
     setLastSavedWorkflowSnapshot(null);
 
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
     if (isViewingLiveVersion) {
       await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });

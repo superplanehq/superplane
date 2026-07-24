@@ -49,9 +49,7 @@ describe("syncCanvasDraftState", () => {
     expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "version-1");
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.stagedCanvasSpec("canvas-1"), version);
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "version-1"), version);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-1"), {
-      metadata: { id: "version-1" },
-    });
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-1"), version);
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
     const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));
@@ -90,9 +88,7 @@ describe("syncCanvasDraftState", () => {
       versionId: "version-2",
     });
 
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-2"), {
-      metadata: { id: "version-2" },
-    });
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-2"), version);
   });
 
   it("loads the live version when the requested version id is stale", async () => {

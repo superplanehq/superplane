@@ -137,9 +137,8 @@ export const canvasKeys = {
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
-  versionDescribePrefix: (canvasId: string) => [...canvasKeys.versions(), canvasId, "describe"] as const,
   versionDescribe: (canvasId: string, versionId: string) =>
-    [...canvasKeys.versionDescribePrefix(canvasId), versionId] as const,
+    [...canvasKeys.versions(), canvasId, "describe", versionId] as const,
   // Canvas-scoped staging reads. Staging belongs to the canvas/user, not a version.
   stagedCanvasSpec: (canvasId: string) => [...canvasKeys.all, "stagedCanvasSpec", canvasId] as const,
   canvasStaging: (canvasId: string) => [...canvasKeys.versions(), "staging", canvasId] as const,
@@ -372,6 +371,7 @@ export const useDescribeCanvasVersion = (
       return response.data?.version;
     },
     enabled: !!canvasId && !!versionId && enabled,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 };
 
@@ -527,7 +527,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const updatedCanvas = response?.data?.canvas;
@@ -944,7 +943,6 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       }
 
       if (!version) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
         return;
       }

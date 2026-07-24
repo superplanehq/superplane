@@ -1,11 +1,27 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { cancelCanvasVersionQueries, canvasKeys, removeCanvasVersionScopedQueries } from "@/hooks/useCanvasData";
 
-type CommitMutation = { mutateAsync: (commitMessage: string) => Promise<{ version?: { metadata?: { id?: string } } }> };
+type CommitMutation = {
+  mutateAsync: (commitMessage: string) => Promise<{ version?: CanvasesCanvasVersion }>;
+};
 type DraftSpec = CanvasesCanvas["spec"] | null;
+
+function seedCommittedVersionCaches(
+  queryClient: QueryClient,
+  canvasId: string,
+  committedVersion?: CanvasesCanvasVersion,
+) {
+  const versionId = committedVersion?.metadata?.id;
+  if (!versionId || !committedVersion) {
+    return;
+  }
+
+  queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, versionId), committedVersion);
+  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), committedVersion);
+}
 
 async function invalidatePostCommitCaches(
   queryClient: QueryClient,
@@ -19,7 +35,6 @@ async function invalidatePostCommitCaches(
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId), refetchType: "all" }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), refetchType: "all" }),
@@ -60,13 +75,16 @@ async function applyPostCommitCacheUpdates({
   canvasId,
   previousVersionId,
   committedVersionId,
+  committedVersion,
 }: {
   queryClient: QueryClient;
   organizationId: string;
   canvasId: string;
   previousVersionId: string;
   committedVersionId: string;
+  committedVersion?: CanvasesCanvasVersion;
 }) {
+  seedCommittedVersionCaches(queryClient, canvasId, committedVersion);
   await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
   await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
 }
@@ -112,9 +130,11 @@ export async function executeCommitStaging({
   const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   const previousVersionId = activeCanvasVersionId;
   let committedVersionId = activeCanvasVersionId;
+  let committedVersion: CanvasesCanvasVersion | undefined;
   try {
     const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);
-    committedVersionId = response?.version?.metadata?.id || activeCanvasVersionId;
+    committedVersion = response?.version;
+    committedVersionId = committedVersion?.metadata?.id || activeCanvasVersionId;
   } catch (error) {
     releaseCanvasUpdatedEcho?.();
     throw error;
@@ -133,6 +153,7 @@ export async function executeCommitStaging({
       canvasId,
       previousVersionId,
       committedVersionId,
+      committedVersion,
     });
   }
 

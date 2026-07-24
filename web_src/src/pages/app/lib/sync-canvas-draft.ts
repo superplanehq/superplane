@@ -58,9 +58,7 @@ export async function syncCanvasDraftState({
   queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), version);
 
   if (!skipVersionListUpdate && version.metadata) {
-    queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, cacheVersionId), {
-      metadata: version.metadata,
-    });
+    queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, cacheVersionId), version);
   }
 
   if (version.spec) {

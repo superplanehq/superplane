@@ -27,10 +27,6 @@ export function useRefreshLatestLiveCanvasData(
           refetchType: "all",
         }),
         queryClient.invalidateQueries({
-          queryKey: canvasKeys.versionDescribePrefix(canvasId),
-          refetchType: "all",
-        }),
-        queryClient.invalidateQueries({
           queryKey: canvasKeys.versionHistory(canvasId),
           refetchType: "all",
         }),
