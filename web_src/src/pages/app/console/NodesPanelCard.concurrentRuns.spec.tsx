@@ -54,7 +54,13 @@ function renderPanel(nodes: SuperplaneComponentsNode[], panel: ConsolePanel, onT
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={nodes} canRunNodes onTriggerNode={onTriggerNode}>
+      <ConsoleContextProvider
+        canvasId="canvas-1"
+        organizationId="org-1"
+        nodes={nodes}
+        canRunNodes
+        onTriggerNode={onTriggerNode}
+      >
         <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
       </ConsoleContextProvider>
     </QueryClientProvider>,

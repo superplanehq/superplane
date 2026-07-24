@@ -22,7 +22,9 @@ describe("nodesPanelContentFromLegacyNode", () => {
   });
 
   it("carries the widget-level allowConcurrentRuns flag through the legacy fold", () => {
-    expect(nodesPanelContentFromLegacyNode({ node: "start", allowConcurrentRuns: true }).allowConcurrentRuns).toBe(true);
+    expect(nodesPanelContentFromLegacyNode({ node: "start", allowConcurrentRuns: true }).allowConcurrentRuns).toBe(
+      true,
+    );
     expect(nodesPanelContentFromLegacyNode({ node: "start" }).allowConcurrentRuns).toBeUndefined();
   });
 });
