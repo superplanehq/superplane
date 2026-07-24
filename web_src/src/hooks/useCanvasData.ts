@@ -48,6 +48,7 @@ import type {
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
+  CanvasesCanvasVersionMetadata,
   CanvasesCanvasRepositoryFileOperation,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
@@ -61,6 +62,7 @@ import {
   fetchConsoleSpecFromRepository,
   fetchRepositorySpecFileContent,
 } from "../pages/app/lib/repository-spec-files";
+import { canvasVersionId } from "../pages/app/lib/canvas-versions";
 import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-spec-paths";
 import { matchesCommittedCanvasYaml, matchesCommittedConsoleYaml } from "../pages/app/lib/staging-content-match";
@@ -416,10 +418,10 @@ export const useCanvasVersion = (organizationId: string, canvasId: string, versi
 
 export const useStagedCanvasSpec = (
   canvasId: string,
-  versionMetadata: CanvasesCanvasVersion | null | undefined,
+  versionMetadata: CanvasesCanvasVersion | CanvasesCanvasVersionMetadata | null | undefined,
   enabled = true,
 ) => {
-  const versionId = versionMetadata?.metadata?.id;
+  const versionId = canvasVersionId(versionMetadata);
   return useQuery({
     queryKey: canvasKeys.stagedCanvasSpec(canvasId),
     queryFn: async () => {

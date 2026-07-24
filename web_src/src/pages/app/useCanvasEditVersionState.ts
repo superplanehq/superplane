@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { useCanvasVersion, useStagedCanvasSpec } from "@/hooks/useCanvasData";
 
+import { canvasVersionShell, type CanvasVersionListItem } from "./lib/canvas-versions";
 import {
   isAwaitingStagedCanvasSpec,
   isViewingCurrentLiveCanvasVersion,
@@ -17,7 +18,7 @@ type UseCanvasEditVersionStateOptions = {
   isEnteringEditSession: boolean;
   activeCanvasVersion: CanvasesCanvasVersion | null;
   liveCanvasVersionId?: string;
-  selectableVersionsById: Map<string, CanvasesCanvasVersion>;
+  selectableVersionsById: Map<string, CanvasVersionListItem>;
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
 };
@@ -39,7 +40,8 @@ export function useCanvasEditVersionState({
     activeCanvasVersionId,
     liveCanvasVersionId,
   });
-  const stagedVersionMetadataShell = activeCanvasVersion ?? selectableVersionsById.get(activeCanvasVersionId) ?? null;
+  const stagedVersionMetadataShell =
+    activeCanvasVersion ?? canvasVersionShell(selectableVersionsById.get(activeCanvasVersionId)) ?? null;
   const {
     data: loadedStagedCanvasVersion,
     isLoading: loadedStagedCanvasVersionLoading,

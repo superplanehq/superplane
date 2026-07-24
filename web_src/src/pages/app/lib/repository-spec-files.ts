@@ -2,12 +2,14 @@ import {
   canvasesDescribeCanvasVersion,
   canvasesGetCanvasStaging,
   type CanvasesCanvasVersion,
+  type CanvasesCanvasVersionMetadata,
   type CanvasesStagingSummary,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+import { toCanvasVersionShell } from "./canvas-versions";
 import { isNotFoundError } from "../workflowPageHelpers";
 
 // Confirms whether a canvas version still exists via DescribeCanvasVersion.
@@ -86,10 +88,11 @@ export function canvasVersionWithSpecFromYaml(
 // is not keyed by version id; version metadata is only used as a display shell.
 export async function fetchStagedCanvasVersionWithSpec(
   canvasId: string,
-  versionMetadata?: CanvasesCanvasVersion,
+  versionMetadata?: CanvasesCanvasVersion | CanvasesCanvasVersionMetadata,
 ): Promise<CanvasesCanvasVersion | undefined> {
+  const shell = toCanvasVersionShell(versionMetadata);
   const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, undefined, true);
-  return canvasVersionWithSpecFromYaml(versionMetadata, canvasYaml);
+  return canvasVersionWithSpecFromYaml(shell, canvasYaml);
 }
 
 // fetchCanvasVersionWithSpec loads a version from DescribeCanvasVersion, including
