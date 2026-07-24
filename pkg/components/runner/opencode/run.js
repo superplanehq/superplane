@@ -15,6 +15,10 @@
  * Session continuity: the first prompt has no session; this script captures
  * the session id emitted by OpenCode into $SUPERPLANE_TASK_DIR/session_id so
  * that later prompt steps resume the exact same session via `--session`.
+ *
+ * Sandboxing: OpenCode's XDG base directories are redirected into the task dir
+ * (see openCodeEnv) so it never tries to write logs/state under a read-only
+ * $HOME inside the fleet-runner sandbox.
  */
 
 const fs = require("fs");
@@ -75,6 +79,7 @@ async function runPrompt(promptFile, model) {
   const formatter = createFormatter(model, previousSession);
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
+    env: openCodeEnv(sp),
   });
   child.stderr.pipe(process.stderr);
 
@@ -102,6 +107,37 @@ async function runPrompt(promptFile, model) {
     return 1;
   }
   return exitCode;
+}
+
+// openCodeEnv returns the environment for the opencode child process with its
+// XDG base directories redirected into the task dir.
+//
+// OpenCode writes its log (and other state) under the XDG data directory,
+// which defaults to $HOME/.local/share/opencode/log/opencode.log. Inside a
+// fleet-runner sandbox that home path is not writable, so opencode aborts with
+// "PermissionDenied: FileSystem.open (.../opencode/log/opencode.log)". The task
+// dir is always writable (we already persist the session id and result there),
+// so pointing every XDG dir at it keeps opencode self-contained and hermetic.
+function openCodeEnv(taskDir) {
+  const env = { ...process.env };
+  const base = path.join(taskDir, "opencode-home");
+  const dirs = {
+    XDG_DATA_HOME: path.join(base, "data"),
+    XDG_CONFIG_HOME: path.join(base, "config"),
+    XDG_CACHE_HOME: path.join(base, "cache"),
+    XDG_STATE_HOME: path.join(base, "state"),
+  };
+  for (const [key, dir] of Object.entries(dirs)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // Leave the variable unset if the dir can't be created; opencode will
+      // fall back to its default and surface any error itself.
+      continue;
+    }
+    env[key] = dir;
+  }
+  return env;
 }
 
 function readSessionID(sessionPath) {
