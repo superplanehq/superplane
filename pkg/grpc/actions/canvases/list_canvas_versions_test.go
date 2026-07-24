@@ -69,8 +69,8 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		response, err := ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(response.GetVersions()), 2)
-		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetMetadata().GetId())
-		assert.Equal(t, firstCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[1].GetMetadata().GetId())
+		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetId())
+		assert.Equal(t, firstCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[1].GetId())
 		assert.GreaterOrEqual(t, response.GetTotalCount(), uint32(2))
 	})
 }

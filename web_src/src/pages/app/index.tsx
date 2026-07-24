@@ -66,6 +66,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
+import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -89,7 +90,11 @@ import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
-import { resolveCanvasForView, syncLoadedVersionToCanvasDetail } from "./lib/resolve-canvas-for-view";
+import {
+  resolveCanvasForView,
+  syncLoadedVersionToCanvasDetail,
+  isHistoricalVersionSpecLoading,
+} from "./lib/resolve-canvas-for-view";
 import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
 import {
   clearLiveEditSessionDraftState,
@@ -98,7 +103,8 @@ import {
   resetCommittedLiveCanvasDetail,
 } from "./lib/live-edit-session";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
-import { sortVersionsDesc } from "./lib/canvas-versions";
+import type { CanvasVersionListItem } from "./lib/canvas-versions";
+import { canvasVersionShell, sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
@@ -331,9 +337,9 @@ export function AppPage() {
   );
   const liveVersions = useMemo(() => sortVersionsDesc(paginatedVersions), [paginatedVersions]);
   const selectableVersionsById = useMemo(() => {
-    const indexedVersions = new Map<string, CanvasesCanvasVersion>();
+    const indexedVersions = new Map<string, CanvasVersionListItem>();
     paginatedVersions.forEach((version) => {
-      const id = version.metadata?.id;
+      const id = version.id;
       if (!id) return;
       indexedVersions.set(id, version);
     });
@@ -416,6 +422,25 @@ export function AppPage() {
         canvasId: canvasId!,
       }),
     [liveCanvas, selectedCanvasVersion, isEditing, isViewingCurrentLiveVersion, draftSpecForView, canvasId],
+  );
+  const versionCanvasLoading = useMemo(
+    () =>
+      isHistoricalVersionSpecLoading({
+        activeCanvasVersionId,
+        liveCanvasVersionId,
+        shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
+        loadedCanvasVersion,
+        loadedCanvasVersionLoading,
+        loadedCanvasVersionFetching,
+      }),
+    [
+      activeCanvasVersionId,
+      liveCanvasVersionId,
+      shouldReadStagedCanvasVersionFlag,
+      loadedCanvasVersion,
+      loadedCanvasVersionLoading,
+      loadedCanvasVersionFetching,
+    ],
   );
   const canvasForPrep = canvas ?? ((isEditing || isEnteringEditSession) && liveCanvas ? liveCanvas : null);
   const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
@@ -776,7 +801,7 @@ export function AppPage() {
       return;
     }
 
-    const requestedVersionId = requestedVersion.metadata?.id || "";
+    const requestedVersionId = requestedVersion.id || "";
     const isCurrentLive = requestedVersionId === liveCanvasVersionId;
 
     if (isCurrentLive) {
@@ -790,17 +815,7 @@ export function AppPage() {
       return;
     }
 
-    setActiveCanvasVersion(requestedVersion);
-    queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId!, canvasId!), (current) => {
-      if (!current || !requestedVersion.spec) {
-        return current;
-      }
-
-      return {
-        ...current,
-        spec: { ...current.spec, ...requestedVersion.spec },
-      };
-    });
+    setActiveCanvasVersion(canvasVersionShell(requestedVersion));
     hasSyncedVersionFromURLRef.current = true;
   }, [
     selectableVersionsById,
@@ -3272,7 +3287,13 @@ export function AppPage() {
         return;
       }
 
-      activateCanvasVersionForEditing(versionID, version, options);
+      const versionShell = canvasVersionShell(version);
+      if (!versionShell) {
+        showErrorToast("Version not found");
+        return;
+      }
+
+      activateCanvasVersionForEditing(versionID, versionShell, options);
     },
     [activateCanvasVersionForEditing, canvasId, organizationId, selectableVersionsById],
   );
@@ -4296,13 +4317,9 @@ export function AppPage() {
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
         />
-        {isDraftCanvasLoading ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px] dark:bg-gray-900/70">
-            <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading canvas...</span>
-            </div>
-          </div>
+        {isDraftCanvasLoading ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
+        {versionCanvasLoading && !runInspectionChromeActive ? (
+          <CanvasPageLoadingOverlay message="Loading version..." testId="canvas-version-loading" />
         ) : null}
       </div>
       {yamlDiffModal}

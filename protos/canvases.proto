@@ -507,7 +507,7 @@ message ListCanvasVersionsRequest {
 }
 
 message ListCanvasVersionsResponse {
-  repeated CanvasVersion versions = 1;
+  repeated CanvasVersion.Metadata versions = 1;
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;

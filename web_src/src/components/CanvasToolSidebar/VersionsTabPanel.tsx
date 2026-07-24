@@ -1,5 +1,6 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { cn } from "@/lib/utils";
+import type { CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
@@ -9,7 +10,7 @@ export interface VersionsTabPanelProps {
   liveCanvasVersionId?: string;
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  liveVersions: CanvasesCanvasVersion[];
+  liveVersions: CanvasVersionListItem[];
   canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
@@ -20,7 +21,7 @@ export interface VersionsTabPanelProps {
 
 type VersionRowItem = {
   key: string;
-  version: CanvasesCanvasVersion;
+  version: CanvasVersionListItem;
   isActive: boolean;
   isCurrentLive: boolean;
   isFirstCanvasVersion?: boolean;
@@ -168,13 +169,13 @@ function buildLiveItems({
   selectedVersionId,
 }: {
   liveCanvasVersionId?: string;
-  liveVersions: CanvasesCanvasVersion[];
+  liveVersions: CanvasVersionListItem[];
   loadMoreLiveVersionsDisabled?: boolean;
   onLoadMoreLiveVersions?: () => void;
   selectedVersionId: string;
 }): VersionRowItem[] {
   return liveVersions.map((version, index) => {
-    const versionID = version.metadata?.id || "";
+    const versionID = version.id || "";
     const isFirstCanvasVersion =
       index === liveVersions.length - 1 && (onLoadMoreLiveVersions ? !!loadMoreLiveVersionsDisabled : true);
     return {
@@ -182,7 +183,7 @@ function buildLiveItems({
       rowTestId: "canvas-live-version-row",
       version,
       isActive: versionID === selectedVersionId,
-      isCurrentLive: liveCanvasVersionId === versionID,
+      isCurrentLive: versionID === liveCanvasVersionId,
       isFirstCanvasVersion,
     };
   });
