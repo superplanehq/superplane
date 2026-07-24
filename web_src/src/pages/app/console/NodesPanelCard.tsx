@@ -71,6 +71,7 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingC
 
 function NodesPanelBody({ content }: { content: NodesPanelContent }) {
   const ctx = useConsoleContext();
+  const allowConcurrentRuns = content.allowConcurrentRuns === true;
   // One lock instance for the whole panel. Submissions inside
   // `useConsoleRunTrigger` are keyed by trigger node id, so two entries
   // pointing at the same trigger disable together the moment either fires —
@@ -92,12 +93,17 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
     );
   }
   if (content.nodes.length === 1) {
-    return <SingleNodeBody entry={content.nodes[0]} lock={lock} />;
+    return <SingleNodeBody entry={content.nodes[0]} lock={lock} allowConcurrentRuns={allowConcurrentRuns} />;
   }
   return (
     <ul className="flex h-full flex-col divide-y divide-slate-100 dark:divide-gray-800" data-testid="nodes-panel-list">
       {content.nodes.map((entry, idx) => (
-        <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} lock={lock} />
+        <NodesPanelRow
+          key={`${entry.node}-${idx}`}
+          entry={entry}
+          lock={lock}
+          allowConcurrentRuns={allowConcurrentRuns}
+        />
       ))}
     </ul>
   );
@@ -108,7 +114,15 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
  * entry — matches the pre-merge single-node card so existing dashboards
  * keep their look after we consolidate the widget.
  */
-function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
+function SingleNodeBody({
+  entry,
+  lock,
+  allowConcurrentRuns,
+}: {
+  entry: NodesPanelNode;
+  lock: ConsoleTriggerLock;
+  allowConcurrentRuns: boolean;
+}) {
   const ctx = useConsoleContext();
   if (!entry.node.trim()) {
     return (
@@ -142,6 +156,7 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
           entry={entry}
           resolved={resolved}
           lock={lock}
+          allowConcurrentRuns={allowConcurrentRuns}
           testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
         />
       ) : null}
@@ -170,7 +185,15 @@ function singleNodeLayoutStyles(useInlineLayout: boolean) {
   };
 }
 
-function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
+function NodesPanelRow({
+  entry,
+  lock,
+  allowConcurrentRuns,
+}: {
+  entry: NodesPanelNode;
+  lock: ConsoleTriggerLock;
+  allowConcurrentRuns: boolean;
+}) {
   const ctx = useConsoleContext();
   const configured = entry.node.trim().length > 0;
   const resolved = resolveConsoleNode(ctx, entry.node);
@@ -208,6 +231,7 @@ function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTr
           entry={entry}
           resolved={resolved}
           lock={lock}
+          allowConcurrentRuns={allowConcurrentRuns}
           testIds={{ button: "nodes-panel-row-run", dialog: "nodes-panel-row-run-dialog" }}
           buttonClassName={useInlineLayout ? undefined : "shrink-0"}
         />
@@ -274,12 +298,14 @@ function NodesPanelRunControl({
   entry,
   resolved,
   lock,
+  allowConcurrentRuns,
   testIds,
   buttonClassName,
 }: {
   entry: NodesPanelNode;
   resolved: ReturnType<typeof resolveConsoleNode>;
   lock: ConsoleTriggerLock;
+  allowConcurrentRuns: boolean;
   testIds: RunControlTestIds;
   buttonClassName?: string;
 }) {
@@ -289,6 +315,7 @@ function NodesPanelRunControl({
       triggerName: entry.triggerName,
       promptConfirmation: entry.promptConfirmation,
       lock,
+      allowConcurrentRuns,
     });
 
   const inlineTemplate = useInlineFormTemplate(entry, resolved);
@@ -307,6 +334,7 @@ function NodesPanelRunControl({
         testIdPrefix={testIds.button}
         lock={lock}
         triggerNodeId={resolved?.node?.id}
+        allowConcurrentRuns={allowConcurrentRuns}
       />
     );
   }
@@ -380,7 +408,8 @@ function normalizeNodesContent(raw: Record<string, unknown> | undefined): NodesP
   const title = typeof raw?.title === "string" ? raw.title : "";
   const rawNodes = Array.isArray(raw?.nodes) ? raw.nodes : [];
   const nodes = rawNodes.map(normalizeEntry).filter((entry): entry is NodesPanelNode => entry != null);
-  return { title, nodes };
+  const allowConcurrentRuns = typeof raw?.allowConcurrentRuns === "boolean" ? raw.allowConcurrentRuns : undefined;
+  return { title, nodes, allowConcurrentRuns };
 }
 
 function normalizeEntry(raw: unknown): NodesPanelNode | null {

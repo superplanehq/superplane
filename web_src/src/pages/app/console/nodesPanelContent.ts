@@ -67,6 +67,14 @@ export interface NodesPanelContent {
    * author adds at least one entry through the form.
    */
   nodes: NodesPanelNode[];
+  /**
+   * Widget-level toggle for concurrent run submissions. When false (the
+   * default), a trigger's Run button is disabled while that trigger has a
+   * run in flight, so operators can't enqueue duplicate runs. When true,
+   * Run buttons stay enabled during an active run so multiple runs can be
+   * triggered at once. Applies to every entry in the panel.
+   */
+  allowConcurrentRuns?: boolean;
 }
 
 /** Default content for a newly added `nodes` panel. */
@@ -109,6 +117,7 @@ export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | u
   return {
     title: typeof obj.title === "string" ? obj.title : "",
     nodes: [entry],
+    allowConcurrentRuns: typeof obj.allowConcurrentRuns === "boolean" ? obj.allowConcurrentRuns : undefined,
   };
 }
 
@@ -119,6 +128,8 @@ export function validateNodesContent(content: unknown): string | null {
   if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
     return "content.title must be a string.";
   }
+  const allowConcurrentRunsError = optionalBooleanError("content.allowConcurrentRuns", obj.allowConcurrentRuns);
+  if (allowConcurrentRunsError) return allowConcurrentRunsError;
   if (!Array.isArray(obj.nodes)) {
     return "content.nodes must be an array.";
   }

@@ -30,6 +30,12 @@ interface NodesPanelInlineRunFormProps {
    * through {@link useConsoleRunTrigger} which owns lock accounting. */
   lock: ConsoleTriggerLock;
   triggerNodeId: string | undefined;
+  /**
+   * Widget-level opt-in for concurrent runs. When true the submit button
+   * ignores the shared `runInFlightIds` signal so it stays enabled (and not
+   * stuck in the "Running…" state) while a previous run is still executing.
+   */
+  allowConcurrentRuns?: boolean;
 }
 
 /**
@@ -55,6 +61,7 @@ export function NodesPanelInlineRunForm({
   testIdPrefix,
   lock,
   triggerNodeId,
+  allowConcurrentRuns = false,
 }: NodesPanelInlineRunFormProps) {
   const parameters = useMemo<StartTemplateParameter[]>(() => template.parameters ?? [], [template]);
   const [parameterValues, setParameterValues] = useState<Record<string, string | number | boolean>>(() =>
@@ -71,7 +78,7 @@ export function NodesPanelInlineRunForm({
     setParameterValues(seedParameterValues(parameters));
   }, [parameterConfiguration, parameters]);
 
-  const runInFlight = Boolean(triggerNodeId && lock.runInFlightIds.has(triggerNodeId));
+  const runInFlight = !allowConcurrentRuns && Boolean(triggerNodeId && lock.runInFlightIds.has(triggerNodeId));
 
   const handleSubmit = () => {
     const result = buildParameterFormPayload(parameters, parameterValues);
