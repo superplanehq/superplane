@@ -1,13 +1,56 @@
+import type { CSSProperties } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
 import { HANDLE_STYLE } from "./handleStyle";
 import { MultiRightHandle } from "./multiRightHandle";
-import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
+import type { BlockConnectionState, BlockEdgeState, BlockOrientation, BlockProps, CanvasBlockData } from "./types";
 
 function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
+}
+
+function getOrientation(data: CanvasBlockData): BlockOrientation {
+  return data._orientation === "vertical" ? "vertical" : "horizontal";
+}
+
+const VERTICAL_TARGET_POSITION_STYLE: CSSProperties = {
+  top: -15,
+  left: "50%",
+  transform: "translateX(-50%)",
+};
+
+const VERTICAL_SOURCE_POSITION_STYLE: CSSProperties = {
+  bottom: -15,
+  left: "50%",
+  transform: "translateX(-50%)",
+};
+
+const HORIZONTAL_TARGET_POSITION_STYLE: CSSProperties = {
+  left: -15,
+  top: 18,
+};
+
+const HORIZONTAL_SOURCE_POSITION_STYLE: CSSProperties = {
+  right: -15,
+  top: 18,
+};
+
+function targetHandlePosition(orientation: BlockOrientation): Position {
+  return orientation === "vertical" ? Position.Top : Position.Left;
+}
+
+function sourceHandlePosition(orientation: BlockOrientation): Position {
+  return orientation === "vertical" ? Position.Bottom : Position.Right;
+}
+
+function targetHandlePositionStyle(orientation: BlockOrientation): CSSProperties {
+  return orientation === "vertical" ? VERTICAL_TARGET_POSITION_STYLE : HORIZONTAL_TARGET_POSITION_STYLE;
+}
+
+function sourceHandlePositionStyle(orientation: BlockOrientation): CSSProperties {
+  return orientation === "vertical" ? VERTICAL_SOURCE_POSITION_STYLE : HORIZONTAL_SOURCE_POSITION_STYLE;
 }
 
 function getNodeConnectionStats(edges: BlockEdgeState[], nodeId?: string) {
@@ -97,6 +140,7 @@ function SingleRightHandle({
   nodeId,
   allEdges,
   isConnectionInteractive,
+  orientation,
 }: {
   channel: string;
   hoveredEdge?: BlockEdgeState;
@@ -104,6 +148,7 @@ function SingleRightHandle({
   nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
+  orientation: BlockOrientation;
 }) {
   const isHighlighted =
     isConnectionInteractive &&
@@ -118,12 +163,11 @@ function SingleRightHandle({
   return (
     <Handle
       type="source"
-      position={Position.Right}
+      position={sourceHandlePosition(orientation)}
       id={channel}
       style={{
         ...HANDLE_STYLE,
-        right: -15,
-        top: 18,
+        ...sourceHandlePositionStyle(orientation),
         pointerEvents: isConnectionInteractive ? "auto" : "none",
       }}
       className={isHighlighted ? "highlighted" : undefined}
@@ -216,15 +260,15 @@ export function LeftHandle({
     nodeId,
     isAlreadyConnected,
   });
+  const orientation = getOrientation(data);
 
   return (
     <Handle
       type="target"
-      position={Position.Left}
+      position={targetHandlePosition(orientation)}
       style={{
         ...HANDLE_STYLE,
-        left: -15,
-        top: 18,
+        ...targetHandlePositionStyle(orientation),
         pointerEvents: isConnectionInteractive ? "auto" : "none",
       }}
       className={isHighlighted ? "highlighted" : undefined}
@@ -252,6 +296,19 @@ export function RightHandle({
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
 
+  if (getOrientation(data) === "vertical") {
+    return (
+      <VerticalSourceHandles
+        channels={channels}
+        hoveredEdge={hoveredEdge}
+        connectingFrom={connectingFrom}
+        nodeId={nodeId}
+        allEdges={allEdges}
+        isConnectionInteractive={isConnectionInteractive}
+      />
+    );
+  }
+
   if (isConnectionInteractive && !hasOutgoing && channels.length === 1 && onAppendFromNode) {
     return (
       <EndNodeAppendConnector
@@ -275,6 +332,7 @@ export function RightHandle({
         nodeId={nodeId}
         allEdges={allEdges}
         isConnectionInteractive={isConnectionInteractive}
+        orientation="horizontal"
       />
     );
   }
@@ -289,5 +347,62 @@ export function RightHandle({
       isConnectionInteractive={isConnectionInteractive}
       onAppendFromNode={onAppendFromNode}
     />
+  );
+}
+
+const VERTICAL_CHANNEL_SPACING = 40;
+
+/**
+ * Renders output handles along the bottom edge of a node for the vertical
+ * auto-layout view. Multiple channels are distributed horizontally so edges leave
+ * the node top-to-bottom. Channel labels are rendered above each handle.
+ */
+function VerticalSourceHandles({
+  channels,
+  hoveredEdge,
+  connectingFrom,
+  nodeId,
+  allEdges,
+  isConnectionInteractive,
+}: {
+  channels: string[];
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  allEdges: BlockEdgeState[];
+  isConnectionInteractive: boolean;
+}) {
+  return (
+    <>
+      {channels.map((channel, index) => {
+        const offsetX = (index - (channels.length - 1) / 2) * VERTICAL_CHANNEL_SPACING;
+        const isHighlighted =
+          isConnectionInteractive &&
+          getSingleChannelHighlight({
+            hoveredEdge,
+            connectingFrom,
+            nodeId,
+            channel,
+            allEdges,
+          });
+
+        return (
+          <Handle
+            key={channel}
+            type="source"
+            position={Position.Bottom}
+            id={channel}
+            style={{
+              ...HANDLE_STYLE,
+              bottom: -15,
+              left: `calc(50% + ${offsetX}px)`,
+              transform: "translateX(-50%)",
+              pointerEvents: isConnectionInteractive ? "auto" : "none",
+            }}
+            className={isHighlighted ? "highlighted" : undefined}
+          />
+        );
+      })}
+    </>
   );
 }

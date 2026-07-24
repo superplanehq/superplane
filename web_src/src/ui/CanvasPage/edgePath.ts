@@ -3,6 +3,7 @@ import { Position, getBezierPath, getSmoothStepPath } from "@xyflow/react";
 const BACKWARD_ROUTE_OFFSET = 80;
 const BACKWARD_ROUTE_TARGET_BIAS = 0.75;
 const CANVAS_NODE_HEIGHT = 280;
+const CANVAS_NODE_WIDTH = 420;
 const MIN_DISTANCE_FROM_TARGET_TOP = 50;
 const MIN_DISTANCE_FROM_SOURCE_BOTTOM = 50;
 const SAME_ROW_TOLERANCE = 40;
@@ -163,9 +164,97 @@ function getBackwardEdgePath(params: CanvasEdgePathParams): [path: string, label
   return [path, labelX, labelY];
 }
 
+export function isVerticalOrientation({ sourcePosition, targetPosition }: CanvasEdgePathParams): boolean {
+  return (
+    sourcePosition === Position.Top ||
+    sourcePosition === Position.Bottom ||
+    targetPosition === Position.Top ||
+    targetPosition === Position.Bottom
+  );
+}
+
+export function getLeftwardBackwardGutterX(sourceX: number, targetX: number): number {
+  const targetLeft = targetX - TARGET_HANDLE_TOP_OFFSET;
+  const targetRight = targetLeft + CANVAS_NODE_WIDTH;
+  const sourceLeft = sourceX - TARGET_HANDLE_TOP_OFFSET;
+  const gap = sourceLeft - targetRight;
+
+  if (gap > 0) {
+    return Math.min(
+      targetRight + Math.min(MIN_DISTANCE_FROM_SOURCE_BOTTOM, gap * (1 - BACKWARD_ROUTE_TARGET_BIAS)),
+      sourceLeft - Math.min(MIN_DISTANCE_FROM_TARGET_TOP, gap * BACKWARD_ROUTE_TARGET_BIAS),
+    );
+  }
+
+  return targetRight + Math.min(MIN_DISTANCE_FROM_SOURCE_BOTTOM, 8);
+}
+
+export function getBackwardRouteCenterX(sourceX: number, targetX: number): number {
+  const horizontalDelta = targetX - sourceX;
+
+  if (Math.abs(horizontalDelta) <= SAME_ROW_TOLERANCE) {
+    return Math.max(sourceX, targetX) + BACKWARD_ROUTE_OFFSET;
+  }
+
+  if (horizontalDelta < 0) {
+    return getLeftwardBackwardGutterX(sourceX, targetX);
+  }
+
+  const biasedX = sourceX + horizontalDelta * BACKWARD_ROUTE_TARGET_BIAS;
+  const targetLeft = targetX - TARGET_HANDLE_TOP_OFFSET;
+  const maxCenterX = targetLeft - MIN_DISTANCE_FROM_TARGET_TOP;
+
+  return Math.min(biasedX, maxCenterX);
+}
+
+function getLeftwardBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, targetX, targetY } = params;
+  const gutterX = getLeftwardBackwardGutterX(sourceX, targetX);
+  const exitY = sourceY + HANDLE_OFFSET;
+  const entryY = targetY - HANDLE_OFFSET;
+
+  const points: Point[] = [
+    { x: sourceX, y: sourceY },
+    { x: sourceX, y: exitY },
+    { x: gutterX, y: exitY },
+    { x: gutterX, y: entryY },
+    { x: targetX, y: entryY },
+    { x: targetX, y: targetY },
+  ];
+
+  const path = buildSmoothStepPath(points, SMOOTH_STEP_BORDER_RADIUS);
+
+  return [path, gutterX, (exitY + entryY) / 2];
+}
+
+function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition } = params;
+  const horizontalDelta = targetX - sourceX;
+
+  if (horizontalDelta < -SAME_ROW_TOLERANCE) {
+    return getLeftwardBackwardEdgePath(params);
+  }
+
+  const centerX = getBackwardRouteCenterX(sourceX, targetX);
+
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: SMOOTH_STEP_BORDER_RADIUS,
+    offset: HANDLE_OFFSET,
+    centerX,
+  });
+
+  return [path, labelX, labelY];
+}
+
 export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   if (isBackwardEdge(params)) {
-    return getBackwardEdgePath(params);
+    return isVerticalOrientation(params) ? getVerticalBackwardEdgePath(params) : getBackwardEdgePath(params);
   }
 
   const [path, labelX, labelY] = getBezierPath(params);

@@ -39,6 +39,8 @@ export interface BlockEdgeState {
   target?: string;
 }
 
+export type BlockOrientation = "horizontal" | "vertical";
+
 export interface BlockInternalData {
   _hoveredEdge?: BlockEdgeState;
   _connectingFrom?: BlockConnectionState;
@@ -47,6 +49,12 @@ export interface BlockInternalData {
   _hasHighlightedNodes?: boolean;
   _dimBodyBelowHeader?: boolean;
   _draftDiffStatus?: "added" | "updated" | "removed";
+  /**
+   * Handle/edge orientation for the node. "horizontal" (default) puts the input on
+   * the left and outputs on the right; "vertical" (auto-layout view) puts the input
+   * on top and outputs on the bottom.
+   */
+  _orientation?: BlockOrientation;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }
