@@ -148,12 +148,7 @@ export function HomeIntegrationConnectRow({
           Connect
         </Button>
       )}
-      {status.kind === "pending" && (
-        <Button type="button" variant="outline" size="xs" className="shrink-0" onClick={onConnect}>
-          Configure
-        </Button>
-      )}
-      {status.kind === "error" && status.configureId && (
+      {(status.kind === "pending" || status.kind === "error") && status.configureId && (
         <Button
           type="button"
           variant="outline"

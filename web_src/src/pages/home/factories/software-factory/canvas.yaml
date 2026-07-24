@@ -147,12 +147,11 @@ spec:
       type: TYPE_ACTION
       component: runnerClaudeCode
       configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.repository.full_name }}'
             valueSource: literal
@@ -207,9 +206,10 @@ spec:
               echo "Pushed changes for PR #${PR_NUMBER}"
             name: Commit and push
             type: bash
-        anthropicApiKey:
-          secret: '{{ install_params.anthropic_api_key }}'
-          key: api_key
+        credentials:
+          source: integration
+          integration:
+            name: claude
       position:
         x: 672
         'y': 816
@@ -348,12 +348,11 @@ spec:
       type: TYPE_ACTION
       component: runnerClaudeCode
       configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.repository.full_name }}'
             valueSource: literal
@@ -412,9 +411,10 @@ spec:
               echo "Updated PR #$PR_NUMBER description with the implementation plan"
             name: Update PR description
             type: bash
-        anthropicApiKey:
-          secret: '{{ install_params.anthropic_api_key }}'
-          key: api_key
+        credentials:
+          source: integration
+          integration:
+            name: claude
       position:
         x: 2304
         'y': 0
@@ -476,12 +476,11 @@ spec:
       type: TYPE_ACTION
       component: runnerClaudeCode
       configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.repository.full_name }}'
             valueSource: literal
@@ -536,9 +535,10 @@ spec:
               echo "Pushed implementation to $BRANCH"
             name: Commit and push
             type: bash
-        anthropicApiKey:
-          secret: '{{ install_params.anthropic_api_key }}'
-          key: api_key
+        credentials:
+          source: integration
+          integration:
+            name: claude
       position:
         x: 3000
         'y': 0
@@ -604,12 +604,11 @@ spec:
       type: TYPE_ACTION
       component: runnerClaudeCode
       configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.parameters.Repository }}'
             valueSource: literal
@@ -668,9 +667,10 @@ spec:
               echo "Pushed fixes for PR #${PR_NUMBER}"
             name: Commit and push
             type: bash
-        anthropicApiKey:
-          secret: '{{ install_params.anthropic_api_key }}'
-          key: api_key
+        credentials:
+          source: integration
+          integration:
+            name: claude
       position:
         x: 1920
         'y': 2688
@@ -732,12 +732,11 @@ spec:
       component: runnerBash
       configuration:
         enable_setup_commands: false
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.repository.full_name }}'
             valueSource: literal
@@ -1082,12 +1081,11 @@ spec:
       component: runnerBash
       configuration:
         enable_setup_commands: false
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ root().data.parameters.Repository }}'
             valueSource: literal
@@ -1229,18 +1227,18 @@ spec:
 
               {"title": "Issue Title", "body": "Issue Body"}
             type: prompt
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
         environment:
-          - name: GITHUB_TOKEN
-            valueSource: secret
-            secret:
-              secret: '{{ install_params.github_token }}'
-              key: token
           - name: REPO
             value: '{{ install_params.repository }}'
             valueSource: literal
-        anthropicApiKey:
-          secret: '{{ install_params.anthropic_api_key }}'
-          key: api_key
+        credentials:
+          source: integration
+          integration:
+            name: claude
       position:
         x: 672
         'y': 4200

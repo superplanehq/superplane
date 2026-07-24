@@ -39,6 +39,29 @@ function replacePlaceholders(content: string, replacements: Record<string, strin
   return next;
 }
 
+function rewriteIntegrationRefNames(value: unknown, selections: IntegrationSelections): void {
+  if (Array.isArray(value)) {
+    for (const item of value) rewriteIntegrationRefNames(item, selections);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  const obj = value as Record<string, unknown>;
+  const integration = obj.integration;
+  if (obj.source === "integration" && integration && typeof integration === "object" && !Array.isArray(integration)) {
+    const ref = integration as { name?: string };
+    const typeName = typeof ref.name === "string" ? ref.name.trim() : "";
+    const selection = typeName ? selections[typeName] : undefined;
+    if (selection?.name) {
+      ref.name = selection.name;
+    }
+  }
+
+  for (const child of Object.values(obj)) {
+    rewriteIntegrationRefNames(child, selections);
+  }
+}
+
 export function wireFactoryIntegrations(
   canvasYaml: string,
   componentIntegrations: Record<string, string>,
@@ -51,10 +74,15 @@ export function wireFactoryIntegrations(
   for (const node of nodes) {
     const component = typeof node.component === "string" ? node.component : "";
     const integrationName = componentIntegrations[component];
-    if (!integrationName) continue;
-    const selection = selections[integrationName];
-    if (!selection) continue;
-    node.integration = { id: selection.id, name: selection.name };
+    if (integrationName) {
+      const selection = selections[integrationName];
+      if (selection) {
+        node.integration = { id: selection.id, name: selection.name };
+      }
+    }
+    // credentials / environmentFrom use integration type names in the template
+    // (e.g. name: claude); rewrite them to the selected installation name.
+    rewriteIntegrationRefNames(node.configuration, selections);
   }
 
   return yaml.dump(doc, { lineWidth: -1, noRefs: true });
