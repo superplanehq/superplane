@@ -3370,7 +3370,9 @@ function CanvasContent({
                   onLayoutModeToggle={toggleLayoutMode}
                   isSnapToGridEnabled={isEditMode && !isVerticalLayout ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode && !isVerticalLayout ? handleSnapToGridToggle : undefined}
-                  isAutoLayoutOnUpdateEnabled={isEditMode && !isVerticalLayout ? isAutoLayoutOnUpdateEnabled : undefined}
+                  isAutoLayoutOnUpdateEnabled={
+                    isEditMode && !isVerticalLayout ? isAutoLayoutOnUpdateEnabled : undefined
+                  }
                   onAutoLayoutOnUpdateToggle={isEditMode && !isVerticalLayout ? onToggleAutoLayoutOnUpdate : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={

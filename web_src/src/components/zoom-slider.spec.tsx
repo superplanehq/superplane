@@ -72,9 +72,7 @@ describe("ZoomSlider layout mode toggle", () => {
   });
 
   it("labels the toggle for switching to vertical when in freeform mode", () => {
-    const { getByTestId } = render(
-      <ZoomSlider usePanel={false} layoutMode="freeform" onLayoutModeToggle={vi.fn()} />,
-    );
+    const { getByTestId } = render(<ZoomSlider usePanel={false} layoutMode="freeform" onLayoutModeToggle={vi.fn()} />);
 
     const button = getByTestId("canvas-layout-mode-toggle");
     expect(button.getAttribute("aria-pressed")).toBe("false");
@@ -82,9 +80,7 @@ describe("ZoomSlider layout mode toggle", () => {
   });
 
   it("labels the toggle for switching to freeform when in vertical mode", () => {
-    const { getByTestId } = render(
-      <ZoomSlider usePanel={false} layoutMode="vertical" onLayoutModeToggle={vi.fn()} />,
-    );
+    const { getByTestId } = render(<ZoomSlider usePanel={false} layoutMode="vertical" onLayoutModeToggle={vi.fn()} />);
 
     const button = getByTestId("canvas-layout-mode-toggle");
     expect(button.getAttribute("aria-pressed")).toBe("true");
