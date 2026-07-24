@@ -4,7 +4,7 @@ type UseEnterLiveEditSessionOptions = {
   organizationId?: string;
   canvasId?: string;
   canUpdateCanvas: boolean;
-  effectiveLiveCanvasVersionId?: string;
+  liveCanvasVersionId?: string;
   selectableVersionsById: Map<string, unknown>;
   handleUseVersion: (versionId: string, options?: { preserveStagedLayer?: boolean }) => void;
   resyncStagedEditorState: (
@@ -20,7 +20,7 @@ export function useEnterLiveEditSession({
   organizationId,
   canvasId,
   canUpdateCanvas,
-  effectiveLiveCanvasVersionId,
+  liveCanvasVersionId,
   selectableVersionsById,
   handleUseVersion,
   resyncStagedEditorState,
@@ -40,19 +40,19 @@ export function useEnterLiveEditSession({
         return false;
       }
 
-      if (!effectiveLiveCanvasVersionId) {
+      if (!liveCanvasVersionId) {
         return false;
       }
 
-      if (!selectableVersionsById.has(effectiveLiveCanvasVersionId)) {
+      if (!selectableVersionsById.has(liveCanvasVersionId)) {
         return false;
       }
 
       setIsEnteringEditSession(true);
       try {
         previewingCurrentVersionRef.current = true;
-        handleUseVersion(effectiveLiveCanvasVersionId, { preserveStagedLayer: true });
-        await resyncStagedEditorState(effectiveLiveCanvasVersionId, {
+        handleUseVersion(liveCanvasVersionId, { preserveStagedLayer: true });
+        await resyncStagedEditorState(liveCanvasVersionId, {
           bumpResetNonce: false,
         });
         setEditSessionActive(true);
@@ -72,7 +72,7 @@ export function useEnterLiveEditSession({
     organizationId,
     canvasId,
     canUpdateCanvas,
-    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     selectableVersionsById,
     handleUseVersion,
     resyncStagedEditorState,

@@ -12,7 +12,6 @@ describe("activateCanvasVersionForEditing", () => {
       versionID: "version-live",
       version: { metadata: { id: "version-live" }, spec: {} },
       options: { preserveStagedLayer: true },
-      effectiveLiveCanvasVersionId: "version-live",
       liveCanvasVersionId: "version-live",
       queryClient: {
         cancelQueries: vi.fn(),

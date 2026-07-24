@@ -35,6 +35,13 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	require.NotNil(t, resp.GetVersion().GetMetadata())
+	require.NotNil(t, resp.GetVersion().GetSpec())
+
+	committedVersion, err := models.FindLiveCanvasVersion(canvas.ID)
+	require.NoError(t, err)
+	assert.Equal(t, committedVersion.ID.String(), resp.GetVersion().GetMetadata().GetId())
+	assert.Len(t, resp.GetVersion().GetSpec().GetNodes(), len(committedVersion.Nodes))
+	assert.Len(t, resp.GetVersion().GetSpec().GetEdges(), len(committedVersion.Edges))
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvas.ID)
 	require.NoError(t, err)

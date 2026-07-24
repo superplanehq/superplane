@@ -26,6 +26,11 @@ func SerializeCanvas(
 		canvasFolderID = canvas.CanvasFolderID.String()
 	}
 
+	liveVersionID := ""
+	if canvas.LiveVersionID != nil {
+		liveVersionID = canvas.LiveVersionID.String()
+	}
+
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
 			Id:             canvas.ID.String(),
@@ -36,6 +41,7 @@ func SerializeCanvas(
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			FolderId:       canvasFolderID,
+			LiveVersionId:  liveVersionID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(liveVersion.Nodes),

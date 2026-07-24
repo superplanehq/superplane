@@ -170,7 +170,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas version";
-      description: "Returns one canvas version by ID";
+      description: "Returns one canvas version by ID, including its workflow spec";
       tags: "CanvasVersion";
     };
   }
@@ -586,6 +586,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     string folder_id = 8;
+    string live_version_id = 9;
   }
 
   message Spec {
