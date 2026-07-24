@@ -1,13 +1,25 @@
 import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
-import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
-import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
+import {
+  DEFAULT_LAYOUT_DIRECTION,
+  type LayoutDirection,
+  type LayoutEngine,
+  type LayoutEngineApplyOptions,
+} from "./types";
+import {
+  appendUniqueChannels,
+  resolveConnectedComponentNodeIds,
+  resolveDisconnectedComponents,
+  resolveForwardLayoutEdges,
+} from "./layoutGraph";
 
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
 const ANNOTATION_NODE_WIDTH = 320;
 const ANNOTATION_NODE_HEIGHT = 200;
-const DISCONNECTED_COMPONENT_VERTICAL_GAP = 220;
+// Gap kept between disconnected components along the packing axis (perpendicular
+// to the flow direction) so independent sub-graphs never overlap.
+const DISCONNECTED_COMPONENT_GAP = 220;
 
 type LayoutPosition = {
   x: number;
@@ -48,8 +60,14 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
+    const direction = options?.direction ?? DEFAULT_LAYOUT_DIRECTION;
     const outputChannelsByNodeId = this.buildOutputChannelsByNodeId(workflow, options?.components || []);
-    const layoutedPositions = await this.resolvePackedLayoutedPositions(workflow, layoutNodes, outputChannelsByNodeId);
+    const layoutedPositions = await this.resolvePackedLayoutedPositions(
+      workflow,
+      layoutNodes,
+      outputChannelsByNodeId,
+      direction,
+    );
 
     if (layoutedPositions.size === 0) {
       return workflow;
@@ -102,63 +120,6 @@ export class ElkLayoutEngine implements LayoutEngine {
     return hasSeedNodeIDs ? "connected-component" : "full-canvas";
   }
 
-  private buildFlowAdjacency(workflow: CanvasesCanvas, flowNodes: ComponentsNode[]) {
-    const flowNodeIDSet = new Set(flowNodes.map((node) => node.id as string));
-    const adjacencyByNodeID = new Map<string, string[]>();
-
-    for (const node of flowNodes) {
-      adjacencyByNodeID.set(node.id as string, []);
-    }
-
-    for (const edge of workflow.spec?.edges || []) {
-      const sourceID = edge.sourceId;
-      const targetID = edge.targetId;
-      if (!sourceID || !targetID || sourceID === targetID) {
-        continue;
-      }
-
-      if (!flowNodeIDSet.has(sourceID) || !flowNodeIDSet.has(targetID)) {
-        continue;
-      }
-
-      adjacencyByNodeID.get(sourceID)?.push(targetID);
-      adjacencyByNodeID.get(targetID)?.push(sourceID);
-    }
-
-    return adjacencyByNodeID;
-  }
-
-  private resolveConnectedComponentNodeIDs(
-    workflow: CanvasesCanvas,
-    flowNodes: ComponentsNode[],
-    seedNodeIDs: string[],
-  ): string[] {
-    if (seedNodeIDs.length === 0) {
-      return flowNodes.map((node) => node.id as string);
-    }
-
-    const adjacencyByNodeID = this.buildFlowAdjacency(workflow, flowNodes);
-    const visitedNodeIDs = new Set<string>();
-    const queue = [...seedNodeIDs];
-
-    while (queue.length > 0) {
-      const currentNodeID = queue.shift();
-      if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) {
-        continue;
-      }
-
-      visitedNodeIDs.add(currentNodeID);
-      const neighbors = adjacencyByNodeID.get(currentNodeID) || [];
-      for (const neighborNodeID of neighbors) {
-        if (!visitedNodeIDs.has(neighborNodeID)) {
-          queue.push(neighborNodeID);
-        }
-      }
-    }
-
-    return flowNodes.map((node) => node.id as string).filter((nodeID) => visitedNodeIDs.has(nodeID));
-  }
-
   private resolveScopedNodeIDs(
     workflow: CanvasesCanvas,
     flowNodes: ComponentsNode[],
@@ -168,7 +129,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     const scope = this.resolveLayoutScope(options, seedNodeIDs.length > 0);
 
     if (scope === "connected-component") {
-      return this.resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);
+      return resolveConnectedComponentNodeIds(flowNodes, workflow.spec?.edges || [], seedNodeIDs);
     }
 
     return flowNodes.map((node) => node.id as string);
@@ -196,94 +157,6 @@ export class ElkLayoutEngine implements LayoutEngine {
     );
   }
 
-  private buildLayoutAdjacency(
-    layoutNodes: ComponentsNode[],
-    layoutEdges: Array<{ sourceId?: string; targetId?: string }>,
-  ) {
-    const nodeIDs = new Set(layoutNodes.map((node) => node.id as string));
-    const adjacencyByNodeID = new Map<string, string[]>();
-
-    for (const node of layoutNodes) {
-      adjacencyByNodeID.set(node.id as string, []);
-    }
-
-    for (const edge of layoutEdges) {
-      const sourceID = edge.sourceId;
-      const targetID = edge.targetId;
-      if (!sourceID || !targetID) {
-        continue;
-      }
-
-      if (!nodeIDs.has(sourceID) || !nodeIDs.has(targetID)) {
-        continue;
-      }
-
-      adjacencyByNodeID.get(sourceID)?.push(targetID);
-      adjacencyByNodeID.get(targetID)?.push(sourceID);
-    }
-
-    return adjacencyByNodeID;
-  }
-
-  private bfsCollectComponent(
-    seedNodeID: string,
-    adjacencyByNodeID: Map<string, string[]>,
-    nodesByID: Map<string, ComponentsNode>,
-    visitedNodeIDs: Set<string>,
-  ): ComponentsNode[] {
-    const componentNodes: ComponentsNode[] = [];
-    const queue = [seedNodeID];
-
-    while (queue.length > 0) {
-      const currentNodeID = queue.shift();
-      if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) {
-        continue;
-      }
-
-      visitedNodeIDs.add(currentNodeID);
-      const currentNode = nodesByID.get(currentNodeID);
-      if (currentNode) {
-        componentNodes.push(currentNode);
-      }
-
-      for (const neighborNodeID of adjacencyByNodeID.get(currentNodeID) || []) {
-        if (!visitedNodeIDs.has(neighborNodeID)) {
-          queue.push(neighborNodeID);
-        }
-      }
-    }
-
-    return componentNodes;
-  }
-
-  private resolveDisconnectedLayoutComponents(
-    layoutNodes: ComponentsNode[],
-    layoutEdges: Array<{ sourceId?: string; targetId?: string }>,
-  ): ComponentsNode[][] {
-    if (layoutNodes.length === 0) {
-      return [];
-    }
-
-    const adjacencyByNodeID = this.buildLayoutAdjacency(layoutNodes, layoutEdges);
-    const nodesByID = new Map(layoutNodes.map((node) => [node.id as string, node]));
-    const visitedNodeIDs = new Set<string>();
-    const components: ComponentsNode[][] = [];
-
-    for (const node of layoutNodes) {
-      const seedNodeID = node.id as string;
-      if (visitedNodeIDs.has(seedNodeID)) {
-        continue;
-      }
-
-      const collected = this.bfsCollectComponent(seedNodeID, adjacencyByNodeID, nodesByID, visitedNodeIDs);
-      if (collected.length > 0) {
-        components.push(collected);
-      }
-    }
-
-    return components;
-  }
-
   private deduplicateEdges<T extends { id: string }>(edges: T[]): T[] {
     const seen = new Set<string>();
     return edges.filter((edge) => {
@@ -296,15 +169,25 @@ export class ElkLayoutEngine implements LayoutEngine {
     });
   }
 
+  private resolvePortSides(direction: LayoutDirection): { input: string; output: string } {
+    if (direction === "vertical") {
+      return { input: "NORTH", output: "SOUTH" };
+    }
+
+    return { input: "WEST", output: "EAST" };
+  }
+
   private buildElkGraph(
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
     positioningEdges?: Array<{ sourceId?: string; targetId?: string; channel?: string }>,
+    direction: LayoutDirection = DEFAULT_LAYOUT_DIRECTION,
   ) {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const graphEdges = positioningEdges ?? layoutEdges;
     const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
+    const portSides = this.resolvePortSides(direction);
 
     for (const edge of layoutEdges) {
       if (!edge.sourceId) {
@@ -320,11 +203,11 @@ export class ElkLayoutEngine implements LayoutEngine {
       id: "root",
       layoutOptions: {
         "elk.algorithm": "layered",
-        "elk.direction": "RIGHT",
+        "elk.direction": direction === "vertical" ? "DOWN" : "RIGHT",
         "elk.spacing.nodeNode": "100",
         "elk.layered.spacing.nodeNodeBetweenLayers": "180",
         "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-        "elk.contentAlignment": "V_CENTER",
+        "elk.contentAlignment": direction === "vertical" ? "H_CENTER" : "V_CENTER",
       },
       children: layoutNodes.map((node) => {
         const { width, height } = this.estimateNodeSize(node);
@@ -342,13 +225,13 @@ export class ElkLayoutEngine implements LayoutEngine {
           {
             id: `${nodeId}__input`,
             properties: {
-              "elk.port.side": "WEST",
+              "elk.port.side": portSides.input,
             },
           },
           ...outputChannels.map((channel, index) => ({
             id: `${nodeId}__${channel}`,
             properties: {
-              "elk.port.side": "EAST",
+              "elk.port.side": portSides.output,
               "elk.port.index": `${index}`,
             },
           })),
@@ -431,16 +314,26 @@ export class ElkLayoutEngine implements LayoutEngine {
     };
   }
 
-  private sortComponentsByCurrentPosition(components: ComponentsNode[][]): ComponentsNode[][] {
+  private sortComponentsByCurrentPosition(
+    components: ComponentsNode[][],
+    direction: LayoutDirection = DEFAULT_LAYOUT_DIRECTION,
+  ): ComponentsNode[][] {
+    const isVertical = direction === "vertical";
     return [...components].sort((componentA, componentB) => {
       const a = this.resolveMinPositionFromNodes(componentA);
       const b = this.resolveMinPositionFromNodes(componentB);
 
-      if (a.y !== b.y) {
-        return a.y - b.y;
+      // Order components along the packing axis (x for vertical, y for horizontal)
+      // so their on-screen arrangement matches the user's existing layout.
+      const primaryA = isVertical ? a.x : a.y;
+      const primaryB = isVertical ? b.x : b.y;
+      if (primaryA !== primaryB) {
+        return primaryA - primaryB;
       }
 
-      return a.x - b.x;
+      const secondaryA = isVertical ? a.y : a.x;
+      const secondaryB = isVertical ? b.y : b.x;
+      return secondaryA - secondaryB;
     });
   }
 
@@ -448,23 +341,28 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
+    direction: LayoutDirection = DEFAULT_LAYOUT_DIRECTION,
   ): Promise<Map<string, LayoutPosition>> {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
-    const components = this.resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges);
+    const components = resolveDisconnectedComponents(layoutNodes, layoutEdges);
     if (components.length <= 1) {
       const graph = this.buildElkGraph(
         workflow,
         layoutNodes,
         outputChannelsByNodeId,
         resolveForwardLayoutEdges(layoutNodes, layoutEdges),
+        direction,
       );
       const layoutedGraph = await this.elk.layout(graph);
       return this.extractLayoutedPositions(layoutedGraph);
     }
 
-    const sortedComponents = this.sortComponentsByCurrentPosition(components);
+    const sortedComponents = this.sortComponentsByCurrentPosition(components, direction);
     const packedLayoutedPositions = new Map<string, LayoutPosition>();
-    let currentTopY = 0;
+    // Disconnected components stack perpendicular to the flow so they never
+    // overlap: below one another for horizontal flows, side-by-side for vertical.
+    const isVertical = direction === "vertical";
+    let currentOffset = 0;
 
     for (const componentNodes of sortedComponents) {
       const componentEdges = this.resolveLayoutEdges(workflow, componentNodes);
@@ -473,6 +371,7 @@ export class ElkLayoutEngine implements LayoutEngine {
         componentNodes,
         outputChannelsByNodeId,
         resolveForwardLayoutEdges(componentNodes, componentEdges),
+        direction,
       );
       const layoutedGraph = await this.elk.layout(graph);
       const componentPositions = this.extractLayoutedPositions(layoutedGraph);
@@ -483,12 +382,12 @@ export class ElkLayoutEngine implements LayoutEngine {
       const bounds = this.resolveLayoutBounds(componentNodes, componentPositions);
       for (const [nodeID, position] of componentPositions.entries()) {
         packedLayoutedPositions.set(nodeID, {
-          x: position.x - bounds.minX,
-          y: position.y - bounds.minY + currentTopY,
+          x: position.x - bounds.minX + (isVertical ? currentOffset : 0),
+          y: position.y - bounds.minY + (isVertical ? 0 : currentOffset),
         });
       }
 
-      currentTopY += bounds.height + DISCONNECTED_COMPONENT_VERTICAL_GAP;
+      currentOffset += (isVertical ? bounds.width : bounds.height) + DISCONNECTED_COMPONENT_GAP;
     }
 
     return packedLayoutedPositions;

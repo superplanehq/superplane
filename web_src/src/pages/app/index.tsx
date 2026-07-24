@@ -60,7 +60,7 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { DefaultLayoutEngine } from "@/lib/layout";
+import { DefaultLayoutEngine, type LayoutDirection, type LayoutEngineApplyOptions } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
@@ -130,6 +130,7 @@ import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
+import { useAutoLayoutDirectionPreference } from "@/hooks/useAutoLayoutDirectionPreference";
 import { useCanvasAutoFocusPreference } from "@/hooks/useCanvasAutoFocusPreference";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
@@ -608,6 +609,7 @@ export function AppPage() {
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
+  const { layoutDirection, setLayoutDirection } = useAutoLayoutDirectionPreference();
   const { handleToggleAutoFocus, isAutoFocusEnabled } = useCanvasAutoFocusPreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
@@ -1179,9 +1181,10 @@ export function AppPage() {
         scope: "connected-component",
         nodeIds: [nodeID],
         components,
+        direction: layoutDirection,
       });
     },
-    [isAutoLayoutOnUpdateEnabled, components],
+    [isAutoLayoutOnUpdateEnabled, components, layoutDirection],
   );
 
   /**
@@ -2853,15 +2856,18 @@ export function AppPage() {
     },
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
-  const handleAutoLayoutNodes = useCallback(
-    async (nodeIds: string[]) => {
+  /**
+   * Runs the auto-layout engine over the current canvas and commits the result:
+   * reports analytics, updates the local graph, and persists unless read-only.
+   * Shared by the node-scoped auto-layout action and the layout-direction toggle
+   * so both flows stay consistent. Callers supply the layout scope/direction; the
+   * component metadata is always threaded through.
+   */
+  const applyAutoLayout = useCallback(
+    async (options: Omit<LayoutEngineApplyOptions, "components">) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
-        nodeIds,
-        scope: "connected-component",
-        components,
-      });
+      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, { ...options, components });
 
       analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
 
@@ -2873,6 +2879,22 @@ export function AppPage() {
     },
     [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
+
+  const handleAutoLayoutNodes = useCallback(
+    (nodeIds: string[]) => applyAutoLayout({ nodeIds, scope: "connected-component", direction: layoutDirection }),
+    [applyAutoLayout, layoutDirection],
+  );
+
+  /**
+   * Switches the canvas between the horizontal (freeform) and vertical auto-layout
+   * views. Changing the orientation immediately reflows the whole canvas so the
+   * result matches the newly selected direction.
+   */
+  const handleToggleLayoutDirection = useCallback(async () => {
+    const nextDirection: LayoutDirection = layoutDirection === "vertical" ? "horizontal" : "vertical";
+    setLayoutDirection(nextDirection);
+    await applyAutoLayout({ scope: "full-canvas", direction: nextDirection });
+  }, [applyAutoLayout, layoutDirection, setLayoutDirection]);
 
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
@@ -4215,6 +4237,8 @@ export function AppPage() {
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
           isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
+          layoutDirection={layoutDirection}
+          onToggleLayoutDirection={!isReadOnly ? handleToggleLayoutDirection : undefined}
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
