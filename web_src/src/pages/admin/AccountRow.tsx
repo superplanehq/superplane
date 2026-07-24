@@ -70,39 +70,59 @@ export function AccountRow({
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={onBlockUnblock} disabled={toggling}>
-                {toggling ? (
-                  "Updating..."
-                ) : acc.blocked ? (
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck size={14} />
-                    Unblock
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <Ban size={14} />
-                    Block
-                  </span>
-                )}
+                <BlockActionLabel toggling={toggling} blocked={acc.blocked} />
               </Button>
               <Button variant="outline" size="sm" onClick={onPromoteDemote} disabled={toggling || acc.blocked}>
-                {toggling ? (
-                  "Updating..."
-                ) : acc.installation_admin ? (
-                  <span className="flex items-center gap-1">
-                    <ShieldOff size={14} />
-                    Demote
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <Shield size={14} />
-                    Promote
-                  </span>
-                )}
+                <AdminActionLabel toggling={toggling} installationAdmin={acc.installation_admin} />
               </Button>
             </>
           )}
         </div>
       </td>
     </tr>
+  );
+}
+
+function BlockActionLabel({ toggling, blocked }: { toggling: boolean; blocked: boolean }) {
+  if (toggling) {
+    return "Updating...";
+  }
+
+  if (blocked) {
+    return (
+      <span className="flex items-center gap-1">
+        <ShieldCheck size={14} />
+        Unblock
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <Ban size={14} />
+      Block
+    </span>
+  );
+}
+
+function AdminActionLabel({ toggling, installationAdmin }: { toggling: boolean; installationAdmin: boolean }) {
+  if (toggling) {
+    return "Updating...";
+  }
+
+  if (installationAdmin) {
+    return (
+      <span className="flex items-center gap-1">
+        <ShieldOff size={14} />
+        Demote
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <Shield size={14} />
+      Promote
+    </span>
   );
 }
