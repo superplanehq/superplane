@@ -4,7 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 
-import { restoreCommittedCanvasDraftState } from "./sync-committed-canvas-draft";
+import { restoreCanvasDraftState } from "./sync-canvas-draft";
 
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
 type DraftSpec = CanvasesCanvas["spec"] | null;
@@ -39,7 +39,7 @@ export async function executeResetStaging({
   cancelPendingCanvasSaves?.();
   consoleMutationGenerationRef.current += 1;
   await discardCanvasStagingMutation.mutateAsync(undefined);
-  await restoreCommittedCanvasDraftState({
+  await restoreCanvasDraftState({
     organizationId,
     canvasId,
     activeCanvasVersionId,

@@ -4,9 +4,9 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { fetchCommittedCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
+import { fetchCanvasVersionWithSpec, fetchLiveCanvasVersionWithSpec } from "./repository-spec-files";
 
-export async function syncCommittedConsoleCaches({
+export async function syncConsoleCaches({
   queryClient,
   canvasId,
   versionId,
@@ -22,11 +22,11 @@ export async function syncCommittedConsoleCaches({
   }
 
   queryClient.setQueryData(canvasKeys.console(canvasId, versionId), consoleData);
-  // After commit, staging is cleared — mirror the committed console in the staged cache.
+  // After commit, staging is cleared — mirror the published console in the staged cache.
   queryClient.setQueryData(canvasKeys.stagedConsole(canvasId), consoleData);
 }
 
-export async function syncCommittedCanvasDraftState({
+export async function syncCanvasDraftState({
   queryClient,
   organizationId,
   canvasId,
@@ -41,33 +41,29 @@ export async function syncCommittedCanvasDraftState({
   resolveLiveVersion?: boolean;
   skipVersionListUpdate?: boolean;
 }): Promise<CanvasesCanvasVersion | undefined> {
-  const committedVersion = resolveLiveVersion
-    ? await fetchLiveCommittedCanvasVersionWithSpec(canvasId)
-    : await fetchCommittedCanvasVersionWithSpec(canvasId, versionId);
-  if (!committedVersion) {
+  const version = resolveLiveVersion
+    ? await fetchLiveCanvasVersionWithSpec(
+        canvasId,
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId))?.metadata
+          ?.liveVersionId ?? versionId,
+      )
+    : await fetchCanvasVersionWithSpec(canvasId, versionId);
+  if (!version) {
     return undefined;
   }
 
-  const cacheVersionId = committedVersion.metadata?.id ?? versionId;
+  const cacheVersionId = version.metadata?.id ?? versionId;
 
-  queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), committedVersion);
-  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), committedVersion);
+  queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), version);
+  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), version);
 
-  if (!skipVersionListUpdate) {
-    queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-      const existing = current ?? [];
-      const index = existing.findIndex((item) => item.metadata?.id === cacheVersionId);
-      if (index === -1) {
-        return [committedVersion, ...existing];
-      }
-
-      return existing.map((item) =>
-        item.metadata?.id === cacheVersionId ? { ...item, spec: committedVersion.spec } : item,
-      );
+  if (!skipVersionListUpdate && version.metadata) {
+    queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, cacheVersionId), {
+      metadata: version.metadata,
     });
   }
 
-  if (committedVersion.spec) {
+  if (version.spec) {
     queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
       if (!current) {
         return current;
@@ -75,17 +71,17 @@ export async function syncCommittedCanvasDraftState({
 
       return {
         ...current,
-        spec: { ...current.spec, ...committedVersion.spec },
+        spec: { ...current.spec, ...version.spec },
       };
     });
   }
 
-  return committedVersion;
+  return version;
 }
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
-export async function restoreCommittedCanvasDraftState({
+export async function restoreCanvasDraftState({
   organizationId,
   canvasId,
   activeCanvasVersionId,
@@ -110,23 +106,23 @@ export async function restoreCommittedCanvasDraftState({
     return;
   }
 
-  const committedVersion = await syncCommittedCanvasDraftState({
+  const version = await syncCanvasDraftState({
     queryClient,
     organizationId,
     canvasId,
     versionId: activeCanvasVersionId,
   });
 
-  if (!committedVersion?.spec) {
+  if (!version?.spec) {
     draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
     setDraftCanvasSpec(null);
     return;
   }
 
-  draftCanvasSpecsRef.current.set(activeCanvasVersionId, committedVersion.spec);
-  setDraftCanvasSpec(committedVersion.spec);
+  draftCanvasSpecsRef.current.set(activeCanvasVersionId, version.spec);
+  setDraftCanvasSpec(version.spec);
   setActiveCanvasVersion?.((current) =>
-    current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: committedVersion.spec } : current,
+    current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: version.spec } : current,
   );
-  onCanvasDraftRestoredToCommitted?.(committedVersion);
+  onCanvasDraftRestoredToCommitted?.(version);
 }

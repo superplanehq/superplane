@@ -359,7 +359,7 @@ describe("useCanvasWebsocket", () => {
     });
 
     expect(onCanvasLifecycleEvent).toHaveBeenCalledWith({ canvasId: testCanvasId }, "canvas_updated");
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionList(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionDescribePrefix(testCanvasId))).toHaveLength(0);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
   });
 

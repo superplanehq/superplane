@@ -48,7 +48,7 @@ describe("executeCommitStaging", () => {
       refetchType: "all",
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList("canvas-1"),
+      queryKey: canvasKeys.versionDescribePrefix("canvas-1"),
       refetchType: "all",
     });
     expect(invalidateQueries).toHaveBeenCalledWith({

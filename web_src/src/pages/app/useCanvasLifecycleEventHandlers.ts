@@ -42,7 +42,7 @@ export function useCanvasLifecycleEventHandlers({
 
   const invalidateLiveVersionData = useCallback(
     (targetCanvasId: string) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.console(targetCanvasId, undefined) });

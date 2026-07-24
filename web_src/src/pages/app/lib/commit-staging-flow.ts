@@ -19,7 +19,7 @@ async function invalidatePostCommitCaches(
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId), refetchType: "all" }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), refetchType: "all" }),

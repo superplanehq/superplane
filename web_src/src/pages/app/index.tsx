@@ -32,7 +32,7 @@ import {
   canvasKeys,
   useCanvas,
   useCanvasMemoryEntries,
-  useCanvasVersions,
+  useDescribeCanvasVersion,
   useCreateCanvasMemoryNamespace,
   useDeleteCanvasMemoryEntry,
   useUpdateCanvasMemoryNamespace,
@@ -319,7 +319,11 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const { data: canvasVersions = [], isLoading: canvasVersionsLoading } = useCanvasVersions(organizationId!, canvasId!);
+  const liveVersionIdFromCanvas = liveCanvas?.metadata?.liveVersionId;
+  const { data: describedLiveVersion, isLoading: describedLiveVersionLoading } = useDescribeCanvasVersion(
+    canvasId!,
+    liveVersionIdFromCanvas,
+  );
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
@@ -327,8 +331,8 @@ export function AppPage() {
   );
   const liveCanvasVersion = useMemo(() => {
     if (paginatedVersions.length > 0) return paginatedVersions[0];
-    return canvasVersions[0];
-  }, [paginatedVersions, canvasVersions]);
+    return describedLiveVersion;
+  }, [paginatedVersions, describedLiveVersion]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
@@ -336,10 +340,12 @@ export function AppPage() {
       if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-    canvasVersions.forEach(addVersion);
+    if (describedLiveVersion) {
+      addVersion(describedLiveVersion);
+    }
     paginatedVersions.forEach(addVersion);
     return Array.from(versionMap.values());
-  }, [canvasVersions, paginatedVersions]);
+  }, [describedLiveVersion, paginatedVersions]);
   const liveVersions = useMemo(() => sortVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
@@ -353,19 +359,19 @@ export function AppPage() {
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
-  const isLiveVersionLoading = canvasVersionsLoading || canvasLiveVersionsQuery.isLoading;
+  const isLiveVersionLoading =
+    canvasLoading || (!!liveVersionIdFromCanvas && describedLiveVersionLoading);
   const effectiveLiveCanvasVersionId = useMemo(() => {
     if (liveCanvasVersionId) {
       return liveCanvasVersionId;
     }
 
-    const fromPaginated = paginatedVersions[0]?.metadata?.id;
-    if (fromPaginated) {
-      return fromPaginated;
+    if (liveVersionIdFromCanvas) {
+      return liveVersionIdFromCanvas;
     }
 
-    return canvasVersions[0]?.metadata?.id;
-  }, [liveCanvasVersionId, paginatedVersions, canvasVersions]);
+    return paginatedVersions[0]?.metadata?.id;
+  }, [liveCanvasVersionId, liveVersionIdFromCanvas, paginatedVersions]);
   const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
     organizationId,
     canvasId,
@@ -876,7 +882,7 @@ export function AppPage() {
       return;
     }
 
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
     if (isViewingLiveVersion) {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
@@ -4007,7 +4013,7 @@ export function AppPage() {
     setRemoteCanvasUpdatePending(false);
     setLastSavedWorkflowSnapshot(null);
 
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
     if (isViewingLiveVersion) {
       await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });

@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { syncCommittedCanvasDraftState, syncCommittedConsoleCaches } from "./sync-committed-canvas-draft";
-import { fetchCommittedCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
+import { syncCanvasDraftState, syncConsoleCaches } from "./sync-canvas-draft";
+import { fetchCanvasVersionWithSpec, fetchLiveCanvasVersionWithSpec } from "./repository-spec-files";
 
 vi.mock("./repository-spec-files", () => ({
-  fetchCommittedCanvasVersionWithSpec: vi.fn(),
-  fetchLiveCommittedCanvasVersionWithSpec: vi.fn(),
+  fetchCanvasVersionWithSpec: vi.fn(),
+  fetchLiveCanvasVersionWithSpec: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
@@ -24,32 +24,34 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("syncCommittedCanvasDraftState", () => {
-  it("reloads committed canvas spec into staged and detail caches", async () => {
-    const committedVersion: CanvasesCanvasVersion = {
+describe("syncCanvasDraftState", () => {
+  it("reloads canvas spec into staged and detail caches", async () => {
+    const version: CanvasesCanvasVersion = {
       metadata: { id: "version-1" },
       spec: {
         nodes: [{ id: "node-1", name: "Trigger", type: "TYPE_TRIGGER" }],
         edges: [],
       },
     };
-    vi.mocked(fetchCommittedCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+    vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(version);
 
     const setQueryData = vi.fn();
     const queryClient = { setQueryData } as unknown as QueryClient;
 
-    const result = await syncCommittedCanvasDraftState({
+    const result = await syncCanvasDraftState({
       queryClient,
       organizationId: "org-1",
       canvasId: "canvas-1",
       versionId: "version-1",
     });
 
-    expect(result).toEqual(committedVersion);
-    expect(fetchCommittedCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "version-1");
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.stagedCanvasSpec("canvas-1"), committedVersion);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "version-1"), committedVersion);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionList("canvas-1"), expect.any(Function));
+    expect(result).toEqual(version);
+    expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "version-1");
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.stagedCanvasSpec("canvas-1"), version);
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "version-1"), version);
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-1"), {
+      metadata: { id: "version-1" },
+    });
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
     const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));
@@ -67,48 +69,49 @@ describe("syncCommittedCanvasDraftState", () => {
       }),
     ).toEqual({
       metadata: { id: "canvas-1" },
-      spec: committedVersion.spec,
+      spec: version.spec,
     });
   });
 
-  it("prepends a new committed version when the version list cache is empty", async () => {
-    const committedVersion: CanvasesCanvasVersion = {
+  it("updates the live version describe cache when the version list cache is empty", async () => {
+    const version: CanvasesCanvasVersion = {
       metadata: { id: "version-2" },
       spec: { nodes: [], edges: [] },
     };
-    vi.mocked(fetchCommittedCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+    vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(version);
 
     const setQueryData = vi.fn();
     const queryClient = { setQueryData } as unknown as QueryClient;
 
-    await syncCommittedCanvasDraftState({
+    await syncCanvasDraftState({
       queryClient,
       organizationId: "org-1",
       canvasId: "canvas-1",
       versionId: "version-2",
     });
 
-    const updateVersionList = setQueryData.mock.calls.find(
-      ([key]) => JSON.stringify(key) === JSON.stringify(canvasKeys.versionList("canvas-1")),
-    )?.[1] as (current: CanvasesCanvasVersion[] | undefined) => CanvasesCanvasVersion[] | undefined;
-
-    expect(updateVersionList(undefined)).toEqual([committedVersion]);
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-2"), {
+      metadata: { id: "version-2" },
+    });
   });
 
-  it("loads the live committed version when the requested version id is stale", async () => {
-    const committedVersion: CanvasesCanvasVersion = {
+  it("loads the live version when the requested version id is stale", async () => {
+    const version: CanvasesCanvasVersion = {
       metadata: { id: "live-version-2" },
       spec: {
         nodes: [{ id: "node-1", name: "Trigger", type: "TYPE_TRIGGER" }],
         edges: [],
       },
     };
-    vi.mocked(fetchLiveCommittedCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+    vi.mocked(fetchLiveCanvasVersionWithSpec).mockResolvedValue(version);
 
     const setQueryData = vi.fn();
-    const queryClient = { setQueryData } as unknown as QueryClient;
+    const getQueryData = vi.fn().mockReturnValue({
+      metadata: { id: "canvas-1", liveVersionId: "live-version-2" },
+    });
+    const queryClient = { setQueryData, getQueryData } as unknown as QueryClient;
 
-    const result = await syncCommittedCanvasDraftState({
+    const result = await syncCanvasDraftState({
       queryClient,
       organizationId: "org-1",
       canvasId: "canvas-1",
@@ -116,22 +119,22 @@ describe("syncCommittedCanvasDraftState", () => {
       resolveLiveVersion: true,
     });
 
-    expect(result).toEqual(committedVersion);
-    expect(fetchLiveCommittedCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1");
-    expect(fetchCommittedCanvasVersionWithSpec).not.toHaveBeenCalled();
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "live-version-2"), committedVersion);
+    expect(result).toEqual(version);
+    expect(fetchLiveCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "live-version-2");
+    expect(fetchCanvasVersionWithSpec).not.toHaveBeenCalled();
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "live-version-2"), version);
   });
 });
 
-describe("syncCommittedConsoleCaches", () => {
-  it("invalidates staged console cache when committed console.yaml is missing or unparsable", async () => {
+describe("syncConsoleCaches", () => {
+  it("invalidates staged console cache when console.yaml is missing or unparsable", async () => {
     vi.mocked(fetchCanvasConsoleData).mockResolvedValue(undefined);
 
     const invalidateQueries = vi.fn().mockResolvedValue(undefined);
     const setQueryData = vi.fn();
     const queryClient = { invalidateQueries, setQueryData } as unknown as QueryClient;
 
-    await syncCommittedConsoleCaches({
+    await syncConsoleCaches({
       queryClient,
       canvasId: "canvas-1",
       versionId: "version-1",

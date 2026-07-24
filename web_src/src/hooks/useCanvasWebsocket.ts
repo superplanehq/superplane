@@ -80,7 +80,7 @@ export function useCanvasWebsocket(
 
       if (eventName === "canvas_deleted") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDescribePrefix(canvasId) });
         return;
       }
 
