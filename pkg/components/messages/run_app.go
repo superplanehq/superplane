@@ -161,10 +161,9 @@ func (c *RunApp) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:    "parameters",
-			Label:   "Parameters",
-			Type:    configuration.FieldTypeRunParameters,
-			Default: "{}",
+			Name:  "parameters",
+			Label: "Parameters",
+			Type:  configuration.FieldTypeRunParameters,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "app",

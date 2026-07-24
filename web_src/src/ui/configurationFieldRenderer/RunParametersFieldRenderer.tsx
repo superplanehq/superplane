@@ -114,9 +114,9 @@ export function RunParametersFieldRenderer({
         className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/40"
       >
         <p className="text-xs text-gray-600 dark:text-gray-400">
-        The trigger you selected does not define any parameters.
-        If parameters are needed in your flow, define them in the trigger configuration first.
-        Without parameters, the run will still be triggered, but no additional values will be passed.
+          The trigger you selected does not define any parameters. If parameters are needed in your flow, define them in
+          the trigger configuration first. Without parameters, the run will still be triggered, but no additional values
+          will be passed.
         </p>
       </div>
     );
