@@ -1,12 +1,6 @@
 import { Loader2 } from "lucide-react";
 
-export function CanvasPageLoadingOverlay({
-  message,
-  testId,
-}: {
-  message: string;
-  testId?: string;
-}) {
+export function CanvasPageLoadingOverlay({ message, testId }: { message: string; testId?: string }) {
   return (
     <div
       className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px] dark:bg-gray-900/70"
