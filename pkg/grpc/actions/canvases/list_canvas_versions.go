@@ -52,7 +52,7 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, versions, organizationID)
+	protoVersions := serializeCanvasVersionMetadataList(ctx, versions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
@@ -74,7 +74,7 @@ func getCanvasVersionLimit(limit uint32) uint32 {
 	return limit
 }
 
-func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb.Timestamp {
+func getLastCanvasVersionTimestamp(versions []models.CanvasVersionMetadata) *timestamppb.Timestamp {
 	if len(versions) == 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb
 	return timestamppb.New(*lastVersion.CreatedAt)
 }
 
-func listCanvasVersionHistory(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
+func listCanvasVersionHistory(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersionMetadata, count int64, err error) {
 	ctx, done := telemetry.Span(ctx, "canvases.list_version_history")
 	defer done(&err)
 
