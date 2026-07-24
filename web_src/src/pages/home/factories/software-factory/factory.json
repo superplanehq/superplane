@@ -1,0 +1,46 @@
+{
+  "id": "software-factory",
+  "title": "Software Factory",
+  "description": "Automate coding work with agents, from issue to pull request.",
+  "integrations": ["github"],
+  "componentIntegrations": {
+    "github.addIssueLabel": "github",
+    "github.createIssue": "github",
+    "github.createIssueComment": "github",
+    "github.createPullRequest": "github",
+    "github.getIssue": "github",
+    "github.markPullRequestReadyForReview": "github",
+    "github.onIssue": "github",
+    "github.onIssueComment": "github",
+    "github.onPRComment": "github",
+    "github.onPRReviewComment": "github",
+    "github.onPullRequest": "github",
+    "github.updateIssue": "github"
+  },
+  "startingTasks": [
+    {
+      "id": "improve-agents-md",
+      "label": "Improve AGENTS.md",
+      "prompt": "Review the existing AGENTS.md and improve it to help coding agents work more effectively in this repository. Make the guidance specific to this codebase, preserving useful instructions and removing outdated or generic ones. If AGENTS.md doesn't exist, create it."
+    },
+    {
+      "id": "unit-test",
+      "label": "Write test",
+      "prompt": "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes."
+    },
+    {
+      "id": "fix-bug",
+      "label": "Fix bug",
+      "prompt": "Scan through the codebase to identify bugs that look important or impactful. Focus on issues that could affect functionality, performance, or user experience. Once you find a significant bug, create a new branch, implement a fix, write or update tests as needed, and commit the changes with a clear description."
+    }
+  ],
+  "run": {
+    "nodeId": "create-task-start",
+    "hookName": "run",
+    "template": "Create Task",
+    "parameters": {
+      "description": { "from": "startingTaskPrompt" }
+    }
+  },
+  "source": { "type": "bundled" }
+}

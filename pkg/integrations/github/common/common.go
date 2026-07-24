@@ -47,7 +47,7 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		return nil
 	}
 
-	if nodeMetadata.Repository != nil && nodeMetadata.Repository.Name == repository {
+	if nodeMetadata.Repository != nil && repositoryRefersTo(nodeMetadata.Repository.Name, repository) {
 		return nil
 	}
 
@@ -66,6 +66,21 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		Name: repo.GetName(),
 		URL:  repo.GetHTMLURL(),
 	}})
+}
+
+// repositoryRefersTo reports whether configured (short name or owner/repo)
+// identifies the same repository as storedName (typically the short name).
+func repositoryRefersTo(storedName, configured string) bool {
+	if storedName == "" || configured == "" {
+		return false
+	}
+	if storedName == configured {
+		return true
+	}
+	if i := strings.LastIndex(configured, "/"); i >= 0 {
+		return storedName == configured[i+1:]
+	}
+	return false
 }
 
 func getRepositoryFromConfiguration(c any) string {
