@@ -76,8 +76,6 @@ export function FactorySetupPanel({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => factory.startingTasks[0]?.id ?? null);
 
   const selectedTask = factory.startingTasks.find((task) => task.id === selectedTaskId) ?? null;
-  // Allow Run without connections, params, or a starting task — template wires what is available.
-  const canRun = !busy;
 
   const visibleParams = useMemo(
     () =>
@@ -87,6 +85,22 @@ export function FactorySetupPanel({
       }),
     [factory.installParams, selections],
   );
+
+  const requiredParamsSatisfied = useMemo(
+    () =>
+      visibleParams.every((param) => {
+        if (!param.required) return true;
+        return Boolean(paramValues[param.name]?.trim());
+      }),
+    [paramValues, visibleParams],
+  );
+
+  const requiredIntegrationsSatisfied = useMemo(
+    () => factory.integrations.every((name) => Boolean(selections[name])),
+    [factory.integrations, selections],
+  );
+
+  const canRun = !busy && requiredIntegrationsSatisfied && requiredParamsSatisfied;
 
   const handleSelectionsChange = useCallback(
     (next: IntegrationSelections) => {
@@ -138,7 +152,7 @@ export function FactorySetupPanel({
         busy={busy}
         tasks={factory.startingTasks}
         selectedTaskId={selectedTaskId}
-        onSelectTask={setSelectedTaskId}
+        onSelectTask={(id) => setSelectedTaskId((prev) => (prev === id ? null : id))}
         prompt={selectedTask?.prompt ?? null}
       />
 

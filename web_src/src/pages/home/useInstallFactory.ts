@@ -142,6 +142,59 @@ async function createCanvasWithUniqueName(args: {
   throw new Error("Failed to create factory canvas");
 }
 
+async function ensureFactoryCanvas(args: {
+  pending: { canvasId: string; canvasName: string } | null;
+  organizationId: string;
+  queryClient: QueryClient;
+  definition: FactoryDefinition;
+  folder?: CanvasFolderData;
+  createCanvas: (input: { name: string; description?: string; method: "ui" }) => Promise<{
+    data?: { canvas?: { metadata?: { id?: string } } };
+  }>;
+  updateCanvasFolderMembership: (membership: ReturnType<typeof appendCanvasToFolderMembership>) => Promise<unknown>;
+}): Promise<{ canvasId: string; canvasName: string }> {
+  if (args.pending) return args.pending;
+
+  const existingNames = new Set(await listExistingCanvasNames(args.organizationId, args.queryClient));
+  const created = await createCanvasWithUniqueName({
+    title: args.definition.title,
+    description: args.definition.description,
+    existingNames,
+    createCanvas: args.createCanvas,
+  });
+
+  if (args.folder) {
+    try {
+      await args.updateCanvasFolderMembership(appendCanvasToFolderMembership(args.folder, created.canvasId));
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
+    }
+  }
+
+  return created;
+}
+
+async function finishFactoryInstall(args: {
+  organizationId: string;
+  canvasId: string;
+  definition: FactoryDefinition;
+  startingTaskPrompt: string;
+  queryClient: QueryClient;
+  navigate: (path: string) => void;
+}) {
+  const shouldTriggerRun = args.startingTaskPrompt.length > 0;
+  if (shouldTriggerRun) {
+    await invokeFactoryRun(args.canvasId, args.definition, args.startingTaskPrompt);
+    args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
+  }
+
+  writeCanvasAgentSidebarOpen(args.canvasId, false);
+  writeCanvasRunsSidebarOpen(args.canvasId, shouldTriggerRun);
+  localStorage.setItem("canvasSidebarOpen", "false");
+  args.queryClient.invalidateQueries({ queryKey: canvasKeys.list(args.organizationId) });
+  args.navigate(appPath(args.organizationId, args.canvasId, shouldTriggerRun ? "?view=console" : ""));
+}
+
 export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
@@ -153,6 +206,8 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
   const { mutateAsync: updateCanvasFolderMembership } = updateCanvasFolderMembershipMutation;
   const [isInstalling, setIsInstalling] = useState(false);
   const isInstallingRef = useRef(false);
+  // Reuse a canvas created on a failed attempt so retry does not spawn duplicates.
+  const pendingCanvasRef = useRef<{ canvasId: string; canvasName: string } | null>(null);
 
   const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
@@ -174,21 +229,16 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
       setIsInstalling(true);
 
       try {
-        const existingNames = new Set(await listExistingCanvasNames(organizationId, queryClient));
-        const { canvasId, canvasName } = await createCanvasWithUniqueName({
-          title: definition.title,
-          description: definition.description,
-          existingNames,
+        const { canvasId, canvasName } = await ensureFactoryCanvas({
+          pending: pendingCanvasRef.current,
+          organizationId,
+          queryClient,
+          definition,
+          folder,
           createCanvas,
+          updateCanvasFolderMembership,
         });
-
-        if (folder) {
-          try {
-            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
-          } catch (error) {
-            showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-          }
-        }
+        pendingCanvasRef.current = { canvasId, canvasName };
 
         await materializeAndCommitFactoryTemplate({
           canvasId,
@@ -201,18 +251,15 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
         // Drop the empty canvas cached by create — page load must see the committed template.
         queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
 
-        const startingTaskPrompt = input.startingTaskPrompt.trim();
-        const shouldTriggerRun = startingTaskPrompt.length > 0;
-        if (shouldTriggerRun) {
-          await invokeFactoryRun(canvasId, definition, startingTaskPrompt);
-          queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
-        }
-
-        writeCanvasAgentSidebarOpen(canvasId, false);
-        writeCanvasRunsSidebarOpen(canvasId, shouldTriggerRun);
-        localStorage.setItem("canvasSidebarOpen", "false");
-        queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-        navigate(appPath(organizationId, canvasId, shouldTriggerRun ? "?view=console" : ""));
+        await finishFactoryInstall({
+          organizationId,
+          canvasId,
+          definition,
+          startingTaskPrompt: input.startingTaskPrompt.trim(),
+          queryClient,
+          navigate,
+        });
+        pendingCanvasRef.current = null;
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to install factory"));
         throw error;

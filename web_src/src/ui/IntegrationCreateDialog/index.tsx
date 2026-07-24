@@ -97,7 +97,7 @@ export function IntegrationCreateDialog({
 
   const updateIntegrationMutation = useUpdateIntegration(
     organizationId,
-    pendingWebhookSetup?.id ?? createdIntegrationId ?? "",
+    pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId ?? "",
   );
 
   const selectedInstructions = useMemo(() => {

@@ -193,7 +193,7 @@ export function ConfigureIntegrationDialog({
                 {integration.status?.browserAction?.url ? (
                   <Button type="button" onClick={handleBrowserAction} className="flex items-center gap-2">
                     <ExternalLink className="h-4 w-4" />
-                    Continue on GitHub
+                    Continue setup
                   </Button>
                 ) : null}
                 <LoadingButton

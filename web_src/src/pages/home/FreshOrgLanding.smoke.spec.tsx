@@ -57,7 +57,7 @@ describe("FreshOrgLanding", () => {
     );
 
     const runButton = within(panel).getByRole("button", { name: /^Run$/i });
-    expect(runButton).toBeEnabled();
+    expect(runButton).toBeDisabled();
     expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
 
     const promptField = within(panel).getByLabelText(/^Prompt$/i);
@@ -70,7 +70,10 @@ describe("FreshOrgLanding", () => {
     expect(promptField).toHaveValue(
       "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
     );
-    expect(runButton).toBeEnabled();
+    // Clicking the selected task again clears it so install can skip Manual Run.
+    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
+    expect(within(panel).queryByLabelText(/^Prompt$/i)).not.toBeInTheDocument();
+    expect(runButton).toBeDisabled();
 
     const githubRow = within(panel).getByText("GitHub").closest("div");
     expect(githubRow).toBeTruthy();
