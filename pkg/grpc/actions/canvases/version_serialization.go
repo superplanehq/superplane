@@ -50,13 +50,6 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	}
 }
 
-func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
-	full := SerializeCanvasVersion(version, organizationID, ownersByID)
-	return &pb.CanvasVersion{
-		Metadata: full.GetMetadata(),
-	}
-}
-
 func canvasVersionOwnerRef(organizationID, ownerID string, ownersByID map[string]*models.User) *pb.UserRef {
 	ownerName := ""
 	if ownersByID != nil {

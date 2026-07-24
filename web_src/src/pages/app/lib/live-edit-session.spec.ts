@@ -13,7 +13,6 @@ describe("shouldReadStagedCanvasVersion", () => {
       shouldReadStagedCanvasVersion({
         editSessionActive: true,
         activeCanvasVersionId: "live-version",
-        effectiveLiveCanvasVersionId: "live-version",
         liveCanvasVersionId: "live-version",
       }),
     ).toBe(true);
@@ -24,7 +23,6 @@ describe("shouldReadStagedCanvasVersion", () => {
       shouldReadStagedCanvasVersion({
         editSessionActive: false,
         activeCanvasVersionId: "live-version",
-        effectiveLiveCanvasVersionId: "live-version",
         liveCanvasVersionId: "live-version",
       }),
     ).toBe(false);
@@ -35,7 +33,6 @@ describe("shouldReadStagedCanvasVersion", () => {
       shouldReadStagedCanvasVersion({
         editSessionActive: true,
         activeCanvasVersionId: "old-version",
-        effectiveLiveCanvasVersionId: "live-version",
         liveCanvasVersionId: "live-version",
       }),
     ).toBe(false);
@@ -114,7 +111,6 @@ describe("isViewingCurrentLiveCanvasVersion", () => {
           metadata: { id: "old-live-version" },
           spec: { nodes: [], edges: [] },
         },
-        effectiveLiveCanvasVersionId: "new-live-version",
         liveCanvasVersionId: "new-live-version",
       }),
     ).toBe(true);
@@ -128,7 +124,6 @@ describe("isViewingCurrentLiveCanvasVersion", () => {
           metadata: { id: "old-version" },
           spec: { nodes: [], edges: [] },
         },
-        effectiveLiveCanvasVersionId: "new-live-version",
         liveCanvasVersionId: "new-live-version",
       }),
     ).toBe(false);
