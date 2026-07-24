@@ -184,9 +184,7 @@ function StarterAppsCatalog({
 }) {
   return (
     <div className="mt-10 flex flex-col gap-3">
-      <p className="text-xs font-normal text-gray-600 dark:text-gray-400">
-        Automation starters
-      </p>
+      <p className="text-xs font-normal text-gray-600 dark:text-gray-400">Automation starters</p>
       {apps.map((app) => (
         <StarterAppListItem key={app.repo} app={app} busy={busy} onSetup={() => onSetup(app)} />
       ))}

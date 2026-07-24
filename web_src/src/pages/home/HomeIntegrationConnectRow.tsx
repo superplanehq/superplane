@@ -99,7 +99,7 @@ function InstanceSwitchPopover({
             className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800"
             onClick={onCreateNew}
           >
-            Create new…
+            Connect new
           </button>
         </div>
       </PopoverContent>
@@ -130,7 +130,8 @@ export function HomeIntegrationConnectRow({
 }) {
   const [switchOpen, setSwitchOpen] = useState(false);
   const displayName = getIntegrationTypeDisplayName(undefined, name) || name.charAt(0).toUpperCase() + name.slice(1);
-  const canSwitch = instances.length > 1;
+  // Show switcher whenever an instance exists so users can change or connect another.
+  const canSwitch = instances.length > 0;
 
   return (
     <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">

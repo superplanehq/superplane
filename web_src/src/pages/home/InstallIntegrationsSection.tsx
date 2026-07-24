@@ -39,13 +39,13 @@ export function IntegrationsSection({
   organizationId,
   selections,
   onSelectionsChange,
-  variant = "select",
+  variant = "status",
 }: {
   integrations: string[];
   organizationId: string;
   selections: IntegrationSelections;
   onSelectionsChange: (selections: IntegrationSelections) => void;
-  /** `select` shows an instance picker; `status` shows Connected / Not connected rows. */
+  /** `status` shows Connected / Pending rows with switcher; `select` keeps the legacy instance picker. */
   variant?: "select" | "status";
 }) {
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
@@ -54,7 +54,7 @@ export function IntegrationsSection({
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
-  /** "create" skips resuming a pending instance so "Create new" always starts fresh. */
+  /** "create" skips resuming a pending instance so "Connect new" always starts fresh. */
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);

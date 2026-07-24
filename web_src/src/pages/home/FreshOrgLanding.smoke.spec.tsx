@@ -28,7 +28,7 @@ describe("FreshOrgLanding", () => {
     expect(screen.queryByText(/automation starters/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /browse starter apps/i }));
-    expect(screen.getByText(/automation starters \(not software factory setup\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/automation starters/i)).toBeInTheDocument();
   });
 
   it("opens inline Software Factory setup with connect, params, optional starting task, and always-available run", async () => {
@@ -48,18 +48,24 @@ describe("FreshOrgLanding", () => {
     expect(within(panel).queryByText("Choose repository")).not.toBeInTheDocument();
     expect(within(panel).queryByText(/anthropic api key/i)).not.toBeInTheDocument();
     expect(within(panel).getByText("Choose starting task")).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: /^write test$/i })).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: /^fix bug$/i })).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: /^improve agents\.md$/i })).toBeInTheDocument();
-    expect(within(panel).queryByLabelText(/^Prompt$/i)).not.toBeInTheDocument();
+    const taskButtons = within(panel).getAllByRole("button", { name: /^(improve agents\.md|write test|fix bug)$/i });
+    expect(taskButtons.map((button) => button.textContent)).toEqual(["Improve AGENTS.md", "Write test", "Fix bug"]);
+    expect(within(panel).getByRole("button", { name: /^improve agents\.md$/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     const runButton = within(panel).getByRole("button", { name: /^Run$/i });
     expect(runButton).toBeEnabled();
     expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
 
-    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
     const promptField = within(panel).getByLabelText(/^Prompt$/i);
     expect(promptField).toHaveAttribute("readonly");
+    expect(promptField).toHaveValue(
+      "Review the existing AGENTS.md and improve it to help coding agents work more effectively in this repository. Make the guidance specific to this codebase, preserving useful instructions and removing outdated or generic ones. If AGENTS.md doesn't exist, create it.",
+    );
+
+    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
     expect(promptField).toHaveValue(
       "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
     );

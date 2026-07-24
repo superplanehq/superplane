@@ -73,7 +73,7 @@ export function FactorySetupPanel({
   const organizationId = propOrgId || routeOrgId || "";
   const [selections, setSelections] = useState<IntegrationSelections>({});
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => factory.startingTasks[0]?.id ?? null);
 
   const selectedTask = factory.startingTasks.find((task) => task.id === selectedTaskId) ?? null;
   // Allow Run without connections, params, or a starting task — template wires what is available.

@@ -28,7 +28,7 @@ export function useHomeIntegrationConnectActions({
     window.open(href, "_blank", "noopener,noreferrer");
   };
 
-  /** Always opens the in-page create modal (used by "Create new…" in the switcher). */
+  /** Always opens the in-page create modal (used by "Connect new" in the switcher). */
   const openCreateIntegrationModal = (integrationName: string) => {
     pendingConnectKeyRef.current = integrationName;
     setDialogMode("create");
