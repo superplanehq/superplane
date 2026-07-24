@@ -74,16 +74,11 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 }
 
 // repositoryRefersTo reports whether configured identifies the same repository
-// as storedName. Short names may match either form when equal; owner/repo only
-// matches an identical stored owner/repo so an owner change cannot skip lookup.
+// as storedName. Only exact matches skip FindRepository — short vs owner/repo
+// (and owner changes) always force a fresh lookup so metadata stays consistent
+// with ListResources full names.
 func repositoryRefersTo(storedName, configured string) bool {
 	if storedName == "" || configured == "" {
-		return false
-	}
-	if storedName == configured {
-		return true
-	}
-	if strings.Contains(configured, "/") {
 		return false
 	}
 	return storedName == configured

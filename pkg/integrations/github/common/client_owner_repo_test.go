@@ -43,9 +43,10 @@ func Test__Client__ownerAndName(t *testing.T) {
 func Test__repositoryRefersTo(t *testing.T) {
 	assert.True(t, repositoryRefersTo("web", "web"))
 	assert.True(t, repositoryRefersTo("acme/web", "acme/web"))
-	// owner/repo vs short metadata is ambiguous across owners — force lookup.
+	// Mixed short/full forms and owner changes always force lookup.
 	assert.False(t, repositoryRefersTo("web", "acme/web"))
-	assert.False(t, repositoryRefersTo("web", "other/web"))
+	assert.False(t, repositoryRefersTo("acme/web", "web"))
+	assert.False(t, repositoryRefersTo("acme/web", "other/web"))
 	assert.False(t, repositoryRefersTo("web", "acme/api"))
 	assert.False(t, repositoryRefersTo("", "web"))
 }

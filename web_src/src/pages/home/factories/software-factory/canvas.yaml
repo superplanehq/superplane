@@ -740,9 +740,6 @@ spec:
           - name: REPO
             value: '{{ root().data.repository.full_name }}'
             valueSource: literal
-          - name: BASE
-            value: main
-            valueSource: literal
           - name: ISSUE_TITLE
             value: '{{ root().data.issue.title }}'
             valueSource: literal
@@ -753,7 +750,12 @@ spec:
           #!/usr/bin/env bash
           set -euo pipefail
 
-          BASE="${BASE:-main}"
+          export GH_TOKEN="$GITHUB_TOKEN"
+          : "${REPO:?REPO is required}"
+
+          # Resolve the repository default branch (not every repo uses main).
+          BASE="$(gh api "repos/${REPO}" --jq .default_branch)"
+          : "${BASE:?failed to resolve default branch}"
 
           # Build branch name: fix/<slug-of-issue-title>-<unix-timestamp>-<randbytes>
           SLUG="$(printf '%s' "${ISSUE_TITLE:-}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50 | sed -E 's/-+$//')"
@@ -769,7 +771,7 @@ spec:
           git config --global user.email "automation@example.com"
           git config --global user.name "Factory Automation"
 
-          git clone --depth 1 "$GITURL" "$WORKDIR"
+          git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
           cd "$WORKDIR"
 
           # Create an empty branch off the base: a single empty commit so a draft PR can be opened,
@@ -778,10 +780,10 @@ spec:
           git commit -s --allow-empty -m "chore: initialize ${BRANCH}"
           git push -u origin "$BRANCH"
 
-          echo "Pushed empty branch ${BRANCH}"
+          echo "Pushed empty branch ${BRANCH} (base ${BASE})"
 
           # Respond with branch metadata
-          printf '{"branch":"%s","session":"%s","slug":"%s","rand":"%s"}\n' "$BRANCH" "$TIMESTAMP" "$SLUG" "$RAND" > "$SUPERPLANE_RESULT_FILE"
+          printf '{"branch":"%s","base":"%s","session":"%s","slug":"%s","rand":"%s"}\n' "$BRANCH" "$BASE" "$TIMESTAMP" "$SLUG" "$RAND" > "$SUPERPLANE_RESULT_FILE"
       position:
         x: 1104
         'y': 0
@@ -936,7 +938,7 @@ spec:
       type: TYPE_ACTION
       component: github.createPullRequest
       configuration:
-        base: main
+        base: '{{ $["Create Branch"].data.result.base }}'
         body: |-
           fixes #{{ root().data.issue.number }}
 
