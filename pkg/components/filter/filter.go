@@ -57,6 +57,7 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
+- **run()**: Access to the current run's metadata — ` + "`run().id`" + `, ` + "`run().url`" + ` (a direct link to the run in the SuperPlane UI), and ` + "`run().started_at`" + ` (a timestamp)
 
 ## Examples
 
