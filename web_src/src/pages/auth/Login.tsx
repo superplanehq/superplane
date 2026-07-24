@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/useAccount";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import {
   readLastUsedLoginMethod,
   recordLastUsedLoginMethod,
@@ -84,8 +85,6 @@ type AuthMode = "login" | "signup";
 interface LoginProps {
   mode?: AuthMode;
 }
-
-const ACCOUNT_BLOCKED_MESSAGE = "Your account has been blocked. Please contact support.";
 
 const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: SignupUnavailableReason) => {
   if (authError === "account_blocked") {

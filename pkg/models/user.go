@@ -87,9 +87,9 @@ func ClearTokenHashesForAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) e
 		Error
 }
 
-// ClearAPIKeyTokenHashesCreatedByAccountInTransaction wipes token hashes on
-// org API keys created by any human user belonging to the given account.
-func ClearAPIKeyTokenHashesCreatedByAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) error {
+// ClearAPIKeyTokenHashesCreatedByAccount wipes token hashes on org API keys
+// created by any human user belonging to the given account.
+func ClearAPIKeyTokenHashesCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) error {
 	humanIDs := tx.Unscoped().Model(&User{}).Select("id").Where("account_id = ?", accountID)
 	return tx.Model(&User{}).
 		Where("type = ?", UserTypeAPIKey).

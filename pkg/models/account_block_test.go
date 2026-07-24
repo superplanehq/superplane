@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 func TestAccountBlockAndUnblock(t *testing.T) {
@@ -29,7 +30,9 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	require.NoError(t, apiKey.UpdateTokenHash("api-key-token-hash"))
 	require.NoError(t, human.Delete())
 
-	require.NoError(t, BlockAccount(account.ID.String()))
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return account.Block(tx, time.Now())
+	}))
 
 	blocked, err := FindAccountByID(account.ID.String())
 	require.NoError(t, err)
@@ -45,7 +48,9 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, refreshedKey.TokenHash)
 
-	require.NoError(t, UnblockAccount(account.ID.String()))
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return blocked.Unblock(tx)
+	}))
 
 	unblocked, err := FindAccountByID(account.ID.String())
 	require.NoError(t, err)
@@ -61,12 +66,16 @@ func TestBlockAccountIsIdempotent(t *testing.T) {
 	account, err := CreateAccount("Idempotent", "idempotent-block@example.com")
 	require.NoError(t, err)
 
-	require.NoError(t, BlockAccount(account.ID.String()))
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return account.Block(tx, time.Now())
+	}))
 	first, err := FindAccountByID(account.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, first.BlockedAt)
 
-	require.NoError(t, BlockAccount(account.ID.String()))
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return account.Block(tx, time.Now())
+	}))
 	second, err := FindAccountByID(account.ID.String())
 	require.NoError(t, err)
 	assert.True(t, second.IsBlocked())

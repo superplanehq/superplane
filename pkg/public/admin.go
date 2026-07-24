@@ -704,7 +704,9 @@ func (s *Server) blockAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.BlockAccount(targetID); err != nil {
+	if err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.Block(tx, time.Now())
+	}); err != nil {
 		log.Errorf("admin: failed to block %s: %v", targetID, err)
 		http.Error(w, "Failed to block account", http.StatusInternalServerError)
 		return
@@ -742,7 +744,9 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.UnblockAccount(targetID); err != nil {
+	if err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.Unblock(tx)
+	}); err != nil {
 		log.Errorf("admin: failed to unblock %s: %v", targetID, err)
 		http.Error(w, "Failed to unblock account", http.StatusInternalServerError)
 		return

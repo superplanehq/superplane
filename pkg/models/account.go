@@ -73,68 +73,47 @@ func DemoteFromInstallationAdmin(accountID string) error {
 		Error
 }
 
-// BlockAccountInTransaction marks the account blocked, invalidates sessions via
-// password_changed_at, and clears personal tokens plus org API keys created by
-// that account's users.
-func BlockAccountInTransaction(tx *gorm.DB, account *Account, now time.Time) error {
-	if account == nil {
+// Block marks the account blocked, invalidates sessions, and clears personal
+// tokens plus org API keys created by the account's users.
+func (a *Account) Block(tx *gorm.DB, now time.Time) error {
+	if a == nil {
 		return errors.New("account is required")
 	}
+	if a.IsBlocked() {
+		return nil
+	}
 
-	err := tx.Model(account).Update("blocked_at", now).Error
+	err := tx.Model(a).Update("blocked_at", now).Error
 	if err != nil {
 		return err
 	}
-	account.BlockedAt = &now
+	a.BlockedAt = &now
 
-	if err := account.MarkPasswordChangedInTransaction(tx, now); err != nil {
+	if err := a.MarkPasswordChangedInTransaction(tx, now); err != nil {
 		return err
 	}
-	if err := ClearTokenHashesForAccountInTransaction(tx, account.ID); err != nil {
+	if err := ClearTokenHashesForAccountInTransaction(tx, a.ID); err != nil {
 		return err
 	}
-	return ClearAPIKeyTokenHashesCreatedByAccountInTransaction(tx, account.ID)
+	return ClearAPIKeyTokenHashesCreatedByAccount(tx, a.ID)
 }
 
-// UnblockAccountInTransaction clears the blocked flag. Existing sessions remain
-// invalid; the user must sign in again.
-func UnblockAccountInTransaction(tx *gorm.DB, account *Account) error {
-	if account == nil {
+// Unblock clears the blocked flag. Existing sessions remain invalid; the user
+// must sign in again.
+func (a *Account) Unblock(tx *gorm.DB) error {
+	if a == nil {
 		return errors.New("account is required")
 	}
+	if !a.IsBlocked() {
+		return nil
+	}
 
-	err := tx.Model(account).Update("blocked_at", nil).Error
+	err := tx.Model(a).Update("blocked_at", nil).Error
 	if err != nil {
 		return err
 	}
-	account.BlockedAt = nil
+	a.BlockedAt = nil
 	return nil
-}
-
-func BlockAccount(accountID string) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		var account Account
-		if err := tx.Where("id = ?", accountID).First(&account).Error; err != nil {
-			return err
-		}
-		if account.IsBlocked() {
-			return nil
-		}
-		return BlockAccountInTransaction(tx, &account, time.Now())
-	})
-}
-
-func UnblockAccount(accountID string) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		var account Account
-		if err := tx.Where("id = ?", accountID).First(&account).Error; err != nil {
-			return err
-		}
-		if !account.IsBlocked() {
-			return nil
-		}
-		return UnblockAccountInTransaction(tx, &account)
-	})
 }
 
 func CreateAccount(name, email string) (*Account, error) {

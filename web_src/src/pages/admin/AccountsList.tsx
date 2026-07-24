@@ -102,6 +102,48 @@ function AccountsTable({
   );
 }
 
+interface AccountsListContentProps extends AccountsTableProps {
+  loading: boolean;
+  search: string;
+  offset: number;
+  total: number;
+  onPageChange: (offset: number) => void;
+}
+
+function AccountsListContent({
+  loading,
+  accounts,
+  search,
+  offset,
+  total,
+  onPageChange,
+  ...tableProps
+}: AccountsListContentProps) {
+  if (loading && accounts.length === 0) {
+    return (
+      <div className="flex flex-col items-center space-y-4 py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
+        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Text className="text-gray-500 dark:text-gray-400">{search ? "No accounts match." : "No accounts found."}</Text>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <AccountsTable accounts={accounts} {...tableProps} />
+      <AdminPagination offset={offset} total={total} pageSize={PAGE_SIZE} onPageChange={onPageChange} />
+    </>
+  );
+}
+
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
@@ -168,14 +210,6 @@ const AccountsList: React.FC = () => {
 
   useReportPageReady(!loading || accounts.length > 0);
 
-  if (loading && accounts.length === 0)
-    return (
-      <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
-      </div>
-    );
-
   return (
     <div>
       <ConfirmAdminDialog
@@ -201,35 +235,24 @@ const AccountsList: React.FC = () => {
         onSearchChange={setSearch}
         placeholder="Search by name or email..."
       />
-      {accounts.length === 0 ? (
-        <div className="text-center py-12">
-          <Text className="text-gray-500 dark:text-gray-400">
-            {search ? "No accounts match." : "No accounts found."}
-          </Text>
-        </div>
-      ) : (
-        <>
-          <AccountsTable
-            accounts={accounts}
-            currentAccountId={currentAccount?.id}
-            togglingAccountId={toggling}
-            sortBy={sortBy}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onPromoteDemote={setConfirmTarget}
-            onBlockUnblock={setBlockTarget}
-          />
-          <AdminPagination
-            offset={offset}
-            total={total}
-            pageSize={PAGE_SIZE}
-            onPageChange={(o: number) => {
-              setOffset(o);
-              fetchAccounts(search, o, sortBy, sortDirection);
-            }}
-          />
-        </>
-      )}
+      <AccountsListContent
+        loading={loading}
+        accounts={accounts}
+        search={search}
+        offset={offset}
+        total={total}
+        currentAccountId={currentAccount?.id}
+        togglingAccountId={toggling}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        onPromoteDemote={setConfirmTarget}
+        onBlockUnblock={setBlockTarget}
+        onPageChange={(nextOffset) => {
+          setOffset(nextOffset);
+          fetchAccounts(search, nextOffset, sortBy, sortDirection);
+        }}
+      />
     </div>
   );
 };

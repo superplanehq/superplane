@@ -75,7 +75,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	})
 
 	t.Run("blocked account cookie returns contact-support message", func(t *testing.T) {
-		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
@@ -181,7 +181,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
-		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -221,7 +221,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		rawToken, err := crypto.Base64String(32)
 		require.NoError(t, err)
 		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
-		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
 		// Re-set hash after block cleared it so we exercise the blocked-account check.
 		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
@@ -287,7 +287,7 @@ func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t
 	require.NoError(t, err)
 	impersonationToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
 	require.NoError(t, err)
-	require.NoError(t, models.BlockAccount(targetAccount.ID.String()))
+	require.NoError(t, targetAccount.Block(database.Conn(), time.Now()))
 
 	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		user, ok := GetUserFromContext(req.Context())
@@ -364,7 +364,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 	t.Run("blocked account cookie is rejected with contact-support message", func(t *testing.T) {
 		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
-		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})

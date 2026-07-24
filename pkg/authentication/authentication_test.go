@@ -186,7 +186,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Email:      originalEmail,
 			Name:       account.Name,
 		}).Error)
-		require.NoError(t, models.BlockAccount(account.ID.String()))
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
 		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
 			UserID:   "blocked-provider-id",
@@ -209,7 +209,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 
 		account, err := models.CreateAccount("Blocked Email User", "blocked-email@example.com")
 		require.NoError(t, err)
-		require.NoError(t, models.BlockAccount(account.ID.String()))
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
 		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
 			UserID:   "new-provider-id",
@@ -369,7 +369,7 @@ func TestHandler_checkSignupPolicy(t *testing.T) {
 
 		account, err := models.CreateAccount("Blocked User", "blocked-magic-code@example.com")
 		require.NoError(t, err)
-		require.NoError(t, models.BlockAccount(account.ID.String()))
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
 		code := "123456"
 		codeHash := crypto.HashToken(code)

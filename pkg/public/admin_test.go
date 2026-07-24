@@ -600,7 +600,7 @@ func TestImpersonationStatus(t *testing.T) {
 			"sub":                     r.Account.ID.String(),
 		})
 		require.NoError(t, err)
-		require.NoError(t, models.BlockAccount(target.ID.String()))
+		require.NoError(t, target.Block(database.Conn(), time.Now()))
 
 		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
