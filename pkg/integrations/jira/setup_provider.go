@@ -71,6 +71,19 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	}
 }
 
+// allCapabilityNames flattens every action/trigger name across all groups.
+// Used to enable everything at once, since (unlike GitHub) there's no
+// granular permission model to gate individual capabilities behind.
+func (s *SetupProvider) allCapabilityNames() []string {
+	names := []string{}
+	for _, group := range s.CapabilityGroups() {
+		for _, capability := range group.Capabilities {
+			names = append(names, capability.Name)
+		}
+	}
+	return names
+}
+
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	callbackURL := redirectURI(ctx.BaseURL, ctx.IntegrationID.String())
 
@@ -177,6 +190,19 @@ func (s *SetupProvider) onEnterAppCredentialsSubmit(ctx core.SetupStepContext) (
 	}
 
 	authorizeURL := BuildAuthorizeURL(clientID, redirectURI(ctx.BaseURL, ctx.IntegrationID.String()), state)
+
+	//
+	// There's no capability-selection step in this flow (OAuth grants a
+	// single fixed scope covering everything - see oauthScopes), so enable
+	// every action/trigger now rather than gating them behind one. This runs
+	// before the OAuth connection is actually verified, but "enabled" only
+	// means "available to add to a canvas" - the integration's Ready/Error
+	// state (set once the token exchange completes) reflects whether it
+	// actually works.
+	//
+	if ctx.Capabilities != nil {
+		ctx.Capabilities.Enable(s.allCapabilityNames()...)
+	}
 
 	return &core.SetupStep{
 		Type:         core.SetupStepTypeRedirectPrompt,

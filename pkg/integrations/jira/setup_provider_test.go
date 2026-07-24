@@ -72,12 +72,14 @@ func Test__SetupProvider__OnStepSubmit(t *testing.T) {
 
 	t.Run("enterAppCredentials stores credentials and returns a redirect step", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{}
+		capabilities := &contexts.CapabilityContext{}
 		integrationID := uuid.New()
 		step, err := s.OnStepSubmit(core.SetupStepContext{
 			BaseURL:       "https://superplane.example.com",
 			IntegrationID: integrationID,
 			Properties:    intCtx.Properties(),
 			Secrets:       intCtx.Secrets(),
+			Capabilities:  capabilities,
 			Step: core.StepInfo{
 				Name:   SetupStepEnterAppCredentials,
 				Inputs: map[string]any{PropertyClientID: "client-1", SecretOAuthClientSecret: "secret-1"},
@@ -104,6 +106,13 @@ func Test__SetupProvider__OnStepSubmit(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, state)
 		assert.Contains(t, step.RedirectPrompt.URL, "state=")
+
+		// Every action/trigger must come out enabled - there's no separate
+		// capability-selection step in this flow, so this is the only place
+		// it can happen. Regression test for "jira.onIssue is not enabled
+		// for integration jira".
+		assert.Contains(t, capabilities.EnabledCapabilities, "jira.onIssue")
+		assert.Contains(t, capabilities.EnabledCapabilities, "jira.createIssue")
 	})
 
 	t.Run("authorize step is not directly submitted", func(t *testing.T) {
