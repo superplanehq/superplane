@@ -100,7 +100,7 @@ func (g *GitLab) Instructions() string {
    - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
    - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) with scopes %s (the link prefills them), paste it into **Access Token**, and click **Save**.
 
-**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating or merging merge requests, approving, and deploying follow the project's roles and protected branch/environment rules.
+**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating, updating, or merging merge requests, approving, deploying, and editing issue comments follow the project's roles and protected branch/environment rules.
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -175,6 +175,7 @@ func (g *GitLab) Actions() []core.Action {
 		&CreateMergeComment{},
 		&AddReaction{},
 		&CreateMergeRequest{},
+		&UpdateMergeRequest{},
 		&AddMergeRequestReviewers{},
 		&RemoveMergeRequestReviewers{},
 		&AcceptMergeRequest{},
@@ -184,6 +185,7 @@ func (g *GitLab) Actions() []core.Action {
 		&GetIssue{},
 		&UpdateIssue{},
 		&CreateIssueComment{},
+		&UpdateIssueComment{},
 		&AddIssueLabel{},
 		&MarkMergeRequestReadyForReview{},
 	}
