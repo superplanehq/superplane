@@ -3,9 +3,9 @@ import type { ConfigurationField, SuperplaneComponentsNode } from "@/api-client"
 import { useCanvas } from "@/hooks/useCanvasData";
 import { toTestId } from "@/lib/testID";
 import { ConfigurationFieldRenderer } from "./index";
-import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
-import { normalizeRunParameterDefinitions } from "./runParameters";
+import { coerceRunParameterValues, normalizeRunParameterDefinitions } from "./runParameters";
+import { useSyncRunParameterValues } from "./useSyncRunParameterValues";
 
 interface RunParametersFieldRendererProps extends FieldRendererProps {
   organizationId: string;
@@ -43,55 +43,41 @@ function findTargetNode(
   return nodes.find((node) => node.id === nodeId);
 }
 
-export function RunParametersFieldRenderer({
+interface RunParametersFieldContentProps {
+  field: ConfigurationField;
+  appId: string | undefined;
+  nodeId: string | undefined;
+  isLoading: boolean;
+  error: unknown;
+  parameterDefinitions: ConfigurationField[];
+  parameterValues: Record<string, unknown>;
+  baseFieldPath: string;
+  onChange: (value: Record<string, unknown>) => void;
+  allValues?: Record<string, unknown>;
+  organizationId: string;
+  allowExpressions: boolean;
+  autocompleteExampleObj: FieldRendererProps["autocompleteExampleObj"];
+  validationErrors?: ValidationError[] | Set<string>;
+  readOnly: boolean;
+}
+
+function RunParametersFieldContent({
   field,
-  value,
+  appId,
+  nodeId,
+  isLoading,
+  error,
+  parameterDefinitions,
+  parameterValues,
+  baseFieldPath,
   onChange,
   allValues,
   organizationId,
-  allowExpressions = false,
+  allowExpressions,
   autocompleteExampleObj,
-  readOnly = false,
   validationErrors,
-  fieldPath,
-}: RunParametersFieldRendererProps) {
-  const appId = useMemo(() => resolveTargetAppId(allValues), [allValues]);
-  const nodeId = useMemo(() => resolveTargetNodeId(allValues), [allValues]);
-
-  const {
-    data: canvas,
-    isLoading,
-    error,
-  } = useCanvas(organizationId, appId ?? "", {
-    enabled: Boolean(appId),
-  });
-
-  const parameterDefinitions = useMemo(() => {
-    const targetNode = findTargetNode(canvas?.spec?.nodes, nodeId);
-    return normalizeRunParameterDefinitions(targetNode?.configuration?.parameters);
-  }, [canvas?.spec?.nodes, nodeId]);
-
-  const parameterValues = useMemo(() => {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      return value as Record<string, unknown>;
-    }
-
-    return {};
-  }, [value]);
-
-  const fallbackObjectField = useMemo(
-    (): ConfigurationField => ({
-      name: field.name ?? "parameters",
-      label: field.label,
-      description: field.description,
-      type: "object",
-      required: field.required,
-    }),
-    [field.description, field.label, field.name, field.required],
-  );
-
-  const baseFieldPath = fieldPath || field.name || "parameters";
-
+  readOnly,
+}: RunParametersFieldContentProps) {
   if (!appId || !nodeId) {
     return (
       <div data-testid={toTestId(`run-parameters-field-${field.name}`)} className="space-y-2">
@@ -120,17 +106,15 @@ export function RunParametersFieldRenderer({
 
   if (parameterDefinitions.length === 0) {
     return (
-      <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
-        <ObjectFieldRenderer
-          field={fallbackObjectField}
-          value={value}
-          onChange={onChange}
-          allValues={allValues}
-          organizationId={organizationId}
-          allowExpressions={allowExpressions}
-          autocompleteExampleObj={autocompleteExampleObj}
-          readOnly={readOnly}
-        />
+      <div
+        data-testid={toTestId(`run-parameters-field-${field.name}`)}
+        className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/40"
+      >
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          The trigger you selected does not define any parameters. If parameters are needed in your flow, define them in
+          the trigger configuration first. Without parameters, the run will still be triggered, but no additional values
+          will be passed.
+        </p>
       </div>
     );
   }
@@ -164,5 +148,64 @@ export function RunParametersFieldRenderer({
         );
       })}
     </div>
+  );
+}
+
+export function RunParametersFieldRenderer({
+  field,
+  value,
+  onChange,
+  allValues,
+  organizationId,
+  allowExpressions = false,
+  autocompleteExampleObj,
+  readOnly = false,
+  validationErrors,
+  fieldPath,
+}: RunParametersFieldRendererProps) {
+  const appId = useMemo(() => resolveTargetAppId(allValues), [allValues]);
+  const nodeId = useMemo(() => resolveTargetNodeId(allValues), [allValues]);
+
+  const { data: canvas, isLoading, error } = useCanvas(organizationId, appId ?? "", {
+    enabled: Boolean(appId),
+  });
+
+  const targetNode = useMemo(() => findTargetNode(canvas?.spec?.nodes, nodeId), [canvas?.spec?.nodes, nodeId]);
+  const parameterDefinitions = useMemo(
+    () => normalizeRunParameterDefinitions(targetNode?.configuration?.parameters),
+    [targetNode],
+  );
+  const parameterValues = useMemo(() => coerceRunParameterValues(value), [value]);
+  const baseFieldPath = fieldPath || field.name || "parameters";
+
+  useSyncRunParameterValues({
+    readOnly,
+    isLoading,
+    error,
+    appId,
+    nodeId,
+    parameterDefinitions,
+    parameterValues,
+    onChange,
+  });
+
+  return (
+    <RunParametersFieldContent
+      field={field}
+      appId={appId}
+      nodeId={nodeId}
+      isLoading={isLoading}
+      error={error}
+      parameterDefinitions={parameterDefinitions}
+      parameterValues={parameterValues}
+      baseFieldPath={baseFieldPath}
+      onChange={onChange}
+      allValues={allValues}
+      organizationId={organizationId}
+      allowExpressions={allowExpressions}
+      autocompleteExampleObj={autocompleteExampleObj}
+      validationErrors={validationErrors}
+      readOnly={readOnly}
+    />
   );
 }
