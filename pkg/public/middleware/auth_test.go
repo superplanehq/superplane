@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -71,6 +72,20 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		handler.ServeHTTP(res, req)
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("blocked account cookie returns contact-support message", func(t *testing.T) {
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
 	})
 }
 
@@ -181,6 +196,95 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
+
+	t.Run("personal token for blocked account is rejected", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		// Re-set hash after block cleared it so we exercise the blocked-account check.
+		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+	})
+}
+
+func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+	rawToken, err := crypto.Base64String(32)
+	require.NoError(t, err)
+
+	description := "key owned by a removed member"
+	apiKey, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"removed-member-key",
+		&description,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, apiKey.UpdateTokenHash(crypto.HashToken(rawToken)))
+	require.NoError(t, r.UserModel.Delete())
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		user, ok := GetUserFromContext(req.Context())
+		require.True(t, ok)
+		assert.Equal(t, apiKey.ID, user.ID)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusNoContent, res.Code)
+}
+
+func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+
+	targetAccount, err := models.CreateAccount("Blocked Target", "blocked-target@example.com")
+	require.NoError(t, err)
+	_, err = models.CreateUser(r.Organization.ID, targetAccount.ID, targetAccount.Email, targetAccount.Name)
+	require.NoError(t, err)
+
+	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	impersonationToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
+	require.NoError(t, err)
+	require.NoError(t, models.BlockAccount(targetAccount.ID.String()))
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		user, ok := GetUserFromContext(req.Context())
+		require.True(t, ok)
+		assert.Equal(t, r.User, user.ID)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: accountToken})
+	req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impersonationToken})
+	req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusNoContent, res.Code)
 }
 
 func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
@@ -235,6 +339,21 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		handler.ServeHTTP(res, req)
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("blocked account cookie is rejected with contact-support message", func(t *testing.T) {
+		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
 	})
 }
 
