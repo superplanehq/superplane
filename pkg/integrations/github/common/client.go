@@ -59,14 +59,21 @@ func (c *Client) FindRepository(repository string) (*github.Repository, error) {
 // ownerAndName accepts either "repo" (scoped to the integration owner) or
 // "owner/repo". Claude components need the latter; GitHub components historically
 // stored the short name.
+//
+// Multi-segment values (e.g. a duplicated "owner/owner/repo") use the first and
+// last segments so we never call the API as /repos/{owner}/{owner/repo}, which
+// GitHub rejects.
 func (c *Client) ownerAndName(repository string) (owner, name string) {
 	repository = strings.TrimSpace(repository)
-	if i := strings.Index(repository, "/"); i > 0 {
-		rest := repository[i+1:]
-		if rest != "" && !strings.Contains(rest, "/") {
-			return repository[:i], rest
-		}
+	if repository == "" {
+		return c.owner, repository
 	}
+
+	parts := strings.Split(repository, "/")
+	if len(parts) >= 2 && parts[0] != "" && parts[len(parts)-1] != "" {
+		return parts[0], parts[len(parts)-1]
+	}
+
 	return c.owner, repository
 }
 

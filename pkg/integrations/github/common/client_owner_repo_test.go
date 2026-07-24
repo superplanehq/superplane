@@ -27,10 +27,16 @@ func Test__Client__ownerAndName(t *testing.T) {
 		assert.Equal(t, "web", name)
 	})
 
-	t.Run("invalid multi-slash falls back to short name", func(t *testing.T) {
-		owner, name := client.ownerAndName("a/b/c")
+	t.Run("multi-slash uses first and last segments", func(t *testing.T) {
+		owner, name := client.ownerAndName("forestileao/forestileao/vhdl-ethernet")
+		assert.Equal(t, "forestileao", owner)
+		assert.Equal(t, "vhdl-ethernet", name)
+	})
+
+	t.Run("empty uses integration owner", func(t *testing.T) {
+		owner, name := client.ownerAndName("  ")
 		assert.Equal(t, "acme", owner)
-		assert.Equal(t, "a/b/c", name)
+		assert.Equal(t, "", name)
 	})
 }
 

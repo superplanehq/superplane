@@ -64,7 +64,7 @@ describe("FreshOrgLanding", () => {
     expect(within(panel).getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument();
   });
 
-  it("lets starting task selection clear so Manual Run can be skipped", async () => {
+  it("keeps a starting task selected when the same button is clicked again", async () => {
     const { user, panel } = await openFactorySetup();
 
     const promptField = within(panel).getByLabelText(/^Prompt$/i);
@@ -78,8 +78,10 @@ describe("FreshOrgLanding", () => {
       "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
     );
     await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
-    expect(within(panel).queryByLabelText(/^Prompt$/i)).not.toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: /^Run$/i })).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: /^write test$/i })).toHaveAttribute("aria-pressed", "true");
+    expect(within(panel).getByLabelText(/^Prompt$/i)).toHaveValue(
+      "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
+    );
   });
 
   it("opens GitHub capability setup in a new tab from Connect", async () => {

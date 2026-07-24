@@ -153,7 +153,7 @@ export function FactorySetupPanel({
         busy={busy}
         tasks={factory.startingTasks}
         selectedTaskId={selectedTaskId}
-        onSelectTask={(id) => setSelectedTaskId((prev) => (prev === id ? null : id))}
+        onSelectTask={setSelectedTaskId}
         prompt={selectedTask?.prompt ?? null}
       />
 

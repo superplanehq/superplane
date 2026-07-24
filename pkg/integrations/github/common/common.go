@@ -61,9 +61,14 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		return fmt.Errorf("failed to find repository: %w", err)
 	}
 
+	name := repo.GetFullName()
+	if name == "" {
+		name = repo.GetName()
+	}
+
 	return ctx.Set(NodeMetadata{Repository: &Repository{
 		ID:   repo.GetID(),
-		Name: repo.GetName(),
+		Name: name,
 		URL:  repo.GetHTMLURL(),
 	}})
 }
