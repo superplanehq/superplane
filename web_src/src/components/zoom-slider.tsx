@@ -11,7 +11,9 @@ import {
   Locate,
   LocateOff,
   Minus,
+  Move,
   Plus,
+  Workflow,
 } from "lucide-react";
 import { toPng } from "html-to-image";
 
@@ -30,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
+import type { CanvasLayoutMode } from "@/ui/CanvasPage/useCanvasLayoutMode";
 
 function hasPrimaryModifier(event: KeyboardEvent) {
   return event.ctrlKey || event.metaKey;
@@ -53,6 +56,33 @@ function isFitViewShortcut(event: KeyboardEvent) {
 
 function isScreenshotShortcut(event: KeyboardEvent, screenshotName?: string) {
   return Boolean(screenshotName) && hasPrimaryModifier(event) && event.shiftKey && event.key === "s";
+}
+
+function LayoutModeToggleButton({ layoutMode, onToggle }: { layoutMode: CanvasLayoutMode; onToggle: () => void }) {
+  const isVertical = layoutMode === "vertical";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-7 w-7"
+          onClick={onToggle}
+          aria-pressed={isVertical}
+          aria-label={isVertical ? "Switch to freeform layout" : "Switch to vertical auto-layout"}
+          data-testid="canvas-layout-mode-toggle"
+        >
+          {isVertical ? <Workflow className="h-3 w-3" /> : <Move className="h-3 w-3" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {isVertical
+          ? "Vertical auto-layout is on. Nodes are arranged top-to-bottom. Click for freeform."
+          : "Freeform layout is on. Drag nodes anywhere. Click for vertical auto-layout."}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function AutoFocusToggleButton({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
@@ -86,6 +116,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   children,
   leadingContent,
   screenshotName,
+  layoutMode,
+  onLayoutModeToggle,
   isSnapToGridEnabled,
   onSnapToGridToggle,
   isAutoLayoutOnUpdateEnabled,
@@ -101,6 +133,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   children?: React.ReactNode;
   leadingContent?: React.ReactNode;
   screenshotName?: string;
+  layoutMode?: CanvasLayoutMode;
+  onLayoutModeToggle?: () => void;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -324,6 +358,9 @@ export const ZoomSlider = memo(function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
         </Tooltip>
+      )}
+      {onLayoutModeToggle && (
+        <LayoutModeToggleButton layoutMode={layoutMode ?? "freeform"} onToggle={onLayoutModeToggle} />
       )}
       {onAutoFocusToggle && (
         <AutoFocusToggleButton enabled={Boolean(isAutoFocusEnabled)} onToggle={onAutoFocusToggle} />

@@ -63,3 +63,43 @@ describe("ZoomSlider auto-focus toggle", () => {
     expect(onAutoFocusToggle).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ZoomSlider layout mode toggle", () => {
+  it("does not render the layout mode toggle when no callback is provided", () => {
+    const { queryByTestId } = render(<ZoomSlider usePanel={false} />);
+
+    expect(queryByTestId("canvas-layout-mode-toggle")).toBeNull();
+  });
+
+  it("labels the toggle for switching to vertical when in freeform mode", () => {
+    const { getByTestId } = render(
+      <ZoomSlider usePanel={false} layoutMode="freeform" onLayoutModeToggle={vi.fn()} />,
+    );
+
+    const button = getByTestId("canvas-layout-mode-toggle");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(button.getAttribute("aria-label")).toBe("Switch to vertical auto-layout");
+  });
+
+  it("labels the toggle for switching to freeform when in vertical mode", () => {
+    const { getByTestId } = render(
+      <ZoomSlider usePanel={false} layoutMode="vertical" onLayoutModeToggle={vi.fn()} />,
+    );
+
+    const button = getByTestId("canvas-layout-mode-toggle");
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.getAttribute("aria-label")).toBe("Switch to freeform layout");
+  });
+
+  it("invokes the callback when clicked", async () => {
+    const onLayoutModeToggle = vi.fn();
+    const user = userEvent.setup();
+    const { getByTestId } = render(
+      <ZoomSlider usePanel={false} layoutMode="freeform" onLayoutModeToggle={onLayoutModeToggle} />,
+    );
+
+    await user.click(getByTestId("canvas-layout-mode-toggle"));
+
+    expect(onLayoutModeToggle).toHaveBeenCalledTimes(1);
+  });
+});

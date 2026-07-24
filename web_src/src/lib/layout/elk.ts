@@ -1,6 +1,6 @@
 import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
-import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
+import type { LayoutDirection, LayoutEngine, LayoutEngineApplyOptions, LayoutPosition } from "./types";
 import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
 
 const DEFAULT_NODE_WIDTH = 420;
@@ -8,11 +8,8 @@ const DEFAULT_NODE_HEIGHT = 180;
 const ANNOTATION_NODE_WIDTH = 320;
 const ANNOTATION_NODE_HEIGHT = 200;
 const DISCONNECTED_COMPONENT_VERTICAL_GAP = 220;
-
-type LayoutPosition = {
-  x: number;
-  y: number;
-};
+const DISCONNECTED_COMPONENT_HORIZONTAL_GAP = 220;
+const DEFAULT_LAYOUT_DIRECTION: LayoutDirection = "RIGHT";
 
 export class ElkLayoutEngine implements LayoutEngine {
   private readonly elk = new ELK();
@@ -37,30 +34,12 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
-    const flowNodes = this.resolveFlowNodes(nodes);
-    if (flowNodes.length === 0) {
-      return workflow;
-    }
-
-    const scopedNodeIDs = this.resolveScopedNodeIDs(workflow, flowNodes, options);
-    const layoutNodes = this.resolveLayoutNodes(flowNodes, scopedNodeIDs);
-    if (layoutNodes.length === 0) {
-      return workflow;
-    }
-
-    const outputChannelsByNodeId = this.buildOutputChannelsByNodeId(workflow, options?.components || []);
-    const layoutedPositions = await this.resolvePackedLayoutedPositions(workflow, layoutNodes, outputChannelsByNodeId);
-
+    const layoutedPositions = await this.computeLayoutPositions(workflow, options);
     if (layoutedPositions.size === 0) {
       return workflow;
     }
 
-    const minCurrentPosition = this.resolveMinPositionFromNodes(layoutNodes);
-    const minLayoutPosition = this.resolveMinPositionFromLayout(layoutedPositions);
-    const updatedNodes = this.applyLayoutedPositions(nodes, layoutedPositions, {
-      x: minCurrentPosition.x - minLayoutPosition.x,
-      y: minCurrentPosition.y - minLayoutPosition.y,
-    });
+    const updatedNodes = this.applyLayoutedPositions(nodes, layoutedPositions, { x: 0, y: 0 });
 
     return {
       ...workflow,
@@ -70,6 +49,62 @@ export class ElkLayoutEngine implements LayoutEngine {
         edges: workflow.spec?.edges || [],
       },
     };
+  }
+
+  /**
+   * Computes engine-controlled positions (already anchored to the current layout's
+   * top-left) without mutating the workflow. Returns a node-id -> position map so
+   * callers can overlay a non-destructive auto-layout view.
+   */
+  async computeLayoutPositions(
+    workflow: CanvasesCanvas,
+    options?: LayoutEngineApplyOptions,
+  ): Promise<Map<string, LayoutPosition>> {
+    const nodes = workflow.spec?.nodes || [];
+    if (nodes.length === 0) {
+      return new Map();
+    }
+
+    const flowNodes = this.resolveFlowNodes(nodes);
+    if (flowNodes.length === 0) {
+      return new Map();
+    }
+
+    const scopedNodeIDs = this.resolveScopedNodeIDs(workflow, flowNodes, options);
+    const layoutNodes = this.resolveLayoutNodes(flowNodes, scopedNodeIDs);
+    if (layoutNodes.length === 0) {
+      return new Map();
+    }
+
+    const direction = options?.direction ?? DEFAULT_LAYOUT_DIRECTION;
+    const outputChannelsByNodeId = this.buildOutputChannelsByNodeId(workflow, options?.components || []);
+    const layoutedPositions = await this.resolvePackedLayoutedPositions(
+      workflow,
+      layoutNodes,
+      outputChannelsByNodeId,
+      direction,
+    );
+
+    if (layoutedPositions.size === 0) {
+      return new Map();
+    }
+
+    const minCurrentPosition = this.resolveMinPositionFromNodes(layoutNodes);
+    const minLayoutPosition = this.resolveMinPositionFromLayout(layoutedPositions);
+    const offset = {
+      x: minCurrentPosition.x - minLayoutPosition.x,
+      y: minCurrentPosition.y - minLayoutPosition.y,
+    };
+
+    const anchoredPositions = new Map<string, LayoutPosition>();
+    layoutedPositions.forEach((position, nodeID) => {
+      anchoredPositions.set(nodeID, {
+        x: Math.round(position.x + offset.x),
+        y: Math.round(position.y + offset.y),
+      });
+    });
+
+    return anchoredPositions;
   }
 
   private normalizeChannel(channel?: string): string {
@@ -296,15 +331,25 @@ export class ElkLayoutEngine implements LayoutEngine {
     });
   }
 
+  private resolvePortSides(direction: LayoutDirection): { input: string; output: string } {
+    if (direction === "DOWN") {
+      return { input: "NORTH", output: "SOUTH" };
+    }
+
+    return { input: "WEST", output: "EAST" };
+  }
+
   private buildElkGraph(
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
+    direction: LayoutDirection,
     positioningEdges?: Array<{ sourceId?: string; targetId?: string; channel?: string }>,
   ) {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const graphEdges = positioningEdges ?? layoutEdges;
     const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
+    const portSides = this.resolvePortSides(direction);
 
     for (const edge of layoutEdges) {
       if (!edge.sourceId) {
@@ -320,11 +365,11 @@ export class ElkLayoutEngine implements LayoutEngine {
       id: "root",
       layoutOptions: {
         "elk.algorithm": "layered",
-        "elk.direction": "RIGHT",
+        "elk.direction": direction,
         "elk.spacing.nodeNode": "100",
         "elk.layered.spacing.nodeNodeBetweenLayers": "180",
         "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-        "elk.contentAlignment": "V_CENTER",
+        "elk.contentAlignment": direction === "DOWN" ? "H_CENTER" : "V_CENTER",
       },
       children: layoutNodes.map((node) => {
         const { width, height } = this.estimateNodeSize(node);
@@ -342,13 +387,13 @@ export class ElkLayoutEngine implements LayoutEngine {
           {
             id: `${nodeId}__input`,
             properties: {
-              "elk.port.side": "WEST",
+              "elk.port.side": portSides.input,
             },
           },
           ...outputChannels.map((channel, index) => ({
             id: `${nodeId}__${channel}`,
             properties: {
-              "elk.port.side": "EAST",
+              "elk.port.side": portSides.output,
               "elk.port.index": `${index}`,
             },
           })),
@@ -448,6 +493,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
+    direction: LayoutDirection,
   ): Promise<Map<string, LayoutPosition>> {
     const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const components = this.resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges);
@@ -456,15 +502,20 @@ export class ElkLayoutEngine implements LayoutEngine {
         workflow,
         layoutNodes,
         outputChannelsByNodeId,
+        direction,
         resolveForwardLayoutEdges(layoutNodes, layoutEdges),
       );
       const layoutedGraph = await this.elk.layout(graph);
       return this.extractLayoutedPositions(layoutedGraph);
     }
 
+    // Independent pipelines are stacked orthogonally to the main flow direction so
+    // each remains a single readable line: horizontal flows stack vertically, and
+    // vertical flows stack side-by-side.
+    const stackVertically = direction !== "DOWN";
     const sortedComponents = this.sortComponentsByCurrentPosition(components);
     const packedLayoutedPositions = new Map<string, LayoutPosition>();
-    let currentTopY = 0;
+    let currentOffset = 0;
 
     for (const componentNodes of sortedComponents) {
       const componentEdges = this.resolveLayoutEdges(workflow, componentNodes);
@@ -472,6 +523,7 @@ export class ElkLayoutEngine implements LayoutEngine {
         workflow,
         componentNodes,
         outputChannelsByNodeId,
+        direction,
         resolveForwardLayoutEdges(componentNodes, componentEdges),
       );
       const layoutedGraph = await this.elk.layout(graph);
@@ -483,12 +535,14 @@ export class ElkLayoutEngine implements LayoutEngine {
       const bounds = this.resolveLayoutBounds(componentNodes, componentPositions);
       for (const [nodeID, position] of componentPositions.entries()) {
         packedLayoutedPositions.set(nodeID, {
-          x: position.x - bounds.minX,
-          y: position.y - bounds.minY + currentTopY,
+          x: position.x - bounds.minX + (stackVertically ? 0 : currentOffset),
+          y: position.y - bounds.minY + (stackVertically ? currentOffset : 0),
         });
       }
 
-      currentTopY += bounds.height + DISCONNECTED_COMPONENT_VERTICAL_GAP;
+      currentOffset += stackVertically
+        ? bounds.height + DISCONNECTED_COMPONENT_VERTICAL_GAP
+        : bounds.width + DISCONNECTED_COMPONENT_HORIZONTAL_GAP;
     }
 
     return packedLayoutedPositions;

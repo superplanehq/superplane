@@ -1,6 +1,14 @@
 import { Position } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import { getBackwardRouteCenterY, getCanvasEdgePath, getUpwardBackwardGutterY, isBackwardEdge } from "./edgePath";
+import {
+  getBackwardRouteCenterX,
+  getBackwardRouteCenterY,
+  getCanvasEdgePath,
+  getLeftwardBackwardGutterX,
+  getUpwardBackwardGutterY,
+  isBackwardEdge,
+  isVerticalOrientation,
+} from "./edgePath";
 
 describe("isBackwardEdge", () => {
   it("detects right-to-left edges that target an earlier node", () => {
@@ -106,5 +114,101 @@ describe("getCanvasEdgePath", () => {
     expect(path).toContain("924,268");
     expect(path).toContain("388");
     expect(path).toContain("200 118");
+  });
+});
+
+describe("isVerticalOrientation", () => {
+  it("detects top/bottom oriented edges", () => {
+    expect(
+      isVerticalOrientation({
+        sourceX: 0,
+        sourceY: 0,
+        sourcePosition: Position.Bottom,
+        targetX: 0,
+        targetY: 400,
+        targetPosition: Position.Top,
+      }),
+    ).toBe(true);
+  });
+
+  it("treats left/right oriented edges as horizontal", () => {
+    expect(
+      isVerticalOrientation({
+        sourceX: 0,
+        sourceY: 0,
+        sourcePosition: Position.Right,
+        targetX: 400,
+        targetY: 0,
+        targetPosition: Position.Left,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("isBackwardEdge (vertical)", () => {
+  it("detects bottom-to-top edges targeting an earlier node", () => {
+    expect(
+      isBackwardEdge({
+        sourceX: 100,
+        sourceY: 500,
+        sourcePosition: Position.Bottom,
+        targetX: 50,
+        targetY: 100,
+        targetPosition: Position.Top,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not treat downward forward edges as backward", () => {
+    expect(
+      isBackwardEdge({
+        sourceX: 100,
+        sourceY: 100,
+        sourcePosition: Position.Bottom,
+        targetX: 100,
+        targetY: 500,
+        targetPosition: Position.Top,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("vertical backward routing helpers", () => {
+  it("places the gutter just to the right of the target column", () => {
+    // targetRight = (118 - 18) + CANVAS_NODE_WIDTH(420) = 520; sources overlap so add the min nudge (8).
+    expect(getLeftwardBackwardGutterX(268, 118)).toBe(528);
+  });
+
+  it("mirrors the backward route centering onto the x axis", () => {
+    expect(getBackwardRouteCenterX(200, 180)).toBe(getBackwardRouteCenterY(200, 180));
+    expect(getBackwardRouteCenterX(120, 420)).toBe(getBackwardRouteCenterY(120, 420));
+  });
+});
+
+describe("getCanvasEdgePath (vertical)", () => {
+  it("uses a bezier path for downward forward edges", () => {
+    const [path] = getCanvasEdgePath({
+      sourceX: 100,
+      sourceY: 100,
+      sourcePosition: Position.Bottom,
+      targetX: 100,
+      targetY: 500,
+      targetPosition: Position.Top,
+    });
+
+    expect(path).toContain("C");
+  });
+
+  it("uses a smooth step path for upward loop-back edges", () => {
+    const [path] = getCanvasEdgePath({
+      sourceX: 200,
+      sourceY: 500,
+      sourcePosition: Position.Bottom,
+      targetX: 190,
+      targetY: 100,
+      targetPosition: Position.Top,
+    });
+
+    expect(path).not.toContain("C");
   });
 });

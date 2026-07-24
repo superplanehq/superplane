@@ -103,7 +103,10 @@ import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
+import { useCanvasLayoutMode } from "./useCanvasLayoutMode";
+import { applyVerticalOverlay, computeVerticalLayoutPositions, getCanvasStructureSignature } from "./verticalLayout";
 import { applyCanvasViewportCulling, useCanvasViewportCulling } from "./useCanvasViewportCulling";
+import type { LayoutPosition } from "@/lib/layout";
 import type { TriggerActionModal } from "@/pages/app/mappers/types";
 
 export interface SidebarData {
@@ -2256,6 +2259,60 @@ function CanvasContent({
   const flowBgColor = resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9";
   const flowDotColor = resolvedTheme === "dark" ? "#374151" : "#cbd5e1";
   const isReadOnly = readOnly ?? false;
+
+  // Vertical auto-layout view: a render-only overlay that arranges nodes top-to-bottom
+  // using the shared ELK engine. It never mutates the saved freeform positions, so
+  // switching back to freeform restores the user's manual layout untouched. Available
+  // across live, run inspection, and edit modes since all render through CanvasContent.
+  const { layoutMode, toggleLayoutMode } = useCanvasLayoutMode();
+  const isVerticalLayout = layoutMode === "vertical";
+  const [verticalPositions, setVerticalPositions] = useState<Map<string, LayoutPosition>>(() => new Map());
+  const structureSignature = useMemo(
+    () => getCanvasStructureSignature(state.nodes, state.edges),
+    [state.nodes, state.edges],
+  );
+
+  useEffect(() => {
+    if (!isVerticalLayout) {
+      return;
+    }
+
+    let cancelled = false;
+    void computeVerticalLayoutPositions(state.nodes, state.edges).then((positions) => {
+      if (!cancelled) {
+        setVerticalPositions(positions);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // Recompute only when the layout mode or the graph structure changes; cosmetic
+    // node/edge data updates should not re-run the (relatively costly) ELK layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVerticalLayout, structureSignature]);
+
+  const orientedNodes = useMemo(
+    () => (isVerticalLayout ? applyVerticalOverlay(state.nodes, verticalPositions) : state.nodes),
+    [isVerticalLayout, state.nodes, verticalPositions],
+  );
+
+  // Re-fit the viewport when the user switches layout modes so the freshly arranged
+  // graph is framed. Skip the very first render to preserve existing fit behaviour.
+  const didMountLayoutModeRef = useRef(false);
+  useEffect(() => {
+    if (!didMountLayoutModeRef.current) {
+      didMountLayoutModeRef.current = true;
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      void fitView({ duration: 400 });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isVerticalLayout, fitView]);
+
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
   // while editing the viewport must stay put (the draft is the same graph the
@@ -2991,7 +3048,7 @@ function CanvasContent({
     const runDimActive = runParticipantSet !== null;
     const hasHighlightedNodes = edgeHoverActive || runDimActive;
     const visibleNodeIds = new Set<string>();
-    const enrichedNodes = state.nodes.map((node) => {
+    const enrichedNodes = orientedNodes.map((node) => {
       visibleNodeIds.add(node.id);
 
       const isHighlighted = isCanvasNodeHighlighted({
@@ -3067,7 +3124,7 @@ function CanvasContent({
 
     return enrichedNodes;
   }, [
-    state.nodes,
+    orientedNodes,
     hoveredEdge,
     connectingFrom,
     state.edges,
@@ -3266,7 +3323,7 @@ function CanvasContent({
             snapToGrid={isSnapToGridEnabled}
             snapGrid={[SNAP_GRID_STEP_PX, SNAP_GRID_STEP_PX]}
             panOnScrollSpeed={0.8}
-            nodesDraggable={!isReadOnly}
+            nodesDraggable={!isReadOnly && !isVerticalLayout}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
             onNodesChange={handleNodesChange}
@@ -3309,10 +3366,12 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
-                  onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
-                  isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
-                  onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  layoutMode={layoutMode}
+                  onLayoutModeToggle={toggleLayoutMode}
+                  isSnapToGridEnabled={isEditMode && !isVerticalLayout ? isSnapToGridEnabled : undefined}
+                  onSnapToGridToggle={isEditMode && !isVerticalLayout ? handleSnapToGridToggle : undefined}
+                  isAutoLayoutOnUpdateEnabled={isEditMode && !isVerticalLayout ? isAutoLayoutOnUpdateEnabled : undefined}
+                  onAutoLayoutOnUpdateToggle={isEditMode && !isVerticalLayout ? onToggleAutoLayoutOnUpdate : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip

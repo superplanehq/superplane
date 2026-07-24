@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { ElkLayoutEngine } from "@/lib/layout";
+import type { LayoutDirection } from "@/lib/layout";
 import { resolveForwardLayoutEdges } from "./layoutGraph";
 
 type ElkGraphForTest = {
+  layoutOptions?: Record<string, string>;
   children?: Array<{
     id: string;
-    ports?: Array<{ id: string }>;
+    ports?: Array<{ id: string; properties?: Record<string, string> }>;
   }>;
 };
 
@@ -15,6 +17,7 @@ type ElkLayoutEngineInternals = {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
+    direction: LayoutDirection,
   ): ElkGraphForTest;
 };
 
@@ -231,10 +234,112 @@ describe("ElkLayoutEngine", () => {
       workflow,
       workflow.spec!.nodes!,
       new Map([["source", ["passed", "failed"]]]),
+      "RIGHT",
     );
     const source = graph.children?.find((child) => child.id === "source");
 
     expect(source?.ports?.map((port) => port.id)).toEqual(["source__input", "source__passed", "source__failed"]);
+  });
+
+  it("uses top/bottom ports and DOWN direction for vertical layout", () => {
+    const workflow: CanvasesCanvas = {
+      metadata: { id: "canvas-vertical", name: "vertical-ports" },
+      spec: {
+        nodes: [
+          { id: "source", name: "Source", type: "TYPE_ACTION", component: "runner", position: { x: 0, y: 0 } },
+          { id: "target", name: "Target", type: "TYPE_ACTION", component: "noop", position: { x: 0, y: 600 } },
+        ],
+        edges: [{ sourceId: "source", targetId: "target", channel: "default" }],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    const graph = (autoLayout as unknown as ElkLayoutEngineInternals).buildElkGraph(
+      workflow,
+      workflow.spec!.nodes!,
+      new Map([["source", ["default"]]]),
+      "DOWN",
+    );
+
+    expect(graph.layoutOptions?.["elk.direction"]).toBe("DOWN");
+    const source = graph.children?.find((child) => child.id === "source");
+    const inputPort = source?.ports?.find((port) => port.id === "source__input");
+    const outputPort = source?.ports?.find((port) => port.id === "source__default");
+    expect(inputPort?.properties?.["elk.port.side"]).toBe("NORTH");
+    expect(outputPort?.properties?.["elk.port.side"]).toBe("SOUTH");
+  });
+
+  it("lays connected nodes top-to-bottom in DOWN direction", async () => {
+    const workflow: CanvasesCanvas = {
+      metadata: { id: "canvas-vertical-flow", name: "vertical-flow" },
+      spec: {
+        nodes: [
+          { id: "start", name: "Start", type: "TYPE_ACTION", component: "comp.start", position: { x: 0, y: 0 } },
+          { id: "middle", name: "Middle", type: "TYPE_ACTION", component: "comp.middle", position: { x: 0, y: 0 } },
+          { id: "end", name: "End", type: "TYPE_ACTION", component: "comp.end", position: { x: 0, y: 0 } },
+        ],
+        edges: [
+          { sourceId: "start", targetId: "middle", channel: "default" },
+          { sourceId: "middle", targetId: "end", channel: "default" },
+        ],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    const positions = await autoLayout.computeLayoutPositions(workflow, { direction: "DOWN" });
+
+    expect(positions.size).toBe(3);
+    expect(positions.get("start")!.y).toBeLessThan(positions.get("middle")!.y);
+    expect(positions.get("middle")!.y).toBeLessThan(positions.get("end")!.y);
+    // Nodes stay in a single vertical column.
+    expect(Math.abs(positions.get("start")!.x - positions.get("end")!.x)).toBeLessThanOrEqual(1);
+  });
+
+  it("stacks disconnected components side-by-side in DOWN direction", async () => {
+    const workflow: CanvasesCanvas = {
+      metadata: { id: "canvas-vertical-disconnected", name: "vertical-disconnected" },
+      spec: {
+        nodes: [
+          { id: "a1", name: "A1", type: "TYPE_ACTION", component: "comp.a1", position: { x: 0, y: 0 } },
+          { id: "a2", name: "A2", type: "TYPE_ACTION", component: "comp.a2", position: { x: 0, y: 300 } },
+          { id: "b1", name: "B1", type: "TYPE_ACTION", component: "comp.b1", position: { x: 500, y: 0 } },
+          { id: "b2", name: "B2", type: "TYPE_ACTION", component: "comp.b2", position: { x: 500, y: 300 } },
+        ],
+        edges: [
+          { sourceId: "a1", targetId: "a2", channel: "default" },
+          { sourceId: "b1", targetId: "b2", channel: "default" },
+        ],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    const positions = await autoLayout.computeLayoutPositions(workflow, {
+      direction: "DOWN",
+      scope: "full-canvas",
+    });
+
+    const componentAMaxX = Math.max(positions.get("a1")!.x + 420, positions.get("a2")!.x + 420);
+    const componentBMinX = Math.min(positions.get("b1")!.x, positions.get("b2")!.x);
+    expect(componentBMinX).toBeGreaterThan(componentAMaxX);
+  });
+
+  it("does not mutate the workflow when computing overlay positions", async () => {
+    const workflow: CanvasesCanvas = {
+      metadata: { id: "canvas-overlay", name: "overlay" },
+      spec: {
+        nodes: [
+          { id: "start", name: "Start", type: "TYPE_ACTION", component: "comp.start", position: { x: 10, y: 20 } },
+          { id: "end", name: "End", type: "TYPE_ACTION", component: "comp.end", position: { x: 30, y: 40 } },
+        ],
+        edges: [{ sourceId: "start", targetId: "end", channel: "default" }],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    await autoLayout.computeLayoutPositions(workflow, { direction: "DOWN" });
+
+    expect(workflow.spec?.nodes?.[0].position).toEqual({ x: 10, y: 20 });
+    expect(workflow.spec?.nodes?.[1].position).toEqual({ x: 30, y: 40 });
   });
 
   it("keeps layout edges when node positions are missing", () => {
