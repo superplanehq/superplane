@@ -24,11 +24,26 @@ func TestResolveSecrets(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, []byte("sk-test"), secrets[integrationSecretOpenAIAPIKey])
-		assert.NotContains(t, secrets, integrationSecretOpenAIAdminKey)
 		assert.NotContains(t, secrets, integrationSecretOpenAIBaseURL)
 	})
 
-	t.Run("api key, admin key, and base URL", func(t *testing.T) {
+	t.Run("api key and base URL", func(t *testing.T) {
+		t.Parallel()
+
+		secrets, err := (&OpenAI{}).ResolveSecrets(core.IntegrationSecretContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey":  "sk-test",
+					"baseURL": "https://example.com/v1",
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []byte("sk-test"), secrets[integrationSecretOpenAIAPIKey])
+		assert.Equal(t, []byte("https://example.com/v1"), secrets[integrationSecretOpenAIBaseURL])
+	})
+
+	t.Run("admin key is never exported", func(t *testing.T) {
 		t.Parallel()
 
 		secrets, err := (&OpenAI{}).ResolveSecrets(core.IntegrationSecretContext{
@@ -36,14 +51,15 @@ func TestResolveSecrets(t *testing.T) {
 				Configuration: map[string]any{
 					"apiKey":   "sk-test",
 					"adminKey": "sk-admin-test",
-					"baseURL":  "https://example.com/v1",
 				},
 			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, []byte("sk-test"), secrets[integrationSecretOpenAIAPIKey])
-		assert.Equal(t, []byte("sk-admin-test"), secrets[integrationSecretOpenAIAdminKey])
-		assert.Equal(t, []byte("https://example.com/v1"), secrets[integrationSecretOpenAIBaseURL])
+		for key, value := range secrets {
+			assert.NotEqual(t, "OPENAI_ADMIN_KEY", key)
+			assert.NotEqual(t, []byte("sk-admin-test"), value)
+		}
 	})
 
 	t.Run("missing api key", func(t *testing.T) {

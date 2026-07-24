@@ -9,14 +9,19 @@ import (
 
 // Env-style keys under which OpenAI credentials are exported to consumers
 // (runners, components, etc.).
+//
+// The organization admin key is intentionally never exported here. It is a
+// highly privileged credential that can read organization-wide usage and
+// costs, and it is only consumed internally by the Get Usage action (which
+// reads it directly from the integration config). Exposing it to runners and
+// components would broaden its blast radius unnecessarily.
 const (
-	integrationSecretOpenAIAPIKey   = "OPENAI_API_KEY"
-	integrationSecretOpenAIAdminKey = "OPENAI_ADMIN_KEY"
-	integrationSecretOpenAIBaseURL  = "OPENAI_BASE_URL"
+	integrationSecretOpenAIAPIKey  = "OPENAI_API_KEY"
+	integrationSecretOpenAIBaseURL = "OPENAI_BASE_URL"
 )
 
 // ResolveSecrets implements core.IntegrationSecretProvider, materializing the
-// OpenAI API key, plus the admin key and base URL when they are configured.
+// OpenAI API key, plus the base URL when it is configured.
 func (o *OpenAI) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
 	apiKeyBytes, err := ctx.Integration.GetConfig("apiKey")
 	if err != nil {
@@ -32,13 +37,7 @@ func (o *OpenAI) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][
 		integrationSecretOpenAIAPIKey: []byte(apiKey),
 	}
 
-	// adminKey and baseURL are optional; only export them when set.
-	if adminKeyBytes, err := ctx.Integration.GetConfig("adminKey"); err == nil {
-		if adminKey := strings.TrimSpace(string(adminKeyBytes)); adminKey != "" {
-			secrets[integrationSecretOpenAIAdminKey] = []byte(adminKey)
-		}
-	}
-
+	// baseURL is optional; only export it when set.
 	if baseURLBytes, err := ctx.Integration.GetConfig("baseURL"); err == nil {
 		if baseURL := strings.TrimSpace(string(baseURLBytes)); baseURL != "" {
 			secrets[integrationSecretOpenAIBaseURL] = []byte(baseURL)
