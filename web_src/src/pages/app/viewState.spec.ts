@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
+  allowsRunsSidebar,
   applyRunInspectionNavigationSearchParams,
   clearRunInspectionSearchParams,
   getExitEditModeDisabledTooltip,
   getWorkflowViewPresentation,
 } from "./viewState";
+
+describe("allowsRunsSidebar", () => {
+  it("allows the runs sidebar on the Canvas workflow tab", () => {
+    expect(allowsRunsSidebar(undefined)).toBe(true);
+    expect(allowsRunsSidebar("default")).toBe(true);
+    expect(allowsRunsSidebar("version-live")).toBe(true);
+  });
+
+  it("allows the runs sidebar on the Console tab", () => {
+    expect(allowsRunsSidebar("console")).toBe(true);
+  });
+
+  it("hides the runs sidebar on the Memory and Files surfaces", () => {
+    expect(allowsRunsSidebar("memory")).toBe(false);
+    expect(allowsRunsSidebar("files")).toBe(false);
+  });
+});
 
 describe("clearRunInspectionSearchParams", () => {
   it("removes run inspection params from the URL", () => {

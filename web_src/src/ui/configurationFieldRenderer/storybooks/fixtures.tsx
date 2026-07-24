@@ -39,6 +39,9 @@ export const STORY_INTEGRATION_REF: ComponentsIntegrationRef = {
   id: STORY_INTEGRATION_ID,
   name: "GitHub Production",
 };
+export const STORY_CONFIGURATION_INTEGRATION_REF = {
+  name: "GitHub Production",
+};
 
 export const STORY_INTEGRATIONS: OrganizationsIntegration[] = [
   {
@@ -692,6 +695,42 @@ export const rendererExamples: RendererExample[] = [
     },
   },
   {
+    id: "integration",
+    storyName: "IntegrationField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeIntegration",
+    docsDescription:
+      "Use `integration` when the configuration should reference a connected integration instance instead of raw id/name fields.",
+    field: baseField({
+      name: "connectedIntegration",
+      label: "Integration",
+      type: "integration",
+      description: "Select a connected integration instance from the organization.",
+      placeholder: "Select integration",
+    }),
+    initialValue: STORY_CONFIGURATION_INTEGRATION_REF,
+  },
+  {
+    id: "secret",
+    storyName: "SecretField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeSecret",
+    docsDescription:
+      "Use `secret` when the configuration should reference an organization secret by name, for example to import all of its keys.",
+    field: baseField({
+      name: "organizationSecret",
+      label: "Secret",
+      type: "secret",
+      description: "Select an organization secret by name.",
+      placeholder: "Select secret",
+    }),
+    initialValue: {
+      secret: "deploy-credentials",
+    },
+  },
+  {
     id: "url",
     storyName: "UrlField",
     category: "Compatibility",
@@ -910,6 +949,7 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
     integrationKeys.resources(STORY_ORGANIZATION_ID, STORY_INTEGRATION_ID, "repository"),
     mockIntegrationResources,
   );
+  queryClient.setQueryData(integrationKeys.connected(STORY_ORGANIZATION_ID), STORY_INTEGRATIONS);
   queryClient.setQueryData(secretKeys.byDomain(STORY_DOMAIN_ID, STORY_DOMAIN_TYPE), mockSecrets);
 
   Object.entries(mockSecretDetails).forEach(([secretRef, secret]) => {

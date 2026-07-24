@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -117,6 +117,10 @@ dev.setup.npm:
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
+
+dev.clean.go.cache:
+	@$(MAKE) dev.test.is.running
+	$(COMPOSE) exec app go clean -modcache -cache
 
 dev.setup.no.cache:
 	rm -rf tmp

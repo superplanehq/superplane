@@ -89,8 +89,8 @@ function DefaultView(props: CommandPalettePageProps) {
         {props.expandedSection === "apps" ? (
           <>
             <CommandItem value="back-from-apps" onSelect={props.onCollapse} className="cursor-pointer">
-              <ChevronLeft className="mr-2 size-4 shrink-0 text-slate-400" />
-              <span className="text-slate-500">Back</span>
+              <ChevronLeft className="mr-2 size-4 shrink-0 text-muted-foreground" />
+              <span className="text-muted-foreground">Back</span>
             </CommandItem>
             <ExpandedAppList {...props.canvasListProps} />
           </>
@@ -98,15 +98,15 @@ function DefaultView(props: CommandPalettePageProps) {
           <CommandItem value="search-apps" onSelect={props.onExpandApps} className="cursor-pointer">
             <Palette className="mr-2 size-4 shrink-0" />
             <span className="flex-1">Apps</span>
-            <ChevronRight className="ml-auto size-4 shrink-0 text-slate-400" />
+            <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
           </CommandItem>
         )}
 
         {props.expandedSection === "integrations" ? (
           <>
             <CommandItem value="back-from-integrations" onSelect={props.onCollapse} className="cursor-pointer">
-              <ChevronLeft className="mr-2 size-4 shrink-0 text-slate-400" />
-              <span className="text-slate-500">Back</span>
+              <ChevronLeft className="mr-2 size-4 shrink-0 text-muted-foreground" />
+              <span className="text-muted-foreground">Back</span>
             </CommandItem>
             <ExpandedIntegrationList
               integrations={props.integrations}
@@ -120,7 +120,7 @@ function DefaultView(props: CommandPalettePageProps) {
           <CommandItem value="connected-integrations" onSelect={props.onExpandIntegrations} className="cursor-pointer">
             <Plug className="mr-2 size-4 shrink-0" />
             <span className="flex-1">Integrations</span>
-            <ChevronRight className="ml-auto size-4 shrink-0 text-slate-400" />
+            <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
           </CommandItem>
         )}
 
@@ -197,8 +197,8 @@ function ExpandedIntegrationList({
         </CommandItem>
       ))}
       <CommandItem value="connect-new-integration" onSelect={onConnectNew} className="cursor-pointer">
-        <Plus className="mr-2 size-4 shrink-0 text-slate-400" />
-        <span className="text-slate-500">Connect new integration...</span>
+        <Plus className="mr-2 size-4 shrink-0 text-muted-foreground" />
+        <span className="text-muted-foreground">Connect new integration...</span>
       </CommandItem>
     </>
   );

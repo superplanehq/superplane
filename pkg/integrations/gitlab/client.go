@@ -231,6 +231,7 @@ type UpdateIssueRequest struct {
 	Description *string `json:"description,omitempty"`
 	StateEvent  *string `json:"state_event,omitempty"`
 	Labels      *string `json:"labels,omitempty"`
+	AddLabels   *string `json:"add_labels,omitempty"`
 	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
 	MilestoneID *int    `json:"milestone_id,omitempty"`
 	DueDate     *string `json:"due_date,omitempty"`
@@ -287,6 +288,14 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
@@ -590,6 +599,13 @@ type Note struct {
 	NoteableType string `json:"noteable_type,omitempty"`
 }
 
+// quickActionNoteResponse is what GitLab returns instead of a Note when a
+// note's body is only quick actions (e.g. "/ready") and has no visible
+// comment content: status 202 with a summary of the applied commands.
+type quickActionNoteResponse struct {
+	Summary []string `json:"summary"`
+}
+
 type CreateNoteRequest struct {
 	Body string `json:"body"`
 }
@@ -613,6 +629,14 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))

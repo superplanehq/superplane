@@ -171,7 +171,7 @@ const defaultConsoleYaml =
     ],
   });
 
-const defaultFixture = {
+export const defaultCanvasAppFixture = {
   ...capturedFixture,
   consoleYaml: defaultConsoleYaml,
   repositoryFileContents: {
@@ -179,6 +179,8 @@ const defaultFixture = {
     ...capturedFixture.repositoryFileContents,
   },
 } satisfies CanvasAppFixture;
+
+const defaultFixture = defaultCanvasAppFixture;
 
 export const canvasAppIds = {
   organizationId: defaultFixture.organizationId,

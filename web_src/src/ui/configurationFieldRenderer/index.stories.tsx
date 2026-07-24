@@ -221,4 +221,6 @@ export const AppCanvasNodeField = createExampleStory("app-canvas-node");
 export const AnyPredicateListField = createExampleStory("any-predicate-list");
 export const GitRefField = createExampleStory("git-ref");
 export const SecretKeyField = createExampleStory("secret-key");
+export const IntegrationField = createExampleStory("integration");
+export const SecretField = createExampleStory("secret");
 export const UrlField = createExampleStory("url");

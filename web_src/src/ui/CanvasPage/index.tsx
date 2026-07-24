@@ -66,8 +66,8 @@ import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
 import {
   allowsBuildingBlocksSidebar,
+  allowsRunsSidebar,
   blocksBuildingBlocksShortcut,
-  isCanvasWorkflowTab,
   isPanelHeaderMode,
   normalizeCanvasHeaderMode,
 } from "@/pages/app/viewState";
@@ -856,7 +856,7 @@ function CanvasPage(props: CanvasPageProps) {
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
-  const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
+  const showRunsSidebar = allowsRunsSidebar(props.headerMode) && props.toolSidebarRunsContent != null;
   const runningRunsCount = useMemo(
     () => props.runningRunsCount ?? (props.logRuns || []).filter((run) => run.state === "STATE_STARTED").length,
     [props.logRuns, props.runningRunsCount],

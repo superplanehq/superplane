@@ -1789,6 +1789,45 @@ func TestValidateConsoleContent_RejectsNodesPanelWithUnknownFormMode(t *testing.
 	assert.Contains(t, err.Error(), `content.nodes[0].formMode must be "modal" or "inline"`)
 }
 
+func TestValidateConsoleContent_AcceptsNodesPanelWithAllowConcurrentRuns(t *testing.T) {
+	for _, value := range []any{true, false} {
+		panels := []ConsolePanel{
+			{
+				ID:   "prompt",
+				Type: ConsolePanelTypeNodes,
+				Content: map[string]any{
+					"allowConcurrentRuns": value,
+					"nodes": []any{
+						map[string]any{"node": "start", "showRun": true},
+					},
+				},
+			},
+		}
+
+		err := ValidateConsoleContent(panels, nil)
+		require.NoError(t, err)
+	}
+}
+
+func TestValidateConsoleContent_RejectsNodesPanelWithNonBooleanAllowConcurrentRuns(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "prompt",
+			Type: ConsolePanelTypeNodes,
+			Content: map[string]any{
+				"allowConcurrentRuns": "yes",
+				"nodes": []any{
+					map[string]any{"node": "start", "showRun": true},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.allowConcurrentRuns must be a boolean")
+}
+
 func TestValidateConsoleContent_RejectsNodesPanelWithNonStringFormMode(t *testing.T) {
 	panels := []ConsolePanel{
 		{
