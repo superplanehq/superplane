@@ -184,6 +184,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	account, wasCreated, err := a.findOrCreateAccountForProvider(mockUser, a.allowSignupFromRequest(r))
 
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			redirectAccountBlocked(w, r)
+			return
+		}
+
 		if errors.Is(err, errSignupRequired) {
 			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
 			return
@@ -217,6 +222,11 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			redirectAccountBlocked(w, r)
+			return
+		}
+
 		if errors.Is(err, errSignupRequired) {
 			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
 			return
@@ -886,6 +896,10 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
+		if account.IsBlocked() {
+			return nil, false, models.ErrAccountBlocked
+		}
+
 		if account.Email != utils.NormalizeEmail(gothUser.Email) {
 			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
 			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
@@ -904,6 +918,9 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 	account, err = models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
+		if account.IsBlocked() {
+			return nil, false, models.ErrAccountBlocked
+		}
 		return account, false, nil
 	}
 

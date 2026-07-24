@@ -173,6 +173,56 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		assert.Equal(t, email, resultAccount.Email)
 	})
 
+	t.Run("should reject blocked provider account before updating its email", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+
+		originalEmail := "blocked-provider@example.com"
+		account, err := models.CreateAccount("Blocked Provider User", originalEmail)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Create(&models.AccountProvider{
+			AccountID:  account.ID,
+			Provider:   "github",
+			ProviderID: "blocked-provider-id",
+			Email:      originalEmail,
+			Name:       account.Name,
+		}).Error)
+		require.NoError(t, models.BlockAccount(account.ID.String()))
+
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+			UserID:   "blocked-provider-id",
+			Email:    "updated-blocked-provider@example.com",
+			Name:     account.Name,
+			Provider: "github",
+		}, false)
+
+		require.ErrorIs(t, err, models.ErrAccountBlocked)
+		assert.Nil(t, resultAccount)
+		assert.False(t, wasCreated)
+
+		account, err = models.FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, originalEmail, account.Email)
+	})
+
+	t.Run("should reject blocked account found by email", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+
+		account, err := models.CreateAccount("Blocked Email User", "blocked-email@example.com")
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(account.ID.String()))
+
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+			UserID:   "new-provider-id",
+			Email:    account.Email,
+			Name:     account.Name,
+			Provider: "google",
+		}, false)
+
+		require.ErrorIs(t, err, models.ErrAccountBlocked)
+		assert.Nil(t, resultAccount)
+		assert.False(t, wasCreated)
+	})
+
 	t.Run("should create new account when not found and signup allowed", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 
