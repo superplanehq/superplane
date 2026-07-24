@@ -11,12 +11,7 @@ export function coerceRunParameterValues(value: unknown): Record<string, unknown
 export function getSyncedRunParameterValues(
   parameterValues: Record<string, unknown>,
   parameterDefinitions: ConfigurationField[],
-  targetNodeResolved: boolean,
 ): Record<string, unknown> | null {
-  if (!targetNodeResolved) {
-    return null;
-  }
-
   if (parameterDefinitions.length === 0) {
     return Object.keys(parameterValues).length > 0 ? {} : null;
   }
