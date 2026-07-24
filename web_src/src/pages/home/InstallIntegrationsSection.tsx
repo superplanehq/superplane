@@ -58,6 +58,8 @@ export function IntegrationsSection({
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
+  // After "Connect new" / setup-tab flows, prefer this instance over an older selection.
+  const [preferredInstanceIds, setPreferredInstanceIds] = useState<Record<string, string>>({});
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
     [connected],
@@ -71,10 +73,30 @@ export function IntegrationsSection({
     [integrations, connected],
   );
 
+  const rememberPreferredInstance = (integrationName: string, integrationId: string) => {
+    setPreferredInstanceIds((prev) => ({ ...prev, [integrationName]: integrationId }));
+  };
+
   useEffect(() => {
-    const synced = syncSelectionsWithInstances(integrationData, selections);
+    const synced = syncSelectionsWithInstances(integrationData, selections, preferredInstanceIds);
     if (synced) onSelectionsChange(synced);
-  }, [integrationData, selections, onSelectionsChange]);
+  }, [integrationData, selections, preferredInstanceIds, onSelectionsChange]);
+
+  // GitHub setup opens in another tab; refresh when the user returns.
+  useEffect(() => {
+    const refresh = () => {
+      void refetch();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refetch]);
 
   const { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName } = useCreateDialogProps(
     dialogIntegrationName,
@@ -103,6 +125,12 @@ export function IntegrationsSection({
       setDialogIntegrationName,
       setConfigureIntegrationId,
     });
+
+  const openCapabilitySetupAndPrefer = (integrationName: string, integrationId?: string) => {
+    if (integrationId) rememberPreferredInstance(integrationName, integrationId);
+    openCapabilitySetup(integrationName, integrationId);
+    void refetch();
+  };
 
   return (
     <>
@@ -138,11 +166,12 @@ export function IntegrationsSection({
         pendingConnectKeyRef={pendingConnectKeyRef}
         selections={selections}
         onSelectionsChange={onSelectionsChange}
+        onPreferInstance={rememberPreferredInstance}
         onClose={() => {
           setDialogIntegrationName(null);
           setDialogMode("resume");
         }}
-        onCapabilitySetup={openCapabilitySetup}
+        onCapabilitySetup={openCapabilitySetupAndPrefer}
         onRefetch={() => void refetch()}
       />
     </>
@@ -164,6 +193,7 @@ function HomeIntegrationCreateDialog({
   pendingConnectKeyRef,
   selections,
   onSelectionsChange,
+  onPreferInstance,
   onClose,
   onCapabilitySetup,
   onRefetch,
@@ -185,6 +215,7 @@ function HomeIntegrationCreateDialog({
   pendingConnectKeyRef: MutableRefObject<string | null>;
   selections: IntegrationSelections;
   onSelectionsChange: (selections: IntegrationSelections) => void;
+  onPreferInstance: (integrationName: string, integrationId: string) => void;
   onClose: () => void;
   onCapabilitySetup: (integrationName: string, integrationId?: string) => void;
   onRefetch: () => void;
@@ -216,6 +247,7 @@ function HomeIntegrationCreateDialog({
         const key = pendingConnectKeyRef.current;
         pendingConnectKeyRef.current = null;
         if (key) {
+          onPreferInstance(key, integrationId);
           onSelectionsChange({
             ...selections,
             [key]: { id: integrationId, name: instanceName },
@@ -226,6 +258,7 @@ function HomeIntegrationCreateDialog({
       }}
       onCapabilitySetupRequired={(integrationName, integrationId) => {
         pendingConnectKeyRef.current = null;
+        onPreferInstance(integrationName, integrationId);
         onClose();
         onCapabilitySetup(integrationName, integrationId);
       }}

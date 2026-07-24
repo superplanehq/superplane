@@ -41,19 +41,42 @@ export function resolveHomeIntegrationStatus(data: IntegrationInstanceSummary): 
   return { kind: "none", label: "Not connected" };
 }
 
+function applyPreferredInstance(
+  data: IntegrationInstanceSummary,
+  next: IntegrationSelections,
+  preferredId: string,
+): boolean {
+  const preferred = data.allInstances.find((instance) => instance.metadata?.id === preferredId);
+  const id = preferred?.metadata?.id;
+  const name = preferred?.metadata?.name;
+  if (!id || !name) return false;
+  if (next[data.name]?.id === id) return false;
+  next[data.name] = { id, name };
+  return true;
+}
+
 /**
  * Clears selections pointing to non-ready instances and auto-selects
- * the first ready instance for unselected types. Returns updated
- * selections if anything changed, or null if no changes needed.
+ * the first ready instance for unselected types. When a preferred instance
+ * id is set (e.g. after Connect new), that instance is kept even while
+ * pending and wins once ready. Returns updated selections if anything
+ * changed, or null if no changes needed.
  */
 export function syncSelectionsWithInstances(
   integrationData: IntegrationInstanceSummary[],
   selections: IntegrationSelections,
+  preferredInstanceIds: Record<string, string> = {},
 ): IntegrationSelections | null {
   let changed = false;
   const next = { ...selections };
 
   for (const data of integrationData) {
+    const preferredId = preferredInstanceIds[data.name];
+    if (preferredId) {
+      if (applyPreferredInstance(data, next, preferredId)) changed = true;
+      continue;
+    }
+
     if (next[data.name]) {
       const selected = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
       if (selected && selected.status?.state !== "ready") {
