@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -39,14 +39,15 @@ describe("FreshOrgLanding", () => {
     await user.click(screen.getByRole("button", { name: /setup factory/i }));
 
     const panel = await screen.findByRole("region", { name: /software factory setup/i });
-    expect(within(panel).getByRole("heading", { name: "Connect your GitHub and Claude" })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: "Connect your GitHub" })).toBeInTheDocument();
     expect(
-      within(panel).getByText(/automate coding work with agents, from trigger to pull request/i),
+      within(panel).getByText(/automate coding work with agents, from issue to pull request/i),
     ).toBeInTheDocument();
     expect(within(panel).getByText("GitHub")).toBeInTheDocument();
-    expect(within(panel).getByText("Claude")).toBeInTheDocument();
+    expect(within(panel).queryByText("Claude")).not.toBeInTheDocument();
     expect(within(panel).queryByText("Choose repository")).not.toBeInTheDocument();
-    expect(within(panel).queryByText(/anthropic api key/i)).not.toBeInTheDocument();
+    expect(within(panel).getByText("Anthropic API key secret")).toBeInTheDocument();
+    expect(within(panel).getByText("GitHub token secret")).toBeInTheDocument();
     expect(within(panel).getByText("Choose starting task")).toBeInTheDocument();
     const taskButtons = within(panel).getAllByRole("button", { name: /^(improve agents\.md|write test|fix bug)$/i });
     expect(taskButtons.map((button) => button.textContent)).toEqual(["Improve AGENTS.md", "Write test", "Fix bug"]);
@@ -85,7 +86,7 @@ describe("FreshOrgLanding", () => {
     expect(panel).toBeInTheDocument();
   });
 
-  it("opens the legacy Claude connect dialog from factory setup", async () => {
+  it("shows secret pickers without a Claude integration row", async () => {
     const user = userEvent.setup();
     render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" />);
 
@@ -93,12 +94,8 @@ describe("FreshOrgLanding", () => {
     await user.click(screen.getByRole("button", { name: /setup factory/i }));
 
     const panel = await screen.findByRole("region", { name: /software factory setup/i });
-    const claudeRow = within(panel).getByText("Claude").closest("div");
-    expect(claudeRow).toBeTruthy();
-    await user.click(within(claudeRow!).getByRole("button", { name: /^Connect$/i }));
-    const claudeDialog = await screen.findByRole("dialog");
-    expect(within(claudeDialog).getByText("API Key")).toBeInTheDocument();
-    await user.click(within(claudeDialog).getByRole("button", { name: /^Cancel$/i }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(panel).getByText("Anthropic API key secret")).toBeInTheDocument();
+    expect(within(panel).getByText("GitHub token secret")).toBeInTheDocument();
+    expect(within(panel).queryByText("Claude")).not.toBeInTheDocument();
   });
 });

@@ -1,11 +1,21 @@
 {
   "id": "software-factory",
   "title": "Software Factory",
-  "description": "Automate coding work with agents, from trigger to pull request.",
-  "integrations": ["github", "claude"],
+  "description": "Automate coding work with agents, from issue to pull request.",
+  "integrations": ["github"],
   "componentIntegrations": {
-    "claude.runCodeAgent": "claude",
-    "github.createIssue": "github"
+    "github.addIssueLabel": "github",
+    "github.createIssue": "github",
+    "github.createIssueComment": "github",
+    "github.createPullRequest": "github",
+    "github.getIssue": "github",
+    "github.markPullRequestReadyForReview": "github",
+    "github.onIssue": "github",
+    "github.onIssueComment": "github",
+    "github.onPRComment": "github",
+    "github.onPRReviewComment": "github",
+    "github.onPullRequest": "github",
+    "github.updateIssue": "github"
   },
   "startingTasks": [
     {
@@ -25,11 +35,11 @@
     }
   ],
   "run": {
-    "nodeId": "manual-run",
+    "nodeId": "create-task-start",
     "hookName": "run",
-    "template": "Run task",
+    "template": "Create Task",
     "parameters": {
-      "prompt": { "from": "startingTaskPrompt" }
+      "description": { "from": "startingTaskPrompt" }
     }
   },
   "source": { "type": "bundled" }

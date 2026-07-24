@@ -90,10 +90,11 @@ async function materializeAndCommitFactoryTemplate(args: {
   const canvasYaml = materializeFactoryCanvas({
     definition: args.definition,
     canvasName: args.canvasName,
+    canvasId: args.canvasId,
     installParams: args.installParams,
     integrations: args.integrations,
   });
-  const consoleYaml = materializeFactoryConsole(args.definition, args.canvasName);
+  const consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
 }
 

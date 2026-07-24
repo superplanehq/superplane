@@ -9,6 +9,24 @@
       "required": true,
       "label": "Choose repository",
       "placeholder": "owner/repo"
+    },
+    {
+      "name": "anthropic_api_key",
+      "type": "secret_picker",
+      "required": true,
+      "label": "Anthropic API key secret",
+      "placeholder": "Select or create a secret",
+      "secretKey": "api_key",
+      "description": "SuperPlane secret with key api_key. Used by Claude Code runners as ANTHROPIC_API_KEY."
+    },
+    {
+      "name": "github_token",
+      "type": "secret_picker",
+      "required": true,
+      "label": "GitHub token secret",
+      "placeholder": "Select or create a secret",
+      "secretKey": "token",
+      "description": "SuperPlane secret with key token. Injected into runners as GITHUB_TOKEN for clone/push/gh."
     }
   ]
 }
