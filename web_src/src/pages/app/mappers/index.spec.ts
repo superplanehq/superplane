@@ -158,4 +158,36 @@ describe("getExecutionDetails", () => {
     expect(props.customField).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
+
+  it("resolves runnerOpenCode mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerOpenCode");
+    const props = mapper.props({
+      node: {
+        id: "node-opencode-1",
+        name: "Run OpenCode",
+        componentName: "runnerOpenCode",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          model: "openai/gpt-4.1",
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerOpenCode",
+        label: "Run OpenCode",
+        description: "Runs OpenCode on a fleet runner",
+        icon: "code",
+        color: "#0B7285",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerOpenCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
 });
