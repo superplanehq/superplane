@@ -17,13 +17,10 @@ import (
 
 const testRunnerMachineType = runner.MachineTypeE1LargeAMD64
 
-func credentials(provider, secret, key string) map[string]any {
+func secretConfig(secret, key string) map[string]any {
 	return map[string]any{
-		"provider": provider,
-		"secret": map[string]any{
-			"secret": secret,
-			"key":    key,
-		},
+		"secret": secret,
+		"key":    key,
 	}
 }
 
@@ -54,15 +51,14 @@ func TestRunOpenCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
-			"model":       "openai/gpt-4.1",
+			"provider":    "openai",
+			"secret":      secretConfig("openai", "api_key"),
+			"model":       "gpt-4.1",
 			"steps": []map[string]any{
 				{"name": "Clone", "type": "bash", "command": "git clone https://github.com/acme/widgets.git /tmp/repo"},
 				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
 				{"name": "Open PR", "type": "prompt", "prompt": "Open a pull request"},
 				{"name": "Status", "type": "bash", "command": "git -C /tmp/repo status"},
-			},
-			"credentials": []map[string]any{
-				credentials("openai", "openai", "api_key"),
 			},
 			"workingDirectory": "/tmp",
 		},
@@ -120,7 +116,7 @@ func TestRunOpenCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, "git -C /tmp/repo status", requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
 }
 
-func TestRunOpenCodeExecuteInjectsMultipleProviderKeys(t *testing.T) {
+func TestRunOpenCodeExecuteInjectsProviderKey(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
@@ -134,20 +130,17 @@ func TestRunOpenCodeExecuteInjectsMultipleProviderKeys(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
-			"model":       "anthropic/claude-sonnet-4-5",
+			"provider":    "anthropic",
+			"secret":      secretConfig("anthropic", "api_key"),
+			"model":       "claude-sonnet-4-5",
 			"steps": []map[string]any{
 				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": []map[string]any{
-				credentials("anthropic", "anthropic", "api_key"),
-				credentials("openai", "openai", "api_key"),
 			},
 		},
 		HTTP: httpContext,
 		Secrets: &contexts.SecretsContext{
 			Values: map[string][]byte{
 				"anthropic/api_key": []byte("sk-ant"),
-				"openai/api_key":    []byte("sk-openai"),
 			},
 		},
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -162,13 +155,16 @@ func TestRunOpenCodeExecuteInjectsMultipleProviderKeys(t *testing.T) {
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	require.Len(t, req.Environment, 2)
-	byName := map[string]string{}
-	for _, e := range req.Environment {
-		byName[e.Name] = e.Value
-	}
-	assert.Equal(t, "sk-ant", byName["ANTHROPIC_API_KEY"])
-	assert.Equal(t, "sk-openai", byName["OPENAI_API_KEY"])
+	require.Len(t, req.Environment, 1)
+	assert.Equal(t, "ANTHROPIC_API_KEY", req.Environment[0].Name)
+	assert.Equal(t, "sk-ant", req.Environment[0].Value)
+
+	// The bare model name is composed with the provider into provider/model.
+	require.Len(t, req.Commands, 2)
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Hello",
+		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-hello.txt" 'anthropic/claude-sonnet-4-5'`,
+	}, req.Commands[1])
 }
 
 func TestRunOpenCodeExecuteRequiresProviderSecret(t *testing.T) {
@@ -179,12 +175,11 @@ func TestRunOpenCodeExecuteRequiresProviderSecret(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
-			"model":       "openai/gpt-4.1",
+			"provider":    "openai",
+			"secret":      secretConfig("openai", "api_key"),
+			"model":       "gpt-4.1",
 			"steps": []map[string]any{
 				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": []map[string]any{
-				credentials("openai", "openai", "api_key"),
 			},
 		},
 		HTTP:           &contexts.HTTPContext{},
@@ -204,11 +199,10 @@ func TestRunOpenCodeExecuteRequiresModel(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
+			"provider":    "openai",
+			"secret":      secretConfig("openai", "api_key"),
 			"steps": []map[string]any{
 				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": []map[string]any{
-				credentials("openai", "openai", "api_key"),
 			},
 		},
 		HTTP:           &contexts.HTTPContext{},

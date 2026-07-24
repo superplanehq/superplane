@@ -1318,7 +1318,7 @@ function main() {
 
 Runs [OpenCode](https://opencode.ai/docs/cli/) in non-interactive mode on a fleet runner.
 
-OpenCode is provider-agnostic: point it at any supported `provider/model` (OpenAI, Anthropic, Google, OpenRouter, Groq, and more) and supply the matching provider API key.
+OpenCode is provider-agnostic: pick a provider (OpenAI, Anthropic, Google, OpenRouter, Groq, and more), supply the matching provider API key, and name the model to run.
 
 ### Prerequisites
 - The `opencode` CLI is installed on the runner machine and available on `PATH` (see the [OpenCode install docs](https://opencode.ai/docs/)).
@@ -1340,8 +1340,9 @@ Example:
 
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Model**: Required `provider/model` (for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4-5`).
-- **Provider API keys**: One or more curated providers, each mapped to a SuperPlane secret. OpenCode reads each key from its well-known environment variable.
+- **Provider**: The curated model provider OpenCode talks to (for example Anthropic or OpenAI).
+- **API key**: SuperPlane secret used as the provider API key. OpenCode reads it from the provider's well-known environment variable.
+- **Model**: The model name on the selected provider (for example `claude-sonnet-4-5` or `gpt-4.1`).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).

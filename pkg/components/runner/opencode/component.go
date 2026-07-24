@@ -58,7 +58,7 @@ func (c *RunOpenCode) Description() string {
 func (c *RunOpenCode) Documentation() string {
 	return `Runs [OpenCode](https://opencode.ai/docs/cli/) in non-interactive mode on a fleet runner.
 
-OpenCode is provider-agnostic: point it at any supported ` + "`provider/model`" + ` (OpenAI, Anthropic, Google, OpenRouter, Groq, and more) and supply the matching provider API key.
+OpenCode is provider-agnostic: pick a provider (OpenAI, Anthropic, Google, OpenRouter, Groq, and more), supply the matching provider API key, and name the model to run.
 
 ## Prerequisites
 - The ` + "`opencode`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + ` (see the [OpenCode install docs](https://opencode.ai/docs/)).
@@ -80,8 +80,9 @@ Example:
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Model**: Required ` + "`provider/model`" + ` (for example ` + "`openai/gpt-4.1`" + ` or ` + "`anthropic/claude-sonnet-4-5`" + `).
-- **Provider API keys**: One or more curated providers, each mapped to a SuperPlane secret. OpenCode reads each key from its well-known environment variable.
+- **Provider**: The curated model provider OpenCode talks to (for example Anthropic or OpenAI).
+- **API key**: SuperPlane secret used as the provider API key. OpenCode reads it from the provider's well-known environment variable.
+- **Model**: The model name on the selected provider (for example ` + "`claude-sonnet-4-5`" + ` or ` + "`gpt-4.1`" + `).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
@@ -109,47 +110,31 @@ func (c *RunOpenCode) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "provider",
+			Label:       "Provider",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Description: "Model provider OpenCode talks to. Sets the matching provider API key environment variable.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: providerFieldOptions(),
+				},
+			},
+		},
+		{
+			Name:        "secret",
+			Label:       "API key",
+			Type:        configuration.FieldTypeSecretKey,
+			Required:    true,
+			Description: "Stored credential key used as the provider API key.",
+		},
+		{
 			Name:        "model",
 			Label:       "Model",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "OpenCode model in provider/model form (for example openai/gpt-4.1 or anthropic/claude-sonnet-4-5).",
-			Placeholder: "provider/model",
-		},
-		{
-			Name:        "credentials",
-			Label:       "Provider API keys",
-			Type:        configuration.FieldTypeList,
-			Required:    true,
-			Description: "Provider API keys OpenCode reads from the environment. Each entry maps a provider to a stored secret.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Provider API key",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:     "provider",
-								Label:    "Provider",
-								Type:     configuration.FieldTypeSelect,
-								Required: true,
-								TypeOptions: &configuration.TypeOptions{
-									Select: &configuration.SelectTypeOptions{
-										Options: providerFieldOptions(),
-									},
-								},
-							},
-							{
-								Name:        "secret",
-								Label:       "API key",
-								Type:        configuration.FieldTypeSecretKey,
-								Required:    true,
-								Description: "Stored credential key used as the provider API key.",
-							},
-						},
-					},
-				},
-			},
+			Description: "Model name on the selected provider (for example claude-sonnet-4-5 or gpt-4.1).",
+			Placeholder: "e.g. claude-sonnet-4-5",
 		},
 		{
 			Name:        "steps",
@@ -238,7 +223,7 @@ func (c *RunOpenCode) Configuration() []configuration.Field {
 			Label:       "Environment variables",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Optional key/value pairs passed into the OpenCode environment (in addition to provider API keys)",
+			Description: "Optional key/value pairs passed into the OpenCode environment (in addition to the provider API key)",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Variable",
@@ -343,7 +328,7 @@ func (c *RunOpenCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err = c.injectCredentials(ctx, environment, spec.Credentials)
+	environment, err = c.injectCredential(ctx, environment, spec.Provider, spec.Secret)
 	if err != nil {
 		return err
 	}
@@ -378,24 +363,21 @@ func (c *RunOpenCode) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func (c *RunOpenCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials []OpenCodeCredential) ([]runner.BrokerEnvironmentVariable, error) {
-	for _, credential := range credentials {
-		provider, ok := providerByValue(strings.TrimSpace(credential.Provider))
-		if !ok {
-			return nil, fmt.Errorf("unsupported provider: %s", credential.Provider)
-		}
-
-		apiKey, err := ctx.Secrets.GetKey(credential.Secret.Secret, credential.Secret.Key)
-		if err != nil {
-			return nil, fmt.Errorf("resolve %s API key: %w", provider.Value, err)
-		}
-
-		environment = append(environment, runner.BrokerEnvironmentVariable{
-			Name:  provider.EnvVar,
-			Value: string(apiKey),
-		})
+func (c *RunOpenCode) injectCredential(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, providerValue string, secret configuration.SecretKeyRef) ([]runner.BrokerEnvironmentVariable, error) {
+	provider, ok := providerByValue(strings.TrimSpace(providerValue))
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider: %s", providerValue)
 	}
-	return environment, nil
+
+	apiKey, err := ctx.Secrets.GetKey(secret.Secret, secret.Key)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s API key: %w", provider.Value, err)
+	}
+
+	return append(environment, runner.BrokerEnvironmentVariable{
+		Name:  provider.EnvVar,
+		Value: string(apiKey),
+	}), nil
 }
 
 func (c *RunOpenCode) Hooks() []core.Hook {

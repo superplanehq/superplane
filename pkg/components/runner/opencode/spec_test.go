@@ -21,12 +21,11 @@ func TestDecodeRunOpenCodeSpecAppliesDefaults(t *testing.T) {
 
 	spec, err := decodeRunOpenCodeSpec(map[string]any{
 		"machineType": testRunnerMachineType,
-		"model":       "openai/gpt-4.1",
+		"provider":    "openai",
+		"secret":      map[string]any{"secret": "openai", "key": "api_key"},
+		"model":       "gpt-4.1",
 		"steps": []map[string]any{
 			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
-		},
-		"credentials": []map[string]any{
-			{"provider": "openai", "secret": map[string]any{"secret": "openai", "key": "api_key"}},
 		},
 	})
 	require.NoError(t, err)
@@ -34,8 +33,9 @@ func TestDecodeRunOpenCodeSpecAppliesDefaults(t *testing.T) {
 	require.Len(t, spec.Steps, 1)
 	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
 	assert.Equal(t, openCodeStepPrompt, spec.Steps[0].Type)
-	require.Len(t, spec.Credentials, 1)
-	assert.Equal(t, "openai", spec.Credentials[0].Provider)
+	assert.Equal(t, "openai", spec.Provider)
+	assert.Equal(t, "gpt-4.1", spec.Model)
+	assert.Equal(t, "openai/gpt-4.1", spec.modelRef())
 }
 
 func TestValidateRunOpenCodeSpec(t *testing.T) {
@@ -43,12 +43,11 @@ func TestValidateRunOpenCodeSpec(t *testing.T) {
 
 	valid := RunOpenCodeSpec{
 		MachineType: testRunnerMachineType,
-		Model:       "anthropic/claude-sonnet-4-5",
+		Provider:    "anthropic",
+		Secret:      secretRef("anthropic", "api_key"),
+		Model:       "claude-sonnet-4-5",
 		Steps: []OpenCodeStep{
 			{Name: "Do the thing", Type: openCodeStepPrompt, Prompt: strPtr("do the thing")},
-		},
-		Credentials: []OpenCodeCredential{
-			{Provider: "anthropic", Secret: secretRef("anthropic", "api_key")},
 		},
 	}
 	require.NoError(t, validateRunOpenCodeSpec(valid))
@@ -59,36 +58,27 @@ func TestValidateRunOpenCodeSpec(t *testing.T) {
 		require.Error(t, validateRunOpenCodeSpec(spec))
 	})
 
-	t.Run("requires provider/model form", func(t *testing.T) {
+	t.Run("accepts a bare model name", func(t *testing.T) {
 		spec := valid
 		spec.Model = "gpt-4.1"
-		require.Error(t, validateRunOpenCodeSpec(spec))
+		require.NoError(t, validateRunOpenCodeSpec(spec))
 	})
 
-	t.Run("requires at least one credential", func(t *testing.T) {
+	t.Run("requires provider", func(t *testing.T) {
 		spec := valid
-		spec.Credentials = nil
+		spec.Provider = ""
 		require.Error(t, validateRunOpenCodeSpec(spec))
 	})
 
 	t.Run("rejects unknown provider", func(t *testing.T) {
 		spec := valid
-		spec.Credentials = []OpenCodeCredential{{Provider: "acme", Secret: secretRef("acme", "key")}}
+		spec.Provider = "acme"
 		require.Error(t, validateRunOpenCodeSpec(spec))
 	})
 
-	t.Run("rejects duplicate provider", func(t *testing.T) {
+	t.Run("requires API key", func(t *testing.T) {
 		spec := valid
-		spec.Credentials = []OpenCodeCredential{
-			{Provider: "anthropic", Secret: secretRef("anthropic", "a")},
-			{Provider: "anthropic", Secret: secretRef("anthropic", "b")},
-		}
-		require.Error(t, validateRunOpenCodeSpec(spec))
-	})
-
-	t.Run("requires credential secret", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = []OpenCodeCredential{{Provider: "anthropic"}}
+		spec.Secret = configuration.SecretKeyRef{}
 		require.Error(t, validateRunOpenCodeSpec(spec))
 	})
 
@@ -124,7 +114,8 @@ func TestBuildOpenCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	t.Parallel()
 
 	spec := RunOpenCodeSpec{
-		Model:            "openai/gpt-4.1",
+		Provider:         "openai",
+		Model:            "gpt-4.1",
 		WorkingDirectory: "/tmp/workspace",
 		Steps: []OpenCodeStep{
 			{Name: "Clone repo", Type: openCodeStepBash, Command: strPtr("git clone https://github.com/acme/widgets.git repo")},

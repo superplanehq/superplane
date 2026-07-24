@@ -47,14 +47,6 @@ func providerByValue(value string) (providerCredential, bool) {
 	return providerCredential{}, false
 }
 
-func providerEnvVars() map[string]struct{} {
-	envVars := make(map[string]struct{}, len(openCodeProviders))
-	for _, provider := range openCodeProviders {
-		envVars[provider.EnvVar] = struct{}{}
-	}
-	return envVars
-}
-
 func providerFieldOptions() []configuration.FieldOption {
 	options := make([]configuration.FieldOption, 0, len(openCodeProviders))
 	for _, provider := range openCodeProviders {
@@ -75,22 +67,27 @@ type OpenCodeStep struct {
 	Command *string `mapstructure:"command,omitempty"`
 }
 
-// OpenCodeCredential maps a curated provider to a secret key ref.
-type OpenCodeCredential struct {
-	Provider string                     `mapstructure:"provider"`
-	Secret   configuration.SecretKeyRef `mapstructure:"secret"`
-}
-
 // RunOpenCodeSpec is persisted runnerOpenCode node configuration.
 type RunOpenCodeSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
+	Provider                string                        `mapstructure:"provider"`
+	Secret                  configuration.SecretKeyRef    `mapstructure:"secret"`
 	Model                   string                        `mapstructure:"model"`
 	Steps                   []OpenCodeStep                `mapstructure:"steps"`
-	Credentials             []OpenCodeCredential          `mapstructure:"credentials"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
+}
+
+// modelRef builds the OpenCode `provider/model` identifier from the configured
+// provider and bare model name (for example anthropic + claude-sonnet-4-5).
+func (s RunOpenCodeSpec) modelRef() string {
+	return openCodeModelRef(s.Provider, s.Model)
+}
+
+func openCodeModelRef(provider, model string) string {
+	return strings.TrimSpace(provider) + "/" + strings.TrimSpace(model)
 }
 
 // OpenCodeBrokerTask is the ordered broker commands and task files for a run.
@@ -133,13 +130,17 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 	if strings.TrimSpace(spec.MachineType) == "" {
 		return fmt.Errorf("machine type is required")
 	}
+	provider, err := validateOpenCodeProvider(spec.Provider)
+	if err != nil {
+		return err
+	}
+	if !spec.Secret.IsSet() {
+		return fmt.Errorf("API key is required")
+	}
 	if err := validateOpenCodeModel(spec.Model); err != nil {
 		return err
 	}
 	if err := validateOpenCodeSteps(spec.Steps); err != nil {
-		return err
-	}
-	if err := validateOpenCodeCredentials(spec.Credentials); err != nil {
 		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
@@ -148,10 +149,9 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
-	reserved := providerEnvVars()
 	for i, variable := range spec.Environment {
-		if _, ok := reserved[strings.TrimSpace(variable.Name)]; ok {
-			return fmt.Errorf("environment[%d].name cannot be %s; use the Provider API keys field", i, strings.TrimSpace(variable.Name))
+		if strings.TrimSpace(variable.Name) == provider.EnvVar {
+			return fmt.Errorf("environment[%d].name cannot be %s; use the API key field", i, provider.EnvVar)
 		}
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
@@ -162,38 +162,21 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 	return nil
 }
 
-func validateOpenCodeModel(model string) error {
-	trimmed := strings.TrimSpace(model)
+func validateOpenCodeProvider(value string) (providerCredential, error) {
+	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return fmt.Errorf("model is required (use the provider/model form, for example anthropic/claude-sonnet-4-5)")
+		return providerCredential{}, fmt.Errorf("provider is required")
 	}
-	parts := strings.SplitN(trimmed, "/", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return fmt.Errorf("model must use the provider/model form, for example openai/gpt-4.1")
+	provider, ok := providerByValue(trimmed)
+	if !ok {
+		return providerCredential{}, fmt.Errorf("provider is not supported: %s", trimmed)
 	}
-	return nil
+	return provider, nil
 }
 
-func validateOpenCodeCredentials(credentials []OpenCodeCredential) error {
-	if len(credentials) == 0 {
-		return fmt.Errorf("at least one provider API key is required")
-	}
-	seen := make(map[string]struct{}, len(credentials))
-	for i, credential := range credentials {
-		provider := strings.TrimSpace(credential.Provider)
-		if provider == "" {
-			return fmt.Errorf("credentials[%d].provider is required", i)
-		}
-		if _, ok := providerByValue(provider); !ok {
-			return fmt.Errorf("credentials[%d].provider is not a supported provider: %s", i, provider)
-		}
-		if _, ok := seen[provider]; ok {
-			return fmt.Errorf("duplicate provider API key: %s", provider)
-		}
-		seen[provider] = struct{}{}
-		if !credential.Secret.IsSet() {
-			return fmt.Errorf("credentials[%d].secret is required", i)
-		}
+func validateOpenCodeModel(model string) error {
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("model is required (the model name on the selected provider, for example claude-sonnet-4-5)")
 	}
 	return nil
 }
@@ -230,7 +213,7 @@ func validateOpenCodeSteps(steps []OpenCodeStep) error {
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
 // Bash steps are sourced into the runner's shared shell so cwd persists across steps.
 func buildOpenCodeBrokerTask(spec RunOpenCodeSpec) OpenCodeBrokerTask {
-	model := strings.TrimSpace(spec.Model)
+	model := spec.modelRef()
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
 	files := []runner.BrokerTaskFile{
