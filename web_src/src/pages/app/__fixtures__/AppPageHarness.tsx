@@ -1,3 +1,4 @@
+import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 
 import { defaultCanvasAppFixture, type CanvasAppFixture } from "./handlers";
@@ -15,6 +16,8 @@ interface AppPageHarnessProps {
    * this false so the Agent toggle is available but the panel starts closed.
    */
   openAgentSidebar?: boolean;
+  /** Agent improvement suggestions for the header Agent control (Live Canvas prototype). */
+  agentSuggestions?: AgentSuggestion[];
 }
 
 /**
@@ -26,8 +29,18 @@ export function AppPageHarness({
   query = "",
   fixture = defaultCanvasAppFixture,
   openAgentSidebar = false,
+  agentSuggestions,
 }: AppPageHarnessProps) {
   return (
-    <OrgWorkspaceHarness startAt="app" appFixture={fixture} appQuery={query} openAgentSidebar={openAgentSidebar} />
+    <OrgWorkspaceHarness
+      startAt="app"
+      appFixture={fixture}
+      appQuery={query}
+      openAgentSidebar={openAgentSidebar}
+      agentSuggestions={agentSuggestions}
+      onSelectAgentSuggestion={
+        agentSuggestions ? (suggestion) => console.log("Select agent suggestion:", suggestion) : undefined
+      }
+    />
   );
 }

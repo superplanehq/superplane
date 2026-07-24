@@ -1,3 +1,4 @@
+import { buildStorybookAgentChat, createStorybookAgentMessageStore } from "@/pages/app/__fixtures__/agentChatResponses";
 import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   fixtureResponse,
@@ -42,11 +43,29 @@ export function createOrgWorkspaceFixtureFetch(
   const homeFixture = options?.homeFixture ?? defaultHomePageFixture;
   const appFixture = options?.appFixture;
   const orgIntegrations: StorybookOrgIntegration[] = [];
+  const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = requestMethod(input, init);
-    const body = parseRequestBody(init);
+    const body = await readRequestJson(input, init);
+
+    // Stateful agent transcript for suggestion/composer sends in AppPage stories.
+    if (/^\/api\/v1\/agents\/chats\/[^/]+\/messages$/.test(url.pathname)) {
+      if (method === "POST") {
+        return fixtureResponse({ json: agentMessages.send(body) });
+      }
+      if (method === "GET") {
+        return fixtureResponse({ json: agentMessages.list() });
+      }
+    }
+    if (/^\/api\/v1\/agents\/canvases\/[^/]+\/chat\/reset$/.test(url.pathname) && method === "POST") {
+      agentMessages.reset();
+      return fixtureResponse({
+        json: appFixture?.agentChat ?? buildStorybookAgentChat(appFixture?.canvasId ?? ""),
+      });
+    }
+
     const resolved = await resolveOrgWorkspaceFixture({
       url,
       method,
@@ -65,13 +84,18 @@ export function createOrgWorkspaceFixtureFetch(
   return impl as typeof fetch;
 }
 
-function parseRequestBody(init?: RequestInit): unknown {
-  if (!init?.body || typeof init.body !== "string") return undefined;
+async function readRequestJson(input: RequestInfo | URL, init?: RequestInit): Promise<unknown> {
   try {
-    return JSON.parse(init.body);
+    if (typeof init?.body === "string" && init.body.trim()) {
+      return JSON.parse(init.body);
+    }
+    if (typeof input !== "string" && !(input instanceof URL)) {
+      return await input.clone().json();
+    }
   } catch {
     return undefined;
   }
+  return undefined;
 }
 
 async function resolveOrgWorkspaceFixture(args: {

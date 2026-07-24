@@ -64,7 +64,7 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import type { AgentSuggestion, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
@@ -223,7 +223,13 @@ function useAutoLayoutOnUpdatePreference() {
   return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
 }
 
-export function AppPage() {
+export type AppPageProps = {
+  /** Optional Agent improvement suggestions (Storybook post-install prototype). */
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
+};
+
+export function AppPage({ agentSuggestions, onSelectAgentSuggestion }: AppPageProps = {}) {
   const { organizationId, appId } = useParams<{
     organizationId: string;
     appId?: string;
@@ -4195,6 +4201,8 @@ export function AppPage() {
           canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
           canUseAgents={canUseAgents}
+          agentSuggestions={agentSuggestions}
+          onSelectAgentSuggestion={onSelectAgentSuggestion}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
