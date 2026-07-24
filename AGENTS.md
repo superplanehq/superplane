@@ -96,13 +96,122 @@ Cross-cutting rules when extending the backend:
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
 
-Further reading:
+### More Makefile targets
 
-- E2E test authoring: [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
-- Dev server profiling: [docs/contributing/profiling.md](docs/contributing/profiling.md)
-- New components/triggers: [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
-- Component design & quality: [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- UI component workflow: [web_src/AGENTS.md](web_src/AGENTS.md)
+`make help` lists everything; these are the ones you will reach for beyond the
+core loop above, grouped by concern:
+
+- **Dev**: `make dev.start.ephemeral BASE_URL=<url>` boots a publicly reachable
+  instance behind Caddy (for webhook testing); `make dev.pr.clean.checkout PR=<n>`
+  checks out a PR into a clean worktree; `make dev.logs` / `dev.logs.app` tail
+  container logs; `make dev.console` opens a shell in the `app` container.
+- **Test**: `make test.coverage` runs Go tests with a coverage profile;
+  `make test.watch` re-runs tests on change; `make test.shell` opens a shell in a
+  container wired to `superplane_test` (screenshots mounted for E2E debugging).
+- **Database**: `make db.console DB_NAME=<db>` opens a `psql` session;
+  `make db.data_migration.create NAME=<name>` scaffolds a data migration under
+  `db/data_migrations/` (distinct from schema migrations).
+- **Codegen**: `make gen.components.docs` regenerates `docs/components/` from the
+  component definitions (run after changing component metadata).
+- **CLI**: `make cli.build` builds the CLI binary to `build/cli`
+  (`OS`/`ARCH` overridable); `make cli.build.m1` targets Apple Silicon.
+- **UI**: `make storybook` runs Storybook locally.
+- **Release**: `make tag.create.patch` and `make tag.create.minor` cut release
+  tags via `release/create_tag.sh`.
+
+### CI check targets
+
+CI runs a family of `check.*` targets that guard invariants; run the relevant one
+locally before pushing. Several compare against a committed baseline — when an
+intentional change moves the baseline, regenerate it with the matching
+`*.baseline.update` target and commit the result.
+
+- `make check.build.app` / `check.build.ui` / `check.build.storybook` — the app,
+  UI, and Storybook still build.
+- `make check.proto.field.numbers` — proto message field numbers stay contiguous.
+- `make check.configuration.fields` — component configuration fields match their
+  baseline (`check.configuration.fields.baseline.update`).
+- `make check.example.payloads` — integration example payloads stay valid.
+- `make check.components.docs` — generated `docs/components/` is up to date.
+- `make check.generated.artifacts` — no generated artifacts are committed by
+  mistake.
+- `make check.grpc.actions.status` — gRPC actions declare a status consistently.
+- `make check.db.structure` — `db/structure.sql` matches the migrated schema.
+- `make check.db.migrations` — no future-dated or out-of-order migrations.
+- `make check.coverage.go` — Go coverage stays within budget
+  (`check.coverage.go.baseline.update`).
+- `make check.lint.ui.knip` — the UI has no unused files/exports/deps
+  (`check.lint.ui.baseline.update`).
+- `make check.models.tx.debt` — no new `database.Conn()` / `*InTransaction` debt
+  in `pkg/models` (`check.models.tx.debt.baseline.update`).
+
+### Agent assets
+
+Reusable agent guidance lives alongside the code so multiple tools share it:
+
+- `.agents/skills/clean-code/` — the shared clean-code skill (standards and a
+  detailed reference) applied when writing or refactoring code.
+- `.cursor/` — Cursor-specific config: `BUGBOT.md` (repository-wide review rules),
+  reusable `commands/`, `skills/`, and `rules/`.
+- `CLAUDE.md` just points here, so this file is the single source of truth for
+  both Claude and Cursor agents.
+
+### Multi-instance development
+
+To run two SuperPlane checkouts side by side (for example to test cross-instance
+flows), copy `.env.multi-instance.example` to `.env` in each repo and uncomment
+the Instance A / Instance B port block so the instances do not collide. See
+[docs/contributing/multi-instance-dev.md](docs/contributing/multi-instance-dev.md)
+for the full port map.
+
+### Further reading
+
+Everything under `docs/contributing/` (linked here so it is discoverable):
+
+- Getting started & workflow
+  - [ai-agents.md](docs/contributing/ai-agents.md) — using AI coding assistants
+    (Cursor, Codex, Claude) in this repo.
+  - [pull-requests.md](docs/contributing/pull-requests.md) — fork/branch/push PR
+    workflow and expectations.
+  - [commit_sign-off.md](docs/contributing/commit_sign-off.md) — DCO sign-off and
+    a git alias to sign every commit.
+  - [issue-tracking.md](docs/contributing/issue-tracking.md) — how issues are
+    reported and organized.
+  - [bounties.md](docs/contributing/bounties.md) — claiming and getting paid for
+    integration bounties via BountyHub.
+  - [multi-instance-dev.md](docs/contributing/multi-instance-dev.md) — running
+    multiple local instances side by side.
+  - [connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
+    — receiving third-party webhooks against a local instance.
+- Architecture & quality
+  - [architecture.md](docs/contributing/architecture.md) — high-level overview of
+    the modular monolith and its modules.
+  - [quality.md](docs/contributing/quality.md) — the quality principles the
+    codebase is held to.
+  - [profiling.md](docs/contributing/profiling.md) — profiling the dev server.
+  - [runtime-configuration.md](docs/contributing/runtime-configuration.md) —
+    runtime environment variables for self-hosted deployments.
+- Components & templates
+  - [component-implementations.md](docs/contributing/component-implementations.md)
+    — adding new components/triggers.
+  - [component-design.md](docs/contributing/component-design.md) — component
+    design and quality guidance.
+  - [component-customization.md](docs/contributing/component-customization.md) —
+    adding custom behaviors via the component registries.
+  - [templates.md](docs/contributing/templates.md) — creating workflow templates.
+- Integrations
+  - [building-an-integration.md](docs/contributing/building-an-integration.md) —
+    high-level steps to add an integration.
+  - [integrations.md](docs/contributing/integrations.md) — the full integration
+    development guide (triggers and components).
+  - [integration-prs.md](docs/contributing/integration-prs.md) — opening PRs for
+    integration work.
+  - [agent-tools.md](docs/contributing/agent-tools.md) — backend-managed agent
+    tools exposed to managed-agent providers.
+- Testing
+  - [e2e-tests.md](docs/contributing/e2e-tests.md) — authoring E2E tests.
+- UI
+  - [web_src/AGENTS.md](web_src/AGENTS.md) — UI-specific component workflow.
 
 ## Coding Style & Naming Conventions
 
