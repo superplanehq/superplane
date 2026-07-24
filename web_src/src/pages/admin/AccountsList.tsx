@@ -9,7 +9,7 @@ import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
-import ConfirmBlockDialog from "./ConfirmBlockDialog";
+import { ConfirmBlockDialog } from "./ConfirmBlockDialog";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
 import { startImpersonation, toggleAdmin, toggleBlock } from "./useAccountActions";
 

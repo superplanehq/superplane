@@ -358,7 +358,9 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 	if err == nil {
 		return user, info, nil
 	}
-	if isActiveImpersonation(jwtSigner, r) {
+	// Blocking an impersonated target invalidates that impersonated view.
+	// Fall back to the real admin, matching AccountAuthMiddleware.
+	if !errors.Is(err, models.ErrAccountBlocked) && isActiveImpersonation(jwtSigner, r) {
 		return nil, nil, err
 	}
 

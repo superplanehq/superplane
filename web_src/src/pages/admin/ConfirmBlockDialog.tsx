@@ -12,7 +12,7 @@ interface ConfirmBlockDialogProps {
   isBlocking: boolean;
 }
 
-const ConfirmBlockDialog: React.FC<ConfirmBlockDialogProps> = ({
+export const ConfirmBlockDialog: React.FC<ConfirmBlockDialogProps> = ({
   open,
   onClose,
   onConfirm,
@@ -69,5 +69,3 @@ const ConfirmBlockDialog: React.FC<ConfirmBlockDialogProps> = ({
     </DialogActions>
   </Dialog>
 );
-
-export default ConfirmBlockDialog;

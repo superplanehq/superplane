@@ -592,15 +592,18 @@ func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userName := ""
-	if target, err := models.FindAccountByID(claims.ImpersonatedAccountID); err == nil {
-		userName = target.Name
+	target, err := models.FindAccountByID(claims.ImpersonatedAccountID)
+	if err != nil || target.IsBlocked() {
+		impersonation.ClearCookie(w, r)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"active":           true,
-		"user_name":        userName,
+		"user_name":        target.Name,
 		"admin_account_id": claims.AdminAccountID,
 	})
 }

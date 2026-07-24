@@ -587,6 +587,40 @@ func TestImpersonationStatus(t *testing.T) {
 		assert.Equal(t, true, result["active"])
 		assert.NotEmpty(t, result["user_name"])
 	})
+
+	t.Run("returns inactive and clears cookie when target is blocked", func(t *testing.T) {
+		target, err := models.CreateAccount("Blocked Status Target", "blocked-status-target@example.com")
+		require.NoError(t, err)
+
+		signer := jwt.NewSigner("test-client-secret")
+		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":                    "impersonation",
+			"admin_account_id":        r.Account.ID.String(),
+			"impersonated_account_id": target.ID.String(),
+			"sub":                     r.Account.ID.String(),
+		})
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(target.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+
+		res := httptest.NewRecorder()
+		server.Router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusOK, res.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
+		assert.Equal(t, false, result["active"])
+
+		for _, cookie := range res.Result().Cookies() {
+			if cookie.Name == "impersonation_token" {
+				assert.Equal(t, "", cookie.Value)
+				assert.Equal(t, -1, cookie.MaxAge)
+			}
+		}
+	})
 }
 
 func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
