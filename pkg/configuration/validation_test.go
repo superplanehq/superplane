@@ -363,6 +363,75 @@ func Test__ValidateList__MaxItems(t *testing.T) {
 	}
 }
 
+func Test__ValidateCron(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid 5-field cron expression",
+			value:       "0 0 * * *",
+			expectError: false,
+		},
+		{
+			name:        "valid 5-field cron with ranges, lists and steps",
+			value:       "*/15 9-17 1,15 * 1-5",
+			expectError: false,
+		},
+		{
+			name:        "valid 6-field cron expression",
+			value:       "0 0 0 * * *",
+			expectError: false,
+		},
+		{
+			name:        "not a string",
+			value:       123,
+			expectError: true,
+			errorMsg:    "must be a string",
+		},
+		{
+			name:        "empty string",
+			value:       "",
+			expectError: true,
+			errorMsg:    "cannot be empty",
+		},
+		{
+			name:        "invalid character",
+			value:       "0 0 * * ?",
+			expectError: true,
+			errorMsg:    "invalid character",
+		},
+		{
+			name:        "wrong number of fields",
+			value:       "0 0 *",
+			expectError: true,
+			errorMsg:    "must have either 5 fields",
+		},
+		{
+			name:        "out of range value",
+			value:       "99 0 * * *",
+			expectError: true,
+			errorMsg:    "invalid cron expression",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCron(Field{Type: FieldTypeCron}, tt.value)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func ptrInt(v int) *int {
 	return &v
 }
