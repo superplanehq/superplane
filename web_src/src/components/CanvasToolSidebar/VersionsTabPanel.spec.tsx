@@ -1,16 +1,14 @@
-import type { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasVersionMetadata } from "@/api-client";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { VersionsTabPanel } from "./VersionsTabPanel";
 
-function makeVersion(id: string, commitMessage?: string): CanvasesCanvasVersion {
+function makeVersion(id: string, commitMessage?: string): CanvasesCanvasVersionMetadata {
   return {
-    metadata: {
-      id,
-      owner: { name: "Alice" },
-      createdAt: "2026-05-18T12:00:00Z",
-      commitMessage,
-    },
+    id,
+    owner: { name: "Alice" },
+    createdAt: "2026-05-18T12:00:00Z",
+    commitMessage,
   };
 }
 
