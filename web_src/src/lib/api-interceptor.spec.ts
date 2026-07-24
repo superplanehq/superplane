@@ -60,14 +60,25 @@ describe("api-interceptor", () => {
     expect(locationHref).toBe("/login?auth_error=account_blocked");
   });
 
-  it("redirects a blocked account bootstrap request", async () => {
+  it("redirects blocked account-session requests", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(new Response(ACCOUNT_BLOCKED_MESSAGE, { status: 403 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");
 
     setupApiInterceptor();
 
-    await expect(globalThis.fetch("/account")).rejects.toThrow(ACCOUNT_BLOCKED_MESSAGE);
-    expect(locationHref).toBe("/login?auth_error=account_blocked");
+    const paths = [
+      "/account",
+      "/account/limits",
+      "/account/password",
+      "/account/experimental-features",
+      "/organizations",
+      "/apps/install/preview",
+      "/apps/install",
+    ];
+    for (const path of paths) {
+      await expect(globalThis.fetch(path)).rejects.toThrow(ACCOUNT_BLOCKED_MESSAGE);
+      expect(locationHref).toBe("/login?auth_error=account_blocked");
+    }
   });
 
   it("leaves unrelated forbidden responses unchanged", async () => {

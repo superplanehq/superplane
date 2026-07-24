@@ -1,5 +1,7 @@
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 
+const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations", "/apps/install/preview", "/apps/install"]);
+
 let interceptorSetup = false;
 
 export const setupApiInterceptor = (): void => {
@@ -32,9 +34,9 @@ export const setupApiInterceptor = (): void => {
 
 function isAuthenticatedRequest(input: RequestInfo | URL): boolean {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  const path = url.split("?")[0];
+  const path = new URL(url, "http://localhost").pathname;
 
-  return path.includes("/api/") || path.endsWith("/account");
+  return path.includes("/api/") || path.startsWith("/account/") || ACCOUNT_SESSION_PATHS.has(path);
 }
 
 function isAuthRoute(pathname: string): boolean {
