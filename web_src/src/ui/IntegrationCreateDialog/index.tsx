@@ -3,7 +3,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings } from "lucide-react";
+import { ExternalLink, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -43,6 +43,8 @@ export interface IntegrationCreateDialogProps {
   defaultName?: string;
   integrationHomeHref?: string;
   onCreated?: (integrationId: string, instanceName: string) => void;
+  /** Called when create returns a capability-based setup step that must continue in the setup wizard. */
+  onCapabilitySetupRequired?: (integrationName: string, integrationId: string) => void;
   /** If set, instructions are truncated at this heading (e.g. "## Webhook integration") so only the part before is shown in the create step. */
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
@@ -67,6 +69,7 @@ export function IntegrationCreateDialog({
   defaultName = "",
   integrationHomeHref,
   onCreated,
+  onCapabilitySetupRequired,
   instructionsEndBeforeHeading,
   initialStepFieldNames,
   webhookStepDescription,
@@ -165,6 +168,15 @@ export function IntegrationCreateDialog({
       const browserAction = integration?.status?.browserAction;
       const webhookUrl = getIntegrationWebhookUrl(integration?.status?.metadata);
 
+      // Capability-based integrations (e.g. GitHub) return a setup wizard step, not a
+      // browserAction. Hand off to the setup wizard instead of closing into a dead end.
+      if (integration?.status?.setupState?.currentStep && integration.metadata?.id) {
+        const setupName = integration.metadata.integrationName || integrationDefinition.name;
+        onCapabilitySetupRequired?.(setupName, integration.metadata.id);
+        handleClose();
+        return;
+      }
+
       if (browserAction) {
         setCreateIntegrationBrowserAction(browserAction);
         if (integration?.metadata?.id) {
@@ -198,6 +210,7 @@ export function IntegrationCreateDialog({
     onCreateIntegration,
     handleClose,
     onCreated,
+    onCapabilitySetupRequired,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
@@ -214,7 +227,7 @@ export function IntegrationCreateDialog({
     }
   }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, integrationName]);
 
-  const handleBrowserActionContinue = useCallback(async () => {
+  const handleBrowserActionContinue = useCallback(() => {
     if (!createIntegrationBrowserAction) return;
     const { url, method, formFields } = createIntegrationBrowserAction;
     if (method?.toUpperCase() === "POST" && formFields) {
@@ -237,16 +250,49 @@ export function IntegrationCreateDialog({
       window.open(url, "_blank");
     }
 
-    if (createdIntegrationId) {
-      setBrowserActionCompleted(true);
+    // Advance the dialog even when resuming a pending integration (initialCreatedIntegrationId).
+    setBrowserActionCompleted(true);
+  }, [createIntegrationBrowserAction]);
+
+  const handleFinishBrowserActionSetup = useCallback(async () => {
+    const integrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
+    if (!integrationId) {
+      handleClose();
+      return;
     }
-  }, [createIntegrationBrowserAction, createdIntegrationId]);
+    try {
+      await updateIntegrationMutation.mutateAsync({
+        configuration: { ...configuration, installed: "true" },
+      });
+      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+      onCreated?.(integrationId, integrationName);
+      handleClose();
+    } catch {
+      showErrorToast("Failed to sync integration");
+    }
+  }, [
+    pendingWebhookSetup?.id,
+    createdIntegrationId,
+    initialCreatedIntegrationId,
+    updateIntegrationMutation,
+    configuration,
+    queryClient,
+    organizationId,
+    onCreated,
+    integrationName,
+    handleClose,
+  ]);
 
   if (!integrationDefinition) return null;
 
   const displayName =
     getIntegrationTypeDisplayName(undefined, integrationDefinition.name) || integrationDefinition.name;
   const createErrorNotice = createError ? getUsageLimitNotice(createError, organizationId) : null;
+  const resolvedIntegrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
+  const resolvedHomeHref =
+    resolvedIntegrationId && organizationId
+      ? `/${organizationId}/settings/integrations/${resolvedIntegrationId}`
+      : integrationHomeHref;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -263,9 +309,11 @@ export function IntegrationCreateDialog({
             />
             <div className="flex items-center gap-2">
               <DialogTitle>{pendingWebhookSetup ? "Complete webhook setup" : `Configure ${displayName}`}</DialogTitle>
-              {integrationHomeHref && (
+              {resolvedHomeHref && (
                 <a
-                  href={integrationHomeHref}
+                  href={resolvedHomeHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
                   aria-label="Open integration settings"
                 >
@@ -280,11 +328,6 @@ export function IntegrationCreateDialog({
                 browserActionCompleted
                   ? [selectedInstructions, createIntegrationBrowserAction?.description].filter(Boolean).join("\n\n")
                   : ((createIntegrationBrowserAction?.description || selectedInstructions) ?? "")
-              }
-              onContinue={
-                !browserActionCompleted && createIntegrationBrowserAction?.url
-                  ? () => void handleBrowserActionContinue()
-                  : undefined
               }
               className="mt-2"
             />
@@ -402,26 +445,30 @@ export function IntegrationCreateDialog({
                 Done
               </Button>
             </>
+          ) : createIntegrationBrowserAction && !browserActionCompleted ? (
+            <>
+              <Button
+                type="button"
+                onClick={handleBrowserActionContinue}
+                disabled={!createIntegrationBrowserAction.url}
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Continue on GitHub
+              </Button>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+            </>
           ) : createIntegrationBrowserAction ? (
             <>
               <LoadingButton
                 color="blue"
-                onClick={async () => {
-                  try {
-                    await updateIntegrationMutation.mutateAsync({
-                      configuration: { ...configuration, installed: "true" },
-                    });
-                    await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
-                    if (createdIntegrationId) onCreated?.(createdIntegrationId, integrationName);
-                    handleClose();
-                  } catch {
-                    showErrorToast("Failed to sync integration");
-                  }
-                }}
+                onClick={() => void handleFinishBrowserActionSetup()}
                 loading={updateIntegrationMutation.isPending}
                 loadingText="Saving..."
               >
-                Save
+                Done
               </LoadingButton>
               <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                 Cancel

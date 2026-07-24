@@ -118,6 +118,7 @@ export function InstallProgressPanel({
                 organizationId={organizationId ?? ""}
                 selections={integrationSelections}
                 onSelectionsChange={setIntegrationSelections}
+                variant="status"
               />
             </div>
           )}

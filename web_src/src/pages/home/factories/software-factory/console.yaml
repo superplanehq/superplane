@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Software Factory
+spec:
+  panels:
+    - id: run-software-factory
+      type: nodes
+      content:
+        nodes:
+          - formMode: inline
+            label: Task prompt
+            node: manual-run
+            showNodeLabel: false
+            showRun: true
+            submitLabel: Run Claude Code
+        title: Run Software Factory
+  layout:
+    - i: run-software-factory
+      x: 0
+      y: 0
+      w: 6
+      h: 4
+      minW: 2
+      minH: 2
