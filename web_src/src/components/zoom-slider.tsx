@@ -11,6 +11,8 @@ import {
   Locate,
   LocateOff,
   Minus,
+  MoveHorizontal,
+  MoveVertical,
   Plus,
 } from "lucide-react";
 import { toPng } from "html-to-image";
@@ -80,6 +82,38 @@ function AutoFocusToggleButton({ enabled, onToggle }: { enabled: boolean; onTogg
   );
 }
 
+function LayoutDirectionToggleButton({
+  direction,
+  onToggle,
+}: {
+  direction: "horizontal" | "vertical";
+  onToggle: () => void;
+}) {
+  const isVertical = direction === "vertical";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-7 w-7"
+          onClick={onToggle}
+          aria-pressed={isVertical}
+          aria-label={isVertical ? "Switch to horizontal auto-layout" : "Switch to vertical auto-layout"}
+          data-testid="canvas-layout-direction-toggle"
+        >
+          {isVertical ? <MoveVertical className="h-3 w-3" /> : <MoveHorizontal className="h-3 w-3" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {isVertical
+          ? "Vertical auto-layout is on. Click to arrange the canvas left-to-right."
+          : "Arrange the canvas top-to-bottom with vertical auto-layout."}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const ZoomSlider = memo(function ZoomSlider({
   className,
   orientation = "horizontal",
@@ -92,6 +126,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  layoutDirection = "horizontal",
+  onLayoutDirectionToggle,
   isAutoFocusEnabled,
   onAutoFocusToggle,
   usePanel = true,
@@ -107,6 +143,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  layoutDirection?: "horizontal" | "vertical";
+  onLayoutDirectionToggle?: () => void;
   isAutoFocusEnabled?: boolean;
   onAutoFocusToggle?: () => void;
   usePanel?: boolean;
@@ -324,6 +362,9 @@ export const ZoomSlider = memo(function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
         </Tooltip>
+      )}
+      {onLayoutDirectionToggle && (
+        <LayoutDirectionToggleButton direction={layoutDirection} onToggle={onLayoutDirectionToggle} />
       )}
       {onAutoFocusToggle && (
         <AutoFocusToggleButton enabled={Boolean(isAutoFocusEnabled)} onToggle={onAutoFocusToggle} />
