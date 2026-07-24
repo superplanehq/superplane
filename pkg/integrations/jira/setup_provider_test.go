@@ -107,10 +107,7 @@ func Test__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.NotEmpty(t, state)
 		assert.Contains(t, step.RedirectPrompt.URL, "state=")
 
-		// Every action/trigger must come out enabled - there's no separate
-		// capability-selection step in this flow, so this is the only place
-		// it can happen. Regression test for "jira.onIssue is not enabled
-		// for integration jira".
+		// Regression test: every action/trigger must come out enabled since there's no capability-selection step.
 		assert.Contains(t, capabilities.EnabledCapabilities, "jira.onIssue")
 		assert.Contains(t, capabilities.EnabledCapabilities, "jira.createIssue")
 	})

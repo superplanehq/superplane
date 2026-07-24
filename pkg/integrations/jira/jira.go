@@ -40,16 +40,12 @@ func (j *Jira) Description() string {
 	return "Manage issues in Jira"
 }
 
-// Instructions is unused: this proof of concept connects Jira exclusively
-// through the OAuth 2.0 (3LO) SetupProvider flow (see setup_provider.go),
-// whose steps carry their own instructions.
+// Instructions is unused: connection is handled by the SetupProvider OAuth flow instead.
 func (j *Jira) Instructions() string {
 	return ""
 }
 
-// Configuration is empty: OAuth connection details (client id/secret, cloud
-// id, tokens) are collected and stored through the SetupProvider flow
-// instead of a static config form.
+// Configuration is empty: connection details are collected by the SetupProvider OAuth flow instead.
 func (j *Jira) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }
@@ -118,10 +114,7 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
-// afterOAuthRedirect handles Atlassian's callback after the user authorizes
-// the app: it exchanges the authorization code for tokens, resolves which
-// Jira site(s) were granted, and stores everything needed for NewClient to
-// build an authenticated Client from then on.
+// afterOAuthRedirect exchanges the authorization code for tokens and stores the connected site.
 func (j *Jira) afterOAuthRedirect(ctx core.HTTPRequestContext) {
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
@@ -166,11 +159,7 @@ func (j *Jira) afterOAuthRedirect(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	//
-	// PoC simplification: connect the first accessible site. A production
-	// implementation would add a "select site" step when the grant spans
-	// more than one.
-	//
+	// PoC simplification: connect the first accessible site rather than prompting to choose one.
 	site := resources[0]
 
 	err = ctx.Integration.Properties().CreateMany([]core.IntegrationPropertyDefinition{
@@ -194,10 +183,7 @@ func (j *Jira) afterOAuthRedirect(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	//
-	// Best-effort immediate sync so the integration doesn't sit in a
-	// "connected but unverified" state until the next scheduled Sync().
-	//
+	// Best-effort immediate sync so the integration isn't left unverified until the next scheduled Sync().
 	if client, err := NewClient(ctx.HTTP, ctx.Integration); err == nil {
 		if user, err := client.GetCurrentUser(); err == nil {
 			projects, _ := client.ListProjects()

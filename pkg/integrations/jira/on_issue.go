@@ -34,9 +34,7 @@ type OnIssueMetadata struct {
 	WebhookID  *int64   `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
-// IssueWebhookPayload is the shape Jira Cloud sends for issue event webhooks
-// (jira:issue_created/updated/deleted) - the same "issue" representation
-// returned by the REST API with no expand parameters, plus the event envelope.
+// IssueWebhookPayload is the shape Jira Cloud sends for issue event webhooks.
 type IssueWebhookPayload struct {
 	Timestamp    int64           `json:"timestamp,omitempty"`
 	WebhookEvent string          `json:"webhookEvent"`
@@ -186,11 +184,7 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	//
-	// Reconcile: tear down a previously-registered webhook before creating a
-	// fresh one, so editing the project/events doesn't leak orphaned
-	// registrations on the Jira side.
-	//
+	// Tear down a previously-registered webhook so editing project/events doesn't leak orphaned registrations.
 	existing := OnIssueMetadata{}
 	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
 	if existing.WebhookID != nil {
@@ -297,8 +291,7 @@ func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-// issueEventAction maps a Jira webhookEvent value to the short action name used
-// in this trigger's configuration and emitted events.
+// issueEventAction maps a native Jira webhookEvent value to this trigger's short action name.
 func issueEventAction(webhookEvent string) (string, bool) {
 	switch webhookEvent {
 	case issueEventCreated:
@@ -312,8 +305,7 @@ func issueEventAction(webhookEvent string) (string, bool) {
 	}
 }
 
-// issueEventWebhookName maps a short action name (as used in this trigger's
-// configuration) to the native Jira webhookEvent value.
+// issueEventWebhookName maps this trigger's short action name to the native Jira webhookEvent value.
 func issueEventWebhookName(action string) string {
 	switch action {
 	case "created":

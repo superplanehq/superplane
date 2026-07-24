@@ -160,8 +160,7 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 	)
 }
 
-// resolveCloudID returns the Atlassian cloud id resolved during the OAuth
-// connect flow (see Jira.afterOAuthRedirect), stored as an integration property.
+// resolveCloudID returns the Atlassian cloud id stored during the OAuth connect flow.
 func resolveCloudID(httpCtx core.HTTPContext, integration core.IntegrationContext) (string, error) {
 	return cloudIDFromIntegration(integration)
 }

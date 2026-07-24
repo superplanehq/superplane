@@ -43,7 +43,6 @@ import {
   componentMappers as jiraComponentMappers,
   triggerRenderers as jiraTriggerRenderers,
   eventStateRegistry as jiraEventStateRegistry,
-  customFieldRenderers as jiraCustomFieldRenderers,
 } from "./jira/index";
 import {
   componentMappers as linearComponentMappers,
@@ -499,7 +498,6 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   incident: incidentCustomFieldRenderers,
   gcp: gcpCustomFieldRenderers,
   servicenow: servicenowCustomFieldRenderers,
-  jira: jiraCustomFieldRenderers,
 };
 
 /**

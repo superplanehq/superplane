@@ -14,9 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// Client speaks to Jira Cloud through Atlassian's OAuth 2.0 (3LO) API proxy
-// (https://api.atlassian.com/ex/jira/{cloudId}/...), authenticating with a
-// Bearer access token obtained via the SetupProvider OAuth flow.
+// Client speaks to Jira Cloud through Atlassian's OAuth API proxy (api.atlassian.com/ex/jira/{cloudId}/...).
 type Client struct {
 	CloudID     string
 	AccessToken string
@@ -47,9 +45,7 @@ func (c *Client) apiURL(path string) string {
 	return atlassianAPIProxyHost + "/" + c.CloudID + path
 }
 
-// execRequest performs the request with a Bearer access token. On a 401 it
-// refreshes the token once (via the stored refresh token) and retries,
-// so a single expired-token error self-heals instead of failing the caller.
+// execRequest sends the request with a Bearer token, refreshing once and retrying on a 401.
 func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
 	var bodyBytes []byte
 	if body != nil {
@@ -111,9 +107,7 @@ func (c *Client) doRequest(method, requestURL string, body []byte) ([]byte, int,
 	return responseBody, res.StatusCode, nil
 }
 
-// refresh exchanges the stored refresh token for a new access/refresh token
-// pair and persists them, so callers only ever see a transparent retry
-// instead of an auth failure when the access token has expired.
+// refresh exchanges the stored refresh token for a new access/refresh token pair and persists them.
 func (c *Client) refresh() error {
 	if c.integration == nil {
 		return fmt.Errorf("no integration context available to refresh the OAuth token")
@@ -813,8 +807,7 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
-// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic
-// webhook registration request.
+// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic webhook registration request.
 type IssueWebhookRegistration struct {
 	JQLFilter string   `json:"jqlFilter,omitempty"`
 	Events    []string `json:"events"`
@@ -830,20 +823,12 @@ type createIssueWebhookResult struct {
 	Errors           []string `json:"errors,omitempty"`
 }
 
-// createIssueWebhookResponse is the documented response shape: results are
-// wrapped under "webhookRegistrationResult", not returned as a bare array
-// (confirmed against a live Jira Cloud site - an earlier version of this
-// client assumed a bare array based on a doc summary and failed on the
-// first real call).
+// createIssueWebhookResponse wraps results under "webhookRegistrationResult", not a bare array.
 type createIssueWebhookResponse struct {
 	WebhookRegistrationResult []createIssueWebhookResult `json:"webhookRegistrationResult"`
 }
 
-// CreateIssueWebhook registers a dynamic webhook for issue events, scoped by
-// an optional JQL filter, via POST /rest/api/3/webhook. This endpoint is only
-// reachable by Connect/OAuth apps (requires manage:jira-webhook) - it is not
-// available to Basic Auth (API token) clients, which is the whole reason
-// this proof of concept exists.
+// CreateIssueWebhook registers a dynamic webhook for issue events, scoped by an optional JQL filter.
 func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []string) (int64, error) {
 	req := createIssueWebhookRequest{
 		URL: callbackURL,
@@ -876,11 +861,7 @@ func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []stri
 	return *results[0].CreatedWebhookID, nil
 }
 
-// parseCreateIssueWebhookResponse accepts either the documented
-// {"webhookRegistrationResult": [...]}  shape or a bare array, since the two
-// disagree between Atlassian's own doc summaries. Always includes the raw
-// body on failure so a future shape mismatch is diagnosable from the error
-// alone instead of requiring another live round trip to find out.
+// parseCreateIssueWebhookResponse accepts either the wrapped shape or a bare array.
 func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookResult, error) {
 	var wrapped createIssueWebhookResponse
 	if err := json.Unmarshal(responseBody, &wrapped); err == nil && len(wrapped.WebhookRegistrationResult) > 0 {
@@ -895,8 +876,7 @@ func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookR
 	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
 }
 
-// DeleteIssueWebhooks removes previously-registered dynamic webhooks by id,
-// via DELETE /rest/api/3/webhook. Non-existent ids are ignored by Jira.
+// DeleteIssueWebhooks removes previously-registered dynamic webhooks by id.
 func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
 	if len(webhookIDs) == 0 {
 		return nil

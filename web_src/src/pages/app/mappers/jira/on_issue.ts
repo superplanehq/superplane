@@ -1,11 +1,5 @@
 import { getBackgroundColorClass } from "@/lib/colors";
-import type {
-  CustomFieldRenderer,
-  NodeInfo,
-  TriggerEventContext,
-  TriggerRenderer,
-  TriggerRendererContext,
-} from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -27,8 +21,6 @@ interface OnIssueConfiguration {
 
 interface OnIssueNodeMetadata {
   project?: JiraProject;
-  webhookUrl?: string;
-  webhookId?: number;
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -121,32 +113,5 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     }
 
     return props;
-  },
-};
-
-export const onIssueCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo) => {
-    const metadata = node.metadata as OnIssueNodeMetadata | undefined;
-    const registered = metadata?.webhookId != null;
-
-    return (
-      <div className="border-t-1 border-gray-200 dark:border-gray-600 pt-4">
-        <div className="space-y-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Jira Webhook</span>
-          <div className="text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md space-y-2">
-            {registered ? (
-              <p className="text-gray-600 dark:text-gray-400">
-                Registered automatically on Jira (webhook id <code>{metadata!.webhookId}</code>) via OAuth. It's removed
-                automatically if you delete this trigger.
-              </p>
-            ) : (
-              <p className="text-gray-600 dark:text-gray-400">
-                Will be registered automatically on Jira once you save the canvas - no manual setup needed.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
   },
 };

@@ -20,8 +20,7 @@ func newLogger() *logrus.Entry {
 	return logrus.NewEntry(logger)
 }
 
-// fakeIntegrationSetupContext is a minimal core.IntegrationSetupContext fake,
-// recording the last step it was asked to set.
+// fakeIntegrationSetupContext is a minimal core.IntegrationSetupContext fake that records the last step set.
 type fakeIntegrationSetupContext struct {
 	LastStep *core.SetupStep
 }

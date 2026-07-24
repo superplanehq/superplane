@@ -11,10 +11,6 @@ import (
 )
 
 // Property and secret names used by the Jira OAuth 2.0 (3LO) setup flow.
-// Client credentials come from an Atlassian OAuth app the user registers
-// themselves in the Developer Console - SuperPlane does not own a shared
-// Jira app the way it does for GitHub (whose App Manifest flow creates one
-// dynamically), so the client id/secret are entered as the first step.
 const (
 	PropertyClientID   = "clientId"
 	PropertyCloudID    = "cloudId"
@@ -32,9 +28,7 @@ const (
 
 type SetupProvider struct{}
 
-// redirectURI is where Atlassian sends the browser back to after the user
-// authorizes the app - it must be registered as the callback URL on the
-// Atlassian OAuth app itself, and is stable per integration instance.
+// redirectURI must match the callback URL registered on the Atlassian OAuth app.
 func redirectURI(baseURL, integrationID string) string {
 	return fmt.Sprintf("%s/api/v1/integrations/%s/redirect", baseURL, integrationID)
 }
@@ -72,8 +66,6 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 }
 
 // allCapabilityNames flattens every action/trigger name across all groups.
-// Used to enable everything at once, since (unlike GitHub) there's no
-// granular permission model to gate individual capabilities behind.
 func (s *SetupProvider) allCapabilityNames() []string {
 	names := []string{}
 	for _, group := range s.CapabilityGroups() {
@@ -94,12 +86,9 @@ func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 		Instructions: fmt.Sprintf(`To connect Jira via OAuth 2.0 (3LO):
 
 1. Open the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) and create an **OAuth 2.0 (3LO)** app.
-2. Add the **Jira API**, with these scopes: `+"`read:jira-work`"+`, `+"`write:jira-work`"+`, `+"`manage:jira-webhook`"+`, `+"`read:jira-user`"+`, `+"`offline_access`"+`.
-3. Under **Authorization**, set the callback URL to:
-
-`+"`%s`"+`
-
-4. Copy the app's **Client ID** and **Client Secret** and paste them below.`, callbackURL),
+2. Go to the **Permissions** tab, add the **Jira API**, and add these scopes: `+"`read:jira-work`"+`, `+"`write:jira-work`"+`, `+"`manage:jira-webhook`"+`, `+"`read:jira-user`"+`, `+"`offline_access`"+`.
+3. Go to the **Authorization** tab, click **Configure** next to OAuth 2.0 (3LO), and paste this callback URL: `+"`%s`"+`
+4. Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**, then copy and paste them below.`, callbackURL),
 		Inputs: []configuration.Field{
 			{
 				Name:     PropertyClientID,
@@ -123,10 +112,7 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	case SetupStepEnterAppCredentials:
 		return s.onEnterAppCredentialsSubmit(ctx)
 
-	//
-	// This step is not submitted - it's completed by Atlassian redirecting
-	// the browser back to HandleRequest's "/redirect" handler.
-	//
+	// Completed by Atlassian redirecting the browser to HandleRequest's "/redirect" handler, not by submission.
 	case SetupStepAuthorize:
 		return nil, nil
 	}
@@ -191,15 +177,7 @@ func (s *SetupProvider) onEnterAppCredentialsSubmit(ctx core.SetupStepContext) (
 
 	authorizeURL := BuildAuthorizeURL(clientID, redirectURI(ctx.BaseURL, ctx.IntegrationID.String()), state)
 
-	//
-	// There's no capability-selection step in this flow (OAuth grants a
-	// single fixed scope covering everything - see oauthScopes), so enable
-	// every action/trigger now rather than gating them behind one. This runs
-	// before the OAuth connection is actually verified, but "enabled" only
-	// means "available to add to a canvas" - the integration's Ready/Error
-	// state (set once the token exchange completes) reflects whether it
-	// actually works.
-	//
+	// No capability-selection step in this flow, so enable everything now rather than gate it behind one.
 	if ctx.Capabilities != nil {
 		ctx.Capabilities.Enable(s.allCapabilityNames()...)
 	}
@@ -241,11 +219,7 @@ func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 		return nil, nil
 	}
 
-	//
-	// Unlike GitHub, Jira's OAuth scopes are fixed and requested once up
-	// front (see oauthScopes), so there's no per-capability permission
-	// diffing here - anything requested is immediately enabled.
-	//
+	// Jira's OAuth scopes are fixed and requested up front, so anything requested here is enabled immediately.
 	ctx.Capabilities.Enable(requested...)
 	return nil, nil
 }

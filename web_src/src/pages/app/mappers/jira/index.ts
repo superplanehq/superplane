@@ -1,4 +1,4 @@
-import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { createIssueMapper } from "./create_issue";
 import { deleteIssueMapper } from "./delete_issue";
@@ -18,7 +18,7 @@ import { createAlertMapper } from "./create_alert";
 import { getAlertMapper } from "./get_alert";
 import { deleteAlertMapper } from "./delete_alert";
 import { updateAlertMapper } from "./update_alert";
-import { onIssueCustomFieldRenderer, onIssueTriggerRenderer } from "./on_issue";
+import { onIssueTriggerRenderer } from "./on_issue";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: createIssueMapper,
@@ -43,10 +43,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onIssue: onIssueTriggerRenderer,
-};
-
-export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
-  onIssue: onIssueCustomFieldRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {

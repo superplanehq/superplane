@@ -16,21 +16,14 @@ const (
 	atlassianTokenURL     = "https://auth.atlassian.com/oauth/token"
 	atlassianResourcesURL = "https://api.atlassian.com/oauth/token/accessible-resources"
 
-	// atlassianAPIProxyHost is how OAuth 2.0 (3LO) apps reach a Jira Cloud
-	// site's REST APIs: https://api.atlassian.com/ex/jira/{cloudId}/{api}.
-	// Unlike Basic Auth, this proxy is required - the site's own domain
-	// (https://your-domain.atlassian.net) does not accept OAuth bearer tokens.
+	// atlassianAPIProxyHost is how OAuth apps reach Jira's REST APIs - the site's own domain rejects OAuth bearer tokens.
 	atlassianAPIProxyHost = "https://api.atlassian.com/ex/jira"
 
-	// oauthScopes is the fixed scope set requested for this proof of concept:
-	// read/write issue data, dynamic webhook management, and offline_access
-	// for a refresh token. See
-	// https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/
+	// oauthScopes is the fixed scope set requested for this PoC.
 	oauthScopes = "read:jira-work write:jira-work manage:jira-webhook read:jira-user offline_access"
 )
 
-// BuildAuthorizeURL returns the Atlassian OAuth 2.0 (3LO) authorization URL
-// the user's browser is redirected to.
+// BuildAuthorizeURL returns the Atlassian OAuth 2.0 (3LO) URL the user's browser is redirected to.
 func BuildAuthorizeURL(clientID, redirectURI, state string) string {
 	query := url.Values{}
 	query.Set("audience", "api.atlassian.com")
@@ -43,8 +36,7 @@ func BuildAuthorizeURL(clientID, redirectURI, state string) string {
 	return atlassianAuthorizeURL + "?" + query.Encode()
 }
 
-// oauthToken is the response shape of https://auth.atlassian.com/oauth/token,
-// shared by the authorization_code and refresh_token grants.
+// oauthToken is the response shape of Atlassian's token endpoint.
 type oauthToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -110,8 +102,7 @@ func doTokenRequest(httpCtx core.HTTPContext, body map[string]string) (*oauthTok
 	return &token, nil
 }
 
-// AccessibleResource is one Jira Cloud site the OAuth grant has access to,
-// per GET https://api.atlassian.com/oauth/token/accessible-resources.
+// AccessibleResource is one Jira Cloud site the OAuth grant has access to.
 type AccessibleResource struct {
 	ID     string   `json:"id"`
 	Name   string   `json:"name"`

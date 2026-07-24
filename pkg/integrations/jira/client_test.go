@@ -19,9 +19,7 @@ const (
 	testAccessToken = "test-access-token"
 )
 
-// newAuthorizedIntegration returns an IntegrationContext that has an OAuth
-// connection (cloud id + access token) and integration metadata already
-// populated, simulating a successfully-connected integration.
+// newAuthorizedIntegration returns an IntegrationContext simulating a successfully-connected OAuth integration.
 func newAuthorizedIntegration() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
 		CurrentProperties: map[string]any{
