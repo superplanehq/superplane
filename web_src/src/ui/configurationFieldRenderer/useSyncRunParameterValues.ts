@@ -8,6 +8,7 @@ interface UseSyncRunParameterValuesOptions {
   error: unknown;
   appId: string | undefined;
   nodeId: string | undefined;
+  targetNodeResolved: boolean;
   parameterDefinitions: ConfigurationField[];
   parameterValues: Record<string, unknown>;
   onChange: (value: Record<string, unknown>) => void;
@@ -19,18 +20,19 @@ export function useSyncRunParameterValues({
   error,
   appId,
   nodeId,
+  targetNodeResolved,
   parameterDefinitions,
   parameterValues,
   onChange,
 }: UseSyncRunParameterValuesOptions) {
   useEffect(() => {
-    if (readOnly || isLoading || error || !appId || !nodeId) {
+    if (readOnly || isLoading || error || !appId || !nodeId || !targetNodeResolved) {
       return;
     }
 
-    const nextValues = getSyncedRunParameterValues(parameterValues, parameterDefinitions);
+    const nextValues = getSyncedRunParameterValues(parameterValues, parameterDefinitions, targetNodeResolved);
     if (nextValues !== null) {
       onChange(nextValues);
     }
-  }, [appId, error, isLoading, nodeId, onChange, parameterDefinitions, parameterValues, readOnly]);
+  }, [appId, error, isLoading, nodeId, onChange, parameterDefinitions, parameterValues, readOnly, targetNodeResolved]);
 }

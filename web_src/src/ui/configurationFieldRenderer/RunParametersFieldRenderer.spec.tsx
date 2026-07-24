@@ -196,4 +196,22 @@ describe("RunParametersFieldRenderer", () => {
       expect(screen.getByTestId("current-value").textContent).toBe('{"message":"hello"}');
     });
   });
+
+  it("preserves parameter values when the selected node is missing from the loaded canvas", async () => {
+    renderWithTheme(
+      <ControlledRenderer
+        initialValue={{ message: "keep-me" }}
+        allValues={{ app: "canvas_target", node: "missing-node" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe('{"message":"keep-me"}');
+      expect(
+        screen.getByText(
+          "The selected node was not found in the target app. Choose a different node before configuring run parameters.",
+        ),
+      ).toBeTruthy();
+    });
+  });
 });
