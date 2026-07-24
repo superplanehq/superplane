@@ -47,12 +47,27 @@ func IsNotFoundError(err error) bool {
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
-	repo, _, err := c.underlying.Repositories.Get(context.Background(), c.owner, repository)
+	owner, name := c.ownerAndName(repository)
+	repo, _, err := c.underlying.Repositories.Get(context.Background(), owner, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository: %w", err)
 	}
 
 	return repo, nil
+}
+
+// ownerAndName accepts either "repo" (scoped to the integration owner) or
+// "owner/repo". Claude components need the latter; GitHub components historically
+// stored the short name.
+func (c *Client) ownerAndName(repository string) (owner, name string) {
+	repository = strings.TrimSpace(repository)
+	if i := strings.Index(repository, "/"); i > 0 {
+		rest := repository[i+1:]
+		if rest != "" && !strings.Contains(rest, "/") {
+			return repository[:i], rest
+		}
+	}
+	return c.owner, repository
 }
 
 func (c *Client) listAppRepositories() ([]*github.Repository, error) {
@@ -149,31 +164,38 @@ func (c *Client) listOrganizationRepositories() ([]*github.Repository, error) {
 }
 
 func (c *Client) ListBranches(ctx context.Context, repository string, opts *github.BranchListOptions) ([]*github.Branch, *github.Response, error) {
-	return c.underlying.Repositories.ListBranches(ctx, c.owner, repository, opts)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListBranches(ctx, owner, name, opts)
 }
 
 func (c *Client) CreateIssueReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
-	return c.underlying.Reactions.CreateIssueCommentReaction(ctx, c.owner, repository, commentID, content)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Reactions.CreateIssueCommentReaction(ctx, owner, name, commentID, content)
 }
 
 func (c *Client) CreateReviewCommentReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
-	return c.underlying.Reactions.CreatePullRequestCommentReaction(ctx, c.owner, repository, commentID, content)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Reactions.CreatePullRequestCommentReaction(ctx, owner, name, commentID, content)
 }
 
 func (c *Client) CreatePullRequestReview(ctx context.Context, repository string, pullNumber int, review *github.PullRequestReviewRequest) (*github.PullRequestReview, *github.Response, error) {
-	return c.underlying.PullRequests.CreateReview(ctx, c.owner, repository, pullNumber, review)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.CreateReview(ctx, owner, name, pullNumber, review)
 }
 
 func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullRequest *github.NewPullRequest) (*github.PullRequest, *github.Response, error) {
-	return c.underlying.PullRequests.Create(ctx, c.owner, repository, pullRequest)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.Create(ctx, owner, name, pullRequest)
 }
 
 func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumber int) (*github.PullRequest, *github.Response, error) {
-	return c.underlying.PullRequests.Get(ctx, c.owner, repository, pullNumber)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
 func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
-	return c.underlying.PullRequests.Edit(ctx, c.owner, repository, pullNumber, pullRequest)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.Edit(ctx, owner, name, pullNumber, pullRequest)
 }
 
 // MarkPullRequestReadyForReview takes a pull request out of the draft state.
@@ -194,135 +216,168 @@ func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, pullRequestI
 }
 
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
-	return c.underlying.PullRequests.Merge(ctx, c.owner, repository, pullNumber, commitMessage, options)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.Merge(ctx, owner, name, pullNumber, commitMessage, options)
 }
 
 func (c *Client) AddPullRequestReviewers(ctx context.Context, repository string, pullNumber int, reviewers github.ReviewersRequest) (*github.PullRequest, *github.Response, error) {
-	return c.underlying.PullRequests.RequestReviewers(ctx, c.owner, repository, pullNumber, reviewers)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.RequestReviewers(ctx, owner, name, pullNumber, reviewers)
 }
 
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
-	return c.underlying.Repositories.CreateStatus(ctx, c.owner, repository, sha, status)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.CreateStatus(ctx, owner, name, sha, status)
 }
 
 func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref string, opts *github.ListOptions) (*github.CombinedStatus, *github.Response, error) {
-	return c.underlying.Repositories.GetCombinedStatus(ctx, c.owner, repository, ref, opts)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetCombinedStatus(ctx, owner, name, ref, opts)
 }
 
 func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
-	return c.underlying.Checks.ListCheckRunsForRef(ctx, c.owner, repository, ref, opts)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
 }
 
 func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
-	return c.underlying.Repositories.CreateDeployment(ctx, c.owner, repository, request)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.CreateDeployment(ctx, owner, name, request)
 }
 
 func (c *Client) CreateDeploymentStatus(ctx context.Context, repository string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
-	return c.underlying.Repositories.CreateDeploymentStatus(ctx, c.owner, repository, deploymentID, request)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.CreateDeploymentStatus(ctx, owner, name, deploymentID, request)
 }
 
 func (c *Client) CreateWorkflowDispatchEvent(ctx context.Context, repository string, workflowFile string, request github.CreateWorkflowDispatchEventRequest) (*github.WorkflowDispatchRunDetails, *github.Response, error) {
-	return c.underlying.Actions.CreateWorkflowDispatchEventByFileName(ctx, c.owner, repository, workflowFile, request)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Actions.CreateWorkflowDispatchEventByFileName(ctx, owner, name, workflowFile, request)
 }
 
 func (c *Client) GetRepositoryPermissionLevel(ctx context.Context, repository string, username string) (*github.RepositoryPermissionLevel, *github.Response, error) {
-	return c.underlying.Repositories.GetPermissionLevel(ctx, c.owner, repository, username)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetPermissionLevel(ctx, owner, name, username)
 }
 
 func (c *Client) CancelWorkflowRun(repository string, workflowRunID int64) (*github.Response, error) {
-	return c.underlying.Actions.CancelWorkflowRunByID(context.Background(), c.owner, repository, workflowRunID)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Actions.CancelWorkflowRunByID(context.Background(), owner, name, workflowRunID)
 }
 
 func (c *Client) GetWorkflowRun(repository string, workflowRunID int64) (*github.WorkflowRun, *github.Response, error) {
-	return c.underlying.Actions.GetWorkflowRunByID(context.Background(), c.owner, repository, workflowRunID)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Actions.GetWorkflowRunByID(context.Background(), owner, name, workflowRunID)
 }
 
 func (c *Client) AddIssueAssignees(ctx context.Context, repository string, issueNumber int, assignees []string) (*github.Issue, *github.Response, error) {
-	return c.underlying.Issues.AddAssignees(ctx, c.owner, repository, issueNumber, assignees)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.AddAssignees(ctx, owner, name, issueNumber, assignees)
 }
 
 func (c *Client) RemoveIssueAssignees(ctx context.Context, repository string, issueNumber int, assignees []string) (*github.Issue, *github.Response, error) {
-	return c.underlying.Issues.RemoveAssignees(ctx, c.owner, repository, issueNumber, assignees)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.RemoveAssignees(ctx, owner, name, issueNumber, assignees)
 }
 
 func (c *Client) CreateIssueComment(ctx context.Context, repository string, issueNumber int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
-	return c.underlying.Issues.CreateComment(ctx, c.owner, repository, issueNumber, comment)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.CreateComment(ctx, owner, name, issueNumber, comment)
 }
 
 func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
-	return c.underlying.Issues.EditComment(ctx, c.owner, repository, commentID, comment)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.EditComment(ctx, owner, name, commentID, comment)
 }
 
 func (c *Client) CreateIssue(ctx context.Context, repository string, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
-	return c.underlying.Issues.Create(ctx, c.owner, repository, issue)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.Create(ctx, owner, name, issue)
 }
 
 func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber int) (*github.Issue, *github.Response, error) {
-	return c.underlying.Issues.Get(ctx, c.owner, repository, issueNumber)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
-	return c.underlying.Issues.Edit(ctx, c.owner, repository, issueNumber, issue)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.Edit(ctx, owner, name, issueNumber, issue)
 }
 
 func (c *Client) AddLabelsToIssue(ctx context.Context, repository string, issueNumber int, labels []string) ([]*github.Label, *github.Response, error) {
-	return c.underlying.Issues.AddLabelsToIssue(ctx, c.owner, repository, issueNumber, labels)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.AddLabelsToIssue(ctx, owner, name, issueNumber, labels)
 }
 
 func (c *Client) RemoveLabelForIssue(ctx context.Context, repository string, issueNumber int, label string) (*github.Response, error) {
-	return c.underlying.Issues.RemoveLabelForIssue(ctx, c.owner, repository, issueNumber, label)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.RemoveLabelForIssue(ctx, owner, name, issueNumber, label)
 }
 
 func (c *Client) ListLabelsForIssue(ctx context.Context, repository string, issueNumber int) ([]*github.Label, *github.Response, error) {
-	return c.underlying.Issues.ListLabelsByIssue(ctx, c.owner, repository, issueNumber, nil)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.ListLabelsByIssue(ctx, owner, name, issueNumber, nil)
 }
 
 func (c *Client) GetRef(repository string, ref string) (*github.Reference, *github.Response, error) {
-	return c.underlying.Git.GetRef(context.Background(), c.owner, repository, ref)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Git.GetRef(context.Background(), owner, name, ref)
 }
 
 func (c *Client) DeleteRef(ctx context.Context, repository string, ref string) (*github.Response, error) {
-	return c.underlying.Git.DeleteRef(ctx, c.owner, repository, ref)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Git.DeleteRef(ctx, owner, name, ref)
 }
 
 func (c *Client) GetRelease(ctx context.Context, repository string, id int64) (*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.GetRelease(ctx, c.owner, repository, id)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetRelease(ctx, owner, name, id)
 }
 
 func (c *Client) CreateRelease(ctx context.Context, repository string, release *github.RepositoryRelease) (*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.CreateRelease(ctx, c.owner, repository, release)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.CreateRelease(ctx, owner, name, release)
 }
 
 func (c *Client) EditRelease(ctx context.Context, repository string, id int64, release *github.RepositoryRelease) (*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.EditRelease(ctx, c.owner, repository, id, release)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.EditRelease(ctx, owner, name, id, release)
 }
 
 func (c *Client) GenerateReleaseNotes(ctx context.Context, repository string, options *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, *github.Response, error) {
-	return c.underlying.Repositories.GenerateReleaseNotes(ctx, c.owner, repository, options)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GenerateReleaseNotes(ctx, owner, name, options)
 }
 
 func (c *Client) ListReleases(ctx context.Context, repository string, options *github.ListOptions) ([]*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.ListReleases(ctx, c.owner, repository, options)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListReleases(ctx, owner, name, options)
 }
 
 func (c *Client) GetReleaseByTag(ctx context.Context, repository string, tag string) (*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.GetReleaseByTag(ctx, c.owner, repository, tag)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetReleaseByTag(ctx, owner, name, tag)
 }
 
 func (c *Client) GetLatestRelease(ctx context.Context, repository string) (*github.RepositoryRelease, *github.Response, error) {
-	return c.underlying.Repositories.GetLatestRelease(ctx, c.owner, repository)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetLatestRelease(ctx, owner, name)
 }
 
 func (c *Client) DeleteRelease(ctx context.Context, repository string, id int64) (*github.Response, error) {
-	return c.underlying.Repositories.DeleteRelease(ctx, c.owner, repository, id)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.DeleteRelease(ctx, owner, name, id)
 }
 
 func (c *Client) CreateHook(ctx context.Context, repository string, hook *github.Hook) (*github.Hook, *github.Response, error) {
-	return c.underlying.Repositories.CreateHook(ctx, c.owner, repository, hook)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.CreateHook(ctx, owner, name, hook)
 }
 
 func (c *Client) DeleteHook(ctx context.Context, repository string, hookID int64) (*github.Response, error) {
-	return c.underlying.Repositories.DeleteHook(ctx, c.owner, repository, hookID)
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.DeleteHook(ctx, owner, name, hookID)
 }
 
 func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Response, error) {

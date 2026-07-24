@@ -118,6 +118,7 @@ export function InstallProgressPanel({
                 organizationId={organizationId ?? ""}
                 selections={integrationSelections}
                 onSelectionsChange={setIntegrationSelections}
+                variant="status"
               />
             </div>
           )}
@@ -320,6 +321,7 @@ function ParamsSection({
                 value={values[param.name]}
                 onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: val }))}
                 organizationId={organizationId}
+                suggestedKeyName={param.secretKey}
               />
             ) : (
               <Input
