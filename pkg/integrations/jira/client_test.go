@@ -318,6 +318,92 @@ func Test__Client__DeleteIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateIssueWebhook(t *testing.T) {
+	t.Run("wrapped response shape (documented, confirmed live)", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"webhookRegistrationResult":[{"createdWebhookId":1000}]}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		id, err := client.CreateIssueWebhook("https://example.com/webhook", `project = "ENG"`, []string{"jira:issue_created"})
+		require.NoError(t, err)
+		assert.Equal(t, int64(1000), id)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/webhook")
+	})
+
+	t.Run("bare array response shape (fallback)", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1001}]`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		id, err := client.CreateIssueWebhook("https://example.com/webhook", `project = "ENG"`, []string{"jira:issue_created"})
+		require.NoError(t, err)
+		assert.Equal(t, int64(1001), id)
+	})
+
+	t.Run("per-webhook error is surfaced", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"webhookRegistrationResult":[{"errors":["The clause myClause is unsupported"]}]}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateIssueWebhook("https://example.com/webhook", "bogus", []string{"jira:issue_created"})
+		require.ErrorContains(t, err, "myClause is unsupported")
+	})
+
+	t.Run("unrecognized shape includes the raw body in the error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"unexpected":"shape"}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateIssueWebhook("https://example.com/webhook", "", []string{"jira:issue_created"})
+		require.ErrorContains(t, err, `{"unexpected":"shape"}`)
+	})
+}
+
+func Test__Client__DeleteIssueWebhooks(t *testing.T) {
+	t.Run("successful delete", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.DeleteIssueWebhooks([]int64{1000})
+		require.NoError(t, err)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		body, _ := io.ReadAll(httpContext.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+	})
+
+	t.Run("no-op for an empty id list", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.DeleteIssueWebhooks(nil)
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
+	})
+}
+
 func Test__Client__GetProjectIssueTypes(t *testing.T) {
 	t.Run("returns issue types for a project", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

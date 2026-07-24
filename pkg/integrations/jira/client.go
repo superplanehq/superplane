@@ -830,15 +830,20 @@ type createIssueWebhookResult struct {
 	Errors           []string `json:"errors,omitempty"`
 }
 
+// createIssueWebhookResponse is the documented response shape: results are
+// wrapped under "webhookRegistrationResult", not returned as a bare array
+// (confirmed against a live Jira Cloud site - an earlier version of this
+// client assumed a bare array based on a doc summary and failed on the
+// first real call).
+type createIssueWebhookResponse struct {
+	WebhookRegistrationResult []createIssueWebhookResult `json:"webhookRegistrationResult"`
+}
+
 // CreateIssueWebhook registers a dynamic webhook for issue events, scoped by
 // an optional JQL filter, via POST /rest/api/3/webhook. This endpoint is only
 // reachable by Connect/OAuth apps (requires manage:jira-webhook) - it is not
 // available to Basic Auth (API token) clients, which is the whole reason
 // this proof of concept exists.
-//
-// PoC caveat: the response shape (a bare array of per-webhook results) is
-// per Atlassian's public docs but was not verified against a live site;
-// confirm before depending on it in production.
 func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []string) (int64, error) {
 	req := createIssueWebhookRequest{
 		URL: callbackURL,
@@ -857,21 +862,37 @@ func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []stri
 		return 0, err
 	}
 
-	var results []createIssueWebhookResult
-	if err := json.Unmarshal(responseBody, &results); err != nil {
-		return 0, fmt.Errorf("parse create webhook response: %w", err)
-	}
-	if len(results) == 0 {
-		return 0, fmt.Errorf("empty create webhook response")
+	results, err := parseCreateIssueWebhookResponse(responseBody)
+	if err != nil {
+		return 0, err
 	}
 	if len(results[0].Errors) > 0 {
 		return 0, fmt.Errorf("failed to create webhook: %s", strings.Join(results[0].Errors, "; "))
 	}
 	if results[0].CreatedWebhookID == nil {
-		return 0, fmt.Errorf("create webhook response missing createdWebhookId")
+		return 0, fmt.Errorf("create webhook response missing createdWebhookId: %s", string(responseBody))
 	}
 
 	return *results[0].CreatedWebhookID, nil
+}
+
+// parseCreateIssueWebhookResponse accepts either the documented
+// {"webhookRegistrationResult": [...]}  shape or a bare array, since the two
+// disagree between Atlassian's own doc summaries. Always includes the raw
+// body on failure so a future shape mismatch is diagnosable from the error
+// alone instead of requiring another live round trip to find out.
+func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookResult, error) {
+	var wrapped createIssueWebhookResponse
+	if err := json.Unmarshal(responseBody, &wrapped); err == nil && len(wrapped.WebhookRegistrationResult) > 0 {
+		return wrapped.WebhookRegistrationResult, nil
+	}
+
+	var results []createIssueWebhookResult
+	if err := json.Unmarshal(responseBody, &results); err == nil && len(results) > 0 {
+		return results, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
 }
 
 // DeleteIssueWebhooks removes previously-registered dynamic webhooks by id,
