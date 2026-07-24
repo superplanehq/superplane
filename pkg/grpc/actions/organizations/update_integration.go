@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -52,7 +52,7 @@ func UpdateIntegration(
 	}
 
 	if name != "" && name != instance.InstallationName {
-		existing, err := models.FindIntegrationByName(org, name)
+		existing, err := models.FindIntegrationByName(database.Conn(), org, name)
 		if err == nil && existing.ID != instance.ID {
 			return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
 		}

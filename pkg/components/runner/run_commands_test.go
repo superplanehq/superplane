@@ -384,7 +384,7 @@ func TestValidateEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateEnvironment(tt.environment)
+			err := ValidateEnvironment(tt.environment)
 			if tt.errContains == "" {
 				require.NoError(t, err)
 				return

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -425,7 +426,9 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values map[string][]byte
+	Values          map[string][]byte
+	SecretKeys      map[string]map[string][]byte
+	IntegrationKeys map[string]map[string][]byte
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -435,6 +438,33 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, error) {
+	if c.SecretKeys == nil {
+		return nil, fmt.Errorf("secret keys not configured")
+	}
+
+	keys, ok := c.SecretKeys[secretName]
+	if !ok {
+		return nil, fmt.Errorf("secret keys not found for %q", secretName)
+	}
+
+	return keys, nil
+}
+
+func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+	if c.IntegrationKeys == nil {
+		return nil, fmt.Errorf("integration secrets not configured")
+	}
+
+	name := strings.TrimSpace(installationName)
+	keys, ok := c.IntegrationKeys[name]
+	if !ok {
+		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+	}
+
+	return keys, nil
 }
 
 type ExpressionContext struct {

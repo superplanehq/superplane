@@ -104,18 +104,6 @@ func (c *contextBoundHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-type fakeSecretsContext struct {
-	value []byte
-	err   error
-}
-
-func (f *fakeSecretsContext) GetKey(_, _ string) ([]byte, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.value, nil
-}
-
 type sequenceHTTPClient struct {
 	errors    []error
 	responses []*http.Response
@@ -530,7 +518,7 @@ func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
 			},
 		},
 	})
-	ctx.Secrets = &fakeSecretsContext{value: []byte("tok-123")}
+	ctx.Secrets = &contexts.SecretsContext{Values: map[string][]byte{"org-secret/token": []byte("tok-123")}}
 
 	err := h.Execute(ctx)
 	require.NoError(t, err)
@@ -561,7 +549,7 @@ func TestHTTP__Execute__SetsBasicAuthFromSecret(t *testing.T) {
 			},
 		},
 	})
-	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+	ctx.Secrets = &contexts.SecretsContext{Values: map[string][]byte{"s/k": []byte("abc")}}
 
 	err := h.Execute(ctx)
 	require.NoError(t, err)
@@ -592,7 +580,7 @@ func TestHTTP__Execute__SetsCustomHeaderFromSecret(t *testing.T) {
 			},
 		},
 	})
-	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+	ctx.Secrets = &contexts.SecretsContext{Values: map[string][]byte{"s/k": []byte("abc")}}
 
 	err := h.Execute(ctx)
 	require.NoError(t, err)
@@ -618,7 +606,7 @@ func TestHTTP__Execute__AuthorizationSecretMissing(t *testing.T) {
 			},
 		},
 	})
-	ctx.Secrets = &fakeSecretsContext{err: core.ErrSecretKeyNotFound}
+	ctx.Secrets = &contexts.SecretsContext{Values: map[string][]byte{}}
 
 	err := h.Execute(ctx)
 	require.NoError(t, err)

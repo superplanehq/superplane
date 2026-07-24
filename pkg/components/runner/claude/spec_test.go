@@ -69,7 +69,10 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		Steps: []ClaudeCodeStep{
 			{Name: "Do the thing", Type: claudeStepPrompt, Prompt: strPtr("do the thing")},
 		},
-		AnthropicAPIKey: secretRef("anthropic", "api_key"),
+		Credentials: ClaudeCodeCredentials{
+			Source: "secret",
+			Secret: secretRef("anthropic", "api_key"),
+		},
 	}
 	require.NoError(t, validateRunClaudeCodeSpec(valid))
 

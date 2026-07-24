@@ -368,7 +368,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 	}

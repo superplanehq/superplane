@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
@@ -68,7 +68,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration exists with the correct name
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, integrationID, integration.ID.String())
 		assert.Equal(t, name, integration.InstallationName)
@@ -91,7 +91,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we cannot find it by the original name anymore
 		//
-		_, err = models.FindIntegrationByName(r.Organization.ID, name)
+		_, err = models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 		//
@@ -106,7 +106,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we can find the new installation by name
 		//
-		newIntegration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		newIntegration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, newIntegration.InstallationName)
 		assert.Equal(t, response2.Integration.Metadata.Id, newIntegration.ID.String())
@@ -143,11 +143,11 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify both integrations exist and can be found by name in their respective organizations
 		//
-		integration1, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration1, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response1.Integration.Metadata.Id, integration1.ID.String())
 
-		integration2, err := models.FindIntegrationByName(org2.ID, name)
+		integration2, err := models.FindIntegrationByName(database.Conn(), org2.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response2.Integration.Metadata.Id, integration2.ID.String())
 	})
@@ -193,7 +193,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 
@@ -236,7 +236,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 		assert.Equal(t, "dummy", integration.AppName)
