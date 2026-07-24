@@ -1,7 +1,6 @@
 {
   "data": {
     "action": "opened",
-    "assignee": null,
     "issue": {
       "number": 42,
       "title": "Fix flaky build",
