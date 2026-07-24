@@ -47,7 +47,7 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		return nil
 	}
 
-	if nodeMetadata.Repository != nil && nodeMetadata.Repository.Name == repository {
+	if nodeMetadata.Repository != nil && repositoryRefersTo(nodeMetadata.Repository.Name, repository) {
 		return nil
 	}
 
@@ -61,11 +61,32 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		return fmt.Errorf("failed to find repository: %w", err)
 	}
 
+	name := repo.GetFullName()
+	if name == "" {
+		name = repo.GetName()
+	}
+
 	return ctx.Set(NodeMetadata{Repository: &Repository{
 		ID:   repo.GetID(),
-		Name: repo.GetName(),
+		Name: name,
 		URL:  repo.GetHTMLURL(),
 	}})
+}
+
+// repositoryRefersTo reports whether configured identifies the same repository
+// as storedName. Short names may match either form when equal; owner/repo only
+// matches an identical stored owner/repo so an owner change cannot skip lookup.
+func repositoryRefersTo(storedName, configured string) bool {
+	if storedName == "" || configured == "" {
+		return false
+	}
+	if storedName == configured {
+		return true
+	}
+	if strings.Contains(configured, "/") {
+		return false
+	}
+	return storedName == configured
 }
 
 func getRepositoryFromConfiguration(c any) string {

@@ -141,7 +141,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         },
       }),
     },
-    // Catalog install from ZeroStatePage / prototype starter setup
+    // Catalog install from FreshOrgLanding starter setup
     {
       pattern: re("/apps/install"),
       resolve: () => ({
@@ -209,20 +209,27 @@ type StorybookConfigField = {
 };
 
 const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
-  storybookIntegrationDefinition("github", "GitHub", "GitHub repositories, issues, and pull requests", [
-    {
-      name: "organization",
-      type: "string",
-      description:
-        "Organization to install the app into. If not specified, the app will be installed into the user's account.",
-      required: false,
-      label: "Organization",
-      visibilityConditions: [],
-      requiredConditions: [],
-      sensitive: false,
-      togglable: false,
-    },
-  ]),
+  storybookIntegrationDefinition(
+    "github",
+    "GitHub",
+    "GitHub repositories, issues, and pull requests",
+    [
+      {
+        name: "organization",
+        type: "string",
+        description:
+          "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+        required: false,
+        label: "Organization",
+        visibilityConditions: [],
+        requiredConditions: [],
+        sensitive: false,
+        togglable: false,
+      },
+    ],
+    // Dev compose sets APP_ENV=development → GitHub SetupProvider path is on.
+    { legacySetupOnly: false },
+  ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
     {
       name: "apiKey",
@@ -262,6 +269,7 @@ function storybookIntegrationDefinition(
   label: string,
   description: string,
   configuration: StorybookConfigField[],
+  options?: { legacySetupOnly?: boolean },
 ) {
   return {
     name,
@@ -270,6 +278,9 @@ function storybookIntegrationDefinition(
     description,
     configuration,
     instructions: "",
+    // Mirrors API LegacySetupOnly (!registry.SupportsNewSetupFlow).
+    // SupportsNewSetupFlow = SetupProvider registered AND APP_ENV == "development".
+    legacySetupOnly: options?.legacySetupOnly ?? true,
   };
 }
 
