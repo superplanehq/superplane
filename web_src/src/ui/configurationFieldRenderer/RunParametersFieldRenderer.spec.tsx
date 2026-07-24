@@ -114,7 +114,7 @@ describe("RunParametersFieldRenderer", () => {
     });
   });
 
-  it("falls back to JSON editing when the target node has no parameters", async () => {
+  it("shows an informational message when the target node has no parameters", async () => {
     mockUseCanvas.mockReturnValue({
       data: {
         id: "canvas_target",
@@ -141,8 +141,77 @@ describe("RunParametersFieldRenderer", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("run-parameters-field-parameters")).toBeTruthy();
+      const message = screen.getByTestId("run-parameters-field-parameters");
+      expect(message).toHaveTextContent("The trigger you selected does not define any parameters.");
+      expect(message).toHaveTextContent(
+        "If parameters are needed in your flow, define them in the trigger configuration first.",
+      );
+      expect(message).toHaveTextContent(
+        "Without parameters, the run will still be triggered, but no additional values will be passed.",
+      );
       expect(screen.queryByTestId("string-field-message")).toBeNull();
+    });
+  });
+
+  it("clears stale parameter values when the target node has no parameters", async () => {
+    mockUseCanvas.mockReturnValue({
+      data: {
+        id: "canvas_target",
+        spec: {
+          nodes: [
+            {
+              id: "on-run-empty",
+              name: "Run",
+              type: "TYPE_TRIGGER",
+              component: "onRun",
+              configuration: {
+                parameters: [],
+              },
+            },
+          ],
+        },
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCanvas>);
+
+    renderWithTheme(
+      <ControlledRenderer initialValue={{ custom: true }} allValues={{ app: "canvas_target", node: "on-run-empty" }} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe("{}");
+    });
+  });
+
+  it("removes stale parameter keys when the target node defines different parameters", async () => {
+    renderWithTheme(
+      <ControlledRenderer
+        initialValue={{ message: "hello", obsolete: "drop-me" }}
+        allValues={{ app: "canvas_target", node: "on-run" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe('{"message":"hello"}');
+    });
+  });
+
+  it("preserves parameter values when the selected node is missing from the loaded canvas", async () => {
+    renderWithTheme(
+      <ControlledRenderer
+        initialValue={{ message: "keep-me" }}
+        allValues={{ app: "canvas_target", node: "missing-node" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-value").textContent).toBe('{"message":"keep-me"}');
+      expect(
+        screen.getByText(
+          "The selected node was not found in the target app. Choose a different node before configuring run parameters.",
+        ),
+      ).toBeTruthy();
     });
   });
 });
