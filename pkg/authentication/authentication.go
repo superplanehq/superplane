@@ -646,13 +646,15 @@ var errSignupRequired = fmt.Errorf("signup must be started from the signup page"
 var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
 
-// checkSignupPolicy verifies that a new-user signup would be allowed for
-// the given email without creating any records. For existing accounts this
-// is always a no-op.
+// checkSignupPolicy verifies account access and whether a new-user signup
+// would be allowed without creating records or consuming a magic code.
 func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
-	_, err := models.FindAccountByEmail(email)
+	account, err := models.FindAccountByEmail(email)
 	if err == nil {
-		return nil // existing user — no signup gate
+		if account.IsBlocked() {
+			return models.ErrAccountBlocked
+		}
+		return nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("Error finding account for %s: %v", email, err)
@@ -706,7 +708,7 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 
 func errorStatusForAccountError(err error) int {
 	switch err {
-	case errSignupDisabled, errSignupRequired, errInviteLinkInvalid:
+	case errSignupDisabled, errSignupRequired, errInviteLinkInvalid, models.ErrAccountBlocked:
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError

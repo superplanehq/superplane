@@ -12,6 +12,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -309,6 +310,33 @@ func TestHandler_checkSignupPolicy(t *testing.T) {
 
 		err = handler.checkSignupPolicy(account.Email, req)
 
+		assert.NoError(t, err)
+	})
+
+	t.Run("should reject blocked account without consuming magic code", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		handler.magicCodeEnabled = true
+
+		account, err := models.CreateAccount("Blocked User", "blocked-magic-code@example.com")
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(account.ID.String()))
+
+		code := "123456"
+		codeHash := crypto.HashToken(code)
+		_, err = models.CreateAccountMagicCode(account.Email, codeHash, time.Now().Add(time.Hour))
+		require.NoError(t, err)
+
+		form := url.Values{"email": {account.Email}, "code": {code}}
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", jsonContentType)
+		recorder := httptest.NewRecorder()
+
+		handler.handleMagicCodeVerify(recorder, req)
+
+		assert.Equal(t, http.StatusForbidden, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), models.AccountBlockedMessage)
+		_, err = models.FindValidAccountMagicCode(account.Email, codeHash, magicCodeMaxVerifyAttempts)
 		assert.NoError(t, err)
 	})
 
