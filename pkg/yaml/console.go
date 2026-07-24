@@ -591,6 +591,11 @@ func validateNodesPanelContent(panel ConsolePanel) error {
 	if err := validateOptionalString(panel.ID, "content.title", panel.Content["title"]); err != nil {
 		return err
 	}
+	if rawConcurrent, ok := panel.Content["allowConcurrentRuns"]; ok && rawConcurrent != nil {
+		if _, ok := rawConcurrent.(bool); !ok {
+			return fmt.Errorf("panel %q content.allowConcurrentRuns must be a boolean", panel.ID)
+		}
+	}
 	rawNodes, ok := panel.Content["nodes"]
 	if !ok || rawNodes == nil {
 		return fmt.Errorf("panel %q content.nodes must be an array", panel.ID)

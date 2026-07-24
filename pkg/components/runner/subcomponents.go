@@ -19,14 +19,6 @@ func MachineTypeOptions() []configuration.FieldOption {
 
 func IntPtr(v int) *int { return intPtr(v) }
 
-func ResolveEnvironment(secrets core.SecretsContext, environment []EnvironmentVariable) ([]BrokerEnvironmentVariable, error) {
-	return resolveEnvironment(secrets, environment)
-}
-
-func ValidateEnvironment(environment []EnvironmentVariable) error {
-	return validateEnvironment(environment)
-}
-
 func AfterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	return afterRunnerTaskCreated(ctx, taskID)
 }

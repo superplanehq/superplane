@@ -127,7 +127,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
 | `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?`, `formMode?`, inline presentation fields |
-| `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
+| `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `allowConcurrentRuns?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `board` | Render rows as kanban lanes grouped by a scalar field | `title?`, `dataSource`, `render.kind: "board"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
@@ -929,6 +929,8 @@ Node panels display one or more pinned canvas nodes in a single card. The single
 `promptConfirmation` (default `false`) controls whether a Run click pops the confirmation dialog. Templates that declare input fields (`parameters`) always open the dialog so the operator can fill them in. Templates with no input fields fire immediately on click unless `promptConfirmation` is `true`, in which case a bare "Run X?" confirmation is shown first.
 
 Every Run button — whether in the node panel or in a table row action — is disabled while its target trigger has an active canvas run in `STATE_STARTED`, so operators cannot enqueue duplicate runs while a pipeline is still executing. The shared `useConsoleTriggerLock` combines websocket-driven in-flight signals with a short submission-grace window; the tooltip switches to "A run for this trigger is already in progress." while the lock is engaged. Each Nodes panel holds a single lock instance shared by all of its entries, with submissions keyed by trigger node id — so two entries pointing at the same trigger lock together the moment either one fires, closing the window between the invoke call and the websocket-driven `STATE_STARTED` refresh.
+
+`allowConcurrentRuns` (default `false`) is a widget-level option on the Nodes panel that opts out of the in-flight lock. When set to `true`, the panel's Run buttons stay enabled during an active run so operators can trigger multiple runs at once; `useConsoleRunTrigger` and `NodesPanelInlineRunForm` ignore the `runInFlightIds` / pending signals for every entry in that panel. When left unset (the default), the blocking behavior above is preserved, so existing dashboards are unaffected.
 
 > **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Nodes entry) to restore the confirm-first behavior.
 
