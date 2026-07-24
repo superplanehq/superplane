@@ -60,7 +60,7 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { DefaultLayoutEngine } from "@/lib/layout";
+import { DefaultLayoutEngine, DEFAULT_LAYOUT_DIRECTION, type LayoutDirection } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
@@ -168,6 +168,7 @@ import {
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
+const CANVAS_LAYOUT_DIRECTION_STORAGE_KEY = "canvas-auto-layout-direction";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 const RUNNING_RUNS_FILTERS = { states: [...ACTIVE_RUN_API_STATES] };
@@ -221,6 +222,34 @@ function useAutoLayoutOnUpdatePreference() {
   }, [isAutoLayoutOnUpdateEnabled]);
 
   return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
+}
+
+function readStoredLayoutDirection(): LayoutDirection {
+  if (typeof window === "undefined") {
+    return DEFAULT_LAYOUT_DIRECTION;
+  }
+
+  return window.localStorage.getItem(CANVAS_LAYOUT_DIRECTION_STORAGE_KEY) === "vertical"
+    ? "vertical"
+    : DEFAULT_LAYOUT_DIRECTION;
+}
+
+/**
+ * Tracks whether auto-layout should arrange the canvas horizontally (freeform default)
+ * or vertically (clean top-to-bottom pipeline view). The preference is persisted so a
+ * user's chosen orientation sticks across canvases and sessions.
+ */
+function useAutoLayoutDirectionPreference() {
+  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>(readStoredLayoutDirection);
+
+  const setDirection = useCallback((direction: LayoutDirection) => {
+    setLayoutDirection(direction);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_LAYOUT_DIRECTION_STORAGE_KEY, direction);
+    }
+  }, []);
+
+  return { layoutDirection, setLayoutDirection: setDirection };
 }
 
 export function AppPage() {
@@ -608,6 +637,7 @@ export function AppPage() {
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
+  const { layoutDirection, setLayoutDirection } = useAutoLayoutDirectionPreference();
   const { handleToggleAutoFocus, isAutoFocusEnabled } = useCanvasAutoFocusPreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
@@ -1179,9 +1209,10 @@ export function AppPage() {
         scope: "connected-component",
         nodeIds: [nodeID],
         components,
+        direction: layoutDirection,
       });
     },
-    [isAutoLayoutOnUpdateEnabled, components],
+    [isAutoLayoutOnUpdateEnabled, components, layoutDirection],
   );
 
   /**
@@ -2861,6 +2892,7 @@ export function AppPage() {
         nodeIds,
         scope: "connected-component",
         components,
+        direction: layoutDirection,
       });
 
       analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
@@ -2871,8 +2903,53 @@ export function AppPage() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [
+      canvas,
+      components,
+      organizationId,
+      canvasId,
+      handleSaveWorkflow,
+      isReadOnly,
+      applyLocalWorkflowUpdate,
+      layoutDirection,
+    ],
   );
+
+  /**
+   * Switches the canvas between the horizontal (freeform) and vertical auto-layout
+   * views. Changing the orientation immediately reflows the whole canvas so the
+   * result matches the newly selected direction.
+   */
+  const handleToggleLayoutDirection = useCallback(async () => {
+    const nextDirection: LayoutDirection = layoutDirection === "vertical" ? "horizontal" : "vertical";
+    setLayoutDirection(nextDirection);
+
+    if (!canvas || !organizationId || !canvasId) return;
+
+    const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
+      scope: "full-canvas",
+      components,
+      direction: nextDirection,
+    });
+
+    analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
+
+    applyLocalWorkflowUpdate(updatedWorkflow);
+
+    if (!isReadOnly) {
+      await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+    }
+  }, [
+    layoutDirection,
+    setLayoutDirection,
+    canvas,
+    components,
+    organizationId,
+    canvasId,
+    handleSaveWorkflow,
+    isReadOnly,
+    applyLocalWorkflowUpdate,
+  ]);
 
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
@@ -4215,6 +4292,8 @@ export function AppPage() {
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
           isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
+          layoutDirection={layoutDirection}
+          onToggleLayoutDirection={!isReadOnly ? handleToggleLayoutDirection : undefined}
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}

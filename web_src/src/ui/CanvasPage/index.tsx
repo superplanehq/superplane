@@ -49,6 +49,7 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
+import type { LayoutDirection } from "@/lib/layout";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
@@ -248,6 +249,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  layoutDirection?: LayoutDirection;
+  onToggleLayoutDirection?: () => void;
   isAutoFocusEnabled?: boolean;
   onToggleAutoFocus?: () => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version";
@@ -1558,6 +1561,8 @@ function CanvasPage(props: CanvasPageProps) {
                   isEditing={props.isEditing}
                   isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                  layoutDirection={props.layoutDirection}
+                  onToggleLayoutDirection={props.onToggleLayoutDirection}
                   autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
                   isAutoFocusEnabled={props.isAutoFocusEnabled}
@@ -2173,6 +2178,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  layoutDirection,
+  onToggleLayoutDirection,
   isAutoFocusEnabled = true,
   onToggleAutoFocus,
   readOnly,
@@ -2229,6 +2236,8 @@ function CanvasContent({
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  layoutDirection?: LayoutDirection;
+  onToggleLayoutDirection?: () => void;
   isAutoFocusEnabled?: boolean;
   onToggleAutoFocus?: () => void;
   readOnly?: boolean;
@@ -3313,6 +3322,8 @@ function CanvasContent({
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                   isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
                   onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  layoutDirection={isEditMode ? layoutDirection : undefined}
+                  onLayoutDirectionToggle={isEditMode ? onToggleLayoutDirection : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
