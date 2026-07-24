@@ -320,7 +320,7 @@ export function AppPage() {
     refetchOnMount: false,
   });
   const liveVersionIdFromCanvas = liveCanvas?.metadata?.liveVersionId;
-  const { data: describedLiveVersion, isLoading: describedLiveVersionLoading } = useDescribeCanvasVersion(
+  const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useDescribeCanvasVersion(
     canvasId!,
     liveVersionIdFromCanvas,
   );
@@ -329,49 +329,25 @@ export function AppPage() {
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
     [canvasLiveVersionsQuery.data?.pages],
   );
-  const liveCanvasVersion = useMemo(() => {
-    if (paginatedVersions.length > 0) return paginatedVersions[0];
-    return describedLiveVersion;
-  }, [paginatedVersions, describedLiveVersion]);
-  const visibleCanvasVersions = useMemo(() => {
-    const versionMap = new Map<string, CanvasesCanvasVersion>();
-    const addVersion = (version: CanvasesCanvasVersion) => {
-      const versionID = version.metadata?.id;
-      if (!versionID || versionMap.has(versionID)) return;
-      versionMap.set(versionID, version);
-    };
-    if (describedLiveVersion) {
-      addVersion(describedLiveVersion);
-    }
-    paginatedVersions.forEach(addVersion);
-    return Array.from(versionMap.values());
-  }, [describedLiveVersion, paginatedVersions]);
-  const liveVersions = useMemo(() => sortVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
+  const liveVersions = useMemo(() => sortVersionsDesc(paginatedVersions), [paginatedVersions]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
-    visibleCanvasVersions.forEach((version) => {
+    paginatedVersions.forEach((version) => {
       const id = version.metadata?.id;
       if (!id) return;
       indexedVersions.set(id, version);
     });
+    const liveId = liveCanvasVersion?.metadata?.id;
+    if (liveId && !indexedVersions.has(liveId)) {
+      indexedVersions.set(liveId, liveCanvasVersion);
+    }
     return indexedVersions;
-  }, [visibleCanvasVersions]);
+  }, [paginatedVersions, liveCanvasVersion]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
-  const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
-  const isLiveVersionLoading =
-    canvasLoading || (!!liveVersionIdFromCanvas && describedLiveVersionLoading);
-  const effectiveLiveCanvasVersionId = useMemo(() => {
-    if (liveCanvasVersionId) {
-      return liveCanvasVersionId;
-    }
-
-    if (liveVersionIdFromCanvas) {
-      return liveVersionIdFromCanvas;
-    }
-
-    return paginatedVersions[0]?.metadata?.id;
-  }, [liveCanvasVersionId, liveVersionIdFromCanvas, paginatedVersions]);
+  const liveCanvasVersionId = liveVersionIdFromCanvas ?? liveCanvasVersion?.metadata?.id;
+  const isLiveVersionLoading = canvasLoading || (!!liveVersionIdFromCanvas && liveCanvasVersionLoading);
+  const effectiveLiveCanvasVersionId = liveCanvasVersionId;
   const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
     organizationId,
     canvasId,
