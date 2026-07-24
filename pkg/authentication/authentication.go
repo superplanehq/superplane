@@ -248,6 +248,11 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	if account.IsBlocked() {
+		redirectAccountBlocked(w, r)
+		return
+	}
+
 	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -333,6 +338,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	if !crypto.VerifyPassword(passwordAuth.PasswordHash, password) {
 		log.Warnf("Invalid password attempt for account: %s", email)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	if account.IsBlocked() {
+		http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
 		return
 	}
 
@@ -704,6 +714,15 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	if account.IsBlocked() {
+		if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
+			http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+			return
+		}
+		redirectAccountBlocked(w, r)
+		return
+	}
+
 	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for magic code login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -712,6 +731,10 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
 	writePostAuthRedirect(w, r, redirectURL)
+}
+
+func redirectAccountBlocked(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/login?auth_error=account_blocked", http.StatusSeeOther)
 }
 
 func writePostAuthRedirect(w http.ResponseWriter, r *http.Request, redirectURL string) {

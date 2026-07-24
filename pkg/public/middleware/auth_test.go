@@ -181,6 +181,25 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
+
+	t.Run("personal token for blocked account is rejected", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		// Re-set hash after block cleared it so we exercise the blocked-account check.
+		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+	})
 }
 
 func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
@@ -235,6 +254,21 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		handler.ServeHTTP(res, req)
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("blocked account cookie is rejected with contact-support message", func(t *testing.T) {
+		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
 	})
 }
 
