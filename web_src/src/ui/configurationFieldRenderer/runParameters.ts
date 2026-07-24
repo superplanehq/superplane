@@ -1,5 +1,32 @@
 import type { ConfigurationField } from "@/api-client";
 
+export function coerceRunParameterValues(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+export function getSyncedRunParameterValues(
+  parameterValues: Record<string, unknown>,
+  parameterDefinitions: ConfigurationField[],
+): Record<string, unknown> | null {
+  if (parameterDefinitions.length === 0) {
+    return Object.keys(parameterValues).length > 0 ? {} : null;
+  }
+
+  const definedNames = new Set(
+    parameterDefinitions.map((definition) => definition.name).filter((name): name is string => Boolean(name)),
+  );
+  const hasStaleKeys = Object.keys(parameterValues).some((name) => !definedNames.has(name));
+  if (!hasStaleKeys) {
+    return null;
+  }
+
+  return Object.fromEntries(Object.entries(parameterValues).filter(([name]) => definedNames.has(name)));
+}
+
 export function normalizeRunParameterDefinitions(raw: unknown): ConfigurationField[] {
   if (!Array.isArray(raw) || raw.length === 0) {
     return [];
