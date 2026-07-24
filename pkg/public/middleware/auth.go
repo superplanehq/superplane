@@ -286,6 +286,9 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	if err == nil {
 		return user, scopedClaims, nil
 	}
+	if errors.Is(err, models.ErrAccountBlocked) {
+		return nil, nil, err
+	}
 
 	hashedToken := crypto.HashToken(token)
 	user, err = models.FindActiveUserByTokenHashInTransaction(database.DB(ctx), hashedToken)

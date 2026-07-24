@@ -173,6 +173,26 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
 
+	t.Run("scoped token for blocked account returns contact-support message", func(t *testing.T) {
+		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject: r.User.String(),
+			OrgID:   r.Organization.ID.String(),
+			Purpose: "agent-builder",
+			Scopes:  []string{"canvases:read"},
+		}, time.Minute)
+		require.NoError(t, err)
+		require.NoError(t, models.BlockAccount(r.Account.ID.String()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+	})
+
 	t.Run("expired API key api token is rejected", func(t *testing.T) {
 		rawToken, err := crypto.Base64String(32)
 		require.NoError(t, err)
