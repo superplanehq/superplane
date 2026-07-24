@@ -26,9 +26,9 @@ export interface CanvasAppFixture {
   /** GET /api/v1/canvases/{canvasId} */
   canvas?: { canvas?: { spec?: unknown; metadata?: { name?: string } } };
   /** GET /api/v1/canvases/{canvasId}/versions[?limit=50] */
-  versions?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  versions?: { versions?: Array<Record<string, unknown>> };
   /** GET /api/v1/canvases/{canvasId}/versions?limit=1 */
-  versionsLatest?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  versionsLatest?: { versions?: Array<Record<string, unknown>> };
   /** GET /api/v1/canvases/{canvasId}/runs (all pages collapsed into one) */
   runs?: {
     runs?: Array<Record<string, unknown>>;
@@ -255,14 +255,22 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     // for the version list, which is all the versions sidebar needs).
     {
       pattern: re(`${CANVAS}/versions/([^/]+)`),
-      resolve: (m) => ({
-        json: {
-          version: {
-            metadata: { ...(fixture.versions?.versions?.[0]?.metadata ?? {}), id: m[1] },
-            spec: fixture.canvas?.canvas?.spec ?? {},
+      resolve: (m) => {
+        const firstVersion = fixture.versions?.versions?.[0];
+        const baseMetadata =
+          firstVersion && typeof firstVersion === "object" && "metadata" in firstVersion
+            ? (firstVersion.metadata as Record<string, unknown> | undefined)
+            : firstVersion;
+
+        return {
+          json: {
+            version: {
+              metadata: { ...(baseMetadata ?? {}), id: m[1] },
+              spec: fixture.canvas?.canvas?.spec ?? {},
+            },
           },
-        },
-      }),
+        };
+      },
     },
 
     // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).
