@@ -5,11 +5,10 @@ import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
 import { syncCanvasDraftState, syncConsoleCaches } from "./sync-canvas-draft";
-import { fetchCanvasVersionWithSpec, fetchLiveCanvasVersionWithSpec } from "./repository-spec-files";
+import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
 
 vi.mock("./repository-spec-files", () => ({
   fetchCanvasVersionWithSpec: vi.fn(),
-  fetchLiveCanvasVersionWithSpec: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
@@ -71,7 +70,7 @@ describe("syncCanvasDraftState", () => {
     });
   });
 
-  it("updates the live version describe cache when the version list cache is empty", async () => {
+  it("updates the version describe cache for the requested version id", async () => {
     const version: CanvasesCanvasVersion = {
       metadata: { id: "version-2" },
       spec: { nodes: [], edges: [] },
@@ -89,36 +88,6 @@ describe("syncCanvasDraftState", () => {
     });
 
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-2"), version);
-  });
-
-  it("loads the live version when the requested version id is stale", async () => {
-    const version: CanvasesCanvasVersion = {
-      metadata: { id: "live-version-2" },
-      spec: {
-        nodes: [{ id: "node-1", name: "Trigger", type: "TYPE_TRIGGER" }],
-        edges: [],
-      },
-    };
-    vi.mocked(fetchLiveCanvasVersionWithSpec).mockResolvedValue(version);
-
-    const setQueryData = vi.fn();
-    const getQueryData = vi.fn().mockReturnValue({
-      metadata: { id: "canvas-1", liveVersionId: "live-version-2" },
-    });
-    const queryClient = { setQueryData, getQueryData } as unknown as QueryClient;
-
-    const result = await syncCanvasDraftState({
-      queryClient,
-      organizationId: "org-1",
-      canvasId: "canvas-1",
-      versionId: "stale-version-1",
-      resolveLiveVersion: true,
-    });
-
-    expect(result).toEqual(version);
-    expect(fetchLiveCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "live-version-2");
-    expect(fetchCanvasVersionWithSpec).not.toHaveBeenCalled();
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "live-version-2"), version);
   });
 });
 

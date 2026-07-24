@@ -107,16 +107,6 @@ export async function fetchCanvasVersionWithSpec(
   return describeResponse.data?.version;
 }
 
-// fetchLiveCanvasVersionWithSpec loads the current live version by id. Callers
-// should pass canvas.metadata.liveVersionId so a stale active version id does
-// not load the wrong row.
-export async function fetchLiveCanvasVersionWithSpec(
-  canvasId: string,
-  liveVersionId: string,
-): Promise<CanvasesCanvasVersion | undefined> {
-  return fetchCanvasVersionWithSpec(canvasId, liveVersionId);
-}
-
 export type ConsoleSpecData = {
   panels: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["panels"];
   layout: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["layout"];

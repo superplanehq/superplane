@@ -9,20 +9,6 @@ type CommitMutation = {
 };
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
-function seedCommittedVersionCaches(
-  queryClient: QueryClient,
-  canvasId: string,
-  committedVersion?: CanvasesCanvasVersion,
-) {
-  const versionId = committedVersion?.metadata?.id;
-  if (!versionId || !committedVersion) {
-    return;
-  }
-
-  queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, versionId), committedVersion);
-  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), committedVersion);
-}
-
 async function invalidatePostCommitCaches(
   queryClient: QueryClient,
   organizationId: string,
@@ -75,16 +61,13 @@ async function applyPostCommitCacheUpdates({
   canvasId,
   previousVersionId,
   committedVersionId,
-  committedVersion,
 }: {
   queryClient: QueryClient;
   organizationId: string;
   canvasId: string;
   previousVersionId: string;
   committedVersionId: string;
-  committedVersion?: CanvasesCanvasVersion;
 }) {
-  seedCommittedVersionCaches(queryClient, canvasId, committedVersion);
   await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
   await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
 }
@@ -130,11 +113,9 @@ export async function executeCommitStaging({
   const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   const previousVersionId = activeCanvasVersionId;
   let committedVersionId = activeCanvasVersionId;
-  let committedVersion: CanvasesCanvasVersion | undefined;
   try {
     const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);
-    committedVersion = response?.version;
-    committedVersionId = committedVersion?.metadata?.id || activeCanvasVersionId;
+    committedVersionId = response?.version?.metadata?.id || activeCanvasVersionId;
   } catch (error) {
     releaseCanvasUpdatedEcho?.();
     throw error;
@@ -153,7 +134,6 @@ export async function executeCommitStaging({
       canvasId,
       previousVersionId,
       committedVersionId,
-      committedVersion,
     });
   }
 

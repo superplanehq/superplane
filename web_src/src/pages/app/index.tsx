@@ -319,10 +319,10 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const liveVersionIdFromCanvas = liveCanvas?.metadata?.liveVersionId;
+  const liveCanvasVersionId = liveCanvas?.metadata?.liveVersionId;
   const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useDescribeCanvasVersion(
     canvasId!,
-    liveVersionIdFromCanvas,
+    liveCanvasVersionId,
   );
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const paginatedVersions = useMemo(
@@ -337,22 +337,11 @@ export function AppPage() {
       if (!id) return;
       indexedVersions.set(id, version);
     });
-    const liveId = liveCanvasVersion?.metadata?.id;
-    if (liveId && !indexedVersions.has(liveId)) {
-      indexedVersions.set(liveId, liveCanvasVersion);
-    }
     return indexedVersions;
-  }, [paginatedVersions, liveCanvasVersion]);
+  }, [paginatedVersions]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
-  const liveCanvasVersionId = liveVersionIdFromCanvas ?? liveCanvasVersion?.metadata?.id;
-  const isLiveVersionLoading = canvasLoading || (!!liveVersionIdFromCanvas && liveCanvasVersionLoading);
-  const effectiveLiveCanvasVersionId = liveCanvasVersionId;
-  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
-    organizationId,
-    canvasId,
-    effectiveLiveCanvasVersionId,
-  );
+  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(organizationId, canvasId, liveCanvasVersionId);
   const {
     activeCanvasVersionId,
     shouldReadStagedCanvasVersionFlag,
@@ -372,7 +361,6 @@ export function AppPage() {
     editSessionActive,
     isEnteringEditSession,
     activeCanvasVersion,
-    effectiveLiveCanvasVersionId,
     liveCanvasVersionId,
     selectableVersionsById,
     isRunInspectionMode,
@@ -789,9 +777,7 @@ export function AppPage() {
     }
 
     const requestedVersionId = requestedVersion.metadata?.id || "";
-    const isCurrentLive =
-      (!!effectiveLiveCanvasVersionId && requestedVersionId === effectiveLiveCanvasVersionId) ||
-      requestedVersionId === liveCanvasVersionId;
+    const isCurrentLive = requestedVersionId === liveCanvasVersionId;
 
     if (isCurrentLive) {
       setActiveCanvasVersion(null);
@@ -823,7 +809,6 @@ export function AppPage() {
     searchParams,
     currentUserId,
     liveCanvasVersionId,
-    effectiveLiveCanvasVersionId,
     setSearchParams,
     queryClient,
     organizationId,
@@ -3187,7 +3172,7 @@ export function AppPage() {
         return false;
       }
 
-      const versionId = activeCanvasVersionId || effectiveLiveCanvasVersionId || "";
+      const versionId = activeCanvasVersionId || liveCanvasVersionId || "";
       if (!versionId) {
         return false;
       }
@@ -3223,7 +3208,7 @@ export function AppPage() {
       organizationId,
       canvasId,
       activeCanvasVersionId,
-      effectiveLiveCanvasVersionId,
+      liveCanvasVersionId,
       queryClient,
       commitCanvasStagingMutation,
       ensureVersionActionDraftReady,
@@ -3245,7 +3230,6 @@ export function AppPage() {
         versionID,
         version,
         options,
-        effectiveLiveCanvasVersionId,
         liveCanvasVersionId,
         queryClient,
         draftCanvasSpec,
@@ -3264,7 +3248,6 @@ export function AppPage() {
     [
       organizationId,
       canvasId,
-      effectiveLiveCanvasVersionId,
       liveCanvasVersionId,
       queryClient,
       draftCanvasSpec,
@@ -3303,18 +3286,18 @@ export function AppPage() {
   );
 
   const handleSeeCurrentVersion = useCallback(() => {
-    if (!effectiveLiveCanvasVersionId) {
+    if (!liveCanvasVersionId) {
       showErrorToast("No live version available");
       return;
     }
     // Deliberate preview of the current version keeps the edit session open.
     previewingCurrentVersionRef.current = true;
     if (editSessionActive) {
-      void resyncLiveVersionDraftAfterSwitch(effectiveLiveCanvasVersionId);
+      void resyncLiveVersionDraftAfterSwitch(liveCanvasVersionId);
       return;
     }
-    handleUseVersion(effectiveLiveCanvasVersionId);
-  }, [editSessionActive, effectiveLiveCanvasVersionId, handleUseVersion, resyncLiveVersionDraftAfterSwitch]);
+    handleUseVersion(liveCanvasVersionId);
+  }, [editSessionActive, liveCanvasVersionId, handleUseVersion, resyncLiveVersionDraftAfterSwitch]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
@@ -3329,7 +3312,6 @@ export function AppPage() {
 
       const isSelectingLiveVersion = isActiveCanvasVersionCurrentLive({
         activeCanvasVersionId: versionID,
-        effectiveLiveCanvasVersionId,
         liveCanvasVersionId,
       });
 
@@ -3351,7 +3333,6 @@ export function AppPage() {
       hasEditableVersion,
       hasLocalSaveActivity,
       editSessionActive,
-      effectiveLiveCanvasVersionId,
       liveCanvasVersionId,
     ],
   );
@@ -3378,7 +3359,7 @@ export function AppPage() {
     organizationId,
     canvasId,
     canUpdateCanvas: canStageCanvasVersion,
-    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     selectableVersionsById,
     handleUseVersion,
     resyncStagedEditorState,
@@ -3388,7 +3369,7 @@ export function AppPage() {
   });
 
   handleRemoteStagingUpdatedRef.current = async () => {
-    const targetVersionId = effectiveLiveCanvasVersionId;
+    const targetVersionId = liveCanvasVersionId;
     if (!targetVersionId || !canvasId) {
       return;
     }
@@ -3414,19 +3395,19 @@ export function AppPage() {
   };
 
   const handleAgentStagingReady = useCallback(async (): Promise<boolean> => {
-    if (!effectiveLiveCanvasVersionId) {
+    if (!liveCanvasVersionId) {
       return false;
     }
 
     if (editSessionActive && isViewingCurrentLiveVersion) {
-      await resyncStagedEditorState(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(liveCanvasVersionId, { bumpResetNonce: false });
       return true;
     }
 
     return enterLiveEditSession();
   }, [
     editSessionActive,
-    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     enterLiveEditSession,
     isViewingCurrentLiveVersion,
     resyncStagedEditorState,
@@ -3465,8 +3446,8 @@ export function AppPage() {
       return;
     }
 
-    if (!effectiveLiveCanvasVersionId || !liveCanvasVersion) {
-      if (isLiveVersionLoading) {
+    if (!liveCanvasVersionId || !liveCanvasVersion) {
+      if (canvasLoading || liveCanvasVersionLoading) {
         return;
       }
       showErrorToast("No live version available");
@@ -3486,9 +3467,10 @@ export function AppPage() {
     canvasId,
     canStageCanvasVersion,
     editSessionActive,
-    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     liveCanvasVersion,
-    isLiveVersionLoading,
+    canvasLoading,
+    liveCanvasVersionLoading,
     enterLiveEditSession,
     refreshLatestLiveCanvasData,
     setSearchParams,
@@ -3702,7 +3684,7 @@ export function AppPage() {
       hasEditableVersion,
       canUpdateCanvas: canStageCanvasVersion,
       canvas,
-      liveVersionLoading: isLiveVersionLoading,
+      liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
       handlePlaceholderAdd,
       searchParams,
     },
@@ -3714,10 +3696,10 @@ export function AppPage() {
   const handleExitEditSession = useCallback(() => {
     setEditSessionActive(false);
     clearRunInspectionForEdit();
-    if (effectiveLiveCanvasVersionId) {
-      handleUseVersion(effectiveLiveCanvasVersionId);
+    if (liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId);
     }
-  }, [clearRunInspectionForEdit, effectiveLiveCanvasVersionId, handleUseVersion]);
+  }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -4079,7 +4061,7 @@ export function AppPage() {
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
-    liveCanvasVersionId: effectiveLiveCanvasVersionId,
+    liveCanvasVersionId: liveCanvasVersionId,
     liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,
@@ -4202,7 +4184,7 @@ export function AppPage() {
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
           activeCanvasVersionId={activeCanvasVersionId}
-          liveCanvasVersionId={effectiveLiveCanvasVersionId}
+          liveCanvasVersionId={liveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}
           onAgentStagingCommit={whenAllowed(canUpdateCanvas, handleAgentSidebarStagingCommit)}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}

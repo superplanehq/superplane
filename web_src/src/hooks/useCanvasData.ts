@@ -355,11 +355,7 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   });
 };
 
-export const useDescribeCanvasVersion = (
-  canvasId: string,
-  versionId: string | undefined,
-  enabled = true,
-) => {
+export const useDescribeCanvasVersion = (canvasId: string, versionId: string | undefined, enabled = true) => {
   return useQuery({
     queryKey: canvasKeys.versionDescribe(canvasId, versionId ?? ""),
     queryFn: async () => {

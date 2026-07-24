@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { fetchCanvasVersionWithSpec, fetchLiveCanvasVersionWithSpec } from "./repository-spec-files";
+import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
 
 export async function syncConsoleCaches({
   queryClient,
@@ -31,23 +31,13 @@ export async function syncCanvasDraftState({
   organizationId,
   canvasId,
   versionId,
-  resolveLiveVersion = false,
-  skipVersionListUpdate = false,
 }: {
   queryClient: QueryClient;
   organizationId: string;
   canvasId: string;
   versionId: string;
-  resolveLiveVersion?: boolean;
-  skipVersionListUpdate?: boolean;
 }): Promise<CanvasesCanvasVersion | undefined> {
-  const version = resolveLiveVersion
-    ? await fetchLiveCanvasVersionWithSpec(
-        canvasId,
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId))?.metadata
-          ?.liveVersionId ?? versionId,
-      )
-    : await fetchCanvasVersionWithSpec(canvasId, versionId);
+  const version = await fetchCanvasVersionWithSpec(canvasId, versionId);
   if (!version) {
     return undefined;
   }
@@ -57,7 +47,7 @@ export async function syncCanvasDraftState({
   queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), version);
   queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), version);
 
-  if (!skipVersionListUpdate && version.metadata) {
+  if (version.metadata) {
     queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, cacheVersionId), version);
   }
 
