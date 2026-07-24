@@ -49,7 +49,6 @@ interface RunParametersFieldContentProps {
   nodeId: string | undefined;
   isLoading: boolean;
   error: unknown;
-  targetNodeResolved: boolean;
   parameterDefinitions: ConfigurationField[];
   parameterValues: Record<string, unknown>;
   baseFieldPath: string;
@@ -68,7 +67,6 @@ function RunParametersFieldContent({
   nodeId,
   isLoading,
   error,
-  targetNodeResolved,
   parameterDefinitions,
   parameterValues,
   baseFieldPath,
@@ -102,16 +100,6 @@ function RunParametersFieldContent({
     return (
       <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
         <p className="text-xs text-gray-500 dark:text-gray-400">Loading run parameters...</p>
-      </div>
-    );
-  }
-
-  if (!targetNodeResolved) {
-    return (
-      <div data-testid={toTestId(`run-parameters-field-${field.name}`)} className="space-y-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          The selected node was not found in the target app. Choose a different node before configuring run parameters.
-        </p>
       </div>
     );
   }
@@ -178,16 +166,11 @@ export function RunParametersFieldRenderer({
   const appId = useMemo(() => resolveTargetAppId(allValues), [allValues]);
   const nodeId = useMemo(() => resolveTargetNodeId(allValues), [allValues]);
 
-  const {
-    data: canvas,
-    isLoading,
-    error,
-  } = useCanvas(organizationId, appId ?? "", {
+  const { data: canvas, isLoading, error } = useCanvas(organizationId, appId ?? "", {
     enabled: Boolean(appId),
   });
 
   const targetNode = useMemo(() => findTargetNode(canvas?.spec?.nodes, nodeId), [canvas?.spec?.nodes, nodeId]);
-  const targetNodeResolved = Boolean(targetNode);
   const parameterDefinitions = useMemo(
     () => normalizeRunParameterDefinitions(targetNode?.configuration?.parameters),
     [targetNode],
@@ -201,7 +184,6 @@ export function RunParametersFieldRenderer({
     error,
     appId,
     nodeId,
-    targetNodeResolved,
     parameterDefinitions,
     parameterValues,
     onChange,
@@ -214,7 +196,6 @@ export function RunParametersFieldRenderer({
       nodeId={nodeId}
       isLoading={isLoading}
       error={error}
-      targetNodeResolved={targetNodeResolved}
       parameterDefinitions={parameterDefinitions}
       parameterValues={parameterValues}
       baseFieldPath={baseFieldPath}
