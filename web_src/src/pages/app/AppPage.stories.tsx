@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { AppPage } from "./index";
 import { AppPageHarness } from "./__fixtures__/AppPageHarness";
@@ -56,4 +57,28 @@ export const AIChat: Story = {
  */
 export const RunInspection: Story = {
   render: () => <AppPageHarness query={`run=${canvasAppIds.publishedRunId}&sidebar=1&node=runner-implement`} />,
+};
+
+/**
+ * Editing view: the same Software Factory canvas after entering an edit session
+ * (the `play` step clicks the header Edit button). Edit mode reveals the canvas
+ * zoom controls' editing affordances, including the new layout-direction toggle
+ * that flips the canvas between horizontal (freeform) and vertical (top-to-bottom
+ * pipeline) auto-layout.
+ */
+export const EditingLayoutControls: Story = {
+  render: () => <AppPageHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const editButton = await canvas.findByTestId("canvas-edit-button", {}, { timeout: 10000 });
+    await userEvent.click(editButton);
+
+    // Once the edit session is active the zoom controls expose the layout
+    // direction toggle; assert it renders so the story fails loudly if the
+    // control is ever accidentally hidden from edit mode.
+    await waitFor(() => expect(canvas.getByTestId("canvas-layout-direction-toggle")).toBeInTheDocument(), {
+      timeout: 10000,
+    });
+  },
 };
