@@ -34,12 +34,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Live canvas view: the ReactFlow graph plus the runs history sidebar.
+ * Software Factory app opened on the Console tab.
  * Agent chat is enabled (header Agent toggle) but starts closed.
  * Shows a prototype Agent suggestions badge/hover card for post-install ideas.
  */
 export const LiveCanvas: Story = {
-  render: () => <AppPageHarness agentSuggestions={softwareFactoryAgentSuggestions} />,
+  render: () => <AppPageHarness query="view=console" agentSuggestions={softwareFactoryAgentSuggestions} />,
 };
 
 /**
