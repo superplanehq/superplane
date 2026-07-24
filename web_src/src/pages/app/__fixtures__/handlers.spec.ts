@@ -144,7 +144,7 @@ describe("createFixtureFetch agent routes", () => {
     expect(body.messages[0]).toEqual(expect.objectContaining({ role: "user" }));
   });
 
-  it("echoes POST message content for send acknowledgements", async () => {
+  it("echoes POST message content and persists it for later GETs", async () => {
     const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
     const fallback = vi.fn() as unknown as typeof fetch;
     const fixtureFetch = createDefaultFixtureFetch(fallback);
@@ -155,6 +155,13 @@ describe("createFixtureFetch agent routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       message: expect.objectContaining({ role: "user", content: "Hello agent" }),
     });
+
+    const listed = await fixtureFetch("http://localhost/api/v1/agents/chats/storybook-agent-chat/messages");
+    const body = await listed.json();
+    expect(body.messages.at(-2)).toEqual(expect.objectContaining({ role: "user", content: "Hello agent" }));
+    expect(body.messages.at(-1)).toEqual(
+      expect.objectContaining({ role: "assistant", content: expect.stringContaining("Storybook simulation") }),
+    );
   });
 });
 

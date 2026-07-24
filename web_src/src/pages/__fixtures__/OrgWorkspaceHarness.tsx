@@ -6,12 +6,15 @@ import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useC
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { agentChatKeys } from "@/hooks/useAgentChats";
 import { AppPage } from "@/pages/app";
+import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
 import { PrototypeNewAppPage } from "@/pages/home/__fixtures__/PrototypeNewAppPage";
+import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
@@ -60,6 +63,9 @@ export interface OrgWorkspaceHarnessProps {
   prototypeNewApp?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
+  /** Storybook-only: Agent improvement suggestions on the canvas Agent control. */
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
 }
 
 function useOrgWorkspaceFixtureFetch(
@@ -93,7 +99,15 @@ function useOrgWorkspaceFixtureFetch(
   return fixtureFetch;
 }
 
-function OrgWorkspaceRoutes({ prototypeNewApp }: { prototypeNewApp: boolean }) {
+function OrgWorkspaceRoutes({
+  prototypeNewApp,
+  agentSuggestions,
+  onSelectAgentSuggestion,
+}: {
+  prototypeNewApp: boolean;
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
+}) {
   return (
     <Routes>
       <Route
@@ -106,7 +120,10 @@ function OrgWorkspaceRoutes({ prototypeNewApp }: { prototypeNewApp: boolean }) {
       >
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={prototypeNewApp ? <PrototypeNewAppPage /> : <NewAppPage />} />
-        <Route path="apps/:appId" element={<AppPage />} />
+        <Route
+          path="apps/:appId"
+          element={<AppPage agentSuggestions={agentSuggestions} onSelectAgentSuggestion={onSelectAgentSuggestion} />}
+        />
       </Route>
     </Routes>
   );
@@ -124,6 +141,8 @@ export function OrgWorkspaceHarness({
   prototypeNewApp = false,
   homeFixture,
   appFixture,
+  agentSuggestions,
+  onSelectAgentSuggestion,
 }: OrgWorkspaceHarnessProps) {
   const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
   const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
@@ -135,6 +154,14 @@ export function OrgWorkspaceHarness({
 
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
 
+  useEffect(() => {
+    const onMessagesUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: agentChatKeys.all });
+    };
+    window.addEventListener(STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT, onMessagesUpdated);
+    return () => window.removeEventListener(STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT, onMessagesUpdated);
+  }, [queryClient]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -142,7 +169,11 @@ export function OrgWorkspaceHarness({
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <OrgWorkspaceRoutes prototypeNewApp={prototypeNewApp} />
+                <OrgWorkspaceRoutes
+                  prototypeNewApp={prototypeNewApp}
+                  agentSuggestions={agentSuggestions}
+                  onSelectAgentSuggestion={onSelectAgentSuggestion}
+                />
               </AccountProvider>
             </MemoryRouter>
           </div>
