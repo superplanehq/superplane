@@ -457,6 +457,40 @@ describe("NodesPanelCard — inline form mode", () => {
     expect(screen.getByTestId("node-panel-run-inline-submit")).toHaveTextContent("Create task");
   });
 
+  it("stretches text parameters to fill the inline panel height", () => {
+    const promptNode: SuperplaneComponentsNode = {
+      ...NODE,
+      configuration: {
+        templates: [
+          {
+            name: "manual",
+            payload: { description: "{{ parameters.description }}" },
+            parameters: [{ name: "description", type: "text", placeholder: "Describe the task…" }],
+          },
+        ],
+      },
+    };
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: vi.fn(),
+      nodes: [promptNode],
+      panel: singleNodePanel({
+        formMode: "inline",
+        showNodeLabel: false,
+        showFieldLabels: false,
+        submitLabel: "Start factory",
+      }),
+    });
+
+    const form = screen.getByTestId("node-panel-run-inline-form");
+    expect(form).toHaveClass("h-full");
+    expect(form.querySelector("[data-fill-available-height='true']")).not.toBeNull();
+    const textarea = screen.getByTestId("start-run-param-description");
+    expect(textarea.tagName).toBe("TEXTAREA");
+    expect(textarea).toHaveClass("flex-1");
+    expect(textarea).toHaveClass("resize-none");
+  });
+
   it("preserves an inline draft when a query refetch replaces the node objects", () => {
     const { rerenderPanel } = renderPanel({
       canRunNodes: true,

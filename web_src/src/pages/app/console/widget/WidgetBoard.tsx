@@ -172,7 +172,7 @@ function BoardLane({
   const laneLabel = bucket.lane.label?.trim() ? bucket.lane.label : bucket.lane.value;
   return (
     <div
-      className="flex h-full min-h-0 w-64 shrink-0 flex-col rounded-md border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900/40"
+      className="flex h-full min-h-0 min-w-56 flex-1 flex-col rounded-md border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900/40"
       data-testid="widget-board-lane"
       data-lane-key={bucket.key}
     >

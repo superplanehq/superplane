@@ -90,36 +90,41 @@ export function NodesPanelInlineRunForm({
   };
 
   return (
-    <div className="w-full space-y-3" data-testid={`${testIdPrefix}-inline-form`}>
-      <StartRunParameterFields
-        parameters={parameters}
-        parameterValues={parameterValues}
-        onParameterValuesChange={setParameterValues}
-        showLabels={showFieldLabels}
-      />
-      <div className="flex justify-end">
-        <LoadingButton
-          type="button"
-          size="xs"
-          loading={running || runInFlight}
-          loadingText="Running…"
-          onClick={handleSubmit}
-          disabled={disabled}
-          title={disabled ? disabledTitle : undefined}
-          data-testid={`${testIdPrefix}-inline-submit`}
-        >
-          <Play className="mr-1 h-3 w-3" />
-          {submitLabel?.trim() || "Run"}
-        </LoadingButton>
+    <div className="flex h-full min-h-0 w-full flex-col gap-3" data-testid={`${testIdPrefix}-inline-form`}>
+      <div className="min-h-0 flex-1">
+        <StartRunParameterFields
+          parameters={parameters}
+          parameterValues={parameterValues}
+          onParameterValuesChange={setParameterValues}
+          showLabels={showFieldLabels}
+          fillAvailableHeight
+        />
       </div>
-      {disabledMessage ? (
-        <p
-          className="text-right text-[11px] text-amber-600 dark:text-amber-400"
-          data-testid={`${testIdPrefix}-inline-disabled-message`}
-        >
-          {disabledMessage}
-        </p>
-      ) : null}
+      <div className="flex shrink-0 flex-col gap-1">
+        <div className="flex justify-end">
+          <LoadingButton
+            type="button"
+            size="xs"
+            loading={running || runInFlight}
+            loadingText="Running…"
+            onClick={handleSubmit}
+            disabled={disabled}
+            title={disabled ? disabledTitle : undefined}
+            data-testid={`${testIdPrefix}-inline-submit`}
+          >
+            <Play className="mr-1 h-3 w-3" />
+            {submitLabel?.trim() || "Run"}
+          </LoadingButton>
+        </div>
+        {disabledMessage ? (
+          <p
+            className="text-right text-[11px] text-amber-600 dark:text-amber-400"
+            data-testid={`${testIdPrefix}-inline-disabled-message`}
+          >
+            {disabledMessage}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
