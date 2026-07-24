@@ -20,6 +20,28 @@ describe("nodesPanelContentFromLegacyNode", () => {
       submitLabel: "Create task",
     });
   });
+
+  it("carries the widget-level allowConcurrentRuns flag through the legacy fold", () => {
+    expect(nodesPanelContentFromLegacyNode({ node: "start", allowConcurrentRuns: true }).allowConcurrentRuns).toBe(true);
+    expect(nodesPanelContentFromLegacyNode({ node: "start" }).allowConcurrentRuns).toBeUndefined();
+  });
+});
+
+describe("validateNodesContent allowConcurrentRuns", () => {
+  it("accepts a boolean allowConcurrentRuns", () => {
+    expect(validateNodesContent({ allowConcurrentRuns: true, nodes: [{ node: "start" }] })).toBeNull();
+    expect(validateNodesContent({ allowConcurrentRuns: false, nodes: [{ node: "start" }] })).toBeNull();
+  });
+
+  it("accepts content without allowConcurrentRuns (defaults to blocking)", () => {
+    expect(validateNodesContent({ nodes: [{ node: "start" }] })).toBeNull();
+  });
+
+  it("rejects a non-boolean allowConcurrentRuns", () => {
+    expect(validateNodesContent({ allowConcurrentRuns: "yes", nodes: [{ node: "start" }] })).toMatch(
+      /content\.allowConcurrentRuns/,
+    );
+  });
 });
 
 describe("validateNodesContent formMode", () => {
