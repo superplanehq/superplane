@@ -105,6 +105,8 @@ func (l *Linear) Configuration() []configuration.Field {
 func (l *Linear) Actions() []core.Action {
 	return []core.Action{
 		&CreateIssue{},
+		&GetIssue{},
+		&UpdateIssue{},
 	}
 }
 
