@@ -27,6 +27,15 @@ type CanvasVersion struct {
 	UpdatedAt     *time.Time
 }
 
+type CanvasVersionMetadata struct {
+	ID            uuid.UUID
+	WorkflowID    uuid.UUID
+	OwnerID       *uuid.UUID
+	CommitMessage string
+	CreatedAt     *time.Time
+	UpdatedAt     *time.Time
+}
+
 func (c *CanvasVersion) TableName() string {
 	return "workflow_versions"
 }
@@ -151,8 +160,10 @@ func ListCanvasVersionHistoryInTransaction(
 	workflowID uuid.UUID,
 	limit int,
 	before *time.Time,
-) ([]CanvasVersion, error) {
+) ([]CanvasVersionMetadata, error) {
 	query := tx.
+		Model(&CanvasVersion{}).
+		Select("id", "workflow_id", "owner_id", "commit_message", "created_at", "updated_at").
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC, id DESC")
 
@@ -164,8 +175,8 @@ func ListCanvasVersionHistoryInTransaction(
 		query = query.Limit(limit)
 	}
 
-	var versions []CanvasVersion
-	if err := query.Find(&versions).Error; err != nil {
+	var versions []CanvasVersionMetadata
+	if err := query.Scan(&versions).Error; err != nil {
 		return nil, err
 	}
 
