@@ -152,7 +152,11 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// impersonated user's account so that non-admin handlers
 			// (getAccount, listOrganizations, etc.) see the target
 			// user's data instead of the admin's.
-			if impAccount, info := resolveImpersonatedAccount(jwtSigner, r, account); impAccount != nil {
+			impAccount, info, impersonationErr := resolveImpersonatedAccount(jwtSigner, r, account)
+			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
+				impersonation.ClearCookie(w, r)
+			}
+			if impAccount != nil {
 				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
@@ -168,31 +172,35 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 // resolveImpersonatedAccount checks for an impersonation cookie and,
 // if valid, returns the impersonated Account so it can be used as the
 // effective account for non-admin endpoints.
-func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *models.Account) (*models.Account, *ImpersonationInfo) {
+func resolveImpersonatedAccount(
+	jwtSigner *jwt.Signer,
+	r *http.Request,
+	admin *models.Account,
+) (*models.Account, *ImpersonationInfo, error) {
 	tokenStr, err := impersonation.ReadCookie(r)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	if claims.AdminAccountID != admin.ID.String() || !admin.IsInstallationAdmin() {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if !admin.IsSessionFresh(claims.IssuedAt) {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 	if impAccount.IsBlocked() {
-		return nil, nil
+		return nil, nil, models.ErrAccountBlocked
 	}
 
 	info := &ImpersonationInfo{
@@ -201,7 +209,7 @@ func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *m
 		UserName:       impAccount.Name,
 	}
 
-	return impAccount, info
+	return impAccount, info, nil
 }
 
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
@@ -240,7 +248,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, impersonationInfo, err := authenticateUserByCookie(ctx, jwtSigner, r)
+			user, impersonationInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r)
 			if err != nil {
 				if errors.Is(err, models.ErrAccountBlocked) {
 					http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
@@ -350,7 +358,12 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 	return user, claims, nil
 }
 
-func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+func authenticateUserByCookie(
+	ctx context.Context,
+	w http.ResponseWriter,
+	jwtSigner *jwt.Signer,
+	r *http.Request,
+) (*models.User, *ImpersonationInfo, error) {
 	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_cookie")
 	defer span.End()
 
@@ -363,7 +376,9 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 	}
 	// Blocking an impersonated target invalidates that impersonated view.
 	// Fall back to the real admin, matching AccountAuthMiddleware.
-	if !errors.Is(err, models.ErrAccountBlocked) && isActiveImpersonation(jwtSigner, r) {
+	if errors.Is(err, models.ErrAccountBlocked) {
+		impersonation.ClearCookie(w, r)
+	} else if isActiveImpersonation(jwtSigner, r) {
 		return nil, nil, err
 	}
 

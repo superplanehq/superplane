@@ -305,6 +305,39 @@ func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t
 	handler.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusNoContent, res.Code)
+	assertImpersonationCookieCleared(t, res)
+}
+
+func TestAccountAuthMiddleware_BlockedImpersonationTargetClearsCookie(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+
+	targetAccount, err := models.CreateAccount("Blocked Target", "blocked-account-target@example.com")
+	require.NoError(t, err)
+
+	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	impersonationToken, err := impersonation.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
+	require.NoError(t, err)
+	require.NoError(t, targetAccount.Block(database.Conn(), time.Now()))
+
+	handler := AccountAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		account, ok := GetEffectiveAccountFromContext(req.Context())
+		require.True(t, ok)
+		assert.Equal(t, r.Account.ID, account.ID)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/account", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: accountToken})
+	req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impersonationToken})
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusNoContent, res.Code)
+	assertImpersonationCookieCleared(t, res)
 }
 
 func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
@@ -421,4 +454,17 @@ func mintTestAccountToken(t *testing.T, signer *jwt.Signer, accountID string, is
 	require.NoError(t, err)
 
 	return tokenString
+}
+
+func assertImpersonationCookieCleared(t *testing.T, recorder *httptest.ResponseRecorder) {
+	t.Helper()
+
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == "impersonation_token" {
+			assert.Less(t, cookie.MaxAge, 0)
+			return
+		}
+	}
+
+	assert.Fail(t, "impersonation cookie was not cleared")
 }
