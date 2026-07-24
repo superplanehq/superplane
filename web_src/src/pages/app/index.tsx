@@ -60,7 +60,7 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { DefaultLayoutEngine } from "@/lib/layout";
+import { DefaultLayoutEngine, type LayoutDirection } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
@@ -141,6 +141,7 @@ import {
   allowsRunsSidebar,
   useWorkflowUrlViewFlags,
   readStoredBoolean,
+  useLayoutDirectionPreference,
   clearRunInspectionSearchParams,
 } from "./viewState";
 import {
@@ -608,6 +609,7 @@ export function AppPage() {
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
+  const { layoutDirection, setLayoutDirection } = useLayoutDirectionPreference();
   const { handleToggleAutoFocus, isAutoFocusEnabled } = useCanvasAutoFocusPreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
@@ -1179,9 +1181,10 @@ export function AppPage() {
         scope: "connected-component",
         nodeIds: [nodeID],
         components,
+        direction: layoutDirection,
       });
     },
-    [isAutoLayoutOnUpdateEnabled, components],
+    [isAutoLayoutOnUpdateEnabled, components, layoutDirection],
   );
 
   /**
@@ -2853,25 +2856,38 @@ export function AppPage() {
     },
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
-  const handleAutoLayoutNodes = useCallback(
-    async (nodeIds: string[]) => {
+  // Runs the auto-layout engine over the canvas and applies the result. The
+  // reflow is applied locally in every mode (so the vertical view works while
+  // viewing) but only persisted to the backend when the canvas is editable.
+  const runAutoLayout = useCallback(
+    async (options: Parameters<typeof DefaultLayoutEngine.apply>[1]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
-        nodeIds,
-        scope: "connected-component",
-        components,
-      });
-
+      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, options);
       analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
-
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+  );
+
+  const handleAutoLayoutNodes = useCallback(
+    (nodeIds: string[]) =>
+      runAutoLayout({ nodeIds, scope: "connected-component", components, direction: layoutDirection }),
+    [runAutoLayout, components, layoutDirection],
+  );
+
+  // Switches between the horizontal (freeform-friendly) and vertical auto-layout
+  // views, persisting the orientation and reflowing the whole canvas to match.
+  const handleSetLayoutDirection = useCallback(
+    (direction: LayoutDirection) => {
+      setLayoutDirection(direction);
+      return runAutoLayout({ scope: "full-canvas", components, direction });
+    },
+    [runAutoLayout, setLayoutDirection, components],
   );
 
   const handleNodesDuplicate = useCallback(
@@ -4215,6 +4231,8 @@ export function AppPage() {
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
           isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
+          layoutDirection={layoutDirection}
+          onSetLayoutDirection={handleSetLayoutDirection}
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
