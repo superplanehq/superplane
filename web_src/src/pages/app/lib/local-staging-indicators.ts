@@ -1,7 +1,6 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { hasDraftVersusLiveConsoleDiff } from "../draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "../draftNodeDiff";
 import type { PendingFileChange } from "../files/types";

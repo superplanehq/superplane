@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { templateForPanelType, type PanelType } from "./panelTypes";
 
 const SAVE_DEBOUNCE_MS = 500;

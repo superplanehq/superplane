@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useTheme } from "@/contexts/useTheme";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { consoleToYaml, consoleYamlFilename, parseConsoleYaml } from "./consoleYaml";
 
 export type ConsoleYamlModalProps = {

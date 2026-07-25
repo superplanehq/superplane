@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -66,10 +65,7 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,
-		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(version.Nodes),
-			Edges: actions.EdgesToProto(version.Edges),
-		},
+		Spec:     serializeCanvasSpecFromVersion(version),
 	}
 }
 

@@ -80,7 +80,7 @@ async function commitUpdatedCanvasVersionYaml(params: {
       body: { commitMessage: "Update signing secret configuration" },
     }),
   );
-  params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);
+  params.queryClient.setQueryData(canvasKeys.version(params.canvasId, params.versionId), params.updatedVersion);
   return true;
 }
 
@@ -112,7 +112,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
       const configured = (invokeResponse.data?.result?.signingSecretConfigured as boolean) ?? false;
 
       const freshVersion = await queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
+        queryKey: canvasKeys.version(canvasId, versionId),
         queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
       });
 

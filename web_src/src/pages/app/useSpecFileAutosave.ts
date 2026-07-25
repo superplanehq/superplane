@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
+import type { UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, isWorkflowSpecPath } from "./lib/workflow-spec-paths";
 import { parseCanvasYamlForImport, parseConsoleYamlForSave } from "./lib/workflow-spec-files";
 

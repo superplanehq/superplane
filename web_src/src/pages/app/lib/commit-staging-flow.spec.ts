@@ -53,10 +53,6 @@ describe("executeCommitStaging", () => {
       queryKey: canvasKeys.detail("org-1", "canvas-1"),
       refetchType: "all",
     });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: canvasKeys.console("canvas-1", undefined),
-      refetchType: "all",
-    });
     expect(draftCanvasSpecsRef.current.has("version-1")).toBe(false);
     expect(setDraftCanvasSpec).toHaveBeenCalledWith(null);
     expect(setStagingResetNonce).toHaveBeenCalled();

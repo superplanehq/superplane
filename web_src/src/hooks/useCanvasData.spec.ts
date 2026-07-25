@@ -364,6 +364,15 @@ const emptyConsoleYaml =
 const afterConsoleYaml =
   "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n";
 
+const emptyCommittedVersionResponse = {
+  data: {
+    version: {
+      metadata: { id: "version-1" },
+      spec: { panels: [], layout: [] },
+    },
+  },
+};
+
 function mockConsoleRepositoryFileFetch(yamlBody: string, options?: { committedYaml?: string }) {
   vi.stubGlobal(
     "fetch",
@@ -395,9 +404,7 @@ describe("useUpdateCanvasConsole", () => {
     canvasesDeleteCanvasStaging.mockResolvedValue({
       data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
     });
-    canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
-    });
+    canvasesDescribeCanvasVersion.mockResolvedValue(emptyCommittedVersionResponse);
     canvasesGetCanvasStaging.mockResolvedValue({
       data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
     });
@@ -421,6 +428,17 @@ describe("useUpdateCanvasConsole", () => {
 
   it("surfaces dashboard save failures", async () => {
     const queryClient = createQueryClient();
+    canvasesDescribeCanvasVersion.mockResolvedValue({
+      data: {
+        version: {
+          metadata: { id: "version-1" },
+          spec: {
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        },
+      },
+    });
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
@@ -432,23 +450,21 @@ describe("useUpdateCanvasConsole", () => {
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
+    const stagingKey = canvasKeys.canvasStaging("canvas-1");
     let resolveSave: (value: unknown) => void = () => {};
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
     });
-    queryClient.setQueryData(dashboardKey, {
-      canvasId: "canvas-1",
-      versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
-      consoleYaml: emptyConsoleYaml,
+    queryClient.setQueryData(stagingKey, {
+      stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] },
+      spec: {
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      },
     });
     canvasesPutCanvasStaging.mockReturnValue(savePromise);
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
-    canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] } },
-    });
+    canvasesDescribeCanvasVersion.mockResolvedValue(emptyCommittedVersionResponse);
     mockConsoleRepositoryFileFetch(afterConsoleYaml, { committedYaml: emptyConsoleYaml });
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
@@ -463,8 +479,10 @@ describe("useUpdateCanvasConsole", () => {
     });
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+      expect(queryClient.getQueryData(stagingKey)).toMatchObject({
+        spec: {
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        },
       });
     });
 
@@ -475,12 +493,13 @@ describe("useUpdateCanvasConsole", () => {
 
   it("rolls back the dashboard cache when console save fails", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
-    queryClient.setQueryData(dashboardKey, {
-      canvasId: "canvas-1",
-      versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    const stagingKey = canvasKeys.canvasStaging("canvas-1");
+    queryClient.setQueryData(stagingKey, {
+      stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] },
+      spec: {
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      },
     });
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
@@ -495,8 +514,10 @@ describe("useUpdateCanvasConsole", () => {
       }),
     ).rejects.toThrow("request failed");
 
-    expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+    expect(queryClient.getQueryData(stagingKey)).toMatchObject({
+      spec: {
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      },
     });
   });
 });

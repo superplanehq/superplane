@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import type { PendingFileChange } from "../files/types";
 import { hasLocalCanvasGraphDiff, hasLocalConsoleDiff, hasLocalFilesStaging } from "./local-staging-indicators";
 

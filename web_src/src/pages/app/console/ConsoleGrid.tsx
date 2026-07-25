@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
 
 import { cn } from "@/lib/utils";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import { ConsolePanelDiffBadge, ConsolePanelDiffDialog } from "./ConsolePanelDiff";

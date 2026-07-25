@@ -25,7 +25,7 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	require.NoError(t, err)
 	staged := baseline + "\n# staged edit\n"
 
-	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
 	})
 	require.NoError(t, err)
@@ -61,7 +61,7 @@ func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 	renamed := strings.Replace(baseline, "name: "+canvas.Name, "name: "+canvas.Name+"-staged", 1)
 	require.NotEqual(t, baseline, renamed)
 
-	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(renamed)},
 	})
 	require.NoError(t, err)
@@ -77,12 +77,10 @@ func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 
-	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: ConsoleYAMLRepositoryPath, Content: []byte("just a scalar, not an object")},
 	})
-	require.NoError(t, err)
-
-	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Bad console", "", r.AuthService)
+	require.Error(t, err)
 	code, msg, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
@@ -105,7 +103,7 @@ func Test__CommitCanvasStaging__StageArbitraryRepositoryFileCommitsToGit(t *test
 
 	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 
-	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: "README.md", Content: []byte("staged readme")},
 	})
 	require.NoError(t, err)
@@ -145,7 +143,7 @@ func Test__CommitCanvasStaging__RejectsStaleStaging(t *testing.T) {
 	baseline, err := ReadRepositorySpecFile(ownerCtx, canvas, liveVersion, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ownerCtx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ownerCtx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# owner staged\n")},
 	})
 	require.NoError(t, err)
@@ -153,7 +151,7 @@ func Test__CommitCanvasStaging__RejectsStaleStaging(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	_, err = PutCanvasStaging(otherCtx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(otherCtx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# other commit\n")},
 	})
 	require.NoError(t, err)

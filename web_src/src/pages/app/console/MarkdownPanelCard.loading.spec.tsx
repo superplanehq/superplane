@@ -3,8 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 import { useMarkdownVariables, type MarkdownVariablesResult } from "./useMarkdownVariables";

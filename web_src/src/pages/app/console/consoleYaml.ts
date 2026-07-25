@@ -18,7 +18,7 @@
  */
 
 import * as yaml from "js-yaml";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { PANEL_TYPES, isPanelType, validatePanelContent, type PanelType } from "./panelTypes";
 
 export const CONSOLE_API_VERSION = "v1";

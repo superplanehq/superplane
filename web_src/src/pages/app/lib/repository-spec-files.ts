@@ -1,14 +1,14 @@
 import {
   canvasesDescribeCanvasVersion,
   canvasesGetCanvasStaging,
+  type CanvasesCanvasSpec,
   type CanvasesCanvasVersion,
   type CanvasesCanvasVersionMetadata,
   type CanvasesStagingSummary,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
-import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+import { dematerializeCanvasSpec, dematerializeConsoleSpec, materializeConsoleSpec } from "./workflow-spec-files";
 import { toCanvasVersionShell } from "./canvas-versions";
 import { isNotFoundError } from "../workflowPageHelpers";
 
@@ -53,15 +53,30 @@ export async function fetchRepositorySpecFileContent(
   return response.text();
 }
 
-// fetchCanvasStagingSummary returns the uncommitted staging summary for the
-// current user on a canvas.
-export async function fetchCanvasStagingSummary(canvasId: string): Promise<CanvasesStagingSummary | undefined> {
+// fetchCanvasStaging returns the current user's effective staged spec and summary.
+export type CanvasStagingData = {
+  stagingSummary: CanvasesStagingSummary;
+  spec?: CanvasesCanvasSpec;
+};
+
+export async function fetchCanvasStaging(canvasId: string): Promise<CanvasStagingData> {
   const response = await canvasesGetCanvasStaging(
     withOrganizationHeader({
       path: { canvasId },
     }),
   );
-  return response.data?.stagingSummary;
+
+  return {
+    stagingSummary: response.data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+    spec: response.data?.spec,
+  };
+}
+
+// fetchCanvasStagingSummary returns the uncommitted staging summary for the
+// current user on a canvas.
+export async function fetchCanvasStagingSummary(canvasId: string): Promise<CanvasesStagingSummary | undefined> {
+  const staging = await fetchCanvasStaging(canvasId);
+  return staging.stagingSummary;
 }
 
 export function canvasVersionWithSpecFromYaml(
@@ -84,15 +99,26 @@ export function canvasVersionWithSpecFromYaml(
   return { ...version, spec };
 }
 
+export function canvasVersionWithStagingSpec(
+  version: CanvasesCanvasVersion | CanvasesCanvasVersionMetadata | undefined,
+  spec: CanvasesCanvasSpec | undefined,
+): CanvasesCanvasVersion | undefined {
+  const shell = toCanvasVersionShell(version);
+  if (!shell || !spec) {
+    return shell;
+  }
+
+  return { ...shell, spec };
+}
+
 // fetchStagedCanvasVersionWithSpec reads the canvas-scoped staging layer. Staging
 // is not keyed by version id; version metadata is only used as a display shell.
 export async function fetchStagedCanvasVersionWithSpec(
   canvasId: string,
   versionMetadata?: CanvasesCanvasVersion | CanvasesCanvasVersionMetadata,
 ): Promise<CanvasesCanvasVersion | undefined> {
-  const shell = toCanvasVersionShell(versionMetadata);
-  const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, undefined, true);
-  return canvasVersionWithSpecFromYaml(shell, canvasYaml);
+  const staging = await fetchCanvasStaging(canvasId);
+  return canvasVersionWithStagingSpec(versionMetadata, staging.spec);
 }
 
 // fetchCanvasVersionWithSpec loads a version from DescribeCanvasVersion, including
@@ -116,6 +142,49 @@ export type ConsoleSpecData = {
   consoleYaml: string;
 };
 
+function protoConsolePanels(panels: NonNullable<CanvasesCanvasVersion["spec"]>["panels"]): ConsoleSpecData["panels"] {
+  return (panels ?? []).map((panel) => ({
+    id: panel.id ?? "",
+    type: panel.type ?? "",
+    content: (panel.content as Record<string, unknown> | undefined) ?? {},
+  }));
+}
+
+function protoConsoleLayout(layout: NonNullable<CanvasesCanvasVersion["spec"]>["layout"]): ConsoleSpecData["layout"] {
+  return (layout ?? []).map((item) => ({
+    i: item.i ?? "",
+    x: item.x ?? 0,
+    y: item.y ?? 0,
+    w: item.w ?? 0,
+    h: item.h ?? 0,
+    ...(item.minW !== undefined ? { minW: item.minW } : {}),
+    ...(item.minH !== undefined ? { minH: item.minH } : {}),
+  }));
+}
+
+export function consoleSpecFromVersion(
+  canvasId: string,
+  version: CanvasesCanvasVersion | undefined,
+): ConsoleSpecData | undefined {
+  const spec = version?.spec;
+  if (!spec?.panels && !spec?.layout) {
+    return undefined;
+  }
+
+  const panels = protoConsolePanels(spec.panels);
+  const layout = protoConsoleLayout(spec.layout);
+  const consoleYaml = materializeConsoleSpec({ panels, layout, canvasId });
+  if (!consoleYaml.trim()) {
+    return undefined;
+  }
+
+  return {
+    panels,
+    layout,
+    consoleYaml,
+  };
+}
+
 export function consoleSpecFromYaml(consoleYaml: string): ConsoleSpecData | undefined {
   const parsed = dematerializeConsoleSpec(consoleYaml);
   if (!parsed) {
@@ -127,16 +196,4 @@ export function consoleSpecFromYaml(consoleYaml: string): ConsoleSpecData | unde
     layout: parsed.layout,
     consoleYaml,
   };
-}
-
-export async function fetchConsoleSpecFromRepository(
-  canvasId: string,
-  versionId?: string,
-  stage = false,
-): Promise<ConsoleSpecData | undefined> {
-  const consoleYaml = await fetchRepositorySpecFileContent(canvasId, CONSOLE_YAML_PATH, versionId, stage);
-  if (!consoleYaml.trim()) {
-    return undefined;
-  }
-  return consoleSpecFromYaml(consoleYaml);
 }

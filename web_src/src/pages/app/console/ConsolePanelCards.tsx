@@ -1,5 +1,4 @@
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { BoardPanelCard } from "./BoardPanelCard";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { HtmlPanelCard } from "./HtmlPanelCard";

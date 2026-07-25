@@ -39,20 +39,12 @@ export function useRefreshLatestLiveCanvasData(
       if (liveVersionId) {
         invalidations.push(
           queryClient.invalidateQueries({
-            queryKey: canvasKeys.console(canvasId, liveVersionId),
+            queryKey: canvasKeys.version(canvasId, liveVersionId),
             exact: true,
             refetchType: "all",
           }),
         );
       }
-
-      invalidations.push(
-        queryClient.invalidateQueries({
-          queryKey: canvasKeys.console(canvasId, undefined),
-          exact: true,
-          refetchType: "all",
-        }),
-      );
 
       await Promise.all(invalidations);
     },

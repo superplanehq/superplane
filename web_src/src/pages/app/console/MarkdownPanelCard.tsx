@@ -11,8 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { useConsoleContext } from "./ConsoleContext";
 import { CONSOLE_PANEL_BODY_SURFACE, CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useMarkdownVariables } from "./useMarkdownVariables";

@@ -2,20 +2,16 @@ import type { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
-import { syncCanvasDraftState, syncConsoleCaches } from "./sync-canvas-draft";
+import { syncCanvasDraftState } from "./sync-canvas-draft";
 import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
 
-vi.mock("./repository-spec-files", () => ({
-  fetchCanvasVersionWithSpec: vi.fn(),
-}));
-
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock("./repository-spec-files", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./repository-spec-files")>();
   return {
-    ...(actual as Record<string, unknown>),
-    fetchCanvasConsoleData: vi.fn(),
+    ...actual,
+    fetchCanvasVersionWithSpec: vi.fn(),
   };
 });
 
@@ -30,12 +26,15 @@ describe("syncCanvasDraftState", () => {
       spec: {
         nodes: [{ id: "node-1", name: "Trigger", type: "TYPE_TRIGGER" }],
         edges: [],
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "Hello" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
       },
     };
     vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(version);
 
     const setQueryData = vi.fn();
-    const queryClient = { setQueryData } as unknown as QueryClient;
+    const invalidateQueries = vi.fn();
+    const queryClient = { setQueryData, invalidateQueries } as unknown as QueryClient;
 
     const result = await syncCanvasDraftState({
       queryClient,
@@ -46,9 +45,15 @@ describe("syncCanvasDraftState", () => {
 
     expect(result).toEqual(version);
     expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1", "version-1");
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.stagedCanvasSpec("canvas-1"), version);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "version-1"), version);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-1"), version);
+    expect(setQueryData).toHaveBeenCalledWith(
+      canvasKeys.canvasStaging("canvas-1"),
+      expect.objectContaining({
+        stagingSummary: { hasStaging: false, stagedPaths: [] },
+        spec: version.spec,
+      }),
+    );
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.version("canvas-1", "version-1"), version);
+    expect(setQueryData).toHaveBeenCalledTimes(3);
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
     const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));
@@ -70,15 +75,16 @@ describe("syncCanvasDraftState", () => {
     });
   });
 
-  it("updates the version describe cache for the requested version id", async () => {
+  it("updates the version cache for the requested version id", async () => {
     const version: CanvasesCanvasVersion = {
       metadata: { id: "version-2" },
-      spec: { nodes: [], edges: [] },
+      spec: { nodes: [], edges: [], panels: [], layout: [] },
     };
     vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(version);
 
     const setQueryData = vi.fn();
-    const queryClient = { setQueryData } as unknown as QueryClient;
+    const invalidateQueries = vi.fn();
+    const queryClient = { setQueryData, invalidateQueries } as unknown as QueryClient;
 
     await syncCanvasDraftState({
       queryClient,
@@ -87,28 +93,6 @@ describe("syncCanvasDraftState", () => {
       versionId: "version-2",
     });
 
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDescribe("canvas-1", "version-2"), version);
-  });
-});
-
-describe("syncConsoleCaches", () => {
-  it("invalidates staged console cache when console.yaml is missing or unparsable", async () => {
-    vi.mocked(fetchCanvasConsoleData).mockResolvedValue(undefined);
-
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-    const setQueryData = vi.fn();
-    const queryClient = { invalidateQueries, setQueryData } as unknown as QueryClient;
-
-    await syncConsoleCaches({
-      queryClient,
-      canvasId: "canvas-1",
-      versionId: "version-1",
-    });
-
-    expect(fetchCanvasConsoleData).toHaveBeenCalledWith("canvas-1", "version-1", false);
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: canvasKeys.stagedConsole("canvas-1"),
-    });
-    expect(setQueryData).not.toHaveBeenCalled();
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.version("canvas-1", "version-2"), version);
   });
 });

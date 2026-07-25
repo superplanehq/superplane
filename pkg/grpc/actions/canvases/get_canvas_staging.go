@@ -8,22 +8,22 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
-func GetCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.StagingSummary, error) {
+func GetCanvasStaging(
+	ctx context.Context,
+	db *gorm.DB,
+	registry *registry.Registry,
+	canvas *models.Canvas,
+) (*CanvasStagingState, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	userUUID := uuid.MustParse(userID)
-	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userUUID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load staging")
-	}
-
-	return buildStagingSummary(canvas, rows), nil
+	return BuildCanvasStagingState(ctx, db, registry, canvas, uuid.MustParse(userID))
 }
 
 func buildStagingSummary(canvas *models.Canvas, rows []models.WorkflowStagedFile) *pb.StagingSummary {

@@ -300,10 +300,10 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	assert.Equal(t, 2, update.Summary.NodeCount)
 	assert.Equal(t, 1, update.Summary.EdgeCount)
 
-	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
+	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas)
 	require.NoError(t, err)
-	assert.True(t, staging.GetHasStaging())
-	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
+	assert.True(t, staging.Summary.GetHasStaging())
+	assert.Contains(t, staging.Summary.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
 
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
@@ -415,10 +415,10 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	// patch_staging writes to the UI staging layer instead of committing into the
 	// live version row, so the edit shows up as pending staging that the user
 	// reviews and publishes, exactly like an edit made in the UI editor.
-	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
+	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas)
 	require.NoError(t, err)
-	assert.True(t, staging.GetHasStaging())
-	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.ConsoleYAMLRepositoryPath)
+	assert.True(t, staging.Summary.GetHasStaging())
+	assert.Contains(t, staging.Summary.GetStagedPaths(), canvasRepository.ConsoleYAMLRepositoryPath)
 
 	// The agent reads back the same staged content it wrote through the staged
 	// read path the `read` action now uses.

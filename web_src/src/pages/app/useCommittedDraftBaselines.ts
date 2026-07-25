@@ -2,8 +2,9 @@ import type { CanvasesCanvas } from "@/api-client";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
+import { parseConsoleDataFromVersion } from "@/pages/app/lib/console-data";
 
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
@@ -42,38 +43,29 @@ export function useCommittedDraftBaselines({
     let cancelled = false;
     setBaselines({ ready: false });
 
-    // Read the committed (stage=false) canvas and console through React Query so
-    // the baselines reuse the cache the rest of the editor already populates.
-    // The console read shares its key/fetcher with the draft console query, so
-    // the two committed console.yaml reads are deduped into a single request.
-    // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
-    void Promise.all([
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
+    void queryClient
+      .fetchQuery({
+        queryKey: canvasKeys.version(canvasId, versionId),
         queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId),
         staleTime: Number.POSITIVE_INFINITY,
-      }),
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.console(canvasId, versionId),
-        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
-        staleTime: Number.POSITIVE_INFINITY,
-      }),
-    ]).then(([version, consoleData]) => {
-      if (cancelled) {
-        return;
-      }
+      })
+      .then((version) => {
+        if (cancelled) {
+          return;
+        }
 
-      setBaselines({
-        canvasSpec: version?.spec,
-        console: consoleData
-          ? {
-              panels: consoleData.panels,
-              layout: consoleData.layout,
-            }
-          : { panels: [], layout: [] },
-        ready: true,
+        const consoleData = parseConsoleDataFromVersion(canvasId, version);
+        setBaselines({
+          canvasSpec: version?.spec,
+          console: consoleData
+            ? {
+                panels: consoleData.panels,
+                layout: consoleData.layout,
+              }
+            : { panels: [], layout: [] },
+          ready: true,
+        });
       });
-    });
 
     return () => {
       cancelled = true;

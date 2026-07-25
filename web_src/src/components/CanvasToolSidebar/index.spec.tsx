@@ -34,7 +34,6 @@ const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() =>
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: { spec: { nodes: [] } } }),
-  useDescribeCanvasVersion: () => ({ data: undefined }),
   useCanvasVersion: () => ({ data: null }),
   useInfiniteCanvasRuns: () => ({ data: { pages: [] } }),
 }));

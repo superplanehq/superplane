@@ -44,7 +44,6 @@ export function useCanvasLifecycleEventHandlers({
     (targetCanvasId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.console(targetCanvasId, undefined) });
     },
     [queryClient],
   );

@@ -46,8 +46,7 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.canvasStaging("canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "live-version-1"), { exact: true });
-    expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
+    expectInvalidation(invalidateQueries, canvasKeys.version("canvas-1", "live-version-1"), { exact: true });
   });
 
   it("does nothing when organization or canvas id is missing", async () => {
@@ -78,7 +77,7 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expect(missingCanvasInvalidate).not.toHaveBeenCalled();
   });
 
-  it("skips version-specific console invalidation when no live version id is available", async () => {
+  it("skips version invalidation when no live version id is available", async () => {
     const { queryClient, invalidateQueries } = createInvalidateSpy();
 
     const { result } = renderHook(() => useRefreshLatestLiveCanvasData("org-1", "canvas-1", undefined), {
@@ -90,15 +89,12 @@ describe("useRefreshLatestLiveCanvasData", () => {
     });
 
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
-
-    const consoleInvalidations = invalidateQueries.mock.calls
-      .map(([args]) => args?.queryKey)
-      .filter((key): key is ReturnType<typeof canvasKeys.console> => Array.isArray(key) && key.includes("console"));
-    expect(consoleInvalidations).toEqual([canvasKeys.console("canvas-1", undefined)]);
+    expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
+    expectInvalidation(invalidateQueries, canvasKeys.canvasStaging("canvas-1"));
+    expect(invalidateQueries).toHaveBeenCalledTimes(3);
   });
 
-  it("uses the provided live version id for console invalidation", async () => {
+  it("uses the provided live version id for version invalidation", async () => {
     const { queryClient, invalidateQueries } = createInvalidateSpy();
 
     const { result } = renderHook(() => useRefreshLatestLiveCanvasData("org-1", "canvas-1", "old-live-version"), {
@@ -112,7 +108,6 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.canvasStaging("canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "published-version"), { exact: true });
-    expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
+    expectInvalidation(invalidateQueries, canvasKeys.version("canvas-1", "published-version"), { exact: true });
   });
 });

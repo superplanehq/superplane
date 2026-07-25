@@ -50,13 +50,13 @@ vi.mock("@/hooks/useCanvasData", () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
-  useDiscardRepositoryFilePaths: () => ({
+  useDiscardCanvasStaging: () => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
     isPending: false,
   }),
   useCanvasStaging: () => ({
-    data: { hasStaging: stagedPaths.length > 0, stagedPaths },
+    data: { stagingSummary: { hasStaging: stagedPaths.length > 0, stagedPaths } },
     isLoading: false,
     error: null,
   }),

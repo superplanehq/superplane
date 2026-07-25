@@ -19,7 +19,17 @@ function consoleLoaded(panels: object[]): ConsoleQueryLike {
 const consoleLoading: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };
 const consoleErrored: ConsoleQueryLike = { isSuccess: false, isError: true, data: undefined };
 
+vi.mock("@/hooks/useOrganizationId", () => ({
+  useOrganizationId: () => "org-1",
+}));
+
 vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: () => ({
+    data: { metadata: { liveVersionId: "live-version-1" } },
+    isSuccess: true,
+    isError: false,
+    isLoading: false,
+  }),
   useCanvasConsole: () => mockConsoleQuery,
 }));
 

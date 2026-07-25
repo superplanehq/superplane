@@ -30,9 +30,10 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
+  type CanvasStagingCache,
   useCanvas,
   useCanvasMemoryEntries,
-  useDescribeCanvasVersion,
+  useCanvasVersion,
   useCreateCanvasMemoryNamespace,
   useDeleteCanvasMemoryEntry,
   useUpdateCanvasMemoryNamespace,
@@ -110,7 +111,8 @@ import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
-import { fetchCanvasStagingSummary } from "./lib/repository-spec-files";
+import { fetchCanvasStaging } from "./lib/repository-spec-files";
+import { CANVAS_YAML_PATH } from "./lib/workflow-spec-paths";
 import { useEnterLiveEditSession } from "./useEnterLiveEditSession";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
@@ -326,7 +328,8 @@ export function AppPage() {
     refetchOnMount: false,
   });
   const liveCanvasVersionId = liveCanvas?.metadata?.liveVersionId;
-  const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useDescribeCanvasVersion(
+  const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useCanvasVersion(
+    organizationId!,
     canvasId!,
     liveCanvasVersionId,
   );
@@ -349,6 +352,7 @@ export function AppPage() {
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(organizationId, canvasId, liveCanvasVersionId);
   const {
+    canvasStagingQuery,
     activeCanvasVersionId,
     shouldReadStagedCanvasVersionFlag,
     loadedCanvasVersion,
@@ -670,14 +674,13 @@ export function AppPage() {
       setActiveCanvasVersion((current) =>
         current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: updatedWorkflow.spec } : current,
       );
-      queryClient.setQueryData<CanvasesCanvasVersion | undefined>(canvasKeys.stagedCanvasSpec(canvasId), (current) =>
-        current
-          ? { ...current, spec: updatedWorkflow.spec }
-          : {
-              metadata: { id: activeCanvasVersionId },
-              spec: updatedWorkflow.spec,
-            },
-      );
+      queryClient.setQueryData<CanvasStagingCache>(canvasKeys.canvasStaging(canvasId), (current) => ({
+        stagingSummary: current?.stagingSummary ?? { hasStaging: true, stagedPaths: [CANVAS_YAML_PATH] },
+        spec: {
+          ...current?.spec,
+          ...updatedWorkflow.spec,
+        },
+      }));
     },
     [organizationId, canvasId, queryClient, isEditing, activeCanvasVersionId],
   );
@@ -943,11 +946,12 @@ export function AppPage() {
     hasCommittedConsoleDraftChanges,
     hasFilesStagingChanges,
   } = useAppDraftStagingData({
+    organizationId: organizationId!,
     canvasId: canvasId!,
     activeCanvasVersionId,
     liveCanvasVersionId,
     isEditing,
-    hasEditableVersion,
+    canvasStagingQuery,
     stagingResetNonce,
     draftSpecToRender,
     canvas,
@@ -3400,15 +3404,12 @@ export function AppPage() {
       return;
     }
 
-    const stagingSummary = await queryClient.fetchQuery({
+    const staging = await queryClient.fetchQuery({
       queryKey: canvasKeys.canvasStaging(canvasId),
-      queryFn: async () => {
-        const summary = await fetchCanvasStagingSummary(canvasId);
-        return summary ?? { hasStaging: false, stagedPaths: [] };
-      },
-      staleTime: 0,
+      queryFn: () => fetchCanvasStaging(canvasId),
+      staleTime: Number.POSITIVE_INFINITY,
     });
-    if (!stagingSummary.hasStaging) {
+    if (!staging.stagingSummary.hasStaging) {
       return;
     }
 

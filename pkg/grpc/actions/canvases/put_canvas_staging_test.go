@@ -17,13 +17,14 @@ func Test__PutCanvasStaging__StagesCanvasYAML(t *testing.T) {
 	require.NoError(t, err)
 
 	staged := baseline + "\n# staged edit\n"
-	state, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	state, err := PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
 	})
 	require.NoError(t, err)
-	assert.True(t, state.GetHasStaging())
-	assert.Equal(t, []string{CanvasYAMLRepositoryPath}, state.GetStagedPaths())
-	assert.Equal(t, version.ID.String(), state.GetBaseVersionId())
+	assert.True(t, state.Summary.GetHasStaging())
+	assert.Equal(t, []string{CanvasYAMLRepositoryPath}, state.Summary.GetStagedPaths())
+	assert.Equal(t, version.ID.String(), state.Summary.GetBaseVersionId())
+	require.NotNil(t, state.Spec)
 
 	effective, err := ReadRepositorySpecFileStaged(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
@@ -39,7 +40,7 @@ func Test__PutCanvasStaging__RejectsReservedPath(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 	defer r.Close()
 
-	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: ".superplane/config", Content: []byte("nope")},
 	})
 	require.Error(t, err)

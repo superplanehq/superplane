@@ -20,15 +20,16 @@ func Test__GetCanvasStaging(t *testing.T) {
 	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# pending\n")},
 	})
 	require.NoError(t, err)
 
-	state, err := GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
+	state, err := GetCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas)
 	require.NoError(t, err)
-	assert.True(t, state.GetHasStaging())
-	assert.Contains(t, state.GetStagedPaths(), CanvasYAMLRepositoryPath)
+	assert.True(t, state.Summary.GetHasStaging())
+	assert.Contains(t, state.Summary.GetStagedPaths(), CanvasYAMLRepositoryPath)
+	require.NotNil(t, state.Spec)
 }
 
 func Test__GetCanvasStaging__StagedReadIsPerUser(t *testing.T) {
@@ -38,7 +39,7 @@ func Test__GetCanvasStaging__StagedReadIsPerUser(t *testing.T) {
 	baseline, err := ReadRepositorySpecFile(ownerCtx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ownerCtx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ownerCtx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# staged\n")},
 	})
 	require.NoError(t, err)

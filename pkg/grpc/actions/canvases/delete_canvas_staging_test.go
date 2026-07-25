@@ -16,14 +16,15 @@ func Test__DeleteCanvasStaging(t *testing.T) {
 	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# pending\n")},
 	})
 	require.NoError(t, err)
 
-	state, err := DeleteCanvasStaging(ctx, database.DB(t.Context()), canvas, nil)
+	state, err := DeleteCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, nil)
 	require.NoError(t, err)
-	assert.False(t, state.GetHasStaging())
+	assert.False(t, state.Summary.GetHasStaging())
+	require.NotNil(t, state.Spec)
 
 	effective, err := ReadRepositorySpecFileStaged(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)

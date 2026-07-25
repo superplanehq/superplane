@@ -1,10 +1,28 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
+import { canvasesDescribeCanvasVersion } from "@/api-client";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { hasDraftVersusLiveConsoleDiff } from "../draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "../draftNodeDiff";
-import { consoleSpecFromYaml, fetchRepositorySpecFileContent } from "./repository-spec-files";
+import { consoleSpecFromVersion, consoleSpecFromYaml, fetchCanvasVersionWithSpec, fetchRepositorySpecFileContent } from "./repository-spec-files";
 import { dematerializeCanvasSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+
+export function matchesCommittedCanvasSpec(
+  committedVersion: CanvasesCanvasVersion | undefined,
+  nextCanvasYaml: string,
+): boolean {
+  try {
+    const nextSpec = dematerializeCanvasSpec(nextCanvasYaml);
+    if (!committedVersion?.spec || !nextSpec) {
+      return false;
+    }
+
+    return !hasDraftVersusLiveGraphDiff(committedVersion, { spec: nextSpec } as CanvasesCanvasVersion);
+  } catch {
+    return false;
+  }
+}
 
 export async function matchesCommittedCanvasYaml(
   canvasId: string,
@@ -12,17 +30,8 @@ export async function matchesCommittedCanvasYaml(
   nextCanvasYaml: string,
 ): Promise<boolean> {
   try {
-    const committedYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, false);
-    const committedSpec = dematerializeCanvasSpec(committedYaml);
-    const nextSpec = dematerializeCanvasSpec(nextCanvasYaml);
-    if (!committedSpec || !nextSpec) {
-      return committedYaml === nextCanvasYaml;
-    }
-
-    return !hasDraftVersusLiveGraphDiff(
-      { spec: committedSpec } as CanvasesCanvasVersion,
-      { spec: nextSpec } as CanvasesCanvasVersion,
-    );
+    const version = await fetchCanvasVersionWithSpec(canvasId, versionId);
+    return matchesCommittedCanvasSpec(version, nextCanvasYaml);
   } catch {
     return false;
   }
@@ -34,10 +43,15 @@ export async function matchesCommittedConsoleYaml(
   nextConsoleYaml: string,
 ): Promise<boolean> {
   try {
-    const committedYaml = await fetchRepositorySpecFileContent(canvasId, CONSOLE_YAML_PATH, versionId, false);
-    const committed = consoleSpecFromYaml(committedYaml);
+    const describeResponse = await canvasesDescribeCanvasVersion(
+      withOrganizationHeader({
+        path: { canvasId, versionId },
+      }),
+    );
+    const committed = consoleSpecFromVersion(canvasId, describeResponse.data?.version);
     const next = consoleSpecFromYaml(nextConsoleYaml);
     if (!committed || !next) {
+      const committedYaml = committed?.consoleYaml ?? "";
       return committedYaml === nextConsoleYaml;
     }
 

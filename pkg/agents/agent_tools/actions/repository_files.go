@@ -15,6 +15,7 @@ import (
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services/files"
 )
 
@@ -221,13 +222,19 @@ func (a readFileAction) readCommittedGitFile(ctx context.Context, session agents
 	return string(content), nil
 }
 
-type writeFileAction struct{}
+type writeFileAction struct {
+	registry *registry.Registry
+}
 
-func (writeFileAction) Name() string {
+func newWriteFileAction(deps Dependencies) writeFileAction {
+	return writeFileAction{registry: deps.Registry}
+}
+
+func (a writeFileAction) Name() string {
 	return writeFileActionName
 }
 
-func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
+func (a writeFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
 	path, err := requestedWritableFilePath(input.Path)
 	if err != nil {
 		return fileStageResult{}, err
@@ -257,6 +264,7 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		db,
+		a.registry,
 		canvas,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
 	)
@@ -269,17 +277,23 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		CanvasID:       session.CanvasID,
 		VersionID:      liveVersion.ID.String(),
 		Path:           path,
-		StagingSummary: serializeStagingSummary(state),
+		StagingSummary: serializeStagingSummary(state.Summary),
 	}, nil
 }
 
-type deleteFileAction struct{}
+type deleteFileAction struct {
+	registry *registry.Registry
+}
 
-func (deleteFileAction) Name() string {
+func newDeleteFileAction(deps Dependencies) deleteFileAction {
+	return deleteFileAction{registry: deps.Registry}
+}
+
+func (a deleteFileAction) Name() string {
 	return deleteFileActionName
 }
 
-func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
+func (a deleteFileAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
 	path, err := requestedWritableFilePath(input.Path)
 	if err != nil {
 		return fileStageResult{}, err
@@ -309,6 +323,7 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		db,
+		a.registry,
 		canvas,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
 	)
@@ -322,7 +337,7 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		VersionID:      liveVersion.ID.String(),
 		Path:           path,
 		Deleted:        true,
-		StagingSummary: serializeStagingSummary(state),
+		StagingSummary: serializeStagingSummary(state.Summary),
 	}, nil
 }
 

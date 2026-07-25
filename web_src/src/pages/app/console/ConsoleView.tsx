@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ConsolePanel, ConsoleLayoutItem } from "@/hooks/useCanvasData";
+import type { ConsolePanel, ConsoleLayoutItem } from "@/pages/app/lib/console-data";
 import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import { ConsoleGrid } from "./ConsoleGrid";

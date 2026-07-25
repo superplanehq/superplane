@@ -1,5 +1,5 @@
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
 import { consoleToYaml, parseConsoleYaml } from "../console/consoleYaml";

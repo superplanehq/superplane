@@ -1,6 +1,5 @@
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { materializeCanvasSpec, materializeConsoleSpec } from "../../lib/workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../../lib/workflow-spec-paths";
 import type { AppFile } from "../types";

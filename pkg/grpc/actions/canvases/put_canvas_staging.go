@@ -13,10 +13,17 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
-func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
+func PutCanvasStaging(
+	ctx context.Context,
+	db *gorm.DB,
+	registry *registry.Registry,
+	canvas *models.Canvas,
+	operations []*pb.CanvasRepositoryFileOperation,
+) (*CanvasStagingState, error) {
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -24,9 +31,6 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 
 	userID := uuid.MustParse(user)
 
-	//
-	// Find the base version id for the staging update.
-	//
 	baseVersionID, err := findBaseVersionIDForStagingUpdate(db, canvas, userID)
 	if err != nil {
 		return nil, err
@@ -47,6 +51,10 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 		}
 
 		if operation.GetDelete() {
+			if IsRepositorySpecFilePath(normalized) {
+				return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+			}
+
 			if err := models.MarkStagedFilePathDeleted(
 				db,
 				canvas.ID,
@@ -58,6 +66,12 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 				return nil, grpcerrors.Internal(err, "failed to stage deletion")
 			}
 			continue
+		}
+
+		if IsRepositorySpecFilePath(normalized) {
+			if err := validateStagedSpecFileContent(registry, canvas.OrganizationID.String(), normalized, operation.GetContent()); err != nil {
+				return nil, err
+			}
 		}
 
 		if _, err := models.UpsertStagedFile(
@@ -73,16 +87,11 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 		}
 	}
 
-	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load staging")
-	}
-
 	if err := messages.NewCanvasStagingMessage(canvas.ID.String(), userID.String()).Publish(); err != nil {
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
-	return buildStagingSummary(canvas, rows), nil
+	return BuildCanvasStagingState(ctx, db, registry, canvas, userID)
 }
 
 func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID) (*uuid.UUID, error) {
@@ -96,9 +105,6 @@ func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userI
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	//
-	// If we already have staged files, use the base version id of the first staged file.
-	//
 	if len(stagedFiles) > 0 {
 		baseVersionID := stagedFiles[0].BaseVersionID
 		if baseVersionID != liveVersion.ID {
@@ -108,8 +114,5 @@ func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userI
 		return &baseVersionID, nil
 	}
 
-	//
-	// Otherwise, use the live version id.
-	//
 	return &liveVersion.ID, nil
 }

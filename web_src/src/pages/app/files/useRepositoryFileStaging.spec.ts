@@ -11,7 +11,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useStageRepositoryFiles: () => ({
     mutateAsync: mutateAsyncStage,
   }),
-  useDiscardRepositoryFilePaths: () => ({
+  useDiscardCanvasStaging: () => ({
     mutateAsync: mutateAsyncDiscard,
   }),
 }));

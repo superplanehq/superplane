@@ -44,9 +44,9 @@ export function useEditor({
   const catalog = useCatalog(canvasId, files);
   const stagingQuery = useCanvasStaging(canvasId, canManageRepositoryFiles);
   const stagedRepositoryPaths = useMemo(() => {
-    const stagedPaths = stagingQuery.data?.stagedPaths ?? [];
+    const stagedPaths = stagingQuery.data?.stagingSummary?.stagedPaths ?? [];
     return stagedPaths.filter((path) => !catalog.generatedPathSet.has(path));
-  }, [catalog.generatedPathSet, stagingQuery.data?.stagedPaths]);
+  }, [catalog.generatedPathSet, stagingQuery.data?.stagingSummary?.stagedPaths]);
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
   const { committedContentByPath, setCommittedContentByPath, committedContentByPathRef } = useEditorCommittedContent();
   const [isDiffOpen, setIsDiffOpen] = useState(false);
@@ -138,9 +138,9 @@ export function useEditor({
   // excluded so they aren't diffed twice (the pending change wins, as it
   // reflects the freshest in-editor content).
   const stagedDiffPaths = useMemo(() => {
-    const stagedPaths = stagingQuery.data?.stagedPaths ?? [];
+    const stagedPaths = stagingQuery.data?.stagingSummary?.stagedPaths ?? [];
     return stagedPaths.filter((path) => !pending.pendingChangesByPath[path]);
-  }, [stagingQuery.data?.stagedPaths, pending.pendingChangesByPath]);
+  }, [stagingQuery.data?.stagingSummary?.stagedPaths, pending.pendingChangesByPath]);
   const stagedFileDiffs = useStagedFileDiffs({
     canvasId,
     versionId,

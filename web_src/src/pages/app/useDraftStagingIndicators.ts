@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { hasLocalCanvasGraphDiff, hasLocalConsoleDiff } from "./lib/local-staging-indicators";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./lib/workflow-spec-paths";
 import type { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
@@ -160,8 +159,8 @@ export function useDraftStagingIndicators({
     [committedBaselines.console, effectiveConsole],
   );
 
-  const { serverHasFilesStaging } = getServerStagingFlags(canvasStagingQuery.data?.stagedPaths);
-  const serverHasStagingChanges = !!canvasStagingQuery.data?.hasStaging;
+  const { serverHasFilesStaging } = getServerStagingFlags(canvasStagingQuery.data?.stagingSummary?.stagedPaths);
+  const serverHasStagingChanges = !!canvasStagingQuery.data?.stagingSummary?.hasStaging;
 
   const { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges } =
     resolveEditingStagingFlags({

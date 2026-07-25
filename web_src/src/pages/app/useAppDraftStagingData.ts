@@ -1,5 +1,5 @@
 import type { CanvasesCanvas } from "@/api-client";
-import { useCanvasStaging, useCommitCanvasStaging, useDiscardCanvasStaging } from "@/hooks/useCanvasData";
+import { useCommitCanvasStaging, useDiscardCanvasStaging, type useCanvasStaging } from "@/hooks/useCanvasData";
 
 import { useCanvasConsoleVersionDiff } from "./useCanvasConsoleVersionDiff";
 import type { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
@@ -7,12 +7,15 @@ import { useDraftStagingIndicators } from "./useDraftStagingIndicators";
 
 type CommittedBaselines = ReturnType<typeof useCommittedDraftBaselines>;
 
+type CanvasStagingQuery = ReturnType<typeof useCanvasStaging>;
+
 type UseAppDraftStagingDataOptions = {
+  organizationId: string;
   canvasId: string;
   activeCanvasVersionId: string;
   liveCanvasVersionId: string | undefined;
   isEditing: boolean;
-  hasEditableVersion: boolean;
+  canvasStagingQuery: CanvasStagingQuery;
   stagingResetNonce: number;
   draftSpecToRender: CanvasesCanvas["spec"] | null | undefined;
   canvas: CanvasesCanvas | null | undefined;
@@ -22,11 +25,12 @@ type UseAppDraftStagingDataOptions = {
 };
 
 export function useAppDraftStagingData({
+  organizationId,
   canvasId,
   activeCanvasVersionId,
   liveCanvasVersionId,
   isEditing,
-  hasEditableVersion,
+  canvasStagingQuery,
   stagingResetNonce,
   draftSpecToRender,
   canvas,
@@ -34,11 +38,12 @@ export function useAppDraftStagingData({
   committedBaselines,
   editBootstrapReady,
 }: UseAppDraftStagingDataOptions) {
-  const canvasStagingQuery = useCanvasStaging(canvasId, hasEditableVersion);
   const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId);
   const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId);
+  const hasEditableVersion = isEditing;
 
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
+    organizationId,
     canvasId,
     versionIds: {
       active: activeCanvasVersionId,
@@ -69,7 +74,7 @@ export function useAppDraftStagingData({
 
   return {
     stagingBaselinesReady: committedBaselines.ready,
-    stagingStale: !!canvasStagingQuery.data?.stale,
+    stagingStale: canvasStagingQuery.data?.stagingSummary?.stale === true,
     commitCanvasStagingMutation,
     discardCanvasStagingMutation,
     consoleQuery,

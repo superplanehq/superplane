@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 
-import { useDiscardRepositoryFilePaths, useStageRepositoryFiles } from "@/hooks/useCanvasData";
+import { useDiscardCanvasStaging, useStageRepositoryFiles } from "@/hooks/useCanvasData";
 
 import { matchesCommittedRepositoryFileContent } from "../lib/staging-content-match";
 import { encodeRepositoryFileContent } from "./lib/repository-files";
@@ -21,7 +21,7 @@ async function syncRepositoryFileStaging({
   versionId,
   pendingChanges,
   stageFiles,
-  discardPaths,
+  discardStaging,
   stagedPathsRef,
   isLatestRun = () => true,
 }: {
@@ -29,7 +29,7 @@ async function syncRepositoryFileStaging({
   versionId: string;
   pendingChanges: PendingFileChange[];
   stageFiles: ReturnType<typeof useStageRepositoryFiles>;
-  discardPaths: ReturnType<typeof useDiscardRepositoryFilePaths>;
+  discardStaging: ReturnType<typeof useDiscardCanvasStaging>;
   stagedPathsRef: MutableRefObject<Set<string>>;
   isLatestRun?: () => boolean;
 }) {
@@ -72,7 +72,7 @@ async function syncRepositoryFileStaging({
     return;
   }
   if (pathsToDiscard.size > 0) {
-    await discardPaths.mutateAsync([...pathsToDiscard]);
+    await discardStaging.mutateAsync([...pathsToDiscard]);
   }
   if (!isLatestRun()) {
     return;
@@ -96,11 +96,11 @@ export function useRepositoryFileStaging({
   onFlushReady,
 }: UseRepositoryFileStagingOptions) {
   const stageFiles = useStageRepositoryFiles(canvasId ?? "");
-  const discardPaths = useDiscardRepositoryFilePaths(canvasId ?? "");
+  const discardStaging = useDiscardCanvasStaging(canvasId ?? "");
   const stageFilesRef = useRef(stageFiles);
   stageFilesRef.current = stageFiles;
-  const discardPathsRef = useRef(discardPaths);
-  discardPathsRef.current = discardPaths;
+  const discardStagingRef = useRef(discardStaging);
+  discardStagingRef.current = discardStaging;
   const stagedPathsRef = useRef<Set<string>>(new Set());
   const runGenerationRef = useRef(0);
 
@@ -115,7 +115,7 @@ export function useRepositoryFileStaging({
       versionId,
       pendingChanges,
       stageFiles: stageFilesRef.current,
-      discardPaths: discardPathsRef.current,
+      discardStaging: discardStagingRef.current,
       stagedPathsRef,
     });
   }, [canvasId, enabled, pendingChanges, versionId]);
@@ -156,7 +156,7 @@ export function useRepositoryFileStaging({
             versionId,
             pendingChanges,
             stageFiles: stageFilesRef.current,
-            discardPaths: discardPathsRef.current,
+            discardStaging: discardStagingRef.current,
             stagedPathsRef,
             isLatestRun: () => generation === runGenerationRef.current,
           });

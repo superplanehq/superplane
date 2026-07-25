@@ -337,7 +337,7 @@ describe("useCanvasWebsocket", () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
       queryKey: canvasKeys.detail(testOrganizationId, testCanvasId),
     });
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionHistory(testCanvasId))).toHaveLength(0);
   });
 
   it("skips lifecycle invalidation when canvas_updated echo is consumed", () => {
@@ -359,7 +359,7 @@ describe("useCanvasWebsocket", () => {
     });
 
     expect(onCanvasLifecycleEvent).toHaveBeenCalledWith({ canvasId: testCanvasId }, "canvas_updated");
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionHistory(testCanvasId))).toHaveLength(0);
   });
 
   it("invalidates staged caches for staging_updated events", () => {
@@ -394,13 +394,9 @@ describe("useCanvasWebsocket", () => {
 
     expect(onCanvasStagingEvent).toHaveBeenCalledWith({ canvasId: testCanvasId, userId: "user-1" }, "staging_updated");
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(1);
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedCanvasSpec(testCanvasId))).toHaveLength(1);
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedConsole(testCanvasId))).toHaveLength(1);
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.repositoryFiles(testCanvasId))).toHaveLength(1);
 
     const [stagedPredicate] = getInvalidationPredicates(invalidateQueriesSpy);
     expect(stagedPredicate).toBeDefined();
-    expect(stagedPredicate({ queryKey: canvasKeys.stagedConsole(testCanvasId) })).toBe(true);
     expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1", true) })).toBe(
       true,
     );

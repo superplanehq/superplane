@@ -1,8 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import { useConsolePanelState } from "./useConsolePanelState";
 
 const LAYOUT: ConsoleLayoutItem[] = [{ i: "deploy", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }];

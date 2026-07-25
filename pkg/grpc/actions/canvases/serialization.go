@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -43,10 +42,7 @@ func SerializeCanvas(
 			FolderId:       canvasFolderID,
 			LiveVersionId:  liveVersionID,
 		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(liveVersion.Nodes),
-			Edges: actions.EdgesToProto(liveVersion.Edges),
-		},
+		Spec:   serializeCanvasSpecFromVersion(liveVersion),
 		Status: status,
 	}, nil
 }

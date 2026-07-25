@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { NodesPanelCard } from "./NodesPanelCard";
 import { MockConsoleProvider, PanelFrame } from "./__stories__/storyDecorators";
 

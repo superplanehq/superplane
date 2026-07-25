@@ -2,9 +2,9 @@ import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStat
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { fetchStagedCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
+import { fetchCanvasStaging } from "@/pages/app/lib/repository-spec-files";
 
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, type CanvasStagingCache } from "@/hooks/useCanvasData";
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
@@ -23,7 +23,7 @@ interface UseCanvasStagingResyncOptions {
 type ResyncStagedOptions = {
   /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
   bumpResetNonce?: boolean;
-  /** When true, reuse a warm stagedCanvasSpec cache instead of forcing a refetch. */
+  /** When true, reuse a warm canvasStaging cache instead of forcing a refetch. */
   preferCachedStagedSpec?: boolean;
 };
 
@@ -101,44 +101,31 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
           return;
         }
 
-        const versionShell = queryClient.getQueryData<CanvasesCanvasVersion>(
-          canvasKeys.versionDetail(canvasId, versionId),
-        ) ??
-          queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDescribe(canvasId, versionId)) ?? {
-            metadata: { id: versionId },
-          };
-
-        const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
-        const cachedStaged = preferCachedStagedSpec
-          ? queryClient.getQueryData<CanvasesCanvasVersion>(stagedCanvasSpecKey)
+        const stagingKey = canvasKeys.canvasStaging(canvasId);
+        const cachedStaging = preferCachedStagedSpec
+          ? queryClient.getQueryData<CanvasStagingCache>(stagingKey)
           : undefined;
-        const cachedStagedQueryState = preferCachedStagedSpec
-          ? queryClient.getQueryState(stagedCanvasSpecKey)
-          : undefined;
+        const cachedStagingQueryState = preferCachedStagedSpec ? queryClient.getQueryState(stagingKey) : undefined;
 
-        if (
-          cachedStaged?.spec &&
-          cachedStaged.metadata?.id === versionId &&
-          cachedStagedQueryState?.isInvalidated !== true
-        ) {
-          applyStagedSpec(versionId, cachedStaged.spec);
+        if (cachedStaging?.spec && cachedStagingQueryState?.isInvalidated !== true) {
+          applyStagedSpec(versionId, cachedStaging.spec);
           return;
         }
 
         consoleMutationGenerationRef.current += 1;
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+        await queryClient.cancelQueries({ queryKey: stagingKey });
 
-        const stagedVersion = await fetchStagedCanvasVersionWithSpec(canvasId, versionShell);
-        const stagedSpec = stagedVersion?.spec ?? null;
+        const staging = await queryClient.fetchQuery({
+          queryKey: stagingKey,
+          queryFn: () => fetchCanvasStaging(canvasId),
+          staleTime: Number.POSITIVE_INFINITY,
+        });
+        const stagedSpec = staging.spec ?? null;
 
-        // Apply editor state before updating the staged query cache so draft sync
+        // Apply editor state before updating the staging cache so draft sync
         // effects cannot briefly overwrite resynced content with a stale snapshot.
         applyStagedSpec(versionId, stagedSpec);
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.setQueryData(stagedCanvasSpecKey, stagedVersion ?? null);
+        queryClient.setQueryData(stagingKey, staging);
 
         if (bumpResetNonce) {
           setStagingResetNonce((nonce) => nonce + 1);

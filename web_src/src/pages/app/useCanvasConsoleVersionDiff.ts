@@ -9,8 +9,7 @@ import {
 } from "./draftConsoleDiff";
 import { materializeConsoleSpec } from "./lib/workflow-spec-files";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
-import type { CanvasConsoleData } from "@/hooks/useCanvasData";
-
+import type { CanvasConsoleData } from "@/pages/app/lib/console-data";
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
@@ -36,6 +35,7 @@ function consoleYamlText(canvasId: string, consoleData?: CanvasConsoleData | nul
 }
 
 type UseCanvasConsoleVersionDiffArgs = {
+  organizationId: string;
   canvasId: string;
   versionIds: {
     active: string;
@@ -50,6 +50,7 @@ type UseCanvasConsoleVersionDiffArgs = {
 };
 
 export function useCanvasConsoleVersionDiff({
+  organizationId,
   canvasId,
   versionIds,
   hasDraftGraphDiffVersusLive,
@@ -58,20 +59,35 @@ export function useCanvasConsoleVersionDiff({
   stageActiveConsole,
   getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, stageActiveConsole);
+  const consoleQuery = useCanvasConsole(
+    organizationId,
+    canvasId,
+    versionIds.active || undefined,
+    enabled,
+    stageActiveConsole,
+  );
   const draftDiffVersionId = versionIds.active || versionIds.draft;
+  const draftConsoleSharesActiveQuery =
+    !stageActiveConsole && !!draftDiffVersionId && draftDiffVersionId === versionIds.active;
   const draftConsoleQuery = useCanvasConsole(
+    organizationId,
     canvasId,
     draftDiffVersionId || undefined,
-    enabled && !!draftDiffVersionId,
+    enabled && !!draftDiffVersionId && !draftConsoleSharesActiveQuery,
   );
-  const liveConsoleQuery = useCanvasConsole(canvasId, undefined, enabled && (!!versionIds.live || !versionIds.active));
+  const liveConsoleQuery = useCanvasConsole(
+    organizationId,
+    canvasId,
+    versionIds.live,
+    enabled && !!versionIds.live,
+  );
+  const draftConsoleData = draftConsoleQuery.data ?? (draftConsoleSharesActiveQuery ? consoleQuery.data : undefined);
   const hasDraftConsoleDiffVersusLive = useMemo(
-    () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleQuery.data),
-    [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],
+    () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleData),
+    [draftDiffVersionId, liveConsoleQuery.data, draftConsoleData],
   );
 
-  const effectiveConsoleData = consoleQuery.data ?? draftConsoleQuery.data;
+  const effectiveConsoleData = consoleQuery.data ?? draftConsoleData;
   const hasEffectiveConsoleDiffVersusLive = useMemo(
     () => hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, effectiveConsoleData),
     [liveConsoleQuery.data, effectiveConsoleData],

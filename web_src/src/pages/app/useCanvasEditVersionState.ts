@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { useCanvasVersion, useStagedCanvasSpec } from "@/hooks/useCanvasData";
+import { useCanvasStaging, useCanvasVersion } from "@/hooks/useCanvasData";
 
+import { canvasVersionWithStagingSpec } from "./lib/repository-spec-files";
 import { canvasVersionShell, type CanvasVersionListItem } from "./lib/canvas-versions";
 import {
   isAwaitingStagedCanvasSpec,
@@ -42,11 +43,19 @@ export function useCanvasEditVersionState({
   });
   const stagedVersionMetadataShell =
     activeCanvasVersion ?? canvasVersionShell(selectableVersionsById.get(activeCanvasVersionId)) ?? null;
+  const canvasStagingQuery = useCanvasStaging(
+    canvasId,
+    shouldReadStagedCanvasVersionFlag && !!activeCanvasVersionId,
+  );
   const {
-    data: loadedStagedCanvasVersion,
+    data: stagingData,
     isLoading: loadedStagedCanvasVersionLoading,
     isFetching: loadedStagedCanvasVersionFetching,
-  } = useStagedCanvasSpec(canvasId, stagedVersionMetadataShell, shouldReadStagedCanvasVersionFlag);
+  } = canvasStagingQuery;
+  const loadedStagedCanvasVersion = useMemo(
+    () => canvasVersionWithStagingSpec(stagedVersionMetadataShell ?? undefined, stagingData?.spec) ?? null,
+    [stagedVersionMetadataShell, stagingData?.spec],
+  );
   const {
     data: loadedCommittedCanvasVersion,
     isLoading: loadedCommittedCanvasVersionLoading,
@@ -102,6 +111,7 @@ export function useCanvasEditVersionState({
   const showLiveActivity = isViewingCurrentLiveVersion && !(editSessionActive && !isRunInspectionMode && !isMemoryMode);
 
   return {
+    canvasStagingQuery,
     activeCanvasVersionId,
     shouldReadStagedCanvasVersionFlag,
     loadedCanvasVersion,

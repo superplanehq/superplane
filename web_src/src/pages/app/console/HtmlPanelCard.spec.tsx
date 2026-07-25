@@ -3,8 +3,8 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import { canvasKeys, type CanvasMemoryEntry, type ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
+import { canvasKeys, type CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
 import { HtmlPanelCard } from "./HtmlPanelCard";
 

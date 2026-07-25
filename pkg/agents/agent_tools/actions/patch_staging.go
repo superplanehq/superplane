@@ -74,7 +74,7 @@ func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSes
 		return updateResult{}, err
 	}
 
-	if err := stagePatchedDraftFiles(ctx, session, target, canvas, patched); err != nil {
+	if err := a.stagePatchedDraftFiles(ctx, target, canvas, patched); err != nil {
 		return updateResult{}, err
 	}
 
@@ -213,7 +213,7 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 	return patched, nil
 }
 
-func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchStagingTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
+func (a patchStagingAction) stagePatchedDraftFiles(ctx context.Context, target patchStagingTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
 	operations := make([]*pb.CanvasRepositoryFileOperation, 0, 2)
 	if target.changeset != nil || target.autoLayoutInput != nil {
 		patchedYAML, err := yaml.VersionToCanvasYAML(canvas.Name, canvas.Description, patched)
@@ -238,6 +238,7 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 	if _, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		database.DB(ctx),
+		a.deps.Registry,
 		canvas,
 		operations,
 	); err != nil {

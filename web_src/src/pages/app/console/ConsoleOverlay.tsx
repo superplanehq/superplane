@@ -4,13 +4,8 @@ import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
-import type {
-  ConsoleLayoutItem,
-  ConsolePanel,
-  CanvasConsoleQueryResult,
-  UpdateCanvasConsoleMutationResult,
-} from "@/hooks/useCanvasData";
-
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
+import type { CanvasConsoleQueryResult, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
 import type { ConsoleContextValue, ConsoleNodeStatus } from "./ConsoleContext";

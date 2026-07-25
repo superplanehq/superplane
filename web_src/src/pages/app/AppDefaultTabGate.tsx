@@ -1,7 +1,8 @@
 import { useRef, type ReactElement } from "react";
 import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 
-import { useCanvasConsole } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvasConsole } from "@/hooks/useCanvasData";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { readLastVisitedAppTab, type AppTabId } from "@/lib/lastVisitedAppTab";
 import { Skeleton } from "@/ui/skeleton";
 
@@ -32,6 +33,7 @@ export function AppDefaultTabGate() {
   const { appId } = useParams<{ appId: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const organizationId = useOrganizationId();
   const canvasId = appId ?? "";
 
   const committedCanvasIdRef = useRef<string | null>(null);
@@ -48,7 +50,17 @@ export function AppDefaultTabGate() {
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
   // stored tab do not pay for an unused read.
   const consoleQueryEnabled = !alreadyCommitted && !pinned && !!canvasId && storedTab === null;
-  const liveConsoleQuery = useCanvasConsole(canvasId, undefined, consoleQueryEnabled);
+  const canvasQuery = useCanvas(organizationId ?? "", canvasId, {
+    enabled: consoleQueryEnabled && !!organizationId,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const liveVersionId = canvasQuery.data?.metadata?.liveVersionId;
+  const liveConsoleQuery = useCanvasConsole(
+    organizationId ?? "",
+    canvasId,
+    liveVersionId,
+    consoleQueryEnabled && !!liveVersionId,
+  );
 
   const commit = (): ReactElement => {
     committedCanvasIdRef.current = canvasId;
@@ -63,7 +75,14 @@ export function AppDefaultTabGate() {
     return resolveWithStoredTab(storedTab, currentUrlTab, searchParams, location.pathname, commit);
   }
 
-  const resolution = resolveDefaultTab({ storedTab, liveConsoleQuery });
+  const defaultTabConsoleQuery =
+    canvasQuery.isSuccess && !liveVersionId
+      ? { isSuccess: true, isError: false, data: { panels: [] as unknown[] } }
+      : canvasQuery.isError
+        ? { isSuccess: false, isError: true, data: undefined }
+        : liveConsoleQuery;
+
+  const resolution = resolveDefaultTab({ storedTab, liveConsoleQuery: defaultTabConsoleQuery });
   return renderResolution(resolution, currentUrlTab, searchParams, location.pathname, commit);
 }
 

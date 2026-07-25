@@ -1,4 +1,4 @@
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/pages/app/lib/console-data";
 import * as yaml from "js-yaml";
 import type { DraftDiffLine, DraftDiffStatus } from "./draftNodeDiff";
 

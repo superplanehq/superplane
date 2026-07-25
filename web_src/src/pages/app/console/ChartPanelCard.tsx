@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { ChartPanelForm } from "./ChartPanelForm";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";

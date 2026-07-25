@@ -47,4 +47,33 @@ func Test__DescribeCanvasVersion(t *testing.T) {
 		assert.Len(t, response.GetVersion().GetSpec().GetNodes(), len(liveVersion.Nodes))
 		assert.Len(t, response.GetVersion().GetSpec().GetEdges(), len(liveVersion.Edges))
 	})
+
+	t.Run("returns version console spec", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
+		require.NoError(t, err)
+
+		panels := []models.ConsolePanel{
+			{
+				ID:      "notes",
+				Type:    "markdown",
+				Content: map[string]any{"body": "Hello"},
+			},
+		}
+		layout := []models.ConsoleLayoutItem{
+			{I: "notes", X: 0, Y: 0, W: 4, H: 2},
+		}
+		_, err = models.UpdateCanvasVersionConsoleInTransaction(database.DB(t.Context()), liveVersion, panels, layout)
+		require.NoError(t, err)
+
+		response, err := DescribeCanvasVersion(ctx, database.DB(t.Context()), canvas, liveVersion.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.GetVersion().GetSpec())
+		assert.Equal(t, canvas.ID.String(), response.GetVersion().GetMetadata().GetCanvasId())
+		require.Len(t, response.GetVersion().GetSpec().GetPanels(), 1)
+		assert.Equal(t, "notes", response.GetVersion().GetSpec().GetPanels()[0].GetId())
+		assert.Equal(t, "markdown", response.GetVersion().GetSpec().GetPanels()[0].GetType())
+		require.Len(t, response.GetVersion().GetSpec().GetLayout(), 1)
+		assert.Equal(t, "notes", response.GetVersion().GetSpec().GetLayout()[0].GetI())
+	})
 }

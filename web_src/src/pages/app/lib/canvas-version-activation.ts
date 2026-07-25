@@ -3,7 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { canvasKeys, invalidateStagedCanvasCaches } from "@/hooks/useCanvasData";
+import { canvasKeys, syncCanvasStagingCache } from "@/hooks/useCanvasData";
 
 import { clearRunInspectionSearchParams } from "../viewState";
 
@@ -174,7 +174,7 @@ export function activateCanvasVersionForEditing({
 
   if (isCurrentLive && !preserveStagedLayer) {
     draftCanvasSpecsRef.current.delete(versionId);
-    invalidateStagedCanvasCaches(queryClient, canvasId);
+    syncCanvasStagingCache(queryClient, canvasId, null, { refetch: true });
   }
 
   if (!isCurrentLive) {

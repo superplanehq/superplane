@@ -15,7 +15,7 @@ import {
   upsertRunIntoInfiniteData,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
-import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
+import { canvasKeys, syncCanvasStagingCache } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
@@ -257,7 +257,7 @@ export function useCanvasWebsocket(
           const shouldInvalidateStagingQueries =
             onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
           if (shouldInvalidateStagingQueries) {
-            invalidateStagedCanvasCaches(queryClient, canvasId);
+            syncCanvasStagingCache(queryClient, canvasId, null, { refetch: true });
           }
           break;
         }

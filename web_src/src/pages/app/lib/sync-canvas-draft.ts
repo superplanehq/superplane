@@ -2,29 +2,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
+import { canvasKeys, syncCanvasStagingCache } from "@/hooks/useCanvasData";
 
 import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
-
-export async function syncConsoleCaches({
-  queryClient,
-  canvasId,
-  versionId,
-}: {
-  queryClient: QueryClient;
-  canvasId: string;
-  versionId: string;
-}): Promise<void> {
-  const consoleData = await fetchCanvasConsoleData(canvasId, versionId, false);
-  if (!consoleData) {
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-    return;
-  }
-
-  queryClient.setQueryData(canvasKeys.console(canvasId, versionId), consoleData);
-  // After commit, staging is cleared — mirror the published console in the staged cache.
-  queryClient.setQueryData(canvasKeys.stagedConsole(canvasId), consoleData);
-}
 
 export async function syncCanvasDraftState({
   queryClient,
@@ -44,12 +24,11 @@ export async function syncCanvasDraftState({
 
   const cacheVersionId = version.metadata?.id ?? versionId;
 
-  queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), version);
-  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), version);
-
-  if (version.metadata) {
-    queryClient.setQueryData(canvasKeys.versionDescribe(canvasId, cacheVersionId), version);
-  }
+  syncCanvasStagingCache(queryClient, canvasId, {
+    stagingSummary: { hasStaging: false, stagedPaths: [] },
+    spec: version.spec,
+  });
+  queryClient.setQueryData(canvasKeys.version(canvasId, cacheVersionId), version);
 
   if (version.spec) {
     queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {

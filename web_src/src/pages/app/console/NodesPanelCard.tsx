@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { CircleDot, Network, Play } from "lucide-react";
 
 import { LoadingButton } from "@/components/ui/loading-button";
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";

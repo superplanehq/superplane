@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-import type { ConsolePanel } from "@/hooks/useCanvasData";
-
+import type { ConsolePanel } from "@/pages/app/lib/console-data";
 import { useCanvasMemoryEntries } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";

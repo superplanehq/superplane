@@ -170,7 +170,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas version";
-      description: "Returns one canvas version by ID, including its workflow spec";
+      description: "Returns one canvas version by ID, including its workflow and console specs";
       tags: "CanvasVersion";
     };
   }
@@ -481,6 +481,7 @@ message PutCanvasStagingRequest {
 
 message PutCanvasStagingResponse {
   StagingSummary staging_summary = 1;
+  Canvas.Spec spec = 2;
 }
 
 message GetCanvasStagingRequest {
@@ -489,6 +490,7 @@ message GetCanvasStagingRequest {
 
 message GetCanvasStagingResponse {
   StagingSummary staging_summary = 1;
+  Canvas.Spec spec = 2;
 }
 
 message DeleteCanvasStagingRequest {
@@ -498,6 +500,7 @@ message DeleteCanvasStagingRequest {
 
 message DeleteCanvasStagingResponse {
   StagingSummary staging_summary = 1;
+  Canvas.Spec spec = 2;
 }
 
 message ListCanvasVersionsRequest {
@@ -592,6 +595,8 @@ message Canvas {
   message Spec {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
+    repeated Console.Panel panels = 3;
+    repeated Console.LayoutItem layout = 4;
   }
 
   message Status {

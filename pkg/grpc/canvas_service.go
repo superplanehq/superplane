@@ -419,11 +419,11 @@ func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasS
 		return nil, err
 	}
 
-	state, err := canvases.PutCanvasStaging(ctx, db, canvas, req.Operations)
+	state, err := canvases.PutCanvasStaging(ctx, db, s.registry, canvas, req.Operations)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.PutCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.PutCanvasStagingResponse{StagingSummary: state.Summary, Spec: state.Spec}, nil
 }
 
 func (s *CanvasService) GetCanvasStaging(ctx context.Context, req *pb.GetCanvasStagingRequest) (*pb.GetCanvasStagingResponse, error) {
@@ -433,11 +433,11 @@ func (s *CanvasService) GetCanvasStaging(ctx context.Context, req *pb.GetCanvasS
 		return nil, err
 	}
 
-	state, err := canvases.GetCanvasStaging(ctx, db, canvas)
+	state, err := canvases.GetCanvasStaging(ctx, db, s.registry, canvas)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.GetCanvasStagingResponse{StagingSummary: state.Summary, Spec: state.Spec}, nil
 }
 
 func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteCanvasStagingRequest) (*pb.DeleteCanvasStagingResponse, error) {
@@ -447,11 +447,11 @@ func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteC
 		return nil, err
 	}
 
-	state, err := canvases.DeleteCanvasStaging(ctx, db, canvas, req.Paths)
+	state, err := canvases.DeleteCanvasStaging(ctx, db, s.registry, canvas, req.Paths)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.DeleteCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.DeleteCanvasStagingResponse{StagingSummary: state.Summary, Spec: state.Spec}, nil
 }
 
 func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {

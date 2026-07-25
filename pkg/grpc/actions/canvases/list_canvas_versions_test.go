@@ -26,7 +26,7 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		baseline, err := ReadRepositorySpecFile(ctx, canvas, liveVersion, CanvasYAMLRepositoryPath)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# first commit\n")},
 		})
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		firstCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "First", "", r.AuthService)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), r.Registry, canvas, []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# second commit\n")},
 		})
 		require.NoError(t, err)
