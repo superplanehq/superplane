@@ -6,7 +6,7 @@ import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { cn } from "@/lib/utils";
 import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
 import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/SecretPickerFieldRenderer";
-import { Bug, FilePenLine, TestTube2, type LucideIcon } from "lucide-react";
+import { Bug, FilePenLine, TestTube2, Workflow, type LucideIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { getFactoryDefinition, type FactoryDefinition, type FactoryStartingTask } from "./factories";
@@ -16,9 +16,10 @@ import { homeInstallPanelClassName } from "./homePageStyles";
 import type { InstallParam } from "../install/types";
 
 const STARTING_TASK_ICONS: Record<string, { icon: LucideIcon; iconClassName: string }> = {
+  "improve-agents-md": { icon: FilePenLine, iconClassName: "text-violet-500" },
+  "improve-ci": { icon: Workflow, iconClassName: "text-sky-500" },
   "unit-test": { icon: TestTube2, iconClassName: "text-amber-500" },
   "fix-bug": { icon: Bug, iconClassName: "text-red-500" },
-  "improve-agents-md": { icon: FilePenLine, iconClassName: "text-violet-500" },
 };
 
 function normalizeResourceValue(val: string | string[] | undefined): string {
