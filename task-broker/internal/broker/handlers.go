@@ -450,6 +450,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		ExecutionMode: mode,
 		DockerImage:   req.DockerImage,
 		Environment:   api.CloneEnvironment(req.Environment),
+		Labels:        models.NormalizeOriginLabels(req.Labels),
 		Files:         api.NormalizeFiles(req.Files),
 	}
 	switch kind {

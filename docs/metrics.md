@@ -52,8 +52,8 @@ like Dash0. `service.name` (`task-broker` or `fleet-manager`) is set via
 | `runner.tasks.created` | Counter | `fleet_id` |
 | `runner.tasks.completed` | Counter | `fleet_id`, `outcome` |
 | `runner.task.start_latency` | Histogram (s) | `fleet_id` |
-| `runner.tasks.queued` | Gauge | `fleet_id` |
-| `runner.tasks.claimed` | Gauge | `fleet_id` |
+| `runner.tasks.queued` | Gauge | `fleet_id`, `canvas_name`, `node_name` |
+| `runner.tasks.claimed` | Gauge | `fleet_id`, `canvas_name`, `node_name` |
 | `runner.tasks.oldest_queued_age` | Gauge (s) | `fleet_id` |
 | `runner.tasks.unclaimed` | Counter | `fleet_id` |
 | `runner.lease.reaps` | Counter | `fleet_id` |
@@ -97,13 +97,15 @@ Attributes: `fleet_id`
 
 **Tasks queued**
 Current number of tasks waiting for a runner to claim them (`status = queued`).
-Sampled periodically.
-Attributes: `fleet_id`
+Sampled periodically. Split by SuperPlane origin when callers send `labels`
+(`canvas_name`, `node_name`); empty strings when omitted.
+Attributes: `fleet_id`, `canvas_name`, `node_name`
 
 **Tasks claimed**
 Current number of tasks claimed by a runner but not yet terminal (`status = claimed`).
 Sampled periodically. A sustained backlog here can indicate stuck claims or insufficient runners.
-Attributes: `fleet_id`
+Same origin attributes as queued.
+Attributes: `fleet_id`, `canvas_name`, `node_name`
 
 **Oldest queued task age**
 Current age of the oldest task still waiting for a runner to claim it (`status = queued`).
