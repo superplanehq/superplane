@@ -54,8 +54,15 @@ describe("FreshOrgLanding", () => {
     expect(within(panel).queryByText("GitHub token secret")).not.toBeInTheDocument();
     expect(within(panel).getByText("Choose starting task")).toBeInTheDocument();
 
-    const taskButtons = within(panel).getAllByRole("button", { name: /^(improve agents\.md|write test|fix bug)$/i });
-    expect(taskButtons.map((button) => button.textContent)).toEqual(["Improve AGENTS.md", "Write test", "Fix bug"]);
+    const taskButtons = within(panel).getAllByRole("button", {
+      name: /^(improve agents\.md|improve test coverage|find and fix a bug|set up or improve ci)$/i,
+    });
+    expect(taskButtons.map((button) => button.textContent)).toEqual([
+      "Improve AGENTS.md",
+      "Improve test coverage",
+      "Find and fix a bug",
+      "Set up or improve CI",
+    ]);
     expect(within(panel).getByRole("button", { name: /^improve agents\.md$/i })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -67,21 +74,23 @@ describe("FreshOrgLanding", () => {
   it("keeps a starting task selected when the same button is clicked again", async () => {
     const { user, panel } = await openFactorySetup();
 
+    const agentsPrompt =
+      "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs";
+    const writeTestPrompt =
+      "Add one focused unit test.\n\n- Review the repository to find core logic and existing test patterns\n- Target a single untested helper or pure function in core logic\n- Use existing test tooling and patterns — do not add a new framework\n- Keep the change as small as possible\n- If there is no test tooling: add only the minimal setup for the primary language, just enough to run that one test";
+
     const promptField = within(panel).getByLabelText(/^Prompt$/i);
     expect(promptField).toHaveAttribute("readonly");
-    expect(promptField).toHaveValue(
-      "Review the existing AGENTS.md and improve it to help coding agents work more effectively in this repository. Make the guidance specific to this codebase, preserving useful instructions and removing outdated or generic ones. If AGENTS.md doesn't exist, create it.",
-    );
+    expect(promptField).toHaveValue(agentsPrompt);
 
-    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
-    expect(promptField).toHaveValue(
-      "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
+    await user.click(within(panel).getByRole("button", { name: /^improve test coverage$/i }));
+    expect(promptField).toHaveValue(writeTestPrompt);
+    await user.click(within(panel).getByRole("button", { name: /^improve test coverage$/i }));
+    expect(within(panel).getByRole("button", { name: /^improve test coverage$/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    await user.click(within(panel).getByRole("button", { name: /^write test$/i }));
-    expect(within(panel).getByRole("button", { name: /^write test$/i })).toHaveAttribute("aria-pressed", "true");
-    expect(within(panel).getByLabelText(/^Prompt$/i)).toHaveValue(
-      "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes.",
-    );
+    expect(within(panel).getByLabelText(/^Prompt$/i)).toHaveValue(writeTestPrompt);
   });
 
   it("opens GitHub capability setup in a new tab from Connect", async () => {
