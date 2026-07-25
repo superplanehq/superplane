@@ -21,17 +21,22 @@
     {
       "id": "improve-agents-md",
       "label": "Improve AGENTS.md",
-      "prompt": "Review the existing AGENTS.md and improve it to help coding agents work more effectively in this repository. Make the guidance specific to this codebase, preserving useful instructions and removing outdated or generic ones. If AGENTS.md doesn't exist, create it."
+      "prompt": "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs"
     },
     {
       "id": "unit-test",
-      "label": "Write test",
-      "prompt": "Scan the codebase to understand its main business logic. Then identify ONE untested function related to this business logic and write a single focused, useful unit test for it. Cover the main execution path and follow existing test patterns. Ensure the test passes."
+      "label": "Improve test coverage",
+      "prompt": "Add one focused unit test.\n\n- Review the repository to find core logic and existing test patterns\n- Target a single untested helper or pure function in core logic\n- Use existing test tooling and patterns — do not add a new framework\n- Keep the change as small as possible\n- If there is no test tooling: add only the minimal setup for the primary language, just enough to run that one test"
     },
     {
       "id": "fix-bug",
-      "label": "Fix bug",
-      "prompt": "Scan through the codebase to identify bugs that look important or impactful. Focus on issues that could affect functionality, performance, or user experience. Once you find a significant bug, create a new branch, implement a fix, write or update tests as needed, and commit the changes with a clear description."
+      "label": "Find and fix a bug",
+      "prompt": "Fix one high-confidence bug.\n\n- Review the repository to find concrete defects\n- Prefer real defects: wrong logic, clear edge-case failure, or broken error handling\n- Skip style nits and speculative issues\n- Minimal fix only; add/update a test only if tests already exist in that area\n- If no clear bug: fix a correctness footgun (e.g. missing nil/empty check) — do not invent one\n- No broad refactors"
+    },
+    {
+      "id": "improve-ci",
+      "label": "Set up or improve CI",
+      "prompt": "Improve CI for this repo.\n\n- Review the repository to detect the existing CI system from config (Actions, CircleCI, Buildkite, Semaphore, Travis, etc.) — do not assume GitHub Actions\n- If CI exists: one small improvement (caching, triggers, clearer jobs, or an obvious gap)\n- If none exists: add a minimal starter for the host that best matches this repo\n- Prefer the simplest existing check/test/lint command; else a checkout + toolchain smoke step\n- No deploy jobs, secrets, or paid third-party services"
     }
   ],
   "run": {

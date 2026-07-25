@@ -1313,9 +1313,12 @@ spec:
       type: TYPE_ACTION
       component: upsertMemory
       configuration:
+        # Match the card created/updated by Correlate Issue Memory (or create one
+        # for label/assign/mention paths that never ran Submit Task Memory).
+        # Matching on pr_number here would miss that row and insert a duplicate.
         matchList:
-          - name: pr_number
-            value: '{{ $["Open Draft PR"].data.number }}'
+          - name: issue_number
+            value: '{{ root().data.issue.number }}'
         namespace: factory_tasks
         valueList:
           - name: pr_number
