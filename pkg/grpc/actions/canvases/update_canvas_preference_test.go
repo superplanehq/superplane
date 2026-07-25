@@ -17,7 +17,7 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-	response, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+	response, err := UpdateCanvasPreference(context.Background(), database.DB(t.Context()), canvas, r.User.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: canvas.ID.String(),
 		Starred:  proto.Bool(true),
 	})
@@ -36,7 +36,7 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 
-	response, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+	response, err = UpdateCanvasPreference(context.Background(), database.DB(t.Context()), canvas, r.User.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: canvas.ID.String(),
 		Starred:  proto.Bool(false),
 	})

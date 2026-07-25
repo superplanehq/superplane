@@ -77,7 +77,7 @@ func Test__CancelRun__RequestsCancellationAndDrainsWork(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	response, err := CancelRun(ctx, r.Organization.ID.String(), canvas.ID, run.ID)
+	response, err := CancelRun(ctx, database.DB(t.Context()), canvas, run.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Run)
@@ -132,10 +132,10 @@ func Test__CancelRun__IsIdempotentForCancellingRun(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	_, err = CancelRun(ctx, r.Organization.ID.String(), canvas.ID, run.ID)
+	_, err = CancelRun(ctx, database.DB(t.Context()), canvas, run.ID)
 	require.NoError(t, err)
 
-	_, err = CancelRun(ctx, r.Organization.ID.String(), canvas.ID, run.ID)
+	_, err = CancelRun(ctx, database.DB(t.Context()), canvas, run.ID)
 	require.NoError(t, err)
 
 	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
@@ -176,7 +176,7 @@ func Test__CancelRun__NoOpForFinishedRun(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	response, err := CancelRun(ctx, r.Organization.ID.String(), canvas.ID, run.ID)
+	response, err := CancelRun(ctx, database.DB(t.Context()), canvas, run.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Equal(t, pb.CanvasRun_STATE_FINISHED, response.Run.State)
@@ -222,7 +222,7 @@ func Test__CancelRun__ReturnsParentRefForSubRun(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	response, err := CancelRun(ctx, r.Organization.ID.String(), childCanvas.ID, childRun.ID)
+	response, err := CancelRun(ctx, database.DB(t.Context()), childCanvas, childRun.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response.Run.Parent)
 	assert.Equal(t, parentRun.ID.String(), response.Run.Parent.Id)
@@ -243,6 +243,6 @@ func Test__CancelRun__ReturnsNotFoundForMissingRun(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	_, err := CancelRun(ctx, r.Organization.ID.String(), canvas.ID, uuid.New())
+	_, err := CancelRun(ctx, database.DB(t.Context()), canvas, uuid.New())
 	require.Error(t, err)
 }

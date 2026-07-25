@@ -4,31 +4,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
 
-func Test__ListEventExecutions__ReturnsErrorForInvalidCanvasID(t *testing.T) {
-	r := support.Setup(t)
-
-	response, err := ListEventExecutions(context.Background(), r.Registry, "invalid-uuid", uuid.New().String())
-	require.Error(t, err)
-	assert.Nil(t, response)
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, code)
-}
-
 func Test__ListEventExecutions__ReturnsErrorForInvalidEventID(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListEventExecutions(context.Background(), r.Registry, uuid.New().String(), "bogus")
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	response, err := ListEventExecutions(context.Background(), database.DB(t.Context()), canvas, "bogus")
 	require.Error(t, err)
 	assert.Nil(t, response)
 	code, _, ok := grpcerrors.HandlerStatus(err)
@@ -58,7 +48,7 @@ func Test__ListEventExecutions__ReturnsEmptyListWhenNoExecutionsExist(t *testing
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
+	response, err := ListEventExecutions(context.Background(), database.DB(t.Context()), canvas, rootEvent.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Executions)
@@ -89,7 +79,7 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 
 	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
-	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
+	response, err := ListEventExecutions(context.Background(), database.DB(t.Context()), canvas, rootEvent.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Executions, 1)
@@ -129,7 +119,7 @@ func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *tes
 	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent2.ID, event2.ID)
 
-	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent1.ID.String())
+	response, err := ListEventExecutions(context.Background(), database.DB(t.Context()), canvas, rootEvent1.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Executions, 1)
