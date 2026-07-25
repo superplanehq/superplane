@@ -286,7 +286,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Verify that exactly one workflow event was emitted (proving only one worker processed it).
 	//
-	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, triggerNode)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), eventCount, "Expected exactly 1 workflow event, but found %d", eventCount)
 
@@ -593,7 +593,7 @@ func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 
-	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, triggerNode)
 	require.NoError(t, err)
 	assert.Zero(t, eventCount)
 
@@ -1102,7 +1102,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
 	assert.Equal(t, models.NodeExecutionRequestStatePending, updatedRequest.State)
 
-	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, triggerNode)
 	require.NoError(t, err)
 	assert.Zero(t, eventCount)
 	assert.False(t, executionConsumer.HasReceivedMessage())

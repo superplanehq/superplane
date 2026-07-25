@@ -3,13 +3,10 @@ package canvases
 import (
 	"context"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
@@ -21,20 +18,8 @@ func loadCanvasCreator(ctx context.Context, db *gorm.DB, canvas *models.Canvas) 
 	return models.FindMaybeDeletedUserByIDInTransaction(db.WithContext(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
 }
 
-func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
-	canvasID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	orgID := uuid.MustParse(organizationID)
-	db := database.DB(ctx)
-
-	canvas, err := loadCanvas(ctx, db, orgID, canvasID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "canvas not found")
-	}
-
+func DescribeCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.DescribeCanvasResponse, error) {
+	var err error
 	var user *models.User
 	if canvas.CreatedBy != nil {
 		user, err = loadCanvasCreator(ctx, db, canvas)
