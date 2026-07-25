@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -49,8 +50,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"run",
 			map[string]any{"template": "Hello World"},
@@ -66,8 +67,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"nope",
 			map[string]any{},
@@ -83,8 +84,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"run",
 			map[string]any{},
@@ -101,8 +102,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"run",
 			map[string]any{"template": "Hello World"},
@@ -114,7 +115,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		result := resp.Result.AsMap()
 		assert.Equal(t, "Hello World", result["template"])
 
-		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), canvas.ID, triggerNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -163,8 +164,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{"template": "Timed"},
@@ -172,7 +173,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -222,8 +223,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{"template": "Timed"},
@@ -231,7 +232,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -274,8 +275,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{"template": "Timed"},
@@ -283,7 +284,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -330,8 +331,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{
@@ -342,7 +343,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -393,8 +394,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{
@@ -405,7 +406,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -455,8 +456,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{
@@ -466,7 +467,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -520,8 +521,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{
@@ -531,7 +532,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -585,8 +586,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			expressionCanvas.ID,
+			database.DB(t.Context()),
+			expressionCanvas,
 			expressionNodeID,
 			"run",
 			map[string]any{
@@ -597,7 +598,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
@@ -631,8 +632,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvasWithComponent.ID,
+			database.DB(t.Context()),
+			canvasWithComponent,
 			componentNodeID,
 			"run",
 			map[string]any{"template": "Hello World"},
@@ -675,8 +676,8 @@ func Test__InvokeNodeTriggerHook__ScheduleRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"emitEvent",
 			map[string]any{},
@@ -692,8 +693,8 @@ func Test__InvokeNodeTriggerHook__ScheduleRun(t *testing.T) {
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
+			database.DB(t.Context()),
+			canvas,
 			triggerNodeID,
 			"run",
 			map[string]any{},
@@ -707,7 +708,7 @@ func Test__InvokeNodeTriggerHook__ScheduleRun(t *testing.T) {
 		require.True(t, ok)
 		require.NotEmpty(t, eventID)
 
-		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), canvas.ID, triggerNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 

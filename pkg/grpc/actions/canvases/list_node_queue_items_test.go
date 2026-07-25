@@ -9,10 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
 
@@ -59,7 +57,7 @@ func Test__ListNodeQueueItems__ReturnsEmptyListWhenNoQueueItemsExist(t *testing.
 		[]models.Edge{},
 	)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Items)
@@ -94,7 +92,7 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 
 	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -140,7 +138,7 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithRootEvent(t *testing.T) {
 
 	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, &rootEvent.ID)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -180,7 +178,7 @@ func Test__ListNodeQueueItems__HandlesPaginationCorrectly(t *testing.T) {
 		queueItems = append(queueItems, *queueItem)
 	}
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 3, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 3, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 3)
@@ -223,7 +221,7 @@ func Test__ListNodeQueueItems__FiltersQueueItemsByNodeID(t *testing.T) {
 	queueItem1 := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent1.ID, nil)
 	createNodeQueueItem(t, canvas.ID, "node-2", inputEvent2.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -259,26 +257,15 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 		createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 	}
 
-	firstResponse, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 2, nil)
+	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil)
 	require.NoError(t, err)
 	require.Len(t, firstResponse.Items, 2)
 	assert.True(t, firstResponse.HasNextPage)
 
-	secondResponse, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 2, firstResponse.LastTimestamp)
+	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp)
 	require.NoError(t, err)
 	require.Len(t, secondResponse.Items, 1)
 	assert.False(t, secondResponse.HasNextPage)
-}
-
-func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
-	r := support.Setup(t)
-
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, "invalid-uuid", "node-1", 10, nil)
-	require.Error(t, err)
-	assert.Nil(t, response)
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {

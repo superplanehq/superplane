@@ -15,21 +15,6 @@ import (
 
 const canvasNameAlreadyExistsMessage = "Canvas with the same name already exists"
 
-func checkCanvasExistence(ctx context.Context, db *gorm.DB, orgID, canvasID uuid.UUID) (err error) {
-	ctx, done := telemetry.Span(ctx, "canvases.check_canvas_existence")
-	defer done(&err)
-
-	exists, err := models.CheckCanvasExistence(db.WithContext(ctx), orgID, canvasID)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return gorm.ErrRecordNotFound
-	}
-
-	return nil
-}
-
 func loadCanvas(ctx context.Context, db *gorm.DB, orgID, canvasID uuid.UUID) (canvas *models.Canvas, err error) {
 	ctx, done := telemetry.Span(ctx, "canvases.find_canvas")
 	defer done(&err)

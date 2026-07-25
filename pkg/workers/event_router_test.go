@@ -73,7 +73,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, run.State)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, node2, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, node2, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
@@ -126,7 +126,7 @@ func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasEventStatePending, updatedEvent.State)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
 
@@ -183,7 +183,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	//
 	// Process node1 output event and verify it was routed properly.
 	//
-	events, err := models.ListCanvasEvents(canvas.ID, node1, 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, node1, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
@@ -194,7 +194,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, node2, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, node2, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
@@ -237,7 +237,7 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
-	events, err := models.ListCanvasEvents(canvas.ID, node, 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, node, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
