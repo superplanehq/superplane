@@ -61,6 +61,8 @@ func Test__DeleteCanvas(t *testing.T) {
 		support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
 		support.VerifyNodeQueueCount(t, canvas.ID, 1)
 
+		originalName := canvas.Name
+
 		//
 		// Delete the canvas (soft delete).
 		//
@@ -81,7 +83,7 @@ func Test__DeleteCanvas(t *testing.T) {
 
 		// Verify the name has been updated with deleted timestamp suffix
 		assert.Contains(t, canvasUnscoped.Name, "(deleted-")
-		assert.NotEqual(t, canvas.Name, canvasUnscoped.Name)
+		assert.NotEqual(t, originalName, canvasUnscoped.Name)
 
 		// Associated data should still exist (cleanup worker handles this)
 		nodes, err = models.FindCanvasNodes(canvas.ID)

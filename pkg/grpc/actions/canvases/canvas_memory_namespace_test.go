@@ -80,7 +80,7 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 			canvas,
 			"durable-namespace",
 			"",
-			structpbEntries(t, map[string]any{"key": "value"}),
+			nil,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)

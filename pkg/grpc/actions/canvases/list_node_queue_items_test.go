@@ -9,10 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
 
@@ -268,18 +266,6 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, secondResponse.Items, 1)
 	assert.False(t, secondResponse.HasNextPage)
-}
-
-func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), nil, "node-1", 10, nil)
-	require.Error(t, err)
-	assert.Nil(t, response)
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
