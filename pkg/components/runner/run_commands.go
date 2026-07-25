@@ -312,6 +312,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)
