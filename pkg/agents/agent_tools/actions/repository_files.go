@@ -42,7 +42,22 @@ func (a listFilesAction) Execute(ctx context.Context, session agents.AgentSessio
 		return fileListResult{}, fmt.Errorf("git provider is not configured")
 	}
 
-	response, err := canvasRepository.ListCanvasRepositoryFiles(ctx, a.gitProvider, session.OrganizationID, session.CanvasID)
+	orgID, err := uuid.Parse(session.OrganizationID)
+	if err != nil {
+		return fileListResult{}, fmt.Errorf("invalid session organization id: %w", err)
+	}
+
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return fileListResult{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	canvas, err := models.FindCanvas(orgID, canvasID)
+	if err != nil {
+		return fileListResult{}, fmt.Errorf("find canvas: %w", err)
+	}
+
+	response, err := canvasRepository.ListCanvasRepositoryFiles(ctx, a.gitProvider, canvas)
 	if err != nil {
 		return fileListResult{}, err
 	}
@@ -218,6 +233,22 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		return fileStageResult{}, err
 	}
 
+	orgID, err := uuid.Parse(session.OrganizationID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("invalid session organization id: %w", err)
+	}
+
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	db := database.DB(ctx)
+	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("find canvas: %w", err)
+	}
+
 	liveVersion, err := resolveFileLiveVersion(session, input)
 	if err != nil {
 		return fileStageResult{}, err
@@ -225,8 +256,8 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 
 	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
-		session.OrganizationID,
-		session.CanvasID,
+		db,
+		canvas,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
 	)
 	if err != nil {
@@ -254,6 +285,22 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		return fileStageResult{}, err
 	}
 
+	orgID, err := uuid.Parse(session.OrganizationID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("invalid session organization id: %w", err)
+	}
+
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	db := database.DB(ctx)
+	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
+	if err != nil {
+		return fileStageResult{}, fmt.Errorf("find canvas: %w", err)
+	}
+
 	liveVersion, err := resolveFileLiveVersion(session, input)
 	if err != nil {
 		return fileStageResult{}, err
@@ -261,8 +308,8 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 
 	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
-		session.OrganizationID,
-		session.CanvasID,
+		db,
+		canvas,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
 	)
 	if err != nil {

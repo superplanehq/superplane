@@ -2,14 +2,12 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -18,27 +16,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func PutCanvasStaging(ctx context.Context, organizationID string, canvasID string, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
-	db := database.DB(ctx)
-
+func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	userID := uuid.MustParse(user)
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	canvas, err := models.FindCanvasInTransaction(db, uuid.MustParse(organizationID), canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
 
 	//
 	// Find the base version id for the staging update.

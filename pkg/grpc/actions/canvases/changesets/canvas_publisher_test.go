@@ -232,7 +232,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
 
-		queueItems, err := models.ListNodeQueueItems(canvas.ID, "approval-node", 10, nil)
+		queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, "approval-node", 10, nil)
 		require.NoError(t, err)
 		require.Empty(t, queueItems)
 
