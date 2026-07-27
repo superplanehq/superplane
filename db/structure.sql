@@ -501,7 +501,8 @@ CREATE TABLE public.user_canvas_preferences (
     canvas_id uuid NOT NULL,
     starred_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2276,7 +2277,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260724101611	f
+20260727223430	f
 \.
 
 
