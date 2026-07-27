@@ -10,6 +10,7 @@ import { MAX_IMAGE_ATTACHMENTS, isSupportedImageFile, useImageAttachments } from
 import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
+import { useFlushAgentComposerSend } from "./useFlushAgentComposerSend";
 
 type ChatComposerProps = {
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
@@ -134,6 +135,8 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
       mentionsApi.restore();
     }
   }, [hasImages, images, getMarkdown, clearImages, onSend, mentionsApi]);
+
+  useFlushAgentComposerSend(onSend, sendPending);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {

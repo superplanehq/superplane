@@ -5,6 +5,7 @@ import { canvasKeys, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasDa
 import { usePermissions } from "@/contexts/usePermissions";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
+import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { showErrorToast } from "@/lib/toast";
@@ -47,6 +48,9 @@ function prepareAgentSidebar(app: AppEntry, canvasId: string) {
       instructions: app.agentInstructions,
       initialMessage: app.agentInitialMessage,
     });
+  }
+  if (app.agentSuggestions?.length) {
+    setAgentSuggestions(canvasId, app.agentSuggestions);
   }
   // A newly installed app always starts with the agent panel open (stored per canvas).
   writeCanvasAgentSidebarOpen(canvasId, true);

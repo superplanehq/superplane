@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,7 +19,7 @@ func loadCanvasCreator(ctx context.Context, db *gorm.DB, canvas *models.Canvas) 
 	return models.FindMaybeDeletedUserByIDInTransaction(db.WithContext(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
 }
 
-func DescribeCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.DescribeCanvasResponse, error) {
+func DescribeCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas, userID string) (*pb.DescribeCanvasResponse, error) {
 	var err error
 	var user *models.User
 	if canvas.CreatedBy != nil {
@@ -44,7 +45,38 @@ func DescribeCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*p
 		return nil, grpcerrors.Internal(err, "failed to serialize workflow")
 	}
 
-	return &pb.DescribeCanvasResponse{
+	response := &pb.DescribeCanvasResponse{
 		Canvas: proto,
-	}, nil
+	}
+
+	preference, err := loadUserCanvasPreference(db, canvas, userID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load canvas preference")
+	}
+	response.Preference = preference
+
+	return response, nil
+}
+
+func loadUserCanvasPreference(db *gorm.DB, canvas *models.Canvas, userID string) (*pb.CanvasPreference, error) {
+	if userID == "" {
+		return &pb.CanvasPreference{CanvasId: canvas.ID.String()}, nil
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	preference, err := models.FindUserCanvasPreference(
+		db,
+		canvas.OrganizationID,
+		userUUID,
+		canvas.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return serializeCanvasPreference(preference), nil
 }
