@@ -756,6 +756,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
       }
 
+      const runMatch = expr.match(/^run\(\)/);
+      if (runMatch) {
+        return `__run${expr.slice(runMatch[0].length)}`;
+      }
+
       return expr;
     };
 

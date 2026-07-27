@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -77,6 +78,79 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "login", result["action"])
 	assert.Equal(t, "true", result["success"])
 	assert.Equal(t, "42", result["count"])
+}
+
+func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "john"})
+
+	//
+	// Associate the root event with a run so run() can resolve it.
+	//
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: map[string]any{"user": "john"}})
+
+	t.Run("returns id, url, and started_at", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`run()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, run.ID.String(), payload["id"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s?run=%s", canvas.OrganizationID.String(), canvas.ID.String(), run.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "view=runs")
+
+		startedAt, ok := payload["started_at"].(time.Time)
+		require.True(t, ok)
+		require.NotNil(t, run.CreatedAt)
+		assert.WithinDuration(t, *run.CreatedAt, startedAt, time.Second)
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"runID":  "{{ run().id }}",
+			"runURL": "{{ run().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, run.ID.String(), result["runID"])
+		assert.Contains(t, result["runURL"], run.ID.String())
+		assert.Contains(t, result["runURL"], "?run=")
+		assert.NotContains(t, result["runURL"], "view=runs")
+	})
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
