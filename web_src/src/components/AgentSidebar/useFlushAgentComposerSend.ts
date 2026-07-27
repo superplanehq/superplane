@@ -3,50 +3,44 @@ import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import { consumeAgentComposerSend, peekAgentComposerSend, subscribeAgentComposerSend } from "./composerPrefill";
 
 /**
- * Flushes suggestion/prefill sends into the composer. Keeps the pending buffer
- * while another mutation is in flight so install boot kickoff cannot drop it.
+ * Flushes queued suggestion/prefill sends into the composer one at a time.
+ * Keeps the queue while another mutation is in flight so install boot kickoff
+ * or a prior suggestion send cannot drop later prompts.
  */
 export function useFlushAgentComposerSend(
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>,
   sendPending: boolean,
 ) {
-  const sendExternalText = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      if (sendPending) return;
-      // Clear before send so Strict Mode remounts do not double-send.
-      if (peekAgentComposerSend() === trimmed) {
-        consumeAgentComposerSend();
-      }
-      void onSend(trimmed, []);
-    },
-    [onSend, sendPending],
-  );
+  const flushPending = useCallback(() => {
+    if (sendPending) return;
+    const pending = peekAgentComposerSend();
+    if (!pending) return;
+    // Clear before send so Strict Mode remounts do not double-send.
+    consumeAgentComposerSend();
+    void onSend(pending, []);
+  }, [onSend, sendPending]);
 
   useEffect(() => {
     let cancelled = false;
-    const flushPending = () => {
+    const flush = () => {
       if (cancelled) return;
-      const pending = peekAgentComposerSend();
-      if (pending) sendExternalText(pending);
+      flushPending();
     };
 
     // Sidebar opens → chat query resolves → composer mounts. Flush now and once
     // more shortly after so a suggestion click is not lost to that race.
-    flushPending();
-    const retryId = window.setTimeout(flushPending, 300);
-    const unsubscribe = subscribeAgentComposerSend(sendExternalText);
+    flush();
+    const retryId = window.setTimeout(flush, 300);
+    const unsubscribe = subscribeAgentComposerSend(flush);
     return () => {
       cancelled = true;
       window.clearTimeout(retryId);
       unsubscribe();
     };
-  }, [sendExternalText]);
+  }, [flushPending]);
 
   useEffect(() => {
     if (sendPending) return;
-    const pending = peekAgentComposerSend();
-    if (pending) sendExternalText(pending);
-  }, [sendPending, sendExternalText]);
+    flushPending();
+  }, [sendPending, flushPending]);
 }

@@ -6,7 +6,7 @@ import { dismissAgentSuggestion, getDismissedAgentSuggestionIds } from "@/lib/ag
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkle, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AgentSuggestionsHoverCard, type AgentSuggestion } from "./AgentSuggestionsHoverCard";
 import {
@@ -41,6 +41,13 @@ export function CanvasToolSidebarTrigger({
   // Sticky on first paint until outside click / Escape; choosing a suggestion removes only that row.
   const [cardOpen, setCardOpen] = useState(true);
   const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(() => getDismissedAgentSuggestionIds(canvasId));
+
+  // SPA navigation reuses this trigger; reload dismissals for the active canvas.
+  useEffect(() => {
+    setDismissedIds(getDismissedAgentSuggestionIds(canvasId));
+    setCardOpen(true);
+  }, [canvasId]);
+
   const visibleSuggestions = useMemo(
     () => agentSuggestions.filter((suggestion) => !dismissedIds.has(suggestion.id)),
     [agentSuggestions, dismissedIds],
