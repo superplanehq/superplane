@@ -333,6 +333,25 @@ type UseCanvasOptions = {
   refetchOnMount?: boolean;
 };
 
+/** Merge DescribeCanvas preference into cache without dropping newer optimistic dismissals. */
+function mergeCanvasPreferenceCache(
+  current: CanvasesCanvasPreference | null | undefined,
+  incoming: CanvasesCanvasPreference | null | undefined,
+): CanvasesCanvasPreference | null {
+  if (!incoming && !current) return null;
+  if (!incoming) return current ?? null;
+  if (!current) return incoming;
+
+  const dismissedAgentSuggestionIds = Array.from(
+    new Set([...(current.dismissedAgentSuggestionIds ?? []), ...(incoming.dismissedAgentSuggestionIds ?? [])]),
+  );
+
+  return {
+    ...incoming,
+    dismissedAgentSuggestionIds,
+  };
+}
+
 export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
   const queryClient = useQueryClient();
   const {
@@ -353,7 +372,7 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
       );
       queryClient.setQueryData<CanvasesCanvasPreference | null>(
         canvasKeys.preference(organizationId, canvasId),
-        response.data?.preference ?? null,
+        (current) => mergeCanvasPreferenceCache(current, response.data?.preference ?? null),
       );
       return response.data?.canvas;
     },
@@ -366,6 +385,8 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
 };
 
 export const useCanvasPreference = (organizationId: string, canvasId: string, enabled = true) => {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: canvasKeys.preference(organizationId, canvasId),
     queryFn: async () => {
@@ -374,7 +395,10 @@ export const useCanvasPreference = (organizationId: string, canvasId: string, en
           path: { id: canvasId },
         }),
       );
-      return response.data?.preference ?? null;
+      const current = queryClient.getQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, canvasId),
+      );
+      return mergeCanvasPreferenceCache(current, response.data?.preference ?? null);
     },
     enabled: enabled && !!organizationId && !!canvasId,
     staleTime: 30_000,
