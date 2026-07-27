@@ -121,6 +121,10 @@ func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextT
 		pbOpts.Language = &opts.Language
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -453,6 +457,10 @@ func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.Tex
 
 	if pbOpts.Language != nil {
 		opts.Language = *pbOpts.Language
+	}
+
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
 	}
 
 	return opts
