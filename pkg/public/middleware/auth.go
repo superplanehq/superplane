@@ -129,11 +129,19 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			account, err := getValidatedAccountFromCookie(r, jwtSigner)
 			if err != nil {
 				if isAccountAPIPath(r.URL.Path) {
+					if errors.Is(err, models.ErrAccountBlocked) {
+						http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+						return
+					}
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 
 				authentication.ClearAccountCookie(w, r)
+				if errors.Is(err, models.ErrAccountBlocked) {
+					http.Redirect(w, r, "/login?auth_error=account_blocked", http.StatusTemporaryRedirect)
+					return
+				}
 				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
@@ -144,7 +152,11 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// impersonated user's account so that non-admin handlers
 			// (getAccount, listOrganizations, etc.) see the target
 			// user's data instead of the admin's.
-			if impAccount, info := resolveImpersonatedAccount(jwtSigner, r, account); impAccount != nil {
+			impAccount, info, impersonationErr := resolveImpersonatedAccount(jwtSigner, r, account)
+			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
+				impersonation.ClearCookie(w, r)
+			}
+			if impAccount != nil {
 				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
@@ -160,28 +172,35 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 // resolveImpersonatedAccount checks for an impersonation cookie and,
 // if valid, returns the impersonated Account so it can be used as the
 // effective account for non-admin endpoints.
-func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *models.Account) (*models.Account, *ImpersonationInfo) {
+func resolveImpersonatedAccount(
+	jwtSigner *jwt.Signer,
+	r *http.Request,
+	admin *models.Account,
+) (*models.Account, *ImpersonationInfo, error) {
 	tokenStr, err := impersonation.ReadCookie(r)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	if claims.AdminAccountID != admin.ID.String() || !admin.IsInstallationAdmin() {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if !admin.IsSessionFresh(claims.IssuedAt) {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
+	}
+	if impAccount.IsBlocked() {
+		return nil, nil, models.ErrAccountBlocked
 	}
 
 	info := &ImpersonationInfo{
@@ -190,7 +209,7 @@ func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *m
 		UserName:       impAccount.Name,
 	}
 
-	return impAccount, info
+	return impAccount, info, nil
 }
 
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
@@ -207,6 +226,10 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				user, scopedClaims, err := authenticateUserByToken(ctx, r, jwtSigner)
 
 				if err != nil {
+					if errors.Is(err, models.ErrAccountBlocked) {
+						http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+						return
+					}
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
@@ -225,8 +248,12 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, impersonationInfo, err := authenticateUserByCookie(ctx, jwtSigner, r)
+			user, impersonationInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r)
 			if err != nil {
+				if errors.Is(err, models.ErrAccountBlocked) {
+					http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+					return
+				}
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
 					return
@@ -267,6 +294,9 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	if err == nil {
 		return user, scopedClaims, nil
 	}
+	if errors.Is(err, models.ErrAccountBlocked) {
+		return nil, nil, err
+	}
 
 	hashedToken := crypto.HashToken(token)
 	user, err = models.FindActiveUserByTokenHashInTransaction(database.DB(ctx), hashedToken)
@@ -275,6 +305,9 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	}
 	if user.IsExpiredAPIKey() {
 		return nil, nil, fmt.Errorf("API key token expired")
+	}
+	if err := rejectIfCredentialAccountBlocked(user); err != nil {
+		return nil, nil, err
 	}
 
 	return user, nil, nil
@@ -309,13 +342,15 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 	// password change so a password rotation also kills programmatic
 	// credentials issued for that user. API keys have no owning
 	// human account, so they're unaffected.
-	if user.AccountID != nil && claims.IssuedAt != nil {
+	if user.AccountID != nil {
 		account, err := models.FindAccountByID(user.AccountID.String())
 		if err != nil {
 			return nil, nil, err
 		}
-
-		if !account.IsSessionFresh(claims.IssuedAt.Unix()) {
+		if account.IsBlocked() {
+			return nil, nil, models.ErrAccountBlocked
+		}
+		if claims.IssuedAt != nil && !account.IsSessionFresh(claims.IssuedAt.Unix()) {
 			return nil, nil, fmt.Errorf("scoped token invalidated by password change")
 		}
 	}
@@ -323,7 +358,12 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 	return user, claims, nil
 }
 
-func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+func authenticateUserByCookie(
+	ctx context.Context,
+	w http.ResponseWriter,
+	jwtSigner *jwt.Signer,
+	r *http.Request,
+) (*models.User, *ImpersonationInfo, error) {
 	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_cookie")
 	defer span.End()
 
@@ -334,12 +374,19 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 	if err == nil {
 		return user, info, nil
 	}
-	if isActiveImpersonation(jwtSigner, r) {
+	// Blocking an impersonated target invalidates that impersonated view.
+	// Fall back to the real admin, matching AccountAuthMiddleware.
+	if errors.Is(err, models.ErrAccountBlocked) {
+		impersonation.ClearCookie(w, r)
+	} else if isActiveImpersonation(jwtSigner, r) {
 		return nil, nil, err
 	}
 
 	account, err := getValidatedAccountFromCookie(r, jwtSigner)
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			return nil, nil, err
+		}
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
@@ -431,6 +478,9 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 	if err != nil {
 		return nil, nil, fmt.Errorf("impersonated account not found: %w", err)
 	}
+	if impAccount.IsBlocked() {
+		return nil, nil, models.ErrAccountBlocked
+	}
 
 	// Find the user in the org from the request header
 	organizationID := findOrganizationID(r)
@@ -502,9 +552,12 @@ func isOwnerSetupAllowedPath(path string) bool {
 }
 
 func isAccountAPIPath(path string) bool {
+	if strings.HasPrefix(path, "/account/") || strings.HasPrefix(path, "/admin/api/") {
+		return true
+	}
+
 	switch path {
-	case "/account", "/account/limits", "/account/password", "/organizations",
-		"/apps/install/preview", "/apps/install":
+	case "/account", "/organizations", "/apps/install/preview", "/apps/install":
 		return true
 	default:
 		return strings.HasPrefix(path, "/api/v1/invite-links/")
@@ -556,11 +609,46 @@ func getValidatedAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (*mod
 		return nil, err
 	}
 
+	if account.IsBlocked() {
+		return nil, models.ErrAccountBlocked
+	}
+
 	if !account.IsSessionFresh(iat) {
 		return nil, fmt.Errorf("session invalidated by password change")
 	}
 
 	return account, nil
+}
+
+// rejectIfCredentialAccountBlocked refuses auth when the credential belongs to
+// a blocked account (human users) or was created by a blocked account (API keys).
+func rejectIfCredentialAccountBlocked(user *models.User) error {
+	account, err := accountForCredentialUser(user)
+	if err != nil {
+		return err
+	}
+	if account != nil && account.IsBlocked() {
+		return models.ErrAccountBlocked
+	}
+	return nil
+}
+
+func accountForCredentialUser(user *models.User) (*models.Account, error) {
+	if user.AccountID != nil {
+		return models.FindAccountByID(user.AccountID.String())
+	}
+	if !user.IsAPIKey() || user.CreatedBy == nil {
+		return nil, nil
+	}
+
+	creator, err := models.FindUnscopedUserByID(user.CreatedBy.String())
+	if err != nil {
+		return nil, err
+	}
+	if creator.AccountID == nil {
+		return nil, nil
+	}
+	return models.FindAccountByID(creator.AccountID.String())
 }
 
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {

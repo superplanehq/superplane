@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE accounts
+  ADD COLUMN blocked_at TIMESTAMP WITH TIME ZONE;
+
+COMMIT;

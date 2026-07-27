@@ -193,7 +193,8 @@ func (c *RunBash) Configuration() []configuration.Field {
 			Description: "Bash executed by the runner. Write JSON to SUPERPLANE_RESULT_FILE; read upstream data from SUPERPLANE_PAYLOAD_FILE.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "shell",
+					Language:         "shell",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
@@ -340,6 +341,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunBashDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)
