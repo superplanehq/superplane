@@ -300,22 +300,22 @@ func (c *Client) buildMessage(email Email, fromName, fromEmail string) (string, 
 
 	// Build headers
 	headers := []string{
-		fmt.Sprintf("From: %s", from),
-		fmt.Sprintf("Subject: %s", email.Subject),
+		fmt.Sprintf("From: %s", sanitizeSMTPHeaderValue(from)),
+		fmt.Sprintf("Subject: %s", sanitizeSMTPHeaderValue(email.Subject)),
 		"MIME-Version: 1.0",
 		fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", boundary),
 	}
 
 	if len(email.To) > 0 {
-		headers = append(headers, fmt.Sprintf("To: %s", strings.Join(email.To, ", ")))
+		headers = append(headers, fmt.Sprintf("To: %s", sanitizeSMTPHeaderValue(strings.Join(email.To, ", "))))
 	}
 
 	if len(email.Cc) > 0 {
-		headers = append(headers, fmt.Sprintf("Cc: %s", strings.Join(email.Cc, ", ")))
+		headers = append(headers, fmt.Sprintf("Cc: %s", sanitizeSMTPHeaderValue(strings.Join(email.Cc, ", "))))
 	}
 
 	if email.ReplyTo != "" {
-		headers = append(headers, fmt.Sprintf("Reply-To: %s", email.ReplyTo))
+		headers = append(headers, fmt.Sprintf("Reply-To: %s", sanitizeSMTPHeaderValue(email.ReplyTo)))
 	}
 
 	// Build message body
@@ -355,6 +355,11 @@ func randomBoundary() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
+}
+
+// sanitizeSMTPHeaderValue strips CR/LF so caller-influenced values cannot inject SMTP headers.
+func sanitizeSMTPHeaderValue(value string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(value)
 }
 
 func stripHTML(html string) string {

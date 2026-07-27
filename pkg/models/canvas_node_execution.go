@@ -191,9 +191,9 @@ func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasN
 	return &execution, nil
 }
 
-func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
+func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
-	query := database.Conn().
+	query := db.
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Order("created_at DESC").
@@ -291,9 +291,9 @@ func CountActiveNodeExecutionsForRootEventInTransaction(tx *gorm.DB, rootEventID
 	return count, nil
 }
 
-func CountNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string) (int64, error) {
+func CountNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string) (int64, error) {
 	var totalCount int64
-	countQuery := database.Conn().
+	countQuery := db.
 		Model(&CanvasNodeExecution{}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID)

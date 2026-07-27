@@ -25,7 +25,7 @@ export const homeDividerLabelClassName =
 export const homeSectionDividerClassName = "border-t border-slate-100 dark:border-gray-700/70";
 
 export const homeInstallPanelClassName = cn(
-  "mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2",
+  "mt-8 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2",
   appDarkModeClasses.surfaceRaised,
   "dark:outline-gray-700/70",
 );

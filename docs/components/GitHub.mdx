@@ -52,6 +52,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
@@ -3306,6 +3307,87 @@ Returns the updated comment object including comment ID, URL, body, and timestam
   },
   "timestamp": "2026-01-16T18:30:00.680755501Z",
   "type": "github.issueComment"
+}
+```
+
+<a id="update-pull-request"></a>
+
+## Update Pull Request
+
+**Component key:** `github.updatePullRequest`
+
+The Update Pull Request component updates an existing pull request in a GitHub repository. Use it instead of Update Issue when the change is about a pull request - GitHub models a pull request's title, body, state, labels, and assignees on its underlying issue, but "Update Issue" is confusing to reach for when working with pull requests.
+
+### Use Cases
+
+- **Retitle/rebody automation**: Update a pull request's title or description as a workflow progresses
+- **Open/close automation**: Close a pull request when it is superseded, or reopen one automatically
+- **Retargeting**: Change the base branch a pull request merges into
+- **Label and assignee management**: Replace a pull request's labels or assignees from a workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to update. Supports expressions.
+- **Title**, **Body**, **State**, **Base Branch**, **Replace Assignees**, **Replace Labels**: each field has its own toggle. Only toggled-on fields are changed; toggled-off fields are left untouched on the pull request.
+
+At least one field must be toggled on.
+
+### Replacing labels and assignees
+
+**Replace Assignees** and **Replace Labels** replace the pull request's full set when toggled on, including replacing it with an empty list to clear all assignees or labels.
+
+### Output
+
+Returns the updated pull request object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      }
+    ],
+    "base": {
+      "label": "acme:release",
+      "ref": "release"
+    },
+    "body": "Adds the new feature described in the linked issue.",
+    "comments_url": "https://api.github.com/repos/acme/widgets/issues/42/comments",
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "labels": [
+      {
+        "color": "a2eeef",
+        "name": "enhancement"
+      }
+    ],
+    "locked": false,
+    "node_id": "PR_kwDOABCD12MAAAABCDEFGH",
+    "number": 42,
+    "state": "open",
+    "title": "Add new feature",
+    "updated_at": "2026-04-22T11:15:00Z",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T11:15:00.000000000Z",
+  "type": "github.pullRequest"
 }
 ```
 

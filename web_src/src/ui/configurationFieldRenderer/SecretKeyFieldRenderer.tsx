@@ -23,7 +23,7 @@ interface SecretKeyFieldRendererProps {
   isRequired: boolean;
   value: SecretKeyRefValue;
   onChange: (value: { secret: string; key: string } | undefined) => void;
-  organizationId: string | undefined;
+  organizationId: string;
 }
 
 type SecretDetail = SuperplaneSecretsSecret | null | undefined;
@@ -163,7 +163,7 @@ export const SecretKeyFieldRenderer = ({
   onChange,
   organizationId,
 }: SecretKeyFieldRendererProps) => {
-  const domainId = organizationId ?? "";
+  const domainId = organizationId;
   const allowClear = !isRequired;
   const placeholder = getSecretKeyPlaceholder(field, isRequired);
   const optionValue = toOptionValue(value);

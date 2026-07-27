@@ -85,14 +85,44 @@ func TestGetNextTrigger(t *testing.T) {
 	}{
 
 		{
-			name: "hours configuration",
+			name: "hours configuration (minute not yet passed, fires current hour)",
 			config: Configuration{
 				Type:          TypeHours,
 				HoursInterval: intPtr(1),
 				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T12:15:00Z"),
+			expectNext: mustParseTime("2025-01-01T12:30:00Z"),
+		},
+		{
+			name: "hours configuration (minute already passed, fires next interval)",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(30),
+			},
+			now:        mustParseTime("2025-01-01T12:45:00Z"),
 			expectNext: mustParseTime("2025-01-01T13:30:00Z"),
+		},
+		{
+			name: "hours configuration (exactly at trigger minute, fires next interval)",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(1),
+				Minute:        intPtr(30),
+			},
+			now:        mustParseTime("2025-01-01T12:30:00Z"),
+			expectNext: mustParseTime("2025-01-01T13:30:00Z"),
+		},
+		{
+			name: "hours configuration with interval > 1 (minute not yet passed, fires current hour)",
+			config: Configuration{
+				Type:          TypeHours,
+				HoursInterval: intPtr(3),
+				Minute:        intPtr(45),
+			},
+			now:        mustParseTime("2025-01-01T11:30:00Z"),
+			expectNext: mustParseTime("2025-01-01T11:45:00Z"),
 		},
 		{
 			name: "days configuration",
@@ -331,8 +361,8 @@ func TestTimezoneHandling(t *testing.T) {
 				Minute:        intPtr(1),       // 1 minute past every hour
 				Timezone:      stringPtr("-3"), // GMT-3
 			},
-			now:        mustParseTime("2025-01-01T07:00:00Z"), // 4 AM GMT-3 (7 AM UTC)
-			expectNext: mustParseTime("2025-01-01T08:01:00Z"), // 5:01 AM GMT-3 (8:01 AM UTC)
+			now:        mustParseTime("2025-01-01T07:00:00Z"), // 4:00 AM GMT-3 (7:00 AM UTC)
+			expectNext: mustParseTime("2025-01-01T07:01:00Z"), // 4:01 AM GMT-3 (7:01 AM UTC), minute 1 not yet passed
 		},
 		{
 			name: "day schedule in GMT+5 timezone",
@@ -400,8 +430,8 @@ func TestTimezoneHandling(t *testing.T) {
 				Minute:        intPtr(30),      // 30 minutes past every hour
 				Timezone:      stringPtr("-5"), // GMT-5
 			},
-			now:        mustParseTime("2025-01-01T03:00:00Z"), // 10 PM GMT-5 (3 AM UTC next day)
-			expectNext: mustParseTime("2025-01-01T04:30:00Z"), // 11:30 PM GMT-5 (4:30 AM UTC next day)
+			now:        mustParseTime("2025-01-01T03:00:00Z"), // 10:00 PM GMT-5 (3:00 AM UTC)
+			expectNext: mustParseTime("2025-01-01T03:30:00Z"), // 10:30 PM GMT-5 (3:30 AM UTC), minute 30 not yet passed
 		},
 	}
 

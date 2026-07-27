@@ -1,4 +1,4 @@
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 export function buildRuntimeExpressionContext(section: RunInspectorNodeSection): Record<string, unknown> | null {
   if (section.upstreamSections.length === 0) return null;

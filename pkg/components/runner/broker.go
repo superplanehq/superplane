@@ -70,7 +70,7 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 // Example request:
 // {
 //   "fleet_id": "e1-large-amd64",
-//   "commands": ["echo \"Hello, World!\""],
+//   "commands": [{"command": "echo \"Hello, World!\""}],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
 //   "webhook_payload_size_limit": 524288,
@@ -90,14 +90,67 @@ type brokerCreateTaskRequest struct {
 	RunMode                 string                      `json:"run_mode,omitempty"`
 	Script                  string                      `json:"script,omitempty"`
 	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
-	Commands                []string                    `json:"commands,omitempty"`
+	Commands                []BrokerCommand             `json:"commands,omitempty"`
 	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
+	Files                   []BrokerTaskFile            `json:"files,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
 	WebhookPayloadSizeLimit int                         `json:"webhook_payload_size_limit"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
+}
+
+// BrokerTaskFile is materialized under SUPERPLANE_TASK_DIR before execution.
+type BrokerTaskFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Mode    string `json:"mode,omitempty"`
+}
+
+// BrokerCommand is one command_list entry sent as {"name","command"} (name optional).
+// Unmarshal still accepts legacy plain strings for tests/fixtures.
+type BrokerCommand struct {
+	Name    string `json:"name,omitempty"`
+	Command string `json:"command"`
+}
+
+func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		*c = BrokerCommand{}
+		return nil
+	}
+	if data[0] == '"' {
+		var command string
+		if err := json.Unmarshal(data, &command); err != nil {
+			return err
+		}
+		*c = BrokerCommand{Command: strings.TrimSpace(command)}
+		return nil
+	}
+	var raw struct {
+		Name    string `json:"name"`
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*c = BrokerCommand{Name: strings.TrimSpace(raw.Name), Command: strings.TrimSpace(raw.Command)}
+	return nil
+}
+
+// BrokerCommandsFromLines adapts plain shell lines into unnamed broker commands.
+func BrokerCommandsFromLines(lines []string) []BrokerCommand {
+	out := make([]BrokerCommand, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out = append(out, BrokerCommand{Command: line})
+	}
+	return out
 }
 
 // BrokerEnvironmentVariable is forwarded to the task broker as JSON.
@@ -118,11 +171,12 @@ type CreateTaskParams struct {
 	RunMode                 string
 	Script                  string
 	MessageChain            json.RawMessage
-	Commands                []string
+	Commands                []BrokerCommand
 	SetupCommands           []string
 	WebhookURL              string
 	WebhookPayloadSizeLimit int
 	Environment             []BrokerEnvironmentVariable
+	Files                   []BrokerTaskFile
 	ExecutionMode           string
 	DockerImage             string
 	TimeoutSeconds          int // 0 = DefaultExecutionTimeoutSeconds
@@ -156,6 +210,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		Commands:                p.Commands,
 		SetupCommands:           p.SetupCommands,
 		Environment:             p.Environment,
+		Files:                   p.Files,
 		WebhookURL:              p.WebhookURL,
 		WebhookPayloadSizeLimit: webhookPayloadSizeLimit,
 		ExecutionMode:           mode,

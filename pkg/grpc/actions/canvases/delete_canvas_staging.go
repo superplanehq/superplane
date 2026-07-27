@@ -2,12 +2,10 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,30 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func DeleteCanvasStaging(ctx context.Context, organizationID string, canvasID string, paths []string) (*pb.StagingSummary, error) {
-	db := database.DB(ctx)
-
+func DeleteCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, paths []string) (*pb.StagingSummary, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	organizationUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	canvas, err := models.FindCanvasInTransaction(db, organizationUUID, canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
 	if err := models.DiscardStagedFilesForUser(db, canvas.ID, uuid.MustParse(userID), paths); err != nil {

@@ -1,10 +1,15 @@
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Timestamp } from "@/components/Timestamp";
+import { parseAppRunPath } from "@/lib/appPaths";
 import { isUrl } from "@/lib/utils";
 import { EventStatusBadge } from "@/ui/EventStatusBadge";
 import { isErrorValue } from "./runNodeDetailModel";
 
 const DETAIL_VALUE_PREVIEW_CHARACTER_LIMIT = 160;
+const appRunLinkClassName =
+  "inline-flex w-fit items-center gap-1 font-medium text-gray-600 underline decoration-gray-300 underline-offset-2 transition-colors hover:text-gray-900 hover:decoration-gray-500 dark:text-gray-400 dark:decoration-gray-600 dark:hover:text-gray-100 dark:hover:decoration-gray-400";
 
 export function RunNodeDetailDetailsView({
   details,
@@ -66,7 +71,13 @@ function DetailValue({ value }: { value: unknown }) {
   const linkClassName =
     "min-w-0 break-words whitespace-pre-wrap text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-indigo-300 dark:hover:text-indigo-200";
 
-  const content = isUrl(stringValue) ? (
+  const appRunHref = parseAppRunPath(stringValue);
+  const content = appRunHref ? (
+    <Link to={appRunHref} className={appRunLinkClassName}>
+      See run
+      <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+    </Link>
+  ) : isUrl(stringValue) ? (
     <a href={stringValue} target="_blank" rel="noopener noreferrer" className={linkClassName}>
       {displayValue}
     </a>

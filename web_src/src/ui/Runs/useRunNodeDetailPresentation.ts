@@ -12,9 +12,8 @@ import {
   eventBadgeForTriggeredTrigger,
   getAdjacentRunNodeId,
   hasObjectValue,
-  type RunNodeDetailTabAvailability,
-  type RunNodeDetailTabData,
 } from "./runNodeDetailModel";
+import type { RunNodeDetailTabData, RunNodeDetailTabAvailability } from "./types";
 
 export function useRunNodeDetailPresentation({
   run,

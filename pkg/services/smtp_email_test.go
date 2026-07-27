@@ -110,6 +110,43 @@ func TestBuildMultipartEmail(t *testing.T) {
 	assert.Contains(t, msg, "<p>html body</p>")
 }
 
+func TestBuildMultipartEmail_StripsCRLFFromHeaders(t *testing.T) {
+	msg, err := buildMultipartEmail(
+		"Sender\r\nBcc: evil@external.com <sender@example.com>",
+		[]string{"to@example.com\r\nCc: attacker@external.com"},
+		nil,
+		"Urgent\r\nFrom: ceo@victim.com\r\nBcc: attacker@external.com",
+		"plain body",
+		"<p>html body</p>",
+	)
+	require.NoError(t, err)
+
+	assert.Contains(t, msg, "Subject: UrgentFrom: ceo@victim.comBcc: attacker@external.com")
+	assert.Contains(t, msg, "From: SenderBcc: evil@external.com <sender@example.com>")
+	assert.Contains(t, msg, "To: to@example.comCc: attacker@external.com")
+	assert.NotContains(t, msg, "\r\nFrom: ceo@victim.com")
+	assert.NotContains(t, msg, "\r\nBcc: attacker@external.com")
+	assert.NotContains(t, msg, "\r\nCc: attacker@external.com")
+	assert.Equal(t, 1, countHeaderLines(msg, "From:"))
+	assert.Equal(t, 1, countHeaderLines(msg, "Subject:"))
+	assert.Equal(t, 1, countHeaderLines(msg, "To:"))
+}
+
+func countHeaderLines(message, headerPrefix string) int {
+	headerEnd := strings.Index(message, "\r\n\r\n")
+	if headerEnd < 0 {
+		return 0
+	}
+
+	count := 0
+	for _, line := range strings.Split(message[:headerEnd], "\r\n") {
+		if strings.HasPrefix(line, headerPrefix) {
+			count++
+		}
+	}
+	return count
+}
+
 func TestSMTPEmailService_SendMagicCodeEmail(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeMagicCodeTemplates(t, tmpDir)

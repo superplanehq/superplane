@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -425,7 +426,9 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values map[string][]byte
+	Values          map[string][]byte
+	SecretKeys      map[string]map[string][]byte
+	IntegrationKeys map[string]map[string][]byte
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -435,6 +438,33 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, error) {
+	if c.SecretKeys == nil {
+		return nil, fmt.Errorf("secret keys not configured")
+	}
+
+	keys, ok := c.SecretKeys[secretName]
+	if !ok {
+		return nil, fmt.Errorf("secret keys not found for %q", secretName)
+	}
+
+	return keys, nil
+}
+
+func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+	if c.IntegrationKeys == nil {
+		return nil, fmt.Errorf("integration secrets not configured")
+	}
+
+	name := strings.TrimSpace(installationName)
+	keys, ok := c.IntegrationKeys[name]
+	if !ok {
+		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+	}
+
+	return keys, nil
 }
 
 type ExpressionContext struct {
@@ -652,6 +682,10 @@ func (c *AppContext) Get(idOrName string) (*core.App, error) {
 	return app, nil
 }
 
+func (c *AppContext) GetNode(app, node string) (*core.CanvasNode, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
 func (c *AppContext) Subscribe(id string) error {
 	if c.SubscribeErrFor != nil {
 		if err, ok := c.SubscribeErrFor[id]; ok {
@@ -675,4 +709,35 @@ func (c *AppContext) Subscribe(id string) error {
 func (c *AppContext) Unsubscribe() error {
 	c.UnsubscribeCalls++
 	return nil
+}
+
+type RunExecutionContext struct {
+	CreateRunID      uuid.UUID
+	CreateErr        error
+	CancelErr        error
+	CancelCalled     bool
+	LastCreateParams *core.RunCreationParams
+}
+
+func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
+	if c.CreateErr != nil {
+		return nil, c.CreateErr
+	}
+
+	runID := c.CreateRunID
+	if runID == uuid.Nil {
+		runID = uuid.New()
+	}
+
+	c.LastCreateParams = &params
+
+	return &core.Run{
+		ID:    runID,
+		AppID: uuid.MustParse(params.App),
+	}, nil
+}
+
+func (c *RunExecutionContext) Cancel() error {
+	c.CancelCalled = true
+	return c.CancelErr
 }

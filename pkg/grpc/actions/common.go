@@ -174,6 +174,38 @@ func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *config
 	}
 }
 
+func appCanvasNodeTypeOptionsToProto(opts *configuration.AppCanvasNodeTypeOptions) *configpb.AppCanvasNodeTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.AppCanvasNodeTypeOptions{
+		NodeTypes:      opts.NodeTypes,
+		ComponentTypes: opts.ComponentTypes,
+		Parameters:     parameterRefsToProto(opts.Parameters),
+	}
+}
+
+func appTypeOptionsToProto(opts *configuration.AppTypeOptions) *configpb.AppTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.AppTypeOptions{
+		AllowSelf: opts.AllowSelf,
+	}
+}
+
+func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.IntegrationTypeOptions{
+		Integration: opts.Integration,
+	}
+}
+
 func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
@@ -299,6 +331,9 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Time:             timeTypeOptionsToProto(opts.Time),
 		Date:             dateTypeOptionsToProto(opts.Date),
 		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
+		AppCanvasNode:    appCanvasNodeTypeOptionsToProto(opts.AppCanvasNode),
+		App:              appTypeOptionsToProto(opts.App),
+		Integration:      integrationTypeOptionsToProto(opts.Integration),
 	}
 }
 
@@ -473,6 +508,38 @@ func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configura
 	}
 }
 
+func protoToAppCanvasNodeTypeOptions(pbOpts *configpb.AppCanvasNodeTypeOptions) *configuration.AppCanvasNodeTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.AppCanvasNodeTypeOptions{
+		NodeTypes:      pbOpts.NodeTypes,
+		ComponentTypes: pbOpts.ComponentTypes,
+		Parameters:     protoToParameterRefs(pbOpts.Parameters),
+	}
+}
+
+func protoToAppTypeOptions(pbOpts *configpb.AppTypeOptions) *configuration.AppTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.AppTypeOptions{
+		AllowSelf: pbOpts.AllowSelf,
+	}
+}
+
+func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.IntegrationTypeOptions{
+		Integration: pbOpts.Integration,
+	}
+}
+
 func parameterRefsToProto(params []configuration.ParameterRef) []*configpb.ParameterRef {
 	if len(params) == 0 {
 		return nil
@@ -640,6 +707,9 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Time:             protoToTimeTypeOptions(pbOpts.Time),
 		Date:             protoToDateTypeOptions(pbOpts.Date),
 		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
+		AppCanvasNode:    protoToAppCanvasNodeTypeOptions(pbOpts.AppCanvasNode),
+		App:              protoToAppTypeOptions(pbOpts.App),
+		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
 	}
 }
 

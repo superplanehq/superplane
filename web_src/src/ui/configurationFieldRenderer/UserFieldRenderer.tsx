@@ -6,7 +6,7 @@ interface UserFieldRendererProps {
   field: ConfigurationField;
   value: string;
   onChange: (value: string | undefined) => void;
-  domainId: string;
+  organizationId: string;
   allValues?: Record<string, unknown>;
   readOnly?: boolean;
 }
@@ -14,12 +14,12 @@ interface UserFieldRendererProps {
 export const UserFieldRenderer = ({
   value,
   onChange,
-  domainId,
+  organizationId,
   allValues,
   readOnly = false,
 }: UserFieldRendererProps) => {
   // Fetch users from the organization
-  const { data: users, isLoading, error } = useOrganizationUsers(domainId);
+  const { data: users, isLoading, error } = useOrganizationUsers(organizationId);
   const approvalContext = getApprovalListContext(allValues);
   const usedUserIds = new Set<string>();
 
@@ -31,10 +31,6 @@ export const UserFieldRenderer = ({
         usedUserIds.add(record.user);
       }
     });
-  }
-
-  if (!domainId || domainId.trim() === "") {
-    return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>;
   }
 
   if (error) {

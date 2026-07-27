@@ -12,6 +12,29 @@ export type AutocompleteExampleContext = {
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
 };
 
+// Representative run id used purely to preview the shape of run() in the editor;
+// the real id is only known at runtime.
+const EXAMPLE_RUN_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+
+// buildRunExample mirrors the server's run() payload so the autocomplete can
+// surface run().id / run().url / run().started_at and show a representative preview.
+// The example url is derived from the current app page location
+// (`/{org}/apps/{appId}`), which matches the real run link format.
+function buildRunExample(): Record<string, unknown> {
+  let url = "";
+  if (typeof window !== "undefined") {
+    const { origin, pathname } = window.location;
+    const appPath = pathname.match(/^\/[^/]+\/apps\/[^/]+/)?.[0] ?? pathname;
+    url = `${origin}${appPath}?run=${EXAMPLE_RUN_ID}`;
+  }
+
+  return {
+    id: EXAMPLE_RUN_ID,
+    url,
+    started_at: new Date().toISOString(),
+  };
+}
+
 function collectChainNodeIds(
   nodeId: string,
   currentNode: ComponentsNode | undefined,
@@ -182,6 +205,7 @@ type BuildNamedExampleObjInput = {
   previousByDepth: Record<string, unknown>;
   canvasNodes: ComponentsNode[];
   incomingNodeIdsByTargetId: Map<string, string[]>;
+  runExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -193,6 +217,7 @@ function buildNamedExampleObj({
   previousByDepth,
   canvasNodes,
   incomingNodeIdsByTargetId,
+  runExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -239,6 +264,8 @@ function buildNamedExampleObj({
   if (exampleObj.__previousByDepth) {
     namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
   }
+
+  namedExampleObj.__run = runExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -289,6 +316,7 @@ export function buildAutocompleteExampleObj(
     nodeNamesById,
     nodeMetadata,
     previousByDepth,
+    runExample: buildRunExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

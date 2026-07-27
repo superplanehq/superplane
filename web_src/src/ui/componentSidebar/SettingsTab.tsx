@@ -1,9 +1,4 @@
-import type {
-  AuthorizationDomainType,
-  ComponentsIntegrationRef,
-  ConfigurationField,
-  OrganizationsIntegration,
-} from "@/api-client";
+import type { ComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -44,7 +39,6 @@ interface SettingsTabProps {
   ) => void | Promise<void>;
   onCancel?: () => void;
   domainId?: string;
-  domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
@@ -85,7 +79,6 @@ export function SettingsTab({
   onSave,
   onCancel: _onCancel,
   domainId,
-  domainType,
   customField,
   integrationName,
   integrationRef,
@@ -527,8 +520,6 @@ export function SettingsTab({
                   }
                 }}
                 allValues={nodeConfiguration}
-                domainId={domainId}
-                domainType={domainType}
                 organizationId={domainId}
                 autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 realtimeValidationErrors={realtimeValidationErrors}
@@ -739,8 +730,6 @@ export function SettingsTab({
                     }
                   }}
                   allValues={nodeConfiguration}
-                  domainId={domainId}
-                  domainType={domainType}
                   organizationId={domainId}
                   integrationId={selectedIntegration?.id}
                   hasError={

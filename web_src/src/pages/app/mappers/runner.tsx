@@ -25,19 +25,6 @@ const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
 const EXECUTION_MODE_DOCKER = "docker";
 const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
 
-/** User-facing machine type names; values in config are task-broker fleet IDs. */
-const MACHINE_TYPE_LABELS: Record<string, string> = {
-  "aws-standard-1": "e1-large-amd64",
-  "aws-arm64-1": "e1-large-arm64",
-  "e1-tiny-amd64": "e1-tiny-amd64",
-  "e1-tiny-arm64": "e1-tiny-arm64",
-};
-
-function machineTypeDisplayName(fleetID: string): string {
-  const trimmed = fleetID.trim();
-  return MACHINE_TYPE_LABELS[trimmed] ?? trimmed;
-}
-
 /** Mirrors `resolvedDockerImageRef` in pkg/components/runner/spec.go for execution summaries. */
 function resolvedContainerImageRef(c: Record<string, unknown>): string {
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
@@ -62,9 +49,10 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     return details;
   }
   const c = configuration as Record<string, unknown>;
-  const machineType = typeof c.machine_type === "string" ? c.machine_type.trim() : "";
+  const machineTypeRaw = c.machineType ?? c.machine_type;
+  const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
   if (machineType) {
-    details["Machine type"] = machineTypeDisplayName(machineType);
+    details["Machine type"] = machineType;
   }
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
   if (rawMode === EXECUTION_MODE_DOCKER) {
@@ -76,7 +64,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
   if (image) {
     details["Container image"] = image;
   }
-  const timeoutRaw = c.execution_timeout_seconds;
+  const timeoutRaw = c.executionTimeoutSeconds ?? c.execution_timeout_seconds;
   const timeoutLabel = (value: number | string) => {
     const parsed = typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -213,7 +201,7 @@ export const runnerMapper: ComponentBaseMapper = {
 
     const taskID = brokerTaskIDFromExecution(context.execution);
     if (taskID) {
-      details["task_id"] = taskID;
+      details["Task ID"] = taskID;
     }
 
     const payload = firstRunnerPayload(context.execution);

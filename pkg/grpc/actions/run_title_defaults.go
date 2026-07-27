@@ -10,6 +10,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"webhook":     "Webhook {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 	"onError":     "{{ root().data.node.name }} errored",
 	"onBroadcast": "{{ root().data.app.name }}",
+	"onRun":       "App run {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.detail.alarmName }} - {{ root().data.detail.previousState.value }} -> {{ root().data.detail.state.value }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",
@@ -66,8 +67,10 @@ var defaultRunTitleExpressions = map[string]string{
 
 	"gitlab.onBranchCreated": "{{ root().data.ref }}",
 	"gitlab.onIssue":         "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
+	"gitlab.onIssueComment":  "#{{ root().data.issue.iid }} - {{ root().data.issue.title }}",
 	"gitlab.onMergeComment":  "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",
 	"gitlab.onMergeRequest":  "!{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
+	"gitlab.onMRDiffNote":    "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",
 	"gitlab.onMilestone":     "{{ root().data.object_attributes.title }}",
 	"gitlab.onPipeline":      "{{ root().data.object_attributes.ref }}",
 	"gitlab.onPush":          "{{ root().data.commits != nil && len(root().data.commits) > 0 ? root().data.commits[-1].message + \" - \" + root().data.commits[-1].id[:7] : root().data.ref }}",
@@ -81,6 +84,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"incident.onIncident":                 "{{ root().data.incident.name }}",
 	"jfrogArtifactory.onArtifactUploaded": "{{ root().data.name }} in {{ root().data.repo }}",
 	"launchdarkly.onFeatureFlagChange":    "{{ root().data.name }}",
+	"linear.onIssue":                      "{{ root().data.data.identifier }} - {{ root().data.data.title }}",
 	"logfire.onAlertReceived":             "{{ root().data.alertName }}",
 	"newrelic.onIssue":                    "{{ root().data.title }} {{ root().data.state }}",
 	"oci.onComputeInstanceCreated":        "{{ root().data.data.resourceName }}",

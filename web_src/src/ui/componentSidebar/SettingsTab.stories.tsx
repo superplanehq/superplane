@@ -6,7 +6,6 @@ import {
   ConfigurationStorySeed,
   STORY_AUTOCOMPLETE_CONTEXT,
   STORY_DOMAIN_ID,
-  STORY_DOMAIN_TYPE,
   STORY_INTEGRATION_REF,
   STORY_INTEGRATIONS,
   settingsTabConfiguration,
@@ -66,7 +65,6 @@ function SettingsTabPlayground() {
         });
       }}
       domainId={STORY_DOMAIN_ID}
-      domainType={STORY_DOMAIN_TYPE}
       integrationName="github"
       integrationRef={integrationRef}
       integrations={STORY_INTEGRATIONS}
@@ -106,7 +104,6 @@ function ReadOnlyConfigurationPlayground() {
       configurationFields={settingsTabFields}
       onSave={() => undefined}
       domainId={STORY_DOMAIN_ID}
-      domainType={STORY_DOMAIN_TYPE}
       integrationName="github"
       integrationRef={STORY_INTEGRATION_REF}
       integrations={STORY_INTEGRATIONS}

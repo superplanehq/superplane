@@ -17,6 +17,14 @@ interface UseCreateAppOptions {
   onCreated?: () => void;
 }
 
+function applyBlankAppBootContext(canvasId: string) {
+  writeCanvasAgentSidebarOpen(canvasId, true);
+  writeCanvasRunsSidebarOpen(canvasId, false);
+  localStorage.setItem("canvasSidebarOpen", "false");
+  setAgentBootContext(canvasId, "blank");
+  sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+}
+
 export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
@@ -48,24 +56,19 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
         });
 
         const canvasId = result?.data?.canvas?.metadata?.id;
-        if (canvasId) {
-          if (folder) {
-            try {
-              await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
-            } catch (error) {
-              showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-            }
-          }
+        if (!canvasId) return;
 
-          onCreated?.();
-          // A new app always starts with the agent panel open (stored per canvas).
-          writeCanvasAgentSidebarOpen(canvasId, true);
-          writeCanvasRunsSidebarOpen(canvasId, false);
-          localStorage.setItem("canvasSidebarOpen", "false");
-          setAgentBootContext(canvasId, "blank");
-          sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
-          navigate(appPath(organizationId, canvasId, "?edit=1"));
+        if (folder) {
+          try {
+            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
+          } catch (error) {
+            showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
+          }
         }
+
+        onCreated?.();
+        applyBlankAppBootContext(canvasId);
+        navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
         throw error;

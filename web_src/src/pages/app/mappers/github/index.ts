@@ -28,6 +28,7 @@ import { createPullRequestMapper } from "./create_pull_request";
 import { mergePullRequestMapper } from "./merge_pull_request";
 import { markPullRequestReadyForReviewMapper } from "./mark_pull_request_ready_for_review";
 import { addPullRequestReviewersMapper } from "./add_pull_request_reviewers";
+import { updatePullRequestMapper } from "./update_pull_request";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
 import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
@@ -47,6 +48,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   mergePullRequest: buildActionStateRegistry("merged"),
   markPullRequestReadyForReview: buildActionStateRegistry("marked ready"),
   addPullRequestReviewers: buildActionStateRegistry("added"),
+  updatePullRequest: buildActionStateRegistry("updated"),
   publishCommitStatus: buildActionStateRegistry("published"),
   createDeployment: buildActionStateRegistry("created"),
   createDeploymentStatus: buildActionStateRegistry("created"),
@@ -76,6 +78,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   mergePullRequest: mergePullRequestMapper,
   markPullRequestReadyForReview: markPullRequestReadyForReviewMapper,
   addPullRequestReviewers: addPullRequestReviewersMapper,
+  updatePullRequest: updatePullRequestMapper,
   runWorkflow: runWorkflowMapper,
   publishCommitStatus: publishCommitStatusMapper,
   createDeployment: createDeploymentMapper,

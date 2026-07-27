@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 
@@ -22,5 +23,28 @@ describe("RunNodeDetailDetailsView", () => {
 
     expect(screen.getByText("root@192.241.150.61")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
+  });
+
+  it("opens app run links in the same tab", () => {
+    render(
+      <MemoryRouter>
+        <RunNodeDetailDetailsView details={{ Run: "/org-1/apps/child-app?run=child-run" }} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole("link", { name: "See run" });
+    expect(link).toHaveAttribute("href", "/org-1/apps/child-app?run=child-run");
+    expect(link).not.toHaveAttribute("target", "_blank");
+  });
+
+  it("still opens external URLs in a new tab", () => {
+    render(
+      <MemoryRouter>
+        <RunNodeDetailDetailsView details={{ URL: "https://example.com/run" }} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole("link", { name: "https://example.com/run" });
+    expect(link).toHaveAttribute("target", "_blank");
   });
 });

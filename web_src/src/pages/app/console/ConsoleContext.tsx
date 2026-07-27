@@ -9,6 +9,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
  * variant.
  */
 export type ConsoleNodeStatus = "passed" | "failed" | "running" | "pending" | "cancelled" | "skipped" | "unknown";
+export type ConsoleRunDisabledReason = "uncommitted-canvas-changes";
 
 export interface ConsoleTriggerOptions {
   /** Trigger hook name (default `run`). */
@@ -41,6 +42,8 @@ export interface ConsoleContextValue {
    * permission see disabled controls instead of clicks that silently fail.
    */
   canRunNodes: boolean;
+  /** Explains a temporary runtime-action block that is not an authorization failure. */
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   /**
    * Open the manual-trigger flow for the given node. Resolution is by node id;
    * if undefined the chip falls back to dispatching the

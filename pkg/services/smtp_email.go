@@ -244,14 +244,14 @@ func buildMultipartEmail(from string, to []string, bcc []string, subject, textBo
 	}
 
 	headers := []string{
-		fmt.Sprintf("From: %s", from),
-		fmt.Sprintf("Subject: %s", subject),
+		fmt.Sprintf("From: %s", sanitizeSMTPHeaderValue(from)),
+		fmt.Sprintf("Subject: %s", sanitizeSMTPHeaderValue(subject)),
 		"MIME-Version: 1.0",
 		fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", boundary),
 	}
 
 	if len(to) > 0 {
-		headers = append(headers, fmt.Sprintf("To: %s", strings.Join(to, ", ")))
+		headers = append(headers, fmt.Sprintf("To: %s", sanitizeSMTPHeaderValue(strings.Join(to, ", "))))
 	}
 
 	message := strings.Join(headers, "\r\n") + "\r\n\r\n"
@@ -272,6 +272,11 @@ func formatFrom(name, email string) string {
 	}
 
 	return fmt.Sprintf("%s <%s>", name, email)
+}
+
+// sanitizeSMTPHeaderValue strips CR/LF so caller-influenced values cannot inject SMTP headers.
+func sanitizeSMTPHeaderValue(value string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(value)
 }
 
 func randomBoundary() (string, error) {

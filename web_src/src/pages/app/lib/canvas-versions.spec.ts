@@ -11,33 +11,23 @@ describe("formatVersionTimestamp", () => {
   it("formats the first available timestamp", () => {
     const updatedAt = "2026-03-29T12:34:56.000Z";
 
-    expect(
-      formatVersionTimestamp({
-        metadata: {
-          updatedAt,
-        },
-      }),
-    ).toBe(new Date(updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }));
+    expect(formatVersionTimestamp({ updatedAt })).toBe(
+      new Date(updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+    );
   });
 
   it("returns undefined for invalid timestamps", () => {
-    expect(
-      formatVersionTimestamp({
-        metadata: {
-          updatedAt: "not-a-date",
-        },
-      }),
-    ).toBeUndefined();
+    expect(formatVersionTimestamp({ updatedAt: "not-a-date" })).toBeUndefined();
   });
 
   it("returns undefined when no timestamp is present", () => {
-    expect(formatVersionTimestamp({ metadata: {} })).toBeUndefined();
+    expect(formatVersionTimestamp({})).toBeUndefined();
   });
 });
 
 describe("formatVersionLabel", () => {
   it("uses the commit message when present", () => {
-    expect(formatVersionLabel({ metadata: { commitMessage: "Fix webhook retry" } })).toBe("Fix webhook retry");
+    expect(formatVersionLabel({ commitMessage: "Fix webhook retry" })).toBe("Fix webhook retry");
   });
 
   it("falls back to a timestamp-based label when commit message is missing", () => {
@@ -47,11 +37,11 @@ describe("formatVersionLabel", () => {
       timeStyle: "short",
     });
 
-    expect(formatVersionLabel({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
+    expect(formatVersionLabel({ createdAt })).toBe(`Update from ${expectedTimestamp}`);
   });
 
   it("falls back to an untitled label when commit message and createdAt are missing", () => {
-    expect(formatVersionLabel({ metadata: {} })).toBe("Untitled update");
+    expect(formatVersionLabel({})).toBe("Untitled update");
   });
 });
 
@@ -65,16 +55,14 @@ describe("formatVersionLabelWithTimestamp", () => {
 
     expect(
       formatVersionLabelWithTimestamp({
-        metadata: {
-          commitMessage: "Initial setup",
-          createdAt,
-        },
+        commitMessage: "Initial setup",
+        createdAt,
       }),
     ).toBe(`Initial setup · ${expectedTimestamp}`);
   });
 
   it("returns only the label when no valid timestamp exists", () => {
-    expect(formatVersionLabelWithTimestamp({ metadata: { commitMessage: "Initial setup" } })).toBe("Initial setup");
+    expect(formatVersionLabelWithTimestamp({ commitMessage: "Initial setup" })).toBe("Initial setup");
   });
 
   it("uses a legacy timestamp label without duplicating the timestamp suffix", () => {
@@ -84,7 +72,7 @@ describe("formatVersionLabelWithTimestamp", () => {
       timeStyle: "short",
     });
 
-    expect(formatVersionLabelWithTimestamp({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
+    expect(formatVersionLabelWithTimestamp({ createdAt })).toBe(`Update from ${expectedTimestamp}`);
   });
 });
 
@@ -92,39 +80,31 @@ describe("sortVersionsDesc", () => {
   it("sorts versions by updatedAt descending", () => {
     const sorted = sortVersionsDesc([
       {
-        metadata: {
-          id: "older",
-          updatedAt: "2026-06-01T12:00:00.000Z",
-        },
+        id: "older",
+        updatedAt: "2026-06-01T12:00:00.000Z",
       },
       {
-        metadata: {
-          id: "newer",
-          updatedAt: "2026-06-03T12:00:00.000Z",
-        },
+        id: "newer",
+        updatedAt: "2026-06-03T12:00:00.000Z",
       },
     ]);
 
-    expect(sorted.map((version) => version.metadata?.id)).toEqual(["newer", "older"]);
+    expect(sorted.map((version) => version.id)).toEqual(["newer", "older"]);
   });
 
   it("falls back to createdAt when updatedAt is missing", () => {
     const sorted = sortVersionsDesc([
       {
-        metadata: {
-          id: "bbb",
-          createdAt: "2026-06-01T12:00:00.000Z",
-        },
+        id: "bbb",
+        createdAt: "2026-06-01T12:00:00.000Z",
       },
       {
-        metadata: {
-          id: "aaa",
-          createdAt: "2026-06-03T12:00:00.000Z",
-        },
+        id: "aaa",
+        createdAt: "2026-06-03T12:00:00.000Z",
       },
     ]);
 
-    expect(sorted.map((version) => version.metadata?.id)).toEqual(["aaa", "bbb"]);
+    expect(sorted.map((version) => version.id)).toEqual(["aaa", "bbb"]);
   });
 });
 

@@ -40,7 +40,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerBash",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: 'echo \'{"ok":true}\' > "$SUPERPLANE_RESULT_FILE"',
         },
         metadata: {},
@@ -72,7 +72,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerJS",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: "function main() { return { ok: true }; }",
         },
         metadata: {},
@@ -104,7 +104,7 @@ describe("getExecutionDetails", () => {
         componentName: "runnerPython",
         isCollapsed: false,
         configuration: {
-          machine_type: "aws-standard-1",
+          machine_type: "e1-large-amd64",
           script: 'def main(payload):\n    return {"ok": True}',
         },
         metadata: {},
@@ -125,5 +125,37 @@ describe("getExecutionDetails", () => {
 
     expect(props.customField).toBeDefined();
     expect(getStateMap("runnerPython")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerClaudeCode mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerClaudeCode");
+    const props = mapper.props({
+      node: {
+        id: "node-claude-1",
+        name: "Run Claude Code",
+        componentName: "runnerClaudeCode",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          prompt: "Fix the failing tests",
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerClaudeCode",
+        label: "Run Claude Code",
+        description: "Runs Claude Code on a fleet runner",
+        icon: "code",
+        color: "#C9784D",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 });

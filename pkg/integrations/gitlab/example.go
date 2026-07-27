@@ -10,8 +10,14 @@ import (
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
 
+//go:embed example_data_on_issue_comment.json
+var exampleDataOnIssueCommentBytes []byte
+
 //go:embed example_data_on_merge_comment.json
 var exampleDataOnMergeCommentBytes []byte
+
+//go:embed example_data_on_mr_diff_note.json
+var exampleDataOnMRDiffNoteBytes []byte
 
 //go:embed example_data_on_merge_request.json
 var exampleDataOnMergeRequestBytes []byte
@@ -40,8 +46,14 @@ var exampleDataOnVulnerabilityBytes []byte
 var exampleDataOnIssueOnce sync.Once
 var exampleDataOnIssue map[string]any
 
+var exampleDataOnIssueCommentOnce sync.Once
+var exampleDataOnIssueComment map[string]any
+
 var exampleDataOnMergeCommentOnce sync.Once
 var exampleDataOnMergeComment map[string]any
+
+var exampleDataOnMRDiffNoteOnce sync.Once
+var exampleDataOnMRDiffNote map[string]any
 
 var exampleDataOnMergeRequestOnce sync.Once
 var exampleDataOnMergeRequest map[string]any
@@ -71,8 +83,16 @@ func (i *OnIssue) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
 
+func (m *OnIssueComment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
 func (m *OnMergeComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMergeCommentOnce, exampleDataOnMergeCommentBytes, &exampleDataOnMergeComment)
+}
+
+func (m *OnMRDiffNote) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMRDiffNoteOnce, exampleDataOnMRDiffNoteBytes, &exampleDataOnMRDiffNote)
 }
 
 func (m *OnMergeRequest) ExampleData() map[string]any {

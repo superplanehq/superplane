@@ -227,7 +227,7 @@ func (s *sshLineEndingsSteps) createRepositoryCommandFile(canvas *models.Canvas,
 
 func (s *sshLineEndingsSteps) whenTheManualTriggerRuns() {
 	node := s.canvas.GetNodeFromDB("Start")
-	eventContext := contexts.NewEventContext(database.Conn(), node, func(events []models.CanvasEvent) {
+	eventContext := contexts.NewEventContext(database.Conn(), node, nil, func(events []models.CanvasEvent) {
 		for i := range events {
 			require.NoError(s.t, messages.PublishCanvasEventCreatedMessage(&events[i]))
 		}

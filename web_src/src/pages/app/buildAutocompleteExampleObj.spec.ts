@@ -52,6 +52,11 @@ describe("buildAutocompleteExampleObj", () => {
 
     expect(autocompleteContext).toEqual({
       __root: triggerMetadata.exampleData,
+      __run: expect.objectContaining({
+        id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+        started_at: expect.any(String),
+      }),
     });
     expect(
       evaluateExpr(
@@ -88,6 +93,11 @@ describe("buildAutocompleteExampleObj", () => {
 
     expect(autocompleteContext).toEqual({
       __root: latestEventData,
+      __run: expect.objectContaining({
+        id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+        started_at: expect.any(String),
+      }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
   });
