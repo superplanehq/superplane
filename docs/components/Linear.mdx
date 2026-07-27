@@ -15,6 +15,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Issue Comment" href="#add-issue-comment" description="Add a comment to an issue in Linear" />
+  <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to an issue in Linear" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single issue from Linear" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing issue in Linear" />
@@ -118,6 +120,161 @@ the **admin** scope, so the Linear connection must be authorized by a **workspac
     "webhookTimestamp": 1774553375841
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="add-issue-comment"></a>
+
+## Add Issue Comment
+
+**Component key:** `linear.addIssueComment`
+
+The Add Issue Comment component adds a comment to an existing Linear issue.
+
+### Use Cases
+
+- **Automated updates**: Post deployment status or workflow results onto the issue
+- **Runbook linking**: Drop runbook links, error details, or context for responders
+- **Cross-tool sync**: Mirror notes from Slack or another tracker into Linear
+
+### Configuration
+
+- **Issue** (required): The issue to comment on, by identifier (e.g. ENG-142) or ID. Supports
+  expressions.
+- **Body** (required): The comment text, written in Markdown. Supports expressions.
+
+### Output
+
+Returns the created comment, including its `id`, `body`, `url`,
+`createdAt`, the `user` who authored it, and the `issue` it was added to.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to comment on the issue. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating comments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deploy pipeline is green again — root cause was a flaky runner.",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    },
+    "updatedAt": "2026-03-27T16:42:11.123Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.comment"
+}
+```
+
+<a id="add-issue-label"></a>
+
+## Add Issue Label
+
+**Component key:** `linear.addIssueLabel`
+
+The Add Issue Label component adds one or more labels to an existing Linear issue,
+keeping any labels already on it.
+
+### Use Cases
+
+- **Triage automation**: Label issues automatically based on workflow signals
+- **Status tracking**: Add labels as an issue moves through a workflow
+- **Cross-tool sync**: Apply labels from another system onto a Linear issue
+
+### Configuration
+
+- **Team** (required): The Linear team whose labels populate the picker. Select the team the
+  issue belongs to.
+- **Issue** (required): The issue to label, by identifier (e.g. ENG-142) or ID. Supports expressions.
+- **Labels** (optional): One or more existing labels to add. Existing labels on the issue are kept.
+- **New Labels** (optional): Names of labels to create if they don't exist yet, then add. A name
+  that already matches a team or workspace label is reused instead of creating a duplicate. New
+  labels are created in the selected team.
+
+At least one label must be provided across the two fields.
+
+### Output
+
+Returns the updated issue, including its `identifier`, `url`, `title`,
+`state`, `team`, `assignee`, `priorityLabel` and the full
+set of `labels` after the addition.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers adding and creating labels. Labels are added
+one at a time, so a mid-way failure may leave some already applied.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      },
+      {
+        "id": "8b2d4e66-1c3a-4f5b-9d7e-2a4c6e8f0b12",
+        "name": "regression"
+      }
+    ],
+    "number": 142,
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T14:05:52.238Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T14:05:52.238104773Z",
   "type": "linear.issue"
 }
 ```
