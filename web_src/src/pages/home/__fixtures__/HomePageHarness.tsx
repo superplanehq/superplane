@@ -1,4 +1,5 @@
 import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
+import type { ReactNode } from "react";
 
 import type { HomePageFixture } from "./handlers";
 
@@ -13,6 +14,7 @@ interface HomePageHarnessProps {
    * Defaults to the org index (`/:organizationId`).
    */
   pathSuffix?: string;
+  appElement?: ReactNode;
 }
 
 /**
@@ -20,6 +22,6 @@ interface HomePageHarnessProps {
  * workspace router with AppPage so clicking Software Factory opens the live
  * canvas story surface (and the logo can navigate back home from the app).
  */
-export function HomePageHarness({ fixture, pathSuffix = "" }: HomePageHarnessProps) {
-  return <OrgWorkspaceHarness startAt="home" homeFixture={fixture} pathSuffix={pathSuffix} />;
+export function HomePageHarness({ fixture, pathSuffix = "", appElement }: HomePageHarnessProps) {
+  return <OrgWorkspaceHarness startAt="home" homeFixture={fixture} pathSuffix={pathSuffix} appElement={appElement} />;
 }
