@@ -383,6 +383,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         runner.OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

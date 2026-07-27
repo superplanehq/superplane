@@ -99,6 +99,7 @@ type brokerCreateTaskRequest struct {
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
+	Labels                  map[string]string           `json:"labels,omitempty"`
 }
 
 // BrokerTaskFile is materialized under SUPERPLANE_TASK_DIR before execution.
@@ -180,6 +181,7 @@ type CreateTaskParams struct {
 	ExecutionMode           string
 	DockerImage             string
 	TimeoutSeconds          int // 0 = DefaultExecutionTimeoutSeconds
+	Labels                  map[string]string
 }
 
 type brokerCreateTaskResponse struct {
@@ -215,6 +217,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		WebhookPayloadSizeLimit: webhookPayloadSizeLimit,
 		ExecutionMode:           mode,
 		DockerImage:             strings.TrimSpace(p.DockerImage),
+		Labels:                  p.Labels,
 	}
 	timeout := p.TimeoutSeconds
 	if timeout <= 0 {
