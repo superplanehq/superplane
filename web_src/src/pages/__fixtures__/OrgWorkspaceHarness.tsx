@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 
@@ -42,7 +43,7 @@ function fixtureFetchState(): FixtureFetchState {
 
 export interface OrgWorkspaceHarnessProps {
   /** Where to land when the story mounts. */
-  startAt?: "home" | "app";
+  startAt?: "home" | "app" | "workItem";
   /** Path under the org when `startAt` is `home`, e.g. `apps/new`. */
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
@@ -54,6 +55,8 @@ export interface OrgWorkspaceHarnessProps {
   openAgentSidebar?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
+  appElement?: ReactNode;
+  workItemElement?: ReactNode;
 }
 
 function useOrgWorkspaceFixtureFetch(
@@ -87,7 +90,7 @@ function useOrgWorkspaceFixtureFetch(
   return fixtureFetch;
 }
 
-function OrgWorkspaceRoutes() {
+function OrgWorkspaceRoutes({ appElement, workItemElement }: { appElement?: ReactNode; workItemElement?: ReactNode }) {
   return (
     <Routes>
       <Route
@@ -100,7 +103,8 @@ function OrgWorkspaceRoutes() {
       >
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={<NewAppPage />} />
-        <Route path="apps/:appId" element={<AppPage />} />
+        <Route path="apps/:appId" element={appElement ?? <AppPage />} />
+        {workItemElement ? <Route path="apps/:appId/work/:workItemId" element={workItemElement} /> : null}
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
@@ -121,6 +125,8 @@ export function OrgWorkspaceHarness({
   openAgentSidebar = false,
   homeFixture,
   appFixture,
+  appElement,
+  workItemElement,
 }: OrgWorkspaceHarnessProps) {
   const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
   const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
@@ -128,7 +134,8 @@ export function OrgWorkspaceHarness({
 
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
-  const initialPath = startAt === "app" ? appPath : homePath;
+  const workItemPath = `/${orgId}/apps/${canvasId}/work/PX-128`;
+  const initialPath = startAt === "app" ? appPath : startAt === "workItem" ? workItemPath : homePath;
 
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
 
@@ -139,7 +146,7 @@ export function OrgWorkspaceHarness({
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <OrgWorkspaceRoutes />
+                <OrgWorkspaceRoutes appElement={appElement} workItemElement={workItemElement} />
               </AccountProvider>
             </MemoryRouter>
           </div>
