@@ -250,9 +250,16 @@ func (b *NodeConfigurationBuilder) walkResolvedValue(value any, preserveTypes bo
 }
 
 func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field configuration.Field) (any, error) {
-	normalized, err := b.normalizeObjectFieldInput(value)
+	normalized, templatesResolved, err := b.normalizeObjectFieldInput(value)
 	if err != nil {
 		return nil, err
+	}
+
+	// String inputs (raw JSON templates or whole {{ … }} expressions) already
+	// had templates evaluated in normalizeObjectFieldInput. Walking again would
+	// re-evaluate mustache-like text that came from expression output.
+	if templatesResolved {
+		return normalized, nil
 	}
 
 	schema := objectFieldSchema(field)
@@ -280,29 +287,30 @@ func objectFieldSchema(field configuration.Field) []configuration.Field {
 }
 
 // normalizeObjectFieldInput turns an object field's stored value into a
-// structured value. Maps/arrays pass through; strings may be a whole
+// structured value. Maps/arrays pass through unresolved; strings may be a whole
 // expression or a JSON template that still needs expression substitution.
-func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, error) {
+// templatesResolved is true when the returned value already had templates applied.
+func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, bool, error) {
 	if obj, ok := asAnyMap(value); ok {
-		return obj, nil
+		return obj, false, nil
 	}
 	if list, ok := value.([]any); ok {
-		return list, nil
+		return list, false, nil
 	}
 
 	text, ok := value.(string)
 	if !ok {
-		return value, nil
+		return value, false, nil
 	}
 
 	resolved, err := b.resolveTemplatePreservingWholeValue(text)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	resolvedText, ok := resolved.(string)
 	if !ok {
-		return resolved, nil
+		return resolved, true, nil
 	}
 
 	decoded, err := decodeJSONValue(resolvedText)
@@ -310,12 +318,12 @@ func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, er
 		// A whole {{ … }} that evaluated to a non-JSON string is kept so schemed
 		// object fields can fall back to generic resolution (pre-existing behavior).
 		if _, isWholeExpression := unwrapExpressionTemplate(text); isWholeExpression {
-			return resolvedText, nil
+			return resolvedText, true, nil
 		}
-		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
+		return nil, false, fmt.Errorf("resolved object field must be valid JSON: %w", err)
 	}
 
-	return decoded, nil
+	return decoded, true, nil
 }
 
 // resolveTemplatePreservingWholeValue returns the native expression result when

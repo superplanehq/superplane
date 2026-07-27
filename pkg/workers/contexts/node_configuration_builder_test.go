@@ -261,6 +261,37 @@ func Test_NodeConfigurationBuilder_ObjectFieldResolvesRawJSONTemplateString(t *t
 	assert.Equal(t, json.Number("0.9"), poolWeights["pool-b"])
 }
 
+func Test_NodeConfigurationBuilder_ObjectFieldDoesNotReevaluateExpressionOutput(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"note":    "use {{ name }} in templates",
+				"payload": map[string]any{"hint": "keep {{ value }} literal"},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	fromJSONString, err := builder.Build(map[string]any{
+		"json": `{"note": "{{ previous().note }}"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromJSONString["json"].(map[string]any)["note"])
+
+	fromWholeExpression, err := builder.Build(map[string]any{
+		"json": "{{ previous().payload }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "keep {{ value }} literal", fromWholeExpression["json"].(map[string]any)["hint"])
+
+	fromWholeString, err := builder.Build(map[string]any{
+		"json": "{{ previous().note }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromWholeString["json"])
+}
+
 func Test_NodeConfigurationBuilder_SchemedObjectFallsBackForNonMapExpression(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
