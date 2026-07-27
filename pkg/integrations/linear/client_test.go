@@ -401,6 +401,72 @@ func Test__Client__CreateIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__GetIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issue":{"id":"i1","identifier":"ENG-142","title":"Boom","labels":{"nodes":[{"id":"l1","name":"bug"}]}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		issue, err := client.GetIssue("ENG-142")
+		require.NoError(t, err)
+		assert.Equal(t, "ENG-142", issue.Identifier)
+
+		// The labels connection is flattened for the emitted payload.
+		require.Len(t, issue.Labels, 1)
+		assert.Equal(t, "bug", issue.Labels[0].Name)
+	})
+
+	t.Run("missing issue -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issue":null}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.GetIssue("ENG-999")
+		require.ErrorContains(t, err, "not found")
+	})
+}
+
+func Test__Client__UpdateIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueUpdate":{"success":true,"issue":{"id":"i1","identifier":"ENG-142","title":"Updated"}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		issue, err := client.UpdateIssue("ENG-142", map[string]any{"title": "Updated"})
+		require.NoError(t, err)
+		assert.Equal(t, "Updated", issue.Title)
+	})
+
+	t.Run("unsuccessful response -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueUpdate":{"success":false,"issue":null}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.UpdateIssue("ENG-142", map[string]any{"title": "Updated"})
+		require.ErrorContains(t, err, "not updated")
+	})
+}
+
 func Test__Client__CreateWebhook(t *testing.T) {
 	t.Run("scoped to a team", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

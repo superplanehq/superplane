@@ -58,7 +58,7 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
-	events, err := models.ListCanvasEvents(canvas.ID, node, 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, node, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
@@ -520,7 +520,7 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	_, err = childExecution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
-	events, err := models.ListCanvasEvents(childCanvas.ID, "component", 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), childCanvas.ID, "component", 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 

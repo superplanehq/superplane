@@ -16,6 +16,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single issue from Linear" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update an existing issue in Linear" />
 </CardGrid>
 
 ## Instructions
@@ -206,6 +208,189 @@ OAuth connection includes the **write** scope, which covers creating issues.
     "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+**Component key:** `linear.getIssue`
+
+The Get Issue component fetches a single issue from Linear by its identifier or ID.
+
+### Use Cases
+
+- **Read state, then act**: Look up an issue's current status, assignee, or labels before deciding what to do next
+- **Data enrichment**: Pull issue details into a workflow to combine with other information
+- **Status checking**: Check whether an issue is done before performing an action
+
+### Configuration
+
+- **Issue** (required): The issue to fetch. Accepts either the human-readable identifier (e.g. ENG-142)
+  or the issue's UUID. Supports expressions, so the value can come from an upstream event.
+
+### Output
+
+Returns the issue, including its `identifier` (e.g. ENG-142), `url`, `title`,
+`description`, `state`, `team`, `assignee`, `creator`, `project`,
+`priorityLabel` and `labels`.
+
+### Permissions
+
+SuperPlane's OAuth connection includes the **read** scope, which covers reading issues. The issue must
+be visible to the user who authorized the Linear connection.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T08:12:04.512Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T08:12:04.512873941Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+**Component key:** `linear.updateIssue`
+
+The Update Issue component modifies an existing Linear issue: its title, description, status,
+assignee, priority, labels, or project.
+
+### Use Cases
+
+- **Status updates**: Move an issue to a new workflow state based on workflow results
+- **Automated triage**: Set the priority, assignee, or labels when a workflow processes the issue
+- **Cross-tool sync**: Mirror state from another system into Linear
+
+### Configuration
+
+- **Team** (required): The Linear team whose statuses, members, labels and projects populate the pickers
+  below. Select the team the issue belongs to.
+- **Issue** (required): The issue to update, by identifier (e.g. ENG-142) or ID. Supports expressions.
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description, written in Markdown
+- **Status** (toggle): New workflow state for the issue
+- **Assignee** (toggle): Team member to assign the issue to
+- **Priority** (toggle): No priority, Urgent, High, Medium or Low
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Project** (toggle): Project to move the issue to
+
+Each field besides Team and Issue is toggled on individually, so only the fields you enable are sent in
+the update. At least one must be enabled. Enabling a field with an empty value clears it - toggling on
+Assignee with no one selected unassigns the issue, toggling on Labels with nothing selected removes all
+of them, and toggling on Project with nothing selected removes the issue from its project. Title and
+Status are the exception: Linear does not allow a blank title or a missing status, so they must have a
+value when enabled.
+
+### Output
+
+Returns the updated issue, including its `identifier`, `url`, `title`, `state`,
+`team`, `assignee`, `priorityLabel`, `project` and `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers updating issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T14:05:52.238Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T14:05:52.238104773Z",
   "type": "linear.issue"
 }
 ```

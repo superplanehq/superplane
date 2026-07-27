@@ -5,14 +5,12 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   NodeInfo,
-  OutputPayload,
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import { renderTimeAgo } from "@/components/TimeAgo";
 import { linearComponentBaseProps } from "./base";
-import { addDetail, addTeamMetadata, getIssueLabel, getUserLabel } from "./utils";
-import type { CreateIssueConfiguration, LinearIssue, LinearNodeMetadata } from "./types";
+import { addTeamMetadata, buildIssueDetails, buildIssueSubtitle } from "./utils";
+import type { CreateIssueConfiguration, LinearNodeMetadata } from "./types";
 
 export const createIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -20,35 +18,11 @@ export const createIssueMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {
-      "Executed At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
-    };
-
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const issue = outputs?.default?.[0]?.data as LinearIssue | undefined;
-    if (!issue) return details;
-
-    addDetail(details, "Issue", issue.identifier);
-    addDetail(details, "Issue URL", issue.url);
-    addDetail(details, "Title", issue.title);
-    addDetail(details, "Status", issue.state?.name);
-    addDetail(details, "Assignee", getUserLabel(issue.assignee));
-
-    return details;
+    return buildIssueDetails(context.execution);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const issue = outputs?.default?.[0]?.data as LinearIssue | undefined;
-
-    const label = getIssueLabel(issue);
-    if (label) return label;
-
-    if (context.execution.createdAt) {
-      return renderTimeAgo(new Date(context.execution.createdAt));
-    }
-
-    return "";
+    return buildIssueSubtitle(context.execution);
   },
 };
 

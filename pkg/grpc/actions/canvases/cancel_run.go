@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,13 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func CancelRun(ctx context.Context, organizationID string, workflowID, runID uuid.UUID) (*pb.CancelRunResponse, error) {
+func CancelRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID uuid.UUID) (*pb.CancelRunResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.PermissionDenied(nil, "user not authenticated")
 	}
 
-	user, err := models.FindActiveUserByID(organizationID, userID)
+	user, err := models.FindActiveUserByIDInTransaction(db, canvas.OrganizationID.String(), userID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "user not found")
 	}
@@ -30,7 +29,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 	var drainResult *models.RunCancellationDrainResult
 	var publishCancelled bool
 
-	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		run, err = models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -40,7 +39,7 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 			return err
 		}
 
-		if run.WorkflowID != workflowID {
+		if run.WorkflowID != canvas.ID {
 			return grpcerrors.NotFound(nil, "run not found")
 		}
 
@@ -66,25 +65,25 @@ func CancelRun(ctx context.Context, organizationID string, workflowID, runID uui
 	}
 
 	if publishCancelled {
-		if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
+		if err := messages.NewCanvasRunMessage(canvas.ID.String(), runID.String()).Publish(); err != nil {
 			log.Errorf("failed to publish run state RabbitMQ message: %v", err)
 		}
 	}
 
-	messages.PublishRunCancellationDrain(workflowID, drainResult)
+	messages.PublishRunCancellationDrain(canvas.ID, drainResult)
 
-	run, err = models.FindCanvasRunInTransaction(database.DB(ctx), workflowID, runID)
+	run, err = models.FindCanvasRunInTransaction(db, canvas.ID, runID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load run")
 	}
 
-	runDetails, err := loadRunDetailsForRuns(ctx, workflowID, []models.CanvasRun{*run})
+	runDetails, err := loadRunDetailsForRuns(ctx, db, canvas.ID, []models.CanvasRun{*run})
 	if err != nil {
 		return nil, err
 	}
 
 	serializedRun, err := SerializeCanvasRun(
-		database.DB(ctx),
+		db,
 		*run,
 		runDetails.rootEventsByRunID[run.ID.String()],
 		runDetails.executionsByRunID[run.ID.String()],

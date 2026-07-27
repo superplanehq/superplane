@@ -1,10 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { cancelCanvasVersionQueries, canvasKeys, removeCanvasVersionScopedQueries } from "@/hooks/useCanvasData";
 
-type CommitMutation = { mutateAsync: (commitMessage: string) => Promise<{ version?: { metadata?: { id?: string } } }> };
+type CommitMutation = {
+  mutateAsync: (commitMessage: string) => Promise<{ version?: CanvasesCanvasVersion }>;
+};
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
 async function invalidatePostCommitCaches(
@@ -19,7 +21,6 @@ async function invalidatePostCommitCaches(
 
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId), refetchType: "all" }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), refetchType: "all" }),
