@@ -43,6 +43,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasPreference,
   CanvasesCanvasSummary,
   CanvasesCanvasRun,
   CanvasesCanvasRunResult,
@@ -134,6 +135,8 @@ export const canvasKeys = {
   folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
+  preferences: () => [...canvasKeys.all, "preference"] as const,
+  preference: (orgId: string, id: string) => [...canvasKeys.preferences(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
@@ -330,7 +333,27 @@ type UseCanvasOptions = {
   refetchOnMount?: boolean;
 };
 
+/** Merge DescribeCanvas preference into cache without dropping newer optimistic dismissals. */
+function mergeCanvasPreferenceCache(
+  current: CanvasesCanvasPreference | null | undefined,
+  incoming: CanvasesCanvasPreference | null | undefined,
+): CanvasesCanvasPreference | null {
+  if (!incoming && !current) return null;
+  if (!incoming) return current ?? null;
+  if (!current) return incoming;
+
+  const dismissedAgentSuggestionIds = Array.from(
+    new Set([...(current.dismissedAgentSuggestionIds ?? []), ...(incoming.dismissedAgentSuggestionIds ?? [])]),
+  );
+
+  return {
+    ...incoming,
+    dismissedAgentSuggestionIds,
+  };
+}
+
 export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
+  const queryClient = useQueryClient();
   const {
     enabled = true,
     staleTime = 0,
@@ -347,6 +370,10 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
           path: { id: canvasId },
         }),
       );
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, canvasId),
+        (current) => mergeCanvasPreferenceCache(current, response.data?.preference ?? null),
+      );
       return response.data?.canvas;
     },
     staleTime,
@@ -354,6 +381,27 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
     refetchOnReconnect,
     refetchOnMount,
     enabled: enabled && !!organizationId && !!canvasId,
+  });
+};
+
+export const useCanvasPreference = (organizationId: string, canvasId: string, enabled = true) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: canvasKeys.preference(organizationId, canvasId),
+    queryFn: async () => {
+      const response = await canvasesDescribeCanvas(
+        withOrganizationHeader({
+          path: { id: canvasId },
+        }),
+      );
+      const current = queryClient.getQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, canvasId),
+      );
+      return mergeCanvasPreferenceCache(current, response.data?.preference ?? null);
+    },
+    enabled: enabled && !!organizationId && !!canvasId,
+    staleTime: 30_000,
   });
 };
 
@@ -555,40 +603,61 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
 type UpdateCanvasPreferenceInput = {
   canvasId: string;
   starred?: boolean;
+  dismissAgentSuggestionId?: string;
 };
 
 export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ canvasId, starred }: UpdateCanvasPreferenceInput) => {
+    mutationFn: async ({ canvasId, starred, dismissAgentSuggestionId }: UpdateCanvasPreferenceInput) => {
       return await canvasesUpdateCanvasPreference(
         withOrganizationHeader({
           path: { canvasId },
           body: {
             starred,
+            dismissAgentSuggestionId,
           },
         }),
       );
     },
     onMutate: async (preference) => {
       await queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) });
+      await queryClient.cancelQueries({ queryKey: canvasKeys.preference(organizationId, preference.canvasId) });
       const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
+      const previousPreference = queryClient.getQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, preference.canvasId),
+      );
       const timestamp = new Date().toISOString();
 
       queryClient.setQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId), (current = []) =>
         current.map((canvas) => applyCanvasPreferenceToSummary(canvas, preference, timestamp)),
       );
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, preference.canvasId),
+        (current) => applyCanvasPreferenceUpdate(current, preference, timestamp),
+      );
 
-      return { previousCanvases };
+      return { previousCanvases, previousPreference, canvasId: preference.canvasId };
     },
     onError: (_error, _preference, context) => {
       if (context?.previousCanvases) {
         queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
       }
+      if (context?.canvasId) {
+        queryClient.setQueryData(canvasKeys.preference(organizationId, context.canvasId), context.previousPreference);
+      }
     },
-    onSettled: () => {
+    onSuccess: (response, preference) => {
+      if (!response.data?.preference) return;
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, preference.canvasId),
+        (current) => mergeCanvasPreferenceCache(current, response.data?.preference),
+      );
+    },
+    onSettled: (_data, _error, preference) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.preference(organizationId, preference.canvasId) });
     },
   });
 };
@@ -610,6 +679,27 @@ function applyCanvasPreferenceToSummary(
           starred: preference.starred,
           starredAt: preference.starred ? timestamp : undefined,
         }),
+  };
+}
+
+function applyCanvasPreferenceUpdate(
+  current: CanvasesCanvasPreference | null | undefined,
+  preference: UpdateCanvasPreferenceInput,
+  timestamp: string,
+): CanvasesCanvasPreference {
+  const dismissedAgentSuggestionIds = [...(current?.dismissedAgentSuggestionIds ?? [])];
+  if (
+    preference.dismissAgentSuggestionId &&
+    !dismissedAgentSuggestionIds.includes(preference.dismissAgentSuggestionId)
+  ) {
+    dismissedAgentSuggestionIds.push(preference.dismissAgentSuggestionId);
+  }
+
+  return {
+    canvasId: preference.canvasId,
+    starred: preference.starred ?? current?.starred ?? false,
+    starredAt: preference.starred === undefined ? current?.starredAt : preference.starred ? timestamp : undefined,
+    dismissedAgentSuggestionIds,
   };
 }
 

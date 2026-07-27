@@ -395,6 +395,7 @@ message DescribeCanvasRequest {
 
 message DescribeCanvasResponse {
   Canvas canvas = 1;
+  CanvasPreference preference = 2;
 }
 
 message UpdateCanvasRequest {
@@ -410,6 +411,8 @@ message UpdateCanvasResponse {
 message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
   optional bool starred = 2;
+  // When set, appends this id to the user's dismissed Agent suggestion ids for the canvas.
+  optional string dismiss_agent_suggestion_id = 3;
 }
 
 message UpdateCanvasPreferenceResponse {
@@ -574,6 +577,7 @@ message CanvasPreference {
   string canvas_id = 1;
   bool starred = 2;
   google.protobuf.Timestamp starred_at = 3;
+  repeated string dismissed_agent_suggestion_ids = 4;
 }
 
 message Canvas {
