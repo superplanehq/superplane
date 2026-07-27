@@ -10,9 +10,9 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { linearComponentBaseProps } from "./base";
 import { addTeamMetadata, buildIssueDetails, buildIssueSubtitle } from "./utils";
-import type { CreateIssueConfiguration, LinearNodeMetadata } from "./types";
+import type { LinearNodeMetadata, UpdateIssueConfiguration } from "./types";
 
-export const createIssueMapper: ComponentBaseMapper = {
+export const updateIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return linearComponentBaseProps(context, metadataList(context.node));
   },
@@ -29,28 +29,13 @@ export const createIssueMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as LinearNodeMetadata | undefined;
-  const configuration = node.configuration as CreateIssueConfiguration | undefined;
+  const configuration = node.configuration as UpdateIssueConfiguration | undefined;
 
   addTeamMetadata(metadata, nodeMetadata?.team, configuration?.team);
 
-  const priority = priorityLabel(configuration?.priority);
-  if (priority) {
-    metadata.push({ icon: "flag", label: priority });
+  if (configuration?.issue) {
+    metadata.push({ icon: "hash", label: configuration.issue });
   }
 
   return metadata;
-}
-
-/** Linear encodes priority as 0-4; the picker stores the number as a string. */
-const PRIORITY_LABELS: Record<string, string> = {
-  "0": "No priority",
-  "1": "Urgent",
-  "2": "High",
-  "3": "Medium",
-  "4": "Low",
-};
-
-function priorityLabel(priority: string | undefined): string | undefined {
-  if (!priority) return undefined;
-  return PRIORITY_LABELS[priority];
 }
