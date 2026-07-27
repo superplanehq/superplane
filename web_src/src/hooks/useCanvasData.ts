@@ -640,13 +640,32 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
 
       return { previousCanvases, previousPreference, canvasId: preference.canvasId };
     },
-    onError: (_error, _preference, context) => {
-      if (context?.previousCanvases) {
+    onError: (_error, preference, context) => {
+      if (context?.previousCanvases && preference.starred !== undefined) {
         queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
       }
-      if (context?.canvasId) {
-        queryClient.setQueryData(canvasKeys.preference(organizationId, context.canvasId), context.previousPreference);
+      if (!context?.canvasId) return;
+
+      // Dismissals are append-only; never restore a full snapshot that can wipe a newer click.
+      if (preference.dismissAgentSuggestionId) {
+        const failedId = preference.dismissAgentSuggestionId;
+        const wasAlreadyDismissed = context.previousPreference?.dismissedAgentSuggestionIds?.includes(failedId);
+        if (wasAlreadyDismissed) return;
+
+        queryClient.setQueryData<CanvasesCanvasPreference | null>(
+          canvasKeys.preference(organizationId, context.canvasId),
+          (current) => {
+            if (!current) return context.previousPreference ?? null;
+            return {
+              ...current,
+              dismissedAgentSuggestionIds: (current.dismissedAgentSuggestionIds ?? []).filter((id) => id !== failedId),
+            };
+          },
+        );
+        return;
       }
+
+      queryClient.setQueryData(canvasKeys.preference(organizationId, context.canvasId), context.previousPreference);
     },
     onSuccess: (response, preference) => {
       if (!response.data?.preference) return;

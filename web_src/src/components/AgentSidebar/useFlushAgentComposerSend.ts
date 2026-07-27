@@ -1,6 +1,11 @@
 import { useCallback, useEffect } from "react";
 import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
-import { consumeAgentComposerSend, peekAgentComposerSend, subscribeAgentComposerSend } from "./composerPrefill";
+import {
+  consumeAgentComposerSend,
+  peekAgentComposerSend,
+  requeueAgentComposerSend,
+  subscribeAgentComposerSend,
+} from "./composerPrefill";
 
 /**
  * Flushes queued suggestion/prefill sends into the composer one at a time.
@@ -17,7 +22,10 @@ export function useFlushAgentComposerSend(
     if (!pending) return;
     // Clear before send so Strict Mode remounts do not double-send.
     consumeAgentComposerSend();
-    void onSend(pending, []);
+    void onSend(pending, []).catch(() => {
+      // Restore the prompt so a failed agent send can be retried on the next flush.
+      requeueAgentComposerSend(pending);
+    });
   }, [onSend, sendPending]);
 
   useEffect(() => {

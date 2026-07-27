@@ -21,8 +21,14 @@ export function useAgentSuggestionDismissals(
   const preferenceReady = !preferenceQueryEnabled || !preferencePending;
 
   useEffect(() => {
+    setDismissedIds(new Set());
+  }, [canvasId]);
+
+  // Union server dismissals into local state so a partial cache write cannot undismiss.
+  useEffect(() => {
     if (!preferenceReady) return;
-    setDismissedIds(new Set(dismissedFromServerKey ? dismissedFromServerKey.split("\0") : []));
+    const fromServer = dismissedFromServerKey ? dismissedFromServerKey.split("\0") : [];
+    setDismissedIds((prev) => new Set([...prev, ...fromServer]));
   }, [canvasId, dismissedFromServerKey, preferenceReady]);
 
   const visibleSuggestions = useMemo(() => {

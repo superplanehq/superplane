@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 import { cn } from "@/lib/utils";
 import { Sparkle } from "lucide-react";
@@ -76,9 +77,11 @@ export function AgentSuggestionsHoverCard({
         <ul className="flex flex-col p-1.5" role="list">
           {suggestions.map((suggestion) => (
             <li key={suggestion.id}>
-              <button
+              <Button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/50"
+                variant="ghost"
+                size={null}
+                className="flex h-auto w-full items-center justify-start gap-2 rounded-md px-2 py-2 text-left shadow-none hover:bg-violet-50 dark:hover:bg-violet-950/50"
                 data-testid={`agent-suggestion-${suggestion.id}`}
                 onClick={() => onSelectSuggestion?.(suggestion)}
               >
@@ -86,7 +89,7 @@ export function AgentSuggestionsHoverCard({
                   <Sparkle className="size-3.5" aria-hidden="true" />
                 </span>
                 <span className="text-[13px] font-medium text-slate-800 dark:text-gray-100">{suggestion.label}</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

@@ -25,6 +25,16 @@ export function consumeAgentComposerSend(): string | null {
   return pendingSends.shift() ?? null;
 }
 
+/** Put a failed send back at the front of the queue for another flush attempt. */
+export function requeueAgentComposerSend(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+
+  pendingSends.unshift(trimmed);
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(AGENT_SEND_COMPOSER_EVENT));
+}
+
 /** Clear the entire pending queue (tests / abandoned flushes). */
 export function clearAgentComposerSend() {
   pendingSends.length = 0;

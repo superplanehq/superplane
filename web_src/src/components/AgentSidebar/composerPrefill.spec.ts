@@ -4,6 +4,7 @@ import {
   consumeAgentComposerSend,
   peekAgentComposerSend,
   requestAgentComposerSend,
+  requeueAgentComposerSend,
 } from "./composerPrefill";
 
 afterEach(() => {
@@ -29,5 +30,12 @@ describe("composerPrefill", () => {
   it("ignores blank requests", () => {
     requestAgentComposerSend("   ");
     expect(peekAgentComposerSend()).toBeNull();
+  });
+
+  it("requeues a failed send at the front of the queue", () => {
+    requestAgentComposerSend("second");
+    requeueAgentComposerSend("first");
+    expect(consumeAgentComposerSend()).toBe("first");
+    expect(consumeAgentComposerSend()).toBe("second");
   });
 });
