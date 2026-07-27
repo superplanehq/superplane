@@ -131,6 +131,17 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	})
 }
 
+func Test__OnIssue__ExampleData(t *testing.T) {
+	trigger := &OnIssue{}
+	data := trigger.ExampleData()
+	require.NotNil(t, data)
+	inner, ok := data["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "opened", inner["action"])
+	_, hasAssignee := inner["assignee"]
+	assert.False(t, hasAssignee, "assignee must not be present in an 'opened' example")
+}
+
 func Test__OnIssue__Setup(t *testing.T) {
 	trigger := OnIssue{}
 
