@@ -81,8 +81,14 @@ describe("useSpecFileAutosave", () => {
     );
 
     const consoleYaml = materializeConsoleSpec({
-      panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
-      layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
+      pages: [
+        {
+          id: "main",
+          name: "Main",
+          panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
+          layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
+        },
+      ],
       canvasId: "canvas-1",
     });
 
@@ -93,9 +99,10 @@ describe("useSpecFileAutosave", () => {
     act(() => vi.advanceTimersByTime(400));
 
     expect(mutate).toHaveBeenCalledTimes(1);
-    const payload = mutate.mock.calls[0]![0] as { panels: unknown[]; layout: unknown[] };
-    expect(payload.panels).toHaveLength(1);
-    expect(payload.layout).toHaveLength(1);
+    const payload = mutate.mock.calls[0]![0] as { pages: { panels: unknown[]; layout: unknown[] }[] };
+    expect(payload.pages).toHaveLength(1);
+    expect(payload.pages[0]!.panels).toHaveLength(1);
+    expect(payload.pages[0]!.layout).toHaveLength(1);
   });
 
   it("debounces rapid edits into a single save", () => {

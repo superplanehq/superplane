@@ -424,7 +424,7 @@ func createNewCanvasVersionFromLive(
 ) (*models.CanvasVersion, error) {
 
 	//
-	// Start new version with the live version's nodes, edges, console panels, and console layout.
+	// Start new version with the live version's nodes, edges, and console pages.
 	//
 	now := time.Now()
 	newVersion := models.CanvasVersion{
@@ -434,8 +434,7 @@ func createNewCanvasVersionFromLive(
 		CommitMessage: strings.TrimSpace(commitMessage),
 		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
 		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
-		ConsolePanels: datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePanels.Data())),
-		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
+		ConsolePages:  datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePages.Data())),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
@@ -490,8 +489,7 @@ func createNewCanvasVersionFromLive(
 				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
 			}
 
-			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))
-			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Layout()))
+			newVersion.ConsolePages = datatypes.NewJSONType(slices.Clone(console.Pages()))
 		default:
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}

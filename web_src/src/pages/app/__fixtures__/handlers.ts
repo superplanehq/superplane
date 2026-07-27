@@ -82,7 +82,11 @@ const defaultConsoleYaml =
   materializeConsoleSpec({
     canvasId: capturedFixture.canvasId,
     canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Software Factory",
-    panels: [
+    pages: [
+      {
+        id: "main",
+        name: "Main",
+        panels: [
       {
         id: "submit-task",
         type: "nodes",
@@ -163,11 +167,12 @@ const defaultConsoleYaml =
         },
       },
     ],
-    layout: [
-      // Left column 50/50 prompt + how-it-works; board matches stacked height.
-      { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
-      { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
-      { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
+        layout: [
+          { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
+          { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
+          { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
+        ],
+      },
     ],
   });
 

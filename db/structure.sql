@@ -714,10 +714,9 @@ CREATE TABLE public.workflow_versions (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    commit_message text DEFAULT ''::text NOT NULL
+    commit_message text DEFAULT ''::text NOT NULL,
+    console_pages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2275,7 +2274,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260720144835	f
+20260727141403	f
 \.
 
 

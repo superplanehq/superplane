@@ -101,8 +101,7 @@ export type CanvasConsoleData = {
   canvasId: string;
   versionId?: string;
   updatedAt?: string;
-  panels: ConsolePanel[];
-  layout: ConsoleLayoutItem[];
+  pages: ConsolePage[];
   consoleYaml: string;
 };
 
@@ -119,8 +118,7 @@ function consoleDataFromYaml(
   return {
     canvasId,
     versionId,
-    panels: parsed.panels,
-    layout: parsed.layout,
+    pages: parsed.pages,
     consoleYaml,
   };
 }
@@ -261,6 +259,21 @@ export interface ConsoleLayoutItem {
   h: number;
   minW?: number;
   minH?: number;
+}
+
+/**
+ * A single tab in the canvas console. Multi-page consoles carry more than
+ * one; legacy (single-page) consoles carry exactly one page with the
+ * implicit id `main`, materialized from the wrapped `panels`/`layout`
+ * on the wire. Panel and layout ids must be unique within a page but may
+ * repeat across pages.
+ */
+export interface ConsolePage {
+  id: string;
+  /** Optional human label rendered on the page tab. */
+  name?: string;
+  panels: ConsolePanel[];
+  layout: ConsoleLayoutItem[];
 }
 
 export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "slate", "orange"] as const;
@@ -1555,14 +1568,13 @@ type UseUpdateCanvasConsoleOptions = {
 function toCanvasConsole(
   canvasId: string,
   versionId: string | undefined,
-  input: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] },
+  input: { pages: ConsolePage[] },
   previous?: CanvasConsoleData,
 ): CanvasConsoleData {
   const consoleYaml =
     previous?.consoleYaml ??
     materializeConsoleSpec({
-      panels: input.panels,
-      layout: input.layout,
+      pages: input.pages,
       canvasId,
     });
 
@@ -1570,11 +1582,12 @@ function toCanvasConsole(
     ...previous,
     canvasId: previous?.canvasId ?? canvasId,
     ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
-    panels: input.panels,
-    layout: input.layout,
+    pages: input.pages,
     consoleYaml,
   };
 }
+
+export type UpdateCanvasConsoleInput = { pages?: ConsolePage[]; consoleYaml?: string };
 
 export const useUpdateCanvasConsole = (
   canvasId: string,
@@ -1587,7 +1600,7 @@ export const useUpdateCanvasConsole = (
       // Console edits are stage-only; write to the staged cache the editor reads.
       const queryKey = canvasKeys.stagedConsole(canvasId);
       const mutationGeneration = options?.getMutationGeneration?.() ?? 0;
-      if (input.panels === undefined || input.layout === undefined) {
+      if (input.pages === undefined) {
         return { previous: queryClient.getQueryData<CanvasConsoleData>(queryKey), queryKey, mutationGeneration };
       }
 
@@ -1595,11 +1608,11 @@ export const useUpdateCanvasConsole = (
       const previous = queryClient.getQueryData<CanvasConsoleData>(queryKey);
       queryClient.setQueryData(
         queryKey,
-        toCanvasConsole(canvasId, versionId, { panels: input.panels, layout: input.layout }, previous),
+        toCanvasConsole(canvasId, versionId, { pages: input.pages }, previous),
       );
       return { previous, queryKey, mutationGeneration };
     },
-    mutationFn: async (input: { panels?: ConsolePanel[]; layout?: ConsoleLayoutItem[]; consoleYaml?: string }) => {
+    mutationFn: async (input: UpdateCanvasConsoleInput) => {
       if (!versionId) {
         throw new Error("version id is required");
       }
@@ -1607,8 +1620,7 @@ export const useUpdateCanvasConsole = (
       const consoleYaml =
         input.consoleYaml ??
         materializeConsoleSpec({
-          panels: input.panels ?? [],
-          layout: input.layout ?? [],
+          pages: input.pages ?? [],
           canvasId,
         });
 

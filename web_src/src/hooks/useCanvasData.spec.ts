@@ -407,7 +407,7 @@ describe("useUpdateCanvasConsole", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await result.current.mutateAsync({ panels: [], layout: [] });
+    await result.current.mutateAsync({ pages: [] });
 
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledOnce();
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledWith(
@@ -427,7 +427,7 @@ describe("useUpdateCanvasConsole", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await expect(result.current.mutateAsync({ panels: [], layout: [] })).rejects.toThrow("request failed");
+    await expect(result.current.mutateAsync({ pages: [] })).rejects.toThrow("request failed");
   });
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
@@ -440,8 +440,13 @@ describe("useUpdateCanvasConsole", () => {
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        },
+      ],
       consoleYaml: emptyConsoleYaml,
     });
     canvasesPutCanvasStaging.mockReturnValue(savePromise);
@@ -457,14 +462,24 @@ describe("useUpdateCanvasConsole", () => {
 
     act(() => {
       result.current.mutate({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        ],
       });
     });
 
     await waitFor(() => {
       expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+          },
+        ],
       });
     });
 
@@ -479,8 +494,13 @@ describe("useUpdateCanvasConsole", () => {
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        },
+      ],
     });
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
@@ -490,13 +510,23 @@ describe("useUpdateCanvasConsole", () => {
 
     await expect(
       result.current.mutateAsync({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        ],
       }),
     ).rejects.toThrow("request failed");
 
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+        },
+      ],
     });
   });
 });

@@ -112,13 +112,22 @@ When changing panel shapes, keep frontend validation, backend validation, YAML t
 
 ## Stored Data Model
 
-Console data is stored as arbitrary JSON content plus a layout:
+Console data is stored as an ordered list of pages; each page owns its
+own panels and grid layout:
 
-- `DashboardPanel`: `id`, `type`, `content`
-- `DashboardLayoutItem`: `i`, `x`, `y`, `w`, `h`, optional `minW`, `minH`
-- `CanvasDashboard`: `canvasId`, `panels[]`, `layout[]`, `updatedAt`
+- `ConsolePanel`: `id`, `type`, `content`
+- `ConsoleLayoutItem`: `i`, `x`, `y`, `w`, `h`, optional `minW`, `minH`
+- `ConsolePage`: `id`, optional `name`, `panels[]`, `layout[]`
+- `CanvasConsole`: `canvasId`, `pages[]`, `updatedAt`
 
-The panel `content` object is intentionally flexible, but every known panel type has a typed shape in `panelTypes.ts` and matching backend validation in `canvas_dashboard_yml.go`.
+A fresh canvas stores an empty `pages` array. The multi-page shape
+appears once the user creates a second page; single-page consoles are
+serialized in the legacy `panels`/`layout` form (see
+[YAML Import And Export](#yaml-import-and-export)).
+
+The panel `content` object is intentionally flexible, but every known
+panel type has a typed shape in `panelTypes.ts` and matching backend
+validation in `pkg/yaml/console.go`.
 
 ## Panel Types
 
@@ -987,7 +996,12 @@ Inline mode is intended for a single prompt-submission panel per console (agent-
 
 ## YAML Import And Export
 
-Canonical Console YAML:
+The Console YAML has two accepted shapes. Both live in the same
+`console.yaml` file — the multi-page shape appears only when a canvas has
+more than one page.
+
+Legacy (single-page) shape, still emitted for empty and one-page consoles
+so existing apps see no diff noise:
 
 ```yaml
 apiVersion: v1
@@ -1016,18 +1030,45 @@ spec:
       h: 6
 ```
 
+Multi-page shape, emitted when two or more pages exist:
+
+```yaml
+apiVersion: v1
+kind: Console
+metadata:
+  canvasId: 00000000-0000-0000-0000-000000000000
+  name: Example canvas
+spec:
+  pages:
+    - id: overview
+      name: Overview
+      panels:
+        - id: envs
+          type: table
+          content: { ... }
+      layout:
+        - { i: envs, x: 0, y: 0, w: 12, h: 6 }
+    - id: details
+      name: Details
+      panels: []
+      layout: []
+```
+
 Rules:
 
 - `apiVersion` must be `v1`.
 - `kind` must be `Console`. Legacy `kind: Dashboard` files exported before the rename are not accepted; re-export from the current UI to upgrade them.
-- Unknown top-level, metadata, panel, and layout fields are rejected.
+- Unknown top-level, metadata, panel, page, and layout fields are rejected.
 - `metadata.canvasId` and `metadata.name` are informational on export.
-- Missing `spec.panels` or `spec.layout` means an empty list.
-- Maximum panel count is 50.
-- Maximum panel payload size is 1 MiB.
+- `spec.pages` and top-level `spec.panels`/`spec.layout` are mutually exclusive; a document that mixes them is rejected.
+- A missing `spec.panels`/`spec.layout` means an empty list; a missing `spec.pages` collapses back to the legacy shape.
+- Maximum 5 pages per console.
+- Maximum 20 panels per page.
+- Maximum panel payload size is 1 MiB per page.
+- Existing consoles that were created before these caps existed still render (the read path is lenient); any new import or commit that would push a page over a cap is rejected.
 - Import replaces the whole console.
 
-Frontend YAML parsing lives in `consoleYaml.ts`. Backend YAML parsing and validation lives in `pkg/yaml/console.go`. Keep error behavior and accepted shapes aligned.
+Frontend YAML parsing lives in `consoleYaml.ts` (`parseConsoleYaml` for save paths, `parseConsoleYamlLenient` for the render path). Backend YAML parsing lives in `pkg/yaml/console.go` (`ConsoleFromYML` / `ConsoleFromYMLLenient` mirror the same split). Keep error behavior and accepted shapes aligned.
 
 ## Bundling A Console With An Installable App
 

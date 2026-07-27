@@ -3910,22 +3910,13 @@ export function AppPage() {
       buildAppFiles({
         canvas,
         canvasNodes: nodes,
-        panels: consoleQuery.data?.panels,
-        layout: consoleQuery.data?.layout,
+        pages: consoleQuery.data?.pages,
         canvasId,
         canvasName: canvas?.metadata?.name,
         consoleLoading: consoleQuery.isLoading,
         consoleError: consoleQuery.error,
       }),
-    [
-      canvas,
-      nodes,
-      consoleQuery.data?.panels,
-      consoleQuery.data?.layout,
-      canvasId,
-      consoleQuery.isLoading,
-      consoleQuery.error,
-    ],
+    [canvas, nodes, consoleQuery.data?.pages, canvasId, consoleQuery.isLoading, consoleQuery.error],
   );
   const { onSpecFileChange } = useSpecFileAutosave({
     canvas,

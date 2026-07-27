@@ -1,20 +1,22 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import type {
-  ConsoleLayoutItem,
-  ConsolePanel,
   CanvasConsoleQueryResult,
+  ConsolePage,
   UpdateCanvasConsoleMutationResult,
 } from "@/hooks/useCanvasData";
 
+import { ConsolePageTabs } from "./ConsolePageTabs";
 import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
 import type { ConsoleContextValue, ConsoleNodeStatus } from "./ConsoleContext";
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
+import { useConsoleActivePageInitial, useConsoleActivePageSync } from "./useConsoleActivePage";
+import { useConsolePagesState } from "./useConsolePagesState";
 
 export type ConsoleOverlayProps = {
   /**
@@ -68,75 +70,199 @@ export type ConsoleOverlayProps = {
     enabled: boolean;
     summary?: DraftConsoleDiffSummary;
   };
-  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
+  onEffectiveConsoleChange?: (next: { pages: ConsolePage[] }) => void;
 };
 
-export function ConsoleOverlay({
-  readOnly,
-  canImportYaml,
-  canRunNodes,
-  runNodesDisabledReason,
+export function ConsoleOverlay(props: ConsoleOverlayProps) {
+  const {
+    canImportYaml,
+    canRunNodes,
+    runNodesDisabledReason,
+    consoleQuery,
+    updateConsoleMutation,
+    yamlModalOpen,
+    onYamlModalOpenChange,
+    canvasId,
+    canvasName,
+    organizationId,
+    canvasNodes,
+    canvasNodesLoading,
+    nodeStatuses,
+    onTriggerNode,
+    onEffectiveConsoleChange,
+  } = props;
+
+  const editor = useConsoleEditorState({
+    consoleQuery,
+    updateConsoleMutation,
+    canvasId,
+    onEffectiveConsoleChange,
+  });
+
+  const overlayContent = (
+    <ConsoleOverlayLayout props={props} editor={editor}>
+      <ConsoleYamlModal
+        open={yamlModalOpen}
+        onOpenChange={onYamlModalOpenChange}
+        pages={editor.localPages}
+        canvasId={canvasId}
+        canvasName={canvasName}
+        onImport={canImportYaml ? editor.handleImportYaml : undefined}
+        isImporting={updateConsoleMutation.isPending}
+      />
+    </ConsoleOverlayLayout>
+  );
+
+  if (!canvasId || !organizationId) {
+    return overlayContent;
+  }
+
+  return (
+    <ConsoleContextProvider
+      canvasId={canvasId}
+      organizationId={organizationId}
+      nodes={canvasNodes ?? []}
+      nodesLoading={canvasNodesLoading}
+      nodeStatuses={nodeStatuses}
+      canRunNodes={canRunNodes}
+      runNodesDisabledReason={runNodesDisabledReason}
+      onTriggerNode={canRunNodes ? onTriggerNode : undefined}
+    >
+      {overlayContent}
+    </ConsoleContextProvider>
+  );
+}
+
+type ConsoleEditorState = ReturnType<typeof useConsoleEditorState>;
+
+function useConsoleEditorState({
   consoleQuery,
   updateConsoleMutation,
-  addPanelDialogOpen,
-  onAddPanelDialogOpenChange,
-  yamlModalOpen,
-  onYamlModalOpenChange,
   canvasId,
-  canvasName,
-  organizationId,
-  canvasNodes,
-  canvasNodesLoading,
-  nodeStatuses,
-  onTriggerNode,
-  showConsoleEditControls = false,
-  onConsoleAddPanel,
-  onConsoleOpenYaml,
-  consoleYamlReadOnly,
-  visualDiff,
   onEffectiveConsoleChange,
-}: ConsoleOverlayProps) {
+}: {
+  consoleQuery: CanvasConsoleQueryResult;
+  updateConsoleMutation: UpdateCanvasConsoleMutationResult;
+  canvasId: string | undefined;
+  onEffectiveConsoleChange?: (next: { pages: ConsolePage[] }) => void;
+}) {
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
-  updateConsoleMutationRef.current = updateConsoleMutation;
+  useEffect(() => {
+    updateConsoleMutationRef.current = updateConsoleMutation;
+  }, [updateConsoleMutation]);
 
-  const panels: ConsolePanel[] = useMemo(() => consoleQuery.data?.panels ?? [], [consoleQuery.data?.panels]);
+  const persistedPages: ConsolePage[] = useMemo(
+    () => consoleQuery.data?.pages ?? [],
+    [consoleQuery.data?.pages],
+  );
+  const persistedPageIds = useMemo(() => persistedPages.map((page) => page.id), [persistedPages]);
 
-  const layout: ConsoleLayoutItem[] = useMemo(() => consoleQuery.data?.layout ?? [], [consoleQuery.data?.layout]);
-
-  const handleChange = useCallback((next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
+  const handleChange = useCallback((next: { pages: ConsolePage[] }) => {
     updateConsoleMutationRef.current.mutate(next);
   }, []);
 
-  const handleImportYaml = useCallback(async (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
+  const handleImportYaml = useCallback(async (next: { pages: ConsolePage[] }) => {
     // Use mutateAsync so the modal can await before closing/showing toasts.
     await updateConsoleMutationRef.current.mutateAsync(next);
   }, []);
 
-  const contextNodes = canvasNodes ?? [];
+  const { activePageId, setActivePageId, rawPageParam } = useConsoleActivePageInitial({
+    canvasId,
+    persistedPageIds,
+  });
+
+  const pagesState = useConsolePagesState({
+    pages: persistedPages,
+    onChange: handleChange,
+    onEffectiveChange: onEffectiveConsoleChange,
+    activePageId,
+    onActivePageIdChange: setActivePageId,
+  });
+
+  const livePageIds = useMemo(() => pagesState.localPages.map((page) => page.id), [pagesState.localPages]);
+
+  useConsoleActivePageSync({
+    canvasId,
+    livePageIds,
+    activePageId,
+    setActivePageId,
+    rawPageParam,
+    persistedPageIds,
+  });
+
+  const persistedActivePage = useMemo(
+    () => persistedPages.find((page) => page.id === pagesState.activePage?.id),
+    [persistedPages, pagesState.activePage?.id],
+  );
+
+  return {
+    ...pagesState,
+    persistedActivePage,
+    activePageId,
+    handleSelectPage: setActivePageId,
+    handleImportYaml,
+  };
+}
+
+function ConsoleOverlayLayout({
+  props,
+  editor,
+  children,
+}: {
+  props: ConsoleOverlayProps;
+  editor: ConsoleEditorState;
+  children: React.ReactNode;
+}) {
+  const {
+    readOnly,
+    addPanelDialogOpen,
+    onAddPanelDialogOpenChange,
+    showConsoleEditControls = false,
+    onConsoleAddPanel,
+    onConsoleOpenYaml,
+    consoleYamlReadOnly,
+    visualDiff,
+    consoleQuery,
+  } = props;
   const leftOffset = useEffectiveLeftSidebarWidth();
-  // The YAML modal is opened from the canvas page header (next to "Add panel").
-  // The dashboard overlay no longer renders its own toolbar so the white
-  // strip is gone and the grid fills the available area.
-  const overlayContent = (
+
+  return (
     <>
       <div
         className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100 dark:bg-gray-900"
         style={{ left: leftOffset, right: 0 }}
         data-testid="console-overlay"
       >
-        <div className="min-h-0 flex-1 overflow-auto">
-          <ConsoleView
-            panels={panels}
-            layout={layout}
-            isLoading={consoleQuery.isLoading}
-            errorMessage={consoleQuery.error ? String(consoleQuery.error) : undefined}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ConsolePageTabs
+            pages={editor.localPages}
+            activePageId={editor.activePage?.id ?? null}
             readOnly={readOnly}
-            onChange={handleChange}
-            onEffectiveChange={onEffectiveConsoleChange}
-            addPanelDialogOpen={addPanelDialogOpen}
-            onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
-            visualDiff={visualDiff}
+            onSelectPage={editor.handleSelectPage}
+            onAddPage={editor.handleAddPage}
+            onRenamePage={editor.handleRenamePage}
+            onReorderPages={editor.handleReorderPages}
+            onRemovePage={editor.handleRemovePage}
           />
+          <div className="min-h-0 flex-1 overflow-auto">
+            <ConsoleView
+              activePageId={editor.activePage?.id ?? null}
+              panels={editor.activePanels}
+              layout={editor.activeLayout}
+              persistedPanels={editor.persistedActivePage?.panels ?? []}
+              persistedLayout={editor.persistedActivePage?.layout ?? []}
+              isLoading={consoleQuery.isLoading}
+              errorMessage={consoleQuery.error ? String(consoleQuery.error) : undefined}
+              readOnly={readOnly}
+              onAddPanel={editor.handleAddPanel}
+              onDeletePanel={editor.handleDeletePanel}
+              onPanelContentChange={editor.handlePanelContentChange}
+              onLayoutChange={editor.handleLayoutChange}
+              addPanelDialogOpen={addPanelDialogOpen}
+              onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
+              visualDiff={visualDiff}
+            />
+          </div>
         </div>
         {showConsoleEditControls ? (
           <RightSideControls
@@ -149,36 +275,7 @@ export function ConsoleOverlay({
           />
         ) : null}
       </div>
-
-      <ConsoleYamlModal
-        open={yamlModalOpen}
-        onOpenChange={onYamlModalOpenChange}
-        panels={panels}
-        layout={layout}
-        canvasId={canvasId}
-        canvasName={canvasName}
-        onImport={canImportYaml ? handleImportYaml : undefined}
-        isImporting={updateConsoleMutation.isPending}
-      />
+      {children}
     </>
-  );
-
-  if (!canvasId || !organizationId) {
-    return overlayContent;
-  }
-
-  return (
-    <ConsoleContextProvider
-      canvasId={canvasId}
-      organizationId={organizationId}
-      nodes={contextNodes}
-      nodesLoading={canvasNodesLoading}
-      nodeStatuses={nodeStatuses}
-      canRunNodes={canRunNodes}
-      runNodesDisabledReason={runNodesDisabledReason}
-      onTriggerNode={canRunNodes ? onTriggerNode : undefined}
-    >
-      {overlayContent}
-    </ConsoleContextProvider>
   );
 }

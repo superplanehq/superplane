@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
+import type { ConsolePage, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, isWorkflowSpecPath } from "./lib/workflow-spec-paths";
 import { parseCanvasYamlForImport, parseConsoleYamlForSave } from "./lib/workflow-spec-files";
@@ -17,7 +17,7 @@ type UseSpecFileAutosaveParams = {
     options?: { showToast?: boolean },
   ) => Promise<{ status: "saved" | "replaced" | "stale" } | undefined | void>;
   updateConsoleMutation: UpdateCanvasConsoleMutationResult;
-  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
+  onEffectiveConsoleChange?: (next: { pages: ConsolePage[] }) => void;
 };
 
 /**
@@ -76,7 +76,7 @@ export function useSpecFileAutosave({
     const parsed = parseConsoleYamlForSave(content);
     if (!parsed.ok) return;
 
-    onEffectiveConsoleChangeRef.current?.({ panels: parsed.panels, layout: parsed.layout });
+    onEffectiveConsoleChangeRef.current?.({ pages: parsed.pages });
   }, []);
 
   const persistCanvasSpec = useCallback((content: string) => {
@@ -98,7 +98,7 @@ export function useSpecFileAutosave({
     const parsed = parseConsoleYamlForSave(content);
     if (!parsed.ok) return;
 
-    updateConsoleMutationRef.current.mutate({ panels: parsed.panels, layout: parsed.layout });
+    updateConsoleMutationRef.current.mutate({ pages: parsed.pages });
   }, []);
 
   const onSpecFileChange = useCallback(
