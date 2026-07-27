@@ -30,6 +30,14 @@ function setReadonlyNumber(element: HTMLElement, property: "clientHeight" | "scr
 }
 
 describe("MentionTextarea", () => {
+  it("hooks up theme-aware selection colors so highlighted text stays readable", () => {
+    // The textarea renders transparent text over a styled backdrop, so its selection color must
+    // come from the `.agent-chat-selection` rule in App.css instead of the OS `HighlightText`
+    // color, which is unreadable in the app's dark mode (issue #6372).
+    const { textarea } = renderTextarea();
+    expect(textarea).toHaveClass("agent-chat-selection");
+  });
+
   it("grows to fit multiline content before internal scrolling", () => {
     const { textarea } = renderTextarea();
     setReadonlyNumber(textarea, "scrollHeight", 72);
