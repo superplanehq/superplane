@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
 import { ComposerToolbar } from "./ComposerToolbar";
 import { useMentions } from "./useMentions";
@@ -8,9 +8,9 @@ import { MentionTextarea } from "./MentionTextarea";
 import { ImageAttachmentPreviews } from "./ImageAttachmentPreviews";
 import { MAX_IMAGE_ATTACHMENTS, isSupportedImageFile, useImageAttachments } from "./useImageAttachments";
 import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
-import { consumeAgentComposerSend, peekAgentComposerSend, subscribeAgentComposerSend } from "./composerPrefill";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
+import { useFlushAgentComposerSend } from "./useFlushAgentComposerSend";
 
 type ChatComposerProps = {
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
@@ -136,38 +136,7 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
     }
   }, [hasImages, images, getMarkdown, clearImages, onSend, mentionsApi]);
 
-  const sendExternalText = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      // Clear before send so Strict Mode remounts do not double-send.
-      if (peekAgentComposerSend() === trimmed) {
-        consumeAgentComposerSend();
-      }
-      void onSend(trimmed, []);
-    },
-    [onSend],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    const flushPending = () => {
-      if (cancelled) return;
-      const pending = peekAgentComposerSend();
-      if (pending) sendExternalText(pending);
-    };
-
-    // Sidebar opens → chat query resolves → composer mounts. Flush now and once
-    // more shortly after so a suggestion click is not lost to that race.
-    flushPending();
-    const retryId = window.setTimeout(flushPending, 300);
-    const unsubscribe = subscribeAgentComposerSend(sendExternalText);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(retryId);
-      unsubscribe();
-    };
-  }, [sendExternalText]);
+  useFlushAgentComposerSend(onSend, sendPending);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
