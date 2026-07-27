@@ -587,6 +587,40 @@ func TestImpersonationStatus(t *testing.T) {
 		assert.Equal(t, true, result["active"])
 		assert.NotEmpty(t, result["user_name"])
 	})
+
+	t.Run("returns inactive and clears cookie when target is blocked", func(t *testing.T) {
+		target, err := models.CreateAccount("Blocked Status Target", "blocked-status-target@example.com")
+		require.NoError(t, err)
+
+		signer := jwt.NewSigner("test-client-secret")
+		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":                    "impersonation",
+			"admin_account_id":        r.Account.ID.String(),
+			"impersonated_account_id": target.ID.String(),
+			"sub":                     r.Account.ID.String(),
+		})
+		require.NoError(t, err)
+		require.NoError(t, target.Block(database.Conn(), time.Now()))
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+
+		res := httptest.NewRecorder()
+		server.Router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusOK, res.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
+		assert.Equal(t, false, result["active"])
+
+		for _, cookie := range res.Result().Cookies() {
+			if cookie.Name == "impersonation_token" {
+				assert.Equal(t, "", cookie.Value)
+				assert.Equal(t, -1, cookie.MaxAge)
+			}
+		}
+	})
 }
 
 func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
@@ -954,5 +988,82 @@ func TestAdminListRunnerTasks(t *testing.T) {
 		require.Len(t, body.Tasks, 1)
 		assert.Equal(t, "active-1", body.Tasks[0].ID)
 		assert.Equal(t, "queued", body.Tasks[0].Status)
+	})
+}
+
+func TestAdminBlockAndUnblockAccount(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	target, err := models.CreateAccount("Block Target", "block-target@example.com")
+	require.NoError(t, err)
+
+	t.Run("blocks an account", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/accounts/" + target.ID.String() + "/block",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		blocked, err := models.FindAccountByID(target.ID.String())
+		require.NoError(t, err)
+		assert.True(t, blocked.IsBlocked())
+	})
+
+	t.Run("lists blocked flag", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/accounts?search=block-target",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Items []struct {
+				ID      string `json:"id"`
+				Blocked bool   `json:"blocked"`
+			} `json:"items"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotEmpty(t, body.Items)
+		assert.True(t, body.Items[0].Blocked)
+	})
+
+	t.Run("rejects impersonating a blocked account", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"account_id": target.ID.String(),
+		})
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cannot impersonate a blocked account")
+	})
+
+	t.Run("unblocks an account", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/accounts/" + target.ID.String() + "/unblock",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		unblocked, err := models.FindAccountByID(target.ID.String())
+		require.NoError(t, err)
+		assert.False(t, unblocked.IsBlocked())
+	})
+
+	t.Run("rejects self-block", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/accounts/" + r.Account.ID.String() + "/block",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cannot block yourself")
 	})
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,18 +10,27 @@ import (
 	"gorm.io/gorm"
 )
 
+const AccountBlockedMessage = "Your account has been blocked. Please contact support."
+
+var ErrAccountBlocked = errors.New(AccountBlockedMessage)
+
 type Account struct {
 	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Email             string
 	Name              string
 	InstallationAdmin bool `gorm:"default:false"`
 	PasswordChangedAt *time.Time
+	BlockedAt         *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 }
 
 func (a *Account) IsInstallationAdmin() bool {
 	return a.InstallationAdmin
+}
+
+func (a *Account) IsBlocked() bool {
+	return a != nil && a.BlockedAt != nil
 }
 
 // IsSessionFresh reports whether a token issued at the given Unix timestamp
@@ -61,6 +71,49 @@ func DemoteFromInstallationAdmin(accountID string) error {
 		Where("id = ?", accountID).
 		Update("installation_admin", false).
 		Error
+}
+
+// Block marks the account blocked, invalidates sessions, and clears personal
+// tokens plus org API keys created by the account's users.
+func (a *Account) Block(tx *gorm.DB, now time.Time) error {
+	if a == nil {
+		return errors.New("account is required")
+	}
+	if a.IsBlocked() {
+		return nil
+	}
+
+	err := tx.Model(a).Update("blocked_at", now).Error
+	if err != nil {
+		return err
+	}
+	a.BlockedAt = &now
+
+	if err := a.MarkPasswordChangedInTransaction(tx, now); err != nil {
+		return err
+	}
+	if err := ClearTokenHashesForAccountInTransaction(tx, a.ID); err != nil {
+		return err
+	}
+	return ClearAPIKeyTokenHashesCreatedByAccount(tx, a.ID)
+}
+
+// Unblock clears the blocked flag. Existing sessions remain invalid; the user
+// must sign in again.
+func (a *Account) Unblock(tx *gorm.DB) error {
+	if a == nil {
+		return errors.New("account is required")
+	}
+	if !a.IsBlocked() {
+		return nil
+	}
+
+	err := tx.Model(a).Update("blocked_at", nil).Error
+	if err != nil {
+		return err
+	}
+	a.BlockedAt = nil
+	return nil
 }
 
 func CreateAccount(name, email string) (*Account, error) {
