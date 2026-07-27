@@ -38,8 +38,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   field,
   value,
   onChange,
-  domainId,
-  domainType,
   integrationId,
   organizationId,
   hasError: _,
@@ -184,8 +182,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             updateItem(index, newItem);
           }}
           allValues={nestedValues}
-          domainId={domainId}
-          domainType={domainType}
           integrationId={integrationId}
           organizationId={organizationId}
           hasError={hasNestedError}

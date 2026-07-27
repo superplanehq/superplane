@@ -269,7 +269,7 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 
 	require.Equal(t, http.StatusNotFound, response.Code)
 
-	eventCount, err := models.CountCanvasEvents(canvas.ID, nodeID)
+	eventCount, err := models.CountCanvasEvents(database.Conn(), canvas.ID, nodeID)
 	require.NoError(t, err)
 	assert.Zero(t, eventCount)
 }

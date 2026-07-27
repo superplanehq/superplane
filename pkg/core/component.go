@@ -47,6 +47,7 @@ type ExecutionContext struct {
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
+	Runs           RunExecutionContext
 }
 
 type AppExecutionContext interface {
@@ -207,6 +208,8 @@ type ProcessQueueContext struct {
 
 type SecretsContext interface {
 	GetKey(secretName, keyName string) ([]byte, error)
+	GetSecretKeys(secretName string) (map[string][]byte, error)
+	GetIntegrationKeys(installationName string) (map[string][]byte, error)
 }
 
 type User struct {

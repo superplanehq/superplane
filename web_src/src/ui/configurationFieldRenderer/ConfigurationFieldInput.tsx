@@ -1,5 +1,4 @@
 import type React from "react";
-import type { AuthorizationDomainType } from "@/api-client";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
 import { CronFieldRenderer } from "./CronFieldRenderer";
@@ -12,6 +11,8 @@ import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
+import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
+import { RunParametersFieldRenderer } from "./RunParametersFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -19,6 +20,8 @@ import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
+import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
+import { SecretFieldRenderer, type SecretRefValue } from "./SecretFieldRenderer";
 import { SelectFieldRenderer } from "./SelectFieldRenderer";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { TextFieldRenderer } from "./TextFieldRenderer";
@@ -32,8 +35,6 @@ import { XMLFieldRenderer } from "./XMLFieldRenderer";
 
 type ConfigurationFieldInputProps = {
   commonProps: FieldRendererProps;
-  domainId?: string;
-  domainType?: AuthorizationDomainType;
   integrationId?: string;
   organizationId?: string;
   allowExpressions: boolean;
@@ -45,10 +46,31 @@ type ConfigurationFieldInputProps = {
   labelRightReady: boolean;
 };
 
+function isPrincipalField(fieldType: string | undefined): boolean {
+  return fieldType === "user" || fieldType === "role" || fieldType === "group";
+}
+
+function fieldRequiresOrganizationContext(fieldType: string | undefined): boolean {
+  return (
+    fieldType === "user" ||
+    fieldType === "role" ||
+    fieldType === "group" ||
+    fieldType === "integration-resource" ||
+    fieldType === "app" ||
+    fieldType === "app-canvas-node" ||
+    fieldType === "run-parameters" ||
+    fieldType === "secret-key" ||
+    fieldType === "secret" ||
+    fieldType === "integration"
+  );
+}
+
+function OrganizationContextRequiredMessage() {
+  return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
+}
+
 export function ConfigurationFieldInput({
   commonProps,
-  domainId,
-  domainType,
   integrationId,
   organizationId,
   allowExpressions,
@@ -61,8 +83,12 @@ export function ConfigurationFieldInput({
 }: ConfigurationFieldInputProps) {
   const { field, value, onChange, allValues } = commonProps;
 
-  if (field.type === "user" || field.type === "role" || field.type === "group") {
-    return renderPrincipalField({ commonProps, domainId });
+  if (fieldRequiresOrganizationContext(field.type) && !organizationId) {
+    return <OrganizationContextRequiredMessage />;
+  }
+
+  if (isPrincipalField(field.type)) {
+    return renderPrincipalField({ commonProps, organizationId: organizationId! });
   }
 
   if (field.type === "integration-resource") {
@@ -72,7 +98,7 @@ export function ConfigurationFieldInput({
         value={value as string | string[] | undefined}
         onChange={onChange}
         allValues={allValues}
-        organizationId={organizationId}
+        organizationId={organizationId!}
         integrationId={integrationId}
         allowExpressions={allowExpressions}
         autocompleteExampleObj={autocompleteExampleObj}
@@ -88,61 +114,93 @@ export function ConfigurationFieldInput({
         field={field}
         value={value as string | undefined}
         onChange={onChange}
-        organizationId={organizationId}
+        organizationId={organizationId!}
         readOnly={commonProps.readOnly}
       />
     );
   }
 
-  if (field.type === "secret-key") {
-    if (!domainId && !organizationId) {
-      return (
-        <div className="text-sm text-red-500 dark:text-red-400">
-          Secret key field requires domain or organization context.
-        </div>
-      );
-    }
+  if (field.type === "app-canvas-node") {
+    return (
+      <AppCanvasNodeFieldRenderer
+        field={field}
+        value={value as string | undefined}
+        onChange={onChange}
+        allValues={allValues}
+        organizationId={organizationId!}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
 
+  if (field.type === "run-parameters") {
+    return (
+      <RunParametersFieldRenderer
+        {...commonProps}
+        organizationId={organizationId!}
+        allowExpressions={allowExpressions}
+        autocompleteExampleObj={autocompleteExampleObj}
+        validationErrors={validationErrors}
+        fieldPath={fieldPath}
+      />
+    );
+  }
+
+  if (field.type === "secret-key") {
     return (
       <SecretKeyFieldRenderer
         field={field}
         isRequired={isRequired}
         value={value as SecretKeyRefValue}
         onChange={(nextValue) => onChange(nextValue)}
-        organizationId={organizationId ?? domainId}
+        organizationId={organizationId!}
+      />
+    );
+  }
+
+  if (field.type === "integration") {
+    return (
+      <IntegrationFieldRenderer
+        field={field}
+        isRequired={isRequired}
+        value={value as IntegrationRefValue}
+        onChange={(nextValue) => onChange(nextValue)}
+        organizationId={organizationId!}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "secret") {
+    return (
+      <SecretFieldRenderer
+        field={field}
+        isRequired={isRequired}
+        value={value as SecretRefValue}
+        onChange={(nextValue) => onChange(nextValue)}
+        organizationId={organizationId!}
+        readOnly={commonProps.readOnly}
       />
     );
   }
 
   if (field.type === "list") {
     return (
-      <ListFieldRenderer
-        {...commonProps}
-        domainId={domainId}
-        domainType={domainType}
-        validationErrors={validationErrors}
-        fieldPath={fieldPath || field.name}
-      />
+      <ListFieldRenderer {...commonProps} validationErrors={validationErrors} fieldPath={fieldPath || field.name} />
     );
-  }
-
-  if (field.type === "object") {
-    return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />;
   }
 
   return renderStandardField({ commonProps });
 }
 
-function renderPrincipalField({ commonProps, domainId }: { commonProps: FieldRendererProps; domainId?: string }) {
+function renderPrincipalField({
+  commonProps,
+  organizationId,
+}: {
+  commonProps: FieldRendererProps;
+  organizationId: string;
+}) {
   const { field, value, onChange, allValues, readOnly } = commonProps;
-
-  if (!domainId) {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">
-        {principalFieldLabel(field.type)} field requires domainId prop
-      </div>
-    );
-  }
 
   if (field.type === "user") {
     return (
@@ -150,7 +208,7 @@ function renderPrincipalField({ commonProps, domainId }: { commonProps: FieldRen
         field={field}
         value={value as string}
         onChange={onChange}
-        domainId={domainId}
+        organizationId={organizationId}
         allValues={allValues}
         readOnly={readOnly}
       />
@@ -163,7 +221,7 @@ function renderPrincipalField({ commonProps, domainId }: { commonProps: FieldRen
         field={field}
         value={value as string}
         onChange={onChange}
-        domainId={domainId}
+        organizationId={organizationId}
         allValues={allValues}
         readOnly={readOnly}
       />
@@ -176,7 +234,7 @@ function renderPrincipalField({ commonProps, domainId }: { commonProps: FieldRen
       field={field}
       value={value as string}
       onChange={onChange}
-      domainId={domainId}
+      organizationId={organizationId}
       allValues={allValues}
       readOnly={readOnly}
     />
@@ -185,6 +243,10 @@ function renderPrincipalField({ commonProps, domainId }: { commonProps: FieldRen
 
 function renderStandardField({ commonProps }: { commonProps: FieldRendererProps }) {
   const { field } = commonProps;
+
+  if (field.type === "object") {
+    return <ObjectFieldRenderer {...commonProps} />;
+  }
 
   if (isTextField(field.type)) {
     return renderTextField(commonProps);
@@ -291,10 +353,4 @@ function isReferenceField(fieldType: string | undefined): boolean {
     fieldType === "timezone" ||
     fieldType === "any-predicate-list"
   );
-}
-
-function principalFieldLabel(fieldType: string | undefined): string {
-  if (fieldType === "user") return "User";
-  if (fieldType === "role") return "Role";
-  return "Group";
 }

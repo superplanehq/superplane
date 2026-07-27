@@ -2,6 +2,7 @@ import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
 import { buildStorybookAgentChat, buildStorybookAgentMessages, STORYBOOK_AGENT_CHAT_ID } from "./agentChatResponses";
 import defaultRaw from "./canvasAppResponses.json";
+import softwareFactoryHowItWorks from "./repository/softwareFactory.howItWorks.md?raw";
 import softwareFactoryReadme from "./repository/softwareFactory.README.md?raw";
 
 // Shape of a captured fixture. Endpoint bodies are stored verbatim as the
@@ -25,9 +26,9 @@ export interface CanvasAppFixture {
   /** GET /api/v1/canvases/{canvasId} */
   canvas?: { canvas?: { spec?: unknown; metadata?: { name?: string } } };
   /** GET /api/v1/canvases/{canvasId}/versions[?limit=50] */
-  versions?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  versions?: { versions?: Array<Record<string, unknown>> };
   /** GET /api/v1/canvases/{canvasId}/versions?limit=1 */
-  versionsLatest?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  versionsLatest?: { versions?: Array<Record<string, unknown>> };
   /** GET /api/v1/canvases/{canvasId}/runs (all pages collapsed into one) */
   runs?: {
     runs?: Array<Record<string, unknown>>;
@@ -74,10 +75,8 @@ const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml
 
 const capturedFixture = defaultRaw as CanvasAppFixture;
 
-// Live Canvas stories need a real console.yaml: `useCanvasConsole` treats an
-// empty/missing file as `undefined`, which TanStack Query rejects. Seed one
-// markdown panel that reuses the README showcase so Console and Files stay in
-// sync while we prototype markdown rendering.
+// Live Canvas / Software Factory console: Create a task (inline) beside a
+// factory pipeline board. `useCanvasConsole` rejects an empty file.
 const defaultConsoleYaml =
   capturedFixture.consoleYaml ??
   materializeConsoleSpec({
@@ -85,19 +84,94 @@ const defaultConsoleYaml =
     canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Software Factory",
     panels: [
       {
-        id: "markdown-showcase",
+        id: "submit-task",
+        type: "nodes",
+        content: {
+          title: "Create a task",
+          nodes: [
+            {
+              node: "create-task-start",
+              formMode: "inline",
+              showFieldLabels: false,
+              showNodeLabel: false,
+              showRun: true,
+              submitLabel: "Work on it",
+              triggerName: "Create Task",
+            },
+          ],
+        },
+      },
+      {
+        id: "how-it-works",
         type: "markdown",
         content: {
-          title: "Software Factory",
-          body: softwareFactoryReadme,
+          title: "How it works",
+          body: softwareFactoryHowItWorks,
           variables: [],
         },
       },
+      {
+        id: "pipeline-board",
+        type: "board",
+        content: {
+          title: "Your Factory Pipeline",
+          dataSource: {
+            kind: "runs",
+            limit: 100,
+            triggers: ["on-issue-labeled-trigger", "component-node-4m9qti"],
+          },
+          render: {
+            kind: "board",
+            // Use `"Mark PR Ready" in $` — accessing `$["Mark PR Ready"].state`
+            // throws when the node never ran, which drops In-progress cards.
+            groupBy: `{{ status == "passed" ? "Done" :
+   status == "failed" || status == "cancelled" ? "Failed" :
+   ("Mark PR Ready" in $) ? "Human review" :
+   "In progress" }}`,
+            lanes: [
+              { value: "In progress", color: "blue" },
+              { value: "Human review", color: "yellow", label: "Human review" },
+              { value: "Failed", color: "red" },
+              { value: "Done", color: "green" },
+            ],
+            otherLane: false,
+            sort: { field: "updatedAt", order: "desc" },
+            where: [{ field: '$["Open Draft PR"].state', op: "exists" }],
+            emptyMessage: "No factory pull requests yet. Submit a task to start one.",
+            card: {
+              titleField: `{{ $["Open Draft PR"].data.title != null
+   ? $["Open Draft PR"].data.title
+   : payload.data.issue.title }}`,
+              fields: [
+                {
+                  field: '$["Open Draft PR"].data.number',
+                  format: "link",
+                  href: '{{ $["Open Draft PR"].data.html_url }}',
+                  label: "PR",
+                },
+                {
+                  field: "payload.data.issue.number",
+                  format: "link",
+                  href: "{{ payload.data.issue.html_url }}",
+                  label: "Issue",
+                },
+                { field: "durationMs", format: "duration", label: "Elapsed" },
+                { field: "updatedAt", format: "relative", label: "Updated" },
+              ],
+            },
+          },
+        },
+      },
     ],
-    layout: [{ i: "markdown-showcase", x: 0, y: 0, w: 12, h: 20, minW: 4, minH: 4 }],
+    layout: [
+      // Left column 50/50 prompt + how-it-works; board matches stacked height.
+      { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
+      { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
+      { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
+    ],
   });
 
-const defaultFixture = {
+export const defaultCanvasAppFixture = {
   ...capturedFixture,
   consoleYaml: defaultConsoleYaml,
   repositoryFileContents: {
@@ -105,6 +179,8 @@ const defaultFixture = {
     ...capturedFixture.repositoryFileContents,
   },
 } satisfies CanvasAppFixture;
+
+const defaultFixture = defaultCanvasAppFixture;
 
 export const canvasAppIds = {
   organizationId: defaultFixture.organizationId,
@@ -179,14 +255,22 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     // for the version list, which is all the versions sidebar needs).
     {
       pattern: re(`${CANVAS}/versions/([^/]+)`),
-      resolve: (m) => ({
-        json: {
-          version: {
-            metadata: { ...(fixture.versions?.versions?.[0]?.metadata ?? {}), id: m[1] },
-            spec: fixture.canvas?.canvas?.spec ?? {},
+      resolve: (m) => {
+        const firstVersion = fixture.versions?.versions?.[0];
+        const baseMetadata =
+          firstVersion && typeof firstVersion === "object" && "metadata" in firstVersion
+            ? (firstVersion.metadata as Record<string, unknown> | undefined)
+            : firstVersion;
+
+        return {
+          json: {
+            version: {
+              metadata: { ...(baseMetadata ?? {}), id: m[1] },
+              spec: fixture.canvas?.canvas?.spec ?? {},
+            },
           },
-        },
-      }),
+        };
+      },
     },
 
     // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).

@@ -5,6 +5,7 @@ import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { AppPage } from "@/pages/app";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { HomePage } from "@/pages/home";
@@ -55,21 +56,12 @@ export interface OrgWorkspaceHarnessProps {
   appFixture?: CanvasAppFixture;
 }
 
-/**
- * Shared Storybook shell for org home + app editor so the real React Router
- * links work: logo/Homepage → home, Software Factory card → live canvas.
- */
-export function OrgWorkspaceHarness({
-  startAt = "home",
-  pathSuffix = "",
-  appQuery = "",
-  openAgentSidebar = false,
-  homeFixture,
-  appFixture,
-}: OrgWorkspaceHarnessProps) {
-  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
-
+function useOrgWorkspaceFixtureFetch(
+  canvasId: string,
+  openAgentSidebar: boolean,
+  homeFixture?: HomePageFixture,
+  appFixture?: CanvasAppFixture,
+) {
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -92,6 +84,48 @@ export function OrgWorkspaceHarness({
     };
   }, [canvasId, fixtureFetch, openAgentSidebar]);
 
+  return fixtureFetch;
+}
+
+function OrgWorkspaceRoutes() {
+  return (
+    <Routes>
+      <Route
+        path=":organizationId"
+        element={
+          <PermissionsProvider>
+            <Outlet />
+          </PermissionsProvider>
+        }
+      >
+        <Route index element={<HomePage />} />
+        <Route path="apps/new" element={<NewAppPage />} />
+        <Route path="apps/:appId" element={<AppPage />} />
+        <Route
+          path="settings/integrations/:integrationName/setup"
+          element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
+        />
+      </Route>
+    </Routes>
+  );
+}
+
+/**
+ * Shared Storybook shell for org home + app editor so the real React Router
+ * links work: logo/Homepage → home, Software Factory card → live canvas.
+ */
+export function OrgWorkspaceHarness({
+  startAt = "home",
+  pathSuffix = "",
+  appQuery = "",
+  openAgentSidebar = false,
+  homeFixture,
+  appFixture,
+}: OrgWorkspaceHarnessProps) {
+  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+  useOrgWorkspaceFixtureFetch(canvasId, openAgentSidebar, homeFixture, appFixture);
+
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
   const initialPath = startAt === "app" ? appPath : homePath;
@@ -100,28 +134,17 @@ export function OrgWorkspaceHarness({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={150}>
-        <div className="h-dvh w-full overflow-auto">
-          <MemoryRouter initialEntries={[initialPath]}>
-            <AccountProvider>
-              <Routes>
-                <Route
-                  path=":organizationId"
-                  element={
-                    <PermissionsProvider>
-                      <Outlet />
-                    </PermissionsProvider>
-                  }
-                >
-                  <Route index element={<HomePage />} />
-                  <Route path="apps/new" element={<NewAppPage />} />
-                  <Route path="apps/:appId" element={<AppPage />} />
-                </Route>
-              </Routes>
-            </AccountProvider>
-          </MemoryRouter>
-        </div>
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider delayDuration={150}>
+          <div className="h-dvh w-full overflow-auto">
+            <MemoryRouter initialEntries={[initialPath]}>
+              <AccountProvider>
+                <OrgWorkspaceRoutes />
+              </AccountProvider>
+            </MemoryRouter>
+          </div>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

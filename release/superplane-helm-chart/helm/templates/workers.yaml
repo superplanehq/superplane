@@ -53,6 +53,8 @@ spec:
               value: "yes"
             - name: START_RUN_FINALIZER
               value: "yes"
+            - name: START_RUN_INITIALIZER
+              value: "yes"
             - name: START_NODE_EXECUTOR
               value: "yes"
             - name: START_EXECUTION_TERMINATOR
@@ -72,6 +74,8 @@ spec:
             - name: START_INTEGRATION_CLEANUP_WORKER
               value: "yes"
             - name: START_CANVAS_CLEANUP_WORKER
+              value: "yes"
+            - name: START_NODE_REQUEST_CLEANUP_WORKER
               value: "yes"
             - name: START_REPOSITORY_PROVISIONER
               value: "yes"

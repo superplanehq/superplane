@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
@@ -51,9 +52,15 @@ The setting applies only to runs that **finish** — including ones that fail or
 
 Kept sessions and environments are not reclaimed automatically, so delete them yourself once you're done debugging.
 
+## Structured Output
+
+Optional: a JSON Schema the agent is asked to match in its final message, in addition to the PR it opens. Managed Agents sessions have no server-enforced equivalent to the Messages API's ` + "`output_config.format`" + ` used by Text Prompt, so this works by appending instructions to the task asking the agent to include a JSON code block matching the schema, then best-effort parsing it from the final message. Treat the result as best-effort, not a guarantee — validate before relying on it downstream.
+
 ## Output
 
 Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
+
+When Structured Output is configured, **parsed** carries the JSON object extracted from the final message — only when the session finished normally (idle), never on a timeout, error, or terminated session.
 
 Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are additionally emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only).`
 }
@@ -106,6 +113,11 @@ func (a *RunCodeAgent) Configuration() []configuration.Field {
 			Name: "task", Label: "Task", Type: configuration.FieldTypeText, Required: true,
 			Description: "What the agent should do.",
 		},
+		structuredoutput.ConfigField(
+			"outputSchema",
+			"Structured Output",
+			"A JSON Schema the agent is asked to match in its final message, alongside the PR it opens. Best-effort: Managed Agents sessions have no server-side schema enforcement, so this is prompt-guided, not guaranteed.",
+		),
 		{
 			Name: "githubToken", Label: "GitHub Token", Type: configuration.FieldTypeSecretKey, Required: true,
 			Description: "SuperPlane secret holding a GitHub token with repo + pull request permissions.",
@@ -167,6 +179,9 @@ func (a *RunCodeAgent) Setup(ctx core.SetupContext) error {
 	if err := validateConfiguredFiles(ctx, spec.Files); err != nil {
 		return err
 	}
+	if err := structuredoutput.ValidateAtSetup(spec.OutputSchema); err != nil {
+		return err
+	}
 	return setNodeMetadata(ctx, spec)
 }
 
@@ -180,6 +195,11 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	if err := validateSpec(spec); err != nil {
+		return err
+	}
+
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
+	if err != nil {
 		return err
 	}
 
@@ -219,7 +239,7 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := a.startSession(ctx, client, spec, pr, attribution, meta, resources); err != nil {
+	if err := a.startSession(ctx, client, spec, pr, attribution, meta, resources, schema); err != nil {
 		return err
 	}
 
@@ -229,7 +249,7 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 
-	handled, err := a.emitIfTerminal(ctx, client, spec, meta, refreshed)
+	handled, err := a.emitIfTerminal(ctx, client, spec, meta, refreshed, schema)
 	if err != nil {
 		return err
 	}
@@ -251,7 +271,7 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 // On any failure it reclaims all provisioned resources — always, regardless of
 // "Keep Session After Run": the run never started, so there is no transcript
 // worth keeping, and no poll exists to reclaim it later.
-func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.Client, spec Spec, pr *pullRequestInfo, attribution commitAttribution, meta *ExecutionMetadata, resources []runagent.FileResource) error {
+func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.Client, spec Spec, pr *pullRequestInfo, attribution commitAttribution, meta *ExecutionMetadata, resources []runagent.FileResource, schema map[string]any) error {
 	session, err := client.CreateManagedSession(runagent.CreateManagedSessionRequest{
 		Agent:         meta.AgentID,
 		EnvironmentID: meta.EnvironmentID,
@@ -268,7 +288,7 @@ func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	message := buildPrompt(spec, pr, meta.Branch, len(spec.Files) > 0, attribution)
+	message := buildPrompt(spec, pr, meta.Branch, len(spec.Files) > 0, attribution, schema)
 	if err := client.SendManagedSessionUserMessage(session.ID, message); err != nil {
 		a.teardown(client, meta, true, false, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to send task to agent: %w", err)
@@ -367,7 +387,7 @@ func warnErr(logWarn func(string, ...any), err error, format string, args ...any
 }
 
 // emitIfTerminal handles fast tasks that finish before the first poll.
-func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagent.Client, spec Spec, meta *ExecutionMetadata, session *runagent.ManagedSession) (bool, error) {
+func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagent.Client, spec Spec, meta *ExecutionMetadata, session *runagent.ManagedSession, schema map[string]any) (bool, error) {
 	if session == nil || !isSessionTerminal(session.Status) {
 		return false, nil
 	}
@@ -379,6 +399,7 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	}
 
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
+	applyStructuredOutput(&out, session.Status, schema)
 	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v; scheduling poll.", meta.Session.ID, err)
@@ -604,8 +625,9 @@ func setNodeMetadata(ctx core.SetupContext, spec Spec) error {
 		return nil
 	}
 	meta := NodeMetadata{
-		SourceMode: spec.SourceMode,
-		Model:      modelForRun(spec),
+		SourceMode:       spec.SourceMode,
+		Model:            modelForRun(spec),
+		StructuredOutput: strings.TrimSpace(spec.OutputSchema) != "",
 	}
 	if spec.SourceMode == sourceModePR {
 		meta.PrURL = strings.TrimSpace(spec.PrURL)

@@ -56,7 +56,7 @@ Each Manual Run trigger exposes a list of templates. A template has:
 - ` + "`parameters`" + ` (optional): a list of typed parameters exposed to payload expressions as ` + "`parameters[\"name\"]`" + ` and used by the run form
 - ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` and ` + "`{{ parameters[\"my parameter\"] }}`" + ` in JSON values.
 
-Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, ` + "`boolean`" + `, or ` + "`select`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type. Select parameters also require an ` + "`options`" + ` list of ` + "`label`" + ` / ` + "`value`" + ` pairs; run-time values use the option ` + "`value`" + ` strings.
+Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`text`" + `, ` + "`number`" + `, ` + "`boolean`" + `, or ` + "`select`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type. ` + "`string`" + ` is a single-line input and ` + "`text`" + ` renders a multi-line textarea; both use ` + "`defaultString`" + `. Select parameters also require an ` + "`options`" + ` list of ` + "`label`" + ` / ` + "`value`" + ` pairs; run-time values use the option ` + "`value`" + ` strings.
 
 ## Event Data
 
@@ -124,6 +124,7 @@ func (s *Start) Configuration() []configuration.Field {
 														Select: &configuration.SelectTypeOptions{
 															Options: []configuration.FieldOption{
 																{Label: "String", Value: configuration.FieldTypeString},
+																{Label: "Text (multi-line)", Value: configuration.FieldTypeText},
 																{Label: "Number", Value: configuration.FieldTypeNumber},
 																{Label: "Boolean", Value: configuration.FieldTypeBool},
 																{Label: "Select", Value: configuration.FieldTypeSelect},
@@ -181,7 +182,7 @@ func (s *Start) Configuration() []configuration.Field {
 													Type:      configuration.FieldTypeString,
 													Togglable: true,
 													VisibilityConditions: []configuration.VisibilityCondition{
-														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeSelect}},
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeText, configuration.FieldTypeSelect}},
 													},
 													TypeOptions: &configuration.TypeOptions{
 														String: &configuration.StringTypeOptions{
@@ -224,7 +225,7 @@ func (s *Start) Configuration() []configuration.Field {
 													Togglable: true,
 													Type:      configuration.FieldTypeString,
 													VisibilityConditions: []configuration.VisibilityCondition{
-														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeNumber}},
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeText, configuration.FieldTypeNumber}},
 													},
 													TypeOptions: &configuration.TypeOptions{
 														String: &configuration.StringTypeOptions{

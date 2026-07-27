@@ -722,6 +722,38 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeTimezone:
 		return validateTimezone(field, value)
+
+	case FieldTypeIntegration:
+		return validateIntegration(value)
+
+	case FieldTypeSecret:
+		return validateSecret(value)
+	}
+
+	return nil
+}
+
+func validateIntegration(value any) error {
+	ref, err := DecodeIntegrationRef(value)
+	if err != nil {
+		return err
+	}
+
+	if !ref.IsSet() {
+		return fmt.Errorf("integration is required")
+	}
+
+	return nil
+}
+
+func validateSecret(value any) error {
+	ref, err := DecodeSecretRef(value)
+	if err != nil {
+		return err
+	}
+
+	if !ref.IsSet() {
+		return fmt.Errorf("secret is required")
 	}
 
 	return nil

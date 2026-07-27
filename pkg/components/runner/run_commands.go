@@ -177,6 +177,7 @@ func (c *Runner) Configuration() []configuration.Field {
 				},
 			},
 		},
+		environmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -286,7 +287,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -305,7 +306,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       cmds,
+		Commands:       BrokerCommandsFromLines(cmds),
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,

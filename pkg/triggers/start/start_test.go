@@ -237,6 +237,50 @@ func TestStart_Configuration_NonSelectParameterDoesNotRequireOptions(t *testing.
 	require.NoError(t, err)
 }
 
+func TestStart_Configuration_AcceptsTextParameter(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Prompted",
+				"payload": map[string]any{"prompt": "hi"},
+				"parameters": []any{
+					map[string]any{
+						"name":          "prompt",
+						"type":          "text",
+						"defaultString": "Write about\nsomething useful.",
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+}
+
+func TestStart_Configuration_TextParameterRejectsNonString(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Prompted",
+				"payload": map[string]any{"prompt": "hi"},
+				"parameters": []any{
+					map[string]any{
+						"name":          "prompt",
+						"type":          "text",
+						"defaultString": 42,
+					},
+				},
+			},
+		},
+	})
+
+	require.Error(t, err)
+}
+
 func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {
 	s := &Start{}
 

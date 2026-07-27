@@ -2,14 +2,10 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -17,26 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organizationID, canvasID string) (*pb.ListCanvasMemoriesResponse, error) {
-	orgUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid canvas_id")
-	}
-
-	err = checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
-	records, err := listCanvasMemories(ctx, canvasUUID)
+func ListCanvasMemories(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.ListCanvasMemoriesResponse, error) {
+	records, err := listCanvasMemories(ctx, db, canvas)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas memories")
 	}
@@ -51,11 +29,11 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 	}, nil
 }
 
-func listCanvasMemories(ctx context.Context, canvasUUID uuid.UUID) (records []models.CanvasMemory, err error) {
+func listCanvasMemories(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (records []models.CanvasMemory, err error) {
 	ctx, done := telemetry.Span(ctx, "memories.list")
 	defer done(&err)
 
-	return models.ListCanvasMemoriesInTransaction(database.DB(ctx), canvasUUID)
+	return models.ListCanvasMemoriesInTransaction(db, canvas.ID)
 }
 
 func serializeCanvasMemories(ctx context.Context, records []models.CanvasMemory) (items []*pb.CanvasMemory, err error) {

@@ -2,7 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { RunInspectorUpstreamSection } from "./runNodeDetailModel";
+import type { RunInspectorUpstreamSection } from "./types";
 import { JsonPayload } from "./RunInspectorTimelineCard";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
 import { NodeMarker } from "./RunInspectorTimelineMarkers";

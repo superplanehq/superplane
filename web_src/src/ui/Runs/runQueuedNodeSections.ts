@@ -4,7 +4,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorNodeSection } from "./types";
 
 export function buildQueuedNodeSections({
   run,

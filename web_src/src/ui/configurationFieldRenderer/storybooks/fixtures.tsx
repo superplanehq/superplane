@@ -39,6 +39,9 @@ export const STORY_INTEGRATION_REF: ComponentsIntegrationRef = {
   id: STORY_INTEGRATION_ID,
   name: "GitHub Production",
 };
+export const STORY_CONFIGURATION_INTEGRATION_REF = {
+  name: "GitHub Production",
+};
 
 export const STORY_INTEGRATIONS: OrganizationsIntegration[] = [
   {
@@ -599,6 +602,33 @@ export const rendererExamples: RendererExample[] = [
     initialValue: "canvas_billing_alerts",
   },
   {
+    id: "app-canvas-node",
+    storyName: "AppCanvasNodeField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeAppCanvasNode",
+    docsDescription:
+      "Use `app-canvas-node` when a field must reference a node in another app, optionally filtered by node type and component.",
+    field: baseField({
+      name: "node",
+      label: "Run node",
+      type: "app-canvas-node",
+      description: "Select the On Run trigger in the target app.",
+      required: true,
+      typeOptions: {
+        appCanvasNode: {
+          nodeTypes: ["trigger"],
+          componentTypes: ["onRun"],
+          parameters: [{ name: "app", valueFrom: { field: "app" } }],
+        },
+      },
+    }),
+    allValues: {
+      app: "canvas_billing_alerts",
+    },
+    initialValue: "on-invoke",
+  },
+  {
     id: "any-predicate-list",
     storyName: "AnyPredicateListField",
     category: "Structured Content",
@@ -662,6 +692,42 @@ export const rendererExamples: RendererExample[] = [
     initialValue: {
       secret: "deploy-credentials",
       key: "TOKEN",
+    },
+  },
+  {
+    id: "integration",
+    storyName: "IntegrationField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeIntegration",
+    docsDescription:
+      "Use `integration` when the configuration should reference a connected integration instance instead of raw id/name fields.",
+    field: baseField({
+      name: "connectedIntegration",
+      label: "Integration",
+      type: "integration",
+      description: "Select a connected integration instance from the organization.",
+      placeholder: "Select integration",
+    }),
+    initialValue: STORY_CONFIGURATION_INTEGRATION_REF,
+  },
+  {
+    id: "secret",
+    storyName: "SecretField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeSecret",
+    docsDescription:
+      "Use `secret` when the configuration should reference an organization secret by name, for example to import all of its keys.",
+    field: baseField({
+      name: "organizationSecret",
+      label: "Secret",
+      type: "secret",
+      description: "Select an organization secret by name.",
+      placeholder: "Select secret",
+    }),
+    initialValue: {
+      secret: "deploy-credentials",
     },
   },
   {
@@ -762,6 +828,19 @@ const mockGroups = [
     },
   },
 ];
+
+const mockTargetAppCanvas = {
+  id: "canvas_billing_alerts",
+  name: "Billing Alerts",
+  organizationId: STORY_ORGANIZATION_ID,
+  spec: {
+    nodes: [
+      { id: "on-run", name: "On Run", type: "TYPE_TRIGGER", component: "onRun" },
+      { id: "on-broadcast", name: "On Broadcast", type: "TYPE_TRIGGER", component: "onBroadcast" },
+      { id: "send-email", name: "Send Email", type: "TYPE_ACTION", component: "sendEmail" },
+    ],
+  },
+};
 
 const mockCanvases = [
   {
@@ -865,10 +944,12 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(organizationKeys.roles(STORY_DOMAIN_ID), mockRoles);
   queryClient.setQueryData(organizationKeys.groups(STORY_DOMAIN_ID), mockGroups);
   queryClient.setQueryData(canvasKeys.list(STORY_ORGANIZATION_ID), mockCanvases);
+  queryClient.setQueryData(canvasKeys.detail(STORY_ORGANIZATION_ID, "canvas_billing_alerts"), mockTargetAppCanvas);
   queryClient.setQueryData(
     integrationKeys.resources(STORY_ORGANIZATION_ID, STORY_INTEGRATION_ID, "repository"),
     mockIntegrationResources,
   );
+  queryClient.setQueryData(integrationKeys.connected(STORY_ORGANIZATION_ID), STORY_INTEGRATIONS);
   queryClient.setQueryData(secretKeys.byDomain(STORY_DOMAIN_ID, STORY_DOMAIN_TYPE), mockSecrets);
 
   Object.entries(mockSecretDetails).forEach(([secretRef, secret]) => {
