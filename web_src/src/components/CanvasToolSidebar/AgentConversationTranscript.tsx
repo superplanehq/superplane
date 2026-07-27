@@ -47,9 +47,9 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   return (
     <div
       ref={scrollRef}
-      // Explicit selection colors keep highlighted text readable in both themes; without them the
-      // browser default leaves light dark-mode text on a light highlight (issue #6372).
-      className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 selection:bg-blue-300/60 selection:text-slate-900 dark:selection:bg-blue-400/45 dark:selection:text-gray-50"
+      // `agent-chat-selection` applies the theme-aware `::selection` colors defined in App.css so
+      // highlighted text stays readable in both light and dark mode (issue #6372).
+      className="agent-chat-selection min-h-0 min-w-0 flex-1 overflow-y-auto px-3"
       data-testid="agent-chat-messages"
     >
       <div className="mx-auto w-full max-w-[800px] py-3">
