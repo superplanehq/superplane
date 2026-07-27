@@ -94,7 +94,7 @@ func (steps *TestHomePageSteps) AssertNotRedirectedToNewApp() {
 
 func (steps *TestHomePageSteps) AssertNewAppPageNotFound() {
 	steps.session.AssertText("404")
-	steps.session.AssertHidden(q.Text("Start from scratch"))
+	steps.session.AssertHidden(q.Text("Create a blank app"))
 }
 
 func (steps *TestHomePageSteps) AssertEmptyHomeVisible() {
@@ -104,7 +104,7 @@ func (steps *TestHomePageSteps) AssertEmptyHomeVisible() {
 
 func (steps *TestHomePageSteps) AssertNewAppDisabled() {
 	steps.session.AssertDisabled(q.Locator(`button[aria-label="Create new app"]`))
-	steps.session.AssertHidden(q.Text("Start from scratch"))
+	steps.session.AssertHidden(q.Text("Create a blank app"))
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
@@ -150,7 +150,7 @@ func (steps *TestHomePageSteps) LoginWithCanvasPermissions(roleLabel string, per
 }
 
 func (steps *TestHomePageSteps) ClickStartFromScratch() {
-	steps.session.Click(q.Text("Start from scratch"))
+	steps.session.Click(q.Text("Create a blank app"))
 	steps.session.Sleep(500)
 }
 
@@ -164,6 +164,6 @@ func (steps *TestHomePageSteps) ClickNewApp() {
 		steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
 	}
 
-	steps.session.Click(q.Text("Start from scratch"))
+	steps.session.Click(q.Text("Create a blank app"))
 	steps.session.Sleep(3000)
 }

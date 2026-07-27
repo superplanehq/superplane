@@ -6,21 +6,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"gorm.io/gorm"
 )
 
-func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID string, versionID string) (*pb.DescribeCanvasVersionResponse, error) {
+func DescribeCanvasVersion(ctx context.Context, db *gorm.DB, canvas *models.Canvas, versionID string) (*pb.DescribeCanvasVersionResponse, error) {
 	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	versionUUID, err := uuid.Parse(versionID)
@@ -28,12 +23,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		return nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "canvas not found")
-	}
-
-	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
+	version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, versionUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "version not found")
@@ -42,6 +32,6 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersionMetadata(version, organizationID, nil),
+		Version: SerializeCanvasVersion(version, canvas.OrganizationID.String(), nil),
 	}, nil
 }

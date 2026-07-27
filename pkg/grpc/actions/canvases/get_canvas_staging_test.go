@@ -15,17 +15,17 @@ import (
 
 func Test__GetCanvasStaging(t *testing.T) {
 	r, ctx, canvas, version := setupLiveCanvasStaging(t)
-	orgID := r.Organization.ID.String()
+	defer r.Close()
 
 	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# pending\n")},
 	})
 	require.NoError(t, err)
 
-	state, err := GetCanvasStaging(ctx, orgID, canvas.ID.String())
+	state, err := GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
 	require.NoError(t, err)
 	assert.True(t, state.GetHasStaging())
 	assert.Contains(t, state.GetStagedPaths(), CanvasYAMLRepositoryPath)
@@ -33,12 +33,12 @@ func Test__GetCanvasStaging(t *testing.T) {
 
 func Test__GetCanvasStaging__StagedReadIsPerUser(t *testing.T) {
 	r, ownerCtx, canvas, version := setupLiveCanvasStaging(t)
-	orgID := r.Organization.ID.String()
+	defer r.Close()
 
 	baseline, err := ReadRepositorySpecFile(ownerCtx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ownerCtx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ownerCtx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# staged\n")},
 	})
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func Test__GetCanvasStaging__StagedReadIsPerUser(t *testing.T) {
 	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
-	otherRead, err := ReadStagedRepositorySpecFile(otherCtx, database.DB(otherCtx), orgID, canvas.ID.String(), liveVersion, CanvasYAMLRepositoryPath)
+	otherRead, err := ReadStagedRepositorySpecFile(otherCtx, database.DB(t.Context()), canvas.OrganizationID.String(), canvas.ID.String(), liveVersion, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 	assert.Equal(t, baseline, otherRead)
 }

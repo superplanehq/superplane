@@ -96,9 +96,9 @@ func FindCanvasEventsForExecutions(tx *gorm.DB, executionIDs []string) ([]Canvas
 	return events, nil
 }
 
-func FindCanvasEventForCanvas(canvasID uuid.UUID, id uuid.UUID) (*CanvasEvent, error) {
+func FindCanvasEventForCanvas(db *gorm.DB, canvasID uuid.UUID, id uuid.UUID) (*CanvasEvent, error) {
 	var event CanvasEvent
-	err := database.Conn().
+	err := db.
 		Where("workflow_id = ?", canvasID).
 		Where("id = ?", id).
 		First(&event).
@@ -143,9 +143,9 @@ func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasE
 	return events, nil
 }
 
-func ListCanvasEvents(canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
+func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	query := database.Conn().
+	query := db.
 		Where("workflow_id = ?", canvasID).
 		Where("node_id = ?", nodeID)
 
@@ -165,10 +165,10 @@ func ListCanvasEvents(canvasID uuid.UUID, nodeID string, limit int, before *time
 	return events, nil
 }
 
-func CountCanvasEvents(canvasID uuid.UUID, nodeID string) (int64, error) {
+func CountCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string) (int64, error) {
 	var count int64
 
-	err := database.Conn().
+	err := db.
 		Model(&CanvasEvent{}).
 		Where("workflow_id = ?", canvasID).
 		Where("node_id = ?", nodeID).
