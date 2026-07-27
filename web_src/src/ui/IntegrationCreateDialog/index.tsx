@@ -254,6 +254,34 @@ export function IntegrationCreateDialog({
     setBrowserActionCompleted(true);
   }, [createIntegrationBrowserAction]);
 
+  const handleBrowserActionConfigSave = useCallback(async () => {
+    try {
+      const response = await updateIntegrationMutation.mutateAsync({ configuration });
+      const nextBrowserAction = response.data?.integration?.status?.browserAction;
+      if (nextBrowserAction) {
+        setCreateIntegrationBrowserAction(nextBrowserAction);
+        return;
+      }
+
+      const integrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
+      handleClose();
+      if (integrationId) {
+        onCreated?.(integrationId, integrationName);
+      }
+    } catch {
+      showErrorToast("Failed to save integration configuration");
+    }
+  }, [
+    updateIntegrationMutation,
+    configuration,
+    pendingWebhookSetup?.id,
+    createdIntegrationId,
+    initialCreatedIntegrationId,
+    handleClose,
+    onCreated,
+    integrationName,
+  ]);
+
   const handleFinishBrowserActionSetup = useCallback(async () => {
     const integrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
     if (!integrationId) {
@@ -447,16 +475,22 @@ export function IntegrationCreateDialog({
             </>
           ) : createIntegrationBrowserAction && !browserActionCompleted ? (
             <>
-              <Button
-                type="button"
-                onClick={handleBrowserActionContinue}
-                disabled={!createIntegrationBrowserAction.url}
-                className="flex items-center gap-2"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Continue on GitHub
-              </Button>
-              <Button variant="outline" onClick={handleClose}>
+              {createIntegrationBrowserAction.url ? (
+                <Button type="button" onClick={handleBrowserActionContinue} className="flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Continue setup
+                </Button>
+              ) : (
+                <LoadingButton
+                  color="blue"
+                  onClick={() => void handleBrowserActionConfigSave()}
+                  loading={updateIntegrationMutation.isPending}
+                  loadingText="Saving..."
+                >
+                  Save
+                </LoadingButton>
+              )}
+              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
                 Cancel
               </Button>
             </>
