@@ -459,6 +459,60 @@ func (c *Client) CreateIssue(input map[string]any) (*Issue, error) {
 	return response.IssueCreate.Issue, nil
 }
 
+const issueQuery = `
+query Issue($id: String!) {
+  issue(id: $id) {` + issueFields + `
+  }
+}`
+
+// GetIssue fetches a single issue. Linear accepts either the issue UUID or the
+// human-readable identifier (e.g. ENG-142) as the id argument.
+func (c *Client) GetIssue(id string) (*Issue, error) {
+	response := struct {
+		Issue *Issue `json:"issue"`
+	}{}
+
+	if err := c.execute(issueQuery, map[string]any{"id": id}, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Issue == nil {
+		return nil, fmt.Errorf("issue %s not found", id)
+	}
+
+	return response.Issue, nil
+}
+
+const updateIssueMutation = `
+mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) {
+    success
+    issue {` + issueFields + `
+    }
+  }
+}`
+
+// UpdateIssue applies the given IssueUpdateInput fields to an issue. Like
+// GetIssue, the id may be the issue UUID or its identifier (e.g. ENG-142).
+func (c *Client) UpdateIssue(id string, input map[string]any) (*Issue, error) {
+	response := struct {
+		IssueUpdate struct {
+			Success bool   `json:"success"`
+			Issue   *Issue `json:"issue"`
+		} `json:"issueUpdate"`
+	}{}
+
+	if err := c.execute(updateIssueMutation, map[string]any{"id": id, "input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.IssueUpdate.Success || response.IssueUpdate.Issue == nil {
+		return nil, fmt.Errorf("linear reported the issue was not updated")
+	}
+
+	return response.IssueUpdate.Issue, nil
+}
+
 type Webhook struct {
 	ID     string `json:"id"`
 	URL    string `json:"url"`

@@ -186,7 +186,8 @@ func (c *RunPython) Configuration() []configuration.Field {
 			Description: "Python executed by Python 3. Define def main(payload) and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "python",
+					Language:         "python",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
