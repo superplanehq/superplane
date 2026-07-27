@@ -89,3 +89,65 @@ func TestRunScriptRedirectsOpenCodeHomeIntoTaskDir(t *testing.T) {
 	assert.Equal(t, "ses_test", result["session_id"])
 	assert.Equal(t, "hello", result["result"])
 }
+
+// TestRunScriptSurfacesNestedOpenCodeErrorMessage covers the live-log case
+// where OpenCode emits {"type":"error","error":{"name":"APIError","data":{"message":"…"}}}
+// and we previously printed a bare "✗ error" because extractError ignored
+// error.data.message. Also asserts --auto is passed so headless runs do not
+// hang on permission prompts.
+func TestRunScriptSurfacesNestedOpenCodeErrorMessage(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not available on PATH")
+	}
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available on PATH")
+	}
+
+	taskDir := t.TempDir()
+	binDir := t.TempDir()
+
+	runJS := filepath.Join(taskDir, "run.js")
+	require.NoError(t, os.WriteFile(runJS, []byte(runScript), 0o644))
+
+	promptFile := filepath.Join(taskDir, "prompt.txt")
+	require.NoError(t, os.WriteFile(promptFile, []byte("do the thing"), 0o644))
+
+	resultFile := filepath.Join(taskDir, "result.json")
+	argvDump := filepath.Join(taskDir, "opencode-argv.txt")
+
+	errorEvent := `{"type":"error","sessionID":"ses_err","error":{"name":"APIError","data":{"message":"Invalid API key","statusCode":401,"isRetryable":false}}}`
+	stub := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" > \"$OPENCODE_ARGV_DUMP\"\n" +
+		"printf '%s\\n' '" + errorEvent + "'\n" +
+		"exit 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "opencode"), []byte(stub), 0o755))
+
+	cmd := exec.Command(node, runJS, promptFile, "openai/gpt-4.1")
+	cmd.Env = []string{
+		"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"HOME=" + t.TempDir(),
+		"SUPERPLANE_TASK_DIR=" + taskDir,
+		"SUPERPLANE_RESULT_FILE=" + resultFile,
+		"OPENCODE_ARGV_DUMP=" + argvDump,
+	}
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err, "nested OpenCode error must fail the prompt step: %s", out)
+	assert.Contains(t, string(out), "✗ error: Invalid API key")
+
+	argv, err := os.ReadFile(argvDump)
+	require.NoError(t, err)
+	assert.Contains(t, string(argv), "--auto")
+	assert.Contains(t, string(argv), "--format")
+	assert.Contains(t, string(argv), "json")
+	assert.Contains(t, string(argv), "--model")
+	assert.Contains(t, string(argv), "openai/gpt-4.1")
+
+	resultRaw, err := os.ReadFile(resultFile)
+	require.NoError(t, err)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(resultRaw, &result))
+	assert.Equal(t, true, result["is_error"])
+	assert.Equal(t, "Invalid API key", result["error"])
+	assert.Equal(t, "ses_err", result["session_id"])
+}

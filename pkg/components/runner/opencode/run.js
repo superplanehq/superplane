@@ -60,7 +60,9 @@ async function runPrompt(promptFile, model) {
   const sessionPath = path.join(sp, "session_id");
   const previousSession = readSessionID(sessionPath);
 
-  const openCodeArgs = ["run", "--format", "json", "--model", model];
+  // --auto approves tools that are not explicitly denied so headless runs
+  // do not hang on permission prompts.
+  const openCodeArgs = ["run", "--format", "json", "--auto", "--model", model];
   if (previousSession) {
     // Resume the exact session started by an earlier prompt step. This is
     // safer than `--continue`, which resumes the most recent session in the
@@ -303,15 +305,44 @@ function extractText(event) {
 }
 
 function extractError(event) {
+  // OpenCode's documented error shape nests the human message under
+  // error.data.message (e.g. APIError). Fall back through flatter layouts
+  // used by stubs and older CLI builds.
   const candidates = [
     event.message,
-    event.error && (typeof event.error === "string" ? event.error : event.error.message),
     event.text,
+    nestedErrorMessage(event.error),
   ];
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.trim()) {
       return candidate.trim();
     }
+  }
+  return "";
+}
+
+function nestedErrorMessage(error) {
+  if (error == null) {
+    return "";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error !== "object" || Array.isArray(error)) {
+    return "";
+  }
+  const candidates = [
+    error.message,
+    error.data && error.data.message,
+    error.data && typeof error.data === "string" ? error.data : "",
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+  if (typeof error.name === "string" && error.name.trim()) {
+    return error.name.trim();
   }
   return "";
 }

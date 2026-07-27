@@ -157,9 +157,11 @@ func TestBuildOpenCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
 
 	assert.Contains(t, runScript, "--format")
+	assert.Contains(t, runScript, "--auto")
 	assert.Contains(t, runScript, "--session")
 	assert.Contains(t, runScript, "session_id")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
+	assert.Contains(t, runScript, "error.data.message")
 }
 
 func TestOpenCodeStepSlug(t *testing.T) {
