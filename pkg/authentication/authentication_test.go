@@ -76,6 +76,27 @@ func TestSignupsEnabledFromMetadata(t *testing.T) {
 	})
 }
 
+func TestHandler_handleMagicCodeRequest_BlockedAccount(t *testing.T) {
+	handler, _ := setupAuthHandler(t, false)
+	handler.magicCodeEnabled = true
+
+	account, err := models.CreateAccount("Blocked Magic User", "blocked-magic-request@example.com")
+	require.NoError(t, err)
+	require.NoError(t, account.Block(database.Conn(), time.Now()))
+
+	form := url.Values{"email": {account.Email}}
+	req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/request", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+
+	handler.handleMagicCodeRequest(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	count, err := models.CountRecentMagicCodes(account.Email, time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	assert.Zero(t, count)
+}
+
 func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 	t.Run("should find existing account by provider and update email when changed", func(t *testing.T) {
 		handler, r := setupAuthHandler(t, false)

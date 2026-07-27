@@ -478,6 +478,17 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		})
 	}
 
+	account, err := models.FindAccountByEmail(email)
+	if err == nil && account.IsBlocked() {
+		successResponse()
+		return
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Failed to look up account before issuing magic code for %s: %v", email, err)
+		successResponse()
+		return
+	}
+
 	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
 	if err != nil {
 		log.Errorf("Failed to count recent magic codes for %s: %v", email, err)
