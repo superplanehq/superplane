@@ -545,6 +545,61 @@ func Test__Client__AddIssueLabel(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateLabel(t *testing.T) {
+	t.Run("creates a team-scoped label", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabelCreate":{"success":true,"issueLabel":{"id":"l9","name":"needs-triage"}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		label, err := client.CreateLabel("needs-triage", "t1")
+		require.NoError(t, err)
+		assert.Equal(t, "l9", label.ID)
+		assert.Equal(t, "needs-triage", label.Name)
+
+		input, ok := variablesFromRequest(t, httpContext, 0)["input"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "needs-triage", input["name"])
+		assert.Equal(t, "t1", input["teamId"])
+	})
+
+	t.Run("omits teamId for a workspace label", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabelCreate":{"success":true,"issueLabel":{"id":"l9","name":"needs-triage"}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateLabel("needs-triage", "")
+		require.NoError(t, err)
+
+		input, ok := variablesFromRequest(t, httpContext, 0)["input"].(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, input, "teamId")
+	})
+
+	t.Run("unsuccessful response -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabelCreate":{"success":false,"issueLabel":null}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateLabel("needs-triage", "t1")
+		require.ErrorContains(t, err, "not created")
+	})
+}
+
 func Test__Client__CreateWebhook(t *testing.T) {
 	t.Run("scoped to a team", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

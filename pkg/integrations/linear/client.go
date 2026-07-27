@@ -600,6 +600,41 @@ func (c *Client) AddIssueLabel(id, labelID string) (*Issue, error) {
 	return response.IssueAddLabel.Issue, nil
 }
 
+const createLabelMutation = `
+mutation IssueLabelCreate($input: IssueLabelCreateInput!) {
+  issueLabelCreate(input: $input) {
+    success
+    issueLabel { id name }
+  }
+}`
+
+// CreateLabel creates a label and returns it. A non-empty teamID scopes the
+// label to that team; an empty teamID creates a workspace-level label. Linear
+// assigns a color when none is given.
+func (c *Client) CreateLabel(name, teamID string) (*Label, error) {
+	input := map[string]any{"name": name}
+	if teamID != "" {
+		input["teamId"] = teamID
+	}
+
+	response := struct {
+		IssueLabelCreate struct {
+			Success bool   `json:"success"`
+			Label   *Label `json:"issueLabel"`
+		} `json:"issueLabelCreate"`
+	}{}
+
+	if err := c.execute(createLabelMutation, map[string]any{"input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.IssueLabelCreate.Success || response.IssueLabelCreate.Label == nil {
+		return nil, fmt.Errorf("linear reported the label was not created")
+	}
+
+	return response.IssueLabelCreate.Label, nil
+}
+
 type Webhook struct {
 	ID     string `json:"id"`
 	URL    string `json:"url"`

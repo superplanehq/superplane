@@ -14,9 +14,10 @@ import (
 type AddIssueLabel struct{}
 
 type AddIssueLabelSpec struct {
-	Team   string   `json:"team" mapstructure:"team"`
-	Issue  string   `json:"issue" mapstructure:"issue"`
-	Labels []string `json:"labels" mapstructure:"labels"`
+	Team      string   `json:"team" mapstructure:"team"`
+	Issue     string   `json:"issue" mapstructure:"issue"`
+	Labels    []string `json:"labels" mapstructure:"labels"`
+	NewLabels []string `json:"newLabels" mapstructure:"newLabels"`
 }
 
 func (c *AddIssueLabel) Name() string {
@@ -46,7 +47,12 @@ keeping any labels already on it.
 - **Team** (required): The Linear team whose labels populate the picker. Select the team the
   issue belongs to.
 - **Issue** (required): The issue to label, by identifier (e.g. ENG-142) or ID. Supports expressions.
-- **Labels** (required): One or more labels to add. Existing labels on the issue are kept.
+- **Labels** (optional): One or more existing labels to add. Existing labels on the issue are kept.
+- **New Labels** (optional): Names of labels to create if they don't exist yet, then add. A name
+  that already matches a team or workspace label is reused instead of creating a duplicate. New
+  labels are created in the selected team.
+
+At least one label must be provided across the two fields.
 
 ## Output
 
@@ -57,8 +63,8 @@ set of ` + "`labels`" + ` after the addition.
 ## Permissions
 
 The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
-connection includes the **write** scope, which covers adding labels. Labels are added one at a
-time, so a mid-way failure may leave some already applied.`
+connection includes the **write** scope, which covers adding and creating labels. Labels are added
+one at a time, so a mid-way failure may leave some already applied.`
 }
 
 func (c *AddIssueLabel) Icon() string {
@@ -100,8 +106,8 @@ func (c *AddIssueLabel) Configuration() []configuration.Field {
 			Name:        "labels",
 			Label:       "Labels",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Labels to add to the issue's existing labels",
+			Required:    false,
+			Description: "Existing labels to add to the issue's current labels",
 			Placeholder: "Select labels",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -112,6 +118,21 @@ func (c *AddIssueLabel) Configuration() []configuration.Field {
 							Name:      "team",
 							ValueFrom: &configuration.ParameterValueFrom{Field: "team"},
 						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "newLabels",
+			Label:       "New Labels",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Names of labels to create if missing, then add. Existing labels with the same name are reused.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Label name",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
 					},
 				},
 			},
@@ -133,7 +154,7 @@ func (c *AddIssueLabel) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("issue is required")
 	}
 
-	if len(trimmedLabels(spec.Labels)) == 0 {
+	if len(trimmedLabels(spec.Labels)) == 0 && len(trimmedLabels(spec.NewLabels)) == 0 {
 		return fmt.Errorf("at least one label is required")
 	}
 
@@ -156,8 +177,9 @@ func (c *AddIssueLabel) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue is required")
 	}
 
-	labels := trimmedLabels(spec.Labels)
-	if len(labels) == 0 {
+	existing := trimmedLabels(spec.Labels)
+	newNames := trimmedLabels(spec.NewLabels)
+	if len(existing) == 0 && len(newNames) == 0 {
 		return fmt.Errorf("at least one label is required")
 	}
 
@@ -166,10 +188,15 @@ func (c *AddIssueLabel) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
+	created, err := resolveNewLabels(client, spec.Team, newNames)
+	if err != nil {
+		return err
+	}
+
 	// Linear adds one label per call, so apply them in turn and emit the issue
 	// as it stands after the last addition.
 	var issue *Issue
-	for _, labelID := range labels {
+	for _, labelID := range dedupeStrings(append(existing, created...)) {
 		issue, err = client.AddIssueLabel(issueID, labelID)
 		if err != nil {
 			return fmt.Errorf("failed to add label: %v", err)
@@ -183,6 +210,44 @@ func (c *AddIssueLabel) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
+// resolveNewLabels turns free-text label names into label IDs, reusing an
+// existing team or workspace label with the same name and creating one only
+// when none exists - Linear rejects a duplicate name within a team.
+func resolveNewLabels(client *Client, teamID string, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+
+	existing, err := client.ListLabels(teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list labels: %v", err)
+	}
+
+	idByName := map[string]string{}
+	for _, label := range existing {
+		idByName[strings.ToLower(label.Name)] = label.ID
+	}
+
+	ids := make([]string, 0, len(names))
+	for _, name := range names {
+		key := strings.ToLower(name)
+		if id, ok := idByName[key]; ok {
+			ids = append(ids, id)
+			continue
+		}
+
+		label, err := client.CreateLabel(name, teamID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create label %q: %v", name, err)
+		}
+
+		idByName[key] = label.ID
+		ids = append(ids, label.ID)
+	}
+
+	return ids, nil
+}
+
 // trimmedLabels drops blank entries so an empty picker slot never reaches Linear.
 func trimmedLabels(labels []string) []string {
 	trimmed := []string{}
@@ -193,6 +258,22 @@ func trimmedLabels(labels []string) []string {
 	}
 
 	return trimmed
+}
+
+// dedupeStrings removes duplicate label IDs so a label picked and also typed as
+// a new label is not added twice.
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+
+	return result
 }
 
 func (c *AddIssueLabel) Cancel(ctx core.ExecutionContext) error {

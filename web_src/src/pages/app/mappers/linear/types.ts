@@ -138,6 +138,7 @@ export interface AddIssueLabelConfiguration {
   team?: string;
   issue?: string;
   labels?: string[];
+  newLabels?: string[];
 }
 
 export interface AddIssueCommentConfiguration {

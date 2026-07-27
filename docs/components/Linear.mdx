@@ -202,7 +202,12 @@ keeping any labels already on it.
 - **Team** (required): The Linear team whose labels populate the picker. Select the team the
   issue belongs to.
 - **Issue** (required): The issue to label, by identifier (e.g. ENG-142) or ID. Supports expressions.
-- **Labels** (required): One or more labels to add. Existing labels on the issue are kept.
+- **Labels** (optional): One or more existing labels to add. Existing labels on the issue are kept.
+- **New Labels** (optional): Names of labels to create if they don't exist yet, then add. A name
+  that already matches a team or workspace label is reused instead of creating a duplicate. New
+  labels are created in the selected team.
+
+At least one label must be provided across the two fields.
 
 ### Output
 
@@ -213,8 +218,8 @@ set of `labels` after the addition.
 ### Permissions
 
 The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
-connection includes the **write** scope, which covers adding labels. Labels are added one at a
-time, so a mid-way failure may leave some already applied.
+connection includes the **write** scope, which covers adding and creating labels. Labels are added
+one at a time, so a mid-way failure may leave some already applied.
 
 ### Example Output
 

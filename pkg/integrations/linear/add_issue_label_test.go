@@ -33,14 +33,24 @@ func Test__AddIssueLabel__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "issue is required")
 	})
 
-	t.Run("no labels -> error", func(t *testing.T) {
+	t.Run("no labels of either kind -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   integrationWithTeam(),
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"team": "t1", "issue": "ENG-142", "labels": []string{"  "}},
+			Configuration: map[string]any{"team": "t1", "issue": "ENG-142", "labels": []string{"  "}, "newLabels": []string{"  "}},
 		})
 
 		require.ErrorContains(t, err, "at least one label is required")
+	})
+
+	t.Run("new labels only is valid", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"team": "t1", "issue": "ENG-142", "newLabels": []string{"needs-triage"}},
+		})
+
+		require.NoError(t, err)
 	})
 
 	t.Run("unknown team -> error", func(t *testing.T) {
@@ -124,6 +134,78 @@ func Test__AddIssueLabel__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "l1", variablesFromRequest(t, httpContext, 0)["labelId"])
+	})
+
+	t.Run("creates a missing new label then adds it", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l1","name":"bug"}],"pageInfo":{"hasNextPage":false}}}}`),
+				jsonResponse(`{"data":{"issueLabelCreate":{"success":true,"issueLabel":{"id":"lnew","name":"needs-triage"}}}}`),
+				jsonResponse(`{"data":{"issueAddLabel":{"success":true,"issue":{"id":"i1","identifier":"ENG-142","labels":{"nodes":[{"id":"lnew","name":"needs-triage"}]}}}}}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpContext,
+			Integration:    integrationWithTeam(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration:  map[string]any{"team": "t1", "issue": "ENG-142", "newLabels": []string{"needs-triage"}},
+		})
+
+		require.NoError(t, err)
+
+		// List existing labels, create the missing one, then attach it.
+		require.Len(t, httpContext.Requests, 3)
+		createInput, ok := variablesFromRequest(t, httpContext, 1)["input"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "needs-triage", createInput["name"])
+		assert.Equal(t, "t1", createInput["teamId"])
+		assert.Equal(t, "lnew", variablesFromRequest(t, httpContext, 2)["labelId"])
+	})
+
+	t.Run("reuses an existing label matching a new-label name", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l1","name":"bug"}],"pageInfo":{"hasNextPage":false}}}}`),
+				jsonResponse(`{"data":{"issueAddLabel":{"success":true,"issue":{"id":"i1","identifier":"ENG-142","labels":{"nodes":[{"id":"l1","name":"bug"}]}}}}}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpContext,
+			Integration:    integrationWithTeam(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration:  map[string]any{"team": "t1", "issue": "ENG-142", "newLabels": []string{"Bug"}},
+		})
+
+		require.NoError(t, err)
+
+		// No label is created; the existing "bug" is reused (case-insensitive).
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "l1", variablesFromRequest(t, httpContext, 1)["labelId"])
+	})
+
+	t.Run("dedupes a label picked and also typed as new", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueLabels":{"nodes":[{"id":"l1","name":"bug"}],"pageInfo":{"hasNextPage":false}}}}`),
+				jsonResponse(`{"data":{"issueAddLabel":{"success":true,"issue":{"id":"i1","identifier":"ENG-142","labels":{"nodes":[{"id":"l1","name":"bug"}]}}}}}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpContext,
+			Integration:    integrationWithTeam(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration:  map[string]any{"team": "t1", "issue": "ENG-142", "labels": []string{"l1"}, "newLabels": []string{"bug"}},
+		})
+
+		require.NoError(t, err)
+
+		// ListLabels resolves "bug" to l1, which is already picked, so it is
+		// attached once: one list call + one add call, no duplicate add.
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "l1", variablesFromRequest(t, httpContext, 1)["labelId"])
 	})
 
 	t.Run("missing issue -> error", func(t *testing.T) {
