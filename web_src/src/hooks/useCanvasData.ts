@@ -70,6 +70,7 @@ import {
   dematerializeConsoleSpec,
   materializeConsoleSpec,
   parseConsoleYamlForImport,
+  validateConsolePagesDelta,
 } from "../pages/app/lib/workflow-spec-files";
 
 function versionWithSpecFromYaml(
@@ -1627,15 +1628,24 @@ export const useUpdateCanvasConsole = (
 
       // Structural validation before staging. `parseConsoleYamlForImport`
       // is lenient about panel/page caps so grandfathered content still
-      // stages successfully — the backend commit path enforces caps via
-      // a delta comparison against the previously committed pages.
-      // Structural errors (malformed YAML, unknown fields, duplicate
-      // ids, unsupported panel types) throw here so React Query surfaces
-      // them via `onError` instead of writing an unusable payload to
-      // staging that would only fail at commit time.
+      // stages successfully. Structural errors (malformed YAML, unknown
+      // fields, duplicate ids, unsupported panel types) throw here so
+      // React Query surfaces them via `onError` instead of writing an
+      // unusable payload to staging that would only fail at commit.
       const parsed = parseConsoleYamlForImport(consoleYaml);
       if (!parsed.ok) {
         throw new Error(`invalid console yaml: ${parsed.error}`);
+      }
+
+      // Delta cap enforcement against the committed baseline. Mirrors
+      // the backend `ValidateConsolePagesDelta` so authors can't stage
+      // over-cap content that the commit path would refuse. Passing
+      // `[]` when there's no committed console yet flips the check to
+      // strict caps, matching the "no grandfathered content" case.
+      const committedSpec = await fetchConsoleSpecFromRepository(canvasId, versionId, false);
+      const deltaError = validateConsolePagesDelta(parsed.pages, committedSpec?.pages ?? []);
+      if (deltaError) {
+        throw new Error(`invalid console yaml: ${deltaError}`);
       }
 
       const consoleMatchesCommitted = await matchesCommittedConsoleYaml(canvasId, versionId, consoleYaml);

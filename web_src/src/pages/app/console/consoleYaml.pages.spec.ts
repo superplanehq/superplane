@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { ConsolePage } from "@/hooks/useCanvasData";
+
 import {
   consoleToYaml,
   DEFAULT_CONSOLE_PAGE_ID,
@@ -8,6 +10,7 @@ import {
   MAX_CONSOLE_PANELS_PER_PAGE,
   parseConsoleYaml,
   parseConsoleYamlLenient,
+  validateConsolePagesDelta,
 } from "./consoleYaml";
 
 describe("consoleToYaml / parseConsoleYaml — multi-page shape", () => {
@@ -167,6 +170,101 @@ spec:
 
     expect(text).not.toContain("pages:");
     expect(text).toContain("panels:");
+  });
+
+  it("mirrors backend delta rules: rejects new over-cap authoring without baseline", () => {
+    // Fresh canvas (no baseline). Over-cap pages must be refused.
+    const overCapPage: ConsolePage = {
+      id: "big",
+      name: "Big",
+      panels: Array.from({ length: MAX_CONSOLE_PANELS_PER_PAGE + 1 }, (_v, i) => ({
+        id: `p${i}`,
+        type: "markdown",
+        content: {},
+      })),
+      layout: [],
+    };
+    const err = validateConsolePagesDelta([overCapPage], []);
+    expect(err).toContain("Too many panels");
+  });
+
+  it("mirrors backend delta rules: grandfathers over-cap pages by exact id", () => {
+    // Committed had 25 panels; new keeps 25. Allowed.
+    const grandfathered: ConsolePage = {
+      id: "big",
+      name: "Big",
+      panels: Array.from({ length: MAX_CONSOLE_PANELS_PER_PAGE + 5 }, (_v, i) => ({
+        id: `p${i}`,
+        type: "markdown",
+        content: {},
+      })),
+      layout: [],
+    };
+    expect(validateConsolePagesDelta([grandfathered], [grandfathered])).toBeNull();
+
+    const shrunk: ConsolePage = {
+      ...grandfathered,
+      panels: grandfathered.panels.slice(0, MAX_CONSOLE_PANELS_PER_PAGE + 1),
+    };
+    expect(validateConsolePagesDelta([shrunk], [grandfathered])).toBeNull();
+
+    // Growth past the previous count is still rejected.
+    const grown: ConsolePage = {
+      ...grandfathered,
+      panels: [
+        ...grandfathered.panels,
+        { id: "p-extra", type: "markdown", content: {} },
+      ],
+    };
+    const err = validateConsolePagesDelta([grown], [grandfathered]);
+    expect(err).toContain("Too many panels");
+  });
+
+  it("mirrors backend delta rules: grandfathers renames via positional + panel-id-subset", () => {
+    const previous: ConsolePage = {
+      id: "main",
+      name: "Main",
+      panels: Array.from({ length: MAX_CONSOLE_PANELS_PER_PAGE + 3 }, (_v, i) => ({
+        id: `p${i}`,
+        type: "markdown",
+        content: {},
+      })),
+      layout: [],
+    };
+    // Renamed id, same position, panels are a subset of the previous ids.
+    const renamed: ConsolePage = { ...previous, id: "overview", name: "Overview" };
+    expect(validateConsolePagesDelta([renamed], [previous])).toBeNull();
+
+    // A "fresh" over-cap page that happens to sit in slot 0 but
+    // introduces panel ids the previous page didn't have — refused.
+    const impersonator: ConsolePage = {
+      id: "overview",
+      name: "Overview",
+      panels: [
+        ...previous.panels.slice(0, MAX_CONSOLE_PANELS_PER_PAGE),
+        { id: "fresh-1", type: "markdown", content: {} },
+        { id: "fresh-2", type: "markdown", content: {} },
+      ],
+      layout: [],
+    };
+    const err = validateConsolePagesDelta([impersonator], [previous]);
+    expect(err).toContain("Too many panels");
+  });
+
+  it("mirrors backend delta rules: allows same page count above cap, refuses growth", () => {
+    // 6 pages, previously 6 → allowed. Adding a 7th → refused.
+    const buildPages = (n: number): ConsolePage[] =>
+      Array.from({ length: n }, (_v, i) => ({
+        id: `page-${i}`,
+        name: `Page ${i}`,
+        panels: [],
+        layout: [],
+      }));
+    const previous = buildPages(MAX_CONSOLE_PAGES + 1);
+    expect(validateConsolePagesDelta(buildPages(MAX_CONSOLE_PAGES + 1), previous)).toBeNull();
+    expect(validateConsolePagesDelta(buildPages(MAX_CONSOLE_PAGES), previous)).toBeNull();
+    const err = validateConsolePagesDelta(buildPages(MAX_CONSOLE_PAGES + 2), previous);
+    expect(err).toContain("Too many pages");
   });
 
   it("wraps a legacy console into a single implicit `main` page", () => {

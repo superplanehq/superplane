@@ -151,6 +151,17 @@ function usePanelHandlers({ activePageId, setLocalPages, queueSave, onActivePage
           ? [{ id: DEFAULT_CONSOLE_PAGE_ID, name: DEFAULT_CONSOLE_PAGE_NAME, panels: [], layout: [] }]
           : prev;
         const targetId = wasEmpty ? base[0]!.id : (activePageId ?? base[0]!.id);
+        // Note: there is intentionally no client-side per-page panel
+        // cap guard here. `useUpdateCanvasConsole` runs
+        // `validateConsolePagesDelta` against the committed baseline,
+        // which correctly allows grandfathered over-cap pages to
+        // regrow up to their previously committed count. A blanket
+        // `>= MAX_CONSOLE_PANELS_PER_PAGE` guard would over-eagerly
+        // freeze grandfathered pages at 20 even when the mutation
+        // would accept adding more. Rapid clicks that push past the
+        // cap on a fresh page are caught at mutation time (rollback +
+        // error toast). The UI disables the control at the cap for
+        // fresh pages, which handles the common case.
         const next = base.map((page) => {
           if (page.id !== targetId) return page;
           const id = uniquePanelId(page.panels, baseId);

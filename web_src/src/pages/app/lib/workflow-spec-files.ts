@@ -9,6 +9,8 @@ import {
   validateConsolePagesStructural,
 } from "../console/consoleYaml";
 
+export { validateConsolePagesDelta } from "../console/consoleYaml";
+
 import {
   buildCanvasYamlFromWorkflow,
   parseCanvasYamlMetadata,

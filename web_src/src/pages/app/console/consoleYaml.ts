@@ -357,6 +357,73 @@ export function validateConsolePagesStructural(pages: ConsolePage[]): string | n
   return validatePagesWith(pages, validateConsoleContentStructural);
 }
 
+/**
+ * Delta cap enforcement, mirroring the backend `ValidateConsolePagesDelta`
+ * in `pkg/yaml/console.go`. Structural validation still runs on every
+ * page (unique/non-empty ids, panel structure, layout references,
+ * payload size). Cap rules:
+ *
+ *   - Page count: reject if new count > MAX_CONSOLE_PAGES AND new count
+ *     > previous count. Grandfathered consoles with more than 5 pages
+ *     may keep or shrink, but not grow further.
+ *   - Per-page panel count: reject if the new count > MAX_CONSOLE_PANELS_PER_PAGE
+ *     AND the new count > the previous count for either the same id OR
+ *     the same positional slot (with panel-id-subset). The positional
+ *     fallback keeps a grandfathered page valid across renames (e.g.
+ *     `main` → `overview`) that do not add panels. Newly-introduced
+ *     pages that share neither id nor position with any previous page
+ *     must be at-or-under the cap on their first commit.
+ *
+ * Callers that don't have a baseline (fresh authoring) should pass
+ * `[]` — that flips the rule to strict caps, matching the desired
+ * "no over-cap on a canvas without grandfathered content" behavior.
+ */
+export function validateConsolePagesDelta(
+  pages: ConsolePage[],
+  previous: ConsolePage[],
+): string | null {
+  const structuralError = validateConsolePagesStructural(pages);
+  if (structuralError) return structuralError;
+
+  if (pages.length > MAX_CONSOLE_PAGES && pages.length > previous.length) {
+    return `Too many pages (max ${MAX_CONSOLE_PAGES}).`;
+  }
+
+  const previousPanelCountByID = new Map<string, number>();
+  for (const page of previous) {
+    previousPanelCountByID.set(page.id, page.panels.length);
+  }
+
+  for (let i = 0; i < pages.length; i += 1) {
+    const page = pages[i];
+    if (page.panels.length <= MAX_CONSOLE_PANELS_PER_PAGE) continue;
+    if (isGrandfatheredOverCapPage(page, i, previous, previousPanelCountByID)) continue;
+    return `Page ${JSON.stringify(page.id)}: Too many panels (max ${MAX_CONSOLE_PANELS_PER_PAGE} per page).`;
+  }
+
+  return null;
+}
+
+function isGrandfatheredOverCapPage(
+  page: ConsolePage,
+  index: number,
+  previous: ConsolePage[],
+  previousPanelCountByID: Map<string, number>,
+): boolean {
+  const byID = previousPanelCountByID.get(page.id);
+  if (byID !== undefined && page.panels.length <= byID) return true;
+
+  if (index >= previous.length) return false;
+  const prevPage = previous[index];
+  if (page.panels.length > prevPage.panels.length) return false;
+
+  const prevPanelIDs = new Set(prevPage.panels.map((p) => p.id));
+  for (const p of page.panels) {
+    if (!prevPanelIDs.has(p.id)) return false;
+  }
+  return true;
+}
+
 function validatePagesWith(
   pages: ConsolePage[],
   perPage: (panels: ConsolePanel[], layout: ConsoleLayoutItem[]) => string | null,
