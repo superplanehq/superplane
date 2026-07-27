@@ -173,7 +173,8 @@ func (c *Runner) Configuration() []configuration.Field {
 			Description: "One shell command per line.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "shell",
+					Language:         "shell",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
@@ -259,6 +260,10 @@ func intPtr(v int) *int {
 	return &v
 }
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func (c *Runner) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunnerSpec(ctx.Configuration)
 	if err != nil {
@@ -312,6 +317,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)
