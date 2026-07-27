@@ -106,3 +106,19 @@ export interface OnIssueConfiguration {
   actions?: string[];
   labels?: Predicate[];
 }
+
+export interface GetIssueConfiguration {
+  issue?: string;
+}
+
+export interface UpdateIssueConfiguration {
+  team?: string;
+  issue?: string;
+  title?: string;
+  description?: string;
+  state?: string;
+  assignee?: string;
+  priority?: string;
+  labels?: string[];
+  project?: string;
+}
