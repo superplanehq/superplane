@@ -45,7 +45,11 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   const turns = useMemo(() => chunkIntoTurns(messageGroups.filter(isRenderableGroup)), [messageGroups]);
 
   return (
-    <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
+    <div
+      ref={scrollRef}
+      className="agent-chat-transcript min-h-0 min-w-0 flex-1 overflow-y-auto px-3"
+      data-testid="agent-chat-messages"
+    >
       <div className="mx-auto w-full max-w-[800px] py-3">
         {isLoading ? (
           <LoadingState label="Loading…" />
