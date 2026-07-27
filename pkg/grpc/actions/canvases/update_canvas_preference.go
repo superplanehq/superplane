@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -29,6 +30,17 @@ func UpdateCanvasPreference(
 		return nil, grpcerrors.InvalidArgument(err, "invalid user id")
 	}
 
+	changes := models.UserCanvasPreferenceChanges{
+		Starred: req.Starred,
+	}
+	if req.DismissAgentSuggestionId != nil {
+		suggestionID := strings.TrimSpace(*req.DismissAgentSuggestionId)
+		if suggestionID == "" {
+			return nil, grpcerrors.InvalidArgument(nil, "dismiss_agent_suggestion_id cannot be empty")
+		}
+		changes.DismissAgentSuggestionID = &suggestionID
+	}
+
 	var preference *models.UserCanvasPreference
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
@@ -37,7 +49,7 @@ func UpdateCanvasPreference(
 			canvas.OrganizationID,
 			userUUID,
 			canvas.ID,
-			req.Starred,
+			changes,
 		)
 		return err
 	})
@@ -55,9 +67,14 @@ func UpdateCanvasPreference(
 }
 
 func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.CanvasPreference {
+	if preference == nil {
+		return nil
+	}
+
 	serialized := &pb.CanvasPreference{
-		CanvasId: preference.CanvasID.String(),
-		Starred:  preference.StarredAt != nil,
+		CanvasId:                    preference.CanvasID.String(),
+		Starred:                     preference.StarredAt != nil,
+		DismissedAgentSuggestionIds: append([]string(nil), preference.DismissedAgentSuggestionIDs...),
 	}
 
 	if preference.StarredAt != nil {

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AppPage } from "./index";
 import { AppPageHarness } from "./__fixtures__/AppPageHarness";
 import { canvasAppIds } from "./__fixtures__/handlers";
+import { softwareFactoryAgentSuggestions } from "./__fixtures__/softwareFactoryAgentSuggestions";
 
 /**
  * Mounts the real `AppPage` orchestrator against an in-process fixture backend
@@ -33,11 +34,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Live canvas view: the ReactFlow graph plus the runs history sidebar.
+ * Software Factory app opened on the Console tab.
  * Agent chat is enabled (header Agent toggle) but starts closed.
+ * Shows a prototype Agent suggestions badge/hover card for post-install ideas.
  */
 export const LiveCanvas: Story = {
-  render: () => <AppPageHarness />,
+  render: () => <AppPageHarness query="view=console" agentSuggestions={softwareFactoryAgentSuggestions} />,
 };
 
 /**
