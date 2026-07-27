@@ -12,6 +12,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -73,6 +74,27 @@ func TestSignupsEnabledFromMetadata(t *testing.T) {
 		assert.True(t, signupsEnabledFromMetadata(&models.InstallationMetadata{SignupsEnabled: true}, nil))
 		assert.False(t, signupsEnabledFromMetadata(&models.InstallationMetadata{SignupsEnabled: false}, nil))
 	})
+}
+
+func TestHandler_handleMagicCodeRequest_BlockedAccount(t *testing.T) {
+	handler, _ := setupAuthHandler(t, false)
+	handler.magicCodeEnabled = true
+
+	account, err := models.CreateAccount("Blocked Magic User", "blocked-magic-request@example.com")
+	require.NoError(t, err)
+	require.NoError(t, account.Block(database.Conn(), time.Now()))
+
+	form := url.Values{"email": {account.Email}}
+	req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/request", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+
+	handler.handleMagicCodeRequest(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	count, err := models.CountRecentMagicCodes(account.Email, time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	assert.Zero(t, count)
 }
 
 func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
@@ -170,6 +192,56 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		assert.Equal(t, account.ID, resultAccount.ID)
 		assert.False(t, wasCreated)
 		assert.Equal(t, email, resultAccount.Email)
+	})
+
+	t.Run("should reject blocked provider account before updating its email", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+
+		originalEmail := "blocked-provider@example.com"
+		account, err := models.CreateAccount("Blocked Provider User", originalEmail)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Create(&models.AccountProvider{
+			AccountID:  account.ID,
+			Provider:   "github",
+			ProviderID: "blocked-provider-id",
+			Email:      originalEmail,
+			Name:       account.Name,
+		}).Error)
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
+
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+			UserID:   "blocked-provider-id",
+			Email:    "updated-blocked-provider@example.com",
+			Name:     account.Name,
+			Provider: "github",
+		}, false)
+
+		require.ErrorIs(t, err, models.ErrAccountBlocked)
+		assert.Nil(t, resultAccount)
+		assert.False(t, wasCreated)
+
+		account, err = models.FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, originalEmail, account.Email)
+	})
+
+	t.Run("should reject blocked account found by email", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+
+		account, err := models.CreateAccount("Blocked Email User", "blocked-email@example.com")
+		require.NoError(t, err)
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
+
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+			UserID:   "new-provider-id",
+			Email:    account.Email,
+			Name:     account.Name,
+			Provider: "google",
+		}, false)
+
+		require.ErrorIs(t, err, models.ErrAccountBlocked)
+		assert.Nil(t, resultAccount)
+		assert.False(t, wasCreated)
 	})
 
 	t.Run("should create new account when not found and signup allowed", func(t *testing.T) {
@@ -309,6 +381,33 @@ func TestHandler_checkSignupPolicy(t *testing.T) {
 
 		err = handler.checkSignupPolicy(account.Email, req)
 
+		assert.NoError(t, err)
+	})
+
+	t.Run("should reject blocked account without consuming magic code", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		handler.magicCodeEnabled = true
+
+		account, err := models.CreateAccount("Blocked User", "blocked-magic-code@example.com")
+		require.NoError(t, err)
+		require.NoError(t, account.Block(database.Conn(), time.Now()))
+
+		code := "123456"
+		codeHash := crypto.HashToken(code)
+		_, err = models.CreateAccountMagicCode(account.Email, codeHash, time.Now().Add(time.Hour))
+		require.NoError(t, err)
+
+		form := url.Values{"email": {account.Email}, "code": {code}}
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", jsonContentType)
+		recorder := httptest.NewRecorder()
+
+		handler.handleMagicCodeVerify(recorder, req)
+
+		assert.Equal(t, http.StatusForbidden, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), models.AccountBlockedMessage)
+		_, err = models.FindValidAccountMagicCode(account.Email, codeHash, magicCodeMaxVerifyAttempts)
 		assert.NoError(t, err)
 	})
 
