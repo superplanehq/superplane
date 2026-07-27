@@ -1,8 +1,8 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { requestAgentComposerSend } from "@/components/AgentSidebar/composerPrefill";
 import { Button as UIButton } from "@/components/ui/button";
+import { useCanvasPreference, useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { useShortcutLabel } from "@/hooks/useShortcutLabel";
-import { dismissAgentSuggestion, getDismissedAgentSuggestionIds } from "@/lib/agentSuggestionsContext";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkle, Sparkles } from "lucide-react";
@@ -27,10 +27,12 @@ export function CanvasToolSidebarTrigger({
   onSelectAgentSuggestion,
 }: CanvasToolSidebarTriggerProps) {
   const {
+    organizationId = "",
     appId,
     canvasId: canvasIdParam,
     workflowId,
   } = useParams<{
+    organizationId?: string;
     appId?: string;
     canvasId?: string;
     workflowId?: string;
@@ -38,15 +40,22 @@ export function CanvasToolSidebarTrigger({
   const canvasId = appId || canvasIdParam || workflowId || "";
   const { showToolSidebarToggle, isToolSidebarOpen, handleToolSidebarToggle, openToolSidebar } = toolSidebarState;
   const shortcutLabel = useShortcutLabel("B");
+  const { data: canvasPreference } = useCanvasPreference(organizationId, canvasId, !!organizationId && !!canvasId);
+  const { mutate: updateCanvasPreference } = useUpdateCanvasPreference(organizationId);
   // Sticky on first paint until outside click / Escape; choosing a suggestion removes only that row.
   const [cardOpen, setCardOpen] = useState(true);
-  const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(() => getDismissedAgentSuggestionIds(canvasId));
+  const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const dismissedFromServerKey = (canvasPreference?.dismissedAgentSuggestionIds ?? []).join("\0");
 
-  // SPA navigation reuses this trigger; reload dismissals for the active canvas.
+  // SPA navigation reuses this trigger; reopen the card for the active canvas.
   useEffect(() => {
-    setDismissedIds(getDismissedAgentSuggestionIds(canvasId));
     setCardOpen(true);
   }, [canvasId]);
+
+  // Seed dismissals from the per-user canvas preference stored in the DB.
+  useEffect(() => {
+    setDismissedIds(new Set(dismissedFromServerKey ? dismissedFromServerKey.split("\0") : []));
+  }, [canvasId, dismissedFromServerKey]);
 
   const visibleSuggestions = useMemo(
     () => agentSuggestions.filter((suggestion) => !dismissedIds.has(suggestion.id)),
@@ -67,8 +76,8 @@ export function CanvasToolSidebarTrigger({
     // Queue the send before opening so it is pending when the composer mounts.
     requestAgentComposerSend(suggestion.prompt);
     openToolSidebar();
-    if (canvasId) {
-      dismissAgentSuggestion(canvasId, suggestion.id);
+    if (canvasId && organizationId) {
+      updateCanvasPreference({ canvasId, dismissAgentSuggestionId: suggestion.id });
     }
     setDismissedIds((prev) => {
       const next = new Set(prev).add(suggestion.id);

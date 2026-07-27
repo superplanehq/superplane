@@ -2,9 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   AGENT_SUGGESTIONS_STORAGE_KEY,
   clearAgentSuggestions,
-  dismissAgentSuggestion,
   getAgentSuggestions,
-  getDismissedAgentSuggestionIds,
   setAgentSuggestions,
 } from "./agentSuggestionsContext";
 
@@ -12,7 +10,6 @@ const canvasId = "canvas-1";
 
 afterEach(() => {
   sessionStorage.clear();
-  localStorage.clear();
 });
 
 describe("agentSuggestionsContext", () => {
@@ -31,15 +28,6 @@ describe("agentSuggestionsContext", () => {
 
     expect(getAgentSuggestions(canvasId)).toEqual([]);
     expect(getAgentSuggestions("other")).toEqual([{ id: "b", label: "B", prompt: "B" }]);
-  });
-
-  it("persists dismissed suggestion ids per canvas", () => {
-    dismissAgentSuggestion(canvasId, "add-ci");
-    dismissAgentSuggestion(canvasId, "add-ci");
-    dismissAgentSuggestion("other", "slack");
-
-    expect(Array.from(getDismissedAgentSuggestionIds(canvasId))).toEqual(["add-ci"]);
-    expect(Array.from(getDismissedAgentSuggestionIds("other"))).toEqual(["slack"]);
   });
 
   it("ignores corrupt session storage payloads", () => {

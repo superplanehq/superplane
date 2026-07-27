@@ -2,24 +2,51 @@ package models
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type UserCanvasPreference struct {
-	OrganizationID uuid.UUID `gorm:"primaryKey"`
-	UserID         uuid.UUID `gorm:"primaryKey"`
-	CanvasID       uuid.UUID `gorm:"primaryKey"`
-	StarredAt      *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	OrganizationID              uuid.UUID `gorm:"primaryKey"`
+	UserID                      uuid.UUID `gorm:"primaryKey"`
+	CanvasID                    uuid.UUID `gorm:"primaryKey"`
+	StarredAt                   *time.Time
+	DismissedAgentSuggestionIDs datatypes.JSONSlice[string]
+	CreatedAt                   time.Time
+	UpdatedAt                   time.Time
+}
+
+// UserCanvasPreferenceChanges is a partial update for a user/canvas preference row.
+// Nil fields are left unchanged.
+type UserCanvasPreferenceChanges struct {
+	Starred                  *bool
+	DismissAgentSuggestionID *string
 }
 
 func (p *UserCanvasPreference) TableName() string {
 	return "user_canvas_preferences"
+}
+
+func (p *UserCanvasPreference) isEmpty() bool {
+	return p.StarredAt == nil && len(p.DismissedAgentSuggestionIDs) == 0
+}
+
+func (c UserCanvasPreferenceChanges) hasUpdates() bool {
+	return c.Starred != nil || c.DismissAgentSuggestionID != nil
+}
+
+func FindUserCanvasPreference(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+	canvasID uuid.UUID,
+) (*UserCanvasPreference, error) {
+	return findUserCanvasPreference(tx, organizationID, userID, canvasID)
 }
 
 func FindUserCanvasPreferencesForCanvases(
@@ -56,27 +83,27 @@ func SetUserCanvasPreference(
 	organizationID uuid.UUID,
 	userID uuid.UUID,
 	canvasID uuid.UUID,
-	starred *bool,
+	changes UserCanvasPreferenceChanges,
 ) (*UserCanvasPreference, error) {
 	if err := ensureCanvasExistsForPreference(tx, organizationID, canvasID); err != nil {
 		return nil, err
 	}
 
-	if starred == nil {
+	if !changes.hasUpdates() {
 		return findUserCanvasPreference(tx, organizationID, userID, canvasID)
 	}
 
 	preference, err := lockUserCanvasPreference(tx, organizationID, userID, canvasID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return createUserCanvasPreference(tx, organizationID, userID, canvasID, starred)
+		return createUserCanvasPreference(tx, organizationID, userID, canvasID, changes)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	applyUserCanvasPreferenceUpdate(preference, starred, time.Now())
-	if preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, changes, time.Now())
+	if preference.isEmpty() {
 		if err := tx.Delete(preference).Error; err != nil {
 			return nil, err
 		}
@@ -144,18 +171,19 @@ func createUserCanvasPreference(
 	organizationID uuid.UUID,
 	userID uuid.UUID,
 	canvasID uuid.UUID,
-	starred *bool,
+	changes UserCanvasPreferenceChanges,
 ) (*UserCanvasPreference, error) {
 	now := time.Now()
 	preference := &UserCanvasPreference{
-		OrganizationID: organizationID,
-		UserID:         userID,
-		CanvasID:       canvasID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		OrganizationID:              organizationID,
+		UserID:                      userID,
+		CanvasID:                    canvasID,
+		DismissedAgentSuggestionIDs: datatypes.JSONSlice[string]{},
+		CreatedAt:                   now,
+		UpdatedAt:                   now,
 	}
-	applyUserCanvasPreferenceUpdate(preference, starred, now)
-	if preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, changes, now)
+	if preference.isEmpty() {
 		return preference, nil
 	}
 
@@ -168,13 +196,26 @@ func createUserCanvasPreference(
 
 func applyUserCanvasPreferenceUpdate(
 	preference *UserCanvasPreference,
-	starred *bool,
+	changes UserCanvasPreferenceChanges,
 	now time.Time,
 ) {
 	preference.UpdatedAt = now
-	if starred != nil {
-		preference.StarredAt = timestampIfEnabled(*starred, now)
+	if changes.Starred != nil {
+		preference.StarredAt = timestampIfEnabled(*changes.Starred, now)
 	}
+	if changes.DismissAgentSuggestionID != nil {
+		appendDismissedAgentSuggestionID(preference, *changes.DismissAgentSuggestionID)
+	}
+}
+
+func appendDismissedAgentSuggestionID(preference *UserCanvasPreference, suggestionID string) {
+	if suggestionID == "" {
+		return
+	}
+	if slices.Contains(preference.DismissedAgentSuggestionIDs, suggestionID) {
+		return
+	}
+	preference.DismissedAgentSuggestionIDs = append(preference.DismissedAgentSuggestionIDs, suggestionID)
 }
 
 func timestampIfEnabled(enabled bool, now time.Time) *time.Time {

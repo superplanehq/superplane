@@ -61,6 +61,14 @@ func TestAgentSuggestionsE2E(t *testing.T) {
 		steps.assertSuggestionsBadgeCount(2)
 		steps.assertSuggestionVisible("fail-notifications")
 		steps.assertSuggestionVisible("slack-approvals")
+
+		// Dismissals persist in user_canvas_preferences across reloads.
+		_, err := steps.session.Page().Reload()
+		require.NoError(t, err)
+		steps.waitForAgentToggle()
+		steps.assertSuggestionHidden("add-ci")
+		steps.assertSuggestionsBadgeCount(2)
+		steps.assertSuggestionVisible("fail-notifications")
 	})
 }
 
