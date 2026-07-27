@@ -649,9 +649,11 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
       }
     },
     onSuccess: (response, preference) => {
-      if (response.data?.preference) {
-        queryClient.setQueryData(canvasKeys.preference(organizationId, preference.canvasId), response.data.preference);
-      }
+      if (!response.data?.preference) return;
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, preference.canvasId),
+        (current) => mergeCanvasPreferenceCache(current, response.data?.preference),
+      );
     },
     onSettled: (_data, _error, preference) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
