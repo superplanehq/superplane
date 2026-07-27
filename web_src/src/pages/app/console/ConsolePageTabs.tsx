@@ -144,11 +144,7 @@ export function ConsolePageTabs({
         ) : null}
       </div>
 
-      <RemovePageDialog
-        page={pendingRemovePage}
-        onCancel={() => setPendingRemoveId(null)}
-        onConfirm={confirmRemove}
-      />
+      <RemovePageDialog page={pendingRemovePage} onCancel={() => setPendingRemoveId(null)} onConfirm={confirmRemove} />
     </>
   );
 }

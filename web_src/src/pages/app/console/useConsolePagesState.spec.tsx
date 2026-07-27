@@ -119,6 +119,44 @@ describe("useConsolePagesState — page management", () => {
     }
   });
 
+  it("refuses to add a page past MAX_CONSOLE_PAGES", async () => {
+    // Rapid successive clicks / direct calls should not drift local
+    // state past the cap. The tab strip disables the button in the UI
+    // but that guard only fires on the next render.
+    const { MAX_CONSOLE_PAGES } = await import("./consoleYaml");
+    const atCap: ConsolePage[] = Array.from({ length: MAX_CONSOLE_PAGES }, (_v, i) => ({
+      id: `page-${i}`,
+      name: `Page ${i}`,
+      panels: [],
+      layout: [],
+    }));
+
+    const onChange = vi.fn();
+    const onActivePageIdChange = vi.fn();
+
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() =>
+        useConsolePagesState({
+          pages: atCap,
+          onChange,
+          activePageId: atCap[0]!.id,
+          onActivePageIdChange,
+        }),
+      );
+
+      act(() => {
+        result.current.handleAddPage();
+        result.current.handleAddPage();
+      });
+
+      expect(result.current.localPages).toHaveLength(MAX_CONSOLE_PAGES);
+      expect(onActivePageIdChange).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renames a page in place", () => {
     const onChange = vi.fn();
     vi.useFakeTimers();

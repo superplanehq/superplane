@@ -4,11 +4,7 @@ import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
-import type {
-  CanvasConsoleQueryResult,
-  ConsolePage,
-  UpdateCanvasConsoleMutationResult,
-} from "@/hooks/useCanvasData";
+import type { CanvasConsoleQueryResult, ConsolePage, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
 import { ConsolePageTabs } from "./ConsolePageTabs";
 import { ConsoleView } from "./ConsoleView";
@@ -151,10 +147,7 @@ function useConsoleEditorState({
     updateConsoleMutationRef.current = updateConsoleMutation;
   }, [updateConsoleMutation]);
 
-  const persistedPages: ConsolePage[] = useMemo(
-    () => consoleQuery.data?.pages ?? [],
-    [consoleQuery.data?.pages],
-  );
+  const persistedPages: ConsolePage[] = useMemo(() => consoleQuery.data?.pages ?? [], [consoleQuery.data?.pages]);
   const persistedPageIds = useMemo(() => persistedPages.map((page) => page.id), [persistedPages]);
 
   const handleChange = useCallback((next: { pages: ConsolePage[] }) => {

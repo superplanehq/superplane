@@ -27,19 +27,13 @@ describe("local-staging-indicators", () => {
 
   it("detects console diffs from effective local state", () => {
     const committed: { pages: ConsolePage[] } = {
-      pages: [
-        { id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] },
-      ],
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] }],
     };
     const effectiveSame: { pages: ConsolePage[] } = {
-      pages: [
-        { id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] },
-      ],
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] }],
     };
     const effectiveDifferent: { pages: ConsolePage[] } = {
-      pages: [
-        { id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "bye" } }], layout: [] },
-      ],
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "bye" } }], layout: [] }],
     };
 
     expect(hasLocalConsoleDiff(committed, effectiveSame)).toBe(false);

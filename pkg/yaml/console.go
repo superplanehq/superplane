@@ -374,11 +374,145 @@ func validateConsolePages(pages []ConsolePage) error {
 	return nil
 }
 
+// ValidateConsolePagesDelta enforces the page/panel caps but grandfathers
+// content that was already over-cap in `previous`. Rules:
+//
+//   - Page count: reject if new count > cap AND new count > previous count.
+//     A migrated console with 6 pages stays valid so long as it does not
+//     grow further; the user can add pages again only after reducing to
+//     the cap.
+//   - Per-page panel count: reject if the new count > cap AND the new
+//     count > the previous count for either the same id OR the same
+//     positional slot. The positional fallback keeps a grandfathered
+//     page valid across renames (e.g. `main` → `overview`) that do not
+//     change the panel count. Newly-introduced pages that share neither
+//     id nor position with any previous page must be at-or-under the
+//     cap on their first commit.
+//   - Structural checks (missing/duplicate ids, unknown panel types,
+//     malformed content) always run.
+//
+// The function accepts `[]models.ConsolePage` because that is the shape
+// on both sides at commit time — `yaml.Console.Pages()` returns models
+// pages, and `CanvasVersion.ConsolePages.Data()` stores them. This lets
+// grandfathered consoles progressively reduce their size without
+// wedging the commit path while still preventing brand-new content from
+// silently exceeding the cap.
+func ValidateConsolePagesDelta(pages []models.ConsolePage, previous []models.ConsolePage) error {
+	if err := validateModelPagesStructure(pages); err != nil {
+		return err
+	}
+
+	if len(pages) > MaxConsolePages && len(pages) > len(previous) {
+		return fmt.Errorf("too many pages (max %d)", MaxConsolePages)
+	}
+
+	previousPanelCountByID := make(map[string]int, len(previous))
+	for _, page := range previous {
+		previousPanelCountByID[page.ID] = len(page.Panels)
+	}
+
+	for i, page := range pages {
+		if err := validateConsoleContentStructure(fromModelPanels(page.Panels), fromModelLayout(page.Layout)); err != nil {
+			return fmt.Errorf("page %q: %w", page.ID, err)
+		}
+		newCount := len(page.Panels)
+		if newCount <= MaxConsolePanelsPerPage {
+			continue
+		}
+
+		if isGrandfatheredOverCapPage(page, i, previous, previousPanelCountByID) {
+			continue
+		}
+		return fmt.Errorf("page %q: too many panels (max %d per page)", page.ID, MaxConsolePanelsPerPage)
+	}
+
+	return nil
+}
+
+// isGrandfatheredOverCapPage reports whether an over-cap page in the
+// new document is inherited from `previous` (and therefore allowed to
+// stay over the cap) rather than freshly authored. Two match modes:
+//
+//   - Exact id match: allowance = previous count for the same id.
+//   - Positional match with panel-id-subset check: same position, and
+//     every panel id in the new page also existed in the previous page
+//     at that position. This recognizes renames like `main` → `overview`
+//     while refusing "fresh" over-cap pages that happen to reuse a
+//     grandfathered slot.
+//
+// A page is grandfathered when its panel count is at-or-under the
+// allowance for whichever mode matches.
+func isGrandfatheredOverCapPage(page models.ConsolePage, index int, previous []models.ConsolePage, previousPanelCountByID map[string]int) bool {
+	if prev, ok := previousPanelCountByID[page.ID]; ok && len(page.Panels) <= prev {
+		return true
+	}
+
+	if index >= len(previous) {
+		return false
+	}
+	prevPage := previous[index]
+	if len(page.Panels) > len(prevPage.Panels) {
+		return false
+	}
+
+	prevPanelIDs := make(map[string]struct{}, len(prevPage.Panels))
+	for _, p := range prevPage.Panels {
+		prevPanelIDs[p.ID] = struct{}{}
+	}
+	for _, p := range page.Panels {
+		if _, ok := prevPanelIDs[p.ID]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// validateModelPagesStructure checks the page-level invariants that hold
+// regardless of cap grandfathering (unique / non-empty ids). The cap
+// check itself is handled by the caller.
+func validateModelPagesStructure(pages []models.ConsolePage) error {
+	pageIDs := make(map[string]struct{}, len(pages))
+	for i, page := range pages {
+		if strings.TrimSpace(page.ID) == "" {
+			return fmt.Errorf("pages[%d].id is required", i)
+		}
+		if _, exists := pageIDs[page.ID]; exists {
+			return fmt.Errorf("duplicate page id %q", page.ID)
+		}
+		pageIDs[page.ID] = struct{}{}
+	}
+	return nil
+}
+
+func fromModelPanels(panels []models.ConsolePanel) []ConsolePanel {
+	out := make([]ConsolePanel, len(panels))
+	for i, p := range panels {
+		out[i] = ConsolePanel{ID: p.ID, Type: p.Type, Content: p.Content}
+	}
+	return out
+}
+
+func fromModelLayout(layout []models.ConsoleLayoutItem) []ConsoleLayoutItem {
+	out := make([]ConsoleLayoutItem, len(layout))
+	for i, l := range layout {
+		out[i] = ConsoleLayoutItem{I: l.I, X: l.X, Y: l.Y, W: l.W, H: l.H, MinW: l.MinW, MinH: l.MinH}
+	}
+	return out
+}
+
 func ValidateConsoleContent(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
 	if len(panels) > MaxConsolePanelsPerPage {
 		return fmt.Errorf("too many panels (max %d per page)", MaxConsolePanelsPerPage)
 	}
+	return validateConsoleContentStructure(panels, layout)
+}
 
+// validateConsoleContentStructure runs all per-page invariants except
+// the panel-count cap: panel id uniqueness/type/content, layout id
+// coverage, payload size. Callers that need cap grandfathering
+// (ValidateConsolePagesDelta) run this instead of ValidateConsoleContent
+// and enforce their own cap rule.
+func validateConsoleContentStructure(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
 	panelIDs := make(map[string]struct{}, len(panels))
 	for _, panel := range panels {
 		if panel.ID == "" {

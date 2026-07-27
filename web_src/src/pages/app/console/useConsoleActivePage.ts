@@ -48,6 +48,86 @@ export function useConsoleActivePageInitial({
   return { activePageId, setActivePageId, rawPageParam, persistedIdsMemo };
 }
 
+type ReconcileInputs = {
+  canvasId: string | undefined;
+  activePageId: string | null;
+  rawPageParam: string | null;
+  liveIds: string[];
+  persistedIds: string[];
+  paramChanged: boolean;
+};
+
+/**
+ * Compute the desired `activePageId` for the current render, or `null`
+ * to indicate "leave state alone; fall through to URL projection". The
+ * three adoption cases are mutually exclusive: at most one runs per
+ * render, and each moves the system strictly closer to a steady state
+ * where the URL param and `activePageId` agree.
+ */
+function nextActivePageIdFromReconciliation({
+  canvasId,
+  activePageId,
+  rawPageParam,
+  liveIds,
+  persistedIds,
+  paramChanged,
+}: ReconcileInputs): string | null {
+  const available = liveIds.length > 0 ? liveIds : persistedIds;
+
+  // Case 1: URL param changed (external navigation, deep link, back
+  // button, or our own prior projection write catching up). Adopt
+  // when the resolved id differs from state; otherwise fall through
+  // so a stale/invalid URL (`?page=ghost`) gets rewritten to match
+  // the fallback state instead of being left in place.
+  if (paramChanged) {
+    const next = resolveActiveConsolePage({ canvasId: canvasId ?? "", pageParam: rawPageParam, availablePageIds: available });
+    if (next !== activePageId) return next;
+  }
+
+  // Case 2a: async load — `useConsoleActivePageInitial` returned `null`
+  // because the console query was still loading; adopt now that pages
+  // are known, even though the URL param never *changed*.
+  //
+  // Uses the same `available` fallback (live → persisted) as Cases 1
+  // and 2b so we can hydrate off `persistedPageIds` on the render
+  // where the query has already populated but `useConsolePagesState`
+  // has not yet mirrored the committed pages into its local `pages`
+  // state. Without this, a multi-page console can briefly render the
+  // empty state or the wrong tab in that one-tick window.
+  if (!activePageId && available.length > 0) {
+    return resolveActiveConsolePage({ canvasId: canvasId ?? "", pageParam: rawPageParam, availablePageIds: available });
+  }
+
+  // Case 2b: active id is no longer present in the authoritative page
+  // list (page removed / renamed / stale query populated). Uses the
+  // same `available` fallback as Cases 1 and 2a so that on the
+  // transitional render where the query has just populated
+  // (`persistedIds` non-empty) but local state has not yet mirrored it
+  // (`liveIds` still empty), a valid `activePageId` from persisted is
+  // not spuriously treated as stale.
+  if (activePageId && available.length > 0 && !available.includes(activePageId)) {
+    const next = resolveActiveConsolePage({ canvasId: canvasId ?? "", pageParam: rawPageParam, availablePageIds: available });
+    if (next !== activePageId) return next;
+  }
+
+  return null;
+}
+
+function writePageParam(
+  setSearchParams: (updater: (prev: URLSearchParams) => URLSearchParams, options: { replace: boolean }) => void,
+  value: string | null,
+) {
+  setSearchParams(
+    (prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === null) next.delete("page");
+      else next.set("page", value);
+      return next;
+    },
+    { replace: true },
+  );
+}
+
 /**
  * Runs after `useConsolePagesState` so URL / storage sync decisions can
  * use the *live* page list. Never called with a stale `livePageIds`.
@@ -67,71 +147,71 @@ export function useConsoleActivePageSync({
   rawPageParam: string | null;
   persistedPageIds: string[];
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   const liveIdsMemo = useMemo(() => livePageIds, [livePageIds]);
   const persistedIdsMemo = useMemo(() => persistedPageIds, [persistedPageIds]);
   const liveCount = liveIdsMemo.length;
+  // `effectiveCount` mirrors the `available` fallback used inside the
+  // reconciliation effect: prefer live, fall back to persisted. Case 3
+  // and the last-visited persistence effect both key off this so we do
+  // not remove the `?page=` param on the transitional render where
+  // live is still empty but persisted has already populated.
+  const effectiveCount = liveCount > 0 ? liveCount : persistedIdsMemo.length;
 
   const previousParamRef = useRef<string | null>(rawPageParam);
   useEffect(() => {
-    // Re-resolve on two independent triggers:
-    //   1. The URL `?page=` param changed. This includes back/forward
-    //      navigation, deep links, and manual URL edits. When the new
-    //      value matches a live page we adopt it, even if the current
-    //      active id is still valid — otherwise the grid gets stuck on
-    //      the previous tab while the URL says otherwise.
-    //   2. The current active id is no longer present in the live page
-    //      list (a page was removed, a stale query populated, etc.).
-    // Adopting our own URL writes is a no-op because the resolved value
-    // will already match `activePageId`.
+    // Reconcile URL <-> state in a single effect so the two directions
+    // do not race each other. The prior implementation split adoption
+    // (URL -> state) from projection (state -> URL) into two effects,
+    // but during the render where a URL change was mid-adoption the
+    // projection effect closed over the pre-adoption `activePageId`
+    // and wrote the old value back to the URL — which then re-triggered
+    // adoption on the next render and looped indefinitely.
     const paramChanged = rawPageParam !== previousParamRef.current;
-    const activeStale = !!activePageId && !liveIdsMemo.includes(activePageId);
     previousParamRef.current = rawPageParam;
 
-    if (!paramChanged && !activeStale && activePageId) return;
-
-    const next = resolveActiveConsolePage({
-      canvasId: canvasId ?? "",
-      pageParam: rawPageParam,
-      availablePageIds: liveIdsMemo.length > 0 ? liveIdsMemo : persistedIdsMemo,
+    const resolved = nextActivePageIdFromReconciliation({
+      canvasId,
+      activePageId,
+      rawPageParam,
+      liveIds: liveIdsMemo,
+      persistedIds: persistedIdsMemo,
+      paramChanged,
     });
-    if (next !== activePageId) setActivePageId(next);
-  }, [activePageId, canvasId, liveIdsMemo, persistedIdsMemo, rawPageParam, setActivePageId]);
+    if (resolved !== null) {
+      setActivePageId(resolved);
+      return;
+    }
+
+    // No adoption fired — project state into the URL. Use
+    // `effectiveCount` (live → persisted fallback) so the URL param is
+    // not stripped on the transitional render where live is empty but
+    // persisted has already populated.
+    if (!activePageId) return;
+    const shouldWriteParam = effectiveCount > 1;
+    if (shouldWriteParam && rawPageParam !== activePageId) {
+      writePageParam(setSearchParams, activePageId);
+      return;
+    }
+    if (!shouldWriteParam && rawPageParam !== null) {
+      writePageParam(setSearchParams, null);
+    }
+  }, [
+    activePageId,
+    canvasId,
+    effectiveCount,
+    liveIdsMemo,
+    persistedIdsMemo,
+    rawPageParam,
+    setActivePageId,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (!canvasId || !activePageId) return;
     // The implicit single-page id is never worth restoring; the same
     // fallback resolves it just as fast on the next visit.
-    if (liveCount <= 1) return;
+    if (effectiveCount <= 1) return;
     recordLastVisitedConsolePage(canvasId, activePageId);
-  }, [canvasId, activePageId, liveCount]);
-
-  useEffect(() => {
-    if (!activePageId) return;
-    const currentParam = searchParams.get("page");
-    const shouldWriteParam = liveCount > 1;
-
-    if (shouldWriteParam && currentParam !== activePageId) {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("page", activePageId);
-          return next;
-        },
-        { replace: true },
-      );
-      return;
-    }
-
-    if (!shouldWriteParam && currentParam !== null) {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete("page");
-          return next;
-        },
-        { replace: true },
-      );
-    }
-  }, [activePageId, liveCount, searchParams, setSearchParams]);
+  }, [canvasId, activePageId, effectiveCount]);
 }

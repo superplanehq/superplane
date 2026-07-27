@@ -74,11 +74,7 @@ type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
  * export as the legacy `panels`/`layout` shape (backwards-compatible with
  * every existing app). Two or more pages export as `spec.pages[]`.
  */
-export function consoleToYaml(input: {
-  pages: ConsolePage[];
-  canvasId?: string;
-  canvasName?: string;
-}): string {
+export function consoleToYaml(input: { pages: ConsolePage[]; canvasId?: string; canvasName?: string }): string {
   const document = {
     apiVersion: CONSOLE_API_VERSION,
     kind: CONSOLE_KIND,
@@ -346,7 +342,25 @@ export function validateConsolePages(pages: ConsolePage[]): string | null {
   if (pages.length > MAX_CONSOLE_PAGES) {
     return `Too many pages (max ${MAX_CONSOLE_PAGES}).`;
   }
+  return validatePagesWith(pages, validateConsoleContent);
+}
 
+/**
+ * Cap-independent structural validation. Runs everything
+ * `validateConsolePages` does except the per-page panel-count cap and
+ * the total-page-count cap. Used by import paths that tolerate
+ * grandfathered over-cap consoles but still need to catch malformed
+ * documents (duplicate ids, unsupported panel types, missing required
+ * fields, broken layout references, oversized payload).
+ */
+export function validateConsolePagesStructural(pages: ConsolePage[]): string | null {
+  return validatePagesWith(pages, validateConsoleContentStructural);
+}
+
+function validatePagesWith(
+  pages: ConsolePage[],
+  perPage: (panels: ConsolePanel[], layout: ConsoleLayoutItem[]) => string | null,
+): string | null {
   const pageIds = new Set<string>();
   for (let i = 0; i < pages.length; i += 1) {
     const page = pages[i];
@@ -354,7 +368,7 @@ export function validateConsolePages(pages: ConsolePage[]): string | null {
     if (pageIds.has(page.id)) return `Duplicate page id ${JSON.stringify(page.id)}.`;
     pageIds.add(page.id);
 
-    const contentError = validateConsoleContent(page.panels, page.layout);
+    const contentError = perPage(page.panels, page.layout);
     if (contentError) return `Page ${JSON.stringify(page.id)}: ${contentError}`;
   }
   return null;
@@ -369,7 +383,13 @@ export function validateConsoleContent(panels: ConsolePanel[], layout: ConsoleLa
   if (panels.length > MAX_CONSOLE_PANELS_PER_PAGE) {
     return `Too many panels (max ${MAX_CONSOLE_PANELS_PER_PAGE} per page).`;
   }
+  return validateConsoleContentStructural(panels, layout);
+}
 
+function validateConsoleContentStructural(
+  panels: ConsolePanel[],
+  layout: ConsoleLayoutItem[],
+): string | null {
   const panelIdsResult = validatePanels(panels);
   if (!panelIdsResult.ok) return panelIdsResult.error;
 
@@ -527,8 +547,7 @@ function validateLayoutItemNumbers(entry: Record<string, unknown>, index: number
       if (required) return `${scope}[${index}].${field} is required.`;
       continue;
     }
-    if (typeof value !== "number" || !Number.isFinite(value))
-      return `${scope}[${index}].${field} must be a number.`;
+    if (typeof value !== "number" || !Number.isFinite(value)) return `${scope}[${index}].${field} must be a number.`;
   }
   return null;
 }

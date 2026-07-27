@@ -1,15 +1,18 @@
-import { act, renderHook } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { useConsoleActivePageInitial, useConsoleActivePageSync } from "./useConsoleActivePage";
 
 /**
- * Small wrapper that spins up the initial + sync hook pair the same
- * way `ConsoleOverlay` does, but exposes both `activePageId` and the
- * search params so tests can assert URL round-trips.
+ * Component-based harness for the initial + sync hook pair, mirroring
+ * the way `ConsoleOverlay` wires them together. Using `render` plus
+ * DOM assertions (rather than `renderHook`) keeps the test transparent
+ * about which React scheduler ticks we are observing — that visibility
+ * mattered when tracking down a URL <-> state reconciliation loop.
  */
-function useSubject({
+function Harness({
   canvasId,
   persistedPageIds,
   livePageIds,
@@ -31,16 +34,50 @@ function useSubject({
     rawPageParam,
     persistedPageIds,
   });
-  return {
-    activePageId,
-    setActivePageId,
-    pageParam: searchParams.get("page"),
-    goToUrl: (search: string) => setSearchParams(new URLSearchParams(search), { replace: true }),
-  };
+
+  return (
+    <div>
+      <div data-testid="active">{activePageId ?? "null"}</div>
+      <div data-testid="url">{searchParams.get("page") ?? "null"}</div>
+      <button
+        onClick={() =>
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("page", "details");
+              return next;
+            },
+            { replace: true },
+          )
+        }
+      >
+        go-details-via-url
+      </button>
+      <button onClick={() => setActivePageId("details")}>click-details</button>
+      <button
+        onClick={() =>
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("page", "ghost");
+              return next;
+            },
+            { replace: true },
+          )
+        }
+      >
+        go-ghost-via-url
+      </button>
+    </div>
+  );
 }
 
-function wrapper({ initialSearch, children }: { initialSearch: string; children: React.ReactNode }) {
-  return <MemoryRouter initialEntries={[{ pathname: "/", search: initialSearch }]}>{children}</MemoryRouter>;
+function renderHarness(initialSearch: string, livePageIds: string[]) {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: "/", search: initialSearch }]}>
+      <Harness canvasId="canvas" persistedPageIds={["overview", "details"]} livePageIds={livePageIds} />
+    </MemoryRouter>,
+  );
 }
 
 describe("useConsoleActivePage — URL / state sync", () => {
@@ -48,60 +85,108 @@ describe("useConsoleActivePage — URL / state sync", () => {
     window.localStorage.clear();
   });
 
-  it("switches active page when the URL param changes to a valid live page", () => {
+  it("renders the initial active page from the URL", () => {
+    renderHarness("?page=overview", ["overview", "details"]);
+    expect(screen.getByTestId("active").textContent).toBe("overview");
+    expect(screen.getByTestId("url").textContent).toBe("overview");
+  });
+
+  it("switches active page when the URL param changes to a valid live page", async () => {
     // Simulates back/forward navigation or a deep link swap. The
-    // previous active id is still valid in the live page list, but the
-    // URL now names a different valid page — the grid must follow.
-    const initial = { canvasId: "canvas", persistedPageIds: ["overview", "details"], livePageIds: ["overview", "details"] };
-    const { result, rerender } = renderHook(({ props, search }) => useSubject(props), {
-      initialProps: { props: initial, search: "?page=overview" },
-      wrapper: ({ children }) => wrapper({ initialSearch: "?page=overview", children }),
+    // previous active id is still valid, but the URL now names a
+    // different valid page — the grid must follow instead of ignoring
+    // the new param because the current id is still technically OK.
+    const user = userEvent.setup();
+    renderHarness("?page=overview", ["overview", "details"]);
+
+    await user.click(screen.getByText("go-details-via-url"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active").textContent).toBe("details");
     });
-
-    expect(result.current.activePageId).toBe("overview");
-
-    act(() => {
-      result.current.goToUrl("?page=details");
-    });
-    rerender({ props: initial, search: "?page=details" });
-
-    expect(result.current.activePageId).toBe("details");
-    expect(result.current.pageParam).toBe("details");
+    expect(screen.getByTestId("url").textContent).toBe("details");
   });
 
-  it("does not clobber a click when the URL param is still stale", () => {
-    // The user clicks tab B while the URL still names A. State should
-    // move to B, then the URL sync effect updates the URL — the
-    // re-resolution effect must not revert the click back to A.
-    const initial = { canvasId: "canvas", persistedPageIds: ["a", "b"], livePageIds: ["a", "b"] };
-    const { result, rerender } = renderHook(({ props }) => useSubject(props), {
-      initialProps: { props: initial },
-      wrapper: ({ children }) => wrapper({ initialSearch: "?page=a", children }),
+  it("projects a click into the URL without reverting", async () => {
+    // The user clicks a tab (in-app state change) while the URL still
+    // names the previous tab. State moves first, then the sync effect
+    // must write the URL to match — without an adoption pass fighting
+    // it and looping back to the prior tab.
+    const user = userEvent.setup();
+    renderHarness("?page=overview", ["overview", "details"]);
+
+    await user.click(screen.getByText("click-details"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("url").textContent).toBe("details");
     });
-
-    expect(result.current.activePageId).toBe("a");
-
-    act(() => {
-      result.current.setActivePageId("b");
-    });
-    rerender({ props: initial });
-
-    expect(result.current.activePageId).toBe("b");
-    expect(result.current.pageParam).toBe("b");
+    expect(screen.getByTestId("active").textContent).toBe("details");
   });
 
-  it("falls back to the first live page when the URL points to a removed page", () => {
-    const initial = { canvasId: "canvas", persistedPageIds: ["a", "b"], livePageIds: ["a", "b"] };
-    const { result, rerender } = renderHook(({ props }) => useSubject(props), {
-      initialProps: { props: initial },
-      wrapper: ({ children }) => wrapper({ initialSearch: "?page=ghost", children }),
-    });
+  it("adopts a URL page once pages hydrate asynchronously", async () => {
+    // The console query is empty on first render (still loading) so
+    // `useConsoleActivePageInitial` returns null. When the pages
+    // arrive on a later render, the URL param never *changed* so a
+    // change-only adoption path would miss it. Case 2a must catch
+    // this and resolve against the freshly-loaded live list.
+    const { rerender } = render(
+      <MemoryRouter initialEntries={[{ pathname: "/", search: "?page=details" }]}>
+        <Harness canvasId="canvas" persistedPageIds={[]} livePageIds={[]} />
+      </MemoryRouter>,
+    );
 
-    // `ghost` is not in the live list — the resolver falls back to the
-    // first available id (`a`).
-    expect(result.current.activePageId).toBe("a");
-    rerender({ props: initial });
-    // The URL sync effect also clears the invalid param out.
-    expect(result.current.pageParam).toBe("a");
+    expect(screen.getByTestId("active").textContent).toBe("null");
+
+    rerender(
+      <MemoryRouter initialEntries={[{ pathname: "/", search: "?page=details" }]}>
+        <Harness canvasId="canvas" persistedPageIds={["overview", "details"]} livePageIds={["overview", "details"]} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active").textContent).toBe("details");
+    });
+  });
+
+  it("adopts a URL page from persisted ids before live state hydrates", async () => {
+    // The console query settles a tick before `useConsolePagesState`
+    // mirrors the committed pages into local state. In that window
+    // `livePageIds` is still empty but `persistedPageIds` is not. The
+    // sync effect must fall back to `persistedPageIds` so the multi-
+    // page URL is honored on the first render where the query has
+    // data, without waiting for a second commit.
+    const { rerender } = render(
+      <MemoryRouter initialEntries={[{ pathname: "/", search: "?page=details" }]}>
+        <Harness canvasId="canvas" persistedPageIds={[]} livePageIds={[]} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("active").textContent).toBe("null");
+
+    // Persisted arrives; live is still empty (state not yet hydrated).
+    rerender(
+      <MemoryRouter initialEntries={[{ pathname: "/", search: "?page=details" }]}>
+        <Harness canvasId="canvas" persistedPageIds={["overview", "details"]} livePageIds={[]} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active").textContent).toBe("details");
+    });
+  });
+
+  it("falls back and rewrites the URL when the param points to a removed page", async () => {
+    // `ghost` is not in the live list, so the resolver falls back to
+    // the first available id and the sync effect rewrites the stale
+    // param so the URL matches the rendered tab.
+    const user = userEvent.setup();
+    renderHarness("?page=overview", ["overview", "details"]);
+
+    await user.click(screen.getByText("go-ghost-via-url"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("url").textContent).toBe("overview");
+    });
+    expect(screen.getByTestId("active").textContent).toBe("overview");
   });
 });

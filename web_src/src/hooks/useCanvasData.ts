@@ -66,7 +66,11 @@ import { canvasVersionId } from "../pages/app/lib/canvas-versions";
 import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-spec-paths";
 import { matchesCommittedCanvasYaml, matchesCommittedConsoleYaml } from "../pages/app/lib/staging-content-match";
-import { dematerializeConsoleSpec, materializeConsoleSpec } from "../pages/app/lib/workflow-spec-files";
+import {
+  dematerializeConsoleSpec,
+  materializeConsoleSpec,
+  parseConsoleYamlForImport,
+} from "../pages/app/lib/workflow-spec-files";
 
 function versionWithSpecFromYaml(
   version: CanvasesCanvasVersion | undefined,
@@ -1606,10 +1610,7 @@ export const useUpdateCanvasConsole = (
 
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<CanvasConsoleData>(queryKey);
-      queryClient.setQueryData(
-        queryKey,
-        toCanvasConsole(canvasId, versionId, { pages: input.pages }, previous),
-      );
+      queryClient.setQueryData(queryKey, toCanvasConsole(canvasId, versionId, { pages: input.pages }, previous));
       return { previous, queryKey, mutationGeneration };
     },
     mutationFn: async (input: UpdateCanvasConsoleInput) => {
@@ -1623,6 +1624,19 @@ export const useUpdateCanvasConsole = (
           pages: input.pages ?? [],
           canvasId,
         });
+
+      // Structural validation before staging. `parseConsoleYamlForImport`
+      // is lenient about panel/page caps so grandfathered content still
+      // stages successfully — the backend commit path enforces caps via
+      // a delta comparison against the previously committed pages.
+      // Structural errors (malformed YAML, unknown fields, duplicate
+      // ids, unsupported panel types) throw here so React Query surfaces
+      // them via `onError` instead of writing an unusable payload to
+      // staging that would only fail at commit time.
+      const parsed = parseConsoleYamlForImport(consoleYaml);
+      if (!parsed.ok) {
+        throw new Error(`invalid console yaml: ${parsed.error}`);
+      }
 
       const consoleMatchesCommitted = await matchesCommittedConsoleYaml(canvasId, versionId, consoleYaml);
       if (consoleMatchesCommitted) {

@@ -25,6 +25,7 @@ const VISUAL_DIFF_SUMMARY: DraftConsoleDiffSummary = {
   removedCount: 1,
   items: [
     {
+      pageId: "main",
       id: "readme",
       title: "Readme",
       changeType: "updated",
@@ -40,12 +41,14 @@ const VISUAL_DIFF_SUMMARY: DraftConsoleDiffSummary = {
       ],
     },
     {
+      pageId: "main",
       id: "new-panel",
       title: "New Panel",
       changeType: "added",
       lines: [],
     },
     {
+      pageId: "main",
       id: "old-panel",
       title: "Old Panel",
       changeType: "removed",
@@ -126,6 +129,7 @@ function StatefulConsoleView({
 }
 
 const BASE_PROPS: StatefulConsoleViewProps = {
+  activePageId: "main",
   panels: [PANEL],
   layout: LAYOUT,
   persistedPanels: [PANEL],
@@ -232,7 +236,7 @@ describe("ConsoleView grid transitions", () => {
               addedCount: changeType === "added" ? 1 : 0,
               updatedCount: changeType === "updated" ? 1 : 0,
               removedCount: 0,
-              items: [{ id: "readme", title: "Readme", changeType, lines: [] }],
+              items: [{ pageId: "main", id: "readme", title: "Readme", changeType, lines: [] }],
             },
           }}
         />

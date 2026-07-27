@@ -3925,6 +3925,9 @@ export function AppPage() {
     handleSaveWorkflow,
     updateConsoleMutation,
     onEffectiveConsoleChange: handleEffectiveConsoleChange,
+    onSpecParseError: (path, error) => {
+      showErrorToast(`Could not save ${path}: ${error}`);
+    },
   });
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: hasStagingChanges,

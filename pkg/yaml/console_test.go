@@ -963,6 +963,115 @@ func TestConsoleFromYMLLenient_GrandfathersOverCapPanels(t *testing.T) {
 	require.Len(t, parsed.Pages()[0].Panels, MaxConsolePanelsPerPage+3)
 }
 
+// TestValidateConsolePagesDelta_GrandfathersOverCapReductions verifies
+// the commit-time grandfathering rule: a page that already exceeded
+// MaxConsolePanelsPerPage in the previous version may be shrunk, kept
+// the same, or grown up to (but not beyond) its previous size without
+// tripping the cap. This is what lets migrated over-cap consoles
+// progressively reduce down to the cap instead of getting wedged.
+func TestValidateConsolePagesDelta_GrandfathersOverCapReductions(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 5
+	previous := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	// Reduce over-cap page but still over cap → allowed.
+	reduced := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over - 2), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(reduced, previous))
+
+	// Stay at the same over-cap size → allowed.
+	same := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(same, previous))
+
+	// Grow beyond the previous over-cap size → rejected.
+	grown := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over + 1), Layout: nil}}
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// Fresh page (no prior counterpart) must respect the cap. Panel
+	// ids are prefixed differently from the shared helper so the
+	// positional-with-subset grandfathering rule cannot match — this
+	// test is specifically about a *new* page inhabiting a slot that
+	// happened to be grandfathered, which must NOT inherit the
+	// allowance.
+	freshPanels := make([]models.ConsolePanel, MaxConsolePanelsPerPage+1)
+	for i := range freshPanels {
+		freshPanels[i] = models.ConsolePanel{
+			ID:      fmt.Sprintf("fresh-%d", i),
+			Type:    "markdown",
+			Content: map[string]any{},
+		}
+	}
+	fresh := []models.ConsolePage{{ID: "extra", Panels: freshPanels, Layout: nil}}
+	err = ValidateConsolePagesDelta(fresh, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+}
+
+// TestValidateConsolePagesDelta_AllowsGrandfatheredPageRename verifies
+// that renaming an over-cap page (id change) does not break its
+// grandfathering. Before the positional fallback the delta lookup was
+// keyed strictly by id, so `main` → `overview` with the same panels
+// would surface as a fresh over-cap page.
+func TestValidateConsolePagesDelta_AllowsGrandfatheredPageRename(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 4
+	previous := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	renamed := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	require.NoError(t, ValidateConsolePagesDelta(renamed, previous))
+
+	// But a rename that also grows the page past the previous size
+	// should still fail: grandfathering caps at the previous count.
+	grown := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over + 1), Layout: nil}}
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+}
+
+// TestValidateConsolePagesDelta_GrandfathersOverCapPageCount verifies
+// that a console with more than MaxConsolePages does not fail delta
+// validation as long as the count does not grow.
+func TestValidateConsolePagesDelta_GrandfathersOverCapPageCount(t *testing.T) {
+	over := MaxConsolePages + 2
+	previous := makeModelConsolePagesN(over)
+
+	// Same over-cap page count → allowed.
+	require.NoError(t, ValidateConsolePagesDelta(previous, previous))
+
+	// Reduce back below the cap → allowed.
+	reduced := makeModelConsolePagesN(MaxConsolePages)
+	require.NoError(t, ValidateConsolePagesDelta(reduced, previous))
+
+	// Add another page beyond the previous over-cap count → rejected.
+	grown := makeModelConsolePagesN(over + 1)
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many pages")
+}
+
+func makeModelConsolePanelsN(n int) []models.ConsolePanel {
+	out := make([]models.ConsolePanel, n)
+	for i := 0; i < n; i++ {
+		out[i] = models.ConsolePanel{
+			ID:      fmt.Sprintf("p-%d", i),
+			Type:    "markdown",
+			Content: map[string]any{},
+		}
+	}
+	return out
+}
+
+func makeModelConsolePagesN(n int) []models.ConsolePage {
+	out := make([]models.ConsolePage, n)
+	for i := 0; i < n; i++ {
+		out[i] = models.ConsolePage{
+			ID:     fmt.Sprintf("page-%d", i),
+			Panels: []models.ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}},
+			Layout: nil,
+		}
+	}
+	return out
+}
+
 func TestValidateConsoleContent_RejectsInvalidLayout(t *testing.T) {
 	panels := []ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}}
 	err := ValidateConsoleContent(panels, []ConsoleLayoutItem{

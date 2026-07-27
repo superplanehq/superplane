@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ConsoleLayoutItem, ConsolePage, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { DEFAULT_CONSOLE_PAGE_ID, DEFAULT_CONSOLE_PAGE_NAME } from "./consoleYaml";
+import { DEFAULT_CONSOLE_PAGE_ID, DEFAULT_CONSOLE_PAGE_NAME, MAX_CONSOLE_PAGES } from "./consoleYaml";
 import { templateForPanelType, type PanelType } from "./panelTypes";
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -226,6 +226,13 @@ function usePageHandlers({
 }) {
   const handleAddPage = useCallback(() => {
     setLocalPages((prev) => {
+      // Enforce the cap in local state as well as in the tab-strip
+      // button. Rapid successive clicks and direct calls (e.g. from
+      // tests or keyboard shortcuts) can bypass the disabled button
+      // between renders; without this guard, staging + the local
+      // editor state can drift past MAX_CONSOLE_PAGES and the commit
+      // then fails while the editor still shows an invalid sixth tab.
+      if (prev.length >= MAX_CONSOLE_PAGES) return prev;
       const pagesForCreation = appendConsolePage(prev);
       queueSave(pagesForCreation);
       onActivePageIdChange(pagesForCreation[pagesForCreation.length - 1]!.id);

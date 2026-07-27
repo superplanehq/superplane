@@ -92,10 +92,7 @@ export function ConsoleView({
     [isAddPanelControlled, onAddPanelDialogOpenChange],
   );
 
-  const activePageDiff = useMemo(
-    () => scopeVisualDiffToPage(visualDiff, activePageId),
-    [visualDiff, activePageId],
-  );
+  const activePageDiff = useMemo(() => scopeVisualDiffToPage(visualDiff, activePageId), [visualDiff, activePageId]);
 
   const visualDiffWithLocalDeletes = useMemo(
     () =>

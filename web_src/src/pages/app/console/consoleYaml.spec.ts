@@ -491,4 +491,3 @@ spec:
     expectParseError(text, /dataSource\.sources\[0\]\.field is required/);
   });
 });
-
