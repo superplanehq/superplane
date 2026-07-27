@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -18,23 +17,6 @@ import (
 
 func Test__ListNodeExecutions(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := ListNodeExecutions(
-			context.Background(),
-			r.Registry,
-			"invalid-uuid",
-			"some-node",
-			[]pb.CanvasNodeExecution_State{},
-			[]pb.CanvasNodeExecution_Result{},
-			0,
-			nil,
-		)
-
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-	})
 
 	t.Run("node does not exist -> 404 error", func(t *testing.T) {
 		//
@@ -62,33 +44,9 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		_, err := ListNodeExecutions(
 			context.Background(),
-			r.Registry,
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"non-existent-node",
-			[]pb.CanvasNodeExecution_State{},
-			[]pb.CanvasNodeExecution_Result{},
-			0,
-			nil,
-		)
-
-		//
-		// Verify we get a NotFound error
-		//
-		code, msg, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, code)
-		assert.Contains(t, msg, "canvas node not found")
-	})
-
-	t.Run("canvas does not exist -> 404 error", func(t *testing.T) {
-		//
-		// Try to list executions for a non-existent canvas
-		//
-		_, err := ListNodeExecutions(
-			context.Background(),
-			r.Registry,
-			uuid.New().String(),
-			"some-node",
 			[]pb.CanvasNodeExecution_State{},
 			[]pb.CanvasNodeExecution_Result{},
 			0,
@@ -140,8 +98,8 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		response, err := ListNodeExecutions(
 			context.Background(),
-			r.Registry,
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"node-1",
 			[]pb.CanvasNodeExecution_State{},
 			[]pb.CanvasNodeExecution_Result{},
@@ -199,7 +157,7 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 		require.NoError(b, err)
 	}
 
-	executions, err := models.ListNodeExecutions(canvas.ID, "node-1", []string{}, []string{}, 1000, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, "node-1", []string{}, []string{}, 1000, nil)
 	require.NoError(b, err)
 
 	resources, err := LoadNodeExecutionResources(database.Conn(), executions)

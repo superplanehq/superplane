@@ -237,8 +237,8 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 
 	if _, err := canvasRepository.PutCanvasStaging(
 		ctx,
-		session.OrganizationID,
-		session.CanvasID,
+		database.DB(ctx),
+		canvas,
 		operations,
 	); err != nil {
 		return fmt.Errorf("stage patched draft files: %w", err)

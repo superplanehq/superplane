@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { fetchCommittedCanvasVersionWithSpec } from "./lib/repository-spec-files";
+import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
 export type CommittedDraftBaselines = {
   canvasSpec?: CanvasesCanvas["spec"];
@@ -50,7 +50,7 @@ export function useCommittedDraftBaselines({
     void Promise.all([
       queryClient.fetchQuery({
         queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
+        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId),
         staleTime: Number.POSITIVE_INFINITY,
       }),
       queryClient.fetchQuery({
