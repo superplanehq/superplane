@@ -104,12 +104,13 @@ describe("ConversationTranscript user messages", () => {
     );
   });
 
-  it("marks the transcript so selected text stays readable across themes", () => {
+  it("applies theme-aware selection colors so selected text stays readable", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Hello")} />);
 
-    // The `agent-chat-transcript` class scopes the theme-aware `::selection`
-    // styles that keep dark-mode selected text readable (issue #6372).
-    expect(screen.getByTestId("agent-chat-messages")).toHaveClass("agent-chat-transcript");
+    // Explicit `selection:` utilities keep dark-mode selected text readable (issue #6372).
+    const transcript = screen.getByTestId("agent-chat-messages");
+    expect(transcript).toHaveClass("selection:text-slate-900");
+    expect(transcript).toHaveClass("dark:selection:text-gray-50");
   });
 
   it("keeps compact user messages sticky", () => {
