@@ -387,6 +387,19 @@
     background-color: Highlight;
     color: HighlightText;
   }
+
+  /* Keep selected chat text readable in both themes. Without an explicit color
+     the browser's default selection leaves the light dark-mode text on a light
+     highlight, which is unreadable (see issue #6372). */
+  .agent-chat-transcript ::selection {
+    background-color: color-mix(in oklab, theme("colors.blue.300") 60%, transparent);
+    color: theme("colors.slate.900");
+  }
+
+  .dark .agent-chat-transcript ::selection {
+    background-color: color-mix(in oklab, theme("colors.blue.400") 45%, transparent);
+    color: theme("colors.gray.50");
+  }
 }
 
 .json-viewer-hide-types .w-rjv-type:not([data-type="null"]) {
