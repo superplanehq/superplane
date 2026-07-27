@@ -33,6 +33,23 @@ func (c *AppContext) Get(idOrName string) (*core.App, error) {
 	return c.getAppByName(idOrName)
 }
 
+func (c *AppContext) GetNode(app, node string) (*core.CanvasNode, error) {
+	other, err := c.Get(app)
+	if err != nil {
+		return nil, err
+	}
+
+	otherNode, err := models.FindCanvasNode(c.tx, uuid.MustParse(other.ID), node)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.CanvasNode{
+		ID:   otherNode.NodeID,
+		Name: otherNode.Name,
+	}, nil
+}
+
 func (c *AppContext) getAppByID(id uuid.UUID) (*core.App, error) {
 	otherApp, err := models.FindCanvasInTransaction(c.tx, c.canvas.OrganizationID, id)
 	if err == nil {

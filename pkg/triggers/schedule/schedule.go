@@ -675,9 +675,14 @@ func nextHoursTrigger(interval int, minute int, now time.Time) (*time.Time, erro
 
 	nowInTZ := now
 
-	// Start with the occurrence of the specified minute in the current hour
+	// Occurrence of the specified minute in the current hour.
 	nextTrigger := time.Date(nowInTZ.Year(), nowInTZ.Month(), nowInTZ.Day(), nowInTZ.Hour(), minute, 0, 0, nowInTZ.Location())
-	nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Hour)
+
+	// If that occurrence is still in the future, fire in the current hour.
+	// Otherwise (the minute has already passed), advance by the configured interval.
+	if !nextTrigger.After(nowInTZ) {
+		nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Hour)
+	}
 
 	utcResult := nextTrigger.UTC()
 	return &utcResult, nil

@@ -34,7 +34,11 @@ const (
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
+	FieldTypeSecret              = "secret"
+	FieldTypeIntegration         = "integration"
 	FieldTypeApp                 = "app"
+	FieldTypeAppCanvasNode       = "app-canvas-node"
+	FieldTypeRunParameters       = "run-parameters"
 )
 
 type Field struct {
@@ -103,6 +107,23 @@ type TypeOptions struct {
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
+	App              *AppTypeOptions              `json:"app,omitempty"`
+	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
+	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
+}
+
+type IntegrationTypeOptions struct {
+	Integration string `json:"integration"`
+}
+
+type AppTypeOptions struct {
+	AllowSelf bool `json:"allowSelf,omitempty"`
+}
+
+type AppCanvasNodeTypeOptions struct {
+	NodeTypes      []string       `json:"nodeTypes,omitempty"`
+	ComponentTypes []string       `json:"componentTypes,omitempty"`
+	Parameters     []ParameterRef `json:"parameters,omitempty"`
 }
 
 /*

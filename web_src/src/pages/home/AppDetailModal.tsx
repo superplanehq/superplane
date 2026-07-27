@@ -122,7 +122,7 @@ export function LeadIcon({
   size?: "sm" | "lg";
 }) {
   const iconName = icon || integrations[0];
-  const cls = size === "lg" ? "h-8 w-8" : "h-5 w-5";
+  const cls = size === "lg" ? "h-6 w-6" : "h-5 w-5";
   if (!iconName) return <Plus className={`${cls} text-slate-400 dark:text-gray-500`} />;
   const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
   if (iconSrc) return <img src={iconSrc} alt={iconName} className={cls} />;

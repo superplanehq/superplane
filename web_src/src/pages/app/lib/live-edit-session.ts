@@ -8,41 +8,28 @@ import { clearComponentSidebarSearchParams } from "../viewState";
 
 export function isActiveCanvasVersionCurrentLive({
   activeCanvasVersionId,
-  effectiveLiveCanvasVersionId,
   liveCanvasVersionId,
 }: {
   activeCanvasVersionId: string;
-  effectiveLiveCanvasVersionId?: string;
   liveCanvasVersionId?: string;
 }): boolean {
-  if (!activeCanvasVersionId) {
+  if (!activeCanvasVersionId || !liveCanvasVersionId) {
     return false;
   }
 
-  return (
-    (!!effectiveLiveCanvasVersionId && activeCanvasVersionId === effectiveLiveCanvasVersionId) ||
-    (!!liveCanvasVersionId && activeCanvasVersionId === liveCanvasVersionId)
-  );
+  return activeCanvasVersionId === liveCanvasVersionId;
 }
 
 export function isViewingCurrentLiveCanvasVersion({
   activeCanvasVersionId,
   selectedCanvasVersion,
-  effectiveLiveCanvasVersionId,
   liveCanvasVersionId,
 }: {
   activeCanvasVersionId: string;
   selectedCanvasVersion: CanvasesCanvasVersion | null;
-  effectiveLiveCanvasVersionId?: string;
   liveCanvasVersionId?: string;
 }): boolean {
-  if (
-    isActiveCanvasVersionCurrentLive({
-      activeCanvasVersionId,
-      effectiveLiveCanvasVersionId,
-      liveCanvasVersionId,
-    })
-  ) {
+  if (isActiveCanvasVersionCurrentLive({ activeCanvasVersionId, liveCanvasVersionId })) {
     return true;
   }
 
@@ -50,11 +37,7 @@ export function isViewingCurrentLiveCanvasVersion({
     return true;
   }
 
-  const selectedVersionId = selectedCanvasVersion.metadata?.id;
-  return (
-    (!!effectiveLiveCanvasVersionId && selectedVersionId === effectiveLiveCanvasVersionId) ||
-    selectedVersionId === liveCanvasVersionId
-  );
+  return selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
 }
 
 function isStagedCanvasVersionForActiveVersion(
@@ -133,20 +116,13 @@ export function resolveSelectedCanvasVersion({
 export function shouldReadStagedCanvasVersion({
   editSessionActive,
   activeCanvasVersionId,
-  effectiveLiveCanvasVersionId,
   liveCanvasVersionId,
 }: {
   editSessionActive: boolean;
   activeCanvasVersionId: string;
-  effectiveLiveCanvasVersionId?: string;
   liveCanvasVersionId?: string;
 }): boolean {
-  return (
-    editSessionActive &&
-    !!activeCanvasVersionId &&
-    ((!!effectiveLiveCanvasVersionId && activeCanvasVersionId === effectiveLiveCanvasVersionId) ||
-      activeCanvasVersionId === liveCanvasVersionId)
-  );
+  return editSessionActive && !!activeCanvasVersionId && activeCanvasVersionId === liveCanvasVersionId;
 }
 
 type LiveEditSessionDraftRefs = {

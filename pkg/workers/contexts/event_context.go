@@ -14,12 +14,13 @@ import (
 type EventContext struct {
 	tx             *gorm.DB
 	node           *models.CanvasNode
+	run            *models.CanvasRun
 	maxPayloadSize int
 	onNewEvents    func([]models.CanvasEvent)
 }
 
-func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
+func NewEventContext(tx *gorm.DB, node *models.CanvasNode, run *models.CanvasRun, onNewEvents func([]models.CanvasEvent)) *EventContext {
+	return &EventContext{tx: tx, node: node, run: run, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -50,6 +51,10 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		Data:       models.NewJSONValue(json.RawMessage(data)),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
+	}
+
+	if s.run != nil {
+		event.RunID = s.run.ID
 	}
 
 	wrappedPayload := map[string]any{"data": payload}

@@ -497,8 +497,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                               value={configuration[field.name!]}
                               onChange={(value) => setConfiguration({ ...configuration, [field.name!]: value })}
                               allValues={configuration}
-                              domainId={organizationId}
-                              domainType="DOMAIN_TYPE_ORGANIZATION"
                               organizationId={organizationId}
                             />
                           ))}

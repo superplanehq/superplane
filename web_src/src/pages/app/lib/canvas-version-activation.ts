@@ -75,15 +75,8 @@ export function refreshLiveCanvasAfterVersionSelection({
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
-function isCurrentLiveVersion(
-  versionId: string,
-  effectiveLiveCanvasVersionId?: string,
-  liveCanvasVersionId?: string,
-): boolean {
-  return (
-    (!!effectiveLiveCanvasVersionId && versionId === effectiveLiveCanvasVersionId) ||
-    (!!liveCanvasVersionId && versionId === liveCanvasVersionId)
-  );
+function isCurrentLiveVersion(versionId: string, liveCanvasVersionId?: string): boolean {
+  return !!liveCanvasVersionId && versionId === liveCanvasVersionId;
 }
 
 function stashDraftSpecForPreviousVersion({
@@ -129,7 +122,6 @@ export function activateCanvasVersionForEditing({
   versionID,
   version,
   options,
-  effectiveLiveCanvasVersionId,
   liveCanvasVersionId,
   queryClient,
   draftCanvasSpec,
@@ -150,7 +142,6 @@ export function activateCanvasVersionForEditing({
   versionID: string;
   version: CanvasesCanvasVersion;
   options?: { preserveStagedLayer?: boolean };
-  effectiveLiveCanvasVersionId?: string;
   liveCanvasVersionId?: string;
   queryClient: QueryClient;
   draftCanvasSpec: DraftSpec;
@@ -171,7 +162,7 @@ export function activateCanvasVersionForEditing({
   }
 
   const versionId = version.metadata?.id || "";
-  const isCurrentLive = isCurrentLiveVersion(versionId, effectiveLiveCanvasVersionId, liveCanvasVersionId);
+  const isCurrentLive = isCurrentLiveVersion(versionId, liveCanvasVersionId);
   const preserveStagedLayer = !!options?.preserveStagedLayer && isCurrentLive;
 
   clearPendingAutoSaveWork();

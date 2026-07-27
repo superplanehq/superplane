@@ -68,8 +68,6 @@ export function InputsStep({
             value={values[fieldName]}
             onChange={(value) => handleFieldChange(fieldName, value)}
             allValues={values}
-            domainId={organizationId}
-            domainType="DOMAIN_TYPE_ORGANIZATION"
             organizationId={organizationId}
             validationErrors={validationErrors}
           />

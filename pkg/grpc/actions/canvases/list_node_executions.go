@@ -4,17 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
-	"sync"
-	"time"
 )
 
 const (
@@ -22,13 +21,8 @@ const (
 	MaxLimit     = 25
 )
 
-func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
-	wfID, err := uuid.Parse(workflowID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	_, err = models.FindCanvasNode(database.Conn(), wfID, nodeID)
+func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
+	_, err := models.FindCanvasNode(db, canvas.ID, nodeID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "canvas node not found")
@@ -53,17 +47,15 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	//
 	// List and count executions
 	//
-	executions, err := models.ListNodeExecutions(wfID, nodeID, states, results, int(limit), beforeTime)
+	executions, err := models.ListNodeExecutions(db, canvas.ID, nodeID, states, results, int(limit), beforeTime)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, err := models.CountNodeExecutions(wfID, nodeID, states, results)
+	totalCount, err := models.CountNodeExecutions(db, canvas.ID, nodeID, states, results)
 	if err != nil {
 		return nil, err
 	}
-
-	db := database.DB(ctx)
 
 	resources, err := LoadNodeExecutionResources(db, executions)
 	if err != nil {

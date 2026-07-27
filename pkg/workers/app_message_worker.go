@@ -238,7 +238,7 @@ func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.C
 		Configuration: targetNode.Configuration.Data(),
 		NodeMetadata:  contexts.NewNodeMetadataContext(tx, targetNode),
 		Message:       message,
-		Events:        contexts.NewEventContext(tx, targetNode, onNewEvents),
+		Events:        contexts.NewEventContext(tx, targetNode, nil, onNewEvents),
 		Logger:        logging.ForNode(*targetNode),
 	})
 }

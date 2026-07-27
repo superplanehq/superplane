@@ -64,7 +64,7 @@ func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndRequestsFinalization(
 	result, err := models.DeleteCanvasNodeWithResult(database.Conn(), *node)
 	require.NoError(t, err)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, nodeID, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, nodeID, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
 

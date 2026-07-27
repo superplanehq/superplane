@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -110,13 +111,13 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 
 	// Another user's star must not leak into this user's view.
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
-	_, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), otherUser.ID.String(), &pb.UpdateCanvasPreferenceRequest{
+	_, err := UpdateCanvasPreference(context.Background(), database.DB(t.Context()), plainCanvas, otherUser.ID.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: plainCanvas.ID.String(),
 		Starred:  proto.Bool(true),
 	})
 	require.NoError(t, err)
 
-	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+	_, err = UpdateCanvasPreference(context.Background(), database.DB(t.Context()), starredCanvas, r.User.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: starredCanvas.ID.String(),
 		Starred:  proto.Bool(true),
 	})

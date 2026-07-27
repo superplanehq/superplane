@@ -231,6 +231,7 @@ type UpdateIssueRequest struct {
 	Description *string `json:"description,omitempty"`
 	StateEvent  *string `json:"state_event,omitempty"`
 	Labels      *string `json:"labels,omitempty"`
+	AddLabels   *string `json:"add_labels,omitempty"`
 	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
 	MilestoneID *int    `json:"milestone_id,omitempty"`
 	DueDate     *string `json:"due_date,omitempty"`
@@ -288,8 +289,50 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
+
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
+// UpdateIssueNote edits an existing note (comment) on an issue.
+// See https://docs.gitlab.com/api/notes/#modify-existing-issue-note
+func (c *Client) UpdateIssueNote(ctx context.Context, projectID, issueIID, noteID string, req *UpdateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s/notes/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID), url.PathEscape(noteID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
 	var note Note
@@ -585,12 +628,27 @@ type Note struct {
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 	System       bool   `json:"system"`
+	ProjectID    int    `json:"project_id,omitempty"`
 	NoteableID   int    `json:"noteable_id,omitempty"`
 	NoteableIID  int    `json:"noteable_iid,omitempty"`
 	NoteableType string `json:"noteable_type,omitempty"`
+	Resolvable   bool   `json:"resolvable"`
+	Confidential bool   `json:"confidential"`
+	Internal     bool   `json:"internal"`
+}
+
+// quickActionNoteResponse is what GitLab returns instead of a Note when a
+// note's body is only quick actions (e.g. "/ready") and has no visible
+// comment content: status 202 with a summary of the applied commands.
+type quickActionNoteResponse struct {
+	Summary []string `json:"summary"`
 }
 
 type CreateNoteRequest struct {
+	Body string `json:"body"`
+}
+
+type UpdateNoteRequest struct {
 	Body string `json:"body"`
 }
 
@@ -613,6 +671,14 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
@@ -699,6 +765,174 @@ func (c *Client) AcceptMergeRequest(ctx context.Context, projectID, mergeRequest
 		return nil, fmt.Errorf("branch cannot be merged: %s", parseGitlabErrorMessage(readResponseBody(resp)))
 	default:
 		return nil, fmt.Errorf("failed to accept merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+type CreateMergeRequestRequest struct {
+	SourceBranch       string `json:"source_branch"`
+	TargetBranch       string `json:"target_branch"`
+	Title              string `json:"title"`
+	Description        string `json:"description,omitempty"`
+	AssigneeIDs        []int  `json:"assignee_ids,omitempty"`
+	ReviewerIDs        []int  `json:"reviewer_ids,omitempty"`
+	Labels             string `json:"labels,omitempty"`
+	MilestoneID        *int   `json:"milestone_id,omitempty"`
+	RemoveSourceBranch *bool  `json:"remove_source_branch,omitempty"`
+	Squash             *bool  `json:"squash,omitempty"`
+}
+
+// CreateMergeRequest opens a new merge request in a project.
+// See https://docs.gitlab.com/api/merge_requests/#create-mr
+func (c *Client) CreateMergeRequest(ctx context.Context, projectID string, req *CreateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// GetMergeRequest fetches a single merge request, including its current reviewers.
+func (c *Client) GetMergeRequest(ctx context.Context, projectID, mergeRequestIID string) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestRequest mirrors GitLab's PUT /projects/:id/merge_requests/:merge_request_iid
+// body. Fields are pointers so a nil field is omitted (left unchanged) while a
+// non-nil field is always sent, even when it points to a zero value - e.g. a
+// non-nil pointer to "" clears the description, and a non-nil pointer to an
+// empty slice clears the assignees.
+type UpdateMergeRequestRequest struct {
+	Title        *string `json:"title,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	TargetBranch *string `json:"target_branch,omitempty"`
+	StateEvent   *string `json:"state_event,omitempty"`
+	Labels       *string `json:"labels,omitempty"`
+	AssigneeIDs  *[]int  `json:"assignee_ids,omitempty"`
+}
+
+// UpdateMergeRequest edits an existing merge request's fields.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *UpdateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestReviewersRequest sets the full reviewer list of a merge
+// request. GitLab replaces the existing reviewers with the given IDs, so an
+// empty (but non-nil) slice clears all reviewers.
+type UpdateMergeRequestReviewersRequest struct {
+	ReviewerIDs []int `json:"reviewer_ids"`
+}
+
+// UpdateMergeRequestReviewers replaces the reviewers of a merge request with the
+// given set of user IDs.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequestReviewers(ctx context.Context, projectID, mergeRequestIID string, reviewerIDs []int) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	if reviewerIDs == nil {
+		reviewerIDs = []int{}
+	}
+
+	body, err := json.Marshal(&UpdateMergeRequestReviewersRequest{ReviewerIDs: reviewerIDs})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request reviewers: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
 	var mergeRequest MergeRequest

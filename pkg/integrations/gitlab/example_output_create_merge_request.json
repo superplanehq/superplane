@@ -1,0 +1,59 @@
+{
+  "data": {
+    "id": 1,
+    "iid": 42,
+    "project_id": 3,
+    "title": "feat: add login page",
+    "description": "Adds the new login page with SSO support",
+    "state": "opened",
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "updated_at": "2026-02-13T08:46:00.000Z",
+    "merged_at": null,
+    "merge_user": null,
+    "closed_at": null,
+    "closed_by": null,
+    "source_branch": "feature/login-page",
+    "target_branch": "main",
+    "author": {
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera",
+      "state": "active",
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "assignees": [
+      {
+        "id": 22,
+        "name": "Jamie Rivera",
+        "username": "jrivera",
+        "state": "active",
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "web_url": "https://gitlab.example.com/jrivera"
+      }
+    ],
+    "reviewers": [
+      {
+        "id": 30,
+        "name": "Alex Morgan",
+        "username": "amorgan",
+        "state": "active",
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "labels": ["feature"],
+    "milestone": null,
+    "draft": false,
+    "detailed_merge_status": "mergeable",
+    "merge_error": null,
+    "sha": "8888888888888888888888888888888888888888",
+    "merge_commit_sha": null,
+    "squash_commit_sha": null,
+    "squash": false,
+    "should_remove_source_branch": true,
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T08:46:00.000Z",
+  "type": "gitlab.mergeRequest"
+}

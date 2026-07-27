@@ -110,6 +110,9 @@ func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finis
 	}
 
 	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
+	if errMsg := strings.TrimSpace(task.Error); errMsg != "" {
+		out["error"] = errMsg
+	}
 	if v := brokerResultAsAny(task.Result); v != nil {
 		out["result"] = v
 	}

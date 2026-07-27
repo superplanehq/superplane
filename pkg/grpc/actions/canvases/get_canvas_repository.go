@@ -5,33 +5,17 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
-func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organizationID string, id string) (*pb.GetCanvasRepositoryResponse, error) {
-	canvasID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "canvas not found")
-	}
-
-	orgID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
-	}
-
-	repository, err := models.FindRepository(orgID, canvasID)
+func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, canvas *models.Canvas) (*pb.GetCanvasRepositoryResponse, error) {
+	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
 	if err != nil {
 		return handleMissingRepository(gitProvider, canvas, err)
 	}
