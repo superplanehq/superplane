@@ -205,6 +205,27 @@ type Issue struct {
 	Labels        LabelList      `json:"labels,omitempty"`
 }
 
+// Comment is a comment on an issue. user is the author and is null when Linear
+// attributes the comment to a bot or integration rather than a person.
+type Comment struct {
+	ID        string        `json:"id"`
+	Body      string        `json:"body"`
+	URL       string        `json:"url"`
+	CreatedAt string        `json:"createdAt,omitempty"`
+	UpdatedAt string        `json:"updatedAt,omitempty"`
+	User      *User         `json:"user,omitempty"`
+	Issue     *CommentIssue `json:"issue,omitempty"`
+}
+
+// CommentIssue is the issue a comment belongs to, trimmed to the fields worth
+// surfacing alongside the comment.
+type CommentIssue struct {
+	ID         string `json:"id"`
+	Identifier string `json:"identifier"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+}
+
 // Viewer identifies the account behind the access token and the workspace it belongs to.
 type Viewer struct {
 	User         *User        `json:"viewer"`
@@ -511,6 +532,107 @@ func (c *Client) UpdateIssue(id string, input map[string]any) (*Issue, error) {
 	}
 
 	return response.IssueUpdate.Issue, nil
+}
+
+const commentFields = `
+      id body url createdAt updatedAt
+      user { id name displayName email }
+      issue { id identifier title url }`
+
+const createCommentMutation = `
+mutation CommentCreate($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment {` + commentFields + `
+    }
+  }
+}`
+
+// CreateComment adds a comment to an issue. The input's issueId may be the issue
+// UUID or its identifier (e.g. ENG-142).
+func (c *Client) CreateComment(input map[string]any) (*Comment, error) {
+	response := struct {
+		CommentCreate struct {
+			Success bool     `json:"success"`
+			Comment *Comment `json:"comment"`
+		} `json:"commentCreate"`
+	}{}
+
+	if err := c.execute(createCommentMutation, map[string]any{"input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.CommentCreate.Success || response.CommentCreate.Comment == nil {
+		return nil, fmt.Errorf("linear reported the comment was not created")
+	}
+
+	return response.CommentCreate.Comment, nil
+}
+
+const addIssueLabelMutation = `
+mutation IssueAddLabel($id: String!, $labelId: String!) {
+  issueAddLabel(id: $id, labelId: $labelId) {
+    success
+    issue {` + issueFields + `
+    }
+  }
+}`
+
+// AddIssueLabel adds a single label to an issue without touching its existing
+// labels, returning the updated issue. Like UpdateIssue, the id may be the issue
+// UUID or its identifier (e.g. ENG-142).
+func (c *Client) AddIssueLabel(id, labelID string) (*Issue, error) {
+	response := struct {
+		IssueAddLabel struct {
+			Success bool   `json:"success"`
+			Issue   *Issue `json:"issue"`
+		} `json:"issueAddLabel"`
+	}{}
+
+	if err := c.execute(addIssueLabelMutation, map[string]any{"id": id, "labelId": labelID}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.IssueAddLabel.Success || response.IssueAddLabel.Issue == nil {
+		return nil, fmt.Errorf("linear reported the label was not added")
+	}
+
+	return response.IssueAddLabel.Issue, nil
+}
+
+const createLabelMutation = `
+mutation IssueLabelCreate($input: IssueLabelCreateInput!) {
+  issueLabelCreate(input: $input) {
+    success
+    issueLabel { id name }
+  }
+}`
+
+// CreateLabel creates a label and returns it. A non-empty teamID scopes the
+// label to that team; an empty teamID creates a workspace-level label. Linear
+// assigns a color when none is given.
+func (c *Client) CreateLabel(name, teamID string) (*Label, error) {
+	input := map[string]any{"name": name}
+	if teamID != "" {
+		input["teamId"] = teamID
+	}
+
+	response := struct {
+		IssueLabelCreate struct {
+			Success bool   `json:"success"`
+			Label   *Label `json:"issueLabel"`
+		} `json:"issueLabelCreate"`
+	}{}
+
+	if err := c.execute(createLabelMutation, map[string]any{"input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.IssueLabelCreate.Success || response.IssueLabelCreate.Label == nil {
+		return nil, fmt.Errorf("linear reported the label was not created")
+	}
+
+	return response.IssueLabelCreate.Label, nil
 }
 
 type Webhook struct {
