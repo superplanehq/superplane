@@ -122,3 +122,25 @@ export interface UpdateIssueConfiguration {
   labels?: string[];
   project?: string;
 }
+
+/** Comment as returned by the `commentCreate` mutation. `user` is null for bot/integration authors. */
+export interface LinearComment {
+  id?: string;
+  body?: string;
+  url?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  user?: LinearUser;
+  issue?: { id?: string; identifier?: string; title?: string; url?: string };
+}
+
+export interface AddIssueLabelConfiguration {
+  team?: string;
+  issue?: string;
+  labels?: string[];
+}
+
+export interface AddIssueCommentConfiguration {
+  issue?: string;
+  body?: string;
+}

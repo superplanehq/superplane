@@ -467,6 +467,84 @@ func Test__Client__UpdateIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateComment(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"commentCreate":{"success":true,"comment":{"id":"c1","body":"Looks good","url":"https://linear.app/acme/issue/ENG-142#comment-c1","user":{"id":"u1","name":"Jane"},"issue":{"id":"i1","identifier":"ENG-142","title":"Boom"}}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		comment, err := client.CreateComment(map[string]any{"issueId": "ENG-142", "body": "Looks good"})
+		require.NoError(t, err)
+		assert.Equal(t, "c1", comment.ID)
+		assert.Equal(t, "https://linear.app/acme/issue/ENG-142#comment-c1", comment.URL)
+		require.NotNil(t, comment.Issue)
+		assert.Equal(t, "ENG-142", comment.Issue.Identifier)
+
+		input, ok := variablesFromRequest(t, httpContext, 0)["input"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "ENG-142", input["issueId"])
+		assert.Equal(t, "Looks good", input["body"])
+	})
+
+	t.Run("unsuccessful response -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"commentCreate":{"success":false,"comment":null}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateComment(map[string]any{"issueId": "ENG-142", "body": "Looks good"})
+		require.ErrorContains(t, err, "not created")
+	})
+}
+
+func Test__Client__AddIssueLabel(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueAddLabel":{"success":true,"issue":{"id":"i1","identifier":"ENG-142","title":"Boom","labels":{"nodes":[{"id":"l1","name":"bug"}]}}}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		issue, err := client.AddIssueLabel("ENG-142", "l1")
+		require.NoError(t, err)
+		assert.Equal(t, "ENG-142", issue.Identifier)
+
+		// The labels connection is flattened for the emitted payload.
+		require.Len(t, issue.Labels, 1)
+		assert.Equal(t, "bug", issue.Labels[0].Name)
+
+		variables := variablesFromRequest(t, httpContext, 0)
+		assert.Equal(t, "ENG-142", variables["id"])
+		assert.Equal(t, "l1", variables["labelId"])
+	})
+
+	t.Run("unsuccessful response -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issueAddLabel":{"success":false,"issue":null}}}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.AddIssueLabel("ENG-142", "l1")
+		require.ErrorContains(t, err, "not added")
+	})
+}
+
 func Test__Client__CreateWebhook(t *testing.T) {
 	t.Run("scoped to a team", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

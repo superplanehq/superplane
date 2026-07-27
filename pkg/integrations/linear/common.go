@@ -17,6 +17,9 @@ const (
 	// both by the createIssue action and the onIssue trigger.
 	IssuePayloadType = "linear.issue"
 
+	// CommentPayloadType is the payload type emitted by the addIssueComment action.
+	CommentPayloadType = "linear.comment"
+
 	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request body.
 	SignatureHeader = "Linear-Signature"
 
