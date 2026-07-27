@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -329,6 +330,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			}
 
 			return b.resolvePreviousPayload(depth)
+		}),
+		expr.Function("run", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("run() takes no arguments")
+			}
+
+			return b.resolveRunPayload()
 		}),
 	}
 
@@ -775,6 +783,67 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	return payload, nil
 }
 
+// resolveRunPayload exposes the current run to expressions via run().
+// It returns id, url, and started_at (a time.Time) for the run that the
+// current node belongs to, resolved from the builder's root event.
+func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
+	if b.rootEventID == nil {
+		return nil, fmt.Errorf("run() is not available in this context: no run found")
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		return nil, fmt.Errorf("run() could not resolve the current run: %w", err)
+	}
+
+	payload := map[string]any{
+		"id": run.ID.String(),
+	}
+
+	if run.CreatedAt != nil {
+		payload["started_at"] = *run.CreatedAt
+	}
+
+	url, err := b.buildRunURL(run)
+	if err != nil {
+		return nil, err
+	}
+	payload["url"] = url
+
+	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return "", fmt.Errorf("run() could not resolve the organization for the run: %w", err)
+	}
+
+	return fmt.Sprintf(
+		"%s/%s/apps/%s?run=%s",
+		runBaseURL(),
+		canvas.OrganizationID.String(),
+		b.workflowID.String(),
+		run.ID.String(),
+	), nil
+}
+
+// runBaseURL mirrors the server's base URL resolution so run().url points at
+// the SuperPlane UI both in production (BASE_URL) and local development.
+func runBaseURL() string {
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL != "" {
+		return baseURL
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
+
+	return fmt.Sprintf("http://localhost:%s", port)
+}
+
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.CanvasEvent, refToNodeID map[string]string) map[string]string {
 	chainRefs := make(map[string]string, len(refToNodeID))
 	for nodeRef, nodeID := range refToNodeID {
@@ -892,6 +961,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"config":   {},
 	"root":     {},
 	"previous": {},
+	"run":      {},
 	"ctx":      {},
 }
 
