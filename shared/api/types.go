@@ -45,6 +45,9 @@ type CreateTaskRequest struct {
 	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
 	Environment []EnvironmentVariable `json:"environment,omitempty"`
+	// Labels are optional origin attributes (canvas_name, node_name) for metrics/alerting.
+	// Other keys are ignored. Not sent to runners or status/webhook payloads.
+	Labels map[string]string `json:"labels,omitempty"`
 	// Files are materialized under SUPERPLANE_TASK_DIR before execution (all run modes).
 	Files         []TaskFile `json:"files,omitempty"`
 	WebhookURL    string     `json:"webhook_url"`

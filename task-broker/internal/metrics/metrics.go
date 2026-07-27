@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/telemetry"
 )
 
@@ -22,6 +24,9 @@ type BrokerMetrics struct {
 	tasksClaimed           metric.Int64Gauge
 	oldestQueuedTaskAge    metric.Float64Gauge
 	instanceSpinupDuration metric.Float64Histogram
+	// lastBacklogKeys tracks series from the previous sample so drained
+	// canvas/node groups are explicitly zeroed (sync gauges keep last value).
+	lastBacklogKeys map[backlogKey]struct{}
 }
 
 // New registers broker metric instruments on meter.
@@ -132,10 +137,14 @@ func (m *BrokerMetrics) WebhookDelivered(ctx context.Context, fleetID, outcome s
 	m.webhookDeliveryDur.Record(ctx, duration.Seconds(), attrs)
 }
 
-func (m *BrokerMetrics) SetTaskBacklog(ctx context.Context, fleetID string, queued, claimed int) {
-	fleet := telemetry.FleetAttr(fleetID)
-	m.tasksQueued.Record(ctx, int64(queued), metric.WithAttributes(fleet))
-	m.tasksClaimed.Record(ctx, int64(claimed), metric.WithAttributes(fleet))
+func (m *BrokerMetrics) SetTaskBacklog(ctx context.Context, fleetID, canvasName, nodeName string, queued, claimed int) {
+	attrs := metric.WithAttributes(
+		telemetry.FleetAttr(fleetID),
+		attribute.String(models.LabelCanvasName, canvasName),
+		attribute.String(models.LabelNodeName, nodeName),
+	)
+	m.tasksQueued.Record(ctx, int64(queued), attrs)
+	m.tasksClaimed.Record(ctx, int64(claimed), attrs)
 }
 
 func (m *BrokerMetrics) SetOldestQueuedTaskAge(ctx context.Context, fleetID string, age time.Duration) {
