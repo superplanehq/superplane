@@ -146,20 +146,24 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug", BaseBranch: "main"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+	attr := commitAttribution{AuthorName: botAuthorName, AuthorEmail: botAuthorEmail}
+	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr, nil)
 	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git checkout -b claude/agent-abc")
 	assert.Contains(t, got, "fix the bug")
 	assert.Contains(t, got, "Open a pull request")
 	assert.Contains(t, got, "PR_URL=")
-	// Acting as bot (default): no git identity config, no trailer suppression.
-	assert.NotContains(t, got, "git config user.name")
+	// Acting as bot (default): commits are attributed to the Claude agent so the
+	// committer is never the sandbox's default "ubuntu" OS user. Agent trailers
+	// are kept since the commit is not attributed to a human user.
+	assert.Contains(t, got, `git config user.name "Claude"`)
+	assert.Contains(t, got, `git config user.email "noreply@anthropic.com"`)
 	assert.NotContains(t, got, "Co-Authored-By")
 }
 
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
-	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com"}
+	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com", AsUser: true}
 	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr, nil)
 	assert.Contains(t, got, `git config user.name "Octo Cat"`)
 	assert.Contains(t, got, `git config user.email "1+octocat@users.noreply.github.com"`)
@@ -197,6 +201,18 @@ func Test__RunCodeAgent__actAsBot(t *testing.T) {
 	assert.True(t, actAsBot(Spec{})) // default
 	assert.True(t, actAsBot(Spec{ActAsBot: &yes}))
 	assert.False(t, actAsBot(Spec{ActAsBot: &no}))
+}
+
+func Test__RunCodeAgent__resolveCommitAttribution__bot(t *testing.T) {
+	// Acting as bot must not fall back to the sandbox's default git identity
+	// (which resolves to the "ubuntu" OS user); it resolves to the Claude agent
+	// without needing any GitHub API call.
+	attr, err := resolveCommitAttribution(core.ExecutionContext{}, Spec{}, "")
+	require.NoError(t, err)
+	assert.Equal(t, botAuthorName, attr.AuthorName)
+	assert.Equal(t, botAuthorEmail, attr.AuthorEmail)
+	assert.True(t, attr.enabled())
+	assert.False(t, attr.AsUser)
 }
 
 // --- Execute ---

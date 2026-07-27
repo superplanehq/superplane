@@ -66,9 +66,9 @@ func writeIdentity(b *strings.Builder, attr commitAttribution) {
 }
 
 // commitInstruction returns the commit step wording, suppressing agent
-// attribution trailers when commits should appear as the user.
+// attribution trailers only when commits should appear as the human user.
 func commitInstruction(attr commitAttribution) string {
-	if attr.enabled() {
+	if attr.AsUser {
 		return "Commit your changes with a clear message, without any \"Co-Authored-By\" or \"Generated with\" trailers"
 	}
 	return "Commit your changes with a clear message"

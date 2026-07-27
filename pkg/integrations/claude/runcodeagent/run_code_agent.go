@@ -645,11 +645,23 @@ func modelForRun(spec Spec) string {
 	return defaultModel
 }
 
-// commitAttribution is the git author identity the agent should commit as. When
-// disabled (empty), the agent keeps its default identity and attribution trailers.
+const (
+	// botAuthorName and botAuthorEmail identify the Claude agent as the git
+	// author/committer when "Act as Bot" is on. Without an explicit identity the
+	// agent would commit with the sandbox's default git config, which resolves to
+	// the "ubuntu" OS user on the Linux sandbox.
+	botAuthorName  = "Claude"
+	botAuthorEmail = "noreply@anthropic.com"
+)
+
+// commitAttribution is the git author identity the agent should commit as. It is
+// always set: to the Claude agent when acting as a bot, or to the token's GitHub
+// user otherwise. AsUser distinguishes the two so agent attribution trailers are
+// only suppressed when commits should appear as the human user.
 type commitAttribution struct {
 	AuthorName  string
 	AuthorEmail string
+	AsUser      bool
 }
 
 func (c commitAttribution) enabled() bool { return c.AuthorName != "" }
@@ -658,18 +670,18 @@ func actAsBot(spec Spec) bool {
 	return spec.ActAsBot == nil || *spec.ActAsBot
 }
 
-// resolveCommitAttribution returns the author identity to attribute commits to
-// when "Act as Bot" is off, so commits appear as the token's GitHub user rather
-// than as the agent.
+// resolveCommitAttribution returns the author identity to attribute commits to.
+// With "Act as Bot" on (the default), commits are attributed to the Claude
+// agent; with it off, commits appear as the token's GitHub user.
 func resolveCommitAttribution(ctx core.ExecutionContext, spec Spec, token string) (commitAttribution, error) {
 	if actAsBot(spec) {
-		return commitAttribution{}, nil
+		return commitAttribution{AuthorName: botAuthorName, AuthorEmail: botAuthorEmail}, nil
 	}
 	name, email, err := resolveGitHubUser(ctx.HTTP, token)
 	if err != nil {
 		return commitAttribution{}, fmt.Errorf("failed to resolve GitHub user for commit attribution: %w", err)
 	}
-	return commitAttribution{AuthorName: name, AuthorEmail: email}, nil
+	return commitAttribution{AuthorName: name, AuthorEmail: email, AsUser: true}, nil
 }
 
 func repositoryForRun(spec Spec, pr *pullRequestInfo) string {
