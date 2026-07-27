@@ -37,6 +37,26 @@ func (c *UpdateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
 }
 
+//go:embed example_output_add_issue_label.json
+var exampleOutputAddIssueLabelBytes []byte
+
+var exampleOutputAddIssueLabelOnce sync.Once
+var exampleOutputAddIssueLabel map[string]any
+
+func (c *AddIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueLabelOnce, exampleOutputAddIssueLabelBytes, &exampleOutputAddIssueLabel)
+}
+
+//go:embed example_output_add_issue_comment.json
+var exampleOutputAddIssueCommentBytes []byte
+
+var exampleOutputAddIssueCommentOnce sync.Once
+var exampleOutputAddIssueComment map[string]any
+
+func (c *AddIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueCommentOnce, exampleOutputAddIssueCommentBytes, &exampleOutputAddIssueComment)
+}
+
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
 
