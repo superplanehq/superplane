@@ -191,7 +191,8 @@ func (c *RunJS) Configuration() []configuration.Field {
 			Description: "JavaScript executed by Node.js. Define function main() and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "javascript",
+					Language:         "javascript",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
