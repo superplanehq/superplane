@@ -154,6 +154,55 @@ func Test__Client__GetCurrentUser(t *testing.T) {
 		accessToken, _ := findSecret(appCtx, SecretOAuthAccessToken)
 		assert.Equal(t, "refreshed-access", accessToken)
 	})
+
+	// Regression test: Atlassian refresh tokens are single-use, so a concurrent Sync or request
+	// can rotate the stored pair first and make this call's own refresh attempt fail with
+	// invalid_grant even though the connection is fine. Adopt the token the winner just stored
+	// instead of failing outright.
+	t.Run("401 whose own refresh loses a concurrent rotation adopts the winner's token", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"123","displayName":"Test User"}`))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		appCtx.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		// Simulate a concurrent caller having already refreshed and stored a new access token.
+		appCtx.CurrentSecrets[SecretOAuthAccessToken] = core.IntegrationSecret{
+			Name: SecretOAuthAccessToken, Value: []byte("winner-access"),
+		}
+
+		user, err := client.GetCurrentUser()
+		require.NoError(t, err)
+		assert.Equal(t, "123", user.AccountID)
+		assert.Equal(t, "winner-access", client.AccessToken)
+
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, "Bearer winner-access", httpContext.Requests[2].Header.Get("Authorization"))
+	})
+
+	t.Run("401 whose own refresh fails with no concurrent rotation still errors", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		appCtx.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		_, err = client.GetCurrentUser()
+		require.ErrorContains(t, err, "token refresh failed")
+	})
 }
 
 func Test__Client__Refresh(t *testing.T) {

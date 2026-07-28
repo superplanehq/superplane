@@ -89,8 +89,8 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	if status == http.StatusUnauthorized {
-		if refreshErr := c.Refresh(); refreshErr != nil {
-			return nil, fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+		if err := c.recoverFromUnauthorized(); err != nil {
+			return nil, err
 		}
 		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
 		if err != nil {
@@ -103,6 +103,23 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 	}
 
 	return responseBody, nil
+}
+
+// recoverFromUnauthorized refreshes the access token after a 401. Atlassian's refresh tokens are
+// single-use, so a concurrent Sync or request can rotate the pair first and make this refresh
+// fail even though the connection is fine - in that case, adopt the token it just stored instead
+// of failing the caller.
+func (c *Client) recoverFromUnauthorized() error {
+	if refreshErr := c.Refresh(); refreshErr != nil {
+		if c.integration != nil {
+			if current, findErr := findSecret(c.integration, SecretOAuthAccessToken); findErr == nil && current != "" && current != c.AccessToken {
+				c.AccessToken = current
+				return nil
+			}
+		}
+		return fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+	}
+	return nil
 }
 
 func (c *Client) doRequest(method, requestURL string, body []byte) ([]byte, int, error) {
@@ -2114,8 +2131,8 @@ func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader
 	}
 
 	if status == http.StatusUnauthorized {
-		if refreshErr := c.Refresh(); refreshErr != nil {
-			return nil, status, fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+		if err := c.recoverFromUnauthorized(); err != nil {
+			return nil, status, err
 		}
 		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
 		if err != nil {
