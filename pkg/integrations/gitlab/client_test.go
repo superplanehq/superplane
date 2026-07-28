@@ -1532,6 +1532,140 @@ func Test__Client__UpdateRelease(t *testing.T) {
 	})
 }
 
+func Test__Client__GetRelease(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"tag_name": "v1.0.0", "name": "Release 1.0.0"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetRelease(context.Background(), "1", "v1.0.0")
+
+		require.NoError(t, err)
+		assert.Equal(t, "v1.0.0", result.TagName)
+		assert.Equal(t, "Release 1.0.0", result.Name)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases/v1.0.0", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetRelease(context.Background(), "1", "v1.0.0")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get release")
+	})
+}
+
+func Test__Client__DeleteRelease(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"tag_name": "v1.0.0", "name": "Release 1.0.0"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.DeleteRelease(context.Background(), "1", "v1.0.0")
+
+		require.NoError(t, err)
+		assert.Equal(t, "v1.0.0", result.TagName)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodDelete, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases/v1.0.0", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.DeleteRelease(context.Background(), "1", "v1.0.0")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete release")
+	})
+}
+
+func Test__Client__DeleteTag(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNoContent, ``),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		err := client.DeleteTag(context.Background(), "1", "v1.0.0")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodDelete, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/repository/tags/v1.0.0", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Tag Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		err := client.DeleteTag(context.Background(), "1", "v1.0.0")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete tag")
+	})
+}
+
 func Test__Client__GetLatestRelease(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
