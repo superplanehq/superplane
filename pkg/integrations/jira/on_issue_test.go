@@ -96,6 +96,31 @@ func Test__OnIssue__Setup(t *testing.T) {
 		require.NotNil(t, stored.WebhookID)
 		assert.Equal(t, int64(1001), *stored.WebhookID)
 	})
+
+	// Regression test: a failed create right after a successful delete must not leave metadata
+	// pointing at the deleted webhook id, since that webhook no longer exists.
+	t.Run("create failure after a successful delete clears the stale webhook id", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"ENG","name":"Engineering"}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["bad request"]}`))},
+			},
+		}
+		existingID := int64(1000)
+		metadata := &contexts.MetadataContext{Metadata: OnIssueMetadata{WebhookID: &existingID}}
+		err := trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   newAuthorizedIntegration(),
+			Metadata:      metadata,
+			Webhook:       &contexts.NodeWebhookContext{},
+			Configuration: map[string]any{"project": "ENG", "events": []string{"created"}},
+		})
+		require.ErrorContains(t, err, "failed to create Jira webhook")
+
+		stored := metadata.Metadata.(OnIssueMetadata)
+		assert.Nil(t, stored.WebhookID)
+	})
 }
 
 func Test__OnIssue__HandleWebhook(t *testing.T) {

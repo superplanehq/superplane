@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -25,12 +26,13 @@ func init() {
 type Jira struct{}
 
 type Metadata struct {
-	State    *string   `json:"state,omitempty" mapstructure:"state,omitempty"`
-	User     *User     `json:"user,omitempty" mapstructure:"user,omitempty"`
-	Projects []Project `json:"projects" mapstructure:"projects"`
-	CloudID  string    `json:"cloudId,omitempty" mapstructure:"cloudId,omitempty"`
-	SiteURL  string    `json:"siteUrl,omitempty" mapstructure:"siteUrl,omitempty"`
-	SiteName string    `json:"siteName,omitempty" mapstructure:"siteName,omitempty"`
+	State                *string   `json:"state,omitempty" mapstructure:"state,omitempty"`
+	User                 *User     `json:"user,omitempty" mapstructure:"user,omitempty"`
+	Projects             []Project `json:"projects" mapstructure:"projects"`
+	CloudID              string    `json:"cloudId,omitempty" mapstructure:"cloudId,omitempty"`
+	SiteURL              string    `json:"siteUrl,omitempty" mapstructure:"siteUrl,omitempty"`
+	SiteName             string    `json:"siteName,omitempty" mapstructure:"siteName,omitempty"`
+	AccessTokenExpiresAt string    `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
 }
 
 const installationInstructions = `
@@ -143,6 +145,11 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 		return j.requestAuthorization(ctx, string(clientID), callbackURL)
 	}
 
+	if err := j.refreshAccessToken(ctx); err != nil {
+		ctx.Logger.Errorf("Failed to refresh token: %v", err)
+		return err
+	}
+
 	if err := j.updateMetadata(ctx); err != nil {
 		ctx.Integration.Error(err.Error())
 		return nil
@@ -151,6 +158,67 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 	return nil
+}
+
+// tokenRefreshMargin is how much of the access token's lifetime is left when it gets refreshed.
+// Atlassian's refresh tokens are single-use, so two overlapping Syncs racing to refresh would
+// have the loser's exchange fail; refreshing only near expiration keeps that window rare.
+const tokenRefreshMargin = 10 * time.Minute
+
+// refreshAccessToken proactively refreshes the stored access token once it is close to expiring,
+// rather than relying solely on the reactive refresh-on-401 in Client, so a token idle between
+// action executions still gets renewed and the refresh isn't only ever attempted concurrently
+// by whichever requests happen to hit a 401 at the same time.
+func (j *Jira) refreshAccessToken(ctx core.SyncContext) error {
+	remaining, known := accessTokenValidity(ctx.Integration)
+	if known && remaining > tokenRefreshMargin {
+		return ctx.Integration.ScheduleResync(remaining - tokenRefreshMargin)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if err := client.Refresh(); err != nil {
+		//
+		// A refresh also fails when a concurrent sync already rotated the token, and then the
+		// stored pair is the fresh one and has to survive. Keep the credentials while the access
+		// token still works and retry before it expires, and only give up on them once it cannot
+		// be used at all.
+		//
+		if known && remaining > 0 {
+			ctx.Logger.Errorf("Failed to refresh token, retrying before expiration: %v", err)
+			return ctx.Integration.ScheduleResync(max(remaining/4, time.Minute))
+		}
+
+		_ = ctx.Integration.SetSecret(SecretOAuthAccessToken, []byte(""))
+		_ = ctx.Integration.SetSecret(SecretOAuthRefreshToken, []byte(""))
+		return fmt.Errorf("failed to refresh token: %w", err)
+	}
+
+	nextResync := 30 * time.Minute
+	if remaining, known := accessTokenValidity(ctx.Integration); known && remaining > 0 {
+		nextResync = remaining / 2
+	}
+	return ctx.Integration.ScheduleResync(nextResync)
+}
+
+// accessTokenValidity reports how long the stored access token remains usable. The second
+// return is false when no expiration was recorded (e.g. an integration connected before this
+// was tracked), in which case it refreshes on the next sync and records one.
+func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bool) {
+	metadata := readMetadata(integration)
+	if metadata.AccessTokenExpiresAt == "" {
+		return 0, false
+	}
+
+	expiresAt, err := time.Parse(time.RFC3339, metadata.AccessTokenExpiresAt)
+	if err != nil {
+		return 0, false
+	}
+
+	return time.Until(expiresAt), true
 }
 
 // jsmScopesForInstructions lists the scopes shown in the setup instructions. offline_access is
@@ -275,6 +343,21 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	// Resolved before any secret is stored: a failure here must leave the integration exactly as
+	// it was (no access token saved), so the next Sync shows the authorize button again instead of
+	// treating a tokens-but-no-cloud-id integration as connected and getting stuck failing to build
+	// a Client.
+	resources, err := auth.AccessibleResources(token.AccessToken)
+	if err != nil {
+		ctx.Logger.Errorf("Callback error: failed to fetch accessible resources: %v", err)
+		ctx.Integration.Error(fmt.Sprintf("failed to resolve Jira site: %v", err))
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
+
+	// PoC simplification: connect the first accessible site rather than prompting to choose one.
+	site := resources[0]
+
 	if err := ctx.Integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
@@ -284,22 +367,20 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	resources, err := auth.AccessibleResources(token.AccessToken)
-	if err != nil {
-		ctx.Logger.Errorf("Callback error: failed to fetch accessible resources: %v", err)
-		ctx.Integration.Error(fmt.Sprintf("connected, but failed to resolve Jira site: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
-		return
-	}
-
-	// PoC simplification: connect the first accessible site rather than prompting to choose one.
-	site := resources[0]
-
 	metadata.State = nil
 	metadata.CloudID = site.ID
 	metadata.SiteURL = site.URL
 	metadata.SiteName = site.Name
+	metadata.AccessTokenExpiresAt = ""
+	if expiresAt := token.ExpiresAt(); !expiresAt.IsZero() {
+		metadata.AccessTokenExpiresAt = expiresAt.Format(time.RFC3339)
+	}
 	ctx.Integration.SetMetadata(metadata)
+
+	if err := ctx.Integration.ScheduleResync(token.GetExpiration()); err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	//
 	// Tokens and site are stored at this point, so a metadata failure must not

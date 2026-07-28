@@ -184,12 +184,21 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// Tear down a previously-registered webhook so editing project/events doesn't leak orphaned registrations.
+	// Tear down a previously-registered webhook so editing project/events doesn't leak orphaned
+	// registrations - Jira allows only one registered URL per OAuth connection, so the old one
+	// must go before the new one can be created.
 	existing := OnIssueMetadata{}
 	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
 	if existing.WebhookID != nil {
 		if delErr := client.DeleteIssueWebhooks([]int64{*existing.WebhookID}); delErr != nil {
 			ctx.Logger.Warnf("failed to remove previous Jira webhook: %v", delErr)
+		} else {
+			// Deleted successfully: persist that now, before attempting to create the replacement,
+			// so a failure below leaves metadata pointing at "no webhook" rather than at an id that
+			// no longer exists.
+			if err := ctx.Metadata.Set(OnIssueMetadata{Project: project, WebhookURL: webhookURL}); err != nil {
+				return fmt.Errorf("failed to update metadata: %w", err)
+			}
 		}
 	}
 
