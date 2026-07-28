@@ -38,9 +38,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
   <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitLab project" />
+  <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitLab project" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
+  <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitLab project" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Mark Merge Request Ready for Review" href="#mark-merge-request-ready-for-review" description="Take a draft merge request out of the draft state in a GitLab project" />
   <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
@@ -2150,6 +2152,124 @@ Returns the created release object.
 }
 ```
 
+<a id="delete-release"></a>
+
+## Delete Release
+
+**Component key:** `gitlab.deleteRelease`
+
+The Delete Release component removes a release from a GitLab project.
+
+### Use Cases
+
+- **Cleanup**: Remove draft or test releases created in error
+- **Rollback**: Delete a release that shouldn't have been published
+- **Automated maintenance**: Remove releases as part of a cleanup workflow
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the release
+- **Release Strategy** (required): Identify the release by a specific tag, or use the project's latest release
+- **Tag Name** (required if strategy is "Specific tag"): The tag of the release to delete
+- **Also delete Git tag** (optional): GitLab does not delete the underlying tag when a release is deleted, so enable this to remove it too
+
+### Output
+
+Returns the deleted release object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -2339,6 +2459,123 @@ Returns pipeline data including status, ref, SHA, and pipeline URL.
   },
   "timestamp": "2026-02-13T18:00:10.000Z",
   "type": "gitlab.pipeline"
+}
+```
+
+<a id="get-release"></a>
+
+## Get Release
+
+**Component key:** `gitlab.getRelease`
+
+The Get Release component retrieves release information from a GitLab project.
+
+### Use Cases
+
+- **Release monitoring**: Fetch release details for use in downstream steps
+- **Deployment pipelines**: Read release assets and metadata for deployment
+- **Version tracking**: Check the project's latest published release
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the release
+- **Release Strategy** (required): Identify the release by a specific tag, or use the project's latest release
+- **Tag Name** (required if strategy is "Specific tag"): The tag of the release to retrieve
+
+### Output
+
+Returns the release object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
 }
 ```
 
