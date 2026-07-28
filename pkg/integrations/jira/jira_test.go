@@ -3,8 +3,11 @@ package jira
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -20,83 +23,467 @@ func newLogger() *logrus.Entry {
 }
 
 func Test__Jira__Sync(t *testing.T) {
-	j := &Jira{}
+	integration := &Jira{}
 
-	t.Run("valid credentials -> ready + populated projects", func(t *testing.T) {
-		appCtx := newAuthorizedIntegration()
+	t.Run("no client credentials - setup instructions with callback URL", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{Configuration: map[string]any{}}
 
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"35273b54-3f06-40d2-880f-dd28cf6daafa"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`)),
-				},
-			},
-		}
-
-		err := j.Sync(core.SyncContext{
-			HTTP:        httpContext,
-			Integration: appCtx,
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
 			Logger:      newLogger(),
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
-
-		meta, ok := appCtx.Metadata.(Metadata)
-		require.True(t, ok)
-		require.NotNil(t, meta.User)
-		assert.Equal(t, "acct-1", meta.User.AccountID)
-		assert.Equal(t, "35273b54-3f06-40d2-880f-dd28cf6daafa", meta.CloudID)
-		require.Len(t, meta.Projects, 1)
-		assert.Equal(t, "TEST", meta.Projects[0].Key)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Empty(t, integrationContext.BrowserAction.URL)
+		assert.Contains(t, integrationContext.BrowserAction.Description, "Atlassian Developer Console")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "manage:jira-webhook")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "/api/v1/integrations/")
+		assert.Contains(t, integrationContext.BrowserAction.Description, "/callback")
 	})
 
-	t.Run("invalid credentials -> error", func(t *testing.T) {
-		appCtx := newAuthorizedIntegration()
+	t.Run("missing client secret - setup instructions", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{"clientId": "client-1"},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Empty(t, integrationContext.BrowserAction.URL)
+	})
+
+	// Regression test: an install still carrying config from the old Basic Auth flow (before this
+	// branch replaced it with OAuth) must not silently stay "ready" while every call fails.
+	t.Run("legacy Basic Auth config with no OAuth credentials marks the integration errored", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{"siteUrl": "https://old.atlassian.net", "email": "a@b.com", "apiToken": "tok"},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "no longer supported")
+		require.NotNil(t, integrationContext.BrowserAction)
+	})
+
+	t.Run("brand new install with no config is not marked errored", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{Configuration: map[string]any{}}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, integrationContext.State)
+	})
+
+	t.Run("credentials but no access token - authorize button", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Contains(t, integrationContext.BrowserAction.Description, "authorize SuperPlane")
+
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "auth.atlassian.com", actionURL.Host)
+		assert.Equal(t, "/authorize", actionURL.Path)
+
+		params := actionURL.Query()
+		assert.Equal(t, "client-1", params.Get("client_id"))
+		assert.Equal(t, "code", params.Get("response_type"))
+		assert.Equal(t, scopeList, params.Get("scope"))
+		assert.NotEmpty(t, params.Get("state"))
+
+		// The generated state is persisted so the callback can validate it.
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.State)
+		assert.Equal(t, *metadata.State, params.Get("state"))
+	})
+
+	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {
+		state := "existing-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Contains(t, integrationContext.BrowserAction.URL, "state=existing-state")
+	})
+
+	t.Run("valid access token - ready + populated projects", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegration()
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusUnauthorized,
-					Body:       io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`)),
-				},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
 			},
 		}
 
-		err := j.Sync(core.SyncContext{
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationContext,
 			Logger:      newLogger(),
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "verifying Jira credentials")
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+		assert.Nil(t, integrationContext.BrowserAction)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.User)
+		assert.Equal(t, "acct-1", metadata.User.AccountID)
+		assert.Equal(t, testCloudID, metadata.CloudID)
+		require.Len(t, metadata.Projects, 1)
+		assert.Equal(t, "TEST", metadata.Projects[0].Key)
+
+		// A comfortably-valid token isn't refreshed, but the next check is still scheduled.
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Len(t, httpContext.Requests, 2)
 	})
 
-	t.Run("missing site URL -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"email":    testEmail,
-				"apiToken": testAPIToken,
+	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegration()
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
 			},
 		}
 
-		err := j.Sync(core.SyncContext{
-			HTTP:        &contexts.HTTPContext{},
-			Integration: appCtx,
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
 			Logger:      newLogger(),
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "site URL")
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "verifying Jira credentials")
 	})
+
+	t.Run("token close to expiring is proactively refreshed", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Equal(t, "new-access", accessToken)
+		assert.Equal(t, TokenURL, httpContext.Requests[0].URL.String())
+		require.Len(t, integrationContext.ResyncRequests, 1)
+	})
+
+	t.Run("refresh failure with a still-valid token retries later instead of erroring", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		// A concurrent Sync racing to refresh the same rotating token can make this exchange fail
+		// even though the credentials are fine; the still-valid access token survives the retry.
+		require.NoError(t, err)
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Equal(t, testAccessToken, accessToken)
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Less(t, integrationContext.ResyncRequests[0], time.Minute+time.Second)
+	})
+
+	t.Run("refresh failure with an expired token clears secrets and errors", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.ErrorContains(t, err, "failed to refresh token")
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, SecretOAuthRefreshToken)
+		assert.Empty(t, accessToken)
+		assert.Empty(t, refreshToken)
+	})
+}
+
+func Test__Jira__HandleRequest(t *testing.T) {
+	integration := &Jira{}
+
+	t.Run("non-callback path -> 404", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:     httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/other", nil),
+			Response:    recorder,
+			Integration: newAuthorizedIntegration(),
+			Logger:      newLogger(),
+		})
+
+		assert.Equal(t, http.StatusNotFound, recorder.Code)
+	})
+
+	t.Run("valid callback exchanges code, resolves site, stores tokens and becomes ready", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"cb-access","refresh_token":"cb-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, SecretOAuthRefreshToken)
+		assert.Equal(t, "cb-access", accessToken)
+		assert.Equal(t, "cb-refresh", refreshToken)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "cloud-1", metadata.CloudID)
+		assert.Equal(t, "https://test.atlassian.net", metadata.SiteURL)
+		assert.Equal(t, "Test Site", metadata.SiteName)
+		assert.Nil(t, metadata.State)
+	})
+
+	t.Run("accessible resources failure redirects with an error state", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"cb-access","refresh_token":"cb-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"message":"forbidden"}`))},
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "failed to resolve Jira site")
+
+		// Tokens are not stored on this failure, so the next Sync shows the authorize
+		// button again instead of getting stuck with an access token but no cloud id.
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Empty(t, accessToken)
+	})
+
+	t.Run("state mismatch does not store tokens", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=wrong-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           &contexts.HTTPContext{},
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Empty(t, accessToken)
+	})
+
+	t.Run("rejects a missing code", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?state=state-1", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:     request,
+			Response:    recorder,
+			BaseURL:     "https://sp.example.com",
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	})
+
+	t.Run("missing config -> internal server error", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=code-1&state=state-1", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:     request,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+			Logger:      newLogger(),
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	})
+}
+
+func Test__Jira__Definition(t *testing.T) {
+	integration := &Jira{}
+
+	assert.Equal(t, "jira", integration.Name())
+	assert.Equal(t, "Jira", integration.Label())
+	assert.Equal(t, "jira", integration.Icon())
+
+	actions := integration.Actions()
+	assert.Len(t, actions, 18)
+
+	triggers := integration.Triggers()
+	require.Len(t, triggers, 1)
+	assert.Equal(t, "jira.onIssue", triggers[0].Name())
 }
