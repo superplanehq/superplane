@@ -66,3 +66,23 @@ var exampleDataOnIssue map[string]any
 func (i *OnIssue) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
+
+//go:embed example_data_on_issue_label.json
+var exampleDataOnIssueLabelBytes []byte
+
+var exampleDataOnIssueLabelOnce sync.Once
+var exampleDataOnIssueLabel map[string]any
+
+func (i *OnIssueLabel) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueLabelOnce, exampleDataOnIssueLabelBytes, &exampleDataOnIssueLabel)
+}
+
+//go:embed example_data_on_issue_comment.json
+var exampleDataOnIssueCommentBytes []byte
+
+var exampleDataOnIssueCommentOnce sync.Once
+var exampleDataOnIssueComment map[string]any
+
+func (i *OnIssueComment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}

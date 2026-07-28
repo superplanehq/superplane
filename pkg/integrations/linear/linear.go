@@ -115,6 +115,8 @@ func (l *Linear) Actions() []core.Action {
 func (l *Linear) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
+		&OnIssueComment{},
+		&OnIssueLabel{},
 	}
 }
 

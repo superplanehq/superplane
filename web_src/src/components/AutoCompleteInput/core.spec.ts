@@ -102,6 +102,22 @@ describe("getSuggestions", () => {
     expect(labels).toContain("started_at");
   });
 
+  it("suggests app() metadata fields after dot", () => {
+    const suggestions = getSuggestions("app().", "app().".length, {
+      __app: {
+        id: "canvas-1",
+        name: "Deploy",
+        description: "Production deploy",
+        url: "https://app.superplane.com/org/apps/canvas-1",
+      },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("id");
+    expect(labels).toContain("name");
+    expect(labels).toContain("description");
+    expect(labels).toContain("url");
+  });
+
   it("suggests previous(n) payload fields after dot", () => {
     const suggestions = getSuggestions("previous(2).", "previous(2).".length, {
       __previousByDepth: { "2": { build: { id: "abc" } } },

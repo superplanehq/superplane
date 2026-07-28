@@ -52,6 +52,12 @@ describe("buildAutocompleteExampleObj", () => {
 
     expect(autocompleteContext).toEqual({
       __root: triggerMetadata.exampleData,
+      __app: expect.objectContaining({
+        id: expect.any(String),
+        name: "Example App",
+        description: "",
+        url: expect.any(String),
+      }),
       __run: expect.objectContaining({
         id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
@@ -88,11 +94,22 @@ describe("buildAutocompleteExampleObj", () => {
           [triggerNode.id!]: [{ data: latestEventData }],
         },
         allTriggersByName: new Map([[triggerMetadata.name, triggerMetadata]]),
+        app: {
+          id: "canvas-1",
+          name: "Deploy",
+          description: "Production deploy",
+        },
       }),
     );
 
     expect(autocompleteContext).toEqual({
       __root: latestEventData,
+      __app: expect.objectContaining({
+        id: "canvas-1",
+        name: "Deploy",
+        description: "Production deploy",
+        url: expect.any(String),
+      }),
       __run: expect.objectContaining({
         id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
@@ -100,5 +117,6 @@ describe("buildAutocompleteExampleObj", () => {
       }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
+    expect(evaluateExpr("app().name", autocompleteContext!)).toBe("Deploy");
   });
 });
