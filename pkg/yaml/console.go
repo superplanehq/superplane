@@ -32,7 +32,17 @@ const (
 	ConsoleNodesPanelFormModeModal  = "modal"
 	ConsoleNodesPanelFormModeInline = "inline"
 
-	MaxConsolePanels       = 50
+	// MaxConsolePages caps how many tabs a console may have. Existing
+	// consoles predate the cap and are grandfathered at read time; any
+	// import or commit that goes over is rejected.
+	MaxConsolePages = 5
+	// MaxConsolePanelsPerPage caps how many panels each page may hold.
+	// Same grandfathering rule as MaxConsolePages: over-cap consoles
+	// still render, only new saves are blocked.
+	MaxConsolePanelsPerPage = 20
+	// MaxConsolePayloadBytes bounds the JSON size of a single page's
+	// panels[]. Kept the same as before pages existed so the per-page
+	// storage envelope does not grow.
 	MaxConsolePayloadBytes = 1024 * 1024
 )
 
@@ -58,32 +68,27 @@ type Console struct {
 	Spec       ConsoleSpec     `json:"spec" yaml:"spec"`
 }
 
-func (c *Console) Panels() []models.ConsolePanel {
-	out := make([]models.ConsolePanel, len(c.Spec.Panels))
-	for i, panel := range c.Spec.Panels {
-		out[i] = models.ConsolePanel{
-			ID:      panel.ID,
-			Type:    panel.Type,
-			Content: panel.Content,
-		}
+// Pages returns the canonical multi-page representation regardless of
+// whether the source YAML used the legacy single-page shape or the
+// `spec.pages[]` shape. Legacy documents are wrapped in a single implicit
+// page with id `main` so downstream code has one path to reason about.
+func (c *Console) Pages() []models.ConsolePage {
+	if len(c.Spec.Pages) > 0 {
+		return pagesToModels(c.Spec.Pages)
 	}
-	return out
-}
-
-func (c *Console) Layout() []models.ConsoleLayoutItem {
-	out := make([]models.ConsoleLayoutItem, len(c.Spec.Layout))
-	for i, item := range c.Spec.Layout {
-		out[i] = models.ConsoleLayoutItem{
-			I:    item.I,
-			X:    item.X,
-			Y:    item.Y,
-			W:    item.W,
-			H:    item.H,
-			MinW: item.MinW,
-			MinH: item.MinH,
-		}
+	panels := c.Spec.Panels
+	layout := c.Spec.Layout
+	if len(panels) == 0 && len(layout) == 0 {
+		return []models.ConsolePage{}
 	}
-	return out
+	return []models.ConsolePage{
+		{
+			ID:     models.DefaultConsolePageID,
+			Name:   models.DefaultConsolePageName,
+			Panels: consolePanelsToModels(panels),
+			Layout: consoleLayoutToModels(layout),
+		},
+	}
 }
 
 type ConsoleMetadata struct {
@@ -91,7 +96,20 @@ type ConsoleMetadata struct {
 	Name     string `json:"name" yaml:"name"`
 }
 
+// ConsoleSpec accepts both the legacy single-page shape (top-level
+// `panels`/`layout`) and the multi-page shape (`pages`). The two shapes
+// are mutually exclusive; a document that mixes them is rejected in
+// Validate. Consumers should read the normalized view via Console.Pages()
+// rather than these fields directly.
 type ConsoleSpec struct {
+	Pages  []ConsolePage       `json:"pages,omitempty" yaml:"pages,omitempty"`
+	Panels []ConsolePanel      `json:"panels,omitempty" yaml:"panels,omitempty"`
+	Layout []ConsoleLayoutItem `json:"layout,omitempty" yaml:"layout,omitempty"`
+}
+
+type ConsolePage struct {
+	ID     string              `json:"id" yaml:"id"`
+	Name   string              `json:"name,omitempty" yaml:"name,omitempty"`
 	Panels []ConsolePanel      `json:"panels" yaml:"panels"`
 	Layout []ConsoleLayoutItem `json:"layout" yaml:"layout"`
 }
@@ -112,7 +130,68 @@ type ConsoleLayoutItem struct {
 	MinH *int   `json:"minH,omitempty" yaml:"minH,omitempty"`
 }
 
+func pagesToModels(pages []ConsolePage) []models.ConsolePage {
+	out := make([]models.ConsolePage, len(pages))
+	for i, page := range pages {
+		out[i] = models.ConsolePage{
+			ID:     page.ID,
+			Name:   page.Name,
+			Panels: consolePanelsToModels(page.Panels),
+			Layout: consoleLayoutToModels(page.Layout),
+		}
+	}
+	return out
+}
+
+func consolePanelsToModels(panels []ConsolePanel) []models.ConsolePanel {
+	out := make([]models.ConsolePanel, len(panels))
+	for i, panel := range panels {
+		out[i] = models.ConsolePanel{
+			ID:      panel.ID,
+			Type:    panel.Type,
+			Content: panel.Content,
+		}
+	}
+	return out
+}
+
+func consoleLayoutToModels(layout []ConsoleLayoutItem) []models.ConsoleLayoutItem {
+	out := make([]models.ConsoleLayoutItem, len(layout))
+	for i, item := range layout {
+		out[i] = models.ConsoleLayoutItem{
+			I:    item.I,
+			X:    item.X,
+			Y:    item.Y,
+			W:    item.W,
+			H:    item.H,
+			MinW: item.MinW,
+			MinH: item.MinH,
+		}
+	}
+	return out
+}
+
+// ConsoleFromYML parses AND validates a console YAML document. Use this
+// on save / import paths — commits, CLI writes, install-from-GitHub —
+// where invalid input must not be persisted.
+//
+// For read-side use where an already-stored (potentially grandfathered)
+// console must still render even if it now exceeds newer caps, use
+// ConsoleFromYMLLenient.
 func ConsoleFromYML(raw []byte) (*Console, error) {
+	return consoleFromYML(raw, true)
+}
+
+// ConsoleFromYMLLenient parses a console YAML document without running
+// the cap / uniqueness / schema validation. Structural YAML errors
+// (unknown fields, wrong apiVersion, malformed JSON) still surface;
+// this variant only skips Validate(). Intended for read paths where a
+// pre-cap console has to render.
+func ConsoleFromYMLLenient(raw []byte) (*Console, error) {
+	return consoleFromYML(raw, false)
+}
+
+func consoleFromYML(raw []byte, validate bool) (*Console, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil, errors.New("console yaml is empty")
 	}
@@ -141,8 +220,10 @@ func ConsoleFromYML(raw []byte) (*Console, error) {
 		return nil, fmt.Errorf("invalid console yaml: %w", err)
 	}
 
-	if err := resource.Validate(); err != nil {
-		return nil, err
+	if validate {
+		if err := resource.Validate(); err != nil {
+			return nil, err
+		}
 	}
 
 	return &resource, nil
@@ -153,16 +234,19 @@ func VersionToConsoleYML(canvasName string, canvasVersion *models.CanvasVersion)
 		return "", errors.New("canvas version is required")
 	}
 
-	resource := Console{
-		APIVersion: APIVersion,
-		Kind:       KindConsole,
-		Spec: ConsoleSpec{
-			Panels: normalizeConsolePanelsForExport(canvasVersion.ConsolePanels.Data()),
-			Layout: normalizeConsoleLayoutForExport(canvasVersion.ConsoleLayout.Data()),
-		},
+	spec := consoleSpecForExport(canvasVersion.ConsolePages.Data())
+
+	// Serialize through map[string]any so `omitempty` on ConsoleSpec
+	// does not drop legacy `panels: []` / `layout: []` for empty
+	// single-page consoles.
+	doc := map[string]any{
+		"apiVersion": APIVersion,
+		"kind":       KindConsole,
+		"metadata":   map[string]any{},
+		"spec":       spec,
 	}
 
-	jsonBytes, err := json.Marshal(resource)
+	jsonBytes, err := json.Marshal(doc)
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize console: %w", err)
 	}
@@ -184,7 +268,82 @@ func VersionToConsoleYML(canvasName string, canvasVersion *models.CanvasVersion)
 	return buf.String(), nil
 }
 
+// consoleSpecForExport implements the "legacy-until-multi" export rule:
+// the legacy top-level `panels`/`layout` shape is only used when it is
+// round-trippable — either the console is empty, or it has a single
+// page still using the default id/name. If the sole page was renamed
+// or given a custom id, escape to the multi-page `pages[]` shape so
+// the rename survives the next save (the parser wraps legacy YAML back
+// into the default `main`/`Main` page, which would otherwise silently
+// drop a customized id or name).
+func consoleSpecForExport(pages []models.ConsolePage) map[string]any {
+	if len(pages) == 0 {
+		return map[string]any{
+			"panels": normalizeConsolePanelsForExport(nil),
+			"layout": normalizeConsoleLayoutForExport(nil),
+		}
+	}
+
+	if len(pages) == 1 && isDefaultConsolePage(pages[0]) {
+		return map[string]any{
+			"panels": normalizeConsolePanelsForExport(pages[0].Panels),
+			"layout": normalizeConsoleLayoutForExport(pages[0].Layout),
+		}
+	}
+
+	out := make([]map[string]any, len(pages))
+	for i, page := range pages {
+		entry := map[string]any{
+			"id":     page.ID,
+			"panels": normalizeConsolePanelsForExport(page.Panels),
+			"layout": normalizeConsoleLayoutForExport(page.Layout),
+		}
+		if page.Name != "" {
+			entry["name"] = page.Name
+		}
+		out[i] = entry
+	}
+	return map[string]any{"pages": out}
+}
+
+func isDefaultConsolePage(page models.ConsolePage) bool {
+	if page.ID != models.DefaultConsolePageID {
+		return false
+	}
+	if page.Name == "" {
+		return true
+	}
+	return page.Name == models.DefaultConsolePageName
+}
+
 func (c *Console) Validate() error {
+	if err := c.ValidateShape(); err != nil {
+		return err
+	}
+
+	if len(c.Spec.Pages) > 0 {
+		return validateConsolePages(c.Spec.Pages)
+	}
+
+	return ValidateConsoleContent(c.Spec.Panels, c.Spec.Layout)
+}
+
+// ValidateShape enforces the document-level invariants that must hold
+// even for grandfathered consoles: apiVersion, kind, mutual exclusion
+// of the two spec shapes, and per-page structural checks (unique
+// page/panel ids, allowed panel types, well-formed panel content,
+// layout references). Cap-based rules (page count, per-page panel
+// count, payload size) are intentionally *not* enforced here — they
+// are the caller's responsibility, either via full Validate() (strict
+// authoring) or via ValidateConsolePagesDelta (write paths that want
+// to allow reducing an over-cap page without wedging on a hard cap).
+//
+// Write paths (CLI `apps console set`, commit_canvas_staging, install)
+// use ConsoleFromYMLLenient + ValidateShape + ValidateConsolePagesDelta
+// so a grandfathered console can be re-committed while a malformed
+// document (wrong kind/apiVersion, mixed spec shapes, unknown panel
+// type) still fails fast.
+func (c *Console) ValidateShape() error {
 	if c.APIVersion == "" {
 		return errors.New("apiVersion is required")
 	}
@@ -198,14 +357,211 @@ func (c *Console) Validate() error {
 		return fmt.Errorf("unsupported kind %q (expected %q)", c.Kind, KindConsole)
 	}
 
-	return ValidateConsoleContent(c.Spec.Panels, c.Spec.Layout)
+	// The two shapes are exposed as separate fields on ConsoleSpec so
+	// legacy documents keep parsing cleanly, but a single document must
+	// pick one. Mixing them would be ambiguous (which set is the source
+	// of truth for the first page?) so we reject it before validating
+	// any content.
+	hasLegacy := c.Spec.Panels != nil || c.Spec.Layout != nil
+	if len(c.Spec.Pages) > 0 && hasLegacy {
+		return errors.New("spec.pages cannot be combined with top-level spec.panels or spec.layout")
+	}
+
+	if len(c.Spec.Pages) > 0 {
+		return validateConsolePagesStructural(c.Spec.Pages)
+	}
+	return validateConsoleContentStructure(c.Spec.Panels, c.Spec.Layout)
+}
+
+// validateConsolePagesStructural enforces the per-page structural
+// invariants (unique/non-empty page ids, structural panel/layout
+// checks per page) without applying the page-count cap. Shared by
+// ValidateShape (write-path shape gate) and by ValidateConsolePagesDelta
+// (which then layers its own delta-aware cap enforcement on top).
+func validateConsolePagesStructural(pages []ConsolePage) error {
+	pageIDs := make(map[string]struct{}, len(pages))
+	for i, page := range pages {
+		if strings.TrimSpace(page.ID) == "" {
+			return fmt.Errorf("pages[%d].id is required", i)
+		}
+		if _, exists := pageIDs[page.ID]; exists {
+			return fmt.Errorf("duplicate page id %q", page.ID)
+		}
+		pageIDs[page.ID] = struct{}{}
+
+		if err := validateConsoleContentStructure(page.Panels, page.Layout); err != nil {
+			return fmt.Errorf("page %q: %w", page.ID, err)
+		}
+	}
+	return nil
+}
+
+// validateConsolePages enforces the invariants that apply across pages
+// (page count cap, unique ids) and then delegates per-page panel/layout
+// validation to the shared ValidateConsoleContent so both shapes share
+// the same panel type / content rules.
+func validateConsolePages(pages []ConsolePage) error {
+	if len(pages) > MaxConsolePages {
+		return fmt.Errorf("too many pages (max %d)", MaxConsolePages)
+	}
+
+	pageIDs := make(map[string]struct{}, len(pages))
+	for i, page := range pages {
+		if strings.TrimSpace(page.ID) == "" {
+			return fmt.Errorf("pages[%d].id is required", i)
+		}
+		if _, exists := pageIDs[page.ID]; exists {
+			return fmt.Errorf("duplicate page id %q", page.ID)
+		}
+		pageIDs[page.ID] = struct{}{}
+
+		if err := ValidateConsoleContent(page.Panels, page.Layout); err != nil {
+			return fmt.Errorf("page %q: %w", page.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// ValidateConsolePagesDelta enforces the page/panel caps but grandfathers
+// content that was already over-cap in `previous`. Rules:
+//
+//   - Page count: reject if new count > cap AND new count > previous count.
+//     A migrated console with 6 pages stays valid so long as it does not
+//     grow further; the user can add pages again only after reducing to
+//     the cap.
+//   - Per-page panel count: reject if the new count > cap AND the new
+//     count > the previous count for either the same id OR the same
+//     positional slot. The positional fallback keeps a grandfathered
+//     page valid across renames (e.g. `main` → `overview`) that do not
+//     change the panel count. Newly-introduced pages that share neither
+//     id nor position with any previous page must be at-or-under the
+//     cap on their first commit.
+//   - Structural checks (missing/duplicate ids, unknown panel types,
+//     malformed content) always run.
+//
+// The function accepts `[]models.ConsolePage` because that is the shape
+// on both sides at commit time — `yaml.Console.Pages()` returns models
+// pages, and `CanvasVersion.ConsolePages.Data()` stores them. This lets
+// grandfathered consoles progressively reduce their size without
+// wedging the commit path while still preventing brand-new content from
+// silently exceeding the cap.
+func ValidateConsolePagesDelta(pages []models.ConsolePage, previous []models.ConsolePage) error {
+	if err := validateModelPagesStructure(pages); err != nil {
+		return err
+	}
+
+	if len(pages) > MaxConsolePages && len(pages) > len(previous) {
+		return fmt.Errorf("too many pages (max %d)", MaxConsolePages)
+	}
+
+	previousPanelCountByID := make(map[string]int, len(previous))
+	for _, page := range previous {
+		previousPanelCountByID[page.ID] = len(page.Panels)
+	}
+
+	for i, page := range pages {
+		if err := validateConsoleContentStructure(fromModelPanels(page.Panels), fromModelLayout(page.Layout)); err != nil {
+			return fmt.Errorf("page %q: %w", page.ID, err)
+		}
+		newCount := len(page.Panels)
+		if newCount <= MaxConsolePanelsPerPage {
+			continue
+		}
+
+		if isGrandfatheredOverCapPage(page, i, previous, previousPanelCountByID) {
+			continue
+		}
+		return fmt.Errorf("page %q: too many panels (max %d per page)", page.ID, MaxConsolePanelsPerPage)
+	}
+
+	return nil
+}
+
+// isGrandfatheredOverCapPage reports whether an over-cap page in the
+// new document is inherited from `previous` (and therefore allowed to
+// stay over the cap) rather than freshly authored. Two match modes:
+//
+//   - Exact id match: allowance = previous count for the same id.
+//   - Positional match with panel-id-subset check: same position, and
+//     every panel id in the new page also existed in the previous page
+//     at that position. This recognizes renames like `main` → `overview`
+//     while refusing "fresh" over-cap pages that happen to reuse a
+//     grandfathered slot.
+//
+// A page is grandfathered when its panel count is at-or-under the
+// allowance for whichever mode matches.
+func isGrandfatheredOverCapPage(page models.ConsolePage, index int, previous []models.ConsolePage, previousPanelCountByID map[string]int) bool {
+	if prev, ok := previousPanelCountByID[page.ID]; ok && len(page.Panels) <= prev {
+		return true
+	}
+
+	if index >= len(previous) {
+		return false
+	}
+	prevPage := previous[index]
+	if len(page.Panels) > len(prevPage.Panels) {
+		return false
+	}
+
+	prevPanelIDs := make(map[string]struct{}, len(prevPage.Panels))
+	for _, p := range prevPage.Panels {
+		prevPanelIDs[p.ID] = struct{}{}
+	}
+	for _, p := range page.Panels {
+		if _, ok := prevPanelIDs[p.ID]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// validateModelPagesStructure checks the page-level invariants that hold
+// regardless of cap grandfathering (unique / non-empty ids). The cap
+// check itself is handled by the caller.
+func validateModelPagesStructure(pages []models.ConsolePage) error {
+	pageIDs := make(map[string]struct{}, len(pages))
+	for i, page := range pages {
+		if strings.TrimSpace(page.ID) == "" {
+			return fmt.Errorf("pages[%d].id is required", i)
+		}
+		if _, exists := pageIDs[page.ID]; exists {
+			return fmt.Errorf("duplicate page id %q", page.ID)
+		}
+		pageIDs[page.ID] = struct{}{}
+	}
+	return nil
+}
+
+func fromModelPanels(panels []models.ConsolePanel) []ConsolePanel {
+	out := make([]ConsolePanel, len(panels))
+	for i, p := range panels {
+		out[i] = ConsolePanel{ID: p.ID, Type: p.Type, Content: p.Content}
+	}
+	return out
+}
+
+func fromModelLayout(layout []models.ConsoleLayoutItem) []ConsoleLayoutItem {
+	out := make([]ConsoleLayoutItem, len(layout))
+	for i, l := range layout {
+		out[i] = ConsoleLayoutItem{I: l.I, X: l.X, Y: l.Y, W: l.W, H: l.H, MinW: l.MinW, MinH: l.MinH}
+	}
+	return out
 }
 
 func ValidateConsoleContent(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
-	if len(panels) > MaxConsolePanels {
-		return fmt.Errorf("too many panels (max %d)", MaxConsolePanels)
+	if len(panels) > MaxConsolePanelsPerPage {
+		return fmt.Errorf("too many panels (max %d per page)", MaxConsolePanelsPerPage)
 	}
+	return validateConsoleContentStructure(panels, layout)
+}
 
+// validateConsoleContentStructure runs all per-page invariants except
+// the panel-count cap: panel id uniqueness/type/content, layout id
+// coverage, payload size. Callers that need cap grandfathering
+// (ValidateConsolePagesDelta) run this instead of ValidateConsoleContent
+// and enforce their own cap rule.
+func validateConsoleContentStructure(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
 	panelIDs := make(map[string]struct{}, len(panels))
 	for _, panel := range panels {
 		if panel.ID == "" {

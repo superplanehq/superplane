@@ -37,7 +37,7 @@ type Story = StoryObj<typeof meta>;
 
 const consoleQuery = "view=console";
 
-const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease } = consoleFixtures;
+const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease, multiPageConsole } = consoleFixtures;
 
 /**
  * Software Factory — Create a task inline form beside a 3-column PR pipeline
@@ -93,4 +93,26 @@ export const DocsReviewer: Story = {
 export const SuperPlaneRelease: Story = {
   name: "SuperPlane Release",
   render: () => <AppPageHarness query={consoleQuery} fixture={superplaneRelease} />,
+};
+
+/**
+ * Multi-page console — three pages against the Software Factory capture,
+ * exercising the tab strip (`ConsolePageTabs`) rendered above the grid by
+ * `ConsoleOverlay`.
+ *
+ * - **Overview** — inline "Create a task" trigger, factory README,
+ *   all-time run count KPI, and a recent-runs table.
+ * - **Pipeline** — the full-width kanban board of in-flight PRs.
+ * - **Playbook** — the "How it works" markdown runbook.
+ *
+ * The story lands on the first page (`?view=console`, no `page` param);
+ * click a tab to switch pages, which updates the URL to
+ * `?view=console&page=<id>` and records the last-visited page in
+ * `localStorage` for that canvas (`lastVisitedConsolePage.ts`). Edit mode
+ * (accessible via the graph view's edit affordances) exposes the "+ add
+ * page", rename, drag-to-reorder, and remove affordances on the tab strip.
+ */
+export const MultiPage: Story = {
+  name: "Multi-page console",
+  render: () => <AppPageHarness query={consoleQuery} fixture={multiPageConsole} />,
 };

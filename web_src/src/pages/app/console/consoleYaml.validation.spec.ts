@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { validateConsoleContent, MAX_CONSOLE_PANELS } from "./consoleYaml";
+import { validateConsoleContent, MAX_CONSOLE_PANELS_PER_PAGE } from "./consoleYaml";
 
 describe("validateConsoleContent", () => {
   it("flags too many panels", () => {
-    const panels = Array.from({ length: MAX_CONSOLE_PANELS + 1 }, (_, i) => ({
+    const panels = Array.from({ length: MAX_CONSOLE_PANELS_PER_PAGE + 1 }, (_, i) => ({
       id: `p${i}`,
       type: "markdown",
       content: {},
