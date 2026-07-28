@@ -154,6 +154,57 @@ func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
 	})
 }
 
+func Test_NodeConfigurationBuilder_AppFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Name:   "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().Model(canvas).Update("description", "Deploy pipeline").Error)
+	canvas.Description = "Deploy pipeline"
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	t.Run("returns id, name, description, and url", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`app()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, canvas.ID.String(), payload["id"])
+		assert.Equal(t, canvas.Name, payload["name"])
+		assert.Equal(t, "Deploy pipeline", payload["description"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s", canvas.OrganizationID.String(), canvas.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "?run=")
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"appName": "{{ app().name }}",
+			"appURL":  "{{ app().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, canvas.Name, result["appName"])
+		assert.Contains(t, result["appURL"], canvas.ID.String())
+	})
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
