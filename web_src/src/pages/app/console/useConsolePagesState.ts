@@ -13,6 +13,14 @@ type UseConsolePagesStateOptions = {
   onEffectiveChange?: (next: { pages: ConsolePage[] }) => void;
   activePageId: string | null;
   onActivePageIdChange: (id: string) => void;
+  // Identifies the canvas whose console this hook is editing. React
+  // Router reuses this route component across canvases, so a change
+  // here (rather than an unmount) is our signal that any in-flight
+  // debounced save from the outgoing canvas must be discarded before
+  // it can be misrouted onto the destination canvas's mutation. Pass
+  // `undefined` in tests / storybook where canvas identity is not
+  // meaningful.
+  canvasId?: string;
 };
 
 /**
@@ -34,8 +42,9 @@ export function useConsolePagesState({
   onEffectiveChange,
   activePageId,
   onActivePageIdChange,
+  canvasId,
 }: UseConsolePagesStateOptions) {
-  const [localPages, setLocalPages, queueSave] = useDebouncedPages({ pages, onChange, onEffectiveChange });
+  const [localPages, setLocalPages, queueSave] = useDebouncedPages({ pages, onChange, onEffectiveChange, canvasId });
 
   const activePage = useMemo(
     () => localPages.find((page) => page.id === activePageId) ?? localPages[0] ?? null,
@@ -68,10 +77,12 @@ function useDebouncedPages({
   pages,
   onChange,
   onEffectiveChange,
+  canvasId,
 }: {
   pages: ConsolePage[];
   onChange: (next: { pages: ConsolePage[] }) => void;
   onEffectiveChange?: (next: { pages: ConsolePage[] }) => void;
+  canvasId?: string;
 }) {
   const [localPages, setLocalPages] = useState<ConsolePage[]>(pages);
   const lastPropsHashRef = useRef<string>("");
@@ -89,26 +100,63 @@ function useDebouncedPages({
   }, [localPages, onEffectiveChange]);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<{ pages: ConsolePage[] } | null>(null);
+  // `pendingRef` also captures the canvas the payload was produced
+  // for. Every fire path (debounce timer, unmount flush) checks that
+  // the pending canvas still matches the current one before invoking
+  // `onChange`. Without this, an in-flight debounce (or an unmount
+  // flush that runs after a canvas switch happened to leave the
+  // component mounted long enough) can hand the outgoing canvas's
+  // pages to `updateConsoleMutationRef.current.mutate`, which by
+  // that point points at the destination canvas — quietly staging
+  // canvas A's console onto canvas B. The tests below (`does not
+  // stage a pending save from a previous canvas`) lock this in.
+  const pendingRef = useRef<{ pages: ConsolePage[]; canvasId: string | undefined } | null>(null);
+  const canvasIdRef = useRef(canvasId);
+
   const queueSave = useCallback(
     (nextPages: ConsolePage[]) => {
-      pendingRef.current = { pages: nextPages };
+      pendingRef.current = { pages: nextPages, canvasId: canvasIdRef.current };
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         const pending = pendingRef.current;
-        if (!pending) return;
-        onChange(pending);
         pendingRef.current = null;
+        saveTimerRef.current = null;
+        if (!pending) return;
+        if (pending.canvasId !== canvasIdRef.current) return;
+        onChange({ pages: pending.pages });
       }, SAVE_DEBOUNCE_MS);
     },
     [onChange],
   );
 
+  // Eagerly discard any pending debounced save on canvas switch.
+  // React Router keeps this component mounted when the user
+  // navigates between canvases (same `apps/:id` route), so absent
+  // this effect the timer above would still fire ~500ms later and
+  // route the outgoing canvas's pages through the current mutation,
+  // which is already the destination canvas's. The pending-canvas
+  // guard inside `queueSave`'s timer is a belt-and-suspenders for
+  // the narrow window where the timer's `setTimeout` scheduler
+  // could theoretically fire before this effect runs.
+  useEffect(() => {
+    const previousCanvasId = canvasIdRef.current;
+    canvasIdRef.current = canvasId;
+    if (previousCanvasId === canvasId) return;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingRef.current = null;
+  }, [canvasId]);
+
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       const pending = pendingRef.current;
-      if (pending) onChange(pending);
+      pendingRef.current = null;
+      if (!pending) return;
+      if (pending.canvasId !== canvasIdRef.current) return;
+      onChange({ pages: pending.pages });
     };
   }, [onChange]);
 

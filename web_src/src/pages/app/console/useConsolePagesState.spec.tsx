@@ -294,3 +294,70 @@ describe("useConsolePagesState — empty console bootstrap", () => {
     }
   });
 });
+
+describe("useConsolePagesState — canvas switch invalidates pending saves", () => {
+  it("does not stage a pending save from a previous canvas onto a new canvas", () => {
+    // Regression test for the high-severity finding "Pending save
+    // can corrupt other canvas". React Router keeps this route
+    // component mounted across canvases, so a debounced save queued
+    // for canvas A would previously fire ~500ms later against the
+    // current mutation — which by then targets canvas B, staging
+    // A's pages onto B. The `canvasId`-keyed effect in
+    // `useDebouncedPages` must clear the pending payload and timer
+    // on switch; the payload-canvas guard in the timer is a second
+    // line of defense.
+    const onChange = vi.fn();
+    const onActivePageIdChange = vi.fn();
+
+    vi.useFakeTimers();
+    try {
+      const { result, rerender } = renderHook(
+        ({ canvasId, pages }: { canvasId: string; pages: ConsolePage[] }) =>
+          useConsolePagesState({
+            pages,
+            onChange,
+            activePageId: "main",
+            onActivePageIdChange,
+            canvasId,
+          }),
+        { initialProps: { canvasId: "canvas-a", pages: [PAGE] } },
+      );
+
+      // Edit on canvas A — debounce starts but has not yet elapsed.
+      act(() => {
+        result.current.handleAddPanel("Notes", "markdown");
+      });
+      expect(onChange).not.toHaveBeenCalled();
+
+      // Simulate the React Router route reuse across canvases: same
+      // hook instance, new `canvasId`, new `pages`. The old timer
+      // must be cancelled and the pending payload must not leak.
+      const canvasBPage: ConsolePage = { ...PAGE, panels: [], layout: [] };
+      rerender({ canvasId: "canvas-b", pages: [canvasBPage] });
+
+      // Fire any residual timers. Nothing should reach `onChange`.
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(onChange).not.toHaveBeenCalled();
+
+      // Sanity: canvas B is editable in its own right, and the save
+      // it triggers is not contaminated by canvas A's earlier edit.
+      act(() => {
+        result.current.handleAddPanel("B Notes", "markdown");
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(onChange).toHaveBeenCalledTimes(1);
+      const stagedPages = onChange.mock.calls[0][0].pages as ConsolePage[];
+      // Only the panel added on canvas B (a markdown "B Notes") is
+      // present; A's earlier markdown "Notes" is not.
+      const allPanelTitles = stagedPages.flatMap((page) => page.panels).map((panel) => panel.content?.title);
+      expect(allPanelTitles).not.toContain("Notes");
+      expect(allPanelTitles).toContain("B Notes");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

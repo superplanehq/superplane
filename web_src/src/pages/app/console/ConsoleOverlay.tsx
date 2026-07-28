@@ -170,6 +170,7 @@ function useConsoleEditorState({
     onEffectiveChange: onEffectiveConsoleChange,
     activePageId,
     onActivePageIdChange: setActivePageId,
+    canvasId,
   });
 
   const livePageIds = useMemo(() => pagesState.localPages.map((page) => page.id), [pagesState.localPages]);
