@@ -378,10 +378,7 @@ export function validateConsolePagesStructural(pages: ConsolePage[]): string | n
  * `[]` — that flips the rule to strict caps, matching the desired
  * "no over-cap on a canvas without grandfathered content" behavior.
  */
-export function validateConsolePagesDelta(
-  pages: ConsolePage[],
-  previous: ConsolePage[],
-): string | null {
+export function validateConsolePagesDelta(pages: ConsolePage[], previous: ConsolePage[]): string | null {
   const structuralError = validateConsolePagesStructural(pages);
   if (structuralError) return structuralError;
 
@@ -453,10 +450,7 @@ export function validateConsoleContent(panels: ConsolePanel[], layout: ConsoleLa
   return validateConsoleContentStructural(panels, layout);
 }
 
-function validateConsoleContentStructural(
-  panels: ConsolePanel[],
-  layout: ConsoleLayoutItem[],
-): string | null {
+function validateConsoleContentStructural(panels: ConsolePanel[], layout: ConsoleLayoutItem[]): string | null {
   const panelIdsResult = validatePanels(panels);
   if (!panelIdsResult.ok) return panelIdsResult.error;
 

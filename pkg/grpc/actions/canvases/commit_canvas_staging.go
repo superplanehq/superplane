@@ -485,15 +485,21 @@ func createNewCanvasVersionFromLive(
 			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
 		case ConsoleYAMLRepositoryPath:
 			// Use the lenient parser so grandfathered consoles (migrated
-			// from before the cap was introduced) still parse. The cap
-			// itself is then enforced with a delta comparison against
-			// the previous committed pages — reductions of over-cap
-			// content are always allowed, but no page may grow beyond
-			// both the cap and its previous size in a single commit.
-			// Structural checks (unknown fields, missing/duplicate ids,
-			// unsupported panel types, payload size) still fail here.
+			// from before the cap was introduced) still parse. The
+			// document-level shape (apiVersion, kind, mutual exclusion
+			// of spec.pages vs legacy spec.panels/layout, per-page
+			// structural checks — unique ids, allowed panel types,
+			// well-formed panel content, layout references) is
+			// enforced via ValidateShape. The cap itself is then
+			// enforced with a delta comparison against the previous
+			// committed pages: reductions of over-cap content are
+			// always allowed, but no page may grow beyond both the
+			// cap and its previous size in a single commit.
 			console, err := yaml.ConsoleFromYMLLenient([]byte(content))
 			if err != nil {
+				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
+			}
+			if err := console.ValidateShape(); err != nil {
 				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
 			}
 

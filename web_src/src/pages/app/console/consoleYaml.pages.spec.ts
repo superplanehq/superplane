@@ -211,10 +211,7 @@ spec:
     // Growth past the previous count is still rejected.
     const grown: ConsolePage = {
       ...grandfathered,
-      panels: [
-        ...grandfathered.panels,
-        { id: "p-extra", type: "markdown", content: {} },
-      ],
+      panels: [...grandfathered.panels, { id: "p-extra", type: "markdown", content: {} }],
     };
     const err = validateConsolePagesDelta([grown], [grandfathered]);
     expect(err).toContain("Too many panels");

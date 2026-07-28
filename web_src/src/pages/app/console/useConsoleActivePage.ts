@@ -80,7 +80,11 @@ function nextActivePageIdFromReconciliation({
   // so a stale/invalid URL (`?page=ghost`) gets rewritten to match
   // the fallback state instead of being left in place.
   if (paramChanged) {
-    const next = resolveActiveConsolePage({ canvasId: canvasId ?? "", pageParam: rawPageParam, availablePageIds: available });
+    const next = resolveActiveConsolePage({
+      canvasId: canvasId ?? "",
+      pageParam: rawPageParam,
+      availablePageIds: available,
+    });
     if (next !== activePageId) return next;
   }
 
@@ -106,7 +110,11 @@ function nextActivePageIdFromReconciliation({
   // (`liveIds` still empty), a valid `activePageId` from persisted is
   // not spuriously treated as stale.
   if (activePageId && available.length > 0 && !available.includes(activePageId)) {
-    const next = resolveActiveConsolePage({ canvasId: canvasId ?? "", pageParam: rawPageParam, availablePageIds: available });
+    const next = resolveActiveConsolePage({
+      canvasId: canvasId ?? "",
+      pageParam: rawPageParam,
+      availablePageIds: available,
+    });
     if (next !== activePageId) return next;
   }
 

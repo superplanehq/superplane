@@ -317,6 +317,33 @@ func isDefaultConsolePage(page models.ConsolePage) bool {
 }
 
 func (c *Console) Validate() error {
+	if err := c.ValidateShape(); err != nil {
+		return err
+	}
+
+	if len(c.Spec.Pages) > 0 {
+		return validateConsolePages(c.Spec.Pages)
+	}
+
+	return ValidateConsoleContent(c.Spec.Panels, c.Spec.Layout)
+}
+
+// ValidateShape enforces the document-level invariants that must hold
+// even for grandfathered consoles: apiVersion, kind, mutual exclusion
+// of the two spec shapes, and per-page structural checks (unique
+// page/panel ids, allowed panel types, well-formed panel content,
+// layout references). Cap-based rules (page count, per-page panel
+// count, payload size) are intentionally *not* enforced here — they
+// are the caller's responsibility, either via full Validate() (strict
+// authoring) or via ValidateConsolePagesDelta (write paths that want
+// to allow reducing an over-cap page without wedging on a hard cap).
+//
+// Write paths (CLI `apps console set`, commit_canvas_staging, install)
+// use ConsoleFromYMLLenient + ValidateShape + ValidateConsolePagesDelta
+// so a grandfathered console can be re-committed while a malformed
+// document (wrong kind/apiVersion, mixed spec shapes, unknown panel
+// type) still fails fast.
+func (c *Console) ValidateShape() error {
 	if c.APIVersion == "" {
 		return errors.New("apiVersion is required")
 	}
@@ -341,10 +368,32 @@ func (c *Console) Validate() error {
 	}
 
 	if len(c.Spec.Pages) > 0 {
-		return validateConsolePages(c.Spec.Pages)
+		return validateConsolePagesStructural(c.Spec.Pages)
 	}
+	return validateConsoleContentStructure(c.Spec.Panels, c.Spec.Layout)
+}
 
-	return ValidateConsoleContent(c.Spec.Panels, c.Spec.Layout)
+// validateConsolePagesStructural enforces the per-page structural
+// invariants (unique/non-empty page ids, structural panel/layout
+// checks per page) without applying the page-count cap. Shared by
+// ValidateShape (write-path shape gate) and by ValidateConsolePagesDelta
+// (which then layers its own delta-aware cap enforcement on top).
+func validateConsolePagesStructural(pages []ConsolePage) error {
+	pageIDs := make(map[string]struct{}, len(pages))
+	for i, page := range pages {
+		if strings.TrimSpace(page.ID) == "" {
+			return fmt.Errorf("pages[%d].id is required", i)
+		}
+		if _, exists := pageIDs[page.ID]; exists {
+			return fmt.Errorf("duplicate page id %q", page.ID)
+		}
+		pageIDs[page.ID] = struct{}{}
+
+		if err := validateConsoleContentStructure(page.Panels, page.Layout); err != nil {
+			return fmt.Errorf("page %q: %w", page.ID, err)
+		}
+	}
+	return nil
 }
 
 // validateConsolePages enforces the invariants that apply across pages

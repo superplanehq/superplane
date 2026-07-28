@@ -49,10 +49,16 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	// (grandfathered) console with more than MaxConsolePanelsPerPage on
 	// a single page can still be updated via the CLI as long as the
 	// staged content does not push any page beyond both the cap and
-	// its previously committed size. Structural errors (malformed
-	// YAML, unknown fields, unsupported panel types) still surface.
-	_, err = yaml.ConsoleFromYMLLenient(yamlBytes)
+	// its previously committed size. Structural + shape errors
+	// (malformed YAML, wrong apiVersion, wrong kind, spec.pages mixed
+	// with legacy spec.panels/layout, unknown / duplicate panel ids,
+	// unsupported panel types, broken layout references) still surface
+	// via ValidateShape below.
+	parsed, err := yaml.ConsoleFromYMLLenient(yamlBytes)
 	if err != nil {
+		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
+	}
+	if err := parsed.ValidateShape(); err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
