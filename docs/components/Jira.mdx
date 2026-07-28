@@ -62,7 +62,7 @@ The On Issue trigger starts a workflow execution when issue events occur in a Ji
 
 ### Webhook Setup
 
-This is provisioned automatically. Jira's dynamic webhook registration API (`POST /rest/api/3/webhook`) is only reachable by Connect/OAuth apps, not accounts authenticated with an API token - since this integration connects via OAuth 2.0 (3LO), SuperPlane registers the webhook directly on save (scoped to the selected project via a JQL filter) and removes it automatically when the trigger is deleted.
+This is provisioned automatically. Jira's dynamic webhook registration API (`POST /rest/api/3/webhook`) only allows a single registered callback URL per OAuth connection, so SuperPlane registers one shared webhook per Jira integration - every `jira.onIssue` trigger on that connection listens through it, each matching only the events for its own configured project. The shared webhook is removed automatically once the last trigger using it is deleted.
 
 ### Output
 

@@ -29,9 +29,7 @@ type OnIssueConfiguration struct {
 }
 
 type OnIssueMetadata struct {
-	Project    *Project `json:"project,omitempty" mapstructure:"project,omitempty"`
-	WebhookURL string   `json:"webhookUrl" mapstructure:"webhookUrl"`
-	WebhookID  *int64   `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
+	Project *Project `json:"project,omitempty" mapstructure:"project,omitempty"`
 }
 
 // IssueWebhookPayload is the shape Jira Cloud sends for issue event webhooks.
@@ -93,7 +91,7 @@ func (t *OnIssue) Documentation() string {
 
 ## Webhook Setup
 
-This is provisioned automatically. Jira's dynamic webhook registration API (` + "`POST /rest/api/3/webhook`" + `) is only reachable by Connect/OAuth apps, not accounts authenticated with an API token - since this integration connects via OAuth 2.0 (3LO), SuperPlane registers the webhook directly on save (scoped to the selected project via a JQL filter) and removes it automatically when the trigger is deleted.
+This is provisioned automatically. Jira's dynamic webhook registration API (` + "`POST /rest/api/3/webhook`" + `) only allows a single registered callback URL per OAuth connection, so SuperPlane registers one shared webhook per Jira integration - every ` + "`jira.onIssue`" + ` trigger on that connection listens through it, each matching only the events for its own configured project. The shared webhook is removed automatically once the last trigger using it is deleted.
 
 ## Output
 
@@ -170,53 +168,17 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	if ctx.Webhook == nil {
-		return fmt.Errorf("missing webhook context")
+	if err := ctx.Metadata.Set(OnIssueMetadata{Project: project}); err != nil {
+		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup webhook: %w", err)
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	// Tear down a previously-registered webhook so editing project/events doesn't leak orphaned
-	// registrations - Jira allows only one registered URL per OAuth connection, so the old one
-	// must go before the new one can be created.
-	existing := OnIssueMetadata{}
-	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if existing.WebhookID != nil {
-		if delErr := client.DeleteIssueWebhooks([]int64{*existing.WebhookID}); delErr != nil {
-			ctx.Logger.Warnf("failed to remove previous Jira webhook: %v", delErr)
-		} else {
-			// Deleted successfully: persist that now, before attempting to create the replacement,
-			// so a failure below leaves metadata pointing at "no webhook" rather than at an id that
-			// no longer exists.
-			if err := ctx.Metadata.Set(OnIssueMetadata{Project: project, WebhookURL: webhookURL}); err != nil {
-				return fmt.Errorf("failed to update metadata: %w", err)
-			}
-		}
-	}
-
-	nativeEvents := make([]string, 0, len(config.Events))
-	for _, event := range config.Events {
-		nativeEvents = append(nativeEvents, issueEventWebhookName(event))
-	}
-
-	webhookID, err := client.CreateIssueWebhook(webhookURL, fmt.Sprintf("project = %q", project.Key), nativeEvents)
-	if err != nil {
-		return fmt.Errorf("failed to create Jira webhook: %w", err)
-	}
-
-	return ctx.Metadata.Set(OnIssueMetadata{
-		Project:    project,
-		WebhookURL: webhookURL,
-		WebhookID:  &webhookID,
-	})
+	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection,
+	// so this doesn't create a webhook itself - it requests one from the platform's webhook
+	// provisioner, which dedups all jira.onIssue triggers on this integration (see
+	// JiraWebhookHandler.CompareConfig) into a single shared registration, and fans out incoming
+	// events to every trigger sharing it. Each trigger filters to its own project and events in
+	// HandleWebhook.
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{})
 }
 
 func (t *OnIssue) Hooks() []core.Hook {
@@ -280,23 +242,10 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	return http.StatusOK, nil, nil
 }
 
+// Cleanup does nothing: the shared Jira webhook registered via RequestWebhook is torn down by
+// the platform's webhook cleanup worker (through JiraWebhookHandler.Cleanup) once the last
+// jira.onIssue trigger referencing it is removed.
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
-	metadata := OnIssueMetadata{}
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return nil
-	}
-	if metadata.WebhookID == nil {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil
-	}
-
-	if err := client.DeleteIssueWebhooks([]int64{*metadata.WebhookID}); err != nil {
-		ctx.Logger.Warnf("failed to delete Jira webhook during cleanup: %v", err)
-	}
 	return nil
 }
 
@@ -311,20 +260,6 @@ func issueEventAction(webhookEvent string) (string, bool) {
 		return "deleted", true
 	default:
 		return "", false
-	}
-}
-
-// issueEventWebhookName maps this trigger's short action name to the native Jira webhookEvent value.
-func issueEventWebhookName(action string) string {
-	switch action {
-	case "created":
-		return issueEventCreated
-	case "updated":
-		return issueEventUpdated
-	case "deleted":
-		return issueEventDeleted
-	default:
-		return action
 	}
 }
 

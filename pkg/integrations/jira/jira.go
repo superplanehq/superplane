@@ -20,7 +20,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegration("jira", &Jira{})
+	registry.RegisterIntegrationWithWebhookHandler("jira", &Jira{}, &JiraWebhookHandler{})
 }
 
 type Jira struct{}
