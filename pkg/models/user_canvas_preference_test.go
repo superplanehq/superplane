@@ -20,7 +20,7 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		boolPointer(true),
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(true)},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, preference.StarredAt)
@@ -30,7 +30,7 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		boolPointer(false),
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(false)},
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.StarredAt)
@@ -46,7 +46,7 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		boolPointer(false),
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(false)},
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.StarredAt)
@@ -57,7 +57,7 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		nil,
+		models.UserCanvasPreferenceChanges{},
 	)
 	require.NoError(t, err)
 	assert.Equal(t, r.Organization.ID, preference.OrganizationID)
@@ -74,9 +74,77 @@ func Test__SetUserCanvasPreference__RequiresExistingCanvas(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		uuid.New(),
-		boolPointer(true),
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(true)},
 	)
 	require.Error(t, err)
+}
+
+func Test__SetUserCanvasPreference__DismissesAgentSuggestionsWithoutClearingStar(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	suggestionID := "add-ci"
+
+	preference, err := models.SetUserCanvasPreference(
+		database.Conn(),
+		r.Organization.ID,
+		r.User,
+		canvas.ID,
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(true)},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, preference.StarredAt)
+
+	preference, err = models.SetUserCanvasPreference(
+		database.Conn(),
+		r.Organization.ID,
+		r.User,
+		canvas.ID,
+		models.UserCanvasPreferenceChanges{DismissAgentSuggestionID: &suggestionID},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, preference.StarredAt)
+	assert.Equal(t, []string{"add-ci"}, []string(preference.DismissedAgentSuggestionIDs))
+
+	preference, err = models.SetUserCanvasPreference(
+		database.Conn(),
+		r.Organization.ID,
+		r.User,
+		canvas.ID,
+		models.UserCanvasPreferenceChanges{DismissAgentSuggestionID: &suggestionID},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"add-ci"}, []string(preference.DismissedAgentSuggestionIDs))
+	assertUserCanvasPreferenceCount(t, canvas.ID, 1)
+}
+
+func Test__SetUserCanvasPreference__KeepsRowWhenUnstarringWithDismissals(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	suggestionID := "add-ci"
+
+	_, err := models.SetUserCanvasPreference(
+		database.Conn(),
+		r.Organization.ID,
+		r.User,
+		canvas.ID,
+		models.UserCanvasPreferenceChanges{
+			Starred:                  boolPointer(true),
+			DismissAgentSuggestionID: &suggestionID,
+		},
+	)
+	require.NoError(t, err)
+
+	preference, err := models.SetUserCanvasPreference(
+		database.Conn(),
+		r.Organization.ID,
+		r.User,
+		canvas.ID,
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(false)},
+	)
+	require.NoError(t, err)
+	assert.Nil(t, preference.StarredAt)
+	assert.Equal(t, []string{"add-ci"}, []string(preference.DismissedAgentSuggestionIDs))
+	assertUserCanvasPreferenceCount(t, canvas.ID, 1)
 }
 
 func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
@@ -98,7 +166,7 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		boolPointer(true),
+		models.UserCanvasPreferenceChanges{Starred: boolPointer(true)},
 	)
 	require.NoError(t, err)
 
