@@ -186,7 +186,8 @@ func (c *RunPython) Configuration() []configuration.Field {
 			Description: "Python executed by Python 3. Define def main(payload) and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "python",
+					Language:         "python",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
@@ -333,6 +334,7 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunPythonDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

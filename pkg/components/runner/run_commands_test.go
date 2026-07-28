@@ -410,6 +410,8 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	component := &Runner{}
 
 	err := component.Execute(core.ExecutionContext{
+		CanvasName: "release-train",
+		NodeName:   "Run commands",
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
 			"commands":     "echo hello",
@@ -448,6 +450,10 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
+	assert.Equal(t, map[string]string{
+		"canvas_name": "release-train",
+		"node_name":   "Run commands",
+	}, req.Labels)
 }
 
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
