@@ -24,17 +24,37 @@ import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftCons
 
 import { ConsoleGrid } from "./ConsoleGrid";
 import { CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
-import { useConsolePanelState } from "./useConsolePanelState";
 import { CREATABLE_PANEL_TYPES, PANEL_TYPE_META, type PanelType } from "./panelTypes";
 
 export interface ConsoleViewProps {
+  /**
+   * Id of the currently active page. Used to scope the visual diff to
+   * panels on this page — panel ids are only unique per page, so
+   * passing a full multi-page diff to `ConsoleGrid` (which keys by
+   * panel id) would collapse same-id panels from other pages onto the
+   * wrong grid position. Callers must pass the same page id whose
+   * panels/layout they pass in `panels`/`layout`.
+   */
+  activePageId: string | null;
+  /** Panels for the currently active page. */
   panels: ConsolePanel[];
+  /** Layout for the currently active page. */
   layout: ConsoleLayoutItem[];
+  /**
+   * Panels persisted for the active page (pre-optimistic edits). Used to
+   * compute the "locally deleted" diff overlay so uncommitted removals
+   * show up in the visual diff without re-fetching.
+   */
+  persistedPanels: ConsolePanel[];
+  /** Layout counterpart to {@link persistedPanels}. */
+  persistedLayout: ConsoleLayoutItem[];
   isLoading: boolean;
   errorMessage?: string;
   readOnly: boolean;
-  onChange: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
-  onEffectiveChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
+  onAddPanel: (name: string, type: PanelType) => void;
+  onDeletePanel: (id: string) => void;
+  onPanelContentChange: (id: string, content: Record<string, unknown>) => void;
+  onLayoutChange: (nextLayout: ConsoleLayoutItem[]) => void;
   /** When provided with `onAddPanelDialogOpenChange`, the add-panel dialog is controlled by the parent (e.g. header). */
   addPanelDialogOpen?: boolean;
   onAddPanelDialogOpenChange?: (open: boolean) => void;
@@ -45,13 +65,18 @@ export interface ConsoleViewProps {
 }
 
 export function ConsoleView({
+  activePageId,
   panels,
   layout,
+  persistedPanels,
+  persistedLayout,
   isLoading,
   errorMessage,
   readOnly,
-  onChange,
-  onEffectiveChange,
+  onAddPanel,
+  onDeletePanel,
+  onPanelContentChange,
+  onLayoutChange,
   addPanelDialogOpen: addPanelDialogOpenProp,
   onAddPanelDialogOpenChange,
   visualDiff,
@@ -67,19 +92,27 @@ export function ConsoleView({
     [isAddPanelControlled, onAddPanelDialogOpenChange],
   );
 
-  const { localPanels, localLayout, handleAddPanel, handleDeletePanel, handlePanelContentChange, handleLayoutChange } =
-    useConsolePanelState(panels, layout, onChange, onEffectiveChange);
+  const activePageDiff = useMemo(() => scopeVisualDiffToPage(visualDiff, activePageId), [visualDiff, activePageId]);
+
   const visualDiffWithLocalDeletes = useMemo(
-    () => withLocalDeletedPanels(visualDiff, panels, layout, localPanels, localLayout),
-    [visualDiff, panels, layout, localPanels, localLayout],
+    () =>
+      withLocalDeletedPanels({
+        visualDiff: activePageDiff,
+        persistedPanels,
+        persistedLayout,
+        localPanels: panels,
+        localLayout: layout,
+        activePageId,
+      }),
+    [activePageDiff, persistedPanels, persistedLayout, panels, layout, activePageId],
   );
 
   const confirmAddPanel = useCallback(
     (name: string, type: PanelType) => {
-      handleAddPanel(name, type);
+      onAddPanel(name, type);
       setAddPanelOpen(false);
     },
-    [handleAddPanel, setAddPanelOpen],
+    [onAddPanel, setAddPanelOpen],
   );
 
   if (errorMessage) {
@@ -99,7 +132,7 @@ export function ConsoleView({
     );
   }
 
-  if (localPanels.length === 0 && !hasRemovedDiffPanels(visualDiffWithLocalDeletes)) {
+  if (panels.length === 0 && !hasRemovedDiffPanels(visualDiffWithLocalDeletes)) {
     return (
       <>
         <EmptyState onAddFirstPanel={() => setAddPanelOpen(true)} />
@@ -111,13 +144,13 @@ export function ConsoleView({
   return (
     <>
       <ConsoleGrid
-        panels={localPanels}
-        layout={localLayout}
+        panels={panels}
+        layout={layout}
         readOnly={readOnly}
         visualDiff={visualDiffWithLocalDeletes}
-        onDeletePanel={handleDeletePanel}
-        onPanelContentChange={handlePanelContentChange}
-        onLayoutChange={handleLayoutChange}
+        onDeletePanel={onDeletePanel}
+        onPanelContentChange={onPanelContentChange}
+        onLayoutChange={onLayoutChange}
       />
       <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
     </>
@@ -128,22 +161,53 @@ function hasRemovedDiffPanels(visualDiff?: ConsoleViewProps["visualDiff"]): bool
   return !!visualDiff?.enabled && !!visualDiff.summary?.items.some((item) => item.changeType === "removed");
 }
 
-function withLocalDeletedPanels(
+/**
+ * Restrict the summary to items whose `pageId` matches the currently
+ * active page. Diff computation runs across every page, but the grid
+ * only renders one page at a time and keys its overlays by panel id
+ * (unique within a page, not across pages). Filtering here keeps the
+ * grid from picking up a diff item that belongs to a different tab.
+ */
+function scopeVisualDiffToPage(
   visualDiff: ConsoleViewProps["visualDiff"],
-  persistedPanels: ConsolePanel[],
-  persistedLayout: ConsoleLayoutItem[],
-  localPanels: ConsolePanel[],
-  localLayout: ConsoleLayoutItem[],
+  activePageId: string | null,
 ): ConsoleViewProps["visualDiff"] {
   if (!visualDiff?.enabled) return visualDiff;
+  const summary = visualDiff.summary;
+  if (!summary || activePageId == null) return visualDiff;
+  const items = summary.items.filter((item) => item.pageId === activePageId);
+  return {
+    ...visualDiff,
+    summary: {
+      items,
+      addedCount: countDiffItems(items, "added"),
+      updatedCount: countDiffItems(items, "updated"),
+      removedCount: countDiffItems(items, "removed"),
+    },
+  };
+}
 
-  const localDeletedItems = buildLocalDeletedDiffItems(
-    visualDiff.summary,
+type LocalDeletedInput = {
+  visualDiff: ConsoleViewProps["visualDiff"];
+  persistedPanels: ConsolePanel[];
+  persistedLayout: ConsoleLayoutItem[];
+  localPanels: ConsolePanel[];
+  localLayout: ConsoleLayoutItem[];
+  activePageId: string | null;
+};
+
+function withLocalDeletedPanels(input: LocalDeletedInput): ConsoleViewProps["visualDiff"] {
+  const { visualDiff, persistedPanels, persistedLayout, localPanels, localLayout, activePageId } = input;
+  if (!visualDiff?.enabled) return visualDiff;
+
+  const localDeletedItems = buildLocalDeletedDiffItems({
+    summary: visualDiff.summary,
     persistedPanels,
     persistedLayout,
     localPanels,
     localLayout,
-  );
+    pageId: activePageId ?? "",
+  });
   if (localDeletedItems.length === 0) return visualDiff;
 
   const localDeletedIds = new Set(localDeletedItems.map((item) => item.id));
@@ -167,13 +231,17 @@ function withLocalDeletedPanels(
   };
 }
 
-function buildLocalDeletedDiffItems(
-  summary: DraftConsoleDiffSummary | undefined,
-  persistedPanels: ConsolePanel[],
-  persistedLayout: ConsoleLayoutItem[],
-  localPanels: ConsolePanel[],
-  localLayout: ConsoleLayoutItem[],
-): DraftConsoleDiffItem[] {
+type LocalDeletedItemsInput = {
+  summary: DraftConsoleDiffSummary | undefined;
+  persistedPanels: ConsolePanel[];
+  persistedLayout: ConsoleLayoutItem[];
+  localPanels: ConsolePanel[];
+  localLayout: ConsoleLayoutItem[];
+  pageId: string;
+};
+
+function buildLocalDeletedDiffItems(input: LocalDeletedItemsInput): DraftConsoleDiffItem[] {
+  const { summary, persistedPanels, persistedLayout, localPanels, localLayout, pageId } = input;
   const persistedPanelsById = new Map(persistedPanels.map((panel) => [panel.id, panel]));
   const persistedLayoutById = new Map(persistedLayout.map((item) => [item.i, item]));
   const localIds = new Set([...localPanels.map((panel) => panel.id), ...localLayout.map((item) => item.i)]);
@@ -185,6 +253,7 @@ function buildLocalDeletedDiffItems(
       const existingItem = existingItemsById.get(id);
       const panel = persistedPanelsById.get(id);
       return {
+        pageId,
         id,
         title: existingItem?.title ?? panelTitle(panel, id),
         changeType: "removed",

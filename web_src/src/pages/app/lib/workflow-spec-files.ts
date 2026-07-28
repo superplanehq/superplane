@@ -1,8 +1,15 @@
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
-import { consoleToYaml, parseConsoleYaml } from "../console/consoleYaml";
+import {
+  consoleToYaml,
+  parseConsoleYaml,
+  parseConsoleYamlLenient,
+  validateConsolePagesStructural,
+} from "../console/consoleYaml";
+
+export { validateConsolePagesDelta } from "../console/consoleYaml";
 
 import {
   buildCanvasYamlFromWorkflow,
@@ -56,26 +63,25 @@ export function dematerializeCanvasMetadata(yamlText: string): ParsedCanvasYamlM
 }
 
 export function materializeConsoleSpec(input: {
-  panels: ConsolePanel[];
-  layout: ConsoleLayoutItem[];
+  pages: ConsolePage[];
   canvasId?: string;
   canvasName?: string;
 }): string {
   return consoleToYaml(input);
 }
 
-export function dematerializeConsoleSpec(
-  yamlText: string,
-): { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | null {
-  const result = parseConsoleYaml(yamlText);
+/**
+ * Read path: parse without cap / uniqueness validation so existing
+ * (grandfathered) consoles that exceed the caps still render. Save
+ * paths use {@link parseConsoleYamlForSave} which does validate.
+ */
+export function dematerializeConsoleSpec(yamlText: string): { pages: ConsolePage[] } | null {
+  const result = parseConsoleYamlLenient(yamlText);
   if (!result.ok) {
     return null;
   }
 
-  return {
-    panels: result.data.spec.panels,
-    layout: result.data.spec.layout,
-  };
+  return { pages: result.data.spec.pages };
 }
 
 export function canvasYamlDownloadFilename(canvasName?: string): string {
@@ -121,11 +127,38 @@ export function parseCanvasYamlForImport(
 
 export function parseConsoleYamlForSave(
   text: string,
-): { ok: true; panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | { ok: false; error: string } {
+): { ok: true; pages: ConsolePage[] } | { ok: false; error: string } {
   const result = parseConsoleYaml(text);
   if (!result.ok) {
     return { ok: false, error: result.error };
   }
 
-  return { ok: true, panels: result.data.spec.panels, layout: result.data.spec.layout };
+  return { ok: true, pages: result.data.spec.pages };
+}
+
+/**
+ * Import path used by Files-tab autosave and the console import modal.
+ * Uses the lenient parser so grandfathered over-cap consoles can still
+ * be edited and re-staged — the backend commit path re-checks the caps
+ * against the previously committed pages, so a save that keeps or
+ * reduces the count of an already-over-cap page still commits cleanly.
+ * Structural errors (malformed YAML, wrong apiVersion, unknown fields,
+ * duplicate ids, unsupported panel types, broken layout references,
+ * oversized payload) still fail here — the lenient parser skips *all*
+ * validation, so we run the structural subset explicitly on top of it.
+ */
+export function parseConsoleYamlForImport(
+  text: string,
+): { ok: true; pages: ConsolePage[] } | { ok: false; error: string } {
+  const result = parseConsoleYamlLenient(text);
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  const structuralError = validateConsolePagesStructural(result.data.spec.pages);
+  if (structuralError) {
+    return { ok: false, error: structuralError };
+  }
+
+  return { ok: true, pages: result.data.spec.pages };
 }

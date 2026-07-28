@@ -3,15 +3,14 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
 export type CommittedDraftBaselines = {
   canvasSpec?: CanvasesCanvas["spec"];
   console?: {
-    panels: ConsolePanel[];
-    layout: ConsoleLayoutItem[];
+    pages: ConsolePage[];
   };
   ready: boolean;
 };
@@ -65,12 +64,7 @@ export function useCommittedDraftBaselines({
 
       setBaselines({
         canvasSpec: version?.spec,
-        console: consoleData
-          ? {
-              panels: consoleData.panels,
-              layout: consoleData.layout,
-            }
-          : { panels: [], layout: [] },
+        console: consoleData ? { pages: consoleData.pages } : { pages: [] },
         ready: true,
       });
     });
