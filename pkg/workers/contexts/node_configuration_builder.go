@@ -499,6 +499,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveRunPayload()
 		}),
+		expr.Function("app", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("app() takes no arguments")
+			}
+
+			return b.resolveAppPayload()
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -944,6 +951,27 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	return payload, nil
 }
 
+// resolveAppPayload exposes the current app (canvas) to expressions via app().
+// It returns id, name, description, and url for the workflow this node belongs to.
+func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("app() could not resolve the current app: %w", err)
+	}
+
+	return map[string]any{
+		"id":          canvas.ID.String(),
+		"name":        canvas.Name,
+		"description": canvas.Description,
+		"url": fmt.Sprintf(
+			"%s/%s/apps/%s",
+			uiBaseURL(),
+			canvas.OrganizationID.String(),
+			canvas.ID.String(),
+		),
+	}, nil
+}
+
 // resolveRunPayload exposes the current run to expressions via run().
 // It returns id, url, and started_at (a time.Time) for the run that the
 // current node belongs to, resolved from the builder's root event.
@@ -982,16 +1010,16 @@ func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, e
 
 	return fmt.Sprintf(
 		"%s/%s/apps/%s?run=%s",
-		runBaseURL(),
+		uiBaseURL(),
 		canvas.OrganizationID.String(),
 		b.workflowID.String(),
 		run.ID.String(),
 	), nil
 }
 
-// runBaseURL mirrors the server's base URL resolution so run().url points at
-// the SuperPlane UI both in production (BASE_URL) and local development.
-func runBaseURL() string {
+// uiBaseURL mirrors the server's base URL resolution so app()/run() URLs
+// point at the SuperPlane UI both in production (BASE_URL) and local development.
+func uiBaseURL() string {
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL != "" {
 		return baseURL
@@ -1123,6 +1151,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"root":     {},
 	"previous": {},
 	"run":      {},
+	"app":      {},
 	"ctx":      {},
 }
 

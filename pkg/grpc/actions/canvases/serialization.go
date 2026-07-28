@@ -33,15 +33,16 @@ func SerializeCanvas(
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:             canvas.ID.String(),
-			OrganizationId: canvas.OrganizationID.String(),
-			Name:           canvas.Name,
-			Description:    canvas.Description,
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:      createdBy,
-			FolderId:       canvasFolderID,
-			LiveVersionId:  liveVersionID,
+			Id:                          canvas.ID.String(),
+			OrganizationId:              canvas.OrganizationID.String(),
+			Name:                        canvas.Name,
+			Description:                 canvas.Description,
+			CreatedAt:                   timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:                   timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:                   createdBy,
+			FolderId:                    canvasFolderID,
+			LiveVersionId:               liveVersionID,
+			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(liveVersion.Nodes),

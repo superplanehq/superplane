@@ -12,6 +12,7 @@ import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useC
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
 import { canvasKeys, useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
+import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -188,6 +189,9 @@ async function finishFactoryInstall(args: {
     args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
   }
 
+  if (args.definition.agentSuggestions?.length) {
+    setAgentSuggestions(args.canvasId, args.definition.agentSuggestions);
+  }
   writeCanvasAgentSidebarOpen(args.canvasId, false);
   writeCanvasRunsSidebarOpen(args.canvasId, shouldTriggerRun);
   localStorage.setItem("canvasSidebarOpen", "false");

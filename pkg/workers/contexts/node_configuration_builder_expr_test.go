@@ -53,6 +53,14 @@ func TestNodeConfigurationBuilder_ResolveExpression_RunRejectsArguments(t *testi
 	require.Contains(t, err.Error(), "run() takes no arguments")
 }
 
+func TestNodeConfigurationBuilder_ResolveExpression_AppRejectsArguments(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
+
+	_, err := b.ResolveExpression(`app(1)`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "app() takes no arguments")
+}
+
 func TestNodeConfigurationBuilder_ResolveExpression_UsesConfiguredExpressionVariables(t *testing.T) {
 	b := NewNodeConfigurationBuilder(nil, uuid.Nil).
 		WithInput(map[string]any{}).
