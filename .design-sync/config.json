@@ -1,0 +1,56 @@
+{
+  "projectId": "90cd76d1-c41a-4ead-8e90-83c80d715e66",
+  "shape": "storybook",
+  "pkg": "web_src",
+  "globalName": "Superplane",
+  "entry": "web_src/ds-entry.ts",
+  "tsconfig": "tsconfig.app.json",
+  "srcDir": "src",
+  "storybookConfigDir": "web_src/.storybook",
+  "storybookStatic": ".design-sync/sb-reference",
+  "cssEntry": "ds-styles.css",
+  "provider": { "component": "DsProvider" },
+  "overrides": {
+    "AspectRatio": { "cardMode": "column" },
+    "BuildingBlocksSidebar": { "cardMode": "column" },
+    "ComponentBase": { "cardMode": "column" },
+    "EmptyState": { "cardMode": "column" },
+    "EventSource": { "cardMode": "column" },
+    "IntegrationStatusIndicator": { "cardMode": "column" },
+    "SidebarEventItem": { "cardMode": "column" },
+    "Trigger": { "cardMode": "column" }
+  },
+  "storyImports": {
+    "shim": ["@tanstack/react-query"],
+    "bundle": [
+      "src/ui/badge",
+      "src/ui/button",
+      "src/ui/command",
+      "src/ui/dialog",
+      "src/ui/hoverCard",
+      "src/ui/input",
+      "src/ui/item",
+      "src/ui/label",
+      "src/ui/select",
+      "src/ui/separator",
+      "src/ui/tabs",
+      "src/ui/tooltip",
+      "src/components/ui/checkbox",
+      "src/components/Badge",
+      "src/components/Checkbox",
+      "src/components/Input",
+      "src/components/Select",
+      "__fixtures__",
+      "__mocks__",
+      "__stories__",
+      "storybooks/fixtures",
+      "pages/home/factories",
+      "/handlers"
+    ],
+    "loaders": {
+      ".md": "text",
+      ".yaml": "text",
+      ".yml": "text"
+    }
+  }
+}

@@ -151,5 +151,6 @@
     "workerDirectory": [
       "public"
     ]
-  }
+  },
+  "types": "ds-entry.ts"
 }
