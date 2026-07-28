@@ -545,6 +545,48 @@ func Test__Client__DeleteIssueWebhooks(t *testing.T) {
 	})
 }
 
+func Test__Client__RefreshIssueWebhooks(t *testing.T) {
+	t.Run("successful refresh", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"expirationDate":"2026-08-27T00:00:00.000Z"}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.RefreshIssueWebhooks([]int64{1000})
+		require.NoError(t, err)
+		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/webhook/refresh")
+		body, _ := io.ReadAll(httpContext.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+	})
+
+	t.Run("no-op for an empty id list", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.RefreshIssueWebhooks(nil)
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("failure is surfaced", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["webhook not found"]}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.RefreshIssueWebhooks([]int64{1000})
+		require.ErrorContains(t, err, "webhook not found")
+	})
+}
+
 func Test__Client__ExecRequestWithStatus(t *testing.T) {
 	t.Run("401 self-heals via a reactive refresh and retries the request", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{

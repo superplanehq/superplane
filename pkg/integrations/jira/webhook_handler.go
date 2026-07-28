@@ -45,6 +45,18 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
 	}
 
+	// Atlassian expires dynamic webhooks 30 days after creation unless refreshed. Mirror the id
+	// onto the integration itself - the refreshWebhook hook (see jira.go) only has access to the
+	// integration, not this webhook record - and kick off the self-rescheduling refresh loop.
+	integrationMetadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	integrationMetadata.WebhookID = &webhookID
+	ctx.Integration.SetMetadata(integrationMetadata)
+
+	if err := ctx.Integration.ScheduleActionCall(refreshWebhookHookName, map[string]any{}, webhookRefreshInterval); err != nil {
+		return nil, fmt.Errorf("failed to schedule webhook refresh: %w", err)
+	}
+
 	return &WebhookMetadata{WebhookID: &webhookID}, nil
 }
 
@@ -64,5 +76,16 @@ func (h *JiraWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	return client.DeleteIssueWebhooks([]int64{*metadata.WebhookID})
+	if err := client.DeleteIssueWebhooks([]int64{*metadata.WebhookID}); err != nil {
+		return err
+	}
+
+	// Clear the mirrored id so a refreshWebhook hook call still in flight finds nothing to
+	// refresh, instead of retrying forever against a webhook that no longer exists.
+	integrationMetadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	integrationMetadata.WebhookID = nil
+	ctx.Integration.SetMetadata(integrationMetadata)
+
+	return nil
 }
