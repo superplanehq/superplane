@@ -104,7 +104,7 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	})
 
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create API key")
+		return nil, apiKeyErrorToStatus(err, "failed to create API key")
 	}
 
 	creator, err := creatorUserForAPIKey(db, orgID, apiKey)
