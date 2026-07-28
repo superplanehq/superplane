@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { LAST_VISITED_CONSOLE_PAGE_STORAGE_KEY, recordLastVisitedConsolePage } from "@/lib/lastVisitedConsolePage";
+
 import { useConsoleActivePageInitial, useConsoleActivePageSync } from "./useConsoleActivePage";
 
 /**
@@ -173,6 +175,63 @@ describe("useConsoleActivePage — URL / state sync", () => {
     await waitFor(() => {
       expect(screen.getByTestId("active").textContent).toBe("details");
     });
+  });
+
+  it("resets active page and preserves per-canvas last-visited across canvas switches", async () => {
+    // React Router keeps this route component mounted when the user
+    // navigates between apps, so `activePageId` state persists across
+    // canvases. Before the fix, that leftover id would land in the
+    // new canvas's last-visited entry (either directly when it
+    // happened to match a page id there, or indirectly via a URL
+    // param resolved against the outgoing canvas's `persistedPageIds`
+    // before RQ swapped caches). This test locks in three behaviors:
+    //   1. Each canvas's own stored last-visited is honored on entry.
+    //   2. Switching canvases does not overwrite the destination
+    //      canvas's stored last-visited with the source canvas's id.
+    //   3. `activePageId` reflects the destination canvas's real
+    //      preference, not the outgoing canvas's leftover.
+    recordLastVisitedConsolePage("canvas-a", "details");
+    recordLastVisitedConsolePage("canvas-b", "playbook");
+
+    function CanvasHarness({ canvasId, pages }: { canvasId: string; pages: string[] }) {
+      const { activePageId, setActivePageId, rawPageParam } = useConsoleActivePageInitial({
+        canvasId,
+        persistedPageIds: pages,
+      });
+      useConsoleActivePageSync({
+        canvasId,
+        livePageIds: pages,
+        activePageId,
+        setActivePageId,
+        rawPageParam,
+        persistedPageIds: pages,
+      });
+      return <div data-testid="active">{activePageId ?? "null"}</div>;
+    }
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={[{ pathname: "/" }]}>
+        <CanvasHarness canvasId="canvas-a" pages={["overview", "details"]} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("details"));
+
+    // Simulate the React Router route reuse across canvases: same
+    // component instance, different `canvasId` prop, different
+    // `persistedPageIds`. Canvas B's stored preference (`playbook`)
+    // must win over Canvas A's leftover in-memory `details`.
+    rerender(
+      <MemoryRouter initialEntries={[{ pathname: "/" }]}>
+        <CanvasHarness canvasId="canvas-b" pages={["overview", "playbook"]} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("playbook"));
+
+    // Canvas A's stored entry survives — the write on Canvas B did
+    // not overwrite it, and Canvas A was never asked to persist
+    // Canvas B's leftover.
+    const stored = JSON.parse(window.localStorage.getItem(LAST_VISITED_CONSOLE_PAGE_STORAGE_KEY) ?? "{}");
+    expect(stored).toEqual({ "canvas-a": "details", "canvas-b": "playbook" });
   });
 
   it("falls back and rewrites the URL when the param points to a removed page", async () => {

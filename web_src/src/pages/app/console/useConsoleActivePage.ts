@@ -45,6 +45,30 @@ export function useConsoleActivePageInitial({
       availablePageIds: persistedIdsMemo,
     }),
   );
+
+  // React Router keeps this component mounted across canvases (the
+  // `apps/:id` route matches both), so `activePageId` would otherwise
+  // survive a canvas switch and leak the previous canvas's tab into
+  // the new one. When that stale id happens to coincide with a page
+  // id on the new canvas (e.g., the implicit `main`), the last-visited
+  // effect below then writes it into `localStorage[<newCanvasId>]`,
+  // overwriting the new canvas's real preference.
+  //
+  // Standard React "reset state on prop change during render" pattern
+  // (https://react.dev/reference/react/useState#storing-information-from-previous-renders):
+  // clear to `null` rather than re-resolving here, because on the
+  // render where `canvasId` first changes `persistedPageIds` typically
+  // still holds the previous canvas's data (RQ has not swapped caches
+  // yet) — a re-resolve against that stale list can return the wrong
+  // canvas's page. Case 2a in the sync effect hydrates against the
+  // new canvas's pages once they arrive, and the last-visited effect
+  // stays inert while `activePageId` is `null`.
+  const [trackedCanvasId, setTrackedCanvasId] = useState(canvasId);
+  if (trackedCanvasId !== canvasId) {
+    setTrackedCanvasId(canvasId);
+    setActivePageId(null);
+  }
+
   return { activePageId, setActivePageId, rawPageParam, persistedIdsMemo };
 }
 
@@ -220,6 +244,23 @@ export function useConsoleActivePageSync({
     // The implicit single-page id is never worth restoring; the same
     // fallback resolves it just as fast on the next visit.
     if (effectiveCount <= 1) return;
+
+    // Membership guard: only persist a page id that we can confirm
+    // belongs to the current canvas. React Router keeps this
+    // component mounted across canvases, so on a canvas switch the
+    // in-memory `activePageId` may briefly hold the previous canvas's
+    // page id — either because the render-time reset in
+    // `useConsoleActivePageInitial` has not run yet, or because Case
+    // 1 in the reconciliation effect adopted a URL param against the
+    // previous canvas's `persistedPageIds` (RQ has not swapped caches
+    // yet). Without this check the write below would overwrite the
+    // new canvas's real last-visited entry with a foreign page id.
+    // The reconciliation effect will re-resolve `activePageId` once
+    // the new canvas's pages arrive, at which point the write fires
+    // with the correct value.
+    const availableForCurrentCanvas = liveIdsMemo.length > 0 ? liveIdsMemo : persistedIdsMemo;
+    if (!availableForCurrentCanvas.includes(activePageId)) return;
+
     recordLastVisitedConsolePage(canvasId, activePageId);
-  }, [canvasId, activePageId, effectiveCount]);
+  }, [canvasId, activePageId, effectiveCount, liveIdsMemo, persistedIdsMemo]);
 }
