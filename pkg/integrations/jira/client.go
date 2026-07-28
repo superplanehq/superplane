@@ -1016,9 +1016,12 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
-// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic webhook registration request.
+// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic webhook registration
+// request. JQLFilter has no omitempty: Atlassian's schema requires the key to be present even when
+// its value is an empty string (which matches every issue in every project), so dropping the key
+// entirely for an unfiltered registration makes the whole request fail.
 type IssueWebhookRegistration struct {
-	JQLFilter string   `json:"jqlFilter,omitempty"`
+	JQLFilter string   `json:"jqlFilter"`
 	Events    []string `json:"events"`
 }
 

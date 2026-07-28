@@ -221,11 +221,13 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusOK, nil, nil
 	}
 
-	if metadata.Project != nil {
-		if projectKey := issueProjectKey(payload.Issue); projectKey != "" && !strings.EqualFold(projectKey, metadata.Project.Key) {
-			ctx.Logger.Infof("Ignoring event for project %s", projectKey)
-			return http.StatusOK, nil, nil
-		}
+	// The webhook is shared by every jira.onIssue trigger on the integration (see
+	// JiraWebhookHandler), so this project check is the only thing keeping one trigger from
+	// reacting to another project's events - fail closed when the payload doesn't carry a
+	// project key to compare against, rather than letting an unidentifiable event through.
+	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
+		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
+		return http.StatusOK, nil, nil
 	}
 
 	event := IssueEvent{

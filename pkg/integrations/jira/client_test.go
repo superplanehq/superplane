@@ -496,6 +496,25 @@ func Test__Client__CreateIssueWebhook(t *testing.T) {
 		_, err = client.CreateIssueWebhook("https://example.com/webhook", "", []string{"jira:issue_created"})
 		require.ErrorContains(t, err, `{"unexpected":"shape"}`)
 	})
+
+	// Regression test: Atlassian's schema requires the "jqlFilter" key to be present even when
+	// empty (an empty value matches every project) - an `omitempty` tag would silently drop the
+	// key for an unfiltered registration and make the whole request fail.
+	t.Run("an empty jqlFilter is still sent as an explicit key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateIssueWebhook("https://example.com/webhook", "", []string{"jira:issue_created"})
+		require.NoError(t, err)
+
+		body, _ := io.ReadAll(httpContext.Requests[0].Body)
+		assert.Contains(t, string(body), `"jqlFilter":""`)
+	})
 }
 
 func Test__Client__DeleteIssueWebhooks(t *testing.T) {

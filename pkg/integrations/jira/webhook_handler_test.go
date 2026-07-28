@@ -55,7 +55,9 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Contains(t, string(body), `"jira:issue_created"`)
 		assert.Contains(t, string(body), `"jira:issue_updated"`)
 		assert.Contains(t, string(body), `"jira:issue_deleted"`)
-		assert.NotContains(t, string(body), "jqlFilter")
+		// An explicit, empty jqlFilter - Atlassian requires the key present, and it matches
+		// every project, which is exactly the "shared, unfiltered" registration this needs.
+		assert.Contains(t, string(body), `"jqlFilter":""`)
 	})
 
 	t.Run("create failure is surfaced", func(t *testing.T) {
