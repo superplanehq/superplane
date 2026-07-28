@@ -424,7 +424,7 @@ func createNewCanvasVersionFromLive(
 ) (*models.CanvasVersion, error) {
 
 	//
-	// Start new version with the live version's nodes, edges, console panels, and console layout.
+	// Start new version with the live version's nodes, edges, and console pages.
 	//
 	now := time.Now()
 	newVersion := models.CanvasVersion{
@@ -434,8 +434,7 @@ func createNewCanvasVersionFromLive(
 		CommitMessage: strings.TrimSpace(commitMessage),
 		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
 		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
-		ConsolePanels: datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePanels.Data())),
-		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
+		ConsolePages:  datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePages.Data())),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
@@ -485,13 +484,25 @@ func createNewCanvasVersionFromLive(
 			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
 			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
 		case ConsoleYAMLRepositoryPath:
-			console, err := yaml.ConsoleFromYML([]byte(content))
+			// Use the lenient parser so grandfathered consoles (migrated
+			// from before the cap was introduced) still parse. The cap
+			// itself is then enforced with a delta comparison against
+			// the previous committed pages — reductions of over-cap
+			// content are always allowed, but no page may grow beyond
+			// both the cap and its previous size in a single commit.
+			// Structural checks (unknown fields, missing/duplicate ids,
+			// unsupported panel types, payload size) still fail here.
+			console, err := yaml.ConsoleFromYMLLenient([]byte(content))
 			if err != nil {
 				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
 			}
 
-			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))
-			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Layout()))
+			newPages := console.Pages()
+			if err := yaml.ValidateConsolePagesDelta(newPages, liveVersion.ConsolePages.Data()); err != nil {
+				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
+			}
+
+			newVersion.ConsolePages = datatypes.NewJSONType(slices.Clone(newPages))
 		default:
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}

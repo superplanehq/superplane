@@ -41,7 +41,7 @@ export async function matchesCommittedConsoleYaml(
       return committedYaml === nextConsoleYaml;
     }
 
-    return !hasDraftVersusLiveConsoleDiff(committed, next);
+    return !hasDraftVersusLiveConsoleDiff({ pages: committed.pages }, { pages: next.pages });
   } catch {
     return false;
   }
