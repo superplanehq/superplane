@@ -282,6 +282,11 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 		url.QueryEscape(*metadata.State),
 	)
 
+	// Clears any stale error from an earlier step (e.g. a legacy Basic Auth install flagged for
+	// missing OAuth credentials) - now that credentials are in hand, that error no longer applies,
+	// even though authorization itself isn't done yet.
+	ctx.Integration.Pending()
+
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: "Click **Continue** to authorize SuperPlane to access your Jira site.",
 		URL:         authorizeURL,

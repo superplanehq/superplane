@@ -79,6 +79,36 @@ func Test__Jira__Sync(t *testing.T) {
 		require.NotNil(t, integrationContext.BrowserAction)
 	})
 
+	// Regression test: once a legacy Basic Auth install is flagged errored (previous test) and
+	// the user then pastes OAuth credentials, the stale "no longer supported" error must not
+	// keep showing next to the "authorize" step - it's resolved, even though the integration
+	// isn't fully ready until authorization finishes.
+	t.Run("providing OAuth credentials after a legacy config error clears it", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":      "https://old.atlassian.net",
+				"apiToken":     "tok",
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			State:            "error",
+			StateDescription: "This integration used Jira's email/API token authentication, which is no longer supported.",
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "pending", integrationContext.State)
+		assert.Empty(t, integrationContext.StateDescription)
+		require.NotNil(t, integrationContext.BrowserAction)
+		assert.Contains(t, integrationContext.BrowserAction.Description, "authorize SuperPlane")
+	})
+
 	t.Run("brand new install with no config is not marked errored", func(t *testing.T) {
 		integrationContext := &contexts.IntegrationContext{Configuration: map[string]any{}}
 
