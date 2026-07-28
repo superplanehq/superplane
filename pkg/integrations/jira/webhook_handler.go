@@ -61,6 +61,14 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 	ctx.Integration.SetMetadata(integrationMetadata)
 
 	if err := ctx.Integration.ScheduleActionCall(refreshWebhookHookName, map[string]any{}, webhookRefreshInterval); err != nil {
+		// Jira allows only one registered URL per OAuth connection. If we leave this registration
+		// behind after a schedule failure, Setup retries hit that limit, never persist WebhookID
+		// into the SuperPlane webhook record, and Cleanup has nothing to delete - orphan forever.
+		if delErr := client.DeleteIssueWebhooks([]int64{webhookID}); delErr != nil {
+			return nil, fmt.Errorf("failed to schedule webhook refresh: %w (also failed to delete orphaned webhook %d: %v)", err, webhookID, delErr)
+		}
+		integrationMetadata.WebhookID = nil
+		ctx.Integration.SetMetadata(integrationMetadata)
 		return nil, fmt.Errorf("failed to schedule webhook refresh: %w", err)
 	}
 

@@ -89,6 +89,38 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "failed to create Jira webhook")
 		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
 	})
+
+	// Regression test: Jira allows only one URL per OAuth connection. If ScheduleActionCall fails
+	// after CreateIssueWebhook succeeds, leaving the Jira registration behind makes retries fail
+	// on that limit and leaves Cleanup unable to delete it (WebhookID never reaches the SuperPlane
+	// webhook record). Setup must delete the registration on that path.
+	t.Run("schedule failure rolls back the Jira registration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+		integration.ScheduleActionCallErr = assert.AnError
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.ErrorContains(t, err, "failed to schedule webhook refresh")
+
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[1].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[1].Body)
+		assert.Contains(t, string(body), "1000")
+
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		assert.Nil(t, storedMetadata.WebhookID)
+	})
 }
 
 func Test__WebhookHandler__Cleanup(t *testing.T) {
