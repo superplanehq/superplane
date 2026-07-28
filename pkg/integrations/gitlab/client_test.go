@@ -1403,3 +1403,195 @@ func Test__Client__CreateMergeRequestNote(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to create merge request note")
 	})
 }
+
+func Test__Client__CreateRelease(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"tag_name": "v1.0.0",
+					"name": "Release 1.0.0",
+					"description": "First release",
+					"released_at": "2026-01-03T01:56:19.539Z",
+					"author": {"id": 1, "username": "root"},
+					"milestones": [{"id": 51, "title": "v1.0"}],
+					"assets": {"count": 2, "sources": [{"format": "zip", "url": "https://example.com/v1.0.0.zip"}]},
+					"_links": {"self": "https://gitlab.com/root/example/-/releases/v1.0.0"}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		req := &CreateReleaseRequest{TagName: "v1.0.0", Ref: "main", Name: "Release 1.0.0"}
+		result, err := client.CreateRelease(context.Background(), "1", req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "v1.0.0", result.TagName)
+		assert.Equal(t, "Release 1.0.0", result.Name)
+		assert.Equal(t, "First release", result.Description)
+
+		require.NotNil(t, result.Author)
+		assert.Equal(t, "root", result.Author.Username)
+
+		require.Len(t, result.Milestones, 1)
+		assert.Equal(t, "v1.0", result.Milestones[0].Title)
+
+		require.NotNil(t, result.Assets)
+		assert.Equal(t, 2, result.Assets.Count)
+		require.Len(t, result.Assets.Sources, 1)
+		assert.Equal(t, "zip", result.Assets.Sources[0].Format)
+
+		require.NotNil(t, result.Links)
+		assert.Equal(t, "https://gitlab.com/root/example/-/releases/v1.0.0", result.Links.Self)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases", mockClient.Requests[0].URL.String())
+
+		body, _ := io.ReadAll(mockClient.Requests[0].Body)
+		assert.True(t, strings.Contains(string(body), `"tag_name":"v1.0.0"`))
+		assert.True(t, strings.Contains(string(body), `"ref":"main"`))
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "Tag name has already been taken"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateRelease(context.Background(), "1", &CreateReleaseRequest{TagName: "v1.0.0"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create release")
+	})
+}
+
+func Test__Client__UpdateRelease(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"tag_name": "v1.0.0", "name": "Updated name", "description": "Updated notes"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		name := "Updated name"
+		milestones := []string{"v1.0"}
+		req := &UpdateReleaseRequest{Name: &name, Milestones: &milestones}
+		result, err := client.UpdateRelease(context.Background(), "1", "v1.0.0", req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "Updated name", result.Name)
+		assert.Equal(t, "Updated notes", result.Description)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases/v1.0.0", mockClient.Requests[0].URL.String())
+
+		body, _ := io.ReadAll(mockClient.Requests[0].Body)
+		assert.True(t, strings.Contains(string(body), `"milestones":["v1.0"]`))
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		name := "x"
+		_, err := client.UpdateRelease(context.Background(), "1", "v1.0.0", &UpdateReleaseRequest{Name: &name})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update release")
+	})
+}
+
+func Test__Client__GetLatestRelease(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[{"tag_name": "v2.0.0", "name": "Release 2.0.0"}]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetLatestRelease(context.Background(), "1")
+
+		require.NoError(t, err)
+		assert.Equal(t, "v2.0.0", result.TagName)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases?order_by=released_at&sort=desc&per_page=1", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("no releases found", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetLatestRelease(context.Background(), "1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no releases found")
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusInternalServerError, `{"message": "internal error"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetLatestRelease(context.Background(), "1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to list releases")
+	})
+}

@@ -1221,6 +1221,217 @@ func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploym
 	return &deployment, nil
 }
 
+type ReleaseCommit struct {
+	ID             string   `json:"id"`
+	ShortID        string   `json:"short_id"`
+	Title          string   `json:"title"`
+	CreatedAt      string   `json:"created_at"`
+	ParentIDs      []string `json:"parent_ids,omitempty"`
+	Message        string   `json:"message"`
+	AuthorName     string   `json:"author_name"`
+	AuthorEmail    string   `json:"author_email"`
+	AuthoredDate   string   `json:"authored_date"`
+	CommitterName  string   `json:"committer_name"`
+	CommitterEmail string   `json:"committer_email"`
+	CommittedDate  string   `json:"committed_date"`
+}
+
+type ReleaseMilestoneIssueStats struct {
+	Total  int `json:"total"`
+	Closed int `json:"closed"`
+}
+
+// ReleaseMilestone is deliberately separate from Milestone (used by issues):
+// the releases API returns a fuller milestone shape, and the two response
+// bodies should not be forced to share a type just because they overlap.
+type ReleaseMilestone struct {
+	ID          int                         `json:"id"`
+	IID         int                         `json:"iid"`
+	ProjectID   int                         `json:"project_id"`
+	Title       string                      `json:"title"`
+	Description string                      `json:"description"`
+	State       string                      `json:"state"`
+	CreatedAt   string                      `json:"created_at"`
+	UpdatedAt   string                      `json:"updated_at"`
+	DueDate     string                      `json:"due_date,omitempty"`
+	StartDate   string                      `json:"start_date,omitempty"`
+	WebURL      string                      `json:"web_url"`
+	IssueStats  *ReleaseMilestoneIssueStats `json:"issue_stats,omitempty"`
+}
+
+type ReleaseAssetSource struct {
+	Format string `json:"format"`
+	URL    string `json:"url"`
+}
+
+type ReleaseAssetLink struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	LinkType string `json:"link_type"`
+}
+
+type ReleaseAssets struct {
+	Count   int                  `json:"count"`
+	Sources []ReleaseAssetSource `json:"sources,omitempty"`
+	Links   []ReleaseAssetLink   `json:"links,omitempty"`
+}
+
+type ReleaseEvidence struct {
+	SHA         string `json:"sha"`
+	Filepath    string `json:"filepath"`
+	CollectedAt string `json:"collected_at"`
+}
+
+type ReleaseLinks struct {
+	ClosedIssuesURL        string `json:"closed_issues_url,omitempty"`
+	ClosedMergeRequestsURL string `json:"closed_merge_requests_url,omitempty"`
+	EditURL                string `json:"edit_url,omitempty"`
+	MergedMergeRequestsURL string `json:"merged_merge_requests_url,omitempty"`
+	OpenedIssuesURL        string `json:"opened_issues_url,omitempty"`
+	OpenedMergeRequestsURL string `json:"opened_merge_requests_url,omitempty"`
+	Self                   string `json:"self,omitempty"`
+}
+
+type Release struct {
+	TagName     string             `json:"tag_name"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreatedAt   string             `json:"created_at"`
+	ReleasedAt  string             `json:"released_at"`
+	Author      *User              `json:"author,omitempty"`
+	Commit      *ReleaseCommit     `json:"commit,omitempty"`
+	Milestones  []ReleaseMilestone `json:"milestones,omitempty"`
+	CommitPath  string             `json:"commit_path,omitempty"`
+	TagPath     string             `json:"tag_path,omitempty"`
+	Assets      *ReleaseAssets     `json:"assets,omitempty"`
+	Evidences   []ReleaseEvidence  `json:"evidences,omitempty"`
+	EvidenceSHA string             `json:"evidence_sha,omitempty"`
+	Links       *ReleaseLinks      `json:"_links,omitempty"`
+}
+
+type CreateReleaseRequest struct {
+	TagName     string   `json:"tag_name"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Milestones  []string `json:"milestones,omitempty"`
+	ReleasedAt  string   `json:"released_at,omitempty"`
+}
+
+// CreateRelease creates a release in a project, creating the underlying tag
+// from Ref first if TagName doesn't already exist.
+// See https://docs.gitlab.com/api/releases/#create-a-release
+func (c *Client) CreateRelease(ctx context.Context, projectID string, req *CreateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// UpdateReleaseRequest mirrors GitLab's PUT /projects/:id/releases/:tag_name
+// body. Fields are pointers so a nil field is omitted (left unchanged) while a
+// non-nil field is always sent, even when it points to a zero value - e.g. a
+// non-nil pointer to an empty slice clears the milestones.
+type UpdateReleaseRequest struct {
+	Name        *string   `json:"name,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Milestones  *[]string `json:"milestones,omitempty"`
+	ReleasedAt  *string   `json:"released_at,omitempty"`
+}
+
+// UpdateRelease edits an existing release's fields. The tag itself and its
+// assets can't be changed through this endpoint.
+// See https://docs.gitlab.com/api/releases/#update-a-release
+func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, req *UpdateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// GetLatestRelease returns the project's most recently released release,
+// used by gitlab.updateRelease's "latest release" strategy.
+func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=1", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list releases: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to decode releases: %v", err)
+	}
+
+	if len(releases) == 0 {
+		return nil, errors.New("no releases found")
+	}
+
+	return &releases[0], nil
+}
+
 // mergeRequestConflictMessage extracts GitLab's error message from a 409
 // response to a merge request accept/approve call. GitLab returns 409 not only
 // for a sha guard mismatch but also e.g. when the merge request is locked or
