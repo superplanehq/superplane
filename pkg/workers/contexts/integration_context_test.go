@@ -80,36 +80,6 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	})
 }
 
-func Test__IntegrationContext_StateTransitions(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	integration, err := models.CreateIntegration(
-		uuid.New(),
-		r.Organization.ID,
-		"dummy",
-		support.RandomName("installation"),
-		map[string]any{},
-	)
-	require.NoError(t, err)
-
-	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
-
-	ctx.Error("something is wrong")
-	assert.Equal(t, models.IntegrationStateError, integration.State)
-	assert.Equal(t, "something is wrong", integration.StateDescription)
-
-	// Pending clears a stale error without claiming the integration is fully ready - e.g. a Sync
-	// step that resolves what caused the error but still needs further user action.
-	ctx.Pending()
-	assert.Equal(t, models.IntegrationStatePending, integration.State)
-	assert.Empty(t, integration.StateDescription)
-
-	ctx.Ready()
-	assert.Equal(t, models.IntegrationStateReady, integration.State)
-	assert.Empty(t, integration.StateDescription)
-}
-
 // Test__IntegrationContext_ScheduleActionCall covers the de-duplication that
 // fixes issue #5386: integration-level action calls must keep at most one pending
 // request per (installation, action, parameters), collapsing self-rescheduling
