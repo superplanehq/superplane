@@ -22,9 +22,10 @@ func UpdateCanvas(
 	canvas *models.Canvas,
 	name *string,
 	description *string,
+	dismissAgentSuggestionID *string,
 ) (*pb.UpdateCanvasResponse, error) {
 	err := db.Transaction(func(tx *gorm.DB) error {
-		return updateCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID, name, description)
+		return updateCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID, name, description, dismissAgentSuggestionID)
 	})
 
 	if err != nil {
@@ -70,6 +71,7 @@ func updateCanvasInTransaction(
 	canvasID uuid.UUID,
 	name *string,
 	description *string,
+	dismissAgentSuggestionID *string,
 ) error {
 	canvas, err := models.LockCanvasForUpdate(tx, organizationUUID, canvasID)
 	if err != nil {
@@ -82,6 +84,16 @@ func updateCanvasInTransaction(
 	updates, err := buildCanvasMetadataUpdates(canvas, name, description)
 	if err != nil {
 		return err
+	}
+
+	if dismissAgentSuggestionID != nil {
+		suggestionID := strings.TrimSpace(*dismissAgentSuggestionID)
+		if suggestionID == "" {
+			return grpcerrors.InvalidArgument(nil, "dismiss_agent_suggestion_id cannot be empty")
+		}
+		if err := canvas.DismissAgentSuggestion(tx, suggestionID); err != nil {
+			return err
+		}
 	}
 
 	if len(updates) == 0 {
