@@ -1,20 +1,45 @@
 import { describe, expect, it } from "vitest";
 
-import { consoleToYaml, parseConsoleYaml } from "./consoleYaml";
+import type { ConsoleLayoutItem, ConsolePage, ConsolePanel } from "@/hooks/useCanvasData";
 
-describe("consoleToYaml / parseConsoleYaml", () => {
-  it("round-trips an empty console", () => {
-    const text = consoleToYaml({ panels: [], layout: [], canvasId: "abc", canvasName: "My Canvas" });
+import { consoleToYaml, DEFAULT_CONSOLE_PAGE_ID, parseConsoleYaml } from "./consoleYaml";
+
+function singlePage(panels: ConsolePanel[], layout: ConsoleLayoutItem[]): ConsolePage[] {
+  if (panels.length === 0 && layout.length === 0) return [];
+  return [{ id: DEFAULT_CONSOLE_PAGE_ID, name: "Main", panels, layout }];
+}
+
+function roundTripSinglePage(panels: ConsolePanel[], layout: ConsoleLayoutItem[]) {
+  const text = consoleToYaml({ pages: singlePage(panels, layout) });
+  const result = parseConsoleYaml(text);
+  if (!result.ok) throw new Error(result.error);
+  return { text, pages: result.data.spec.pages };
+}
+
+function expectParseError(text: string, pattern: RegExp | string) {
+  const result = parseConsoleYaml(text);
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    if (typeof pattern === "string") expect(result.error).toContain(pattern);
+    else expect(result.error).toMatch(pattern);
+  }
+}
+
+describe("consoleToYaml / parseConsoleYaml — legacy single-page shape", () => {
+  it("round-trips an empty console using the legacy shape", () => {
+    const text = consoleToYaml({ pages: [], canvasId: "abc", canvasName: "My Canvas" });
     expect(text).toContain("apiVersion: v1");
     expect(text).toContain("kind: Console");
     expect(text).toContain("canvasId: abc");
     expect(text).toContain("name: My Canvas");
+    // Empty consoles export as legacy `panels`/`layout` so existing apps
+    // see no diff noise — the `pages:` key must not appear yet.
+    expect(text).not.toContain("pages:");
 
     const result = parseConsoleYaml(text);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.spec.panels).toEqual([]);
-      expect(result.data.spec.layout).toEqual([]);
+      expect(result.data.spec.pages).toEqual([]);
     }
   });
 
@@ -32,21 +57,18 @@ spec:
     expect(result.error).toMatch(/Unsupported kind/);
   });
 
-  it("round-trips a populated console", () => {
-    const text = consoleToYaml({
-      panels: [{ id: "intro", type: "markdown", content: { body: "# Hi" } }],
-      layout: [{ i: "intro", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }],
-    });
-
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error("parseConsoleYaml should succeed");
-    expect(result.data.spec.panels).toEqual([{ id: "intro", type: "markdown", content: { body: "# Hi" } }]);
-    expect(result.data.spec.layout).toEqual([{ i: "intro", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }]);
+  it("round-trips a populated single-page console via the legacy shape", () => {
+    const { pages } = roundTripSinglePage(
+      [{ id: "intro", type: "markdown", content: { body: "# Hi" } }],
+      [{ i: "intro", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }],
+    );
+    expect(pages).toHaveLength(1);
+    expect(pages[0]!.panels).toEqual([{ id: "intro", type: "markdown", content: { body: "# Hi" } }]);
+    expect(pages[0]!.layout).toEqual([{ i: "intro", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }]);
   });
 
   it("round-trips all typed panel kinds", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       { id: "doc", type: "markdown", content: { title: "Intro", body: "# Hi" } },
       { id: "deploy", type: "node", content: { node: "deploy-prod", showRun: true } },
       {
@@ -120,12 +142,9 @@ spec:
       },
     ];
     const layout = panels.map((p, i) => ({ i: p.id, x: 0, y: i * 4, w: 12, h: 4 }));
-    const text = consoleToYaml({ panels, layout });
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
-    expect(result.data.spec.layout).toEqual(layout);
+    const { pages } = roundTripSinglePage(panels, layout);
+    expect(pages[0]!.panels).toEqual(panels);
+    expect(pages[0]!.layout).toEqual(layout);
   });
 
   it("rejects render.sort when field is missing", () => {
@@ -146,9 +165,7 @@ spec:
             order: asc
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.sort\.field/);
+    expectParseError(text, /render\.sort\.field/);
   });
 
   it("rejects render.sort.order with an unknown value", () => {
@@ -172,9 +189,7 @@ spec:
             order: random
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.sort\.order/);
+    expectParseError(text, /render\.sort\.order/);
   });
 
   it("rejects a nodes panel entry without a node reference", () => {
@@ -190,9 +205,7 @@ spec:
           - description: missing node
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/content\.nodes\[0\]\.node must be a non-empty string/);
+    expectParseError(text, /content\.nodes\[0\]\.node must be a non-empty string/);
   });
 
   it("rejects a nodes panel where nodes is not an array", () => {
@@ -208,9 +221,7 @@ spec:
           oops: true
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/content\.nodes must be an array/);
+    expectParseError(text, /content\.nodes must be an array/);
   });
 
   it("rejects a node panel whose node field is not a string", () => {
@@ -225,9 +236,7 @@ spec:
         node: 123
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/content\.node must be a string/);
+    expectParseError(text, /content\.node must be a string/);
   });
 
   it("accepts a table panel without columns (configured via the form)", () => {
@@ -262,9 +271,7 @@ spec:
   layout: []
 extra: 1
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("Unknown top-level field");
+    expectParseError(text, "Unknown top-level field");
   });
 
   it("rejects unsupported panel types", () => {
@@ -278,9 +285,7 @@ spec:
       content: {}
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("unsupported type");
+    expectParseError(text, "unsupported type");
   });
 
   it("rejects duplicate panel ids", () => {
@@ -297,9 +302,7 @@ spec:
       content: {}
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("Duplicate panel id");
+    expectParseError(text, "Duplicate panel id");
   });
 
   it("rejects non-string body", () => {
@@ -314,9 +317,7 @@ spec:
         body: 42
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("body must be a string");
+    expectParseError(text, "body must be a string");
   });
 
   it("rejects layout referring to missing panel", () => {
@@ -347,13 +348,11 @@ spec:
   panels: []
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("Unsupported apiVersion");
+    expectParseError(text, "Unsupported apiVersion");
   });
 
   it("round-trips a number panel with prefix and suffix symbols", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       {
         id: "spend",
         type: "number",
@@ -370,16 +369,13 @@ spec:
         },
       },
     ];
-    const layout = [{ i: "spend", x: 0, y: 0, w: 6, h: 3 }];
-    const text = consoleToYaml({ panels, layout });
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
+    const layout: ConsoleLayoutItem[] = [{ i: "spend", x: 0, y: 0, w: 6, h: 3 }];
+    const { pages } = roundTripSinglePage(panels, layout);
+    expect(pages[0]!.panels).toEqual(panels);
   });
 
   it("round-trips a composite memory number panel with heterogeneous sources", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       {
         id: "score",
         type: "number",
@@ -396,12 +392,9 @@ spec:
         },
       },
     ];
-    const layout = [{ i: "score", x: 0, y: 0, w: 4, h: 3 }];
-    const text = consoleToYaml({ panels, layout });
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
+    const layout: ConsoleLayoutItem[] = [{ i: "score", x: 0, y: 0, w: 4, h: 3 }];
+    const { pages } = roundTripSinglePage(panels, layout);
+    expect(pages[0]!.panels).toEqual(panels);
   });
 
   it("rejects a composite memory number panel when render.aggregation is set", () => {
@@ -426,9 +419,7 @@ spec:
           field: cost
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.aggregation must not be set/);
+    expectParseError(text, /render\.aggregation must not be set/);
   });
 
   it("rejects a composite memory number panel when only render.field is set", () => {
@@ -452,9 +443,7 @@ spec:
           field: cost
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.field must not be set/);
+    expectParseError(text, /render\.field must not be set/);
   });
 
   it("rejects a composite memory number panel with an unknown combine operator", () => {
@@ -477,9 +466,7 @@ spec:
           kind: number
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/dataSource\.combine must be one of/);
+    expectParseError(text, /dataSource\.combine must be one of/);
   });
 
   it("rejects a composite memory source missing a field for non-count aggregation", () => {
@@ -501,8 +488,6 @@ spec:
           kind: number
   layout: []
 `;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/dataSource\.sources\[0\]\.field is required/);
+    expectParseError(text, /dataSource\.sources\[0\]\.field is required/);
   });
 });

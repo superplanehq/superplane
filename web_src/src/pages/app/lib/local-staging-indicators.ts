@@ -1,6 +1,6 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 
 import { hasDraftVersusLiveConsoleDiff } from "../draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "../draftNodeDiff";
@@ -21,8 +21,8 @@ export function hasLocalCanvasGraphDiff(
 }
 
 export function hasLocalConsoleDiff(
-  committed: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | undefined,
-  effective: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | undefined,
+  committed: { pages: ConsolePage[] } | undefined,
+  effective: { pages: ConsolePage[] } | undefined,
 ): boolean {
   if (!committed || !effective) {
     return false;
