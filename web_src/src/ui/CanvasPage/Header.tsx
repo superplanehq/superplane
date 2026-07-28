@@ -7,6 +7,7 @@ import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasRunsSidebarTrigger } from "./components/CanvasRunsSidebarTrigger";
 import { CanvasVersionsSidebarTrigger } from "./components/CanvasVersionsSidebarTrigger";
+import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
@@ -94,6 +95,9 @@ export interface HeaderProps {
   toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
   versionsSidebarState: CanvasVersionsSidebarState;
+  /** Optional Agent improvement suggestions (Storybook / post-install prototype). */
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
 }
 
 export function Header(props: HeaderProps) {
@@ -225,7 +229,11 @@ function SecondaryHeader(props: HeaderProps) {
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3 dark:border-gray-700/70 dark:bg-gray-900">
       <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center gap-1">
-        <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
+        <CanvasToolSidebarTrigger
+          toolSidebarState={props.toolSidebarState}
+          agentSuggestions={props.agentSuggestions}
+          onSelectAgentSuggestion={props.onSelectAgentSuggestion}
+        />
         <CanvasRunsSidebarTrigger runsSidebarState={props.runsSidebarState} />
         <CanvasVersionsSidebarTrigger versionsSidebarState={props.versionsSidebarState} />
       </div>

@@ -1,0 +1,43 @@
+{
+  "data": {
+    "action": "create",
+    "type": "Comment",
+    "actor": {
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "type": "user",
+      "name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "url": "https://linear.app/acme/profiles/ada"
+    },
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "data": {
+      "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+      "createdAt": "2026-03-27T16:42:11.123Z",
+      "updatedAt": "2026-03-27T16:42:11.123Z",
+      "body": "Deploy pipeline is green again — root cause was a flaky runner.",
+      "issueId": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "userId": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "reactionData": [],
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+      "user": {
+        "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+        "name": "Ada Lovelace",
+        "displayName": "ada",
+        "email": "ada@example.com"
+      },
+      "issue": {
+        "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+        "identifier": "ENG-142",
+        "title": "Deploy pipeline fails on retry",
+        "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+        "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d"
+      }
+    },
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "webhookTimestamp": 1774629731123,
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329"
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.comment"
+}

@@ -25,6 +25,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas,
 			stringPointer("   "),
 			stringPointer("description"),
+			nil,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -42,6 +43,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas,
 			&newName,
 			&newDescription,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -57,6 +59,32 @@ func Test__UpdateCanvas(t *testing.T) {
 		assert.Equal(t, newDescription, updatedCanvas.Description)
 	})
 
+	t.Run("dismisses agent suggestion for the canvas", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		suggestionID := "add-ci"
+
+		response, err := UpdateCanvas(
+			context.Background(),
+			database.DB(t.Context()),
+			canvas,
+			nil,
+			nil,
+			&suggestionID,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+
+		reloaded, err := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"add-ci"}, []string(reloaded.DismissedAgentSuggestionIDs))
+		assert.Equal(t, []string{"add-ci"}, response.Canvas.Metadata.DismissedAgentSuggestionIds)
+
+		described, err := DescribeCanvas(context.Background(), database.DB(t.Context()), reloaded)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"add-ci"}, described.Canvas.Metadata.DismissedAgentSuggestionIds)
+	})
+
 	t.Run("duplicate name -> error", func(t *testing.T) {
 		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		targetCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
@@ -67,6 +95,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			targetCanvas,
 			&existingCanvas.Name,
 			&targetCanvas.Description,
+			nil,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)

@@ -49,6 +49,7 @@ import { useCanvasStagingResync } from "@/hooks/useCanvasStagingResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
+import { useAutocompleteExampleContext } from "./useAutocompleteExampleContext";
 import { CommitStagingDialog } from "./CommitStagingDialog";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -68,6 +69,8 @@ import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/Ca
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
+import { useAppPageAgentSuggestions } from "./useAppPageAgentSuggestions";
+import { useAutoLayoutOnUpdatePreference } from "./useAutoLayoutOnUpdatePreference";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -146,7 +149,6 @@ import {
   getWorkflowViewPresentation,
   allowsRunsSidebar,
   useWorkflowUrlViewFlags,
-  readStoredBoolean,
   clearRunInspectionSearchParams,
 } from "./viewState";
 import {
@@ -173,7 +175,6 @@ import {
   prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
-const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 const RUNNING_RUNS_FILTERS = { states: [...ACTIVE_RUN_API_STATES] };
@@ -213,28 +214,13 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
-function useAutoLayoutOnUpdatePreference() {
-  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
-    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
-  );
-
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    const newValue = !isAutoLayoutOnUpdateEnabled;
-    setIsAutoLayoutOnUpdateEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-  }, [isAutoLayoutOnUpdateEnabled]);
-
-  return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
-}
-
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
     appId?: string;
   }>();
   const canvasId = appId || "";
+  const agentSuggestions = useAppPageAgentSuggestions(appId);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -1818,26 +1804,16 @@ export function AppPage() {
     [canvasNodes, visibleNodeExecutionsMap, visibleNodeEventsMap, visibleNodeQueueItemsMap],
   );
 
-  const autocompleteExampleContext = useMemo(
-    () => ({
-      canvasNodes,
-      canvasNodesById,
-      incomingNodeIdsByTargetId,
-      visibleNodeExecutionsMap,
-      visibleNodeEventsMap,
-      allComponentsByName,
-      allTriggersByName,
-    }),
-    [
-      canvasNodes,
-      canvasNodesById,
-      incomingNodeIdsByTargetId,
-      visibleNodeExecutionsMap,
-      visibleNodeEventsMap,
-      allComponentsByName,
-      allTriggersByName,
-    ],
-  );
+  const autocompleteExampleContext = useAutocompleteExampleContext({
+    canvas,
+    canvasNodes,
+    canvasNodesById,
+    incomingNodeIdsByTargetId,
+    visibleNodeExecutionsMap,
+    visibleNodeEventsMap,
+    allComponentsByName,
+    allTriggersByName,
+  });
   const getAutocompleteExampleObj = useCallback(
     (nodeId: string) => buildAutocompleteExampleObj(nodeId, autocompleteExampleContext),
     [autocompleteExampleContext],
@@ -4216,6 +4192,7 @@ export function AppPage() {
           canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
           canUseAgents={canUseAgents}
+          agentSuggestions={agentSuggestions}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}

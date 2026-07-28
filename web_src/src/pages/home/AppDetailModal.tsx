@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { resolveLucideIcon } from "@/lib/iconRegistry";
+import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
 import {
   homeModalFooterEdgeClassName,
@@ -22,6 +23,8 @@ export interface AppEntry {
   requirements: string[];
   agentInstructions: string;
   agentInitialMessage?: string;
+  /** Post-install Agent improvement shortcuts shown on the canvas Agent control. */
+  agentSuggestions?: AgentSuggestion[];
 }
 
 interface AppDetailModalProps {

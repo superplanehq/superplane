@@ -119,7 +119,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	if err != nil {
 		return nil, err
 	}
-	return canvases.UpdateCanvas(ctx, db, canvas, req.Name, req.Description)
+	return canvases.UpdateCanvas(ctx, db, canvas, req.Name, req.Description, req.DismissAgentSuggestionId)
 }
 
 func (s *CanvasService) UpdateCanvasPreference(
