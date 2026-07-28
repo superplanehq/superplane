@@ -23,6 +23,7 @@ function buildSoftwareFactory(): FactoryDefinition {
     integrations: factoryMeta.integrations,
     componentIntegrations: factoryMeta.componentIntegrations,
     startingTasks: factoryMeta.startingTasks,
+    agentSuggestions: factoryMeta.agentSuggestions,
     run: factoryMeta.run as FactoryDefinition["run"],
     source: factoryMeta.source as FactoryDefinition["source"],
     installParams: factoryParams.install_params as InstallParam[],

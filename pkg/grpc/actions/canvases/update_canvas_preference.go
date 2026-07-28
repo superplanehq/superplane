@@ -55,6 +55,10 @@ func UpdateCanvasPreference(
 }
 
 func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.CanvasPreference {
+	if preference == nil {
+		return nil
+	}
+
 	serialized := &pb.CanvasPreference{
 		CanvasId: preference.CanvasID.String(),
 		Starred:  preference.StarredAt != nil,
