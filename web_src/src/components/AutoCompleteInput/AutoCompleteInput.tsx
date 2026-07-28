@@ -761,6 +761,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return `__run${expr.slice(runMatch[0].length)}`;
       }
 
+      const appMatch = expr.match(/^app\(\)/);
+      if (appMatch) {
+        return `__app${expr.slice(appMatch[0].length)}`;
+      }
+
       return expr;
     };
 
