@@ -97,7 +97,16 @@ export function useBrowserActionSetup({
     } catch {
       showErrorToast("Failed to sync integration");
     }
-  }, [integrationId, updateIntegrationMutation, configuration, queryClient, organizationId, onCreated, integrationName, handleClose]);
+  }, [
+    integrationId,
+    updateIntegrationMutation,
+    configuration,
+    queryClient,
+    organizationId,
+    onCreated,
+    integrationName,
+    handleClose,
+  ]);
 
   return {
     browserAction,
