@@ -1,0 +1,177 @@
+package jira
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
+)
+
+func Test__WebhookHandler__CompareConfig(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("always matches - Jira allows only one registered URL per connection", func(t *testing.T) {
+		equal, err := handler.CompareConfig(WebhookConfiguration{}, WebhookConfiguration{})
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
+}
+
+func Test__WebhookHandler__Setup(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("creates a webhook covering every project and event", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.NoError(t, err)
+
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		require.NotNil(t, webhookMetadata.WebhookID)
+		assert.Equal(t, int64(1000), *webhookMetadata.WebhookID)
+
+		require.Len(t, httpCtx.Requests, 1)
+		req := httpCtx.Requests[0]
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.Contains(t, req.URL.String(), "/rest/api/3/webhook")
+
+		body, _ := io.ReadAll(req.Body)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+		assert.Contains(t, string(body), `"jira:issue_updated"`)
+		assert.Contains(t, string(body), `"jira:issue_deleted"`)
+		// Regression test: Atlassian rejects an empty jqlFilter outright ("Empty JQL search not
+		// supported", confirmed live) even though the key must be present - this must be a real,
+		// always-true clause instead.
+		assert.Contains(t, string(body), `"jqlFilter":"project != EMPTY"`)
+
+		// The id is mirrored onto the integration and a refresh is scheduled, since Atlassian
+		// expires this webhook in 30 days otherwise.
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		require.NotNil(t, storedMetadata.WebhookID)
+		assert.Equal(t, int64(1000), *storedMetadata.WebhookID)
+
+		require.Len(t, integration.ActionRequests, 1)
+		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)
+		assert.Equal(t, webhookRefreshInterval, integration.ActionRequests[0].Interval)
+	})
+
+	t.Run("create failure is surfaced", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["bad request"]}`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.ErrorContains(t, err, "failed to create Jira webhook")
+		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
+	})
+}
+
+func Test__WebhookHandler__Cleanup(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("deletes the registered webhook and clears the mirrored id", func(t *testing.T) {
+		webhookID := int64(1000)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+		integration := newAuthorizedIntegrationWithMetadata(Metadata{WebhookID: &webhookID})
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: WebhookMetadata{WebhookID: &webhookID}},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		assert.Nil(t, storedMetadata.WebhookID)
+	})
+
+	t.Run("no-op when Setup never completed", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook:     &contexts.WebhookContext{Metadata: WebhookMetadata{}},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("delete failure is surfaced", func(t *testing.T) {
+		webhookID := int64(1000)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook:     &contexts.WebhookContext{Metadata: WebhookMetadata{WebhookID: &webhookID}},
+		})
+		require.ErrorContains(t, err, "not found")
+	})
+}
+
+// Regression test: the platform persists webhook metadata by JSON-encoding it into a
+// map[string]any (see models.Webhook.Metadata / WebhookContext.GetMetadata), which turns
+// WebhookID into a float64 before mapstructure decodes it back - unlike the test doubles above,
+// which store the struct directly. mapstructure (the version pinned in go.mod) does convert
+// float64 into a *int64 field, so WebhookID survives the round trip; this pins that behavior so a
+// future mapstructure upgrade can't silently break it.
+func Test__WebhookMetadata__SurvivesJSONMetadataRoundTrip(t *testing.T) {
+	webhookID := int64(1000)
+	original := WebhookMetadata{WebhookID: &webhookID}
+
+	serialized, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	var asMap map[string]any
+	require.NoError(t, json.Unmarshal(serialized, &asMap))
+
+	// Confirms the premise: JSON decodes the number as float64, not int64.
+	_, isFloat := asMap["webhookId"].(float64)
+	require.True(t, isFloat)
+
+	var restored WebhookMetadata
+	require.NoError(t, mapstructure.Decode(asMap, &restored))
+
+	require.NotNil(t, restored.WebhookID)
+	assert.Equal(t, webhookID, *restored.WebhookID)
+}
