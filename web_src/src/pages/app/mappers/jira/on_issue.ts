@@ -6,7 +6,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { JiraIssue, JiraProject, JiraUser } from "./types";
+import type { JiraIssue, JiraIssueFields, JiraProject, JiraUser } from "./types";
 
 interface OnIssueEventData {
   action?: string;
@@ -40,6 +40,17 @@ function issueTitle(issue?: JiraIssue): string {
   return summary ? `${issue.key} - ${summary}` : issue.key || "Issue event";
 }
 
+function issueFieldValues(fields?: JiraIssueFields): Record<string, string> {
+  return {
+    Summary: stringOrDash(fields?.summary),
+    Status: stringOrDash(fields?.status?.name),
+    Priority: stringOrDash(fields?.priority?.name),
+    "Issue Type": stringOrDash(fields?.issuetype?.name),
+    Assignee: stringOrDash(fields?.assignee?.displayName),
+    Reporter: stringOrDash(fields?.reporter?.displayName),
+  };
+}
+
 /**
  * Renderer for the "jira.onIssue" trigger.
  */
@@ -58,19 +69,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const data = (context.event?.data ?? {}) as OnIssueEventData;
     const issue = data.issue;
-    const fields = issue?.fields;
     const receivedAt = context.event?.createdAt ? formatTimestampInUserTimezone(context.event.createdAt) : "-";
 
     return {
       "Received At": receivedAt,
       Action: stringOrDash(actionLabel(data.action)),
       Key: stringOrDash(issue?.key),
-      Summary: stringOrDash(fields?.summary),
-      Status: stringOrDash(fields?.status?.name),
-      Priority: stringOrDash(fields?.priority?.name),
-      "Issue Type": stringOrDash(fields?.issuetype?.name),
-      Assignee: stringOrDash(fields?.assignee?.displayName),
-      Reporter: stringOrDash(fields?.reporter?.displayName),
+      ...issueFieldValues(issue?.fields),
     };
   },
 

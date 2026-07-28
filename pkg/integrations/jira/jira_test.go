@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -144,6 +145,10 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Equal(t, testCloudID, metadata.CloudID)
 		require.Len(t, metadata.Projects, 1)
 		assert.Equal(t, "TEST", metadata.Projects[0].Key)
+
+		// A comfortably-valid token isn't refreshed, but the next check is still scheduled.
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Len(t, httpContext.Requests, 2)
 	})
 
 	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
@@ -166,6 +171,95 @@ func Test__Jira__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "error", integrationContext.State)
 		assert.Contains(t, integrationContext.StateDescription, "verifying Jira credentials")
+	})
+
+	t.Run("token close to expiring is proactively refreshed", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Equal(t, "new-access", accessToken)
+		assert.Equal(t, TokenURL, httpContext.Requests[0].URL.String())
+		require.Len(t, integrationContext.ResyncRequests, 1)
+	})
+
+	t.Run("refresh failure with a still-valid token retries later instead of erroring", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		// A concurrent Sync racing to refresh the same rotating token can make this exchange fail
+		// even though the credentials are fine; the still-valid access token survives the retry.
+		require.NoError(t, err)
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Equal(t, testAccessToken, accessToken)
+		require.Len(t, integrationContext.ResyncRequests, 1)
+		assert.Less(t, integrationContext.ResyncRequests[0], time.Minute+time.Second)
+	})
+
+	t.Run("refresh failure with an expired token clears secrets and errors", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.ErrorContains(t, err, "failed to refresh token")
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		refreshToken, _ := findSecret(integrationContext, SecretOAuthRefreshToken)
+		assert.Empty(t, accessToken)
+		assert.Empty(t, refreshToken)
 	})
 }
 
@@ -273,9 +367,10 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		assert.Equal(t, "error", integrationContext.State)
 		assert.Contains(t, integrationContext.StateDescription, "failed to resolve Jira site")
 
-		// The tokens are still stored, so the next sync can pick up from here.
+		// Tokens are not stored on this failure, so the next Sync shows the authorize
+		// button again instead of getting stuck with an access token but no cloud id.
 		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
-		assert.Equal(t, "cb-access", accessToken)
+		assert.Empty(t, accessToken)
 	})
 
 	t.Run("state mismatch does not store tokens", func(t *testing.T) {

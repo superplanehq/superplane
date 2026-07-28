@@ -14,10 +14,10 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { useQueryClient } from "@tanstack/react-query";
+import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { useBrowserActionSetup } from "./useBrowserActionSetup";
 import type {
   ConfigurationField,
   IntegrationsIntegrationDefinition,
@@ -78,12 +78,8 @@ export function IntegrationCreateDialog({
   initialWebhookSetup,
   initialConfiguration,
 }: IntegrationCreateDialogProps) {
-  const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
-  const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
-    OrganizationsBrowserAction | undefined
-  >(undefined);
   const [pendingWebhookSetup, setPendingWebhookSetup] = useState<{
     id: string;
     webhookUrl: string;
@@ -92,13 +88,10 @@ export function IntegrationCreateDialog({
   const [isCreatePending, setIsCreatePending] = useState(false);
   const [createError, setCreateError] = useState<unknown>(null);
   const [createdIntegrationId, setCreatedIntegrationId] = useState<string | undefined>(undefined);
-  const [browserActionCompleted, setBrowserActionCompleted] = useState(false);
   const prevOpenRef = useRef(false);
 
-  const updateIntegrationMutation = useUpdateIntegration(
-    organizationId,
-    pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId ?? "",
-  );
+  const resolvedIntegrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
+  const updateIntegrationMutation = useUpdateIntegration(organizationId, resolvedIntegrationId ?? "");
 
   const selectedInstructions = useMemo(() => {
     const raw = integrationDefinition?.instructions?.trim();
@@ -113,28 +106,13 @@ export function IntegrationCreateDialog({
     return fields.filter((f) => f.name && initialStepFieldNames.includes(f.name));
   }, [integrationDefinition?.configuration, initialStepFieldNames]);
 
-  useEffect(() => {
-    const justOpened = open && !prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (!justOpened) return;
-
-    setIntegrationName(defaultName);
-    setConfiguration(initialConfiguration ? { ...initialConfiguration } : {});
-    setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
-    setPendingWebhookSetup(initialWebhookSetup ?? null);
-    setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
-    setBrowserActionCompleted(false);
-  }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId, initialConfiguration]);
-
   const handleOpenChange = useCallback(
     (next: boolean) => {
       if (!next) {
         setIntegrationName("");
         setConfiguration({});
-        setCreateIntegrationBrowserAction(undefined);
         setPendingWebhookSetup(null);
         setCreatedIntegrationId(undefined);
-        setBrowserActionCompleted(false);
         setCreateError(null);
         onReset?.();
       }
@@ -146,6 +124,44 @@ export function IntegrationCreateDialog({
   const handleClose = useCallback(() => {
     handleOpenChange(false);
   }, [handleOpenChange]);
+
+  const {
+    browserAction: createIntegrationBrowserAction,
+    browserActionCompleted,
+    setBrowserAction: setCreateIntegrationBrowserAction,
+    resetBrowserAction,
+    continueBrowserAction: handleBrowserActionContinue,
+    saveBrowserActionConfig: handleBrowserActionConfigSave,
+    finishBrowserActionSetup: handleFinishBrowserActionSetup,
+  } = useBrowserActionSetup({
+    updateIntegrationMutation,
+    configuration,
+    organizationId,
+    integrationId: resolvedIntegrationId,
+    integrationName,
+    onCreated,
+    handleClose,
+  });
+
+  useEffect(() => {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
+    setIntegrationName(defaultName);
+    setConfiguration(initialConfiguration ? { ...initialConfiguration } : {});
+    resetBrowserAction(initialBrowserAction ?? undefined);
+    setPendingWebhookSetup(initialWebhookSetup ?? null);
+    setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
+  }, [
+    open,
+    defaultName,
+    initialBrowserAction,
+    initialWebhookSetup,
+    initialCreatedIntegrationId,
+    initialConfiguration,
+    resetBrowserAction,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     if (!integrationDefinition?.name || !organizationId) return;
@@ -211,6 +227,7 @@ export function IntegrationCreateDialog({
     handleClose,
     onCreated,
     onCapabilitySetupRequired,
+    setCreateIntegrationBrowserAction,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
@@ -227,96 +244,11 @@ export function IntegrationCreateDialog({
     }
   }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, integrationName]);
 
-  const handleBrowserActionContinue = useCallback(() => {
-    if (!createIntegrationBrowserAction) return;
-    const { url, method, formFields } = createIntegrationBrowserAction;
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-    } else if (url) {
-      window.open(url, "_blank");
-    }
-
-    // Advance the dialog even when resuming a pending integration (initialCreatedIntegrationId).
-    setBrowserActionCompleted(true);
-  }, [createIntegrationBrowserAction]);
-
-  const handleBrowserActionConfigSave = useCallback(async () => {
-    try {
-      const response = await updateIntegrationMutation.mutateAsync({ configuration });
-      const nextBrowserAction = response.data?.integration?.status?.browserAction;
-      if (nextBrowserAction) {
-        setCreateIntegrationBrowserAction(nextBrowserAction);
-        return;
-      }
-
-      const integrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
-      handleClose();
-      if (integrationId) {
-        onCreated?.(integrationId, integrationName);
-      }
-    } catch {
-      showErrorToast("Failed to save integration configuration");
-    }
-  }, [
-    updateIntegrationMutation,
-    configuration,
-    pendingWebhookSetup?.id,
-    createdIntegrationId,
-    initialCreatedIntegrationId,
-    handleClose,
-    onCreated,
-    integrationName,
-  ]);
-
-  const handleFinishBrowserActionSetup = useCallback(async () => {
-    const integrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
-    if (!integrationId) {
-      handleClose();
-      return;
-    }
-    try {
-      await updateIntegrationMutation.mutateAsync({
-        configuration: { ...configuration, installed: "true" },
-      });
-      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
-      onCreated?.(integrationId, integrationName);
-      handleClose();
-    } catch {
-      showErrorToast("Failed to sync integration");
-    }
-  }, [
-    pendingWebhookSetup?.id,
-    createdIntegrationId,
-    initialCreatedIntegrationId,
-    updateIntegrationMutation,
-    configuration,
-    queryClient,
-    organizationId,
-    onCreated,
-    integrationName,
-    handleClose,
-  ]);
-
   if (!integrationDefinition) return null;
 
   const displayName =
     getIntegrationTypeDisplayName(undefined, integrationDefinition.name) || integrationDefinition.name;
   const createErrorNotice = createError ? getUsageLimitNotice(createError, organizationId) : null;
-  const resolvedIntegrationId = pendingWebhookSetup?.id ?? createdIntegrationId ?? initialCreatedIntegrationId;
   const resolvedHomeHref =
     resolvedIntegrationId && organizationId
       ? `/${organizationId}/settings/integrations/${resolvedIntegrationId}`
@@ -457,75 +389,20 @@ export function IntegrationCreateDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-start mt-6">
-          {pendingWebhookSetup ? (
-            <>
-              <LoadingButton
-                color="blue"
-                onClick={() => void handleCompleteWebhookSetup()}
-                loading={updateIntegrationMutation.isPending}
-                loadingText="Completing..."
-                className="flex items-center gap-2"
-              >
-                Complete setup
-              </LoadingButton>
-              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
-                Done
-              </Button>
-            </>
-          ) : createIntegrationBrowserAction && !browserActionCompleted ? (
-            <>
-              {createIntegrationBrowserAction.url ? (
-                <Button type="button" onClick={handleBrowserActionContinue} className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  Continue setup
-                </Button>
-              ) : (
-                <LoadingButton
-                  color="blue"
-                  onClick={() => void handleBrowserActionConfigSave()}
-                  loading={updateIntegrationMutation.isPending}
-                  loadingText="Saving..."
-                >
-                  Save
-                </LoadingButton>
-              )}
-              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
-                Cancel
-              </Button>
-            </>
-          ) : createIntegrationBrowserAction ? (
-            <>
-              <LoadingButton
-                color="blue"
-                onClick={() => void handleFinishBrowserActionSetup()}
-                loading={updateIntegrationMutation.isPending}
-                loadingText="Saving..."
-              >
-                Done
-              </LoadingButton>
-              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <LoadingButton
-                color="blue"
-                onClick={() => void handleSubmit()}
-                disabled={!integrationName?.trim()}
-                loading={isCreatePending}
-                loadingText="Connecting..."
-                className="flex items-center gap-2"
-              >
-                Connect
-              </LoadingButton>
-              <Button variant="outline" onClick={handleClose} disabled={isCreatePending}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </DialogFooter>
+        <IntegrationCreateDialogFooter
+          pendingWebhookSetup={pendingWebhookSetup}
+          createIntegrationBrowserAction={createIntegrationBrowserAction}
+          browserActionCompleted={browserActionCompleted}
+          mutationPending={updateIntegrationMutation.isPending}
+          isCreatePending={isCreatePending}
+          integrationName={integrationName}
+          onCompleteWebhookSetup={handleCompleteWebhookSetup}
+          onBrowserActionContinue={handleBrowserActionContinue}
+          onBrowserActionConfigSave={handleBrowserActionConfigSave}
+          onFinishBrowserActionSetup={handleFinishBrowserActionSetup}
+          onSubmit={handleSubmit}
+          onClose={handleClose}
+        />
 
         {createError && createErrorNotice ? <UsageLimitAlert notice={createErrorNotice} className="mt-4" /> : null}
         {createError && !createErrorNotice ? (
@@ -536,5 +413,115 @@ export function IntegrationCreateDialog({
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface IntegrationCreateDialogFooterProps {
+  pendingWebhookSetup: { id: string; webhookUrl: string; config: Record<string, unknown> } | null;
+  createIntegrationBrowserAction: OrganizationsBrowserAction | undefined;
+  browserActionCompleted: boolean;
+  mutationPending: boolean;
+  isCreatePending: boolean;
+  integrationName: string;
+  onCompleteWebhookSetup: () => Promise<void>;
+  onBrowserActionContinue: () => void;
+  onBrowserActionConfigSave: () => Promise<void>;
+  onFinishBrowserActionSetup: () => Promise<void>;
+  onSubmit: () => Promise<void>;
+  onClose: () => void;
+}
+
+function IntegrationCreateDialogFooter({
+  pendingWebhookSetup,
+  createIntegrationBrowserAction,
+  browserActionCompleted,
+  mutationPending,
+  isCreatePending,
+  integrationName,
+  onCompleteWebhookSetup,
+  onBrowserActionContinue,
+  onBrowserActionConfigSave,
+  onFinishBrowserActionSetup,
+  onSubmit,
+  onClose,
+}: IntegrationCreateDialogFooterProps) {
+  if (pendingWebhookSetup) {
+    return (
+      <DialogFooter className="gap-2 sm:justify-start mt-6">
+        <LoadingButton
+          color="blue"
+          onClick={() => void onCompleteWebhookSetup()}
+          loading={mutationPending}
+          loadingText="Completing..."
+          className="flex items-center gap-2"
+        >
+          Complete setup
+        </LoadingButton>
+        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
+          Done
+        </Button>
+      </DialogFooter>
+    );
+  }
+
+  if (createIntegrationBrowserAction && !browserActionCompleted) {
+    return (
+      <DialogFooter className="gap-2 sm:justify-start mt-6">
+        {createIntegrationBrowserAction.url ? (
+          <Button type="button" onClick={onBrowserActionContinue} className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Continue setup
+          </Button>
+        ) : (
+          <LoadingButton
+            color="blue"
+            onClick={() => void onBrowserActionConfigSave()}
+            loading={mutationPending}
+            loadingText="Saving..."
+          >
+            Save
+          </LoadingButton>
+        )}
+        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
+          Cancel
+        </Button>
+      </DialogFooter>
+    );
+  }
+
+  if (createIntegrationBrowserAction) {
+    return (
+      <DialogFooter className="gap-2 sm:justify-start mt-6">
+        <LoadingButton
+          color="blue"
+          onClick={() => void onFinishBrowserActionSetup()}
+          loading={mutationPending}
+          loadingText="Saving..."
+        >
+          Done
+        </LoadingButton>
+        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
+          Cancel
+        </Button>
+      </DialogFooter>
+    );
+  }
+
+  return (
+    <DialogFooter className="gap-2 sm:justify-start mt-6">
+      <LoadingButton
+        color="blue"
+        onClick={() => void onSubmit()}
+        disabled={!integrationName?.trim()}
+        loading={isCreatePending}
+        loadingText="Connecting..."
+        className="flex items-center gap-2"
+      >
+        Connect
+      </LoadingButton>
+      <Button variant="outline" onClick={onClose} disabled={isCreatePending}>
+        Cancel
+      </Button>
+    </DialogFooter>
   );
 }
