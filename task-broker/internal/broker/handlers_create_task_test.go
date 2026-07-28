@@ -73,7 +73,7 @@ func TestCreateTaskPersistsOriginLabels(t *testing.T) {
 	body := []byte(`{
 		"fleet_id": "fleet-labels",
 		"webhook_url": "https://example.com/hook",
-		"commands": ["echo hi"],
+		"commands": [{"command": "echo hi"}],
 		"labels": {
 			"canvas_name": "release-train",
 			"node_name": "Run tests",
