@@ -149,4 +149,25 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
+	// Regression test: the webhook is shared by every jira.onIssue trigger on the integration, so
+	// a payload that doesn't carry a project key (e.g. a stripped-down delete payload) must not
+	// fail open and fire for a trigger configured for a different project.
+	t.Run("ignores an event missing project info rather than fanning it out to every trigger", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		bodyWithoutProject := []byte(`{
+			"webhookEvent": "jira:issue_created",
+			"issue": {"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithoutProject,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
 }
