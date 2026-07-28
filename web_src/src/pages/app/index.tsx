@@ -49,6 +49,7 @@ import { useCanvasStagingResync } from "@/hooks/useCanvasStagingResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
+import { useAutocompleteExampleContext } from "./useAutocompleteExampleContext";
 import { CommitStagingDialog } from "./CommitStagingDialog";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -1803,26 +1804,16 @@ export function AppPage() {
     [canvasNodes, visibleNodeExecutionsMap, visibleNodeEventsMap, visibleNodeQueueItemsMap],
   );
 
-  const autocompleteExampleContext = useMemo(
-    () => ({
-      canvasNodes,
-      canvasNodesById,
-      incomingNodeIdsByTargetId,
-      visibleNodeExecutionsMap,
-      visibleNodeEventsMap,
-      allComponentsByName,
-      allTriggersByName,
-    }),
-    [
-      canvasNodes,
-      canvasNodesById,
-      incomingNodeIdsByTargetId,
-      visibleNodeExecutionsMap,
-      visibleNodeEventsMap,
-      allComponentsByName,
-      allTriggersByName,
-    ],
-  );
+  const autocompleteExampleContext = useAutocompleteExampleContext({
+    canvas,
+    canvasNodes,
+    canvasNodesById,
+    incomingNodeIdsByTargetId,
+    visibleNodeExecutionsMap,
+    visibleNodeEventsMap,
+    allComponentsByName,
+    allTriggersByName,
+  });
   const getAutocompleteExampleObj = useCallback(
     (nodeId: string) => buildAutocompleteExampleObj(nodeId, autocompleteExampleContext),
     [autocompleteExampleContext],
