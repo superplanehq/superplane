@@ -104,6 +104,7 @@ function OrgWorkspaceRoutes({ appElement, workItemElement }: { appElement?: Reac
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={appElement ?? <AppPage />} />
+        <Route path="apps/:factoryId/automations/:appId" element={<AppPage />} />
         {workItemElement ? <Route path="apps/:appId/work/:workItemId" element={workItemElement} /> : null}
         <Route
           path="settings/integrations/:integrationName/setup"

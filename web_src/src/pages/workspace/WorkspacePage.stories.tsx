@@ -55,6 +55,8 @@ function WorkspaceStory() {
           agentCount: 1,
           elapsed: "Now",
           status: "running",
+          detail: "Factory is preparing the work order context.",
+          updatedAt: "Now",
         },
         ...current.workItems,
       ],
