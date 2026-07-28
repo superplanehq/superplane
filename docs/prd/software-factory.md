@@ -82,6 +82,27 @@ The following decisions are confirmed for this draft:
     the bottom.
 28. Conversations, decisions, approvals, and steering instructions are durable
     Work Order Events.
+29. The Factory page has a header with the Factory name and optional
+    description.
+30. The Factory page has four primary tabs: **Overview**, **Work Orders**,
+    **Automations**, and **Velocity**.
+31. Overview is the default tab and puts Work Orders requiring attention
+    before summary metrics and other activity.
+32. Work Orders are grouped into **Needs attention**, **Running**,
+    **Recently done**, and **Unsuccessful** sections.
+33. Automations are presented as a finite list within the Factory.
+34. Opening an Automation opens the existing Canvas editing experience for
+    that Factory-owned Canvas.
+35. Velocity defaults to the last 14 days.
+36. Velocity is filtered by repository, not by Automation.
+37. Velocity presents the same delivery indicators for the Team total,
+    human-authored work, and Factory-authored work without framing the
+    comparison as a competition.
+38. Human-authored velocity is aggregated from pull requests associated with
+    organization members' Git accounts. The main Factory page does not show an
+    unbounded per-person breakdown.
+39. Tracked Factory cost includes model tokens and execution compute.
+    Third-party service charges are excluded.
 
 ## Goals
 
@@ -112,7 +133,8 @@ The following decisions are confirmed for this draft:
 - Defining the complete lifecycle state machine, approval policy, or steering
   behavior beyond the initial requirements in this draft.
 - Finalizing formulas for throughput, success rate, or attention.
-- Designing detailed analytics beyond the high-level Factory overview.
+- Attributing salary, human labor cost, or third-party service charges in the
+  Factory cost metric.
 
 ## Primary Users
 
@@ -260,12 +282,23 @@ Conceptually:
 ```text
 Software Factory
 |-- Overview
+|   |-- Needs attention
+|   |-- Factory summary metrics
+|   `-- Current activity
+|-- Work Orders
+|   |-- Needs attention
+|   |-- Running
+|   |-- Recently done
+|   `-- Unsuccessful
 |-- Automations
 |   `-- Canvas-backed Automation
-|-- Work Order
+|-- Velocity
+|   |-- Repository filter
+|   |-- Team, human-authored, and Factory-authored indicators
+|   `-- Tracked token and compute cost
+`-- Work Order
 |   |-- Description
 |   `-- Chronological automation events
-`-- Additional Factory areas (to be defined)
 ```
 
 The exact placement of Factories in organization navigation and resource
@@ -298,19 +331,110 @@ experience remains to be designed.
 
 ## Factory Overview
 
-Every Factory has a dedicated overview page. Its purpose is operational
-orientation, not detailed analysis.
+Every Factory has a dedicated page with the Factory name, optional
+description, operational status, primary actions, and four tabs:
+
+- **Overview**
+- **Work Orders**
+- **Automations**
+- **Velocity**
+
+Overview is the default tab. Its purpose is operational orientation, not
+detailed analysis. Work Orders that require a human decision, approval,
+clarification, or intervention appear first so the user can immediately
+understand what is blocked.
 
 The overview must communicate at least:
 
 - Factory throughput.
 - Factory success rate.
 - Work Orders that require attention.
+- Active Work Orders.
+- Tracked Factory execution cost.
 
-The overview may later include other high-level Factory health and work-state
-information. Success rate can be grounded in the explicit successful and
-unsuccessful outcomes recorded by Work Order components. The exact denominator,
-time windows, targets, and drill-down behavior will be specified separately.
+The Overview may summarize running, recently completed, and unsuccessful work,
+but the complete state-grouped lists belong on the Work Orders tab. Success
+rate can be grounded in the explicit successful and unsuccessful outcomes
+recorded by Work Order components. The exact denominator, targets, and
+drill-down behavior remain to be specified.
+
+### Factory Page Layout
+
+The recommended layout is responsive and uses the available width with
+consistent page gutters and a restrained maximum content width of roughly
+1,500-1,600 pixels. Operational tables and comparative charts benefit from
+horizontal space, while the cap preserves scanning comfort on very wide
+displays.
+
+This width recommendation applies to the Factory page and its tabular views.
+The Work Order page may use a narrower reading column for chronology, and the
+Canvas-backed Automation editor remains full-bleed.
+
+## Work Orders Tab
+
+The Work Orders tab is the complete operational queue for Factory work. It
+groups Work Orders into:
+
+1. **Needs attention:** Work paused for a decision, approval, clarification,
+   or intervention.
+2. **Running:** Work currently moving through Factory Automations.
+3. **Recently done:** Recently successful Work Orders and their delivered pull
+   requests.
+4. **Unsuccessful:** Work Orders explicitly marked unsuccessful and available
+   for review, retry, or reopen.
+
+The list is ordered for actionability within each group and lets the user open
+the dedicated Work Order page.
+
+## Automations Tab
+
+The Automations tab presents the Factory's Canvas-backed Automations as a
+finite operational list. Each row should communicate enough context to select
+the correct Automation, including its name, description, trigger, status,
+current activity, recent success, and last run.
+
+Opening an Automation uses the existing Canvas view and editing behavior.
+Factory context changes the ownership and product terminology, not the core
+Canvas authoring experience.
+
+## Velocity Tab
+
+The Velocity tab explains repository delivery performance without treating
+human and Factory output as opposing teams.
+
+The default period is the last 14 days. When a Factory operates across
+multiple repositories, the primary filter is repository. Automations are not
+a velocity filter because several Automations may contribute to one Work Order
+and repository outcome.
+
+The same delivery indicators are shown for three cohorts:
+
+- **Team total:** All qualifying repository work in the selected period.
+- **Human-authored:** Qualifying pull requests attributed to organization
+  members through their Git accounts.
+- **Factory-authored:** Qualifying pull requests attached to Factory Work
+  Orders.
+
+The main view remains aggregated and does not list every human contributor.
+Individual drill-downs may be designed later.
+
+The initial velocity matrix includes:
+
+- Merged pull-request throughput.
+- Pull-request cycle time.
+- Success rate.
+- Tracked execution cost.
+
+The page should also show throughput over time and a clear cost breakdown.
+Tracked cost includes:
+
+- Model tokens.
+- Execution compute.
+
+Tracked cost excludes third-party service charges. Human labor and salary are
+also outside this cost definition. Until a separate attribution model is
+defined, human-authored work may show tracked execution cost as unavailable
+rather than implying that human work has no cost.
 
 ## Work Order Page
 
@@ -445,6 +569,41 @@ creation, review, checks, or merge.
 2. Users can see high-level Factory success rate.
 3. Users can see Work Orders that require their attention.
 4. Users can open a Work Order from the Factory overview.
+5. Users see the Factory name and optional description above the tab
+   navigation.
+6. Overview is the default of four tabs: Overview, Work Orders, Automations,
+   and Velocity.
+7. Work Orders requiring attention appear before summary metrics and other
+   activity.
+
+### Work Orders Page
+
+1. Users can see Work Orders grouped into Needs attention, Running, Recently
+   done, and Unsuccessful.
+2. Users can open any listed Work Order.
+3. Users can distinguish work waiting on them from work the Factory is
+   actively processing.
+
+### Automations Page
+
+1. Users can see the set of Automations owned by the Factory.
+2. Each Automation shows identifying and operational context.
+3. Opening an Automation opens its existing Canvas view.
+
+### Velocity
+
+1. Velocity defaults to a 14-day period.
+2. Users can filter velocity by repository when the Factory works across
+   multiple repositories.
+3. Velocity is not filtered by Automation.
+4. Users can compare the same delivery indicators for Team total,
+   human-authored, and Factory-authored work.
+5. Human-authored data is aggregated rather than rendered as an unbounded
+   contributor list.
+6. Velocity communicates the cohorts neutrally rather than presenting humans
+   and the Factory as competitors.
+7. Tracked cost includes model tokens and execution compute.
+8. Tracked cost excludes third-party service charges and human labor.
 
 ### Work Orders
 
@@ -502,6 +661,16 @@ creation, review, checks, or merge.
 21. A retry, rerun, or reopen appends new events and preserves all earlier
     attempts.
 22. Existing App creation and App pages exhibit no behavioral regression.
+23. The Factory page has Overview, Work Orders, Automations, and Velocity tabs.
+24. The Overview puts Work Orders requiring attention first.
+25. The Work Orders tab groups work into Needs attention, Running, Recently
+    done, and Unsuccessful.
+26. Opening an Automation from the Automations tab opens its Canvas view.
+27. Velocity defaults to 14 days and can be filtered by repository.
+28. Team total, human-authored, and Factory-authored velocity use the same
+    indicators.
+29. Factory cost includes token and execution compute cost but excludes
+    third-party service charges.
 
 ## Assumptions Requiring Confirmation
 
@@ -521,6 +690,14 @@ These are working assumptions, not settled requirements:
 5. **Current-state projection:** The current Work Order state can be stored as
    a projection for efficient queries, while its transitions remain represented
    by append-only events.
+6. **Team total:** The Team total cohort combines qualifying human-authored and
+   Factory-authored repository work.
+7. **Human cost:** Human-authored work shows tracked execution cost as
+   unavailable until a meaningful and explicitly scoped attribution model is
+   defined.
+8. **Factory page width:** The Factory page uses responsive available width
+   with a maximum content width near 1,600 pixels. Work Order chronology may
+   be narrower and Canvas remains full-bleed.
 
 ## Open Questions
 
@@ -578,11 +755,21 @@ These are working assumptions, not settled requirements:
 19. What actions make a Work Order require attention: a question, approval,
     failed Automation, missing permission, merge conflict, or other states?
 
-### Overview Metrics
+### Overview and Velocity Metrics
 
-20. Is throughput based on Work Orders created, Work Orders completed, pull
-    requests opened, pull requests merged, or another unit?
-21. Is success rate calculated as successful Work Orders divided by all
-    explicitly completed Work Orders, or should cancelled work and other
-    outcomes affect it?
-22. Which default time window should the overview use?
+20. Which throughput unit is primary on Overview: completed Work Orders,
+    opened pull requests, merged pull requests, or a small set of these?
+21. What is the precise success definition for each cohort? Factory work has
+    explicit successful and unsuccessful Work Order outcomes, while
+    human-authored work needs an equivalent repository-derived rule.
+22. Should cancelled or reverted work affect the success-rate denominator, and
+    in what time period should the outcome be attributed?
+23. Is **Team total** definitively the combined human-authored and
+    Factory-authored cohort, including Factory pull requests authored by a
+    service Git account?
+24. Should human-authored tracked execution cost remain unavailable, or should
+    token and compute used by human-triggered automations be attributed to that
+    cohort?
+25. When a Factory has several repositories, should Velocity initially select
+    the most recently active repository, a configured default, or an
+    all-repositories aggregate?
