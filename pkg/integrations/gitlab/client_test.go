@@ -1554,36 +1554,13 @@ func Test__Client__GetLatestRelease(t *testing.T) {
 
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases?order_by=released_at&sort=desc&per_page=100", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/releases?order_by=released_at&sort=desc&per_page=1", mockClient.Requests[0].URL.String())
 	})
 
-	t.Run("skips upcoming releases sorted above published ones", func(t *testing.T) {
+	t.Run("no releases found", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `[
-					{"tag_name": "v3.0.0-rc1", "upcoming_release": true},
-					{"tag_name": "v2.0.0", "upcoming_release": false}
-				]`),
-			},
-		}
-
-		client := &Client{
-			baseURL:    "https://gitlab.com",
-			token:      "token",
-			authType:   AuthTypePersonalAccessToken,
-			httpClient: mockClient,
-		}
-
-		result, err := client.GetLatestRelease(context.Background(), "1")
-
-		require.NoError(t, err)
-		assert.Equal(t, "v2.0.0", result.TagName)
-	})
-
-	t.Run("no published releases found", func(t *testing.T) {
-		mockClient := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `[{"tag_name": "v3.0.0-rc1", "upcoming_release": true}]`),
+				GitlabMockResponse(http.StatusOK, `[]`),
 			},
 		}
 
@@ -1596,7 +1573,7 @@ func Test__Client__GetLatestRelease(t *testing.T) {
 
 		_, err := client.GetLatestRelease(context.Background(), "1")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no published releases found")
+		assert.Contains(t, err.Error(), "no releases found")
 	})
 
 	t.Run("failure", func(t *testing.T) {

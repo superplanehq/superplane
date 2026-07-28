@@ -1241,7 +1241,9 @@ type ReleaseMilestoneIssueStats struct {
 	Closed int `json:"closed"`
 }
 
-// ReleaseMilestone is kept separate from Milestone (used by issues) since the releases API returns a fuller shape.
+// ReleaseMilestone is deliberately separate from Milestone (used by issues):
+// the releases API returns a fuller milestone shape, and the two response
+// bodies should not be forced to share a type just because they overlap.
 type ReleaseMilestone struct {
 	ID          int                         `json:"id"`
 	IID         int                         `json:"iid"`
@@ -1292,21 +1294,20 @@ type ReleaseLinks struct {
 }
 
 type Release struct {
-	TagName         string             `json:"tag_name"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	CreatedAt       string             `json:"created_at"`
-	ReleasedAt      string             `json:"released_at"`
-	UpcomingRelease bool               `json:"upcoming_release"`
-	Author          *User              `json:"author,omitempty"`
-	Commit          *ReleaseCommit     `json:"commit,omitempty"`
-	Milestones      []ReleaseMilestone `json:"milestones,omitempty"`
-	CommitPath      string             `json:"commit_path,omitempty"`
-	TagPath         string             `json:"tag_path,omitempty"`
-	Assets          *ReleaseAssets     `json:"assets,omitempty"`
-	Evidences       []ReleaseEvidence  `json:"evidences,omitempty"`
-	EvidenceSHA     string             `json:"evidence_sha,omitempty"`
-	Links           *ReleaseLinks      `json:"_links,omitempty"`
+	TagName     string             `json:"tag_name"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreatedAt   string             `json:"created_at"`
+	ReleasedAt  string             `json:"released_at"`
+	Author      *User              `json:"author,omitempty"`
+	Commit      *ReleaseCommit     `json:"commit,omitempty"`
+	Milestones  []ReleaseMilestone `json:"milestones,omitempty"`
+	CommitPath  string             `json:"commit_path,omitempty"`
+	TagPath     string             `json:"tag_path,omitempty"`
+	Assets      *ReleaseAssets     `json:"assets,omitempty"`
+	Evidences   []ReleaseEvidence  `json:"evidences,omitempty"`
+	EvidenceSHA string             `json:"evidence_sha,omitempty"`
+	Links       *ReleaseLinks      `json:"_links,omitempty"`
 }
 
 type CreateReleaseRequest struct {
@@ -1318,7 +1319,9 @@ type CreateReleaseRequest struct {
 	ReleasedAt  string   `json:"released_at,omitempty"`
 }
 
-// CreateRelease creates a release, tagging Ref first if TagName doesn't already exist.
+// CreateRelease creates a release in a project, creating the underlying tag
+// from Ref first if TagName doesn't already exist.
+// See https://docs.gitlab.com/api/releases/#create-a-release
 func (c *Client) CreateRelease(ctx context.Context, projectID string, req *CreateReleaseRequest) (*Release, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases", c.baseURL, apiVersion, url.PathEscape(projectID))
 
@@ -1351,7 +1354,10 @@ func (c *Client) CreateRelease(ctx context.Context, projectID string, req *Creat
 	return &release, nil
 }
 
-// UpdateReleaseRequest fields are pointers so a nil field is left unchanged while a non-nil field (even a zero value) is always sent.
+// UpdateReleaseRequest mirrors GitLab's PUT /projects/:id/releases/:tag_name
+// body. Fields are pointers so a nil field is omitted (left unchanged) while a
+// non-nil field is always sent, even when it points to a zero value - e.g. a
+// non-nil pointer to an empty slice clears the milestones.
 type UpdateReleaseRequest struct {
 	Name        *string   `json:"name,omitempty"`
 	Description *string   `json:"description,omitempty"`
@@ -1359,7 +1365,9 @@ type UpdateReleaseRequest struct {
 	ReleasedAt  *string   `json:"released_at,omitempty"`
 }
 
-// UpdateRelease edits an existing release's name, description, milestones, or released-at date; the tag and assets can't be changed here.
+// UpdateRelease edits an existing release's fields. The tag itself and its
+// assets can't be changed through this endpoint.
+// See https://docs.gitlab.com/api/releases/#update-a-release
 func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, req *UpdateReleaseRequest) (*Release, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
 
@@ -1392,9 +1400,10 @@ func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, r
 	return &release, nil
 }
 
-// GetLatestRelease returns the most recently published release, skipping upcoming (scheduled) ones.
+// GetLatestRelease returns the project's most recently released release,
+// used by gitlab.updateRelease's "latest release" strategy.
 func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Release, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=100", c.baseURL, apiVersion, url.PathEscape(projectID))
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=1", c.baseURL, apiVersion, url.PathEscape(projectID))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -1416,13 +1425,11 @@ func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Relea
 		return nil, fmt.Errorf("failed to decode releases: %v", err)
 	}
 
-	for _, release := range releases {
-		if !release.UpcomingRelease {
-			return &release, nil
-		}
+	if len(releases) == 0 {
+		return nil, errors.New("no releases found")
 	}
 
-	return nil, errors.New("no published releases found")
+	return &releases[0], nil
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409
