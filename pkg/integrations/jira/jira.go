@@ -38,7 +38,7 @@ type Metadata struct {
 const installationInstructions = `
 SuperPlane connects to Jira with OAuth.
 
-1. Click **Save** with Client ID and Client Secret empty to see the steps for creating an Atlassian OAuth app.
+1. Click the **Connect** button with Client ID and Client Secret empty to see the steps for creating an Atlassian OAuth app.
 `
 
 func (j *Jira) Name() string {
