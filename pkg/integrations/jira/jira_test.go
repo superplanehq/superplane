@@ -65,6 +65,23 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, integrationContext.BrowserAction.Description, "manage:jira-webhook")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/api/v1/integrations/")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/callback")
+
+		// Regression test: incident and ops-alert/ops-config scopes live under separate API
+		// products in the Developer Console from the (classic) "Jira Service Management API",
+		// which only ever offers servicedesk-request/servicedesk-customer/insight-object scopes -
+		// so each API product must be named and paired with only the scopes that belong to it.
+		description := integrationContext.BrowserAction.Description
+		assert.Contains(t, description, "Jira Service Management Incident API")
+		assert.Contains(t, description, "Jira Service Management Ops API")
+		assert.Contains(t, description, "read:incident:jira-service-management")
+		assert.Contains(t, description, "read:ops-alert:jira-service-management")
+		assert.Contains(t, description, "read:ops-config:jira-service-management")
+		jsmAPIIndex := strings.Index(description, "**Jira Service Management API**")
+		incidentAPIIndex := strings.Index(description, "**Jira Service Management Incident API**")
+		require.NotEqual(t, -1, jsmAPIIndex)
+		require.NotEqual(t, -1, incidentAPIIndex)
+		assert.NotContains(t, description[jsmAPIIndex:incidentAPIIndex], "incident:jira-service-management",
+			"incident scopes must not be listed under the plain Jira Service Management API")
 	})
 
 	t.Run("missing client secret - setup instructions", func(t *testing.T) {

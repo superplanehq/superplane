@@ -261,14 +261,21 @@ func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bo
 	return time.Until(expiresAt), true
 }
 
-// jsmScopesForInstructions lists the scopes shown in the setup instructions. offline_access is
-// requested on the authorize URL too (see scopeList in oauth.go) but omitted here since it isn't
-// selectable in the Developer Console's Permissions tab.
-const jsmScopesForInstructions = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`, " +
-	"`read:servicedesk-request`, `write:servicedesk-request`, " +
-	"`read:incident:jira-service-management`, `write:incident:jira-service-management`, " +
-	"`read:ops-alert:jira-service-management`, `write:ops-alert:jira-service-management`, `delete:ops-alert:jira-service-management`, " +
-	"`read:ops-config:jira-service-management`, `write:ops-config:jira-service-management`, `delete:ops-config:jira-service-management`"
+// The scopes below are grouped by the separate API products they actually belong to in the
+// Developer Console's Permissions tab. They used to be listed as one flat list under just "the
+// Jira API and the Jira Service Management API", but the incident and ops-alert/ops-config
+// scopes live under two other, separate API products there - the (classic) "Jira Service
+// Management API" only ever offers servicedesk-request/servicedesk-customer/insight-object
+// scopes, so a user could never find the rest under it. offline_access is requested on the
+// authorize URL too (see scopeList in client.go) but omitted here since it isn't selectable in
+// the Permissions tab at all.
+const (
+	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`"
+	jsmRequestScopesForInstructions  = "`read:servicedesk-request`, `write:servicedesk-request`"
+	jsmIncidentScopesForInstructions = "`read:incident:jira-service-management`, `write:incident:jira-service-management`"
+	jsmOpsScopesForInstructions      = "`read:ops-alert:jira-service-management`, `write:ops-alert:jira-service-management`, `delete:ops-alert:jira-service-management`, " +
+		"`read:ops-config:jira-service-management`, `write:ops-config:jira-service-management`, `delete:ops-config:jira-service-management`"
+)
 
 func appSetupInstructions(callbackURL string) string {
 	return fmt.Sprintf(`
@@ -276,9 +283,14 @@ func appSetupInstructions(callbackURL string) string {
 
 Open the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) and create an **OAuth 2.0 (3LO)** app.
 
-**2. Add the Jira API and the Jira Service Management API, with these scopes**
+**2. Add these APIs, each with their listed scopes**
 
-Go to the **Permissions** tab and add the **Jira API** and the **Jira Service Management API**, then add these scopes: %s.
+Go to the **Permissions** tab. These are 4 separate API entries - scopes for one won't appear under another, so add each one and its own scopes:
+
+- **Jira API**: %s
+- **Jira Service Management API**: %s
+- **Jira Service Management Incident API**: %s
+- **Jira Service Management Ops API**: %s
 
 **3. Configure the callback URL**
 
@@ -289,7 +301,7 @@ Go to the **Authorization** tab, click **Configure** next to OAuth 2.0 (3LO), an
 **4. Complete the installation setup**
 
 Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**. Paste them into the fields below and click **Save**.
-`, jsmScopesForInstructions, callbackURL)
+`, coreJiraScopesForInstructions, jsmRequestScopesForInstructions, jsmIncidentScopesForInstructions, jsmOpsScopesForInstructions, callbackURL)
 }
 
 // requestAuthorization sends the user to Atlassian to approve the OAuth app, using a CSRF state
