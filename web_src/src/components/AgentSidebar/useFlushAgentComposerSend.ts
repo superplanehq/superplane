@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import { consumeAgentComposerSend, peekAgentComposerSend, subscribeAgentComposerSend } from "./composerPrefill";
 
@@ -14,15 +14,22 @@ export function useFlushAgentComposerSend(
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>,
   sendPending: boolean,
 ) {
+  const sendInFlightRef = useRef(false);
+
   const flushPending = useCallback(() => {
-    if (!canvasId || sendPending) return;
+    if (!canvasId || sendPending || sendInFlightRef.current) return;
     const pending = peekAgentComposerSend(canvasId);
     if (!pending) return;
     // Clear before send so Strict Mode remounts do not double-send.
     consumeAgentComposerSend(canvasId);
-    void onSend(pending, []).catch(() => {
-      // Do not requeue: sendPending→false would immediately flush again forever.
-    });
+    sendInFlightRef.current = true;
+    void onSend(pending, [])
+      .catch(() => {
+        // Do not requeue: sendPending→false would immediately flush again forever.
+      })
+      .finally(() => {
+        sendInFlightRef.current = false;
+      });
   }, [canvasId, onSend, sendPending]);
 
   useEffect(() => {

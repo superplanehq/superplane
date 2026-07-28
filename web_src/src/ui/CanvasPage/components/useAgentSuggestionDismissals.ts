@@ -8,7 +8,7 @@ export function useAgentSuggestionDismissals(
   canvasId: string,
   agentSuggestions: AgentSuggestion[],
 ) {
-  const preferenceQueryEnabled = !!organizationId && !!canvasId;
+  const preferenceQueryEnabled = !!organizationId && !!canvasId && agentSuggestions.length > 0;
   const { data: canvasPreference, isPending: preferencePending } = useCanvasPreference(
     organizationId,
     canvasId,
@@ -37,10 +37,21 @@ export function useAgentSuggestionDismissals(
   }, [agentSuggestions, dismissedIds, preferenceReady]);
 
   const dismissSuggestion = (suggestionId: string) => {
-    if (canvasId && organizationId) {
-      updateCanvasPreference({ canvasId, dismissAgentSuggestionId: suggestionId });
-    }
     setDismissedIds((prev) => new Set(prev).add(suggestionId));
+    if (!canvasId || !organizationId) return;
+
+    updateCanvasPreference(
+      { canvasId, dismissAgentSuggestionId: suggestionId },
+      {
+        onError: () => {
+          setDismissedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(suggestionId);
+            return next;
+          });
+        },
+      },
+    );
   };
 
   return { visibleSuggestions, dismissSuggestion };
