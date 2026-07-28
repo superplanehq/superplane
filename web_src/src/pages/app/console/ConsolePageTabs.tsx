@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { ConsolePage } from "@/hooks/useCanvasData";
 
@@ -244,7 +245,7 @@ type PageTabRenameFieldProps = {
 function PageTabRenameField({ page, value, inputRef, onChange, onCommit, onCancel }: PageTabRenameFieldProps) {
   return (
     <div className="flex items-center gap-1">
-      <input
+      <Input
         ref={inputRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -259,7 +260,10 @@ function PageTabRenameField({ page, value, inputRef, onChange, onCommit, onCance
           }
         }}
         onBlur={onCommit}
-        className="h-5 w-32 rounded border border-slate-300 bg-white px-1 text-xs text-slate-900 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        // Overrides the default shadcn Input sizing to keep the rename
+        // affordance visually inline with the tab strip (matches the
+        // 20-px tab height and small type used elsewhere on the strip).
+        className="h-5 w-32 px-1 text-xs"
         data-testid={`console-page-tab-${page.id}-rename-input`}
       />
       <button
