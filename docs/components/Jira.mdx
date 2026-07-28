@@ -6,6 +6,12 @@ Manage issues in Jira
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue created, updated, or deleted events in Jira" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
@@ -31,13 +37,99 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To connect Jira to SuperPlane:
+SuperPlane connects to Jira with OAuth.
 
-1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-2. Click **Create API token**, give it a recognizable label, and copy the generated token.
-3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
-4. Paste the Atlassian account **Email** that owns the API token.
-5. Paste the generated **API Token**.
+1. Click the **Connect** button with Client ID and Client Secret empty to see the steps for creating an Atlassian OAuth app.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+**Trigger key:** `jira.onIssue`
+
+The On Issue trigger starts a workflow execution when issue events occur in a Jira project.
+
+### Use Cases
+
+- **Issue automation**: Automate responses to new or updated Jira issues
+- **Notification workflows**: Send notifications when issues are created or updated
+- **Sync workflows**: Mirror Jira issues into other tools
+
+### Configuration
+
+- **Project**: The Jira project to listen for issue events in
+- **Events**: Which issue events to listen for (Created, Updated, Deleted)
+
+### Webhook Setup
+
+This is provisioned automatically. Jira's dynamic webhook registration API (`POST /rest/api/3/webhook`) only allows a single registered callback URL per OAuth connection, so SuperPlane registers one shared webhook per Jira integration - every `jira.onIssue` trigger on that connection listens through it, each matching only the events for its own configured project. The shared webhook is removed automatically once the last trigger using it is deleted.
+
+### Output
+
+Emits one event per matching issue webhook with:
+- **action**: `created`, `updated`, or `deleted`
+- **issue**: The full issue (id, key, self, fields)
+- **user**: The user who triggered the event
+- **changelog**: The list of changed fields (only present for updates)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "issue": {
+      "fields": {
+        "assignee": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+          "displayName": "Alice Smith",
+          "emailAddress": "alice@example.com"
+        },
+        "created": "2026-07-17T09:30:00.000+0000",
+        "issuetype": {
+          "name": "Bug"
+        },
+        "labels": [
+          "auth",
+          "regression"
+        ],
+        "priority": {
+          "name": "High"
+        },
+        "project": {
+          "id": "10000",
+          "key": "ENG",
+          "name": "Engineering"
+        },
+        "reporter": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+          "displayName": "Bob Jones",
+          "emailAddress": "bob@example.com"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new",
+            "name": "To Do"
+          }
+        },
+        "summary": "Login page returns 500 on invalid password",
+        "updated": "2026-07-17T09:30:00.000+0000"
+      },
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    },
+    "user": {
+      "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+      "displayName": "Bob Jones",
+      "emailAddress": "bob@example.com"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issue"
+}
+```
 
 <a id="approve-workflow"></a>
 
