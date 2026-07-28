@@ -105,9 +105,12 @@ func UpdateIntegration(
 	})
 
 	if syncErr != nil {
-		instance.State = "error"
+		instance.State = models.IntegrationStateError
 		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
-	} else {
+	} else if instance.State != models.IntegrationStateError {
+		// A nil error doesn't mean Sync had nothing to report: it may have called
+		// Integration.Error() itself (e.g. to flag a config problem) and returned nil rather than
+		// a hard error. Only clear a stale description when Sync didn't just set a fresh one.
 		instance.StateDescription = ""
 	}
 
