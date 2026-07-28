@@ -285,6 +285,47 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Len(t, httpContext.Requests, 2)
 	})
 
+	// Regression test: Atlassian has no incremental-consent mechanism, so a token granted
+	// without JSM Ops scopes never gains them on its own - turning enableOpsFeatures on for an
+	// already-connected integration must prompt a fresh authorize round trip instead of silently
+	// doing nothing, which previously left incident/alert/heartbeat actions failing forever.
+	t.Run("ops features enabled after connecting - stays ready but prompts reconnect", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OpsScopesRequested: false})
+		integrationContext.Configuration = map[string]any{
+			"clientId":          "client-1",
+			"clientSecret":      "secret-1",
+			"enableOpsFeatures": true,
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			HTTP:          httpContext,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		// The connection itself keeps working with its existing (narrower) scope in the meantime.
+		assert.Equal(t, "ready", integrationContext.State)
+
+		require.NotNil(t, integrationContext.BrowserAction)
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, actionURL.Query().Get("scope"))
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.True(t, metadata.OpsScopesRequested)
+	})
+
 	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegration()
 		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
@@ -529,6 +570,51 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		assert.Equal(t, "https://test.atlassian.net", metadata.SiteURL)
 		assert.Equal(t, "Test Site", metadata.SiteName)
 		assert.Nil(t, metadata.State)
+	})
+
+	// Regression test: a token response missing a refresh token means this connection could
+	// never refresh itself once the access token expires - fail the connect immediately with an
+	// actionable error instead of reporting success and leaving a time bomb for an hour later.
+	t.Run("callback response without a refresh token errors instead of connecting", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"cb-access","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
+				))},
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "no refresh token")
+
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Empty(t, accessToken, "must not store the access token without a refresh token")
 	})
 
 	t.Run("accessible resources failure redirects with an error state", func(t *testing.T) {

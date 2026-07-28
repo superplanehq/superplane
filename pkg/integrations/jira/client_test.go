@@ -243,6 +243,32 @@ func Test__Client__Refresh(t *testing.T) {
 
 		require.ErrorContains(t, client.Refresh(), "missing Jira OAuth refresh token")
 	})
+
+	// Regression test: Atlassian's refresh tokens are single-use, so the one just sent is already
+	// dead the moment this call succeeds. A response that omits the replacement leaves no usable
+	// refresh token going forward - fail loudly instead of silently keeping the (now dead) old one
+	// and only discovering the break the next time a refresh is attempted.
+	t.Run("response omits the new refresh token -> error, old token untouched", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"new-access","expires_in":3600}`,
+				))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		appCtx.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		require.ErrorContains(t, client.Refresh(), "did not include a new refresh token")
+
+		accessToken, _ := findSecret(appCtx, SecretOAuthAccessToken)
+		refreshToken, _ := findSecret(appCtx, SecretOAuthRefreshToken)
+		assert.Equal(t, testAccessToken, accessToken, "must not store the new access token without a paired refresh token")
+		assert.Equal(t, testRefreshToken, refreshToken)
+	})
 }
 
 func Test__Client__ListProjects(t *testing.T) {

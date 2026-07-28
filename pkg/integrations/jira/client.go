@@ -187,13 +187,20 @@ func (c *Client) Refresh() error {
 		return err
 	}
 
+	// Atlassian's refresh tokens are single-use: this call already invalidated the one just sent,
+	// whether or not the writes below succeed. A missing replacement leaves no way to ever
+	// refresh again, so treat it as a hard failure rather than silently keeping the (now dead)
+	// old one. Persist it before the access token: if a crash or write failure happens between
+	// the two, losing the access token just means the next near-expiry attempt retries normally,
+	// but losing the new refresh token means every future refresh fails until the user reconnects.
+	if token.RefreshToken == "" {
+		return fmt.Errorf("token refresh response did not include a new refresh token")
+	}
+	if err := c.integration.SetSecret(SecretOAuthRefreshToken, []byte(token.RefreshToken)); err != nil {
+		return fmt.Errorf("error storing refreshed refresh token: %w", err)
+	}
 	if err := c.integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
 		return fmt.Errorf("error storing refreshed access token: %w", err)
-	}
-	if token.RefreshToken != "" {
-		if err := c.integration.SetSecret(SecretOAuthRefreshToken, []byte(token.RefreshToken)); err != nil {
-			return fmt.Errorf("error storing refreshed refresh token: %w", err)
-		}
 	}
 
 	metadata := readMetadata(c.integration)

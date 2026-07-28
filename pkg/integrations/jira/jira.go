@@ -49,6 +49,12 @@ type Metadata struct {
 	// (in addition to the webhook record's own metadata) so the refreshWebhook hook - which only
 	// has access to the integration, not any particular webhook record - can find it.
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
+
+	// OpsScopesRequested records whether the most recent authorize URL requestAuthorization built
+	// included the JSM Ops scopes. Atlassian has no incremental-consent mechanism - a token
+	// granted without them never gains them - so if enableOpsFeatures is turned on after this is
+	// false, Sync knows the existing connection needs a fresh authorize round trip.
+	OpsScopesRequested bool `json:"opsScopesRequested,omitempty" mapstructure:"opsScopesRequested,omitempty"`
 }
 
 const installationInstructions = `
@@ -191,6 +197,16 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
+
+	// Ops features were turned on after this connection's token was granted without those scopes.
+	// Atlassian has no incremental-consent mechanism to add them to an existing grant, so this
+	// stays Ready with its current (narrower) scope in the meantime, and a reconnect prompt is
+	// attached on top rather than blocking the rest of Sync - requestAuthorization only replaces
+	// the browser action just cleared above, it doesn't touch the secrets or state set by Ready().
+	if metadata := readMetadata(ctx.Integration); jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested {
+		return j.requestAuthorization(ctx, string(clientID), callbackURL)
+	}
+
 	return nil
 }
 
@@ -337,11 +353,14 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 			return fmt.Errorf("failed to generate state: %v", err)
 		}
 		metadata.State = &state
-		ctx.Integration.SetMetadata(metadata)
 	}
 
+	opsEnabled := jsmOpsFeaturesEnabled(ctx.Configuration)
+	metadata.OpsScopesRequested = opsEnabled
+	ctx.Integration.SetMetadata(metadata)
+
 	scope := coreScopeList
-	if jsmOpsFeaturesEnabled(ctx.Configuration) {
+	if opsEnabled {
 		scope = scope + " " + jsmOpsScopeList
 	}
 
@@ -436,6 +455,16 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 
 	// PoC simplification: connect the first accessible site rather than prompting to choose one.
 	site := resources[0]
+
+	// A missing refresh token here means this connection can never refresh itself once the
+	// access token expires (in about an hour) - fail the connect now with an actionable message
+	// instead of reporting success and leaving a time bomb for later.
+	if token.RefreshToken == "" {
+		ctx.Logger.Errorf("Callback error: token response did not include a refresh token")
+		ctx.Integration.Error("connected to Atlassian, but no refresh token was returned - reconnect and make sure the offline_access scope is granted")
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
 
 	if err := ctx.Integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to store access token: %v", err)
