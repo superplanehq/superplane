@@ -1,6 +1,6 @@
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
-import React, { forwardRef } from "react";
+import React, { forwardRef, useEffect, useState } from "react";
 import { Link } from "../Link/link";
 
 type AvatarProps = {
@@ -19,16 +19,20 @@ export function Avatar({
   className,
   ...props
 }: AvatarProps & React.ComponentPropsWithoutRef<"span">) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   return (
     <span
       data-slot="avatar"
       {...props}
       className={clsx(
         className,
-        // Basic layout
         "inline-grid shrink-0 align-middle [--avatar-radius:20%] *:col-start-1 *:row-start-1",
         "outline -outline-offset-1 outline-black/10 dark:outline-white/10",
-        // Border radius
         square ? "rounded-(--avatar-radius) *:rounded-(--avatar-radius)" : "rounded-full *:rounded-full",
       )}
     >
@@ -44,7 +48,20 @@ export function Avatar({
           </text>
         </svg>
       )}
-      {src && <img className="size-full" src={src} alt={alt} />}
+      {src && !imgError && (
+        <img className="size-full" src={src} alt={alt} onError={() => setImgError(true)} />
+      )}
+      {!initials && imgError && (
+        <svg
+          className="size-full fill-current p-[5%] select-none"
+          viewBox="0 0 100 100"
+          aria-label={alt || "User avatar"}
+          role="img"
+        >
+          <circle cx="50" cy="35" r="18" />
+          <path d="M10,90 C10,65 30,55 50,55 C70,55 90,65 90,90" />
+        </svg>
+      )}
     </span>
   );
 }
