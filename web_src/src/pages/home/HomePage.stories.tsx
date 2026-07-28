@@ -3,11 +3,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HomePage } from "./index";
 import { HomePageHarness } from "./__fixtures__/HomePageHarness";
 import { emptyHomePageFixture } from "./__fixtures__/homePageResponses";
+import { projectXWorkspaceData } from "../workspace/__fixtures__/workspaceData";
+import { WorkspacePage } from "../workspace";
 
 /**
  * Mounts the real org home routes against an in-process fixture backend.
- * Use **Current** for the populated homepage baseline, and **FreshOrg** for the
- * empty-org create screen (factory-first landing via `NewAppPage`).
+ * Use **Current** for the populated homepage baseline, **Workspace** for new
+ * homepage experiments, and **FreshOrg** for the empty-org create screen
+ * (factory-first landing via `NewAppPage`).
  *
  * **Current** shares a router with AppPage: clicking Software Factory opens the
  * live canvas surface (same as Pages/AppPage → Live Canvas).
@@ -30,6 +33,11 @@ type Story = StoryObj<typeof meta>;
 /** Populated homepage: Apps header, toolbar, folder sections, and app cards. */
 export const Current: Story = {
   render: () => <HomePageHarness />,
+};
+
+/** Copy of Current for workspace homepage iteration. */
+export const Workspace: Story = {
+  render: () => <HomePageHarness appElement={<WorkspacePage data={projectXWorkspaceData} />} />,
 };
 
 /**

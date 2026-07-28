@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -21,6 +22,16 @@ describe("HomePageHarness story smoke", () => {
     expect(screen.getByText("Automation")).toBeInTheDocument();
     expect(screen.getByText("Releases")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /create a? ?new app/i })).not.toBeInTheDocument();
+  });
+
+  it("can route homepage app cards to a story-specific workspace page", async () => {
+    const user = userEvent.setup();
+    render(<HomePageHarness appElement={<div data-testid="workspace-page" />} />);
+
+    await user.click(await screen.findByRole("link", { name: "Open canvas Software Factory" }, { timeout: 5000 }));
+
+    expect(await screen.findByTestId("workspace-page")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Apps" })).not.toBeInTheDocument();
   });
 
   it("redirects a fresh org to the factory-first create screen", async () => {
