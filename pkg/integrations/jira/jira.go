@@ -387,11 +387,15 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	site := resources[0]
 
 	if err := ctx.Integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Logger.Errorf("Callback error: failed to store access token: %v", err)
+		ctx.Integration.Error(fmt.Sprintf("failed to store access token: %v", err))
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 		return
 	}
 	if err := ctx.Integration.SetSecret(SecretOAuthRefreshToken, []byte(token.RefreshToken)); err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Logger.Errorf("Callback error: failed to store refresh token: %v", err)
+		ctx.Integration.Error(fmt.Sprintf("failed to store refresh token: %v", err))
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 		return
 	}
 
@@ -406,7 +410,9 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(token.GetExpiration()); err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Logger.Errorf("Callback error: failed to schedule resync: %v", err)
+		ctx.Integration.Error(fmt.Sprintf("failed to schedule token refresh: %v", err))
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 		return
 	}
 
