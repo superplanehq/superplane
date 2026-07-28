@@ -1,11 +1,13 @@
 package jira
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -251,4 +253,37 @@ func Test__OnIssue__Cleanup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, httpCtx.Requests)
 	})
+}
+
+// Regression test: real node metadata storage round-trips through JSON into a map[string]any
+// (see NodeMetadataContext.Set/Get), turning WebhookID into a float64 before mapstructure decodes
+// it back - unlike the test double above, which stores the struct directly. mapstructure (the
+// version pinned in go.mod) does convert float64 into a *int64 field, so WebhookID survives the
+// round trip; this pins that behavior so a future mapstructure upgrade can't silently break it.
+func Test__OnIssueMetadata__SurvivesJSONMetadataRoundTrip(t *testing.T) {
+	webhookID := int64(1000)
+	original := OnIssueMetadata{
+		Project:    &Project{ID: "1", Key: "ENG", Name: "Engineering"},
+		WebhookURL: "https://example.com/webhook",
+		WebhookID:  &webhookID,
+	}
+
+	serialized, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	var asMap map[string]any
+	require.NoError(t, json.Unmarshal(serialized, &asMap))
+
+	// Confirms the premise: JSON decodes the number as float64, not int64.
+	_, isFloat := asMap["webhookId"].(float64)
+	require.True(t, isFloat)
+
+	var restored OnIssueMetadata
+	require.NoError(t, mapstructure.Decode(asMap, &restored))
+
+	require.NotNil(t, restored.WebhookID)
+	assert.Equal(t, webhookID, *restored.WebhookID)
+	assert.Equal(t, original.WebhookURL, restored.WebhookURL)
+	require.NotNil(t, restored.Project)
+	assert.Equal(t, "ENG", restored.Project.Key)
 }
