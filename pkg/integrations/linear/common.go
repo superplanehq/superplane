@@ -28,6 +28,9 @@ const (
 
 	// IssueResourceType is the Linear webhook resource type for issue events.
 	IssueResourceType = "Issue"
+
+	// CommentResourceType is the Linear webhook resource type for comment events.
+	CommentResourceType = "Comment"
 )
 
 // NodeMetadata is stored on Linear nodes at setup time, so canvas cards can
