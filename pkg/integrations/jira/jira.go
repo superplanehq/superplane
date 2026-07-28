@@ -130,6 +130,13 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	// one-click "Continue".
 	//
 	if len(clientID) == 0 || len(clientSecret) == 0 {
+		// An install still carrying config from the old Basic Auth (site URL + API token) flow
+		// this replaced would otherwise stay marked ready while every call fails for a missing
+		// OAuth access token - flag it explicitly instead of leaving it looking connected.
+		if hasLegacyBasicAuthConfig(ctx.Configuration) {
+			ctx.Integration.Error("This integration used Jira's email/API token authentication, which is no longer supported. Reconnect it using the OAuth instructions below.")
+		}
+
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupInstructions(callbackURL),
 		})
@@ -401,6 +408,19 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Integration.Ready()
 
 	http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+}
+
+// hasLegacyBasicAuthConfig reports whether the raw stored configuration still carries keys from
+// the old Basic Auth (site URL + API token) flow, which changing Configuration() to clientId/
+// clientSecret does not itself clear out of already-stored installs.
+func hasLegacyBasicAuthConfig(configuration any) bool {
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, hasSiteURL := config["siteUrl"]
+	_, hasAPIToken := config["apiToken"]
+	return hasSiteURL || hasAPIToken
 }
 
 func readMetadata(integration core.IntegrationContext) Metadata {
