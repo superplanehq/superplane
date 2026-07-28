@@ -190,12 +190,25 @@ func (j *Jira) refreshAccessToken(ctx core.SyncContext) error {
 		return err
 	}
 
+	previousAccessToken := client.AccessToken
+
 	if err := client.Refresh(); err != nil {
 		//
-		// A refresh also fails when a concurrent sync already rotated the token, and then the
-		// stored pair is the fresh one and has to survive. Keep the credentials while the access
-		// token still works and retry before it expires, and only give up on them once it cannot
-		// be used at all.
+		// Atlassian's refresh tokens are single-use, so this exchange also fails when a
+		// concurrent Sync or request (e.g. recoverFromUnauthorized in Client) already refreshed
+		// and rotated the token first - most likely exactly when this proactive refresh runs,
+		// since both are triggered by the same near-expiry window. Adopt what the winner stored
+		// instead of destroying valid credentials the same way Client already does for a
+		// reactive 401.
+		//
+		if current, findErr := findSecret(ctx.Integration, SecretOAuthAccessToken); findErr == nil && current != "" && current != previousAccessToken {
+			return ctx.Integration.ScheduleResync(30 * time.Minute)
+		}
+
+		//
+		// A refresh can also fail for reasons unrelated to a concurrent rotation. Keep the
+		// credentials while the access token still works and retry before it expires, and only
+		// give up on them once it cannot be used at all.
 		//
 		if known && remaining > 0 {
 			ctx.Logger.Errorf("Failed to refresh token, retrying before expiration: %v", err)
