@@ -59,6 +59,40 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Empty(t, integrationContext.BrowserAction.URL)
 	})
 
+	// Regression test: an install still carrying config from the old Basic Auth flow (before this
+	// branch replaced it with OAuth) must not silently stay "ready" while every call fails.
+	t.Run("legacy Basic Auth config with no OAuth credentials marks the integration errored", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{"siteUrl": "https://old.atlassian.net", "email": "a@b.com", "apiToken": "tok"},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "no longer supported")
+		require.NotNil(t, integrationContext.BrowserAction)
+	})
+
+	t.Run("brand new install with no config is not marked errored", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{Configuration: map[string]any{}}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, integrationContext.State)
+	})
+
 	t.Run("credentials but no access token - authorize button", func(t *testing.T) {
 		integrationContext := &contexts.IntegrationContext{
 			Configuration: map[string]any{
