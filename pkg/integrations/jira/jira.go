@@ -23,6 +23,11 @@ const (
 	// creation or last refresh, with no other way to extend it.
 	refreshWebhookHookName = "refreshWebhook"
 	webhookRefreshInterval = 20 * 24 * time.Hour
+
+	// webhookRefreshRetryInterval is used to reschedule after a failed refresh attempt instead
+	// of webhookRefreshInterval - comfortably short enough for several retries to still land
+	// inside the 10-day margin the success interval leaves before the webhook actually expires.
+	webhookRefreshRetryInterval = 24 * time.Hour
 )
 
 func init() {
@@ -514,9 +519,23 @@ func refreshWebhook(httpCtx core.HTTPContext, integration core.IntegrationContex
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	if err := client.RefreshIssueWebhooks([]int64{*metadata.WebhookID}); err != nil {
-		return fmt.Errorf("failed to refresh Jira webhook: %w", err)
+	refreshErr := client.RefreshIssueWebhooks([]int64{*metadata.WebhookID})
+
+	// Reschedule regardless of outcome - a transient failure here must not permanently stop the
+	// loop and leave the webhook to expire in 30 days with nothing left to retry it. A failed
+	// attempt retries much sooner than a successful one, via webhookRefreshRetryInterval.
+	interval := webhookRefreshInterval
+	if refreshErr != nil {
+		interval = webhookRefreshRetryInterval
 	}
 
-	return integration.ScheduleActionCall(refreshWebhookHookName, map[string]any{}, webhookRefreshInterval)
+	if err := integration.ScheduleActionCall(refreshWebhookHookName, map[string]any{}, interval); err != nil {
+		return fmt.Errorf("failed to schedule webhook refresh: %w", err)
+	}
+
+	if refreshErr != nil {
+		return fmt.Errorf("failed to refresh Jira webhook: %w", refreshErr)
+	}
+
+	return nil
 }

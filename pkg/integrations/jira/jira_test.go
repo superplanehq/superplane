@@ -658,7 +658,10 @@ func Test__Jira__HandleHook(t *testing.T) {
 		assert.Empty(t, integrationCtx.ActionRequests)
 	})
 
-	t.Run("refresh failure is surfaced and not rescheduled", func(t *testing.T) {
+	// Regression test: a transient refresh failure must still reschedule itself (with a much
+	// shorter retry interval), rather than permanently ending the loop and letting the webhook
+	// expire 30 days later with nothing left to retry it.
+	t.Run("refresh failure is surfaced but still retries sooner", func(t *testing.T) {
 		webhookID := int64(1000)
 		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{WebhookID: &webhookID})
 		httpCtx := &contexts.HTTPContext{
@@ -674,7 +677,11 @@ func Test__Jira__HandleHook(t *testing.T) {
 			Logger:      newLogger(),
 		})
 		require.ErrorContains(t, err, "failed to refresh Jira webhook")
-		assert.Empty(t, integrationCtx.ActionRequests)
+
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, refreshWebhookHookName, integrationCtx.ActionRequests[0].ActionName)
+		assert.Equal(t, webhookRefreshRetryInterval, integrationCtx.ActionRequests[0].Interval)
+		assert.Less(t, webhookRefreshRetryInterval, webhookRefreshInterval)
 	})
 
 	t.Run("unknown hook name errors", func(t *testing.T) {
