@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +21,29 @@ func newLogger() *logrus.Entry {
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
 	return logrus.NewEntry(logger)
+}
+
+// raceSimulatingHTTPContext simulates a concurrent caller rotating the stored access token while
+// this client's own token request is in flight, by mutating the integration's stored secret the
+// moment a request reaches the token endpoint - regardless of what response comes back for it.
+type raceSimulatingHTTPContext struct {
+	integration *contexts.IntegrationContext
+	responses   []*http.Response
+}
+
+func (h *raceSimulatingHTTPContext) Do(req *http.Request) (*http.Response, error) {
+	if req.URL.String() == TokenURL {
+		h.integration.CurrentSecrets[SecretOAuthAccessToken] = core.IntegrationSecret{
+			Name: SecretOAuthAccessToken, Value: []byte("winner-access"),
+		}
+	}
+
+	if len(h.responses) == 0 {
+		return nil, errors.New("no response mocked")
+	}
+	resp := h.responses[0]
+	h.responses = h.responses[1:]
+	return resp, nil
 }
 
 func Test__Jira__Sync(t *testing.T) {
@@ -356,6 +380,40 @@ func Test__Jira__Sync(t *testing.T) {
 		refreshToken, _ := findSecret(integrationContext, SecretOAuthRefreshToken)
 		assert.Empty(t, accessToken)
 		assert.Empty(t, refreshToken)
+	})
+
+	// Regression test: near/past expiry is exactly when a concurrent Sync or 401-driven refresh
+	// (Client.recoverFromUnauthorized) is most likely to win the same race, since both trigger in
+	// the same window. This proactive refresh failing (its own refresh token was single-use and
+	// already spent by the winner) must adopt what the winner stored, not wipe valid credentials.
+	t.Run("refresh failure near expiry adopts a concurrently-rotated token instead of wiping it", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
+			CloudID:              testCloudID,
+			AccessTokenExpiresAt: time.Now().Add(-time.Minute).Format(time.RFC3339),
+		})
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+
+		httpContext := &raceSimulatingHTTPContext{
+			integration: integrationContext,
+			responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error":"invalid_grant"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationContext.State)
+		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
+		assert.Equal(t, "winner-access", accessToken)
+		require.Len(t, integrationContext.ResyncRequests, 1)
 	})
 }
 
