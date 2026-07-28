@@ -99,6 +99,12 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     example: "previous(2).data.image.version",
   },
   {
+    name: "app",
+    snippet: "app().",
+    description: "Returns the current app, exposing its id, name, description, and url.",
+    example: "app().name",
+  },
+  {
     name: "run",
     snippet: "run().",
     description: "Returns the current run, exposing its id, url, and started_at.",
@@ -1459,6 +1465,11 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
   const runMatch = expr.match(/^run\(\)/);
   if (runMatch) {
     return `__run${expr.slice(runMatch[0].length)}`;
+  }
+
+  const appMatch = expr.match(/^app\(\)/);
+  if (appMatch) {
+    return `__app${expr.slice(appMatch[0].length)}`;
   }
 
   return expr;
