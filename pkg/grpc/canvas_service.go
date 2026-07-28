@@ -110,7 +110,12 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 	if err != nil {
 		return nil, err
 	}
-	return canvases.DescribeCanvas(ctx, db, canvas)
+
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return canvases.DescribeCanvas(ctx, db, canvas, userID)
 }
 
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
