@@ -2095,28 +2095,35 @@ func allowedValuesFromCreateMetaFields(fields map[string]createMetaField, fieldL
 	return nil, ""
 }
 
+// execRequestWithStatus behaves like execRequest (refreshing once and retrying on a 401), but
+// returns whatever status code came back instead of treating every non-2xx as an error, since
+// its callers (createmeta/custom-field option lookups) fall back to an empty result on failure.
 func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader) ([]byte, int, error) {
-	req, err := http.NewRequest(method, requestURL, body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error building request: %v", err)
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("error reading request body: %v", err)
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
-
-	res, err := c.http.Do(req)
+	responseBody, status, err := c.doRequest(method, requestURL, bodyBytes)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error executing request: %v", err)
-	}
-	defer res.Body.Close()
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, res.StatusCode, fmt.Errorf("error reading body: %v", err)
+		return nil, status, err
 	}
 
-	return responseBody, res.StatusCode, nil
+	if status == http.StatusUnauthorized {
+		if refreshErr := c.Refresh(); refreshErr != nil {
+			return nil, status, fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+		}
+		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
+		if err != nil {
+			return nil, status, err
+		}
+	}
+
+	return responseBody, status, nil
 }
 
 // GetRequestType returns one request type, optionally expanded (always requests expand=practice).

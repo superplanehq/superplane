@@ -477,6 +477,67 @@ func Test__Client__DeleteIssueWebhooks(t *testing.T) {
 	})
 }
 
+func Test__Client__ExecRequestWithStatus(t *testing.T) {
+	t.Run("401 self-heals via a reactive refresh and retries the request", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"refreshed-access","refresh_token":"refreshed-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true}`))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		appCtx.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		body, status, err := client.execRequestWithStatus(http.MethodGet, testProxyURL("/rest/api/3/issue/createmeta/TEST/issuetypes"), nil)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, status)
+		assert.Contains(t, string(body), `"ok":true`)
+
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, TokenURL, httpContext.Requests[1].URL.String())
+
+		accessToken, _ := findSecret(appCtx, SecretOAuthAccessToken)
+		assert.Equal(t, "refreshed-access", accessToken)
+	})
+
+	t.Run("refresh failure on a 401 is surfaced", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		delete(appCtx.CurrentSecrets, SecretOAuthRefreshToken)
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		_, _, err = client.execRequestWithStatus(http.MethodGet, testProxyURL("/rest/api/3/issue/createmeta/TEST/issuetypes"), nil)
+		require.ErrorContains(t, err, "token refresh failed")
+	})
+
+	t.Run("non-401 non-2xx status is returned without erroring", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, status, err := client.execRequestWithStatus(http.MethodGet, testProxyURL("/rest/api/3/issue/createmeta/TEST/issuetypes"), nil)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, status)
+	})
+}
+
 func Test__Client__GetProjectIssueTypes(t *testing.T) {
 	t.Run("returns issue types for a project", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
