@@ -107,6 +107,16 @@ export interface OnIssueConfiguration {
   labels?: Predicate[];
 }
 
+export interface OnIssueLabelConfiguration {
+  team?: string;
+  labels?: string[];
+}
+
+export interface OnIssueCommentConfiguration {
+  team?: string;
+  actions?: string[];
+}
+
 export interface GetIssueConfiguration {
   issue?: string;
 }
@@ -132,6 +142,21 @@ export interface LinearComment {
   updatedAt?: string;
   user?: LinearUser;
   issue?: { id?: string; identifier?: string; title?: string; url?: string };
+}
+
+/** Envelope Linear POSTs for a comment event. `data` is the comment. */
+export interface LinearCommentWebhookEvent {
+  action?: string;
+  type?: string;
+  url?: string;
+  createdAt?: string;
+  actor?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    type?: string;
+  };
+  data?: LinearComment;
 }
 
 export interface AddIssueLabelConfiguration {
