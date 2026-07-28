@@ -44,7 +44,14 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	_, err = yaml.ConsoleFromYML(yamlBytes)
+	// Lenient parse — the server-side commit path applies a delta cap
+	// check against the previously committed pages, so a migrated
+	// (grandfathered) console with more than MaxConsolePanelsPerPage on
+	// a single page can still be updated via the CLI as long as the
+	// staged content does not push any page beyond both the cap and
+	// its previously committed size. Structural errors (malformed
+	// YAML, unknown fields, unsupported panel types) still surface.
+	_, err = yaml.ConsoleFromYMLLenient(yamlBytes)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
@@ -79,7 +86,10 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("console updated but failed to read console.yaml: %w", err)
 	}
 
-	updatedResource, err := yaml.ConsoleFromYML(updatedYAML)
+	// Lenient again: the server may return a multi-page shape, and we
+	// still want to display something useful for grandfathered consoles
+	// even though a strict parse would reject them.
+	updatedResource, err := yaml.ConsoleFromYMLLenient(updatedYAML)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}
@@ -88,11 +98,22 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return ctx.Renderer.Render(updatedResource)
 	}
 
+	// The legacy `spec.panels` / `spec.layout` fields are empty for
+	// consoles parsed from the multi-page shape, so summing over
+	// `Pages()` is the only accurate count regardless of how the YAML
+	// was written.
+	panelCount := 0
+	layoutCount := 0
+	for _, page := range updatedResource.Pages() {
+		panelCount += len(page.Panels)
+		layoutCount += len(page.Layout)
+	}
+
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Console updated for app %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Version: %s\n", versionID)
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
-		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", panelCount)
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", layoutCount)
 		return err
 	})
 }
