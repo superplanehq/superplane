@@ -54,7 +54,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
@@ -146,7 +146,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -216,7 +216,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -266,7 +266,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -348,7 +348,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -431,7 +431,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
+		response, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 

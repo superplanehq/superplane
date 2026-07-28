@@ -1,24 +1,26 @@
-import { useCanvasPreference, useUpdateCanvasPreference } from "@/hooks/useCanvasData";
+import { useCanvas, useUpdateCanvas } from "@/hooks/useCanvasData";
 import { useEffect, useMemo, useState } from "react";
 import type { AgentSuggestion } from "./AgentSuggestionsHoverCard";
 
-/** Tracks DB-backed Agent suggestion dismissals for the current canvas. */
+/** Tracks canvas-scoped Agent suggestion dismissals for the current app. */
 export function useAgentSuggestionDismissals(
   organizationId: string,
   canvasId: string,
   agentSuggestions: AgentSuggestion[],
 ) {
-  const preferenceQueryEnabled = !!organizationId && !!canvasId && agentSuggestions.length > 0;
-  const { data: canvasPreference, isPending: preferencePending } = useCanvasPreference(
-    organizationId,
-    canvasId,
-    preferenceQueryEnabled,
-  );
-  const { mutate: updateCanvasPreference } = useUpdateCanvasPreference(organizationId);
+  const canvasQueryEnabled = !!organizationId && !!canvasId && agentSuggestions.length > 0;
+  const { data: canvas, isPending: canvasPending } = useCanvas(organizationId, canvasId, {
+    enabled: canvasQueryEnabled,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+  const { mutate: updateCanvas } = useUpdateCanvas(organizationId, canvasId);
   const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(() => new Set());
-  const dismissedFromServerKey = (canvasPreference?.dismissedAgentSuggestionIds ?? []).join("\0");
-  // Avoid flashing already-dismissed suggestions before the DB preference loads.
-  const preferenceReady = !preferenceQueryEnabled || !preferencePending;
+  const dismissedFromServerKey = (canvas?.metadata?.dismissedAgentSuggestionIds ?? []).join("\0");
+  // Avoid flashing already-dismissed suggestions before the canvas loads.
+  const dismissalsReady = !canvasQueryEnabled || !canvasPending;
 
   useEffect(() => {
     setDismissedIds(new Set());
@@ -26,22 +28,22 @@ export function useAgentSuggestionDismissals(
 
   // Union server dismissals into local state so a partial cache write cannot undismiss.
   useEffect(() => {
-    if (!preferenceReady) return;
+    if (!dismissalsReady) return;
     const fromServer = dismissedFromServerKey ? dismissedFromServerKey.split("\0") : [];
     setDismissedIds((prev) => new Set([...prev, ...fromServer]));
-  }, [canvasId, dismissedFromServerKey, preferenceReady]);
+  }, [canvasId, dismissedFromServerKey, dismissalsReady]);
 
   const visibleSuggestions = useMemo(() => {
-    if (!preferenceReady) return [];
+    if (!dismissalsReady) return [];
     return agentSuggestions.filter((suggestion) => !dismissedIds.has(suggestion.id));
-  }, [agentSuggestions, dismissedIds, preferenceReady]);
+  }, [agentSuggestions, dismissedIds, dismissalsReady]);
 
   const dismissSuggestion = (suggestionId: string) => {
     setDismissedIds((prev) => new Set(prev).add(suggestionId));
     if (!canvasId || !organizationId) return;
 
-    updateCanvasPreference(
-      { canvasId, dismissAgentSuggestionId: suggestionId },
+    updateCanvas(
+      { dismissAgentSuggestionId: suggestionId },
       {
         onError: () => {
           setDismissedIds((prev) => {

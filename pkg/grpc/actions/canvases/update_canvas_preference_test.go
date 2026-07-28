@@ -54,22 +54,3 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, count)
 }
-
-func Test__UpdateCanvasPreference__DismissesAgentSuggestion(t *testing.T) {
-	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-	response, err := UpdateCanvasPreference(context.Background(), database.DB(t.Context()), canvas, r.User.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId:                 canvas.ID.String(),
-		DismissAgentSuggestionId: proto.String("add-ci"),
-	})
-	require.NoError(t, err)
-	require.NotNil(t, response.Preference)
-	assert.False(t, response.Preference.Starred)
-	assert.Equal(t, []string{"add-ci"}, response.Preference.DismissedAgentSuggestionIds)
-
-	described, err := DescribeCanvas(context.Background(), database.DB(t.Context()), canvas, r.User.String())
-	require.NoError(t, err)
-	require.NotNil(t, described.Preference)
-	assert.Equal(t, []string{"add-ci"}, described.Preference.DismissedAgentSuggestionIds)
-}

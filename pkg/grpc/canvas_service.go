@@ -110,12 +110,7 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 	if err != nil {
 		return nil, err
 	}
-
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return canvases.DescribeCanvas(ctx, db, canvas, userID)
+	return canvases.DescribeCanvas(ctx, db, canvas)
 }
 
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
@@ -124,7 +119,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	if err != nil {
 		return nil, err
 	}
-	return canvases.UpdateCanvas(ctx, db, canvas, req.Name, req.Description)
+	return canvases.UpdateCanvas(ctx, db, canvas, req.Name, req.Description, req.DismissAgentSuggestionId)
 }
 
 func (s *CanvasService) UpdateCanvasPreference(
