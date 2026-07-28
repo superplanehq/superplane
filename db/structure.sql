@@ -735,7 +735,8 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     folder_id uuid,
-    description text DEFAULT ''::text NOT NULL
+    description text DEFAULT ''::text NOT NULL,
+    dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2275,7 +2276,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260727141403	f
+20260728141948	f
 \.
 
 

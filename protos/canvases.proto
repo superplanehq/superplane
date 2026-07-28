@@ -401,6 +401,8 @@ message UpdateCanvasRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
+  // When set, appends this id to the canvas's dismissed Agent suggestion ids.
+  optional string dismiss_agent_suggestion_id = 4;
 }
 
 message UpdateCanvasResponse {
@@ -587,6 +589,7 @@ message Canvas {
     UserRef created_by = 7;
     string folder_id = 8;
     string live_version_id = 9;
+    repeated string dismissed_agent_suggestion_ids = 10;
   }
 
   message Spec {
