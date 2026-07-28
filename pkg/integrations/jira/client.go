@@ -27,15 +27,23 @@ const (
 	// APIProxyHost is how OAuth apps reach Jira's REST APIs - the site's own domain rejects OAuth bearer tokens.
 	APIProxyHost = "https://api.atlassian.com/ex/jira"
 
-	// scopeList is requested on the authorize URL. This integration grants one fixed set of permissions up front.
-	// offline_access isn't selectable in the Developer Console's Permissions tab, but it's still required to get a
-	// refresh token, so it's requested here directly rather than shown in the setup instructions.
-	scopeList = "read:jira-work write:jira-work manage:jira-webhook read:jira-user " +
-		"read:servicedesk-request write:servicedesk-request " +
-		"read:incident:jira-service-management write:incident:jira-service-management " +
+	// coreScopeList is always requested on the authorize URL - every jira integration feature
+	// except the optional JSM Ops ones (incidents, alerts, heartbeats) needs only these.
+	// offline_access isn't selectable in the Developer Console's Permissions tab, but it's still
+	// required to get a refresh token, so it's requested here directly rather than shown in the
+	// setup instructions.
+	coreScopeList = "read:jira-work write:jira-work manage:jira-webhook read:jira-user " +
+		"read:servicedesk-request write:servicedesk-request offline_access"
+
+	// jsmOpsScopeList is appended to coreScopeList only when the "Enable Ops features" config
+	// option is on (see jira.go's Configuration() and jsmOpsFeaturesEnabled). Most Jira Cloud
+	// sites don't have the JSM Ops product (incidents, alerts, heartbeats) enabled at all, and
+	// requesting scopes for a product the Atlassian app was never configured with makes
+	// Atlassian's own authorize page reject the whole request outright - before the user even
+	// sees a consent screen - so these are opt-in rather than always requested.
+	jsmOpsScopeList = "read:incident:jira-service-management write:incident:jira-service-management " +
 		"read:ops-alert:jira-service-management write:ops-alert:jira-service-management delete:ops-alert:jira-service-management " +
-		"read:ops-config:jira-service-management write:ops-config:jira-service-management delete:ops-config:jira-service-management " +
-		"offline_access"
+		"read:ops-config:jira-service-management write:ops-config:jira-service-management delete:ops-config:jira-service-management"
 )
 
 // Client speaks to Jira Cloud through Atlassian's OAuth API proxy (api.atlassian.com/ex/jira/{cloudId}/...).

@@ -53,9 +53,10 @@ func Test__Jira__Sync(t *testing.T) {
 		integrationContext := &contexts.IntegrationContext{Configuration: map[string]any{}}
 
 		err := integration.Sync(core.SyncContext{
-			BaseURL:     "https://sp.example.com",
-			Integration: integrationContext,
-			Logger:      newLogger(),
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
 		})
 
 		require.NoError(t, err)
@@ -65,6 +66,33 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, integrationContext.BrowserAction.Description, "manage:jira-webhook")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/api/v1/integrations/")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/callback")
+
+		// Regression test: most Jira Cloud sites don't have the JSM Ops product (incidents,
+		// alerts, heartbeats) enabled at all, and Atlassian's authorize page rejects the whole
+		// request outright if the app requests scopes for a product it was never configured
+		// with - so by default (ops features off), instructions must not mention them.
+		description := integrationContext.BrowserAction.Description
+		assert.NotContains(t, description, "Jira Service Management Incident API")
+		assert.NotContains(t, description, "Jira Service Management Ops API")
+		assert.NotContains(t, description, "incident:jira-service-management")
+		assert.NotContains(t, description, "ops-alert:jira-service-management")
+		assert.NotContains(t, description, "ops-config:jira-service-management")
+	})
+
+	t.Run("no client credentials with ops features enabled - setup instructions include the extra APIs", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{"enableOpsFeatures": true},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationContext.BrowserAction)
 
 		// Regression test: incident and ops-alert/ops-config scopes live under separate API
 		// products in the Developer Console from the (classic) "Jira Service Management API",
@@ -161,7 +189,8 @@ func Test__Jira__Sync(t *testing.T) {
 		params := actionURL.Query()
 		assert.Equal(t, "client-1", params.Get("client_id"))
 		assert.Equal(t, "code", params.Get("response_type"))
-		assert.Equal(t, scopeList, params.Get("scope"))
+		// Ops features are off by default - only the scopes every Jira Cloud site can grant.
+		assert.Equal(t, coreScopeList, params.Get("scope"))
 		assert.NotEmpty(t, params.Get("state"))
 
 		// The generated state is persisted so the callback can validate it.
@@ -169,6 +198,35 @@ func Test__Jira__Sync(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, metadata.State)
 		assert.Equal(t, *metadata.State, params.Get("state"))
+	})
+
+	// Regression test: requesting JSM Ops scopes (incidents, alerts, heartbeats) from an
+	// Atlassian app that was never configured with the matching API products makes Atlassian's
+	// authorize page reject the whole request outright - most Jira Cloud sites don't have JSM
+	// Ops at all, so those scopes are opt-in via the enableOpsFeatures config option.
+	t.Run("credentials with ops features enabled - authorize URL includes ops scopes", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":          "client-1",
+				"clientSecret":      "secret-1",
+				"enableOpsFeatures": true,
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationContext.BrowserAction)
+
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		params := actionURL.Query()
+		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, params.Get("scope"))
 	})
 
 	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {

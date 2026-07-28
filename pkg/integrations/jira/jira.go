@@ -92,6 +92,13 @@ func (j *Jira) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "OAuth Client Secret from your Atlassian OAuth 2.0 (3LO) app",
 		},
+		{
+			Name:        "enableOpsFeatures",
+			Label:       "Enable Ops features (incidents, alerts, heartbeats)",
+			Type:        configuration.FieldTypeBool,
+			Default:     false,
+			Description: "Most Jira Cloud sites don't have the JSM Ops product enabled. Only turn this on if yours does - it requests extra OAuth scopes that Atlassian will otherwise reject the authorization request for.",
+		},
 	}
 }
 
@@ -147,7 +154,7 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	//
 	if len(clientID) == 0 || len(clientSecret) == 0 {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appSetupInstructions(callbackURL),
+			Description: appSetupInstructions(callbackURL, jsmOpsFeaturesEnabled(ctx.Configuration)),
 		})
 
 		// An install still carrying config from the old Basic Auth (site URL + API token) flow
@@ -277,7 +284,25 @@ const (
 		"`read:ops-config:jira-service-management`, `write:ops-config:jira-service-management`, `delete:ops-config:jira-service-management`"
 )
 
-func appSetupInstructions(callbackURL string) string {
+// jsmOpsFeaturesEnabled reads the "Enable Ops features" config option - see Configuration().
+func jsmOpsFeaturesEnabled(configuration any) bool {
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, _ := config["enableOpsFeatures"].(bool)
+	return enabled
+}
+
+func appSetupInstructions(callbackURL string, opsEnabled bool) string {
+	apis := fmt.Sprintf("- **Jira API**: %s\n- **Jira Service Management API**: %s",
+		coreJiraScopesForInstructions, jsmRequestScopesForInstructions)
+
+	if opsEnabled {
+		apis += fmt.Sprintf("\n- **Jira Service Management Incident API**: %s\n- **Jira Service Management Ops API**: %s",
+			jsmIncidentScopesForInstructions, jsmOpsScopesForInstructions)
+	}
+
 	return fmt.Sprintf(`
 **1. Create an OAuth 2.0 (3LO) app**
 
@@ -285,12 +310,9 @@ Open the [Atlassian Developer Console](https://developer.atlassian.com/console/m
 
 **2. Add these APIs, each with their listed scopes**
 
-Go to the **Permissions** tab. These are 4 separate API entries - scopes for one won't appear under another, so add each one and its own scopes:
+Go to the **Permissions** tab. These are separate API entries - scopes for one won't appear under another, so add each one and its own scopes:
 
-- **Jira API**: %s
-- **Jira Service Management API**: %s
-- **Jira Service Management Incident API**: %s
-- **Jira Service Management Ops API**: %s
+%s
 
 **3. Configure the callback URL**
 
@@ -301,7 +323,7 @@ Go to the **Authorization** tab, click **Configure** next to OAuth 2.0 (3LO), an
 **4. Complete the installation setup**
 
 Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**. Paste them into the fields below and click **Save**.
-`, coreJiraScopesForInstructions, jsmRequestScopesForInstructions, jsmIncidentScopesForInstructions, jsmOpsScopesForInstructions, callbackURL)
+`, apis, callbackURL)
 }
 
 // requestAuthorization sends the user to Atlassian to approve the OAuth app, using a CSRF state
@@ -318,12 +340,17 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 		ctx.Integration.SetMetadata(metadata)
 	}
 
+	scope := coreScopeList
+	if jsmOpsFeaturesEnabled(ctx.Configuration) {
+		scope = scope + " " + jsmOpsScopeList
+	}
+
 	authorizeURL := fmt.Sprintf(
 		"%s?audience=api.atlassian.com&client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&prompt=consent",
 		AuthorizeURL,
 		url.QueryEscape(clientID),
 		url.QueryEscape(callbackURL),
-		url.QueryEscape(scopeList),
+		url.QueryEscape(scope),
 		url.QueryEscape(*metadata.State),
 	)
 
