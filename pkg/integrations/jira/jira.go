@@ -50,11 +50,17 @@ type Metadata struct {
 	// has access to the integration, not any particular webhook record - can find it.
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 
-	// OpsScopesRequested records whether the most recent authorize URL requestAuthorization built
-	// included the JSM Ops scopes. Atlassian has no incremental-consent mechanism - a token
-	// granted without them never gains them - so if enableOpsFeatures is turned on after this is
-	// false, Sync knows the existing connection needs a fresh authorize round trip.
+	// OpsScopesRequested records whether the currently stored OAuth token was granted with JSM Ops
+	// scopes. Set only after a successful OAuth callback — never when building the authorize URL —
+	// so a Sync that prompts reconnect for ops keeps re-prompting until the user actually finishes
+	// authorization. Atlassian has no incremental-consent mechanism; a token granted without ops
+	// scopes never gains them, so if enableOpsFeatures is turned on while this is false, Sync
+	// knows the connection needs a fresh authorize round trip.
 	OpsScopesRequested bool `json:"opsScopesRequested,omitempty" mapstructure:"opsScopesRequested,omitempty"`
+
+	// OpsScopesPending records whether the authorize URL currently outstanding includes JSM Ops
+	// scopes. Copied into OpsScopesRequested (and cleared) only after a successful OAuth callback.
+	OpsScopesPending bool `json:"opsScopesPending,omitempty" mapstructure:"opsScopesPending,omitempty"`
 }
 
 const installationInstructions = `
@@ -355,8 +361,12 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 		metadata.State = &state
 	}
 
+	// Record what this authorize URL requests, but do not claim the token has those scopes yet —
+	// OpsScopesRequested is only set after a successful callback. Setting it here made the next
+	// Sync think reconnect already succeeded, permanently clearing the ops prompt while the
+	// token still lacked the scopes.
 	opsEnabled := jsmOpsFeaturesEnabled(ctx.Configuration)
-	metadata.OpsScopesRequested = opsEnabled
+	metadata.OpsScopesPending = opsEnabled
 	ctx.Integration.SetMetadata(metadata)
 
 	scope := coreScopeList
@@ -487,6 +497,9 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	if expiresAt := token.ExpiresAt(); !expiresAt.IsZero() {
 		metadata.AccessTokenExpiresAt = expiresAt.Format(time.RFC3339)
 	}
+	// Commit the scopes that were actually on the authorize URL that produced this token.
+	metadata.OpsScopesRequested = metadata.OpsScopesPending
+	metadata.OpsScopesPending = false
 	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(token.GetExpiration()); err != nil {

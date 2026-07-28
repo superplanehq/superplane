@@ -323,7 +323,57 @@ func Test__Jira__Sync(t *testing.T) {
 
 		metadata, ok := integrationContext.Metadata.(Metadata)
 		require.True(t, ok)
-		assert.True(t, metadata.OpsScopesRequested)
+		// Pending records what the authorize URL asked for; Requested stays false until callback
+		// succeeds — otherwise the next Sync would clear the prompt while the token still lacks
+		// ops scopes.
+		assert.True(t, metadata.OpsScopesPending)
+		assert.False(t, metadata.OpsScopesRequested)
+	})
+
+	// Regression test: requestAuthorization used to set OpsScopesRequested when building the
+	// authorize URL. The next Sync always RemoveBrowserAction'd first, then skipped re-prompt
+	// because the flag was already true — permanently clearing the ops reconnect while the
+	// token still lacked those scopes.
+	t.Run("ops reconnect prompt survives a subsequent Sync until callback succeeds", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OpsScopesRequested: false})
+		integrationContext.Configuration = map[string]any{
+			"clientId":          "client-1",
+			"clientSecret":      "secret-1",
+			"enableOpsFeatures": true,
+		}
+
+		syncOnce := func() {
+			httpContext := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
+				},
+			}
+			err := integration.Sync(core.SyncContext{
+				BaseURL:       "https://sp.example.com",
+				Configuration: integrationContext.Configuration,
+				HTTP:          httpContext,
+				Integration:   integrationContext,
+				Logger:        newLogger(),
+			})
+			require.NoError(t, err)
+		}
+
+		syncOnce()
+		require.NotNil(t, integrationContext.BrowserAction)
+		firstURL := integrationContext.BrowserAction.URL
+
+		syncOnce()
+		require.NotNil(t, integrationContext.BrowserAction, "ops reconnect prompt must come back after Sync clears browser actions")
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, actionURL.Query().Get("scope"))
+		assert.NotEmpty(t, firstURL)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.False(t, metadata.OpsScopesRequested)
+		assert.True(t, metadata.OpsScopesPending)
 	})
 
 	t.Run("credential verification failure marks the integration errored", func(t *testing.T) {
@@ -570,6 +620,56 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		assert.Equal(t, "https://test.atlassian.net", metadata.SiteURL)
 		assert.Equal(t, "Test Site", metadata.SiteName)
 		assert.Nil(t, metadata.State)
+		assert.False(t, metadata.OpsScopesRequested)
+		assert.False(t, metadata.OpsScopesPending)
+	})
+
+	// Regression test: OpsScopesRequested must be committed from OpsScopesPending only after a
+	// successful callback — that is what stops the ops reconnect prompt, not building the
+	// authorize URL itself.
+	t.Run("callback with pending ops scopes commits OpsScopesRequested", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state, OpsScopesPending: true},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"cb-access","refresh_token":"cb-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "ready", integrationContext.State)
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.True(t, metadata.OpsScopesRequested)
+		assert.False(t, metadata.OpsScopesPending)
 	})
 
 	// Regression test: a token response missing a refresh token means this connection could
