@@ -33,10 +33,7 @@ type UpdateReleaseConfiguration struct {
 	ReleasedAt      string   `mapstructure:"releasedAt"`
 }
 
-// updateReleaseToggles tracks which optional fields were explicitly turned on
-// via their UI toggle, independent of whether the decoded value ended up
-// empty. See update_issue.go for why this can't just check the decoded
-// zero value.
+// updateReleaseToggles tracks which fields were explicitly toggled on, since a toggled-on-but-empty value must still be sent (see update_issue.go).
 type updateReleaseToggles struct {
 	Name        bool
 	Description bool
@@ -282,8 +279,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-// resolveReleaseTagName identifies which release to update: either the
-// explicitly configured tag, or the project's latest release.
+// resolveReleaseTagName identifies which release to update: the configured tag, or the project's latest release.
 func resolveReleaseTagName(client *Client, config UpdateReleaseConfiguration) (string, error) {
 	if config.ReleaseStrategy != ReleaseStrategyLatest {
 		return config.TagName, nil
