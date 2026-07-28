@@ -83,6 +83,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"honeycomb.onAlertFired":              "{{ root().data.name }}",
 	"incident.onIncident":                 "{{ root().data.incident.name }}",
 	"jfrogArtifactory.onArtifactUploaded": "{{ root().data.name }} in {{ root().data.repo }}",
+	"jira.onIssue":                        "{{ root().data.issue.key }} - {{ root().data.issue.fields.summary }}",
 	"launchdarkly.onFeatureFlagChange":    "{{ root().data.name }}",
 	"linear.onIssue":                      "{{ root().data.data.identifier }} - {{ root().data.data.title }}",
 	"logfire.onAlertReceived":             "{{ root().data.alertName }}",
