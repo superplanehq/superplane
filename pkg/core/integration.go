@@ -211,13 +211,6 @@ type IntegrationContext interface {
 	Ready()
 	Error(message string)
 
-	/*
-	 * Clears a previous Error() and returns the integration to a neutral, not-yet-ready state
-	 * (distinct from Ready()) - for a Sync step that resolves what caused a prior error but
-	 * hasn't itself reached ready yet (e.g. still waiting on further user action).
-	 */
-	Pending()
-
 	//
 	// Control the browser action of the integration
 	//

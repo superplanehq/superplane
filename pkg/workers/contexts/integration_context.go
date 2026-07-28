@@ -345,11 +345,6 @@ func (c *IntegrationContext) Error(message string) {
 	c.integration.StateDescription = message
 }
 
-func (c *IntegrationContext) Pending() {
-	c.integration.State = models.IntegrationStatePending
-	c.integration.StateDescription = ""
-}
-
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 	now := time.Now()
 

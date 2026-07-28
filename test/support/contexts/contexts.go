@@ -162,11 +162,6 @@ func (c *IntegrationContext) Error(message string) {
 	c.StateDescription = message
 }
 
-func (c *IntegrationContext) Pending() {
-	c.State = "pending"
-	c.StateDescription = ""
-}
-
 func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
 	c.BrowserAction = &action
 }

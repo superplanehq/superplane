@@ -130,16 +130,17 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	// one-click "Continue".
 	//
 	if len(clientID) == 0 || len(clientSecret) == 0 {
-		// An install still carrying config from the old Basic Auth (site URL + API token) flow
-		// this replaced would otherwise stay marked ready while every call fails for a missing
-		// OAuth access token - flag it explicitly instead of leaving it looking connected.
-		if hasLegacyBasicAuthConfig(ctx.Configuration) {
-			ctx.Integration.Error("This integration used Jira's email/API token authentication, which is no longer supported. Reconnect it using the OAuth instructions below.")
-		}
-
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupInstructions(callbackURL),
 		})
+
+		// An install still carrying config from the old Basic Auth (site URL + API token) flow
+		// this replaced would otherwise stay marked ready while every call fails for a missing
+		// OAuth access token - report it as a real error so the caller marks the integration
+		// accordingly, instead of leaving it looking connected.
+		if hasLegacyBasicAuthConfig(ctx.Configuration) {
+			return fmt.Errorf("this integration used Jira's email/API token authentication, which is no longer supported - reconnect it using the instructions below")
+		}
 
 		return nil
 	}
@@ -297,11 +298,6 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, clientID, callbackURL 
 		url.QueryEscape(scopeList),
 		url.QueryEscape(*metadata.State),
 	)
-
-	// Clears any stale error from an earlier step (e.g. a legacy Basic Auth install flagged for
-	// missing OAuth credentials) - now that credentials are in hand, that error no longer applies,
-	// even though authorization itself isn't done yet.
-	ctx.Integration.Pending()
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: "Click **Continue** to authorize SuperPlane to access your Jira site.",

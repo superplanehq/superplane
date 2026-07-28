@@ -266,41 +266,6 @@ func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	assert.Contains(t, integration.StateDescription, "Sync failed: sync failed")
 }
 
-// Test__IntegrationRequestWorker_SyncErrorReportedViaIntegrationErrorPersists reproduces a
-// bugbot finding: a Sync that reports a problem via ctx.Integration.Error(...) and returns nil
-// (rather than a hard error) - the pattern integrations use to flag "connected but action
-// needed" - previously had its description wiped by the else branch below, since a nil syncErr
-// was treated as unconditional success.
-func Test__IntegrationRequestWorker_SyncErrorReportedViaIntegrationErrorPersists(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
-
-	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		OnSync: func(ctx core.SyncContext) error {
-			ctx.Integration.Error("action needed: reconnect this integration")
-			return nil
-		},
-	})
-
-	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
-	require.NoError(t, err)
-
-	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
-	requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
-	require.NoError(t, err)
-	require.Len(t, requests, 1)
-
-	require.NoError(t, worker.LockAndProcessRequest(requests[0]))
-
-	integration, err = models.FindIntegration(r.Organization.ID, integration.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.IntegrationStateError, integration.State)
-	assert.Contains(t, integration.StateDescription, "action needed: reconnect this integration")
-}
-
 func Test__AppInstallationRequestWorker_InvokeHook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

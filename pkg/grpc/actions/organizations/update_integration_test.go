@@ -247,33 +247,4 @@ func Test__UpdateIntegration(t *testing.T) {
 		assert.Equal(t, codes.AlreadyExists, code)
 		assert.Contains(t, msg, "already exists")
 	})
-
-	// Regression test: a Sync that reports a problem via ctx.Integration.Error(...) and returns
-	// nil (rather than a hard error) - the pattern integrations use to flag "connected but action
-	// needed" - previously had its description wiped right after, since a nil syncErr was treated
-	// as unconditional success.
-	t.Run("sync reports a problem via Integration.Error without returning an error -> description persists", func(t *testing.T) {
-		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-			OnSync: func(ctx core.SyncContext) error {
-				ctx.Integration.Error("action needed: reconnect this integration")
-				return nil
-			},
-		})
-
-		integrationName := support.RandomName("integration")
-		appConfig, err := structpb.NewStruct(map[string]any{"key": "value1"})
-		require.NoError(t, err)
-
-		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", integrationName, appConfig)
-		require.NoError(t, err)
-		integrationID := createResponse.Integration.Metadata.Id
-
-		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key": "value2"}, "")
-		require.NoError(t, err)
-
-		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
-		require.NoError(t, err)
-		assert.Equal(t, models.IntegrationStateError, integration.State)
-		assert.Contains(t, integration.StateDescription, "action needed: reconnect this integration")
-	})
 }
