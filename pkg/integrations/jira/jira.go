@@ -17,6 +17,12 @@ import (
 const (
 	SecretOAuthAccessToken  = "accessToken"
 	SecretOAuthRefreshToken = "refreshToken"
+
+	// refreshWebhookHookName is the internal hook that keeps the shared dynamic webhook
+	// registered by JiraWebhookHandler from expiring - Atlassian expires it 30 days after
+	// creation or last refresh, with no other way to extend it.
+	refreshWebhookHookName = "refreshWebhook"
+	webhookRefreshInterval = 20 * 24 * time.Hour
 )
 
 func init() {
@@ -33,6 +39,11 @@ type Metadata struct {
 	SiteURL              string    `json:"siteUrl,omitempty" mapstructure:"siteUrl,omitempty"`
 	SiteName             string    `json:"siteName,omitempty" mapstructure:"siteName,omitempty"`
 	AccessTokenExpiresAt string    `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
+
+	// WebhookID is the shared dynamic webhook registered by JiraWebhookHandler, mirrored here
+	// (in addition to the webhook record's own metadata) so the refreshWebhook hook - which only
+	// has access to the integration, not any particular webhook record - can find it.
+	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
 const installationInstructions = `
@@ -471,9 +482,41 @@ func findSecret(integration core.IntegrationContext, name string) (string, error
 }
 
 func (j *Jira) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{
+		{Name: refreshWebhookHookName, Type: core.HookTypeInternal},
+	}
 }
 
 func (j *Jira) HandleHook(ctx core.IntegrationHookContext) error {
-	return nil
+	switch ctx.Name {
+	case refreshWebhookHookName:
+		return refreshWebhook(ctx.HTTP, ctx.Integration)
+	default:
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
+	}
+}
+
+// refreshWebhook extends the shared dynamic webhook's life and reschedules itself. If the
+// webhook has since been removed (e.g. the last jira.onIssue trigger was deleted), there is
+// nothing to refresh and the loop stops rescheduling.
+func refreshWebhook(httpCtx core.HTTPContext, integration core.IntegrationContext) error {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.WebhookID == nil {
+		return nil
+	}
+
+	client, err := NewClient(httpCtx, integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	if err := client.RefreshIssueWebhooks([]int64{*metadata.WebhookID}); err != nil {
+		return fmt.Errorf("failed to refresh Jira webhook: %w", err)
+	}
+
+	return integration.ScheduleActionCall(refreshWebhookHookName, map[string]any{}, webhookRefreshInterval)
 }

@@ -1103,6 +1103,22 @@ func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
 	return err
 }
 
+// RefreshIssueWebhooks extends the life of previously-registered dynamic webhooks by another 30
+// days from now - Atlassian expires them 30 days after creation or after their last refresh.
+func (c *Client) RefreshIssueWebhooks(webhookIDs []int64) error {
+	if len(webhookIDs) == 0 {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string][]int64{"webhookIds": webhookIDs})
+	if err != nil {
+		return fmt.Errorf("marshal refresh webhook request: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodPut, c.apiURL("/rest/api/3/webhook/refresh"), bytes.NewReader(body))
+	return err
+}
+
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {

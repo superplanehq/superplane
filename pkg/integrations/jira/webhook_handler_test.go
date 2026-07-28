@@ -33,10 +33,11 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
 			},
 		}
+		integration := newAuthorizedIntegration()
 
 		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
-			Integration: newAuthorizedIntegration(),
+			Integration: integration,
 			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
 		})
 		require.NoError(t, err)
@@ -58,6 +59,17 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		// An explicit, empty jqlFilter - Atlassian requires the key present, and it matches
 		// every project, which is exactly the "shared, unfiltered" registration this needs.
 		assert.Contains(t, string(body), `"jqlFilter":""`)
+
+		// The id is mirrored onto the integration and a refresh is scheduled, since Atlassian
+		// expires this webhook in 30 days otherwise.
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		require.NotNil(t, storedMetadata.WebhookID)
+		assert.Equal(t, int64(1000), *storedMetadata.WebhookID)
+
+		require.Len(t, integration.ActionRequests, 1)
+		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)
+		assert.Equal(t, webhookRefreshInterval, integration.ActionRequests[0].Interval)
 	})
 
 	t.Run("create failure is surfaced", func(t *testing.T) {
@@ -66,30 +78,33 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["bad request"]}`))},
 			},
 		}
+		integration := newAuthorizedIntegration()
 
 		_, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
-			Integration: newAuthorizedIntegration(),
+			Integration: integration,
 			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
 		})
 		require.ErrorContains(t, err, "failed to create Jira webhook")
+		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
 	})
 }
 
 func Test__WebhookHandler__Cleanup(t *testing.T) {
 	handler := &JiraWebhookHandler{}
 
-	t.Run("deletes the registered webhook", func(t *testing.T) {
+	t.Run("deletes the registered webhook and clears the mirrored id", func(t *testing.T) {
 		webhookID := int64(1000)
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			},
 		}
+		integration := newAuthorizedIntegrationWithMetadata(Metadata{WebhookID: &webhookID})
 
 		err := handler.Cleanup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
-			Integration: newAuthorizedIntegration(),
+			Integration: integration,
 			Webhook:     &contexts.WebhookContext{Metadata: WebhookMetadata{WebhookID: &webhookID}},
 		})
 		require.NoError(t, err)
@@ -98,6 +113,10 @@ func Test__WebhookHandler__Cleanup(t *testing.T) {
 		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
 		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
 		assert.Contains(t, string(body), "1000")
+
+		storedMetadata := Metadata{}
+		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
+		assert.Nil(t, storedMetadata.WebhookID)
 	})
 
 	t.Run("no-op when Setup never completed", func(t *testing.T) {

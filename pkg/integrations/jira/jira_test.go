@@ -612,6 +612,81 @@ func Test__Jira__HandleRequest(t *testing.T) {
 	})
 }
 
+func Test__Jira__HandleHook(t *testing.T) {
+	integration := &Jira{}
+
+	t.Run("refreshes the shared webhook and reschedules itself", func(t *testing.T) {
+		webhookID := int64(1000)
+		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{WebhookID: &webhookID})
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPut, httpCtx.Requests[0].Method)
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/rest/api/3/webhook/refresh")
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+
+		require.Len(t, integrationCtx.ActionRequests, 1)
+		assert.Equal(t, refreshWebhookHookName, integrationCtx.ActionRequests[0].ActionName)
+		assert.Equal(t, webhookRefreshInterval, integrationCtx.ActionRequests[0].Interval)
+	})
+
+	t.Run("no-op and no reschedule when the webhook has since been removed", func(t *testing.T) {
+		integrationCtx := newAuthorizedIntegration()
+		httpCtx := &contexts.HTTPContext{}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.Requests)
+		assert.Empty(t, integrationCtx.ActionRequests)
+	})
+
+	t.Run("refresh failure is surfaced and not rescheduled", func(t *testing.T) {
+		webhookID := int64(1000)
+		integrationCtx := newAuthorizedIntegrationWithMetadata(Metadata{WebhookID: &webhookID})
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["not found"]}`))},
+			},
+		}
+
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        refreshWebhookHookName,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Logger:      newLogger(),
+		})
+		require.ErrorContains(t, err, "failed to refresh Jira webhook")
+		assert.Empty(t, integrationCtx.ActionRequests)
+	})
+
+	t.Run("unknown hook name errors", func(t *testing.T) {
+		err := integration.HandleHook(core.IntegrationHookContext{
+			Name:        "bogus",
+			Integration: newAuthorizedIntegration(),
+			Logger:      newLogger(),
+		})
+		require.ErrorContains(t, err, "unknown hook")
+	})
+}
+
 func Test__Jira__Definition(t *testing.T) {
 	integration := &Jira{}
 
