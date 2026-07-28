@@ -19,6 +19,13 @@ type WebhookMetadata struct {
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
+// allProjectsJQLFilter matches every issue in every project. An empty jqlFilter is rejected
+// outright by Atlassian ("Empty JQL search not supported") even though the key itself must be
+// present - this is the simplest clause confirmed (live, against a real site) to both be accepted
+// and match unconditionally, needed since this single registration is shared by every
+// jira.onIssue trigger on the integration regardless of project.
+const allProjectsJQLFilter = "project != EMPTY"
+
 type JiraWebhookHandler struct{}
 
 func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
@@ -35,10 +42,10 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// No jqlFilter: this single registration must cover every project, since it is shared by
-	// every jira.onIssue trigger on this integration - each one filters to its own configured
-	// project and events itself, in HandleWebhook.
-	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), "", []string{
+	// This single registration must cover every project, since it is shared by every
+	// jira.onIssue trigger on this integration - each one filters to its own configured project
+	// and events itself, in HandleWebhook.
+	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, []string{
 		issueEventCreated, issueEventUpdated, issueEventDeleted,
 	})
 	if err != nil {

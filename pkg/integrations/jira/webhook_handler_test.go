@@ -56,9 +56,10 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Contains(t, string(body), `"jira:issue_created"`)
 		assert.Contains(t, string(body), `"jira:issue_updated"`)
 		assert.Contains(t, string(body), `"jira:issue_deleted"`)
-		// An explicit, empty jqlFilter - Atlassian requires the key present, and it matches
-		// every project, which is exactly the "shared, unfiltered" registration this needs.
-		assert.Contains(t, string(body), `"jqlFilter":""`)
+		// Regression test: Atlassian rejects an empty jqlFilter outright ("Empty JQL search not
+		// supported", confirmed live) even though the key must be present - this must be a real,
+		// always-true clause instead.
+		assert.Contains(t, string(body), `"jqlFilter":"project != EMPTY"`)
 
 		// The id is mirrored onto the integration and a refresh is scheduled, since Atlassian
 		// expires this webhook in 30 days otherwise.
