@@ -237,6 +237,38 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, integrationContext.StateDescription, "verifying Jira credentials")
 	})
 
+	// Regression test: a metadata reload failure with an otherwise-valid connection (a stale
+	// "authorize" browser action left over from before OAuth completed) must not leave that
+	// browser action attached - the OAuth connection itself is fine, so there's nothing left to
+	// authorize, only a metadata retry on the next sync.
+	t.Run("metadata failure with valid credentials clears a stale browser action", func(t *testing.T) {
+		integrationContext := newAuthorizedIntegration()
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		integrationContext.BrowserAction = &core.BrowserAction{
+			Description: "Click Continue to authorize SuperPlane to access your Jira site.",
+			URL:         "https://auth.atlassian.com/authorize?...",
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"server error"}`))},
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:     "https://sp.example.com",
+			HTTP:        httpContext,
+			Integration: integrationContext,
+			Logger:      newLogger(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "listing projects")
+		assert.Nil(t, integrationContext.BrowserAction)
+	})
+
 	t.Run("token close to expiring is proactively refreshed", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
 			CloudID:              testCloudID,
@@ -435,6 +467,54 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		// button again instead of getting stuck with an access token but no cloud id.
 		accessToken, _ := findSecret(integrationContext, SecretOAuthAccessToken)
 		assert.Empty(t, accessToken)
+	})
+
+	// Regression test: the OAuth exchange and site resolution already succeeded by this point,
+	// so a metadata reload failure must not leave the "authorize" browser action attached - only
+	// a metadata retry is needed, not re-authorization.
+	t.Run("metadata failure after a successful exchange clears the browser action", func(t *testing.T) {
+		state := "expected-state"
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":     "client-1",
+				"clientSecret": "secret-1",
+			},
+			Metadata: Metadata{State: &state},
+			BrowserAction: &core.BrowserAction{
+				Description: "Click Continue to authorize SuperPlane to access your Jira site.",
+				URL:         "https://auth.atlassian.com/authorize?...",
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"access_token":"cb-access","refresh_token":"cb-refresh","expires_in":3600}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
+				))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"server error"}`))},
+			},
+		}
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
+
+		integration.HandleRequest(core.HTTPRequestContext{
+			Request:        request,
+			Response:       recorder,
+			BaseURL:        "https://sp.example.com",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integrationContext,
+			Logger:         newLogger(),
+		})
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "error", integrationContext.State)
+		assert.Contains(t, integrationContext.StateDescription, "failed to load workspace data")
+		assert.Nil(t, integrationContext.BrowserAction)
 	})
 
 	t.Run("state mismatch does not store tokens", func(t *testing.T) {

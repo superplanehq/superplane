@@ -158,6 +158,9 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	}
 
 	if err := j.updateMetadata(ctx); err != nil {
+		// The OAuth connection itself is fine at this point (a valid access token is in hand) -
+		// only the metadata reload failed, so there's nothing left for the user to authorize.
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.Error(err.Error())
 		return nil
 	}
@@ -404,6 +407,9 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		Integration: ctx.Integration,
 	}); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to update metadata: %v", err)
+		// The OAuth exchange itself just succeeded (tokens and site are already stored) - only
+		// the metadata reload failed, so there's nothing left for the user to authorize.
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.Error(fmt.Sprintf("connected, but failed to load workspace data: %v", err))
 		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 		return
