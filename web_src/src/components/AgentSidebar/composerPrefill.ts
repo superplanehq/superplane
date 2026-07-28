@@ -1,43 +1,51 @@
 /**
  * Window event + FIFO pending buffer so suggestions can send even if the Agent
  * composer mounts after the sidebar opens, including multiple rapid clicks.
+ * Entries are canvas-scoped so SPA navigation cannot flush a prompt into the wrong chat.
  */
 export const AGENT_SEND_COMPOSER_EVENT = "agent:send-composer";
 
-const pendingSends: string[] = [];
+type PendingSend = {
+  canvasId: string;
+  text: string;
+};
 
-export function requestAgentComposerSend(text: string) {
+const pendingSends: PendingSend[] = [];
+
+export function requestAgentComposerSend(canvasId: string, text: string) {
   const trimmed = text.trim();
-  if (!trimmed) return;
+  if (!canvasId || !trimmed) return;
 
-  pendingSends.push(trimmed);
+  pendingSends.push({ canvasId, text: trimmed });
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(AGENT_SEND_COMPOSER_EVENT));
 }
 
-/** Read the next pending text without clearing (composer may not be ready yet). */
-export function peekAgentComposerSend(): string | null {
-  return pendingSends[0] ?? null;
+/** Read the next pending text for this canvas without clearing. */
+export function peekAgentComposerSend(canvasId: string): string | null {
+  if (!canvasId) return null;
+  return pendingSends.find((item) => item.canvasId === canvasId)?.text ?? null;
 }
 
-/** Read and clear the next send that was requested before the composer mounted. */
-export function consumeAgentComposerSend(): string | null {
-  return pendingSends.shift() ?? null;
+/** Read and clear the next send for this canvas. */
+export function consumeAgentComposerSend(canvasId: string): string | null {
+  if (!canvasId) return null;
+  const index = pendingSends.findIndex((item) => item.canvasId === canvasId);
+  if (index < 0) return null;
+  return pendingSends.splice(index, 1)[0]?.text ?? null;
 }
 
-/** Put a failed send back at the front of the queue for another flush attempt. */
-export function requeueAgentComposerSend(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed) return;
-
-  pendingSends.unshift(trimmed);
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(AGENT_SEND_COMPOSER_EVENT));
-}
-
-/** Clear the entire pending queue (tests / abandoned flushes). */
-export function clearAgentComposerSend() {
-  pendingSends.length = 0;
+/** Clear pending sends for one canvas, or the entire queue when omitted. */
+export function clearAgentComposerSend(canvasId?: string) {
+  if (!canvasId) {
+    pendingSends.length = 0;
+    return;
+  }
+  for (let index = pendingSends.length - 1; index >= 0; index -= 1) {
+    if (pendingSends[index]?.canvasId === canvasId) {
+      pendingSends.splice(index, 1);
+    }
+  }
 }
 
 export function subscribeAgentComposerSend(onFlush: () => void): () => void {

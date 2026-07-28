@@ -1,32 +1,29 @@
 import { useCallback, useEffect } from "react";
 import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
-import {
-  consumeAgentComposerSend,
-  peekAgentComposerSend,
-  requeueAgentComposerSend,
-  subscribeAgentComposerSend,
-} from "./composerPrefill";
+import { consumeAgentComposerSend, peekAgentComposerSend, subscribeAgentComposerSend } from "./composerPrefill";
 
 /**
  * Flushes queued suggestion/prefill sends into the composer one at a time.
  * Keeps the queue while another mutation is in flight so install boot kickoff
  * or a prior suggestion send cannot drop later prompts.
+ * Failed sends are dropped (not requeued) to avoid a tight retry loop when
+ * sendPending clears after rejection.
  */
 export function useFlushAgentComposerSend(
+  canvasId: string,
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>,
   sendPending: boolean,
 ) {
   const flushPending = useCallback(() => {
-    if (sendPending) return;
-    const pending = peekAgentComposerSend();
+    if (!canvasId || sendPending) return;
+    const pending = peekAgentComposerSend(canvasId);
     if (!pending) return;
     // Clear before send so Strict Mode remounts do not double-send.
-    consumeAgentComposerSend();
+    consumeAgentComposerSend(canvasId);
     void onSend(pending, []).catch(() => {
-      // Restore the prompt so a failed agent send can be retried on the next flush.
-      requeueAgentComposerSend(pending);
+      // Do not requeue: sendPending→false would immediately flush again forever.
     });
-  }, [onSend, sendPending]);
+  }, [canvasId, onSend, sendPending]);
 
   useEffect(() => {
     let cancelled = false;

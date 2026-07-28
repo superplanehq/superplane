@@ -13,6 +13,7 @@ import type { CanvasesCanvasRun } from "@/api-client";
 import { useFlushAgentComposerSend } from "./useFlushAgentComposerSend";
 
 type ChatComposerProps = {
+  canvasId: string;
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
   onClearChat: () => void;
@@ -34,6 +35,7 @@ const modePlaceholder = {
 } as const;
 
 export function ChatComposer({
+  canvasId,
   onSend,
   onStop,
   onClearChat,
@@ -48,7 +50,7 @@ export function ChatComposer({
   nodes,
   runs,
 }: ChatComposerProps) {
-  const c = useComposerController({ onSend, sendPending, nodes, runs });
+  const c = useComposerController({ canvasId, onSend, sendPending, nodes, runs });
 
   return (
     <footer className="px-3 pb-3 pt-2">
@@ -99,13 +101,14 @@ export function ChatComposer({
 }
 
 type ComposerControllerArgs = {
+  canvasId: string;
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   sendPending: boolean;
   nodes?: SuperplaneComponentsNode[];
   runs?: CanvasesCanvasRun[];
 };
 
-function useComposerController({ onSend, sendPending, nodes, runs }: ComposerControllerArgs) {
+function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: ComposerControllerArgs) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -136,7 +139,7 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
     }
   }, [hasImages, images, getMarkdown, clearImages, onSend, mentionsApi]);
 
-  useFlushAgentComposerSend(onSend, sendPending);
+  useFlushAgentComposerSend(canvasId, onSend, sendPending);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {

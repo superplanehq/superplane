@@ -66,7 +66,7 @@ export function CanvasToolSidebarTrigger({
   const handleSelectSuggestion = (suggestion: AgentSuggestion) => {
     onSelectAgentSuggestion?.(suggestion);
     // Queue the send before opening so it is pending when the composer mounts.
-    requestAgentComposerSend(suggestion.prompt);
+    requestAgentComposerSend(canvasId, suggestion.prompt);
     openToolSidebar();
     dismissSuggestion(suggestion.id);
     // Keep the card open while other suggestions remain (sidebar open can steal focus).

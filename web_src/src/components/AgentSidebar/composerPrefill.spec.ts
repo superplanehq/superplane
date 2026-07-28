@@ -4,8 +4,10 @@ import {
   consumeAgentComposerSend,
   peekAgentComposerSend,
   requestAgentComposerSend,
-  requeueAgentComposerSend,
 } from "./composerPrefill";
+
+const canvasA = "canvas-a";
+const canvasB = "canvas-b";
 
 afterEach(() => {
   clearAgentComposerSend();
@@ -13,29 +15,33 @@ afterEach(() => {
 
 describe("composerPrefill", () => {
   it("stores a pending send until consumed", () => {
-    requestAgentComposerSend("  Add CI  ");
-    expect(peekAgentComposerSend()).toBe("Add CI");
-    expect(consumeAgentComposerSend()).toBe("Add CI");
-    expect(peekAgentComposerSend()).toBeNull();
+    requestAgentComposerSend(canvasA, "  Add CI  ");
+    expect(peekAgentComposerSend(canvasA)).toBe("Add CI");
+    expect(consumeAgentComposerSend(canvasA)).toBe("Add CI");
+    expect(peekAgentComposerSend(canvasA)).toBeNull();
   });
 
-  it("queues multiple pending sends in order", () => {
-    requestAgentComposerSend("first");
-    requestAgentComposerSend("second");
-    expect(consumeAgentComposerSend()).toBe("first");
-    expect(consumeAgentComposerSend()).toBe("second");
-    expect(consumeAgentComposerSend()).toBeNull();
+  it("queues multiple pending sends in order for a canvas", () => {
+    requestAgentComposerSend(canvasA, "first");
+    requestAgentComposerSend(canvasA, "second");
+    expect(consumeAgentComposerSend(canvasA)).toBe("first");
+    expect(consumeAgentComposerSend(canvasA)).toBe("second");
+    expect(consumeAgentComposerSend(canvasA)).toBeNull();
   });
 
-  it("ignores blank requests", () => {
-    requestAgentComposerSend("   ");
-    expect(peekAgentComposerSend()).toBeNull();
+  it("keeps pending sends isolated per canvas", () => {
+    requestAgentComposerSend(canvasA, "for-a");
+    requestAgentComposerSend(canvasB, "for-b");
+
+    expect(peekAgentComposerSend(canvasA)).toBe("for-a");
+    expect(peekAgentComposerSend(canvasB)).toBe("for-b");
+    expect(consumeAgentComposerSend(canvasB)).toBe("for-b");
+    expect(peekAgentComposerSend(canvasA)).toBe("for-a");
   });
 
-  it("requeues a failed send at the front of the queue", () => {
-    requestAgentComposerSend("second");
-    requeueAgentComposerSend("first");
-    expect(consumeAgentComposerSend()).toBe("first");
-    expect(consumeAgentComposerSend()).toBe("second");
+  it("ignores blank requests and missing canvas ids", () => {
+    requestAgentComposerSend(canvasA, "   ");
+    requestAgentComposerSend("", "hello");
+    expect(peekAgentComposerSend(canvasA)).toBeNull();
   });
 });
