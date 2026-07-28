@@ -179,6 +179,11 @@ type WebhookPayload struct {
 	Status   string `json:"status"`
 	ExitCode int    `json:"exit_code"`
 	Error    string `json:"error,omitempty"`
+	// ClaimedAt/FinishedAt let callers compute execution duration (e.g. usage
+	// metering). ClaimedAt is nil when the task never ran (canceled while queued)
+	// or when the runner was lost (infra failure, not billed).
+	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
 	// CloudWatch fields mirror TaskStatusResponse when task-broker advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
@@ -195,7 +200,8 @@ type TaskStatusResponse struct {
 	CreatedAt       time.Time  `json:"created_at"`
 	ClaimedAt       *time.Time `json:"claimed_at,omitempty"`
 	LeaseUntil      *time.Time `json:"lease_until,omitempty"`
-	RunnerID        string     `json:"runner_id,omitempty"` // set after claim (EC2: instance id from IMDS)
+	FinishedAt      *time.Time `json:"finished_at,omitempty"` // set when the task reached a terminal status
+	RunnerID        string     `json:"runner_id,omitempty"`   // set after claim (EC2: instance id from IMDS)
 	ExecutionMode   string     `json:"execution_mode,omitempty"`
 	DockerImage     string     `json:"docker_image,omitempty"`
 	ExitCode        *int       `json:"exit_code,omitempty"`

@@ -43,12 +43,14 @@ type Task struct {
 	// used for metrics. Not sent to runners.
 	Labels map[string]string
 	// Files are materialized under SUPERPLANE_TASK_DIR before execution.
-	Files         []TaskFile
-	WebhookURL    string
-	Status        TaskStatus
-	CreatedAt     time.Time
-	ClaimedAt     *time.Time
-	LeaseUntil    *time.Time
+	Files      []TaskFile
+	WebhookURL string
+	Status     TaskStatus
+	CreatedAt  time.Time
+	ClaimedAt  *time.Time
+	LeaseUntil *time.Time
+	// FinishedAt is when the task reached a terminal status (succeeded/failed/canceled).
+	FinishedAt    *time.Time
 	RunnerID      string
 	ExecutionMode ExecutionMode
 	DockerImage   string

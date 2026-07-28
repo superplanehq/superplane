@@ -60,4 +60,40 @@ func TestTaskStatusResponseIncludesTimelineAndFleet(t *testing.T) {
 			t.Fatalf("missing json field %q in %s", key, string(b))
 		}
 	}
+	if _, ok := raw["finished_at"]; ok {
+		t.Fatalf("finished_at should be omitted for non-terminal task: %s", string(b))
+	}
+}
+
+func TestTaskStatusResponseIncludesFinishedAt(t *testing.T) {
+	created := time.Date(2026, 5, 24, 20, 1, 0, 0, time.UTC)
+	claimed := created.Add(2 * time.Second)
+	finished := claimed.Add(90 * time.Second)
+	exitCode := 0
+	task := &models.Task{
+		ID:         "task-1",
+		FleetID:    "e1-tiny-amd64",
+		Status:     models.StatusSucceeded,
+		CreatedAt:  created,
+		ClaimedAt:  &claimed,
+		FinishedAt: &finished,
+		ExitCode:   &exitCode,
+	}
+
+	resp := taskStatusResponse(task, &Server{})
+	if resp.FinishedAt == nil || !resp.FinishedAt.Equal(finished) {
+		t.Fatalf("finished_at: %#v", resp.FinishedAt)
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["finished_at"]; !ok {
+		t.Fatalf("missing json field finished_at in %s", string(b))
+	}
 }

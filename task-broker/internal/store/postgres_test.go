@@ -875,6 +875,118 @@ func TestFinalizeTerminatedRunnerTasksIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestTerminalTransitionsSetFinishedAt(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	t.Run("complete keeps claimed_at and sets finished_at", func(t *testing.T) {
+		taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+		result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+			ID:       taskID,
+			RunnerID: "runner-1",
+			ExitCode: 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Task.FinishedAt == nil {
+			t.Fatal("finished_at should be set on completion")
+		}
+		if result.Task.ClaimedAt == nil {
+			t.Fatal("claimed_at should be preserved on completion")
+		}
+		if result.Task.FinishedAt.Before(*result.Task.ClaimedAt) {
+			t.Fatalf("finished_at %v before claimed_at %v", result.Task.FinishedAt, result.Task.ClaimedAt)
+		}
+	})
+
+	t.Run("cancel while queued sets finished_at without claimed_at", func(t *testing.T) {
+		taskID := uuid.NewString()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         taskID,
+			FleetID:    "fleet-finished-at",
+			Status:     models.StatusQueued,
+			CreatedAt:  time.Now().UTC(),
+			WebhookURL: "https://example.com/hook",
+			Commands:   models.CommandList{{Command: "echo hi"}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		task, outcome, err := st.RequestCancelTask(ctx, taskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome != taskstore.CancelOutcomeCanceledQueued {
+			t.Fatalf("cancel outcome: got %s want %s", outcome, taskstore.CancelOutcomeCanceledQueued)
+		}
+		if task.FinishedAt == nil {
+			t.Fatal("finished_at should be set on queued cancel")
+		}
+		if task.ClaimedAt != nil {
+			t.Fatalf("claimed_at should stay nil for never-claimed task: %v", task.ClaimedAt)
+		}
+	})
+
+	t.Run("finalize lost runner sets finished_at", func(t *testing.T) {
+		taskID := createClaimedTask(t, ctx, st, "runner-2", 1)
+		if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-2"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-2"}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.GetTask(ctx, taskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != models.StatusFailed {
+			t.Fatalf("status: got %s want failed", got.Status)
+		}
+		if got.FinishedAt == nil {
+			t.Fatal("finished_at should be set when a lost runner task is finalized")
+		}
+	})
+
+	t.Run("lease reap cancel sets finished_at", func(t *testing.T) {
+		now := time.Now().UTC()
+		taskID := uuid.NewString()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:              taskID,
+			FleetID:         "fleet-finished-at",
+			Status:          models.StatusClaimed,
+			CreatedAt:       now,
+			ClaimedAt:       &now,
+			LeaseUntil:      ptrTime(now.Add(-time.Minute)),
+			RunnerID:        "runner-3",
+			WebhookURL:      "https://example.com/hook",
+			Commands:        models.CommandList{{Command: "echo hi"}},
+			CancelRequested: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, canceled, err := st.ReapExpiredLeases(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reaped *models.Task
+		for _, c := range canceled {
+			if c.ID == taskID {
+				reaped = c
+			}
+		}
+		if reaped == nil {
+			t.Fatalf("task %s should be canceled by the lease reaper: %#v", taskID, canceled)
+		}
+		if reaped.Status != models.StatusCanceled {
+			t.Fatalf("status: got %s want canceled", reaped.Status)
+		}
+		if reaped.FinishedAt == nil {
+			t.Fatal("finished_at should be set when the lease reaper cancels a task")
+		}
+	})
+}
+
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
 	t.Helper()
 	taskID := uuid.NewString()
