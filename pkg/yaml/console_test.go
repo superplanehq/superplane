@@ -935,6 +935,88 @@ spec:
 	assert.Empty(t, parsed.Pages())
 }
 
+// TestValidateShape_AcceptsGrandfatheredOverCap_RejectsShapeErrors is
+// the contract test for the lenient-parse-plus-shape-check pattern
+// used by every write-to-staging path (commit_canvas_staging,
+// `apps console set`, `apps staging update`, the agent `patch_staging`
+// tool). All of those paths must accept a grandfathered document that
+// exceeds MaxConsolePanelsPerPage — otherwise a user with an over-cap
+// console cannot re-stage the file even to reduce it — while still
+// rejecting document-level shape errors (wrong apiVersion, wrong
+// kind, mixed spec shapes, unsupported panel types, missing/duplicate
+// ids). Cap enforcement is deferred to commit time via
+// `ValidateConsolePagesDelta`.
+func TestValidateShape_AcceptsGrandfatheredOverCap_RejectsShapeErrors(t *testing.T) {
+	overCap := func() []byte {
+		var b strings.Builder
+		b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
+		for i := 0; i < MaxConsolePanelsPerPage+3; i++ {
+			fmt.Fprintf(&b, "    - id: panel-%d\n      type: markdown\n      content: {}\n", i)
+		}
+		b.WriteString("  layout: []\n")
+		return []byte(b.String())
+	}
+
+	// 1. Grandfathered over-cap document: lenient parse must accept
+	//    it and ValidateShape must not surface a cap-related error.
+	//    This is what unblocks `apps staging update`, `patch_staging`,
+	//    and the commit flow for existing over-cap consoles.
+	parsed, err := ConsoleFromYMLLenient(overCap())
+	require.NoError(t, err)
+	require.NoError(t, parsed.ValidateShape())
+
+	// 2. Structural / shape errors still surface via ValidateShape,
+	//    so switching a write path from strict `ConsoleFromYML` to
+	//    `ConsoleFromYMLLenient + ValidateShape` does not silently
+	//    accept malformed input. Each case below mirrors a class of
+	//    error that a real client could produce (wrong kind, wrong
+	//    apiVersion, mixed spec shapes, unsupported panel type).
+	shapeErrorCases := []struct {
+		name    string
+		yaml    string
+		wantMsg string
+	}{
+		{
+			name:    "wrong kind",
+			yaml:    "apiVersion: v1\nkind: Canvas\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+			wantMsg: "unsupported kind",
+		},
+		{
+			name:    "wrong apiVersion",
+			yaml:    "apiVersion: v2\nkind: Console\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+			wantMsg: "unsupported apiVersion",
+		},
+		{
+			name: "mixed spec shapes",
+			yaml: "apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n" +
+				"  panels: []\n" +
+				"  pages:\n    - id: main\n      panels: []\n      layout: []\n",
+			wantMsg: "pages cannot be combined with",
+		},
+		{
+			name: "unsupported panel type",
+			yaml: "apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n" +
+				"  panels:\n    - id: p1\n      type: mystery-panel\n      content: {}\n" +
+				"  layout: []\n",
+			wantMsg: "unsupported type",
+		},
+	}
+	for _, tc := range shapeErrorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, parseErr := ConsoleFromYMLLenient([]byte(tc.yaml))
+			// The mixed-shapes and unsupported-panel cases parse
+			// cleanly at the JSON-decode layer but must fail on
+			// ValidateShape. The wrong-apiVersion/wrong-kind cases
+			// also parse cleanly (they are string fields) and must
+			// fail on ValidateShape. All four hit ValidateShape.
+			require.NoError(t, parseErr)
+			err := doc.ValidateShape()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantMsg)
+		})
+	}
+}
+
 // TestConsoleFromYMLLenient_GrandfathersOverCapPanels verifies that an
 // existing (pre-cap) console with more than MaxConsolePanelsPerPage
 // panels still parses on the read path via ConsoleFromYMLLenient, while

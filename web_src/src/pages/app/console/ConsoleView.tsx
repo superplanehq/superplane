@@ -133,10 +133,22 @@ export function ConsoleView({
   }
 
   if (panels.length === 0 && !hasRemovedDiffPanels(visualDiffWithLocalDeletes)) {
+    // In the pre-multi-page world an empty console was rare (whole
+    // canvas empty), so the "Add first panel" CTA was mostly seen
+    // during initial authoring and its unconditional wiring was
+    // benign in practice. Multi-page consoles make empty pages a
+    // normal state — every new tab starts empty — so view-mode
+    // users routinely land on an empty page. Gate both the CTA and
+    // the underlying dialog on `!readOnly` so we never surface a
+    // clickable authoring affordance to a viewer, and never mount
+    // the dialog in a mode where its confirm handler would attempt
+    // a mutation the caller does not expose.
     return (
       <>
-        <EmptyState onAddFirstPanel={() => setAddPanelOpen(true)} />
-        <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
+        <EmptyState onAddFirstPanel={readOnly ? undefined : () => setAddPanelOpen(true)} />
+        {!readOnly && (
+          <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
+        )}
       </>
     );
   }

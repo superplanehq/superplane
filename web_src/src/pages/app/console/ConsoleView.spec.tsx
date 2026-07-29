@@ -274,6 +274,38 @@ describe("ConsoleView grid transitions", () => {
     expect(container.querySelectorAll('[data-testid="console-removed-panel-ghost"]')).toHaveLength(0);
   });
 
+  it.each([
+    ["view mode hides the add-panel CTA on empty pages", true, false],
+    ["edit mode surfaces the add-panel CTA on empty pages", false, true],
+  ] as const)("%s", (_label, readOnly, expectCta) => {
+    // Regression test for the multi-page world where every new tab
+    // starts empty. Pre-multi-page an empty console was rare, so an
+    // always-on "Add First Panel" CTA was mostly harmless; now that
+    // empty pages are a normal navigation state, view-mode users
+    // routinely land on them and must not see authoring affordances.
+    render(
+      <TestWrapper>
+        <StatefulConsoleView
+          {...BASE_PROPS}
+          panels={[]}
+          layout={[]}
+          persistedPanels={[]}
+          persistedLayout={[]}
+          readOnly={readOnly}
+          isLoading={false}
+          errorMessage={undefined}
+        />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByTestId("console-empty-state")).toBeTruthy();
+    if (expectCta) {
+      expect(screen.getByTestId("console-add-first-panel")).toBeTruthy();
+    } else {
+      expect(screen.queryByTestId("console-add-first-panel")).toBeNull();
+    }
+  });
+
   it("renders a deleted panel ghost immediately after local delete", () => {
     const { container } = render(
       <TestWrapper>
