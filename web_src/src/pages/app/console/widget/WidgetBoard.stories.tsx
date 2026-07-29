@@ -29,12 +29,7 @@ type Story = StoryObj<typeof meta>;
 const boardRender: WidgetBoardRender = {
   kind: "board",
   groupBy: "status",
-  lanes: [
-    { value: "Backlog", color: "gray" },
-    { value: "In Progress", label: "Building", color: "blue" },
-    { value: "Review", color: "yellow" },
-    { value: "Done", color: "green" },
-  ],
+  lanes: [{ value: "Backlog" }, { value: "In Progress", label: "Building" }, { value: "Review" }, { value: "Done" }],
   card: {
     titleField: "title",
     fields: [

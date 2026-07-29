@@ -19,11 +19,9 @@ import { normalizeTableDataSource } from "./runDataSourceFilterSchema";
 import type { TablePanelDataSource } from "./panelTypes";
 import { validateDataSource, validateSort } from "./panelTypes";
 import {
-  WIDGET_BOARD_LANE_COLORS,
   WIDGET_FILTER_OPS,
   type WidgetBoardCard,
   type WidgetBoardLane,
-  type WidgetBoardLaneColor,
   type WidgetBoardRender,
   type WidgetColumnFormat,
   type WidgetRowAction,
@@ -60,7 +58,7 @@ export function templateForBoardPanel(defaultTitle?: string): BoardPanelContent 
     render: {
       kind: "board",
       groupBy: "status",
-      lanes: [{ value: "Todo" }, { value: "In Progress" }, { value: "Done", color: "green" }],
+      lanes: [{ value: "Todo" }, { value: "In Progress" }, { value: "Done" }],
       card: { titleField: "title" },
     },
   };
@@ -102,14 +100,10 @@ function normalizeLanes(raw: unknown): WidgetBoardLane[] {
     if (!obj) continue;
     const value = typeof obj.value === "string" ? obj.value : "";
     if (!value.trim()) continue;
-    const color =
-      typeof obj.color === "string" && WIDGET_BOARD_LANE_COLORS.includes(obj.color as WidgetBoardLaneColor)
-        ? (obj.color as WidgetBoardLaneColor)
-        : undefined;
+    // Legacy `color` keys are dropped — lane chrome is uncolored.
     out.push({
       value,
       label: typeof obj.label === "string" ? obj.label : undefined,
-      color,
     });
   }
   return out;
@@ -238,11 +232,6 @@ function validateLanes(raw: unknown): string | null {
     seenValues.add(normalizedValue);
     const labelError = optionalStringError(`render.lanes[${i}].label`, lane.label);
     if (labelError) return labelError;
-    if (lane.color !== undefined && lane.color !== null) {
-      if (typeof lane.color !== "string" || !WIDGET_BOARD_LANE_COLORS.includes(lane.color as WidgetBoardLaneColor)) {
-        return `render.lanes[${i}].color must be one of ${WIDGET_BOARD_LANE_COLORS.join(", ")}.`;
-      }
-    }
   }
   return null;
 }
