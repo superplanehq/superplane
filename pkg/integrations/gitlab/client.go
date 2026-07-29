@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -1496,44 +1497,25 @@ type ListCommitStatusesRequest struct {
 	Name string
 }
 
-// ListCommitStatuses returns the build/CI statuses of a commit (latest per context by default).
-func (c *Client) ListCommitStatuses(ctx context.Context, projectID, sha string, req *ListCommitStatusesRequest) ([]CommitStatus, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s/statuses", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha))
-
+// ListCommitStatuses returns the build/CI statuses of a commit (latest per context by
+// default), following pagination so commits with many statuses are not truncated.
+func (c *Client) ListCommitStatuses(projectID, sha string, req *ListCommitStatusesRequest) ([]CommitStatus, error) {
+	query := url.Values{}
 	if req != nil {
-		query := url.Values{}
 		if req.Ref != "" {
 			query.Set("ref", req.Ref)
 		}
 		if req.Name != "" {
 			query.Set("name", req.Name)
 		}
-		if encoded := query.Encode(); encoded != "" {
-			apiURL += "?" + encoded
-		}
 	}
+	query.Set("per_page", "100")
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to list commit statuses: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
-	}
-
-	var statuses []CommitStatus
-	if err := json.NewDecoder(resp.Body).Decode(&statuses); err != nil {
-		return nil, fmt.Errorf("failed to decode commit statuses: %v", err)
-	}
-
-	return statuses, nil
+	return fetchAllResources[CommitStatus](c, func(page int) string {
+		query.Set("page", strconv.Itoa(page))
+		return fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s/statuses?%s",
+			c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha), query.Encode())
+	})
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409

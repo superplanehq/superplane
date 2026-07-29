@@ -1,7 +1,6 @@
 package gitlab
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -161,7 +160,7 @@ func (c *GetCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
-	statuses, err := client.ListCommitStatuses(context.Background(), config.Project, strings.TrimSpace(config.SHA), &ListCommitStatusesRequest{
+	statuses, err := client.ListCommitStatuses(config.Project, strings.TrimSpace(config.SHA), &ListCommitStatusesRequest{
 		Ref:  strings.TrimSpace(config.Ref),
 		Name: strings.TrimSpace(config.Name),
 	})
