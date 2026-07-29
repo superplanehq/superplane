@@ -30,5 +30,6 @@ type Task struct {
 	ErrorMessage                 string     `gorm:""`
 	InfraRetryCount              int        `gorm:"not null;default:0"`
 	CancelRequested              bool       `gorm:"not null;default:false"`
+	WebhookPayloadSizeLimit      int        `gorm:"not null;default:0"`
 	RunnerTerminationRequestedAt *time.Time `gorm:""`
 }

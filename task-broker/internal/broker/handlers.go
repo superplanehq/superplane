@@ -476,6 +476,9 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		v := *req.ExecutionTimeoutSeconds
 		task.ExecutionTimeoutSeconds = &v
 	}
+	if req.WebhookPayloadSizeLimit > 0 {
+		task.WebhookPayloadSizeLimit = req.WebhookPayloadSizeLimit
+	}
 	if err := s.Store.CreateTask(ctx, task); err != nil {
 		s.logErr("create task", err)
 		writeError(w, http.StatusInternalServerError, "could not create task")
