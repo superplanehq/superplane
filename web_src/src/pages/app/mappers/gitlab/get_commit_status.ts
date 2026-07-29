@@ -11,7 +11,7 @@ import type {
 import { formatTimestamp } from "../utils";
 import { baseProps } from "./base";
 import type { CommitStatus, GitLabNodeMetadata } from "./types";
-import { buildGitlabExecutionSubtitle } from "./utils";
+import { buildGitlabExecutionSubtitle, shortSha } from "./utils";
 
 interface GetCommitStatusConfiguration {
   project?: string;
@@ -32,7 +32,7 @@ export const getCommitStatusMapper: ComponentBaseMapper = {
     }
 
     if (configuration.sha) {
-      metadataItems.push({ icon: "git-commit", label: configuration.sha.slice(0, 8) });
+      metadataItems.push({ icon: "git-commit", label: shortSha(configuration.sha) });
     }
 
     return {

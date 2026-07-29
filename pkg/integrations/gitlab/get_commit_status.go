@@ -168,6 +168,11 @@ func (c *GetCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get commit status: %w", err)
 	}
 
+	if statuses == nil {
+		// Emit an empty array rather than JSON null when a commit has no statuses.
+		statuses = []CommitStatus{}
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		CommitStatusesPayloadType,

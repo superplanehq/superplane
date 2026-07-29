@@ -110,6 +110,30 @@ func Test__GetCommitStatus__Execute(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/123/repository/commits/abc123/statuses?order_by=id&page=1&per_page=100&sort=desc", httpCtx.Requests[0].URL.String())
 	})
 
+	t.Run("emits an empty array when there are no statuses", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[]`),
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration:  map[string]any{"project": "123", "sha": "abc123"},
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		require.Len(t, executionState.Payloads, 1)
+		payload := executionState.Payloads[0].(map[string]any)
+		dataBytes, err := json.Marshal(payload["data"])
+		require.NoError(t, err)
+		assert.Equal(t, "[]", string(dataBytes))
+	})
+
 	t.Run("applies ref and name filters", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
