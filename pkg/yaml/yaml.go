@@ -39,29 +39,47 @@ func normalizeCanvasDocument(doc map[string]any) {
 }
 
 // normalizeConsoleDocument fixes YAML 1.1 layout items where unquoted "y" was
-// parsed as boolean true.
+// parsed as boolean true. Applies to both the legacy top-level layout list
+// and the layout list nested inside each `pages[]` entry so multi-page
+// consoles inherit the same fix.
 func normalizeConsoleDocument(doc map[string]any) {
 	spec, ok := doc["spec"].(map[string]any)
 	if !ok {
 		return
 	}
 
-	layout, ok := spec["layout"].([]any)
+	if layout, ok := spec["layout"].([]any); ok {
+		spec["layout"] = normalizeConsoleLayoutList(layout)
+	}
+
+	pages, ok := spec["pages"].([]any)
 	if !ok {
 		return
 	}
 
+	for i, rawPage := range pages {
+		page, ok := rawPage.(map[string]any)
+		if !ok {
+			continue
+		}
+		if pageLayout, ok := page["layout"].([]any); ok {
+			page["layout"] = normalizeConsoleLayoutList(pageLayout)
+		}
+		pages[i] = page
+	}
+	spec["pages"] = pages
+}
+
+func normalizeConsoleLayoutList(layout []any) []any {
 	for i, raw := range layout {
 		item, ok := raw.(map[string]any)
 		if !ok {
 			continue
 		}
-
 		normalizeYAML1YKey(item)
 		layout[i] = item
 	}
-
-	spec["layout"] = layout
+	return layout
 }
 
 func normalizeYAML1YKey(m map[string]any) {

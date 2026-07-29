@@ -18,11 +18,13 @@ Use this skill when working on **per-canvas consoles**: the console mode overlay
 
 ## Product rules (do not break)
 
-- One console per **canvas** (not templates). Stored as versioned JSON `panels` + `layout` on the canvas version.
-- Console mode hides the graph; **12-column** `react-grid-layout` (`ConsoleView`).
-- **Edit** (panels, layout, YAML import): `canvases:update`, not template, canvas not deleted.
+- One console per **canvas** (not templates). Stored as a versioned JSON `pages[]` list (each page owns its own `panels` + `layout`) on the canvas version.
+- A canvas console can have **1–5 pages**; a page holds up to **20 panels**. Existing pre-cap consoles are grandfathered — the read path never validates them, so they still render, but any new import / commit that pushes a page past the cap is rejected.
+- Console mode hides the graph; **12-column** `react-grid-layout` (`ConsoleView`) renders the active page. The tab strip (`ConsolePageTabs`) sits above the grid; it is hidden in view mode when the console has one page and is always shown in edit mode so `+ add page` stays discoverable.
+- Active page is driven by `?view=console&page=<id>` (the `page` param is dropped when the console has one page); the resolver in `lib/lastVisitedConsolePage.ts` prefers an explicit valid param, then the last-visited page, then the first page. A stale stored id silently falls through.
+- **Edit** (panels, layout, YAML import, page add / rename / reorder / remove): `canvases:update`, not template, canvas not deleted. The last page cannot be removed.
 - **Run** (node panel Run, table / board row actions): same as edit — `InvokeNodeTriggerHook`; UI uses `canRunNodes`.
-- YAML import is **replace-all** (max **50** panels, **1 MiB** payload).
+- YAML import is **replace-all** for the whole console document (all pages). Payload cap: **1 MiB** per page.
 - User-facing name: **SuperPlane** (capital P).
 - Row actions are **`kind: trigger` only** — they fire trigger nodes; they do not call HTTP Request nodes directly.
 
@@ -32,16 +34,21 @@ Use this skill when working on **per-canvas consoles**: the console mode overlay
 
 | Layer | Key paths |
 | --- | --- |
-| Console page | `web_src/src/pages/app/console/ConsoleView.tsx` — grid, Add Panel picker, YAML modal wiring |
+| Console overlay | `web_src/src/pages/app/console/ConsoleOverlay.tsx` — page-state wiring, tab strip, YAML modal, active page → URL sync |
+| Console page | `console/ConsoleView.tsx` — grid and Add Panel picker for a single active page |
+| Page tabs | `console/ConsolePageTabs.tsx` — folder-style strip with add / rename / drag-reorder / remove (edit mode) |
+| Page state | `console/useConsolePagesState.ts` — active-page-scoped panel edits, debounced save, page CRUD |
+| Active page persistence | `web_src/src/lib/lastVisitedConsolePage.ts` — localStorage per-canvas `pageId` + `resolveActiveConsolePage` (?page= → stored → first page) |
 | Context | `console/ConsoleContext.tsx`, `ConsoleContextProvider.tsx` |
 | Trigger hook | `console/useConsoleRunTrigger.ts`, `useConsoleTriggerLock.ts` |
 | Panel router | `console/ConsolePanelCards.tsx` |
 | Schema | `console/panelTypes.ts` — types, templates, validators, `normalizeTablePanelContent`, `normalizeBoardPanelContent` |
-| YAML (FE) | `console/consoleYaml.ts`, `ConsoleYamlModal.tsx` |
+| YAML (FE) | `console/consoleYaml.ts` (`parseConsoleYaml` / `parseConsoleYamlLenient` / `consoleToYaml`), `ConsoleYamlModal.tsx` |
 | Widget data | `console/widget/useWidgetData.ts` |
 | Widget UI | `console/widget/WidgetTable.tsx`, `WidgetBoard.tsx`, `WidgetChart.tsx`, `WidgetNumber.tsx`, `WidgetScorecard.tsx` |
-| Backend | `pkg/yaml/console.go` — YAML import/export + validators |
-| Proto | `protos/canvases.proto` — console panels live on the canvas version |
+| Backend | `pkg/yaml/console.go` — YAML import/export + validators; `ConsoleFromYML` (save) and `ConsoleFromYMLLenient` (read/grandfather) |
+| Storage | `pkg/models/canvas_version.go` (`ConsolePages datatypes.JSONType[[]ConsolePage]`), `pkg/models/console.go` (`ConsolePage`, update / upsert helpers) |
+| Proto | `protos/canvases.proto` — the console travels as a YAML repository file, not a protobuf message |
 
 **Invariant:** `panelTypes.ts` validators (plus satellite modules like `boardPanelContent.ts` and `nodesPanelContent.ts`), `pkg/yaml/console.go`, and widget `types.ts` must agree. Frontend fast-fails; backend is authoritative on import.
 
@@ -150,7 +157,12 @@ Helpers live in `widget/scorecardMath.ts` (`extractScorecardSeries`, `pickChange
 
 ## YAML
 
+Two accepted shapes live in the same `console.yaml` — **legacy** for 0-or-1
+page consoles (zero diff noise for existing apps) and **multi-page** once
+a second page exists.
+
 ```yaml
+# Legacy (single-page) — emitted for empty and one-page consoles.
 apiVersion: v1
 kind: Console
 metadata:
@@ -161,9 +173,29 @@ spec:
   layout: [{ i, x, y, w, h, minW?, minH? }]
 ```
 
-- FE: `consoleYaml.ts` — parse/serialize + `validatePanelContent`
-- BE: `ConsoleFromYML` / `VersionToConsoleYML` in `pkg/yaml/console.go`
-- Unknown fields rejected; missing `panels`/`layout` → empty lists
+```yaml
+# Multi-page — emitted when the console has 2+ pages.
+apiVersion: v1
+kind: Console
+metadata: { name: <display> }
+spec:
+  pages:
+    - id: overview
+      name: Overview
+      panels: [{ id, type, content }]
+      layout: [{ i, x, y, w, h, minW?, minH? }]
+    - id: details
+      name: Details
+      panels: []
+      layout: []
+```
+
+- FE: `consoleYaml.ts` — `parseConsoleYaml` (save path, enforces caps and page-id uniqueness), `parseConsoleYamlLenient` (render path, skips cap / uniqueness so grandfathered consoles still display), `consoleToYaml` (legacy-until-multi export), `validatePanelContent`.
+- BE: `ConsoleFromYML` (save / import / install) and `ConsoleFromYMLLenient` (read path) in `pkg/yaml/console.go`; `VersionToConsoleYML` mirrors the legacy-until-multi export.
+- Unknown top-level, `metadata`, `page`, `panel`, and `layout` fields are rejected.
+- `spec.pages` and top-level `spec.panels`/`spec.layout` are mutually exclusive; a document that mixes them is rejected.
+- Missing `spec.panels`/`spec.layout` → empty lists; missing `spec.pages` collapses to the legacy shape (empty console).
+- Caps: max **5** pages per console, max **20** panels per page, **1 MiB** payload per page. Existing over-cap data still renders via the lenient parsers.
 
 ---
 
