@@ -182,8 +182,8 @@ function isInlineLayout(entry: NodesPanelNode, canManualRun: boolean): boolean {
 function singleNodeLayoutStyles(useInlineLayout: boolean) {
   return {
     container: useInlineLayout
-      ? "flex h-full min-h-0 flex-col items-stretch gap-3 p-4"
-      : "flex h-full flex-col items-center justify-center gap-3 p-4",
+      ? "flex h-full min-h-0 flex-col items-stretch gap-3 p-3"
+      : "flex h-full flex-col items-center justify-center gap-3 p-3",
     header: "shrink-0 text-[13px] font-semibold text-slate-800 dark:text-gray-100",
     description: useInlineLayout
       ? "shrink-0 text-[13px] text-slate-500 dark:text-gray-400"
