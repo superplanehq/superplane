@@ -151,12 +151,8 @@ func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
 		return
 	}
 
-	duration := task.FinishedAt.Sub(*task.ClaimedAt)
-	seconds := int64(duration / time.Second)
-	if duration%time.Second != 0 {
-		seconds++
-	}
-	if seconds <= 0 {
+	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
+	if seconds == 0 {
 		return
 	}
 
@@ -165,6 +161,21 @@ func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
 			logger.WithError(err).Warn("runner: failed to publish usage")
 		}
 	}
+}
+
+// billableSeconds rounds a task duration up to the next whole second. Clock skew
+// between the runner and the broker can put finished_at before claimed_at, so
+// non-positive durations bill nothing rather than rounding up to one second.
+func billableSeconds(duration time.Duration) int64 {
+	if duration <= 0 {
+		return 0
+	}
+
+	seconds := int64(duration / time.Second)
+	if duration%time.Second != 0 {
+		seconds++
+	}
+	return seconds
 }
 
 func cancelBrokerTask(ctx core.ExecutionContext) error {
