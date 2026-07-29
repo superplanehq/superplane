@@ -562,7 +562,7 @@ func TestRunnerProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"items":[1,2],"ok":true}`),
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
@@ -584,7 +584,7 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`not-json`),
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	wrapped := state.Payloads[0].(map[string]any)
 	data := wrapped["data"].(map[string]any)
 	_, ok := data["result"]
@@ -600,7 +600,7 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 		Status:   "canceled",
 		ExitCode: &exit,
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 }
 
