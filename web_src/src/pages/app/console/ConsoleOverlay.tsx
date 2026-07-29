@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
+import { showErrorToast } from "@/lib/toast";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
@@ -7,6 +8,7 @@ import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 import type { CanvasConsoleQueryResult, ConsolePage, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
 import { ConsolePageTabs } from "./ConsolePageTabs";
+import { formatConsoleSaveErrorMessage } from "./consoleSaveErrorMessage";
 import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
 import type { ConsoleContextValue, ConsoleNodeStatus } from "./ConsoleContext";
@@ -151,7 +153,21 @@ function useConsoleEditorState({
   const persistedPageIds = useMemo(() => persistedPages.map((page) => page.id), [persistedPages]);
 
   const handleChange = useCallback((next: { pages: ConsolePage[] }) => {
-    updateConsoleMutationRef.current.mutate(next);
+    // The mutation applies its own delta-cap and structural validation
+    // and rolls back the console cache on rejection (see
+    // `useUpdateCanvasConsole`). Without a toast the user experiences
+    // a phantom edit: `useConsolePagesState` accepted the new panel
+    // into `localPages` optimistically, so the panel briefly renders,
+    // then the rollback triggers the props-sync effect in
+    // `useDebouncedPages` which restores `localPages` from the
+    // rolled-back cache and the panel disappears with no explanation.
+    // Emit an error toast here so the user learns *why* their edit
+    // was reverted (e.g., "Too many panels (max 20 per page).").
+    updateConsoleMutationRef.current.mutate(next, {
+      onError: (error) => {
+        showErrorToast(formatConsoleSaveErrorMessage(error));
+      },
+    });
   }, []);
 
   const handleImportYaml = useCallback(async (next: { pages: ConsolePage[] }) => {

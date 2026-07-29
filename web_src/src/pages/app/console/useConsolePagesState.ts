@@ -231,10 +231,21 @@ function usePanelHandlers({ activePageId, setLocalPages, queueSave, onActivePage
         // regrow up to their previously committed count. A blanket
         // `>= MAX_CONSOLE_PANELS_PER_PAGE` guard would over-eagerly
         // freeze grandfathered pages at 20 even when the mutation
-        // would accept adding more. Rapid clicks that push past the
-        // cap on a fresh page are caught at mutation time (rollback +
-        // error toast). The UI disables the control at the cap for
-        // fresh pages, which handles the common case.
+        // would accept adding more.
+        //
+        // When a user does push a *fresh* page past the cap, the
+        // flow is: local state accepts the new panel optimistically
+        // here, the debounced save calls the mutation, the mutation
+        // rejects the delta, React Query rolls back the console cache
+        // via `onError`, the props-sync effect in `useDebouncedPages`
+        // restores `localPages` from the rolled-back cache, and
+        // `handleChange` in `ConsoleOverlay` fires an error toast so
+        // the user learns why the panel disappeared. There is no
+        // pre-flight disable of the add-panel control: knowing the
+        // authoritative cap for a given page requires reading the
+        // committed baseline count (grandfathered pages can exceed
+        // MAX_CONSOLE_PANELS_PER_PAGE), and the mutation is the
+        // source of truth for that check.
         const next = base.map((page) => {
           if (page.id !== targetId) return page;
           const id = uniquePanelId(page.panels, baseId);
