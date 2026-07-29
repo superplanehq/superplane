@@ -1,7 +1,10 @@
 package runner
 
 import (
+	"errors"
+
 	"github.com/superplanehq/superplane/pkg/core"
+	"google.golang.org/grpc/status"
 )
 
 // RunnerMinutesLimitChecker blocks starting a new runner task when an org is over budget.
@@ -18,5 +21,13 @@ func ensureRunnerMinutesAvailable(ctx core.ExecutionContext) error {
 	if runnerMinutesLimitChecker == nil {
 		return nil
 	}
-	return runnerMinutesLimitChecker(ctx.OrganizationID)
+
+	err := runnerMinutesLimitChecker(ctx.OrganizationID)
+	if err == nil {
+		return nil
+	}
+
+	// The checker reports limits as gRPC status errors, but this error becomes the
+	// canvas failure reason verbatim, so keep only the human-readable message.
+	return errors.New(status.Convert(err).Message())
 }
