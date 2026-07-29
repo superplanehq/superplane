@@ -53,42 +53,15 @@ func commitStatusStateOptions() []configuration.FieldOption {
 type PublishCommitStatus struct{}
 
 type PublishCommitStatusConfiguration struct {
-	Project     string  `mapstructure:"project"`
-	SHA         string  `mapstructure:"sha"`
-	State       string  `mapstructure:"state"`
-	Name        string  `mapstructure:"name"`
-	TargetURL   string  `mapstructure:"targetUrl"`
-	Description string  `mapstructure:"description"`
-	Ref         string  `mapstructure:"ref"`
-	Coverage    float64 `mapstructure:"coverage"`
-	PipelineID  string  `mapstructure:"pipelineId"`
-}
-
-// publishCommitStatusToggles tracks which optional fields were turned on via
-// their UI toggle. Coverage in particular needs this: 0 is a valid value, so a
-// toggled-on zero must be sent while an untoggled field is omitted.
-type publishCommitStatusToggles struct {
-	Name        bool
-	TargetURL   bool
-	Description bool
-	Ref         bool
-	Coverage    bool
-	PipelineID  bool
-}
-
-func newPublishCommitStatusToggles(raw map[string]any) publishCommitStatusToggles {
-	enabled := func(field string) bool {
-		v, ok := raw[field]
-		return ok && v != nil
-	}
-	return publishCommitStatusToggles{
-		Name:        enabled("name"),
-		TargetURL:   enabled("targetUrl"),
-		Description: enabled("description"),
-		Ref:         enabled("ref"),
-		Coverage:    enabled("coverage"),
-		PipelineID:  enabled("pipelineId"),
-	}
+	Project     string   `mapstructure:"project"`
+	SHA         string   `mapstructure:"sha"`
+	State       string   `mapstructure:"state"`
+	Name        string   `mapstructure:"name"`
+	TargetURL   string   `mapstructure:"targetUrl"`
+	Description string   `mapstructure:"description"`
+	Ref         string   `mapstructure:"ref"`
+	Coverage    *float64 `mapstructure:"coverage"`
+	PipelineID  string   `mapstructure:"pipelineId"`
 }
 
 func (c *PublishCommitStatus) Name() string {
@@ -117,12 +90,12 @@ func (c *PublishCommitStatus) Documentation() string {
 - **Project** (required): The GitLab project containing the commit
 - **Commit SHA** (required): The commit to attach the status to (supports expressions)
 - **State** (required): One of pending, running, success, failed, canceled, skipped
-- **Name** (toggle): Label distinguishing this status from others on the same commit (GitLab defaults to ` + "`default`" + `)
-- **Target URL** (toggle): URL the status links to, e.g. the build or job page
-- **Description** (toggle): Short description shown alongside the status
-- **Ref** (toggle): Branch or tag the status is reported for
-- **Coverage** (toggle): Total code coverage percentage
-- **Pipeline ID** (toggle): Attach the status to a specific pipeline when several ran on the commit
+- **Name** (optional): Label distinguishing this status from others on the same commit (GitLab defaults to ` + "`default`" + `)
+- **Target URL** (optional): URL the status links to, e.g. the build or job page
+- **Description** (optional): Short description shown alongside the status
+- **Ref** (optional): Branch or tag the status is reported for
+- **Coverage** (optional): Total code coverage percentage
+- **Pipeline ID** (optional): Attach the status to a specific pipeline when several ran on the commit
 
 ## Permissions
 
@@ -191,7 +164,6 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 			Label:       "Name",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "Label distinguishing this status from others on the same commit",
 		},
 		{
@@ -199,22 +171,19 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 			Label:       "Target URL",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "URL the status links to, e.g. the build or job page",
 		},
 		{
-			Name:      "description",
-			Label:     "Description",
-			Type:      configuration.FieldTypeText,
-			Required:  false,
-			Togglable: true,
+			Name:     "description",
+			Label:    "Description",
+			Type:     configuration.FieldTypeText,
+			Required: false,
 		},
 		{
 			Name:        "ref",
 			Label:       "Ref",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "Branch or tag the status is reported for",
 		},
 		{
@@ -222,7 +191,6 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 			Label:       "Coverage",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Togglable:   true,
 			Description: "Total code coverage percentage",
 		},
 		{
@@ -230,7 +198,6 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 			Label:       "Pipeline ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "Attach the status to a specific pipeline when several ran on the commit",
 		},
 	}
@@ -284,37 +251,23 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
-	raw, _ := ctx.Configuration.(map[string]any)
-	toggles := newPublishCommitStatusToggles(raw)
-	req := &CreateCommitStatusRequest{State: config.State}
-
-	if toggles.Name {
-		req.Name = config.Name
+	// Optional fields are omitted when empty (the request struct uses omitempty).
+	// Coverage is a pointer so an explicit 0 is still sent while an unset value is dropped.
+	req := &CreateCommitStatusRequest{
+		State:       config.State,
+		Name:        config.Name,
+		TargetURL:   config.TargetURL,
+		Description: config.Description,
+		Ref:         config.Ref,
+		Coverage:    config.Coverage,
 	}
 
-	if toggles.TargetURL {
-		req.TargetURL = config.TargetURL
-	}
-
-	if toggles.Description {
-		req.Description = config.Description
-	}
-
-	if toggles.Ref {
-		req.Ref = config.Ref
-	}
-
-	if toggles.Coverage {
-		coverage := config.Coverage
-		req.Coverage = &coverage
-	}
-
-	if toggles.PipelineID && strings.TrimSpace(config.PipelineID) != "" {
-		pipelineID, err := parseWholeNumberID(config.PipelineID, "pipeline ID")
+	if pipelineID := strings.TrimSpace(config.PipelineID); pipelineID != "" {
+		id, err := parseWholeNumberID(pipelineID, "pipeline ID")
 		if err != nil {
 			return err
 		}
-		req.PipelineID = &pipelineID
+		req.PipelineID = &id
 	}
 
 	status, err := client.CreateCommitStatus(context.Background(), config.Project, strings.TrimSpace(config.SHA), req)

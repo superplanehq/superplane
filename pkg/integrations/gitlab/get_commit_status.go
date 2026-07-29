@@ -52,8 +52,8 @@ func (c *GetCommitStatus) Documentation() string {
 
 - **Project** (required): The GitLab project containing the commit
 - **Commit SHA** (required): The commit to read statuses for (supports expressions)
-- **Ref** (toggle): Only return statuses reported for this branch or tag
-- **Name** (toggle): Only return statuses with this job name
+- **Ref** (optional): Only return statuses reported for this branch or tag
+- **Name** (optional): Only return statuses with this job name
 
 ## Permissions
 
@@ -110,7 +110,6 @@ func (c *GetCommitStatus) Configuration() []configuration.Field {
 			Label:       "Ref",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "Only return statuses reported for this branch or tag",
 		},
 		{
@@ -118,7 +117,6 @@ func (c *GetCommitStatus) Configuration() []configuration.Field {
 			Label:       "Name",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Togglable:   true,
 			Description: "Only return statuses with this job name",
 		},
 	}

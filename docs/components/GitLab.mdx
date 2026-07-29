@@ -2170,8 +2170,8 @@ The Get Commit Status component retrieves the build/CI statuses reported on a co
 
 - **Project** (required): The GitLab project containing the commit
 - **Commit SHA** (required): The commit to read statuses for (supports expressions)
-- **Ref** (toggle): Only return statuses reported for this branch or tag
-- **Name** (toggle): Only return statuses with this job name
+- **Ref** (optional): Only return statuses reported for this branch or tag
+- **Name** (optional): Only return statuses with this job name
 
 ### Permissions
 
@@ -2587,12 +2587,12 @@ The Publish Commit Status component sets a build/CI status on a specific commit,
 - **Project** (required): The GitLab project containing the commit
 - **Commit SHA** (required): The commit to attach the status to (supports expressions)
 - **State** (required): One of pending, running, success, failed, canceled, skipped
-- **Name** (toggle): Label distinguishing this status from others on the same commit (GitLab defaults to `default`)
-- **Target URL** (toggle): URL the status links to, e.g. the build or job page
-- **Description** (toggle): Short description shown alongside the status
-- **Ref** (toggle): Branch or tag the status is reported for
-- **Coverage** (toggle): Total code coverage percentage
-- **Pipeline ID** (toggle): Attach the status to a specific pipeline when several ran on the commit
+- **Name** (optional): Label distinguishing this status from others on the same commit (GitLab defaults to `default`)
+- **Target URL** (optional): URL the status links to, e.g. the build or job page
+- **Description** (optional): Short description shown alongside the status
+- **Ref** (optional): Branch or tag the status is reported for
+- **Coverage** (optional): Total code coverage percentage
+- **Pipeline ID** (optional): Attach the status to a specific pipeline when several ran on the commit
 
 ### Permissions
 

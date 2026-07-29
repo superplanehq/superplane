@@ -88,7 +88,7 @@ func Test__PublishCommitStatus__Execute(t *testing.T) {
 		},
 	}
 
-	t.Run("success with optional fields toggled", func(t *testing.T) {
+	t.Run("success with optional fields", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -148,7 +148,7 @@ func Test__PublishCommitStatus__Execute(t *testing.T) {
 		assert.Contains(t, bodyString, `"coverage":92.5`)
 	})
 
-	t.Run("omits untoggled optional fields", func(t *testing.T) {
+	t.Run("omits unset optional fields", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
