@@ -121,3 +121,89 @@ export interface Deployment {
   user?: User;
   environment?: DeploymentEnvironment;
 }
+
+export interface ReleaseCommit {
+  id: string;
+  short_id: string;
+  title: string;
+  created_at: string;
+  parent_ids?: string[];
+  message: string;
+  author_name: string;
+  author_email: string;
+  authored_date: string;
+  committer_name: string;
+  committer_email: string;
+  committed_date: string;
+}
+
+export interface ReleaseMilestoneIssueStats {
+  total: number;
+  closed: number;
+}
+
+export interface ReleaseMilestone {
+  id: number;
+  iid: number;
+  project_id: number;
+  title: string;
+  description: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+  due_date?: string;
+  start_date?: string;
+  web_url: string;
+  issue_stats?: ReleaseMilestoneIssueStats;
+}
+
+export interface ReleaseAssetSource {
+  format: string;
+  url: string;
+}
+
+export interface ReleaseAssetLink {
+  id: number;
+  name: string;
+  url: string;
+  link_type: string;
+}
+
+export interface ReleaseAssets {
+  count: number;
+  sources?: ReleaseAssetSource[];
+  links?: ReleaseAssetLink[];
+}
+
+export interface ReleaseEvidence {
+  sha: string;
+  filepath: string;
+  collected_at: string;
+}
+
+export interface ReleaseLinks {
+  closed_issues_url?: string;
+  closed_merge_requests_url?: string;
+  edit_url?: string;
+  merged_merge_requests_url?: string;
+  opened_issues_url?: string;
+  opened_merge_requests_url?: string;
+  self?: string;
+}
+
+export interface Release {
+  tag_name: string;
+  name: string;
+  description: string;
+  created_at: string;
+  released_at: string;
+  author?: User;
+  commit?: ReleaseCommit;
+  milestones?: ReleaseMilestone[];
+  commit_path?: string;
+  tag_path?: string;
+  assets?: ReleaseAssets;
+  evidences?: ReleaseEvidence[];
+  evidence_sha?: string;
+  _links?: ReleaseLinks;
+}

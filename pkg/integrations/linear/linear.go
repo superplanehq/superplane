@@ -105,12 +105,18 @@ func (l *Linear) Configuration() []configuration.Field {
 func (l *Linear) Actions() []core.Action {
 	return []core.Action{
 		&CreateIssue{},
+		&GetIssue{},
+		&UpdateIssue{},
+		&AddIssueLabel{},
+		&AddIssueComment{},
 	}
 }
 
 func (l *Linear) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
+		&OnIssueComment{},
+		&OnIssueLabel{},
 	}
 }
 

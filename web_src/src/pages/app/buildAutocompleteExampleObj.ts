@@ -1,6 +1,27 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import type { ActionsAction, TriggersTrigger } from "@/api-client";
+
+export type AutocompleteAppExample = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+export function buildAutocompleteAppExample(
+  canvas: CanvasesCanvas | null | undefined,
+): AutocompleteAppExample | undefined {
+  const id = canvas?.metadata?.id;
+  if (!id) {
+    return undefined;
+  }
+
+  return {
+    id,
+    name: canvas?.metadata?.name ?? "",
+    description: canvas?.metadata?.description ?? "",
+  };
+}
 
 export type AutocompleteExampleContext = {
   canvasNodes: ComponentsNode[];
@@ -10,7 +31,52 @@ export type AutocompleteExampleContext = {
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   allComponentsByName: Map<string | undefined, ActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
+  app?: AutocompleteAppExample;
 };
+
+// Representative run id used purely to preview the shape of run() in the editor;
+// the real id is only known at runtime.
+const EXAMPLE_RUN_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+
+function currentAppPath(): { origin: string; appPath: string } | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const { origin, pathname } = window.location;
+  const appPath = pathname.match(/^\/[^/]+\/apps\/[^/]+/)?.[0] ?? pathname;
+  return { origin, appPath };
+}
+
+// buildAppExample mirrors the server's app() payload so the autocomplete can
+// surface app().id / app().name / app().description / app().url.
+function buildAppExample(app?: AutocompleteAppExample): Record<string, unknown> {
+  const location = currentAppPath();
+  const id = app?.id || location?.appPath.split("/").pop() || "";
+  const url = location ? `${location.origin}${location.appPath}` : "";
+
+  return {
+    id,
+    name: app?.name ?? "Example App",
+    description: app?.description ?? "",
+    url,
+  };
+}
+
+// buildRunExample mirrors the server's run() payload so the autocomplete can
+// surface run().id / run().url / run().started_at and show a representative preview.
+// The example url is derived from the current app page location
+// (`/{org}/apps/{appId}`), which matches the real run link format.
+function buildRunExample(): Record<string, unknown> {
+  const location = currentAppPath();
+  const url = location ? `${location.origin}${location.appPath}?run=${EXAMPLE_RUN_ID}` : "";
+
+  return {
+    id: EXAMPLE_RUN_ID,
+    url,
+    started_at: new Date().toISOString(),
+  };
+}
 
 function collectChainNodeIds(
   nodeId: string,
@@ -182,6 +248,8 @@ type BuildNamedExampleObjInput = {
   previousByDepth: Record<string, unknown>;
   canvasNodes: ComponentsNode[];
   incomingNodeIdsByTargetId: Map<string, string[]>;
+  appExample: Record<string, unknown>;
+  runExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -193,6 +261,8 @@ function buildNamedExampleObj({
   previousByDepth,
   canvasNodes,
   incomingNodeIdsByTargetId,
+  appExample,
+  runExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -239,6 +309,9 @@ function buildNamedExampleObj({
   if (exampleObj.__previousByDepth) {
     namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
   }
+
+  namedExampleObj.__app = appExample;
+  namedExampleObj.__run = runExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -289,6 +362,8 @@ export function buildAutocompleteExampleObj(
     nodeNamesById,
     nodeMetadata,
     previousByDepth,
+    appExample: buildAppExample(context.app),
+    runExample: buildRunExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

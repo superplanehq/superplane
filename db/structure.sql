@@ -97,7 +97,8 @@ CREATE TABLE public.accounts (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     installation_admin boolean DEFAULT false NOT NULL,
-    password_changed_at timestamp with time zone
+    password_changed_at timestamp with time zone,
+    blocked_at timestamp with time zone
 );
 
 
@@ -735,7 +736,8 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     folder_id uuid,
-    description text DEFAULT ''::text NOT NULL
+    description text DEFAULT ''::text NOT NULL,
+    dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2275,7 +2277,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260720144835	f
+20260728035514	f
 \.
 
 

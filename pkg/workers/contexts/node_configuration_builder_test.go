@@ -2,12 +2,14 @@ package contexts
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -79,6 +81,130 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "42", result["count"])
 }
 
+func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "john"})
+
+	//
+	// Associate the root event with a run so run() can resolve it.
+	//
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: map[string]any{"user": "john"}})
+
+	t.Run("returns id, url, and started_at", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`run()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, run.ID.String(), payload["id"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s?run=%s", canvas.OrganizationID.String(), canvas.ID.String(), run.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "view=runs")
+
+		startedAt, ok := payload["started_at"].(time.Time)
+		require.True(t, ok)
+		require.NotNil(t, run.CreatedAt)
+		assert.WithinDuration(t, *run.CreatedAt, startedAt, time.Second)
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"runID":  "{{ run().id }}",
+			"runURL": "{{ run().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, run.ID.String(), result["runID"])
+		assert.Contains(t, result["runURL"], run.ID.String())
+		assert.Contains(t, result["runURL"], "?run=")
+		assert.NotContains(t, result["runURL"], "view=runs")
+	})
+}
+
+func Test_NodeConfigurationBuilder_AppFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Name:   "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().Model(canvas).Update("description", "Deploy pipeline").Error)
+	canvas.Description = "Deploy pipeline"
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	t.Run("returns id, name, description, and url", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`app()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, canvas.ID.String(), payload["id"])
+		assert.Equal(t, canvas.Name, payload["name"])
+		assert.Equal(t, "Deploy pipeline", payload["description"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s", canvas.OrganizationID.String(), canvas.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "?run=")
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"appName": "{{ app().name }}",
+			"appURL":  "{{ app().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, canvas.Name, result["appName"])
+		assert.Contains(t, result["appURL"], canvas.ID.String())
+	})
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
@@ -112,6 +238,150 @@ func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testi
 
 	require.NoError(t, err)
 	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldPreservesWholeTemplateTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"enabled": true,
+				"poolID":  "pool-a",
+				"weight":  json.Number("0.1"),
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+			{Name: "name", Type: configuration.FieldTypeString},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": map[string]any{
+			"enabled": "{{ previous().enabled }}",
+			"label":   "pool-{{ previous().poolID }}",
+			"nested": map[string]any{
+				"weight": "{{ previous().weight }}",
+			},
+			"weights": []any{"{{ previous().weight }}"},
+		},
+		"name": "{{ previous().weight }}",
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+	assert.Equal(t, "pool-pool-a", payload["label"])
+
+	nested := payload["nested"].(map[string]any)
+	assert.Equal(t, 0.1, nested["weight"])
+
+	weights := payload["weights"].([]any)
+	assert.Equal(t, 0.1, weights[0])
+
+	assert.Equal(t, "0.1", result["name"])
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldResolvesRawJSONTemplateString(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"canary": true,
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": `{
+			"pool_weights": {
+				"pool-a": {{ previous().canary ? 0.1 : 0.9 }},
+				"pool-b": {{ previous().canary ? 0.9 : 0.1 }}
+			},
+			"enabled": {{ previous().canary }}
+		}`,
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+
+	poolWeights := payload["pool_weights"].(map[string]any)
+	assert.Equal(t, json.Number("0.1"), poolWeights["pool-a"])
+	assert.Equal(t, json.Number("0.9"), poolWeights["pool-b"])
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldDoesNotReevaluateExpressionOutput(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"note":    "use {{ name }} in templates",
+				"payload": map[string]any{"hint": "keep {{ value }} literal"},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	fromJSONString, err := builder.Build(map[string]any{
+		"json": `{"note": "{{ previous().note }}"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromJSONString["json"].(map[string]any)["note"])
+
+	fromWholeExpression, err := builder.Build(map[string]any{
+		"json": "{{ previous().payload }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "keep {{ value }} literal", fromWholeExpression["json"].(map[string]any)["hint"])
+
+	fromWholeString, err := builder.Build(map[string]any{
+		"json": "{{ previous().note }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromWholeString["json"])
+}
+
+func Test_NodeConfigurationBuilder_SchemedObjectFallsBackForNonMapExpression(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"token": "secret-token",
+				"auth": map[string]any{
+					"type":  "bearer",
+					"token": "from-map",
+				},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{
+				Name: "authorization",
+				Type: configuration.FieldTypeObject,
+				TypeOptions: &configuration.TypeOptions{
+					Object: &configuration.ObjectTypeOptions{
+						Schema: []configuration.Field{
+							{Name: "type", Type: configuration.FieldTypeString},
+							{Name: "token", Type: configuration.FieldTypeString},
+						},
+					},
+				},
+			},
+		})
+
+	nonMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().token }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "secret-token", nonMap["authorization"])
+
+	asMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().auth }}",
+	})
+	require.NoError(t, err)
+	auth := asMap["authorization"].(map[string]any)
+	assert.Equal(t, "bearer", auth["type"])
+	assert.Equal(t, "from-map", auth["token"])
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {

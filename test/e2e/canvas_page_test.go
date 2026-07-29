@@ -628,7 +628,7 @@ func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) 
 		}
 		require.NotNil(s.t, waitNode, nodeName+" node not found")
 
-		queueItems, err := models.ListNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID, 100, nil)
+		queueItems, err := models.ListNodeQueueItems(database.Conn(), waitNode.WorkflowID, waitNode.NodeID, 100, nil)
 		require.NoError(s.t, err)
 
 		lastCount = len(queueItems)

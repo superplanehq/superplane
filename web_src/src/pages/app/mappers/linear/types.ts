@@ -106,3 +106,67 @@ export interface OnIssueConfiguration {
   actions?: string[];
   labels?: Predicate[];
 }
+
+export interface OnIssueLabelConfiguration {
+  team?: string;
+  labels?: string[];
+}
+
+export interface OnIssueCommentConfiguration {
+  team?: string;
+  actions?: string[];
+}
+
+export interface GetIssueConfiguration {
+  issue?: string;
+}
+
+export interface UpdateIssueConfiguration {
+  team?: string;
+  issue?: string;
+  title?: string;
+  description?: string;
+  state?: string;
+  assignee?: string;
+  priority?: string;
+  labels?: string[];
+  project?: string;
+}
+
+/** Comment as returned by the `commentCreate` mutation. `user` is null for bot/integration authors. */
+export interface LinearComment {
+  id?: string;
+  body?: string;
+  url?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  user?: LinearUser;
+  issue?: { id?: string; identifier?: string; title?: string; url?: string };
+}
+
+/** Envelope Linear POSTs for a comment event. `data` is the comment. */
+export interface LinearCommentWebhookEvent {
+  action?: string;
+  type?: string;
+  url?: string;
+  createdAt?: string;
+  actor?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    type?: string;
+  };
+  data?: LinearComment;
+}
+
+export interface AddIssueLabelConfiguration {
+  team?: string;
+  issue?: string;
+  labels?: string[];
+  newLabels?: string[];
+}
+
+export interface AddIssueCommentConfiguration {
+  issue?: string;
+  body?: string;
+}

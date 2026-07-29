@@ -1,6 +1,12 @@
 import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
-import { buildStorybookAgentChat, buildStorybookAgentMessages, STORYBOOK_AGENT_CHAT_ID } from "./agentChatResponses";
+import {
+  buildStorybookAgentChat,
+  buildStorybookAgentMessages,
+  createStorybookAgentMessageStore,
+  matchStorybookAgentMessageRoute,
+  STORYBOOK_AGENT_CHAT_ID,
+} from "./agentChatResponses";
 import defaultRaw from "./canvasAppResponses.json";
 import softwareFactoryHowItWorks from "./repository/softwareFactory.howItWorks.md?raw";
 import softwareFactoryReadme from "./repository/softwareFactory.README.md?raw";
@@ -472,6 +478,8 @@ function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
  * data no matter how Storybook is accessed.
  */
 export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFixture = defaultFixture): typeof fetch {
+  const agentMessages = createStorybookAgentMessageStore(fixture.agentMessages?.messages);
+
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = (
@@ -479,7 +487,19 @@ export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFix
       (typeof input !== "string" && !(input instanceof URL) ? input.method : "GET") ??
       "GET"
     ).toUpperCase();
-    const resolved = matchCanvasAppFixture(url, fixture, method, parseRequestBody(init)) ?? emptyCanvasApiCatchAll(url);
+    const body = await readRequestJson(input, init);
+    const agentRoute = matchStorybookAgentMessageRoute({
+      pathname: url.pathname,
+      method,
+      body,
+      agentMessages,
+      resetChat: () => fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId),
+    });
+    if (agentRoute) {
+      return fixtureResponse(agentRoute);
+    }
+
+    const resolved = matchCanvasAppFixture(url, fixture, method, body) ?? emptyCanvasApiCatchAll(url);
     if (!resolved) {
       return fallback(input, init);
     }
@@ -494,13 +514,18 @@ function requestUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-function parseRequestBody(init?: RequestInit): unknown {
-  if (!init?.body || typeof init.body !== "string") return undefined;
+async function readRequestJson(input: RequestInfo | URL, init?: RequestInit): Promise<unknown> {
   try {
-    return JSON.parse(init.body);
+    if (typeof init?.body === "string" && init.body.trim()) {
+      return JSON.parse(init.body);
+    }
+    if (typeof input !== "string" && !(input instanceof URL)) {
+      return await input.clone().json();
+    }
   } catch {
     return undefined;
   }
+  return undefined;
 }
 
 function listRuns(fixture: CanvasAppFixture): Array<Record<string, unknown>> {

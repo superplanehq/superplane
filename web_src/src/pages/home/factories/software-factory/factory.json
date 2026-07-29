@@ -1,0 +1,73 @@
+{
+  "id": "software-factory",
+  "title": "Software Factory",
+  "description": "Automate coding work with agents, from issue to pull request.",
+  "integrations": ["github", "claude"],
+  "componentIntegrations": {
+    "github.addIssueLabel": "github",
+    "github.createIssue": "github",
+    "github.createIssueComment": "github",
+    "github.createPullRequest": "github",
+    "github.getIssue": "github",
+    "github.markPullRequestReadyForReview": "github",
+    "github.onIssue": "github",
+    "github.onIssueComment": "github",
+    "github.onPRComment": "github",
+    "github.onPRReviewComment": "github",
+    "github.onPullRequest": "github",
+    "github.updateIssue": "github"
+  },
+  "agentSuggestions": [
+    {
+      "id": "add-ci",
+      "label": "Add CI to my loop",
+      "prompt": "Add a CI step to this Software Factory loop so every implementation run is validated before review. Prefer reusing existing components on the canvas when possible."
+    },
+    {
+      "id": "fail-notifications",
+      "label": "Add notifications if something fails",
+      "prompt": "Add failure notifications to this Software Factory app so the team is alerted when a run or critical step fails. Suggest a concrete channel (e.g. Slack) and wire it into the failure path."
+    },
+    {
+      "id": "slack-approvals",
+      "label": "Connect Slack for approvals",
+      "prompt": "Connect Slack and add an approval step to this Software Factory loop so humans can approve before risky changes proceed."
+    },
+    {
+      "id": "pr-checks",
+      "label": "Gate merges on review checks",
+      "prompt": "Update this Software Factory loop so merges are gated on review checks passing. Keep the change minimal and aligned with the existing PR/review nodes."
+    }
+  ],
+  "startingTasks": [
+    {
+      "id": "improve-agents-md",
+      "label": "Improve AGENTS.md",
+      "prompt": "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs"
+    },
+    {
+      "id": "unit-test",
+      "label": "Improve test coverage",
+      "prompt": "Add one focused unit test.\n\n- Review the repository to find core logic and existing test patterns\n- Target a single untested helper or pure function in core logic\n- Use existing test tooling and patterns — do not add a new framework\n- Keep the change as small as possible\n- If there is no test tooling: add only the minimal setup for the primary language, just enough to run that one test"
+    },
+    {
+      "id": "fix-bug",
+      "label": "Find and fix a bug",
+      "prompt": "Fix one high-confidence bug.\n\n- Review the repository to find concrete defects\n- Prefer real defects: wrong logic, clear edge-case failure, or broken error handling\n- Skip style nits and speculative issues\n- Minimal fix only; add/update a test only if tests already exist in that area\n- If no clear bug: fix a correctness footgun (e.g. missing nil/empty check) — do not invent one\n- No broad refactors"
+    },
+    {
+      "id": "improve-ci",
+      "label": "Set up or improve CI",
+      "prompt": "Improve CI for this repo.\n\n- Review the repository to detect the existing CI system from config (Actions, CircleCI, Buildkite, Semaphore, Travis, etc.) — do not assume GitHub Actions\n- If CI exists: one small improvement (caching, triggers, clearer jobs, or an obvious gap)\n- If none exists: add a minimal starter for the host that best matches this repo\n- Prefer the simplest existing check/test/lint command; else a checkout + toolchain smoke step\n- No deploy jobs, secrets, or paid third-party services"
+    }
+  ],
+  "run": {
+    "nodeId": "create-task-start",
+    "hookName": "run",
+    "template": "Create Task",
+    "parameters": {
+      "description": { "from": "startingTaskPrompt" }
+    }
+  },
+  "source": { "type": "bundled" }
+}

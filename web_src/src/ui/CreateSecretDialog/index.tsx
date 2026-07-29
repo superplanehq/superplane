@@ -22,6 +22,8 @@ export interface CreateSecretDialogProps {
   organizationId: string;
   /** Called after a secret is successfully created. */
   onCreated?: (secret: CreatedSecretSummary) => void;
+  /** Prefills the first key name when the dialog opens (value left blank). */
+  initialKeyName?: string;
 }
 
 interface KeyValuePair {
@@ -135,15 +137,27 @@ function KeyValuePairsSection({ pairs, disabled, onUpdate, onAdd, onRemove }: Ke
   );
 }
 
-export function CreateSecretDialog({ open, onOpenChange, organizationId, onCreated }: CreateSecretDialogProps) {
+function initialPairs(initialKeyName?: string): KeyValuePair[] {
+  const key = initialKeyName?.trim();
+  if (!key) return [{ ...EMPTY_PAIR }];
+  return [{ name: key, value: "" }];
+}
+
+export function CreateSecretDialog({
+  open,
+  onOpenChange,
+  organizationId,
+  onCreated,
+  initialKeyName,
+}: CreateSecretDialogProps) {
   const [secretName, setSecretName] = useState("");
-  const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>([{ ...EMPTY_PAIR }]);
+  const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>(() => initialPairs(initialKeyName));
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const isPending = createSecretMutation.isPending;
 
   const reset = () => {
     setSecretName("");
-    setKeyValuePairs([{ ...EMPTY_PAIR }]);
+    setKeyValuePairs(initialPairs(initialKeyName));
     createSecretMutation.reset();
   };
 

@@ -191,7 +191,8 @@ func (c *RunJS) Configuration() []configuration.Field {
 			Description: "JavaScript executed by Node.js. Define function main() and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "javascript",
+					Language:         "javascript",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
@@ -338,6 +339,7 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunJSDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

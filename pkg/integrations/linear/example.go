@@ -17,6 +17,46 @@ func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
 }
 
+//go:embed example_output_get_issue.json
+var exampleOutputGetIssueBytes []byte
+
+var exampleOutputGetIssueOnce sync.Once
+var exampleOutputGetIssue map[string]any
+
+func (c *GetIssue) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
+}
+
+//go:embed example_output_update_issue.json
+var exampleOutputUpdateIssueBytes []byte
+
+var exampleOutputUpdateIssueOnce sync.Once
+var exampleOutputUpdateIssue map[string]any
+
+func (c *UpdateIssue) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
+}
+
+//go:embed example_output_add_issue_label.json
+var exampleOutputAddIssueLabelBytes []byte
+
+var exampleOutputAddIssueLabelOnce sync.Once
+var exampleOutputAddIssueLabel map[string]any
+
+func (c *AddIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueLabelOnce, exampleOutputAddIssueLabelBytes, &exampleOutputAddIssueLabel)
+}
+
+//go:embed example_output_add_issue_comment.json
+var exampleOutputAddIssueCommentBytes []byte
+
+var exampleOutputAddIssueCommentOnce sync.Once
+var exampleOutputAddIssueComment map[string]any
+
+func (c *AddIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueCommentOnce, exampleOutputAddIssueCommentBytes, &exampleOutputAddIssueComment)
+}
+
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
 
@@ -25,4 +65,24 @@ var exampleDataOnIssue map[string]any
 
 func (i *OnIssue) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
+}
+
+//go:embed example_data_on_issue_label.json
+var exampleDataOnIssueLabelBytes []byte
+
+var exampleDataOnIssueLabelOnce sync.Once
+var exampleDataOnIssueLabel map[string]any
+
+func (i *OnIssueLabel) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueLabelOnce, exampleDataOnIssueLabelBytes, &exampleDataOnIssueLabel)
+}
+
+//go:embed example_data_on_issue_comment.json
+var exampleDataOnIssueCommentBytes []byte
+
+var exampleDataOnIssueCommentOnce sync.Once
+var exampleDataOnIssueComment map[string]any
+
+func (i *OnIssueComment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
 }

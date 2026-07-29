@@ -309,6 +309,40 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 	return &note, nil
 }
 
+// UpdateIssueNote edits an existing note (comment) on an issue.
+// See https://docs.gitlab.com/api/notes/#modify-existing-issue-note
+func (c *Client) UpdateIssueNote(ctx context.Context, projectID, issueIID, noteID string, req *UpdateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s/notes/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID), url.PathEscape(noteID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
 type Milestone struct {
 	ID    int    `json:"id"`
 	IID   int    `json:"iid"`
@@ -594,9 +628,13 @@ type Note struct {
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 	System       bool   `json:"system"`
+	ProjectID    int    `json:"project_id,omitempty"`
 	NoteableID   int    `json:"noteable_id,omitempty"`
 	NoteableIID  int    `json:"noteable_iid,omitempty"`
 	NoteableType string `json:"noteable_type,omitempty"`
+	Resolvable   bool   `json:"resolvable"`
+	Confidential bool   `json:"confidential"`
+	Internal     bool   `json:"internal"`
 }
 
 // quickActionNoteResponse is what GitLab returns instead of a Note when a
@@ -607,6 +645,10 @@ type quickActionNoteResponse struct {
 }
 
 type CreateNoteRequest struct {
+	Body string `json:"body"`
+}
+
+type UpdateNoteRequest struct {
 	Body string `json:"body"`
 }
 
@@ -797,6 +839,54 @@ func (c *Client) GetMergeRequest(ctx context.Context, projectID, mergeRequestIID
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestRequest mirrors GitLab's PUT /projects/:id/merge_requests/:merge_request_iid
+// body. Fields are pointers so a nil field is omitted (left unchanged) while a
+// non-nil field is always sent, even when it points to a zero value - e.g. a
+// non-nil pointer to "" clears the description, and a non-nil pointer to an
+// empty slice clears the assignees.
+type UpdateMergeRequestRequest struct {
+	Title        *string `json:"title,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	TargetBranch *string `json:"target_branch,omitempty"`
+	StateEvent   *string `json:"state_event,omitempty"`
+	Labels       *string `json:"labels,omitempty"`
+	AssigneeIDs  *[]int  `json:"assignee_ids,omitempty"`
+}
+
+// UpdateMergeRequest edits an existing merge request's fields.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *UpdateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
 	var mergeRequest MergeRequest
@@ -1129,6 +1219,286 @@ func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploym
 	}
 
 	return &deployment, nil
+}
+
+type ReleaseCommit struct {
+	ID             string   `json:"id"`
+	ShortID        string   `json:"short_id"`
+	Title          string   `json:"title"`
+	CreatedAt      string   `json:"created_at"`
+	ParentIDs      []string `json:"parent_ids,omitempty"`
+	Message        string   `json:"message"`
+	AuthorName     string   `json:"author_name"`
+	AuthorEmail    string   `json:"author_email"`
+	AuthoredDate   string   `json:"authored_date"`
+	CommitterName  string   `json:"committer_name"`
+	CommitterEmail string   `json:"committer_email"`
+	CommittedDate  string   `json:"committed_date"`
+}
+
+type ReleaseMilestoneIssueStats struct {
+	Total  int `json:"total"`
+	Closed int `json:"closed"`
+}
+
+// ReleaseMilestone is kept separate from Milestone (used by issues) since the releases API returns a fuller shape.
+type ReleaseMilestone struct {
+	ID          int                         `json:"id"`
+	IID         int                         `json:"iid"`
+	ProjectID   int                         `json:"project_id"`
+	Title       string                      `json:"title"`
+	Description string                      `json:"description"`
+	State       string                      `json:"state"`
+	CreatedAt   string                      `json:"created_at"`
+	UpdatedAt   string                      `json:"updated_at"`
+	DueDate     string                      `json:"due_date,omitempty"`
+	StartDate   string                      `json:"start_date,omitempty"`
+	WebURL      string                      `json:"web_url"`
+	IssueStats  *ReleaseMilestoneIssueStats `json:"issue_stats,omitempty"`
+}
+
+type ReleaseAssetSource struct {
+	Format string `json:"format"`
+	URL    string `json:"url"`
+}
+
+type ReleaseAssetLink struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	LinkType string `json:"link_type"`
+}
+
+type ReleaseAssets struct {
+	Count   int                  `json:"count"`
+	Sources []ReleaseAssetSource `json:"sources,omitempty"`
+	Links   []ReleaseAssetLink   `json:"links,omitempty"`
+}
+
+type ReleaseEvidence struct {
+	SHA         string `json:"sha"`
+	Filepath    string `json:"filepath"`
+	CollectedAt string `json:"collected_at"`
+}
+
+type ReleaseLinks struct {
+	ClosedIssuesURL        string `json:"closed_issues_url,omitempty"`
+	ClosedMergeRequestsURL string `json:"closed_merge_requests_url,omitempty"`
+	EditURL                string `json:"edit_url,omitempty"`
+	MergedMergeRequestsURL string `json:"merged_merge_requests_url,omitempty"`
+	OpenedIssuesURL        string `json:"opened_issues_url,omitempty"`
+	OpenedMergeRequestsURL string `json:"opened_merge_requests_url,omitempty"`
+	Self                   string `json:"self,omitempty"`
+}
+
+type Release struct {
+	TagName         string             `json:"tag_name"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	CreatedAt       string             `json:"created_at"`
+	ReleasedAt      string             `json:"released_at"`
+	UpcomingRelease bool               `json:"upcoming_release"`
+	Author          *User              `json:"author,omitempty"`
+	Commit          *ReleaseCommit     `json:"commit,omitempty"`
+	Milestones      []ReleaseMilestone `json:"milestones,omitempty"`
+	CommitPath      string             `json:"commit_path,omitempty"`
+	TagPath         string             `json:"tag_path,omitempty"`
+	Assets          *ReleaseAssets     `json:"assets,omitempty"`
+	Evidences       []ReleaseEvidence  `json:"evidences,omitempty"`
+	EvidenceSHA     string             `json:"evidence_sha,omitempty"`
+	Links           *ReleaseLinks      `json:"_links,omitempty"`
+}
+
+type CreateReleaseRequest struct {
+	TagName     string   `json:"tag_name"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Milestones  []string `json:"milestones,omitempty"`
+	ReleasedAt  string   `json:"released_at,omitempty"`
+}
+
+// CreateRelease creates a release, tagging Ref first if TagName doesn't already exist.
+func (c *Client) CreateRelease(ctx context.Context, projectID string, req *CreateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// UpdateReleaseRequest fields are pointers so a nil field is left unchanged while a non-nil field (even a zero value) is always sent.
+type UpdateReleaseRequest struct {
+	Name        *string   `json:"name,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Milestones  *[]string `json:"milestones,omitempty"`
+	ReleasedAt  *string   `json:"released_at,omitempty"`
+}
+
+// UpdateRelease edits an existing release's name, description, milestones, or released-at date; the tag and assets can't be changed here.
+func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, req *UpdateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// GetRelease fetches a single release by tag name.
+func (c *Client) GetRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteRelease deletes a release and returns the deleted release; it does not delete the underlying tag.
+func (c *Client) DeleteRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to delete release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteTag deletes a Git tag from the project's repository.
+func (c *Client) DeleteTag(ctx context.Context, projectID, tagName string) error {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/tags/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete tag: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	return nil
+}
+
+// GetLatestRelease returns the most recently published release, skipping upcoming (scheduled) ones.
+func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=100", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list releases: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to decode releases: %v", err)
+	}
+
+	for _, release := range releases {
+		if !release.UpcomingRelease {
+			return &release, nil
+		}
+	}
+
+	return nil, errors.New("no published releases found")
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409

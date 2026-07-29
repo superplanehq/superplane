@@ -45,7 +45,13 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   const turns = useMemo(() => chunkIntoTurns(messageGroups.filter(isRenderableGroup)), [messageGroups]);
 
   return (
-    <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
+    <div
+      ref={scrollRef}
+      // Explicit selection colors keep highlighted text readable in both themes; without them the
+      // browser default leaves light dark-mode text on a light highlight (issue #6372).
+      className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 selection:bg-blue-300/60 selection:text-slate-900 dark:selection:bg-blue-400/45 dark:selection:text-gray-50"
+      data-testid="agent-chat-messages"
+    >
       <div className="mx-auto w-full max-w-[800px] py-3">
         {isLoading ? (
           <LoadingState label="Loading…" />

@@ -18,25 +18,14 @@ import (
 
 func UpdateCanvas(
 	ctx context.Context,
-	organizationID string,
-	id string,
+	db *gorm.DB,
+	canvas *models.Canvas,
 	name *string,
 	description *string,
+	dismissAgentSuggestionID *string,
 ) (*pb.UpdateCanvasResponse, error) {
-	canvasID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	organizationUUID := uuid.MustParse(organizationID)
-
-	canvas, err := models.FindCanvas(organizationUUID, canvasID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "canvas not found")
-	}
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return updateCanvasInTransaction(tx, organizationUUID, canvasID, name, description)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		return updateCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID, name, description, dismissAgentSuggestionID)
 	})
 
 	if err != nil {
@@ -50,7 +39,7 @@ func UpdateCanvas(
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
 
-	refreshedCanvas, err := models.FindCanvas(organizationUUID, canvasID)
+	refreshedCanvas, err := models.FindCanvasInTransaction(db, canvas.OrganizationID, canvas.ID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load updated canvas")
 	}
@@ -82,6 +71,7 @@ func updateCanvasInTransaction(
 	canvasID uuid.UUID,
 	name *string,
 	description *string,
+	dismissAgentSuggestionID *string,
 ) error {
 	canvas, err := models.LockCanvasForUpdate(tx, organizationUUID, canvasID)
 	if err != nil {
@@ -94,6 +84,16 @@ func updateCanvasInTransaction(
 	updates, err := buildCanvasMetadataUpdates(canvas, name, description)
 	if err != nil {
 		return err
+	}
+
+	if dismissAgentSuggestionID != nil {
+		suggestionID := strings.TrimSpace(*dismissAgentSuggestionID)
+		if suggestionID == "" {
+			return grpcerrors.InvalidArgument(nil, "dismiss_agent_suggestion_id cannot be empty")
+		}
+		if err := canvas.DismissAgentSuggestion(tx, suggestionID); err != nil {
+			return err
+		}
 	}
 
 	if len(updates) == 0 {

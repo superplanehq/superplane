@@ -1,7 +1,8 @@
-import type { CanvasesCanvasVersion, CanvasesCanvasRun } from "@/api-client";
+import type { CanvasesCanvasRun, CanvasesCanvasVersion } from "@/api-client";
 import { RunsTabPanelContent } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import type { RunFiltersState } from "@/components/CanvasToolSidebar/useRunFilters";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
+import type { CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
 import type { ReactNode } from "react";
 
 export interface CanvasRunsSidebarPanelConfig {
@@ -34,7 +35,7 @@ export interface CanvasVersionsSidebarPanelConfig {
   liveCanvasVersionId?: string;
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  liveVersions: CanvasesCanvasVersion[];
+  liveVersions: CanvasVersionListItem[];
   canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;

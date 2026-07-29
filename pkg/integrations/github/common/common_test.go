@@ -182,3 +182,35 @@ func testPrivateKeyPEM(t *testing.T) []byte {
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
 }
+
+func Test__EnsureRepoInMetadata__acceptsOwnerRepo(t *testing.T) {
+	integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			mocks.GitHubResponse(http.StatusOK, `{
+				"id": 99,
+				"name": "vhdl-ethernet",
+				"full_name": "forestileao/vhdl-ethernet",
+				"html_url": "https://github.com/forestileao/vhdl-ethernet"
+			}`),
+		},
+	}
+
+	nodeMetadataCtx := &contexts.MetadataContext{}
+	err := EnsureRepoInMetadata(
+		nodeMetadataCtx,
+		integrationCtx,
+		httpCtx,
+		map[string]any{"repository": "forestileao/vhdl-ethernet"},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	// Must not prepend the integration owner onto an owner/repo value.
+	assert.Equal(t, "/repos/forestileao/vhdl-ethernet", httpCtx.Requests[0].URL.Path)
+	require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &Repository{
+		ID:   99,
+		Name: "forestileao/vhdl-ethernet",
+		URL:  "https://github.com/forestileao/vhdl-ethernet",
+	}})
+}
