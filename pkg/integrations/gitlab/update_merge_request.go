@@ -88,7 +88,7 @@ func (c *UpdateMergeRequest) Documentation() string {
 - **Retitle/redescribe automation**: Update a merge request's title or description as a workflow progresses
 - **Open/close automation**: Close a merge request when it is superseded, or reopen one automatically
 - **Retargeting**: Change the target branch a merge request merges into
-- **Label and assignee management**: Replace a merge request's labels or assignees from a workflow
+- **Label and assignee management**: Add labels to a merge request or set its assignees from a workflow
 
 ## Configuration
 
@@ -98,10 +98,10 @@ func (c *UpdateMergeRequest) Documentation() string {
 - **Description** (toggle): New description for the merge request
 - **Target Branch** (toggle): Retarget the merge request onto a different branch
 - **State** (toggle): Close or reopen the merge request
-- **Labels** (toggle): Labels to set, replacing any existing labels
+- **Labels** (toggle): Labels to add, keeping any existing labels
 - **Assignees** (toggle): Users to assign, replacing any existing assignees
 
-Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling Labels or Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the merge request's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
 
 ## Permissions
 
@@ -288,8 +288,8 @@ func (c *UpdateMergeRequest) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if toggles.Labels {
-		labels := strings.Join(config.Labels, ",")
-		req.Labels = &labels
+		addLabels := strings.Join(config.Labels, ",")
+		req.AddLabels = &addLabels
 	}
 
 	if toggles.Assignees {

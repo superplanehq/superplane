@@ -99,11 +99,11 @@ func (c *UpdateIssue) Documentation() string {
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Labels** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the issue's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected removes all assignees, and enabling Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
 
 ## Output
 
@@ -309,8 +309,8 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if toggles.Labels {
-		labels := strings.Join(config.Labels, ",")
-		req.Labels = &labels
+		addLabels := strings.Join(config.Labels, ",")
+		req.AddLabels = &addLabels
 	}
 
 	if toggles.Assignees {
