@@ -16,6 +16,8 @@ import { createMergeCommentMapper } from "./create_merge_comment";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { getIssueMapper } from "./get_issue";
+import { getCommitStatusMapper } from "./get_commit_status";
+import { publishCommitStatusMapper } from "./publish_commit_status";
 import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready_for_review";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onIssueTriggerRenderer } from "./on_issue";
@@ -58,6 +60,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   markMergeRequestReadyForReview: buildActionStateRegistry("marked ready"),
   createRelease: buildActionStateRegistry("created"),
   updateRelease: buildActionStateRegistry("updated"),
+  getCommitStatus: buildActionStateRegistry("retrieved"),
+  publishCommitStatus: buildActionStateRegistry("published"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -84,6 +88,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   markMergeRequestReadyForReview: markMergeRequestReadyForReviewMapper,
   createRelease: createReleaseMapper,
   updateRelease: updateReleaseMapper,
+  getCommitStatus: getCommitStatusMapper,
+  publishCommitStatus: publishCommitStatusMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
