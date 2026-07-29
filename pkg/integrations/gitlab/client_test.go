@@ -1752,3 +1752,148 @@ func Test__Client__GetLatestRelease(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to list releases")
 	})
 }
+
+func Test__Client__CreateCommitStatus(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 98,
+					"sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+					"ref": "main",
+					"status": "success",
+					"name": "ci/superplane",
+					"target_url": "https://ci.example.com/runs/42",
+					"description": "Build passed",
+					"created_at": "2026-02-13T18:00:00.000Z",
+					"finished_at": "2026-02-13T18:04:12.000Z",
+					"allow_failure": false,
+					"coverage": 92.5,
+					"author": {"id": 1, "username": "root", "name": "Administrator", "state": "active"}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		status, err := client.CreateCommitStatus(context.Background(), "456", "18f3e63d05582537db6d183d9d557be09e1f90c8", &CreateCommitStatusRequest{
+			State:       "success",
+			Name:        "ci/superplane",
+			TargetURL:   "https://ci.example.com/runs/42",
+			Description: "Build passed",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, status)
+		assert.Equal(t, 98, status.ID)
+		assert.Equal(t, "success", status.Status)
+		assert.Equal(t, "ci/superplane", status.Name)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/statuses/18f3e63d05582537db6d183d9d557be09e1f90c8", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, `"state":"success"`)
+		assert.Contains(t, bodyString, `"name":"ci/superplane"`)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "400 Bad Request"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateCommitStatus(context.Background(), "456", "abc123", &CreateCommitStatusRequest{State: "success"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create commit status")
+	})
+}
+
+func Test__Client__ListCommitStatuses(t *testing.T) {
+	t.Run("success with filters", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 99, "sha": "abc123", "ref": "main", "status": "success", "name": "ci/superplane"},
+					{"id": 98, "sha": "abc123", "ref": "main", "status": "failed", "name": "lint"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		statuses, err := client.ListCommitStatuses("456", "abc123", &ListCommitStatusesRequest{Ref: "main", Name: "ci/superplane"})
+		require.NoError(t, err)
+		require.Len(t, statuses, 2)
+		assert.Equal(t, "success", statuses[0].Status)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?name=ci%2Fsuperplane&order_by=id&page=1&per_page=100&ref=main&sort=desc", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("follows pagination across pages", func(t *testing.T) {
+		page1 := GitlabMockResponse(http.StatusOK, `[{"id": 1, "sha": "abc123", "status": "success", "name": "a"}]`)
+		page1.Header.Set("X-Next-Page", "2")
+		page2 := GitlabMockResponse(http.StatusOK, `[{"id": 2, "sha": "abc123", "status": "failed", "name": "b"}]`)
+
+		mockClient := &contexts.HTTPContext{Responses: []*http.Response{page1, page2}}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		statuses, err := client.ListCommitStatuses("456", "abc123", nil)
+		require.NoError(t, err)
+		require.Len(t, statuses, 2)
+		assert.Equal(t, 1, statuses[0].ID)
+		assert.Equal(t, 2, statuses[1].ID)
+
+		require.Len(t, mockClient.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=1&per_page=100&sort=desc", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=2&per_page=100&sort=desc", mockClient.Requests[1].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Commit Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.ListCommitStatuses("456", "abc123", nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resource not found")
+	})
+}
