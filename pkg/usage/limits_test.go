@@ -158,6 +158,30 @@ func TestEnsureCanStartRunnerTaskAllowsUnlimited(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestEnsureCanStartRunnerTaskAllowsWhenUsageMissing(t *testing.T) {
+	service := &fakeLimitService{
+		enabled:               true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.NoError(t, err)
+}
+
+func TestEnsureCanStartRunnerTaskAllowsWhenCapacityNotReported(t *testing.T) {
+	service := &fakeLimitService{
+		enabled: true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
+			Usage: &usagepb.OrganizationUsage{
+				EventBucketCapacity: 100,
+			},
+		},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.NoError(t, err)
+}
+
 func TestEnsureAccountWithinLimitsReturnsResourceExhaustedForViolations(t *testing.T) {
 	service := &fakeLimitService{
 		enabled: true,
