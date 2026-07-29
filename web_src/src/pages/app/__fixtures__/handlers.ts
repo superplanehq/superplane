@@ -88,92 +88,97 @@ const defaultConsoleYaml =
   materializeConsoleSpec({
     canvasId: capturedFixture.canvasId,
     canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Software Factory",
-    panels: [
+    pages: [
       {
-        id: "submit-task",
-        type: "nodes",
-        content: {
-          title: "Create a task",
-          nodes: [
-            {
-              node: "create-task-start",
-              formMode: "inline",
-              showFieldLabels: false,
-              showNodeLabel: false,
-              showRun: true,
-              submitLabel: "Work on it",
-              triggerName: "Create Task",
-            },
-          ],
-        },
-      },
-      {
-        id: "how-it-works",
-        type: "markdown",
-        content: {
-          title: "How it works",
-          body: softwareFactoryHowItWorks,
-          variables: [],
-        },
-      },
-      {
-        id: "pipeline-board",
-        type: "board",
-        content: {
-          title: "Your Factory Pipeline",
-          dataSource: {
-            kind: "runs",
-            limit: 100,
-            triggers: ["on-issue-labeled-trigger", "component-node-4m9qti"],
-          },
-          render: {
-            kind: "board",
-            // Use `"Mark PR Ready" in $` — accessing `$["Mark PR Ready"].state`
-            // throws when the node never ran, which drops In-progress cards.
-            groupBy: `{{ status == "passed" ? "Done" :
-   status == "failed" || status == "cancelled" ? "Failed" :
-   ("Mark PR Ready" in $) ? "Human review" :
-   "In progress" }}`,
-            lanes: [
-              { value: "In progress", color: "blue" },
-              { value: "Human review", color: "yellow", label: "Human review" },
-              { value: "Failed", color: "red" },
-              { value: "Done", color: "green" },
-            ],
-            otherLane: false,
-            sort: { field: "updatedAt", order: "desc" },
-            where: [{ field: '$["Open Draft PR"].state', op: "exists" }],
-            emptyMessage: "No factory pull requests yet. Submit a task to start one.",
-            card: {
-              titleField: `{{ $["Open Draft PR"].data.title != null
-   ? $["Open Draft PR"].data.title
-   : payload.data.issue.title }}`,
-              fields: [
+        id: "main",
+        name: "Main",
+        panels: [
+          {
+            id: "submit-task",
+            type: "nodes",
+            content: {
+              title: "Create a task",
+              nodes: [
                 {
-                  field: '$["Open Draft PR"].data.number',
-                  format: "link",
-                  href: '{{ $["Open Draft PR"].data.html_url }}',
-                  label: "PR",
+                  node: "create-task-start",
+                  formMode: "inline",
+                  showFieldLabels: false,
+                  showNodeLabel: false,
+                  showRun: true,
+                  submitLabel: "Work on it",
+                  triggerName: "Create Task",
                 },
-                {
-                  field: "payload.data.issue.number",
-                  format: "link",
-                  href: "{{ payload.data.issue.html_url }}",
-                  label: "Issue",
-                },
-                { field: "durationMs", format: "duration", label: "Elapsed" },
-                { field: "updatedAt", format: "relative", label: "Updated" },
               ],
             },
           },
-        },
+          {
+            id: "how-it-works",
+            type: "markdown",
+            content: {
+              title: "How it works",
+              body: softwareFactoryHowItWorks,
+              variables: [],
+            },
+          },
+          {
+            id: "pipeline-board",
+            type: "board",
+            content: {
+              title: "Your Factory Pipeline",
+              dataSource: {
+                kind: "runs",
+                limit: 100,
+                triggers: ["on-issue-labeled-trigger", "component-node-4m9qti"],
+              },
+              render: {
+                kind: "board",
+                // Use `"Mark PR Ready" in $` — accessing `$["Mark PR Ready"].state`
+                // throws when the node never ran, which drops In-progress cards.
+                groupBy: `{{ status == "passed" ? "Done" :
+   status == "failed" || status == "cancelled" ? "Failed" :
+   ("Mark PR Ready" in $) ? "Human review" :
+   "In progress" }}`,
+                lanes: [
+                  { value: "In progress", color: "blue" },
+                  { value: "Human review", color: "yellow", label: "Human review" },
+                  { value: "Failed", color: "red" },
+                  { value: "Done", color: "green" },
+                ],
+                otherLane: false,
+                sort: { field: "updatedAt", order: "desc" },
+                where: [{ field: '$["Open Draft PR"].state', op: "exists" }],
+                emptyMessage: "No factory pull requests yet. Submit a task to start one.",
+                card: {
+                  titleField: `{{ $["Open Draft PR"].data.title != null
+   ? $["Open Draft PR"].data.title
+   : payload.data.issue.title }}`,
+                  fields: [
+                    {
+                      field: '$["Open Draft PR"].data.number',
+                      format: "link",
+                      href: '{{ $["Open Draft PR"].data.html_url }}',
+                      label: "PR",
+                    },
+                    {
+                      field: "payload.data.issue.number",
+                      format: "link",
+                      href: "{{ payload.data.issue.html_url }}",
+                      label: "Issue",
+                    },
+                    { field: "durationMs", format: "duration", label: "Elapsed" },
+                    { field: "updatedAt", format: "relative", label: "Updated" },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+        layout: [
+          { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
+          { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
+          { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
+        ],
       },
-    ],
-    layout: [
-      // Left column 50/50 prompt + how-it-works; board matches stacked height.
-      { i: "submit-task", x: 0, y: 0, w: 3, h: 7, minW: 2, minH: 4 },
-      { i: "how-it-works", x: 0, y: 7, w: 3, h: 7, minW: 2, minH: 3 },
-      { i: "pipeline-board", x: 3, y: 0, w: 9, h: 14, minW: 6, minH: 6 },
     ],
   });
 
