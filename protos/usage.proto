@@ -93,6 +93,7 @@ message OrganizationLimits {
   int64 max_events_per_month = 5;
   int32 max_integrations = 6;
   int64 max_agent_tokens_per_month = 7;
+  int64 max_runner_minutes_per_month = 8;
 }
 
 message OrganizationPlanChanged {
@@ -120,6 +121,10 @@ message OrganizationUsage {
   double agent_token_bucket_capacity = 7;
   int64 agent_token_bucket_last_updated_at_unix_seconds = 8;
   int64 next_agent_token_bucket_leak_at_unix_seconds = 9;
+  double runner_minutes_bucket_level = 10;
+  double runner_minutes_bucket_capacity = 11;
+  int64 runner_minutes_bucket_last_updated_at_unix_seconds = 12;
+  int64 next_runner_minutes_bucket_leak_at_unix_seconds = 13;
 }
 
 message OrganizationState {
@@ -141,6 +146,7 @@ enum LimitName {
   LIMIT_NAME_MAX_EVENTS_PER_MONTH = 5;
   LIMIT_NAME_MAX_INTEGRATIONS = 6;
   LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH = 7;
+  LIMIT_NAME_MAX_RUNNER_MINUTES_PER_MONTH = 8;
 }
 
 message LimitViolation {

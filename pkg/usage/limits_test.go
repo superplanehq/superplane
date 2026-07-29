@@ -22,9 +22,12 @@ type fakeLimitService struct {
 	checkAccountError         error
 	checkOrganizationResponse *usagepb.CheckOrganizationLimitsResponse
 	checkOrganizationError    error
+	describeUsageResponse     *usagepb.DescribeOrganizationUsageResponse
+	describeUsageError        error
 
 	checkAccountCalls      int
 	checkOrganizationCalls int
+	describeUsageCalls     int
 }
 
 func (s *fakeLimitService) Enabled() bool {
@@ -56,6 +59,13 @@ func (s *fakeLimitService) DescribeOrganizationLimits(context.Context, string) (
 }
 
 func (s *fakeLimitService) DescribeOrganizationUsage(context.Context, string) (*usagepb.DescribeOrganizationUsageResponse, error) {
+	s.describeUsageCalls++
+	if s.describeUsageError != nil {
+		return nil, s.describeUsageError
+	}
+	if s.describeUsageResponse != nil {
+		return s.describeUsageResponse, nil
+	}
 	return &usagepb.DescribeOrganizationUsageResponse{}, nil
 }
 
@@ -104,6 +114,72 @@ func TestLimitViolationErrorForMaxAgentTokensPerMonth(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
 	assert.Equal(t, "organization agent token limit exceeded", status.Convert(err).Message())
+}
+
+func TestLimitViolationErrorForMaxRunnerMinutesPerMonth(t *testing.T) {
+	violations := []*usagepb.LimitViolation{
+		{Limit: usagepb.LimitName_LIMIT_NAME_MAX_RUNNER_MINUTES_PER_MONTH},
+	}
+	err := LimitViolationError(violations)
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization runner minutes limit exceeded", status.Convert(err).Message())
+}
+
+func TestEnsureCanStartRunnerTaskBlocksWhenOverCapacity(t *testing.T) {
+	service := &fakeLimitService{
+		enabled: true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
+			Usage: &usagepb.OrganizationUsage{
+				RunnerMinutesBucketLevel:    2,
+				RunnerMinutesBucketCapacity: 1,
+			},
+		},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization runner minutes limit exceeded", status.Convert(err).Message())
+}
+
+func TestEnsureCanStartRunnerTaskAllowsUnlimited(t *testing.T) {
+	service := &fakeLimitService{
+		enabled: true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
+			Usage: &usagepb.OrganizationUsage{
+				RunnerMinutesBucketLevel:    1000,
+				RunnerMinutesBucketCapacity: -1,
+			},
+		},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.NoError(t, err)
+}
+
+func TestEnsureCanStartRunnerTaskAllowsWhenUsageMissing(t *testing.T) {
+	service := &fakeLimitService{
+		enabled:               true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.NoError(t, err)
+}
+
+func TestEnsureCanStartRunnerTaskAllowsWhenCapacityNotReported(t *testing.T) {
+	service := &fakeLimitService{
+		enabled: true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
+			Usage: &usagepb.OrganizationUsage{
+				EventBucketCapacity: 100,
+			},
+		},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.NoError(t, err)
 }
 
 func TestEnsureAccountWithinLimitsReturnsResourceExhaustedForViolations(t *testing.T) {
