@@ -75,6 +75,13 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		}
 		row.EnvironmentJSON = string(b)
 	}
+	if len(t.Labels) > 0 {
+		b, err := json.Marshal(t.Labels)
+		if err != nil {
+			return nil, err
+		}
+		row.LabelsJSON = string(b)
+	}
 	if len(t.Files) > 0 {
 		b, err := json.Marshal(t.Files)
 		if err != nil {
@@ -111,6 +118,12 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 			return nil, fmt.Errorf("environment_json: %w", err)
 		}
 	}
+	var labels map[string]string
+	if strings.TrimSpace(row.LabelsJSON) != "" {
+		if err := json.Unmarshal([]byte(row.LabelsJSON), &labels); err != nil {
+			return nil, fmt.Errorf("labels_json: %w", err)
+		}
+	}
 	var files []models.TaskFile
 	if strings.TrimSpace(row.FilesJSON) != "" {
 		if err := json.Unmarshal([]byte(row.FilesJSON), &files); err != nil {
@@ -127,6 +140,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		Commands:                     cmds,
 		SetupCommands:                setupCmds,
 		Environment:                  env,
+		Labels:                       labels,
 		Files:                        files,
 		WebhookURL:                   row.WebhookURL,
 		Status:                       models.TaskStatus(row.Status),
