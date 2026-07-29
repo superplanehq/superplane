@@ -26,11 +26,11 @@ describe("consoleYaml — progress columns", () => {
       },
     ];
     const layout = [{ i: "checklist", x: 0, y: 0, w: 12, h: 4 }];
-    const text = consoleToYaml({ panels, layout });
+    const text = consoleToYaml({ pages: [{ id: "main", panels, layout }] });
     const result = parseConsoleYaml(text);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
+    expect(result.data.spec.pages[0]!.panels).toEqual(panels);
   });
 
   it("rejects a progress column without progressTarget", () => {

@@ -61,8 +61,7 @@ func (p *CanvasPatcher) buildFinalVersion() (*models.CanvasVersion, error) {
 		WorkflowID:    p.originalVersion.WorkflowID,
 		OwnerID:       p.originalVersion.OwnerID,
 		CommitMessage: p.originalVersion.CommitMessage,
-		ConsolePanels: p.originalVersion.ConsolePanels,
-		ConsoleLayout: p.originalVersion.ConsoleLayout,
+		ConsolePages:  p.originalVersion.ConsolePages,
 		CreatedAt:     p.originalVersion.CreatedAt,
 		UpdatedAt:     p.originalVersion.UpdatedAt,
 	}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 
 import { hasLocalCanvasGraphDiff, hasLocalConsoleDiff } from "./lib/local-staging-indicators";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./lib/workflow-spec-paths";
@@ -109,13 +109,11 @@ export function useDraftStagingIndicators({
   consoleQueryData,
   stagingResetNonce,
 }: UseDraftStagingIndicatorsOptions) {
-  const [effectiveConsole, setEffectiveConsole] = useState<
-    { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | undefined
-  >();
+  const [effectiveConsole, setEffectiveConsole] = useState<{ pages: ConsolePage[] } | undefined>();
   const [localHasFilesStaging, setLocalHasFilesStaging] = useState(false);
   const [filesLocalStagingActive, setFilesLocalStagingActive] = useState(false);
 
-  const handleEffectiveConsoleChange = useCallback((next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
+  const handleEffectiveConsoleChange = useCallback((next: { pages: ConsolePage[] }) => {
     setEffectiveConsole(next);
   }, []);
 
@@ -144,10 +142,7 @@ export function useDraftStagingIndicators({
 
   useEffect(() => {
     if (consoleQueryData) {
-      setEffectiveConsole({
-        panels: consoleQueryData.panels ?? [],
-        layout: consoleQueryData.layout ?? [],
-      });
+      setEffectiveConsole({ pages: consoleQueryData.pages ?? [] });
     }
   }, [consoleQueryData, stagingResetNonce]);
 

@@ -1,5 +1,5 @@
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePage, ConsolePanel } from "@/hooks/useCanvasData";
 
 import { materializeCanvasSpec, materializeConsoleSpec } from "../../lib/workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../../lib/workflow-spec-paths";
@@ -21,11 +21,17 @@ type ConsoleLayoutInput = {
   minH?: number;
 };
 
+type ConsolePageInput = {
+  id?: string;
+  name?: string;
+  panels?: ConsolePanelInput[];
+  layout?: ConsoleLayoutInput[];
+};
+
 export function buildAppFiles({
   canvas,
   canvasNodes,
-  panels,
-  layout,
+  pages,
   canvasId,
   canvasName,
   consoleLoading,
@@ -33,8 +39,7 @@ export function buildAppFiles({
 }: {
   canvas: CanvasesCanvas | null | undefined;
   canvasNodes?: Parameters<typeof materializeCanvasSpec>[1];
-  panels: ConsolePanelInput[] | undefined;
-  layout: ConsoleLayoutInput[] | undefined;
+  pages: ConsolePageInput[] | undefined;
   canvasId: string | null | undefined;
   canvasName: string | undefined;
   consoleLoading: boolean;
@@ -42,8 +47,7 @@ export function buildAppFiles({
 }): AppFile[] {
   const canvasYamlText = canvas ? materializeCanvasSpec(canvas, canvasNodes) : "";
   const consoleYamlText = materializeConsoleSpec({
-    panels: normalizePanels(panels),
-    layout: normalizeLayout(layout),
+    pages: normalizePages(pages),
     canvasId: canvasId || undefined,
     canvasName,
   });
@@ -63,6 +67,15 @@ export function buildAppFiles({
       errorMessage: consoleError ? String(consoleError) : undefined,
     },
   ];
+}
+
+function normalizePages(pages: ConsolePageInput[] | undefined): ConsolePage[] {
+  return (pages || []).map((page) => ({
+    id: page.id || "",
+    ...(page.name ? { name: page.name } : {}),
+    panels: normalizePanels(page.panels),
+    layout: normalizeLayout(page.layout),
+  }));
 }
 
 function normalizePanels(panels: ConsolePanelInput[] | undefined): ConsolePanel[] {

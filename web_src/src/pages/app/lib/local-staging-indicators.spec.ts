@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 
 import type { PendingFileChange } from "../files/types";
 import { hasLocalCanvasGraphDiff, hasLocalConsoleDiff, hasLocalFilesStaging } from "./local-staging-indicators";
@@ -26,18 +26,15 @@ describe("local-staging-indicators", () => {
   });
 
   it("detects console diffs from effective local state", () => {
-    const committed = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
-      layout: [],
-    } as { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] };
-    const effectiveSame = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
-      layout: [],
-    } as { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] };
-    const effectiveDifferent = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "bye" } }],
-      layout: [],
-    } as { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] };
+    const committed: { pages: ConsolePage[] } = {
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] }],
+    };
+    const effectiveSame: { pages: ConsolePage[] } = {
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }], layout: [] }],
+    };
+    const effectiveDifferent: { pages: ConsolePage[] } = {
+      pages: [{ id: "main", panels: [{ id: "p1", type: "markdown", content: { body: "bye" } }], layout: [] }],
+    };
 
     expect(hasLocalConsoleDiff(committed, effectiveSame)).toBe(false);
     expect(hasLocalConsoleDiff(committed, effectiveDifferent)).toBe(true);
