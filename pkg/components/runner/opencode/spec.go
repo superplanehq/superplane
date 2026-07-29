@@ -1,6 +1,7 @@
 package opencode
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,6 +14,12 @@ import (
 const (
 	openCodeStepPrompt = "prompt"
 	openCodeStepBash   = "bash"
+
+	providerCloudflareAIGateway = "cloudflare-ai-gateway"
+
+	envCloudflareAccountID = "CLOUDFLARE_ACCOUNT_ID"
+	envCloudflareGatewayID = "CLOUDFLARE_GATEWAY_ID"
+	envCloudflareAPIToken  = "CLOUDFLARE_API_TOKEN"
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -22,11 +29,13 @@ var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
 type providerCredential struct {
 	Value  string // stored provider identifier
 	Label  string // UI label
-	EnvVar string // environment variable OpenCode reads
+	EnvVar string // environment variable OpenCode reads for the API key/token
 }
 
-// openCodeProviders is the curated list of provider API keys, in display order.
-// OpenCode reads provider keys from these well-known environment variables.
+// openCodeProviders is the curated list of providers, in display order.
+// OpenCode reads API keys from these well-known environment variables.
+// Cloudflare AI Gateway additionally needs CLOUDFLARE_ACCOUNT_ID and
+// CLOUDFLARE_GATEWAY_ID (see CloudflareAccountID / CloudflareGatewayID).
 var openCodeProviders = []providerCredential{
 	{Value: "anthropic", Label: "Anthropic", EnvVar: "ANTHROPIC_API_KEY"},
 	{Value: "openai", Label: "OpenAI", EnvVar: "OPENAI_API_KEY"},
@@ -36,6 +45,7 @@ var openCodeProviders = []providerCredential{
 	{Value: "xai", Label: "xAI (Grok)", EnvVar: "XAI_API_KEY"},
 	{Value: "deepseek", Label: "DeepSeek", EnvVar: "DEEPSEEK_API_KEY"},
 	{Value: "mistral", Label: "Mistral", EnvVar: "MISTRAL_API_KEY"},
+	{Value: providerCloudflareAIGateway, Label: "Cloudflare AI Gateway", EnvVar: envCloudflareAPIToken},
 }
 
 func providerByValue(value string) (providerCredential, bool) {
@@ -72,12 +82,18 @@ type RunOpenCodeSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
 	Provider                string                        `mapstructure:"provider"`
 	Secret                  configuration.SecretKeyRef    `mapstructure:"secret"`
+	CloudflareAccountID     string                        `mapstructure:"cloudflareAccountId"`
+	CloudflareGatewayID     string                        `mapstructure:"cloudflareGatewayId"`
 	Model                   string                        `mapstructure:"model"`
 	Steps                   []OpenCodeStep                `mapstructure:"steps"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"` // 0 = runner.DefaultExecutionTimeoutSeconds
+}
+
+func (s RunOpenCodeSpec) isCloudflareAIGateway() bool {
+	return strings.TrimSpace(s.Provider) == providerCloudflareAIGateway
 }
 
 // modelRef builds the OpenCode `provider/model` identifier from the configured
@@ -135,7 +151,18 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 		return err
 	}
 	if !spec.Secret.IsSet() {
+		if spec.isCloudflareAIGateway() {
+			return fmt.Errorf("Cloudflare API token is required")
+		}
 		return fmt.Errorf("API key is required")
+	}
+	if spec.isCloudflareAIGateway() {
+		if strings.TrimSpace(spec.CloudflareAccountID) == "" {
+			return fmt.Errorf("Cloudflare Account ID is required")
+		}
+		if strings.TrimSpace(spec.CloudflareGatewayID) == "" {
+			return fmt.Errorf("Cloudflare Gateway ID is required")
+		}
 	}
 	if err := validateOpenCodeModel(spec.Model); err != nil {
 		return err
@@ -149,9 +176,11 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
+	reserved := reservedOpenCodeEnvVars(provider)
 	for i, variable := range spec.Environment {
-		if strings.TrimSpace(variable.Name) == provider.EnvVar {
-			return fmt.Errorf("environment[%d].name cannot be %s; use the API key field", i, provider.EnvVar)
+		name := strings.TrimSpace(variable.Name)
+		if _, ok := reserved[name]; ok {
+			return fmt.Errorf("environment[%d].name cannot be %s; use the provider credential fields", i, name)
 		}
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
@@ -160,6 +189,16 @@ func validateRunOpenCodeSpec(spec RunOpenCodeSpec) error {
 		}
 	}
 	return nil
+}
+
+func reservedOpenCodeEnvVars(provider providerCredential) map[string]struct{} {
+	reserved := map[string]struct{}{provider.EnvVar: {}}
+	if provider.Value == providerCloudflareAIGateway {
+		reserved[envCloudflareAccountID] = struct{}{}
+		reserved[envCloudflareGatewayID] = struct{}{}
+		reserved[envCloudflareAPIToken] = struct{}{}
+	}
+	return reserved
 }
 
 func validateOpenCodeProvider(value string) (providerCredential, error) {
@@ -176,7 +215,7 @@ func validateOpenCodeProvider(value string) (providerCredential, error) {
 
 func validateOpenCodeModel(model string) error {
 	if strings.TrimSpace(model) == "" {
-		return fmt.Errorf("model is required (the model name on the selected provider, for example claude-sonnet-4-5)")
+		return fmt.Errorf("model is required (for example claude-sonnet-4-5, or moonshotai/kimi-k3 for Cloudflare AI Gateway)")
 	}
 	return nil
 }
@@ -219,6 +258,13 @@ func buildOpenCodeBrokerTask(spec RunOpenCodeSpec) OpenCodeBrokerTask {
 	files := []runner.BrokerTaskFile{
 		{Path: "run.js", Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: openCodePrepareScript(workdir), Mode: "0644"},
+	}
+	if spec.isCloudflareAIGateway() {
+		files = append(files, runner.BrokerTaskFile{
+			Path:    "opencode.jsonc",
+			Content: openCodeCloudflareConfig(spec.Model),
+			Mode:    "0644",
+		})
 	}
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
@@ -279,6 +325,10 @@ func openCodePrepareScript(workdir string) string {
 	prepare.WriteString("  return 127\n")
 	prepare.WriteString("fi\n")
 	prepare.WriteString("rm -f \"$SUPERPLANE_TASK_DIR/session_id\"\n")
+	// Point OpenCode at the task-local config when present (Cloudflare AI Gateway).
+	prepare.WriteString("if [ -f \"$SUPERPLANE_TASK_DIR/opencode.jsonc\" ]; then\n")
+	prepare.WriteString("  export OPENCODE_CONFIG=\"$SUPERPLANE_TASK_DIR/opencode.jsonc\"\n")
+	prepare.WriteString("fi\n")
 	if workdir != "" {
 		fmt.Fprintf(&prepare, "cd %s\n", shellSingleQuote(workdir))
 	}
@@ -287,6 +337,41 @@ func openCodePrepareScript(workdir string) string {
 	prepare.WriteString("echo \"node=$(node --version 2>/dev/null)\"\n")
 	prepare.WriteString("echo \"cwd=$(pwd -P)\"\n")
 	return prepare.String()
+}
+
+// openCodeCloudflareConfig builds the OpenCode config that registers the
+// selected model under the cloudflare-ai-gateway provider. Auth still comes
+// from CLOUDFLARE_* environment variables; this file only declares the model.
+func openCodeCloudflareConfig(model string) string {
+	model = strings.TrimSpace(model)
+	cfg := map[string]any{
+		"$schema": "https://opencode.ai/config.json",
+		"provider": map[string]any{
+			providerCloudflareAIGateway: map[string]any{
+				"models": map[string]any{
+					model: map[string]any{
+						"name": cloudflareModelDisplayName(model),
+					},
+				},
+			},
+		},
+		"model": openCodeModelRef(providerCloudflareAIGateway, model),
+	}
+	raw, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		// Marshal of string maps cannot fail in practice; keep a minimal fallback.
+		return "{\n  \"$schema\": \"https://opencode.ai/config.json\"\n}\n"
+	}
+	return string(raw) + "\n"
+}
+
+func cloudflareModelDisplayName(model string) string {
+	switch model {
+	case "moonshotai/kimi-k3":
+		return "Kimi K3"
+	default:
+		return model
+	}
 }
 
 func openCodeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {

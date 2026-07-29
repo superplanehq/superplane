@@ -108,6 +108,18 @@ func TestValidateRunOpenCodeSpec(t *testing.T) {
 		}
 		require.Error(t, validateRunOpenCodeSpec(spec))
 	})
+
+	t.Run("requires cloudflare account and gateway ids", func(t *testing.T) {
+		spec := valid
+		spec.Provider = providerCloudflareAIGateway
+		spec.Model = "moonshotai/kimi-k3"
+		spec.Secret = secretRef("cloudflare", "api_token")
+		require.Error(t, validateRunOpenCodeSpec(spec))
+		spec.CloudflareAccountID = "acct"
+		require.Error(t, validateRunOpenCodeSpec(spec))
+		spec.CloudflareGatewayID = "gw"
+		require.NoError(t, validateRunOpenCodeSpec(spec))
+	})
 }
 
 func TestBuildOpenCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
@@ -162,6 +174,37 @@ func TestBuildOpenCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "session_id")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
 	assert.Contains(t, runScript, "error.data.message")
+}
+
+func TestBuildOpenCodeBrokerTaskCloudflareConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := RunOpenCodeSpec{
+		Provider:            providerCloudflareAIGateway,
+		Model:               "moonshotai/kimi-k3",
+		CloudflareAccountID: "acct-1",
+		CloudflareGatewayID: "gw-1",
+		Steps: []OpenCodeStep{
+			{Name: "Ask", Type: openCodeStepPrompt, Prompt: strPtr("hello")},
+		},
+	}
+
+	task := buildOpenCodeBrokerTask(spec)
+	assert.Equal(t, "cloudflare-ai-gateway/moonshotai/kimi-k3", spec.modelRef())
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Ask",
+		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-ask.txt" 'cloudflare-ai-gateway/moonshotai/kimi-k3'`,
+	}, task.Commands[1])
+
+	config := requireTaskFile(t, task.Files, "opencode.jsonc").Content
+	assert.Contains(t, config, `"cloudflare-ai-gateway"`)
+	assert.Contains(t, config, `"moonshotai/kimi-k3"`)
+	assert.Contains(t, config, `"Kimi K3"`)
+	assert.Contains(t, config, `"model": "cloudflare-ai-gateway/moonshotai/kimi-k3"`)
+
+	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
+	assert.Contains(t, prepare, "OPENCODE_CONFIG")
+	assert.Contains(t, prepare, "opencode.jsonc")
 }
 
 func TestOpenCodeStepSlug(t *testing.T) {

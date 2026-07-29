@@ -167,6 +167,69 @@ func TestRunOpenCodeExecuteInjectsProviderKey(t *testing.T) {
 	}, req.Commands[1])
 }
 
+func TestRunOpenCodeExecuteInjectsCloudflareGatewayEnv(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-opencode-cf"}`))},
+		},
+	}
+
+	component := &RunOpenCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType":         testRunnerMachineType,
+			"provider":            providerCloudflareAIGateway,
+			"secret":              secretConfig("cloudflare", "api_token"),
+			"cloudflareAccountId": "acct-123",
+			"cloudflareGatewayId": "my-gateway",
+			"model":               "moonshotai/kimi-k3",
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
+		},
+		HTTP: httpContext,
+		Secrets: &contexts.SecretsContext{
+			Values: map[string][]byte{
+				"cloudflare/api_token": []byte("cf-token"),
+			},
+		},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+
+	env := map[string]string{}
+	for _, variable := range req.Environment {
+		env[variable.Name] = variable.Value
+	}
+	assert.Equal(t, "cf-token", env[envCloudflareAPIToken])
+	assert.Equal(t, "acct-123", env[envCloudflareAccountID])
+	assert.Equal(t, "my-gateway", env[envCloudflareGatewayID])
+
+	require.Len(t, req.Commands, 2)
+	assert.Equal(t, runner.BrokerCommand{
+		Name:    "Hello",
+		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-hello.txt" 'cloudflare-ai-gateway/moonshotai/kimi-k3'`,
+	}, req.Commands[1])
+
+	config := requireTaskFile(t, req.Files, "opencode.jsonc").Content
+	assert.Contains(t, config, `"moonshotai/kimi-k3"`)
+	assert.NotContains(t, config, "cf-token")
+	for _, file := range req.Files {
+		assert.NotContains(t, file.Content, "cf-token")
+	}
+}
+
 func TestRunOpenCodeExecuteRequiresProviderSecret(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")

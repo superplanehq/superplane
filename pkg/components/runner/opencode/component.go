@@ -58,12 +58,12 @@ func (c *RunOpenCode) Description() string {
 func (c *RunOpenCode) Documentation() string {
 	return `Runs [OpenCode](https://opencode.ai/docs/cli/) in non-interactive mode on a fleet runner.
 
-OpenCode is provider-agnostic: pick a provider (OpenAI, Anthropic, Google, OpenRouter, Groq, and more), supply the matching provider API key, and name the model to run.
+OpenCode is provider-agnostic: pick a provider (OpenAI, Anthropic, Google, OpenRouter, Groq, Cloudflare AI Gateway, and more), supply the matching credentials, and name the model to run.
 
 ## Prerequisites
 - The ` + "`opencode`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + ` (see the [OpenCode install docs](https://opencode.ai/docs/)).
 - ` + "`node`" + ` is available on ` + "`PATH`" + ` (used to format live logs).
-- A provider API key stored as a SuperPlane secret.
+- Provider credentials stored as SuperPlane secrets (and Cloudflare Account / Gateway IDs when using Cloudflare AI Gateway).
 
 ## Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -80,12 +80,16 @@ Example:
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Provider**: The curated model provider OpenCode talks to (for example Anthropic or OpenAI).
-- **API key**: SuperPlane secret used as the provider API key. OpenCode reads it from the provider's well-known environment variable.
-- **Model**: The model name on the selected provider (for example ` + "`claude-sonnet-4-5`" + ` or ` + "`gpt-4.1`" + `).
+- **Provider**: The curated model provider OpenCode talks to (for example Anthropic, OpenAI, or Cloudflare AI Gateway).
+- **API key / token**: SuperPlane secret used as the provider API key. For Cloudflare AI Gateway this is the Cloudflare API token (` + "`CLOUDFLARE_API_TOKEN`" + `).
+- **Cloudflare Account ID / Gateway ID**: Required when provider is Cloudflare AI Gateway. Injected as ` + "`CLOUDFLARE_ACCOUNT_ID`" + ` and ` + "`CLOUDFLARE_GATEWAY_ID`" + `.
+- **Model**: The model name on the selected provider (for example ` + "`claude-sonnet-4-5`" + `, or ` + "`moonshotai/kimi-k3`" + ` for Cloudflare — not ` + "`@cf/…`" + `).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+## Cloudflare AI Gateway
+When Cloudflare AI Gateway is selected, the runner ships an ` + "`opencode.jsonc`" + ` that registers the chosen model under ` + "`cloudflare-ai-gateway`" + ` and injects the three Cloudflare environment variables OpenCode expects. Use model id ` + "`moonshotai/kimi-k3`" + ` for Kimi K3 (full OpenCode ref: ` + "`cloudflare-ai-gateway/moonshotai/kimi-k3`" + `).
 
 ## Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest OpenCode result and session id.
@@ -123,18 +127,46 @@ func (c *RunOpenCode) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "secret",
-			Label:       "API key",
+			Label:       "API key / token",
 			Type:        configuration.FieldTypeSecretKey,
 			Required:    true,
-			Description: "Stored credential key used as the provider API key.",
+			Description: "Provider API key, or Cloudflare API token when using Cloudflare AI Gateway.",
+		},
+		{
+			Name:        "cloudflareAccountId",
+			Label:       "Cloudflare Account ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Cloudflare account id. Injected as CLOUDFLARE_ACCOUNT_ID.",
+			Placeholder: "e.g. 1234567890abcdef1234567890abcdef",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "provider", Values: []string{providerCloudflareAIGateway}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "provider", Values: []string{providerCloudflareAIGateway}},
+			},
+		},
+		{
+			Name:        "cloudflareGatewayId",
+			Label:       "Cloudflare Gateway ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Cloudflare AI Gateway id/name. Injected as CLOUDFLARE_GATEWAY_ID.",
+			Placeholder: "e.g. my-gateway",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "provider", Values: []string{providerCloudflareAIGateway}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "provider", Values: []string{providerCloudflareAIGateway}},
+			},
 		},
 		{
 			Name:        "model",
 			Label:       "Model",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Model name on the selected provider (for example claude-sonnet-4-5 or gpt-4.1).",
-			Placeholder: "e.g. claude-sonnet-4-5",
+			Description: "Model name on the selected provider (for example claude-sonnet-4-5, or moonshotai/kimi-k3 for Cloudflare AI Gateway — not @cf/…).",
+			Placeholder: "e.g. claude-sonnet-4-5 or moonshotai/kimi-k3",
 		},
 		{
 			Name:        "steps",
@@ -328,7 +360,7 @@ func (c *RunOpenCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err = c.injectCredential(ctx, environment, spec.Provider, spec.Secret)
+	environment, err = c.injectCredentials(ctx, environment, spec)
 	if err != nil {
 		return err
 	}
@@ -363,21 +395,41 @@ func (c *RunOpenCode) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func (c *RunOpenCode) injectCredential(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, providerValue string, secret configuration.SecretKeyRef) ([]runner.BrokerEnvironmentVariable, error) {
-	provider, ok := providerByValue(strings.TrimSpace(providerValue))
+func (c *RunOpenCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, spec RunOpenCodeSpec) ([]runner.BrokerEnvironmentVariable, error) {
+	provider, ok := providerByValue(strings.TrimSpace(spec.Provider))
 	if !ok {
-		return nil, fmt.Errorf("unsupported provider: %s", providerValue)
+		return nil, fmt.Errorf("unsupported provider: %s", spec.Provider)
 	}
 
-	apiKey, err := ctx.Secrets.GetKey(secret.Secret, secret.Key)
+	apiKey, err := ctx.Secrets.GetKey(spec.Secret.Secret, spec.Secret.Key)
 	if err != nil {
+		if spec.isCloudflareAIGateway() {
+			return nil, fmt.Errorf("resolve Cloudflare API token: %w", err)
+		}
 		return nil, fmt.Errorf("resolve %s API key: %w", provider.Value, err)
 	}
 
-	return append(environment, runner.BrokerEnvironmentVariable{
+	environment = append(environment, runner.BrokerEnvironmentVariable{
 		Name:  provider.EnvVar,
 		Value: string(apiKey),
-	}), nil
+	})
+
+	if !spec.isCloudflareAIGateway() {
+		return environment, nil
+	}
+
+	// OpenCode's Cloudflare AI Gateway plugin reads these env vars and skips
+	// interactive /connect prompts when they are already set.
+	return append(environment,
+		runner.BrokerEnvironmentVariable{
+			Name:  envCloudflareAccountID,
+			Value: strings.TrimSpace(spec.CloudflareAccountID),
+		},
+		runner.BrokerEnvironmentVariable{
+			Name:  envCloudflareGatewayID,
+			Value: strings.TrimSpace(spec.CloudflareGatewayID),
+		},
+	), nil
 }
 
 func (c *RunOpenCode) Hooks() []core.Hook {

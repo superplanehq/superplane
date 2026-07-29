@@ -139,6 +139,11 @@ function openCodeEnv(taskDir) {
     }
     env[key] = dir;
   }
+  // Task-local OpenCode config (Cloudflare AI Gateway model registration).
+  const configPath = path.join(taskDir, "opencode.jsonc");
+  if (fs.existsSync(configPath)) {
+    env.OPENCODE_CONFIG = configPath;
+  }
   return env;
 }
 
