@@ -368,6 +368,10 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
+	if err := runner.EnsureRunnerMinutesAvailable(ctx); err != nil {
+		return err
+	}
+
 	broker, err := runner.NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)

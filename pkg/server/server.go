@@ -18,6 +18,7 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git"
@@ -607,6 +608,14 @@ func Start() {
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
+
+	runnerUsageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Fatalf("failed to initialize usage service for runner limits: %v", err)
+	}
+	runner.SetRunnerMinutesLimitChecker(func(organizationID string) error {
+		return usage.EnsureCanStartRunnerTask(context.Background(), runnerUsageService, organizationID)
+	})
 
 	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
