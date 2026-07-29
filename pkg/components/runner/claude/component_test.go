@@ -206,7 +206,7 @@ func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"result":"done","session_id":"abc"}`),
 	}
-	require.NoError(t, runner.ProcessBrokerTaskStatus(state, task, FinishedEventType))
+	require.NoError(t, runner.ProcessBrokerTaskStatus(state, task, FinishedEventType, ""))
 	require.Equal(t, runner.PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
