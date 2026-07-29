@@ -68,6 +68,55 @@ func EnsureOrganizationWithinLimits(
 	return limitViolationError(response.GetViolations())
 }
 
+func EnsureCanStartRunnerTask(ctx context.Context, usageService Service, organizationID string) error {
+	if usageService == nil || !usageService.Enabled() {
+		return nil
+	}
+
+	usage, err := describeOrganizationUsageForLimits(ctx, usageService, organizationID)
+	if err != nil {
+		return err
+	}
+
+	// A negative capacity means unlimited. A zero capacity means the limit was not
+	// reported: either usage is missing entirely, or saas predates runner metering and
+	// left the field at its proto3 zero value. Absence must not read as "exhausted",
+	// otherwise every runner task is blocked until saas catches up.
+	capacity := usage.GetRunnerMinutesBucketCapacity()
+	if capacity <= 0 {
+		return nil
+	}
+	if usage.GetRunnerMinutesBucketLevel() >= capacity {
+		return status.Error(codes.ResourceExhausted, "organization runner minutes limit exceeded")
+	}
+	return nil
+}
+
+func describeOrganizationUsageForLimits(
+	ctx context.Context,
+	usageService Service,
+	organizationID string,
+) (*pb.OrganizationUsage, error) {
+	response, err := usageService.DescribeOrganizationUsage(ctx, organizationID)
+	if err == nil {
+		return response.GetUsage(), nil
+	}
+
+	if status.Code(err) != codes.NotFound {
+		return nil, mapLimitCheckError("describe organization usage", err)
+	}
+
+	if syncErr := SyncOrganizationForce(ctx, usageService, organizationID); syncErr != nil {
+		return nil, mapLimitSyncError(syncErr)
+	}
+
+	response, err = usageService.DescribeOrganizationUsage(ctx, organizationID)
+	if err != nil {
+		return nil, mapLimitCheckError("describe organization usage after sync", err)
+	}
+	return response.GetUsage(), nil
+}
+
 func LimitViolationError(violations []*pb.LimitViolation) error {
 	return limitViolationError(violations)
 }
@@ -92,6 +141,8 @@ func limitViolationError(violations []*pb.LimitViolation) error {
 		return status.Error(codes.ResourceExhausted, "organization event limit exceeded")
 	case pb.LimitName_LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH:
 		return status.Error(codes.ResourceExhausted, "organization agent token limit exceeded")
+	case pb.LimitName_LIMIT_NAME_MAX_RUNNER_MINUTES_PER_MONTH:
+		return status.Error(codes.ResourceExhausted, "organization runner minutes limit exceeded")
 	default:
 		return status.Error(codes.ResourceExhausted, "organization usage limit exceeded")
 	}
