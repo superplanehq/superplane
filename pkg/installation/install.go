@@ -303,8 +303,7 @@ func persistInstalledConsole(canvasID string, console *yaml.Console) error {
 		_, err := models.UpdateCanvasVersionConsoleInTransaction(
 			tx,
 			version,
-			console.Panels(),
-			console.Layout(),
+			console.Pages(),
 		)
 		return err
 	})
