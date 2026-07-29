@@ -93,6 +93,14 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
 
     setIsConsoleAddPanelOpen(false);
     setIsConsoleYamlOpen(false);
+    // `?page=` is a console-mode-only param; leaving console mode without
+    // dropping it would leave a stale reference in the URL that becomes
+    // meaningless outside the console tabs.
+    if (searchParams.has("page")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("page");
+      setSearchParamsRef.current(next, { replace: true });
+    }
   }, [viewParam, consoleViewActive, searchParams]);
 
   const noopSetBoolean = useCallback((_value: boolean) => {}, []);

@@ -40,7 +40,11 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("app %q has no console", canvasID)
 	}
 
-	console, err := yaml.ConsoleFromYML(yamlBytes)
+	// Read path: pre-cap consoles are grandfathered so this parse must
+	// not fail when a stored console exceeds newer limits. The strict
+	// validator only runs on the save/import paths (`apps console set`,
+	// commit, install).
+	console, err := yaml.ConsoleFromYMLLenient(yamlBytes)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}
@@ -55,11 +59,18 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return ctx.Renderer.Render(console)
 	}
 
+	pages := console.Pages()
+	var panelCount, layoutCount int
+	for _, page := range pages {
+		panelCount += len(page.Panels)
+		layoutCount += len(page.Layout)
+	}
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.Spec.Panels))
-		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(console.Spec.Layout))
+		_, _ = fmt.Fprintf(stdout, "Pages: %d\n", len(pages))
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", panelCount)
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", layoutCount)
 		return err
 	})
 }

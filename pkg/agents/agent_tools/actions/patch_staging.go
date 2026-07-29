@@ -107,8 +107,20 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 		return patchStagingTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_staging")
 	}
 	if consoleYAML != "" {
-		_, err := yaml.ConsoleFromYML([]byte(consoleYAML))
+		// Lenient parse + shape check mirrors the commit path
+		// (commit_canvas_staging.go) and the CLI staging paths.
+		// Cap enforcement lives at commit time via
+		// ValidateConsolePagesDelta against the previously
+		// committed pages, so a grandfathered console with
+		// 21+ panels on a page can still be patched here as long
+		// as the commit path accepts the delta. ValidateShape
+		// still catches malformed YAML, wrong apiVersion/kind,
+		// mixed spec shapes, and unsupported panel types.
+		parsed, err := yaml.ConsoleFromYMLLenient([]byte(consoleYAML))
 		if err != nil {
+			return patchStagingTarget{}, err
+		}
+		if err := parsed.ValidateShape(); err != nil {
 			return patchStagingTarget{}, err
 		}
 	}

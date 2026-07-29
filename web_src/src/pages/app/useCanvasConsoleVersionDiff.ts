@@ -17,19 +17,23 @@ const CanvasYamlDiffModal = lazy(() =>
 
 function consoleYamlText(canvasId: string, consoleData?: CanvasConsoleData | null): string {
   return materializeConsoleSpec({
-    panels: (consoleData?.panels ?? []).map((panel) => ({
-      id: panel.id ?? "",
-      type: panel.type ?? "markdown",
-      content: (panel.content as Record<string, unknown>) ?? {},
-    })),
-    layout: (consoleData?.layout ?? []).map((item) => ({
-      i: item.i ?? "",
-      x: item.x ?? 0,
-      y: item.y ?? 0,
-      w: item.w ?? 0,
-      h: item.h ?? 0,
-      ...(item.minW !== undefined ? { minW: item.minW } : {}),
-      ...(item.minH !== undefined ? { minH: item.minH } : {}),
+    pages: (consoleData?.pages ?? []).map((page) => ({
+      id: page.id ?? "",
+      ...(page.name ? { name: page.name } : {}),
+      panels: (page.panels ?? []).map((panel) => ({
+        id: panel.id ?? "",
+        type: panel.type ?? "markdown",
+        content: (panel.content as Record<string, unknown>) ?? {},
+      })),
+      layout: (page.layout ?? []).map((item) => ({
+        i: item.i ?? "",
+        x: item.x ?? 0,
+        y: item.y ?? 0,
+        w: item.w ?? 0,
+        h: item.h ?? 0,
+        ...(item.minW !== undefined ? { minW: item.minW } : {}),
+        ...(item.minH !== undefined ? { minH: item.minH } : {}),
+      })),
     })),
     canvasId,
   });
