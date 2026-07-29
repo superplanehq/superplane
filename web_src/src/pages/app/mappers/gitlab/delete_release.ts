@@ -19,6 +19,10 @@ interface DeleteReleaseConfiguration {
   deleteTag?: boolean;
 }
 
+interface DeletedRelease extends Release {
+  tag_deleted?: boolean;
+}
+
 export const deleteReleaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
@@ -65,13 +69,17 @@ export const deleteReleaseMapper: ComponentBaseMapper = {
       return details;
     }
 
-    const release = outputs.default[0].data as Release;
+    const release = outputs.default[0].data as DeletedRelease;
     if (!release) {
       return details;
     }
 
     details["Tag"] = release.tag_name || "-";
     details["Name"] = release.name || "-";
+
+    if (typeof release.tag_deleted === "boolean") {
+      details["Tag Deleted"] = release.tag_deleted ? "Yes" : "No";
+    }
 
     return details;
   },

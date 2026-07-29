@@ -4,7 +4,7 @@ import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types"
 import { deleteReleaseMapper } from "./delete_release";
 
 describe("deleteReleaseMapper", () => {
-  it("shows deleted release details", () => {
+  it("shows deleted release details, including a successful tag deletion", () => {
     const details = deleteReleaseMapper.getExecutionDetails(
       buildDetailsContext({
         configuration: {
@@ -12,6 +12,66 @@ describe("deleteReleaseMapper", () => {
           releaseStrategy: "specific",
           tagName: "v1.0.0",
           deleteTag: true,
+        },
+        outputs: {
+          default: [
+            {
+              data: {
+                tag_name: "v1.0.0",
+                name: "Release 1.0.0",
+                tag_deleted: true,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(details).toEqual({
+      Tag: "v1.0.0",
+      Name: "Release 1.0.0",
+      "Tag Deleted": "Yes",
+    });
+  });
+
+  it("surfaces a failed tag deletion instead of hiding it", () => {
+    const details = deleteReleaseMapper.getExecutionDetails(
+      buildDetailsContext({
+        configuration: {
+          project: "123",
+          releaseStrategy: "specific",
+          tagName: "v1.0.0",
+          deleteTag: true,
+        },
+        outputs: {
+          default: [
+            {
+              data: {
+                tag_name: "v1.0.0",
+                name: "Release 1.0.0",
+                tag_deleted: false,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(details).toEqual({
+      Tag: "v1.0.0",
+      Name: "Release 1.0.0",
+      "Tag Deleted": "No",
+    });
+  });
+
+  it("omits the Tag Deleted row when the output has no tag_deleted field", () => {
+    const details = deleteReleaseMapper.getExecutionDetails(
+      buildDetailsContext({
+        configuration: {
+          project: "123",
+          releaseStrategy: "specific",
+          tagName: "v1.0.0",
+          deleteTag: false,
         },
         outputs: {
           default: [

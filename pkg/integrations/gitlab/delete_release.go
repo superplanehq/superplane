@@ -55,7 +55,7 @@ func (c *DeleteRelease) Documentation() string {
 
 ## Output
 
-Returns the deleted release object.`
+Returns the deleted release object, plus a "tag_deleted" field that is true only if the Git tag was also requested and successfully removed.`
 }
 
 func (c *DeleteRelease) Icon() string {
@@ -177,17 +177,40 @@ func (c *DeleteRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to delete release: %w", err)
 	}
 
+	output, err := releaseWithTagDeletionStatus(release)
+	if err != nil {
+		return fmt.Errorf("failed to encode release: %w", err)
+	}
+
 	if config.DeleteTag {
 		if err := client.DeleteTag(context.Background(), config.Project, tagName); err != nil {
 			ctx.Logger.Warnf("Release deleted successfully, but failed to delete tag %s: %v", tagName, err)
+		} else {
+			output["tag_deleted"] = true
 		}
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"gitlab.release",
-		[]any{release},
+		[]any{output},
 	)
+}
+
+// releaseWithTagDeletionStatus flattens a release into a map with tag_deleted defaulted to false, so the field can be added without dropping any of GitLab's own release fields.
+func releaseWithTagDeletionStatus(release *Release) (map[string]any, error) {
+	body, err := json.Marshal(release)
+	if err != nil {
+		return nil, err
+	}
+
+	var output map[string]any
+	if err := json.Unmarshal(body, &output); err != nil {
+		return nil, err
+	}
+
+	output["tag_deleted"] = false
+	return output, nil
 }
 
 func (c *DeleteRelease) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

@@ -2175,7 +2175,7 @@ The Delete Release component removes a release from a GitLab project.
 
 ### Output
 
-Returns the deleted release object.
+Returns the deleted release object, plus a "tag_deleted" field that is true only if the Git tag was also requested and successfully removed.
 
 ### Example Output
 
@@ -2261,6 +2261,7 @@ Returns the deleted release object.
     ],
     "name": "Release 1.0.0",
     "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_deleted": true,
     "tag_name": "v1.0.0",
     "tag_path": "/root/example-project/-/tags/v1.0.0",
     "upcoming_release": false

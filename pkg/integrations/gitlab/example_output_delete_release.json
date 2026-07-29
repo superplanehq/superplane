@@ -79,7 +79,8 @@
       "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0&scope=all&state=opened",
       "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0&scope=all&state=opened",
       "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
-    }
+    },
+    "tag_deleted": true
   },
   "timestamp": "2026-01-03T01:56:19.552000000Z",
   "type": "gitlab.release"
