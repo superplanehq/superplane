@@ -303,6 +303,10 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
+	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
+		return err
+	}
+
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -345,8 +349,8 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task, organizationID string) error {
+	return processBrokerTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil)
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {
