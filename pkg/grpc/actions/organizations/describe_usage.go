@@ -166,13 +166,14 @@ func serializeUsageLimits(limits *usagepb.OrganizationLimits) *pb.OrganizationLi
 	}
 
 	return &pb.OrganizationLimits{
-		MaxCanvases:            limits.MaxCanvases,
-		MaxNodesPerCanvas:      limits.MaxNodesPerCanvas,
-		MaxUsers:               limits.MaxUsers,
-		RetentionWindowDays:    limits.RetentionWindowDays,
-		MaxEventsPerMonth:      limits.MaxEventsPerMonth,
-		MaxIntegrations:        limits.MaxIntegrations,
-		MaxAgentTokensPerMonth: limits.MaxAgentTokensPerMonth,
+		MaxCanvases:              limits.MaxCanvases,
+		MaxNodesPerCanvas:        limits.MaxNodesPerCanvas,
+		MaxUsers:                 limits.MaxUsers,
+		RetentionWindowDays:      limits.RetentionWindowDays,
+		MaxEventsPerMonth:        limits.MaxEventsPerMonth,
+		MaxIntegrations:          limits.MaxIntegrations,
+		MaxAgentTokensPerMonth:   limits.MaxAgentTokensPerMonth,
+		MaxRunnerMinutesPerMonth: limits.MaxRunnerMinutesPerMonth,
 	}
 }
 
@@ -209,15 +210,33 @@ func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
 		)
 	}
 
+	var runnerMinutesBucketLastUpdatedAt *timestamppb.Timestamp
+	if orgUsage.RunnerMinutesBucketLastUpdatedAtUnixSeconds > 0 {
+		runnerMinutesBucketLastUpdatedAt = timestamppb.New(
+			time.Unix(orgUsage.RunnerMinutesBucketLastUpdatedAtUnixSeconds, 0).UTC(),
+		)
+	}
+
+	var nextRunnerMinutesBucketDecreaseAt *timestamppb.Timestamp
+	if orgUsage.NextRunnerMinutesBucketLeakAtUnixSeconds > 0 {
+		nextRunnerMinutesBucketDecreaseAt = timestamppb.New(
+			time.Unix(orgUsage.NextRunnerMinutesBucketLeakAtUnixSeconds, 0).UTC(),
+		)
+	}
+
 	return &pb.OrganizationUsage{
-		Canvases:                       orgUsage.Canvases,
-		EventBucketLevel:               orgUsage.EventBucketLevel,
-		EventBucketCapacity:            orgUsage.EventBucketCapacity,
-		EventBucketLastUpdatedAt:       eventBucketLastUpdatedAt,
-		NextEventBucketDecreaseAt:      nextEventBucketDecreaseAt,
-		AgentTokenBucketLevel:          orgUsage.AgentTokenBucketLevel,
-		AgentTokenBucketCapacity:       orgUsage.AgentTokenBucketCapacity,
-		AgentTokenBucketLastUpdatedAt:  agentTokenBucketLastUpdatedAt,
-		NextAgentTokenBucketDecreaseAt: nextAgentTokenBucketDecreaseAt,
+		Canvases:                          orgUsage.Canvases,
+		EventBucketLevel:                  orgUsage.EventBucketLevel,
+		EventBucketCapacity:               orgUsage.EventBucketCapacity,
+		EventBucketLastUpdatedAt:          eventBucketLastUpdatedAt,
+		NextEventBucketDecreaseAt:         nextEventBucketDecreaseAt,
+		AgentTokenBucketLevel:             orgUsage.AgentTokenBucketLevel,
+		AgentTokenBucketCapacity:          orgUsage.AgentTokenBucketCapacity,
+		AgentTokenBucketLastUpdatedAt:     agentTokenBucketLastUpdatedAt,
+		NextAgentTokenBucketDecreaseAt:    nextAgentTokenBucketDecreaseAt,
+		RunnerMinutesBucketLevel:          orgUsage.RunnerMinutesBucketLevel,
+		RunnerMinutesBucketCapacity:       orgUsage.RunnerMinutesBucketCapacity,
+		RunnerMinutesBucketLastUpdatedAt:  runnerMinutesBucketLastUpdatedAt,
+		NextRunnerMinutesBucketDecreaseAt: nextRunnerMinutesBucketDecreaseAt,
 	}
 }
