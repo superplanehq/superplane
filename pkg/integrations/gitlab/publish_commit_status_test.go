@@ -178,6 +178,21 @@ func Test__PublishCommitStatus__Execute(t *testing.T) {
 		assert.NotContains(t, bodyString, `"target_url"`)
 	})
 
+	t.Run("requires sha at execution time", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project": "123",
+				"sha":     "  ",
+				"state":   "success",
+			},
+			Integration: integration,
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "commit SHA is required")
+	})
+
 	t.Run("invalid pipeline ID", func(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{

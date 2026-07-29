@@ -107,7 +107,7 @@ func Test__GetCommitStatus__Execute(t *testing.T) {
 
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/123/repository/commits/abc123/statuses?page=1&per_page=100", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/123/repository/commits/abc123/statuses?order_by=id&page=1&per_page=100&sort=desc", httpCtx.Requests[0].URL.String())
 	})
 
 	t.Run("applies ref and name filters", func(t *testing.T) {
@@ -133,7 +133,7 @@ func Test__GetCommitStatus__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/123/repository/commits/abc123/statuses?name=ci%2Fsuperplane&page=1&per_page=100&ref=main", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/123/repository/commits/abc123/statuses?name=ci%2Fsuperplane&order_by=id&page=1&per_page=100&ref=main&sort=desc", httpCtx.Requests[0].URL.String())
 	})
 
 	t.Run("failure", func(t *testing.T) {

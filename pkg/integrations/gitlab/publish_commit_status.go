@@ -271,6 +271,10 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if strings.TrimSpace(config.SHA) == "" {
+		return errors.New("commit SHA is required")
+	}
+
 	if !slices.Contains(commitStatusStates, config.State) {
 		return fmt.Errorf("invalid state %q: must be one of pending, running, success, failed, canceled, skipped", config.State)
 	}

@@ -1716,7 +1716,7 @@ func Test__Client__ListCommitStatuses(t *testing.T) {
 
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?name=ci%2Fsuperplane&page=1&per_page=100&ref=main", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?name=ci%2Fsuperplane&order_by=id&page=1&per_page=100&ref=main&sort=desc", mockClient.Requests[0].URL.String())
 	})
 
 	t.Run("follows pagination across pages", func(t *testing.T) {
@@ -1740,8 +1740,8 @@ func Test__Client__ListCommitStatuses(t *testing.T) {
 		assert.Equal(t, 2, statuses[1].ID)
 
 		require.Len(t, mockClient.Requests, 2)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?page=1&per_page=100", mockClient.Requests[0].URL.String())
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?page=2&per_page=100", mockClient.Requests[1].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=1&per_page=100&sort=desc", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=2&per_page=100&sort=desc", mockClient.Requests[1].URL.String())
 	})
 
 	t.Run("failure", func(t *testing.T) {

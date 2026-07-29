@@ -1510,6 +1510,9 @@ func (c *Client) ListCommitStatuses(projectID, sha string, req *ListCommitStatus
 		}
 	}
 	query.Set("per_page", "100")
+	// Newest first, so the first result is the most recent status.
+	query.Set("order_by", "id")
+	query.Set("sort", "desc")
 
 	return fetchAllResources[CommitStatus](c, func(page int) string {
 		query.Set("page", strconv.Itoa(page))
