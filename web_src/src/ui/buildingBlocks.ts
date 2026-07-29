@@ -174,6 +174,7 @@ const RUNNER_BLOCK_ORDER: Record<string, number> = {
   runnerJS: 2,
   runnerPython: 3,
   runnerClaudeCode: 4,
+  runnerOpenCode: 5,
 };
 
 function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
@@ -194,7 +195,8 @@ function isRunnerBlock(component: { name?: string }): boolean {
     name === "runnerJS" ||
     name === "runnerBash" ||
     name === "runnerPython" ||
-    name === "runnerClaudeCode"
+    name === "runnerClaudeCode" ||
+    name === "runnerOpenCode"
   );
 }
 
