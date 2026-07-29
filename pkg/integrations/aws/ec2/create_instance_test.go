@@ -147,8 +147,22 @@ func Test__CreateInstance__ConfigurationIncludesProductionLaunchFields(t *testin
 	blockDevices := findConfigurationField(t, fields, "additionalBlockDevices")
 	require.NotNil(t, blockDevices.TypeOptions)
 	require.NotNil(t, blockDevices.TypeOptions.List)
-	assert.Contains(t, configurationFieldNames(blockDevices.TypeOptions.List.ItemDefinition.Schema), "deviceName")
-	assert.Contains(t, configurationFieldNames(blockDevices.TypeOptions.List.ItemDefinition.Schema), "kmsKeyId")
+	blockDeviceSchema := blockDevices.TypeOptions.List.ItemDefinition.Schema
+	assert.Contains(t, configurationFieldNames(blockDeviceSchema), "deviceName")
+	assert.Contains(t, configurationFieldNames(blockDeviceSchema), "kmsKeyId")
+
+	configureRootVolume := findConfigurationField(t, fields, "configureRootVolume")
+	assert.Equal(t, configuration.FieldTypeBool, configureRootVolume.Type)
+	assert.False(t, configureRootVolume.Togglable)
+
+	rootSize := findConfigurationField(t, fields, "volumeSizeGiB")
+	additionalSize := findConfigurationField(t, blockDeviceSchema, "volumeSizeGiB")
+	assert.Equal(t, defaultVolumeSizeGiB, rootSize.Default)
+	assert.Equal(t, defaultVolumeSizeGiB, additionalSize.Default)
+
+	rootIops := findConfigurationField(t, fields, "volumeIops")
+	additionalIops := findConfigurationField(t, blockDeviceSchema, "volumeIops")
+	assert.Equal(t, rootIops.Description, additionalIops.Description)
 
 	timeout := findConfigurationField(t, fields, "waitForRunningTimeoutSeconds")
 	require.NotNil(t, timeout.TypeOptions)

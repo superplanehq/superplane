@@ -26,6 +26,7 @@ var (
 		"root":     {},
 		"previous": {},
 		"run":      {},
+		"app":      {},
 		"ctx":      {},
 	}
 

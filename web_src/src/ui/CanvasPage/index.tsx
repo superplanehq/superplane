@@ -95,6 +95,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
+import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
@@ -260,6 +261,9 @@ export interface CanvasPageProps {
   hideCanvasToolSidebar?: boolean;
   /** Enables managed agent chat controls when the user has the required RBAC permissions. */
   canUseAgents?: boolean;
+  /** Optional Agent improvement suggestions shown on the Agent header control. */
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -1450,6 +1454,8 @@ function CanvasPage(props: CanvasPageProps) {
           toolSidebarState={toolSidebarState}
           runsSidebarState={runsSidebarState}
           versionsSidebarState={versionsSidebarState}
+          agentSuggestions={props.agentSuggestions}
+          onSelectAgentSuggestion={props.onSelectAgentSuggestion}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1955,6 +1961,8 @@ function CanvasContentHeader({
   toolSidebarState,
   runsSidebarState,
   versionsSidebarState,
+  agentSuggestions,
+  onSelectAgentSuggestion,
 }: {
   canvasName: string;
   organizationId?: string;
@@ -2019,6 +2027,8 @@ function CanvasContentHeader({
   toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
   versionsSidebarState: CanvasVersionsSidebarState;
+  agentSuggestions?: AgentSuggestion[];
+  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
 }) {
   return (
     <Header
@@ -2075,6 +2085,8 @@ function CanvasContentHeader({
       toolSidebarState={toolSidebarState}
       runsSidebarState={runsSidebarState}
       versionsSidebarState={versionsSidebarState}
+      agentSuggestions={agentSuggestions}
+      onSelectAgentSuggestion={onSelectAgentSuggestion}
     />
   );
 }
@@ -3527,4 +3539,5 @@ function CanvasContent({
 
 export type { BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
+export type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 export { CanvasPage };
