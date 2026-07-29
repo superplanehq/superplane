@@ -1392,6 +1392,82 @@ func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, r
 	return &release, nil
 }
 
+// GetRelease fetches a single release by tag name.
+func (c *Client) GetRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteRelease deletes a release and returns the deleted release; it does not delete the underlying tag.
+func (c *Client) DeleteRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to delete release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteTag deletes a Git tag from the project's repository.
+func (c *Client) DeleteTag(ctx context.Context, projectID, tagName string) error {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/tags/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete tag: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	return nil
+}
+
 // GetLatestRelease returns the most recently published release, skipping upcoming (scheduled) ones.
 func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Release, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=100", c.baseURL, apiVersion, url.PathEscape(projectID))
