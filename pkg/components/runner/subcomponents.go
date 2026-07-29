@@ -35,6 +35,10 @@ func CancelBrokerTask(ctx core.ExecutionContext) error {
 	return cancelBrokerTask(ctx)
 }
 
-func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType string) error {
-	return processBrokerTaskStatus(state, task, finishedEventType)
+func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {
+	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil)
+}
+
+func EnsureRunnerMinutesAvailable(ctx core.ExecutionContext) error {
+	return ensureRunnerMinutesAvailable(ctx)
 }
