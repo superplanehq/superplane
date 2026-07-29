@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+import { useCallback, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
-import { ConsoleView } from "./ConsoleView";
+import { ConsoleView, type ConsoleViewProps } from "./ConsoleView";
+import type { PanelType } from "./panelTypes";
 
 const PANEL: ConsolePanel = {
   id: "readme",
@@ -23,6 +25,7 @@ const VISUAL_DIFF_SUMMARY: DraftConsoleDiffSummary = {
   removedCount: 1,
   items: [
     {
+      pageId: "main",
       id: "readme",
       title: "Readme",
       changeType: "updated",
@@ -38,12 +41,14 @@ const VISUAL_DIFF_SUMMARY: DraftConsoleDiffSummary = {
       ],
     },
     {
+      pageId: "main",
       id: "new-panel",
       title: "New Panel",
       changeType: "added",
       lines: [],
     },
     {
+      pageId: "main",
       id: "old-panel",
       title: "Old Panel",
       changeType: "removed",
@@ -52,13 +57,6 @@ const VISUAL_DIFF_SUMMARY: DraftConsoleDiffSummary = {
       lines: [],
     },
   ],
-};
-
-const BASE_PROPS = {
-  panels: [PANEL],
-  layout: LAYOUT,
-  readOnly: true,
-  onChange: vi.fn(),
 };
 
 function flushAnimationFrame() {
@@ -82,8 +80,67 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Stateful test harness that mirrors how {@link ConsoleOverlay} wires
+ * {@link ConsoleView} to a page-state manager. Keeping the harness local
+ * to the spec avoids leaking test-only helpers into the production
+ * console modules.
+ */
+type StatefulConsoleViewProps = Omit<
+  ConsoleViewProps,
+  "onAddPanel" | "onDeletePanel" | "onPanelContentChange" | "onLayoutChange"
+>;
+
+function StatefulConsoleView({
+  panels: initialPanels,
+  layout: initialLayout,
+  persistedPanels,
+  persistedLayout,
+  ...rest
+}: StatefulConsoleViewProps) {
+  const [panels, setPanels] = useState<ConsolePanel[]>(initialPanels);
+  const [layout, setLayout] = useState<ConsoleLayoutItem[]>(initialLayout);
+
+  const handleAddPanel = useCallback((_name: string, _type: PanelType) => {
+    // Not exercised by these tests.
+  }, []);
+  const handleDeletePanel = useCallback((id: string) => {
+    setPanels((prev) => prev.filter((p) => p.id !== id));
+    setLayout((prev) => prev.filter((l) => l.i !== id));
+  }, []);
+  const handlePanelContentChange = useCallback((id: string, content: Record<string, unknown>) => {
+    setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, content } : p)));
+  }, []);
+  const handleLayoutChange = useCallback((next: ConsoleLayoutItem[]) => setLayout(next), []);
+
+  return (
+    <ConsoleView
+      {...rest}
+      panels={panels}
+      layout={layout}
+      persistedPanels={persistedPanels}
+      persistedLayout={persistedLayout}
+      onAddPanel={handleAddPanel}
+      onDeletePanel={handleDeletePanel}
+      onPanelContentChange={handlePanelContentChange}
+      onLayoutChange={handleLayoutChange}
+    />
+  );
+}
+
+const BASE_PROPS: StatefulConsoleViewProps = {
+  activePageId: "main",
+  panels: [PANEL],
+  layout: LAYOUT,
+  persistedPanels: [PANEL],
+  persistedLayout: LAYOUT,
+  readOnly: true,
+  isLoading: false,
+};
+
 describe("ConsoleView grid transitions", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     globalThis.ResizeObserver = class {
       private callback: ResizeObserverCallback;
 
@@ -104,12 +161,9 @@ describe("ConsoleView grid transitions", () => {
   });
 
   it("does not arm transitions while loading before the grid mounts", async () => {
-    // The markdown panel that backs this grid issues queries through
-    // `useMarkdownVariables`, so the test tree needs the standard providers
-    // even for purely layout-focused assertions.
     const { rerender, container } = render(
       <TestWrapper>
-        <ConsoleView {...BASE_PROPS} isLoading errorMessage={undefined} />
+        <StatefulConsoleView {...BASE_PROPS} isLoading errorMessage={undefined} />
       </TestWrapper>,
     );
 
@@ -117,7 +171,7 @@ describe("ConsoleView grid transitions", () => {
 
     rerender(
       <TestWrapper>
-        <ConsoleView {...BASE_PROPS} isLoading={false} errorMessage={undefined} />
+        <StatefulConsoleView {...BASE_PROPS} isLoading={false} errorMessage={undefined} />
       </TestWrapper>,
     );
 
@@ -127,12 +181,16 @@ describe("ConsoleView grid transitions", () => {
   });
 
   it("renders visual diff badges and deleted panels by default", () => {
+    const panels = [PANEL, { id: "new-panel", type: "markdown", content: { title: "New Panel", body: "Added" } }];
+    const layout = [...LAYOUT, { i: "new-panel", x: 0, y: 4, w: 6, h: 4 }];
     const { container } = render(
       <TestWrapper>
-        <ConsoleView
+        <StatefulConsoleView
           {...BASE_PROPS}
-          panels={[PANEL, { id: "new-panel", type: "markdown", content: { title: "New Panel", body: "Added" } }]}
-          layout={[...LAYOUT, { i: "new-panel", x: 0, y: 4, w: 6, h: 4 }]}
+          panels={panels}
+          layout={layout}
+          persistedPanels={panels}
+          persistedLayout={layout}
           isLoading={false}
           errorMessage={undefined}
           visualDiff={{ enabled: true, summary: VISUAL_DIFF_SUMMARY }}
@@ -167,7 +225,7 @@ describe("ConsoleView grid transitions", () => {
   ] as const)("hides the %s badge while its panel is editing", (label, changeType) => {
     render(
       <TestWrapper>
-        <ConsoleView
+        <StatefulConsoleView
           {...BASE_PROPS}
           readOnly={false}
           isLoading={false}
@@ -178,7 +236,7 @@ describe("ConsoleView grid transitions", () => {
               addedCount: changeType === "added" ? 1 : 0,
               updatedCount: changeType === "updated" ? 1 : 0,
               removedCount: 0,
-              items: [{ id: "readme", title: "Readme", changeType, lines: [] }],
+              items: [{ pageId: "main", id: "readme", title: "Readme", changeType, lines: [] }],
             },
           }}
         />
@@ -193,12 +251,16 @@ describe("ConsoleView grid transitions", () => {
   });
 
   it("replaces deleted ghost panels when a live panel occupies their layout", () => {
+    const panels = [PANEL, { id: "new-panel", type: "markdown", content: { title: "New Panel", body: "Added" } }];
+    const layout = [...LAYOUT, { i: "new-panel", x: 6, y: 0, w: 6, h: 4 }];
     const { container } = render(
       <TestWrapper>
-        <ConsoleView
+        <StatefulConsoleView
           {...BASE_PROPS}
-          panels={[PANEL, { id: "new-panel", type: "markdown", content: { title: "New Panel", body: "Added" } }]}
-          layout={[...LAYOUT, { i: "new-panel", x: 6, y: 0, w: 6, h: 4 }]}
+          panels={panels}
+          layout={layout}
+          persistedPanels={panels}
+          persistedLayout={layout}
           isLoading={false}
           errorMessage={undefined}
           visualDiff={{ enabled: true, summary: VISUAL_DIFF_SUMMARY }}
@@ -212,10 +274,42 @@ describe("ConsoleView grid transitions", () => {
     expect(container.querySelectorAll('[data-testid="console-removed-panel-ghost"]')).toHaveLength(0);
   });
 
+  it.each([
+    ["view mode hides the add-panel CTA on empty pages", true, false],
+    ["edit mode surfaces the add-panel CTA on empty pages", false, true],
+  ] as const)("%s", (_label, readOnly, expectCta) => {
+    // Regression test for the multi-page world where every new tab
+    // starts empty. Pre-multi-page an empty console was rare, so an
+    // always-on "Add First Panel" CTA was mostly harmless; now that
+    // empty pages are a normal navigation state, view-mode users
+    // routinely land on them and must not see authoring affordances.
+    render(
+      <TestWrapper>
+        <StatefulConsoleView
+          {...BASE_PROPS}
+          panels={[]}
+          layout={[]}
+          persistedPanels={[]}
+          persistedLayout={[]}
+          readOnly={readOnly}
+          isLoading={false}
+          errorMessage={undefined}
+        />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByTestId("console-empty-state")).toBeTruthy();
+    if (expectCta) {
+      expect(screen.getByTestId("console-add-first-panel")).toBeTruthy();
+    } else {
+      expect(screen.queryByTestId("console-add-first-panel")).toBeNull();
+    }
+  });
+
   it("renders a deleted panel ghost immediately after local delete", () => {
     const { container } = render(
       <TestWrapper>
-        <ConsoleView
+        <StatefulConsoleView
           {...BASE_PROPS}
           readOnly={false}
           isLoading={false}

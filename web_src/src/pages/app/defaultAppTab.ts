@@ -80,20 +80,24 @@ export function buildAppTabSearchParams(tab: AppTabId, current: URLSearchParams)
   return next;
 }
 
-/** Minimal shape of the live-console query the resolver depends on. */
+/**
+ * Minimal shape of the live-console query the resolver depends on. Kept
+ * generic so tests can pass in synthetic data; the real query returns
+ * `CanvasConsoleData` which satisfies this shape.
+ */
 export type ConsoleQueryLike = {
   isSuccess: boolean;
   isError: boolean;
-  data: { panels: unknown[] } | undefined;
+  data: { pages?: { panels?: unknown[] }[] } | undefined;
 };
 
 export type DefaultTabResolution = { settled: false } | { settled: true; redirectTo: AppTabId | null };
 
 /**
  * Decides which tab (if any) should be the destination on a bare app URL.
- * Priority: stored tab → live console (Console when the app has panels,
- * Canvas otherwise). A console read that errors settles on Canvas so the
- * caller does not wait forever.
+ * Priority: stored tab → live console (Console when the app has any panel
+ * on any page, Canvas otherwise). A console read that errors settles on
+ * Canvas so the caller does not wait forever.
  */
 export function resolveDefaultTab({
   storedTab,
@@ -108,6 +112,7 @@ export function resolveDefaultTab({
 
   if (!liveConsoleQuery.isSuccess) return { settled: false };
 
-  const panels = liveConsoleQuery.data?.panels ?? [];
-  return { settled: true, redirectTo: panels.length > 0 ? "console" : null };
+  const pages = liveConsoleQuery.data?.pages ?? [];
+  const hasPanels = pages.some((page) => (page?.panels?.length ?? 0) > 0);
+  return { settled: true, redirectTo: hasPanels ? "console" : null };
 }
