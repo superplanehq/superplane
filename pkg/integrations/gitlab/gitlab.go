@@ -190,6 +190,8 @@ func (g *GitLab) Actions() []core.Action {
 		&MarkMergeRequestReadyForReview{},
 		&CreateRelease{},
 		&UpdateRelease{},
+		&GetRelease{},
+		&DeleteRelease{},
 	}
 }
 
