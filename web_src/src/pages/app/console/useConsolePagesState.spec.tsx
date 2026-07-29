@@ -360,4 +360,66 @@ describe("useConsolePagesState — canvas switch invalidates pending saves", () 
       vi.useRealTimers();
     }
   });
+
+  it("resets local editor state on canvas switch even when the pages hash is identical", () => {
+    // Regression test for the high-severity finding "Stale pages leak
+    // across canvases". The props-sync effect only fires when
+    // `JSON.stringify(pages)` differs from the last synced hash, so
+    // two canvases with the same pages payload (commonly two empty
+    // consoles) would previously slip past the reset. Combined with
+    // `activePage = localPages.find(...) ?? localPages[0]`, canvas A's
+    // diverged local state would render on canvas B and a subsequent
+    // edit on B would stage A's content onto B via `queueSave`.
+    const onChange = vi.fn();
+    const onActivePageIdChange = vi.fn();
+
+    vi.useFakeTimers();
+    try {
+      const { result, rerender } = renderHook(
+        ({ canvasId, pages }: { canvasId: string; pages: ConsolePage[] }) =>
+          useConsolePagesState({
+            pages,
+            onChange,
+            activePageId: null,
+            onActivePageIdChange,
+            canvasId,
+          }),
+        { initialProps: { canvasId: "canvas-a", pages: [] as ConsolePage[] } },
+      );
+
+      // Local edit on canvas A: adds the first panel, which auto-
+      // creates the default `main` page. `localPages` now diverges
+      // from the still-empty `pages` prop.
+      act(() => {
+        result.current.handleAddPanel("Leaky Note", "markdown");
+      });
+      expect(result.current.localPages).toHaveLength(1);
+      expect(result.current.localPages[0].panels).toHaveLength(1);
+
+      // Switch to canvas B whose `pages` prop is *also* empty — same
+      // hash as A's props. The buggy version would keep canvas A's
+      // divergent local pages because the props-sync effect skips
+      // the reset when the JSON hash matches.
+      rerender({ canvasId: "canvas-b", pages: [] });
+
+      expect(result.current.localPages).toHaveLength(0);
+
+      // Confirm canvas B stages only its own edits. If A's content
+      // leaked, this `onChange` call would carry the "Leaky Note"
+      // panel alongside the new "B Note" one.
+      onChange.mockClear();
+      act(() => {
+        result.current.handleAddPanel("B Note", "markdown");
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(onChange).toHaveBeenCalledTimes(1);
+      const stagedPages = onChange.mock.calls[0][0].pages as ConsolePage[];
+      const titles = stagedPages.flatMap((page) => page.panels).map((panel) => panel.content?.title);
+      expect(titles).toEqual(["B Note"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -87,6 +87,31 @@ function useDebouncedPages({
   const [localPages, setLocalPages] = useState<ConsolePage[]>(pages);
   const lastPropsHashRef = useRef<string>("");
 
+  // Reset local editor state on canvas switch. React Router reuses
+  // this route component across `apps/:id`, so a canvas switch would
+  // otherwise leave the outgoing canvas's diverged local state in
+  // `localPages`. The props-sync effect below only fires when the
+  // JSON hash of `pages` actually changes; two canvases with the
+  // same pages payload (commonly, two empty consoles) slip past
+  // that check. Combined with `activePage = localPages.find(...) ??
+  // localPages[0]` upstream, canvas A's unsaved local pages then
+  // render on canvas B, and a subsequent edit stages A's content
+  // onto B via `queueSave`.
+  //
+  // Standard React "reset state on prop change during render"
+  // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders):
+  // running the reset in-render ensures `localPages` is aligned with
+  // the incoming canvas before any effect (including the effective-
+  // change callback that drives staging indicators) observes stale
+  // state on this render. Mirrors the equivalent reset in
+  // `useConsoleActivePageInitial`.
+  const [trackedCanvasId, setTrackedCanvasId] = useState(canvasId);
+  if (trackedCanvasId !== canvasId) {
+    setTrackedCanvasId(canvasId);
+    setLocalPages(pages);
+    lastPropsHashRef.current = JSON.stringify(pages);
+  }
+
   useEffect(() => {
     const next = JSON.stringify(pages);
     if (next !== lastPropsHashRef.current) {
