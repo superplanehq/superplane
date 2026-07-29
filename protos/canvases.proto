@@ -780,6 +780,7 @@ message ListRunsRequest {
   google.protobuf.Timestamp before = 3;
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
+  string triggered_by_user_id = 6;
 }
 
 message ListRunsResponse {
@@ -901,6 +902,7 @@ message CanvasRun {
   repeated CanvasNodeQueueItem queue_items = 11;
   google.protobuf.Timestamp cancelled_at = 12;
   CanvasRunRef parent = 13;
+  UserRef triggered_by = 14;
 }
 
 message CanvasRunRef {

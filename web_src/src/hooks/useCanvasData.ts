@@ -159,6 +159,7 @@ export const canvasKeys = {
       ...canvasKeys.runs(),
       canvasId,
       "infinite",
+      ...(filters?.triggeredByUserId ? ["triggeredByUserId", filters.triggeredByUserId] : []),
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
     ] as const,
@@ -1034,6 +1035,7 @@ export const useDeleteCanvas = (organizationId: string) => {
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+  triggeredByUserId?: string;
 };
 
 export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
@@ -1101,6 +1103,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
             limit,
             ...(filters.states?.length ? { states: filters.states } : {}),
             ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(filters.triggeredByUserId ? { triggeredByUserId: filters.triggeredByUserId } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

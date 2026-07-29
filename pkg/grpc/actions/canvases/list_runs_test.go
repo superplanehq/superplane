@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -33,7 +34,7 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
 	execution := createRunExecution(t, run, rootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Runs, 1)
@@ -79,7 +80,7 @@ func Test__ListRuns__ReturnsRunsWithQueueItems(t *testing.T) {
 	createStartedRun(t, otherRootEvent)
 	support.CreateQueueItem(t, otherCanvas.ID, "trigger", otherRootEvent.ID, otherRootEvent.ID)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil, "")
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 2)
 
@@ -113,7 +114,7 @@ func Test__ListRuns__ScopesRunsToCanvas(t *testing.T) {
 	runOne := createFinishedRun(t, rootEventOne, models.CanvasRunResultPassed)
 	createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvasOne, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvasOne, 0, nil, nil, nil, "")
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 1)
 	assert.Equal(t, runOne.ID.String(), response.Runs[0].Id)
@@ -145,6 +146,7 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		nil,
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_PASSED},
+		"",
 	)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 2)
@@ -163,6 +165,7 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		nil,
 		nil,
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_FAILED, pb.CanvasRun_RESULT_CANCELLED},
+		"",
 	)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 2)
@@ -180,11 +183,33 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		nil,
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
 		nil,
+		"",
 	)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 1)
 	assert.Equal(t, startedRun.ID.String(), response.Runs[0].Id)
 	assert.Equal(t, uint32(1), response.TotalCount)
+}
+
+func Test__ListRuns__FiltersByTriggeredByUser(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
+
+	rootEventOne := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	runOne := createFinishedRun(t, rootEventOne, models.CanvasRunResultPassed)
+	require.NoError(t, database.Conn().Model(runOne).Update("triggered_by", r.User).Error)
+
+	rootEventTwo := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	_ = createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	response, err := ListRuns(ctx, database.DB(t.Context()), canvas, 0, nil, nil, nil, r.User.String())
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 1)
+	assert.Equal(t, runOne.ID.String(), response.Runs[0].Id)
+
+	_, err = ListRuns(ctx, database.DB(t.Context()), canvas, 0, nil, nil, nil, uuid.NewString())
+	require.Error(t, err)
 }
 
 func Test__RunStateMapping__Pending(t *testing.T) {
@@ -207,6 +232,7 @@ func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 		nil,
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_UNKNOWN},
 		nil,
+		"",
 	)
 	require.Error(t, err)
 
@@ -218,6 +244,7 @@ func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 		nil,
 		nil,
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_UNKNOWN},
+		"",
 	)
 	require.Error(t, err)
 }
@@ -266,6 +293,7 @@ func Test__ListRuns__ReturnsPendingSubRunWithoutRootEvent(t *testing.T) {
 		nil,
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_PENDING},
 		nil,
+		"",
 	)
 	require.NoError(t, err)
 	require.Len(t, childResponse.Runs, 1)
@@ -273,7 +301,7 @@ func Test__ListRuns__ReturnsPendingSubRunWithoutRootEvent(t *testing.T) {
 	assert.Equal(t, pb.CanvasRun_STATE_PENDING, childResponse.Runs[0].State)
 	assert.Nil(t, childResponse.Runs[0].RootEvent)
 
-	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil)
+	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil, "")
 	require.NoError(t, err)
 	require.Len(t, parentResponse.Runs, 1)
 	require.Len(t, parentResponse.Runs[0].Executions, 1)
@@ -320,7 +348,7 @@ func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
 	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onRun", "default", nil)
 	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
 
-	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil)
+	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil, "")
 	require.NoError(t, err)
 	require.Len(t, parentResponse.Runs, 1)
 	require.Len(t, parentResponse.Runs[0].Executions, 1)

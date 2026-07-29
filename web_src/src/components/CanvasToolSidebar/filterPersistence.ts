@@ -5,16 +5,17 @@ export const RUNS_SIDEBAR_FILTERS_STORAGE_KEY = "runs-sidebar-filters";
 export type PersistedFilters = {
   statuses: Set<RunStatusFilter>;
   triggerIds: Set<string>;
+  myRunsOnly: boolean;
 };
 
 export function loadPersistedFilters(): PersistedFilters {
-  if (typeof window === "undefined") return { statuses: new Set(), triggerIds: new Set() };
+  if (typeof window === "undefined") return { statuses: new Set(), triggerIds: new Set(), myRunsOnly: false };
 
   try {
     const raw = window.localStorage.getItem(RUNS_SIDEBAR_FILTERS_STORAGE_KEY);
-    if (!raw) return { statuses: new Set(), triggerIds: new Set() };
+    if (!raw) return { statuses: new Set(), triggerIds: new Set(), myRunsOnly: false };
 
-    const parsed = JSON.parse(raw) as { statuses?: unknown; triggerIds?: unknown };
+    const parsed = JSON.parse(raw) as { statuses?: unknown; triggerIds?: unknown; myRunsOnly?: unknown };
     const validStatuses = new Set<RunStatusFilter>(RUN_STATUS_FILTER_OPTIONS.map((option) => option.id));
     const statuses = new Set<RunStatusFilter>(
       Array.isArray(parsed.statuses)
@@ -29,10 +30,11 @@ export function loadPersistedFilters(): PersistedFilters {
         ? parsed.triggerIds.filter((triggerId: unknown): triggerId is string => typeof triggerId === "string")
         : [],
     );
+    const myRunsOnly = typeof parsed.myRunsOnly === "boolean" ? parsed.myRunsOnly : false;
 
-    return { statuses, triggerIds };
+    return { statuses, triggerIds, myRunsOnly };
   } catch {
-    return { statuses: new Set(), triggerIds: new Set() };
+    return { statuses: new Set(), triggerIds: new Set(), myRunsOnly: false };
   }
 }
 
@@ -44,6 +46,7 @@ export function savePersistedFilters(filters: PersistedFilters): void {
       JSON.stringify({
         statuses: Array.from(filters.statuses),
         triggerIds: Array.from(filters.triggerIds),
+        myRunsOnly: filters.myRunsOnly,
       }),
     );
   } catch {
