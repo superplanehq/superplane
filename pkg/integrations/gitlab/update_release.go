@@ -18,11 +18,6 @@ var exampleOutputUpdateRelease []byte
 
 type UpdateRelease struct{}
 
-const (
-	ReleaseStrategySpecific = "specific"
-	ReleaseStrategyLatest   = "latest"
-)
-
 type UpdateReleaseConfiguration struct {
 	Project         string   `mapstructure:"project"`
 	ReleaseStrategy string   `mapstructure:"releaseStrategy"`
@@ -238,7 +233,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
-	tagName, err := resolveReleaseTagName(client, config)
+	tagName, err := resolveReleaseTagName(client, config.Project, config.ReleaseStrategy, config.TagName)
 	if err != nil {
 		return err
 	}
@@ -277,20 +272,6 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 		"gitlab.release",
 		[]any{release},
 	)
-}
-
-// resolveReleaseTagName identifies which release to update: the configured tag, or the project's latest release.
-func resolveReleaseTagName(client *Client, config UpdateReleaseConfiguration) (string, error) {
-	if config.ReleaseStrategy != ReleaseStrategyLatest {
-		return config.TagName, nil
-	}
-
-	latest, err := client.GetLatestRelease(context.Background(), config.Project)
-	if err != nil {
-		return "", fmt.Errorf("failed to find latest release: %w", err)
-	}
-
-	return latest.TagName, nil
 }
 
 func validateUpdateRelease(rawConfig any, config UpdateReleaseConfiguration) error {
