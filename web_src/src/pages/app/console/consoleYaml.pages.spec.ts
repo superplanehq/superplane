@@ -248,6 +248,43 @@ spec:
     expect(err).toContain("Too many panels");
   });
 
+  it("mirrors backend delta rules: refuses over-cap page duplication via positional slot", () => {
+    // Regression: a user with a grandfathered over-cap page "big"
+    // used to be able to keep "big" AND insert a positional twin
+    // that copied the same panel ids. Both new pages would appear
+    // grandfathered individually (exact-id inheritance for "big",
+    // positional inheritance for the twin) even though they share
+    // the *same* previous slot. Delta validation now claims previous
+    // slots by exact-id and refuses positional inheritance of an
+    // already-claimed slot.
+    const over = MAX_CONSOLE_PANELS_PER_PAGE + 4;
+    const bigPanels = Array.from({ length: over }, (_v, i) => ({
+      id: `p-${i}`,
+      type: "markdown" as const,
+      content: {},
+    }));
+    const previous: ConsolePage[] = [{ id: "big", name: "Big", panels: bigPanels, layout: [] }];
+
+    // Positional twin ahead of the original — the exploit shape.
+    const withDupBefore: ConsolePage[] = [
+      { id: "big-clone", name: "Big clone", panels: bigPanels, layout: [] },
+      { id: "big", name: "Big", panels: bigPanels, layout: [] },
+    ];
+    expect(validateConsolePagesDelta(withDupBefore, previous)).toContain("Too many panels");
+
+    // Twin after the original — index 1 has no previous slot to
+    // inherit either way, so this is also refused.
+    const withDupAfter: ConsolePage[] = [
+      { id: "big", name: "Big", panels: bigPanels, layout: [] },
+      { id: "big-clone", name: "Big clone", panels: bigPanels, layout: [] },
+    ];
+    expect(validateConsolePagesDelta(withDupAfter, previous)).toContain("Too many panels");
+
+    // Sanity: a legitimate rename without a duplicate still passes.
+    const renamedOnly: ConsolePage[] = [{ id: "overview", name: "Overview", panels: bigPanels, layout: [] }];
+    expect(validateConsolePagesDelta(renamedOnly, previous)).toBeNull();
+  });
+
   it("mirrors backend delta rules: allows same page count above cap, refuses growth", () => {
     // 6 pages, previously 6 → allowed. Adding a 7th → refused.
     const buildPages = (n: number): ConsolePage[] =>

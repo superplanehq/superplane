@@ -455,9 +455,25 @@ func ValidateConsolePagesDelta(pages []models.ConsolePage, previous []models.Con
 		return fmt.Errorf("too many pages (max %d)", MaxConsolePages)
 	}
 
-	previousPanelCountByID := make(map[string]int, len(previous))
-	for _, page := range previous {
-		previousPanelCountByID[page.ID] = len(page.Panels)
+	// Pair each new page with its exact-id match in `previous` (if
+	// any) and record which previous indices are claimed by that
+	// pairing. A previous slot must be inherited by at most one new
+	// page — otherwise a user with a grandfathered over-cap page
+	// could keep that page *and* add a positional twin that inherits
+	// the same allowance, effectively duplicating over-cap content
+	// past the delta cap. See `isGrandfatheredOverCapPage` for how
+	// this map is consumed on the positional (rename) fallback.
+	previousIndexByID := make(map[string]int, len(previous))
+	for i, page := range previous {
+		previousIndexByID[page.ID] = i
+	}
+	claimedPreviousIdx := make(map[int]struct{}, len(pages))
+	exactIDMatch := make(map[int]int, len(pages))
+	for i, page := range pages {
+		if prevIdx, ok := previousIndexByID[page.ID]; ok {
+			claimedPreviousIdx[prevIdx] = struct{}{}
+			exactIDMatch[i] = prevIdx
+		}
 	}
 
 	for i, page := range pages {
@@ -469,7 +485,7 @@ func ValidateConsolePagesDelta(pages []models.ConsolePage, previous []models.Con
 			continue
 		}
 
-		if isGrandfatheredOverCapPage(page, i, previous, previousPanelCountByID) {
+		if isGrandfatheredOverCapPage(page, i, previous, exactIDMatch, claimedPreviousIdx) {
 			continue
 		}
 		return fmt.Errorf("page %q: too many panels (max %d per page)", page.ID, MaxConsolePanelsPerPage)
@@ -490,13 +506,22 @@ func ValidateConsolePagesDelta(pages []models.ConsolePage, previous []models.Con
 //     grandfathered slot.
 //
 // A page is grandfathered when its panel count is at-or-under the
-// allowance for whichever mode matches.
-func isGrandfatheredOverCapPage(page models.ConsolePage, index int, previous []models.ConsolePage, previousPanelCountByID map[string]int) bool {
-	if prev, ok := previousPanelCountByID[page.ID]; ok && len(page.Panels) <= prev {
-		return true
+// allowance for whichever mode matches. Each previous slot can back
+// at most one new page: `claimedPreviousIdx` records slots already
+// pinned by an exact-id match elsewhere in this document, and the
+// positional fallback refuses those. Without that claim check, a
+// grandfathered over-cap page could be positionally duplicated into
+// a new tab that also keeps the original id — bypassing the delta
+// cap despite both pages carrying inflated panel counts.
+func isGrandfatheredOverCapPage(page models.ConsolePage, index int, previous []models.ConsolePage, exactIDMatch map[int]int, claimedPreviousIdx map[int]struct{}) bool {
+	if prevIdx, ok := exactIDMatch[index]; ok {
+		return len(page.Panels) <= len(previous[prevIdx].Panels)
 	}
 
 	if index >= len(previous) {
+		return false
+	}
+	if _, claimed := claimedPreviousIdx[index]; claimed {
 		return false
 	}
 	prevPage := previous[index]

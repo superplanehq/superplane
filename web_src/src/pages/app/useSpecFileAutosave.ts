@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { CanvasesCanvas } from "@/api-client";
 import type { ConsolePage, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
+import { consoleSaveErrorReason } from "./console/consoleSaveErrorMessage";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, isWorkflowSpecPath } from "./lib/workflow-spec-paths";
 import { parseCanvasYamlForImport, parseConsoleYamlForImport } from "./lib/workflow-spec-files";
 
@@ -161,7 +162,15 @@ export function useSpecFileAutosave({
       }
 
       clearParseError(CONSOLE_YAML_PATH);
-      updateConsoleMutationRef.current.mutate({ pages: parsed.pages });
+      // Route mutation-time failures (delta cap, structural, network)
+      // through the same `onSpecParseError` channel parse errors use;
+      // otherwise the Files-tab autosave silently drops the edit while
+      // the mutation rolls the console cache back. `reportParseError`
+      // dedupes identical repeats per path.
+      updateConsoleMutationRef.current.mutate(
+        { pages: parsed.pages },
+        { onError: (error) => reportParseError(CONSOLE_YAML_PATH, consoleSaveErrorReason(error)) },
+      );
     },
     [clearParseError, reportParseError],
   );

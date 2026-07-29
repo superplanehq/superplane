@@ -386,15 +386,29 @@ export function validateConsolePagesDelta(pages: ConsolePage[], previous: Consol
     return `Too many pages (max ${MAX_CONSOLE_PAGES}).`;
   }
 
-  const previousPanelCountByID = new Map<string, number>();
-  for (const page of previous) {
-    previousPanelCountByID.set(page.id, page.panels.length);
-  }
+  // Pair each new page with its exact-id match in `previous` and
+  // record which previous indices that pairing consumes. A previous
+  // slot can be inherited by at most one new page; without tracking
+  // claims a user with a grandfathered over-cap page could keep that
+  // page *and* add a positional twin that also inherits the same
+  // allowance, duplicating over-cap content past the delta cap.
+  // Mirrors the backend `ValidateConsolePagesDelta` implementation.
+  const previousIndexByID = new Map<string, number>();
+  previous.forEach((page, i) => previousIndexByID.set(page.id, i));
+  const claimedPreviousIdx = new Set<number>();
+  const exactIDMatch = new Map<number, number>();
+  pages.forEach((page, i) => {
+    const prevIdx = previousIndexByID.get(page.id);
+    if (prevIdx !== undefined) {
+      claimedPreviousIdx.add(prevIdx);
+      exactIDMatch.set(i, prevIdx);
+    }
+  });
 
   for (let i = 0; i < pages.length; i += 1) {
     const page = pages[i];
     if (page.panels.length <= MAX_CONSOLE_PANELS_PER_PAGE) continue;
-    if (isGrandfatheredOverCapPage(page, i, previous, previousPanelCountByID)) continue;
+    if (isGrandfatheredOverCapPage(page, i, previous, exactIDMatch, claimedPreviousIdx)) continue;
     return `Page ${JSON.stringify(page.id)}: Too many panels (max ${MAX_CONSOLE_PANELS_PER_PAGE} per page).`;
   }
 
@@ -405,12 +419,16 @@ function isGrandfatheredOverCapPage(
   page: ConsolePage,
   index: number,
   previous: ConsolePage[],
-  previousPanelCountByID: Map<string, number>,
+  exactIDMatch: Map<number, number>,
+  claimedPreviousIdx: Set<number>,
 ): boolean {
-  const byID = previousPanelCountByID.get(page.id);
-  if (byID !== undefined && page.panels.length <= byID) return true;
+  const exactIdx = exactIDMatch.get(index);
+  if (exactIdx !== undefined) {
+    return page.panels.length <= previous[exactIdx].panels.length;
+  }
 
   if (index >= previous.length) return false;
+  if (claimedPreviousIdx.has(index)) return false;
   const prevPage = previous[index];
   if (page.panels.length > prevPage.panels.length) return false;
 

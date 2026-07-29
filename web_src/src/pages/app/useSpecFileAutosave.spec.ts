@@ -218,6 +218,58 @@ describe("useSpecFileAutosave", () => {
     expect(payload.pages[0]!.panels).toHaveLength(overCap);
   });
 
+  it("surfaces console mutation failures via onSpecParseError", () => {
+    // Regression: parse failures already surfaced through
+    // `onSpecParseError`, but mutation-time failures — the delta cap
+    // check inside `useUpdateCanvasConsole`, an intentional structural
+    // rejection, or a transient network error — used to fire and
+    // forget. The mutation's own `onError` rolled the console cache
+    // back while the Files-tab editor still showed the rejected YAML
+    // and no toast surfaced. `persistConsoleSpec` now attaches its own
+    // `onError` to the `mutate` call and reports through the same
+    // `onSpecParseError` channel that parse errors use, so both
+    // failure modes land in a single toast pipeline.
+    const onSpecParseError = vi.fn();
+    const mutate = vi.fn((_input: unknown, options?: { onError?: (e: unknown) => void }) => {
+      options?.onError?.(new Error("invalid console yaml: Too many panels (max 20 per page)."));
+    });
+    const updateConsoleMutation = { mutate } as never;
+
+    const { result } = renderHook(() =>
+      useSpecFileAutosave({
+        canvas: sampleCanvas,
+        isReadOnly: false,
+        applyLocalWorkflowUpdate: vi.fn(),
+        handleSaveWorkflow: vi.fn().mockResolvedValue({ status: "saved" as const }),
+        updateConsoleMutation,
+        onSpecParseError,
+      }),
+    );
+
+    const consoleYaml = materializeConsoleSpec({
+      pages: [
+        {
+          id: "main",
+          name: "Main",
+          panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
+          layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
+        },
+      ],
+      canvasId: "canvas-1",
+    });
+
+    act(() => result.current.onSpecFileChange(CONSOLE_YAML_PATH, consoleYaml));
+    act(() => vi.advanceTimersByTime(400));
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(onSpecParseError).toHaveBeenCalledTimes(1);
+    expect(onSpecParseError.mock.calls[0]![0]).toBe(CONSOLE_YAML_PATH);
+    // The mutation's `invalid console yaml: ` wrapper prefix is
+    // stripped before being reported so the toast reads as a plain
+    // reason (the caller adds its own surface-specific prefix).
+    expect(onSpecParseError.mock.calls[0]![1]).toBe("Too many panels (max 20 per page).");
+  });
+
   it("does not save when read-only", () => {
     const { onSpecFileChange, handleSaveWorkflow, mutate } = setup({ isReadOnly: true });
     const yamlText = materializeCanvasSpec(sampleCanvas);

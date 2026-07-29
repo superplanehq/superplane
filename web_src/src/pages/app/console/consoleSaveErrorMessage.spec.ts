@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { formatConsoleSaveErrorMessage } from "./consoleSaveErrorMessage";
+import { consoleSaveErrorReason, formatConsoleSaveErrorMessage } from "./consoleSaveErrorMessage";
+
+describe("consoleSaveErrorReason", () => {
+  it("strips the mutation's 'invalid console yaml: ' wrapper prefix", () => {
+    // Callers use this helper to prefix the reason with their own
+    // surface-specific copy ("Failed to save console: …" for the
+    // overlay, "Could not save console.yaml: …" for the Files tab).
+    // Stripping the wrapper prefix keeps the reason surface-agnostic.
+    const error = new Error(`invalid console yaml: Page "main": Too many panels (max 20 per page).`);
+    expect(consoleSaveErrorReason(error)).toBe(`Page "main": Too many panels (max 20 per page).`);
+  });
+
+  it("passes non-wrapped errors through verbatim", () => {
+    expect(consoleSaveErrorReason(new Error("Network request failed"))).toBe("Network request failed");
+  });
+
+  it("stringifies non-Error thrown values", () => {
+    expect(consoleSaveErrorReason("boom")).toBe("boom");
+  });
+
+  it("falls back to 'unknown error' when the message is empty", () => {
+    expect(consoleSaveErrorReason(new Error(""))).toBe("unknown error");
+    expect(consoleSaveErrorReason(new Error("invalid console yaml: "))).toBe("unknown error");
+  });
+});
 
 describe("formatConsoleSaveErrorMessage", () => {
   it("strips the mutation's 'invalid console yaml: ' wrapper prefix", () => {

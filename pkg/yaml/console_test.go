@@ -1109,6 +1109,51 @@ func TestValidateConsolePagesDelta_AllowsGrandfatheredPageRename(t *testing.T) {
 	assert.Contains(t, err.Error(), "too many panels")
 }
 
+// TestValidateConsolePagesDelta_RejectsOverCapPageDuplication guards
+// the "positional grandfathering" fallback against being used to
+// smuggle a duplicate of an over-cap page into a second tab. A user
+// who keeps a grandfathered page under its original id and inserts a
+// new page above it (or renames it while keeping the old id elsewhere)
+// used to slip past the delta cap: the new insert would inherit the
+// previous positional slot's allowance, while the old id still passed
+// exact-id grandfathering — producing two grandfathered copies of the
+// same content. The delta enforcement now tracks which previous slots
+// are claimed by exact-id matches and refuses positional inheritance
+// of an already-claimed slot.
+func TestValidateConsolePagesDelta_RejectsOverCapPageDuplication(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 4
+	previous := []models.ConsolePage{{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	// The exploit: keep "big" (exact-id inherits the allowance) and
+	// insert a positionally-first duplicate that copies the same
+	// panel ids. Both new pages would look grandfathered in isolation
+	// but they share the *same* previous slot.
+	dup := []models.ConsolePage{
+		{ID: "big-clone", Panels: makeModelConsolePanelsN(over), Layout: nil},
+		{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil},
+	}
+	err := ValidateConsolePagesDelta(dup, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// Sanity: the *reverse* order (dup at index 1) is also rejected
+	// because index 1 is out of range for `previous`, so positional
+	// grandfathering has nothing to inherit either way.
+	dupReversed := []models.ConsolePage{
+		{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil},
+		{ID: "big-clone", Panels: makeModelConsolePanelsN(over), Layout: nil},
+	}
+	err = ValidateConsolePagesDelta(dupReversed, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// A legitimate rename (no dup) still works — the previous slot
+	// is not claimed by any exact-id match, so positional inheritance
+	// applies. This locks in that the fix does not overcorrect.
+	renamed := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(renamed, previous))
+}
+
 // TestValidateConsolePagesDelta_GrandfathersOverCapPageCount verifies
 // that a console with more than MaxConsolePages does not fail delta
 // validation as long as the count does not grow.
