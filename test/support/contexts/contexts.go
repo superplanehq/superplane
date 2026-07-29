@@ -100,6 +100,8 @@ type IntegrationContext struct {
 	ResyncRequests    []time.Duration
 	ActionRequests    []ActionRequest
 	Subscriptions     []Subscription
+	// ScheduleActionCallErr, when set, is returned from ScheduleActionCall after recording the request.
+	ScheduleActionCallErr error
 }
 
 type ActionRequest struct {
@@ -198,6 +200,9 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 
 func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
 	c.ActionRequests = append(c.ActionRequests, ActionRequest{ActionName: actionName, Parameters: parameters, Interval: interval})
+	if c.ScheduleActionCallErr != nil {
+		return c.ScheduleActionCallErr
+	}
 	return nil
 }
 
