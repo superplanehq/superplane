@@ -7,13 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type ConsoleQueryLike = {
   isSuccess: boolean;
   isError: boolean;
-  data: { panels: object[] } | undefined;
+  data: { pages: { panels: object[] }[] } | undefined;
 };
 
 let mockConsoleQuery: ConsoleQueryLike;
 
 function consoleLoaded(panels: object[]): ConsoleQueryLike {
-  return { isSuccess: true, isError: false, data: { panels } };
+  return { isSuccess: true, isError: false, data: { pages: [{ panels }] } };
 }
 
 const consoleLoading: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };

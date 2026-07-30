@@ -46,8 +46,7 @@ describe("workflow-spec-files", () => {
     const exportPayload = buildCanvasYamlExportPayload(sampleWorkflow);
     const files = buildAppFiles({
       canvas: sampleWorkflow,
-      panels: [],
-      layout: [],
+      pages: [],
       canvasId: sampleWorkflow.metadata?.id,
       canvasName: sampleWorkflow.metadata?.name,
       consoleLoading: false,
