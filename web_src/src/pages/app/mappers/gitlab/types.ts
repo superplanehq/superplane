@@ -56,11 +56,21 @@ export interface CommitStatus {
   author?: User;
 }
 
-export interface CombinedCommitStatus {
-  state?: string;
+export interface CommitPipeline {
+  id?: number;
+  ref?: string;
   sha?: string;
-  total_count?: number;
-  statuses?: CommitStatus[];
+  status?: string;
+  web_url?: string;
+}
+
+export interface Commit {
+  id?: string;
+  short_id?: string;
+  title?: string;
+  status?: string;
+  web_url?: string;
+  last_pipeline?: CommitPipeline;
 }
 
 export interface Note {

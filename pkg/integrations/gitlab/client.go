@@ -9,8 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -1523,16 +1521,6 @@ type CommitStatus struct {
 	Author       *User    `json:"author,omitempty"`
 }
 
-// CombinedCommitStatus is the rolled-up status of a commit: a single overall state
-// plus the individual statuses. GitLab has no combined-status endpoint, so this is
-// assembled from the commit's statuses (mirrors GitHub's combined status shape).
-type CombinedCommitStatus struct {
-	State      string         `json:"state"`
-	SHA        string         `json:"sha"`
-	TotalCount int            `json:"total_count"`
-	Statuses   []CommitStatus `json:"statuses"`
-}
-
 // CreateCommitStatusRequest mirrors GitLab's POST /projects/:id/statuses/:sha body.
 // Only State is required; the rest are omitted when empty.
 type CreateCommitStatusRequest struct {
@@ -1578,43 +1566,76 @@ func (c *Client) CreateCommitStatus(ctx context.Context, projectID, sha string, 
 	return &status, nil
 }
 
-// ListCommitStatusesRequest holds the optional filters for listing a commit's statuses.
-type ListCommitStatusesRequest struct {
-	Ref  string
-	Name string
+// CommitPipeline is the last pipeline associated with a commit - GitLab's native
+// rolled-up CI status for that commit.
+type CommitPipeline struct {
+	ID        int    `json:"id"`
+	IID       int    `json:"iid,omitempty"`
+	ProjectID int    `json:"project_id,omitempty"`
+	Ref       string `json:"ref"`
+	SHA       string `json:"sha"`
+	Status    string `json:"status"`
+	Source    string `json:"source,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+	WebURL    string `json:"web_url,omitempty"`
 }
 
-// ListCommitStatuses returns the build/CI statuses of a commit (latest per context by
-// default), following pagination so commits with many statuses are not truncated.
-func (c *Client) ListCommitStatuses(projectID, sha string, req *ListCommitStatusesRequest) ([]CommitStatus, error) {
-	query := url.Values{}
-	if req != nil {
-		if req.Ref != "" {
-			query.Set("ref", req.Ref)
-		}
-		if req.Name != "" {
-			query.Set("name", req.Name)
-		}
-	}
-	query.Set("per_page", "100")
+// CommitStats is the line-change summary of a commit.
+type CommitStats struct {
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+	Total     int `json:"total"`
+}
 
-	statuses, err := fetchAllResources[CommitStatus](c, func(page int) string {
-		query.Set("page", strconv.Itoa(page))
-		return fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s/statuses?%s",
-			c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha), query.Encode())
-	})
+// Commit is a GitLab repository commit. Its top-level Status and LastPipeline are
+// GitLab's native overall CI status for the commit (rolled up from its pipeline).
+// See https://docs.gitlab.com/api/commits/#get-a-single-commit
+type Commit struct {
+	ID             string          `json:"id"`
+	ShortID        string          `json:"short_id"`
+	Title          string          `json:"title"`
+	Message        string          `json:"message"`
+	AuthorName     string          `json:"author_name"`
+	AuthorEmail    string          `json:"author_email"`
+	AuthoredDate   string          `json:"authored_date"`
+	CommitterName  string          `json:"committer_name"`
+	CommitterEmail string          `json:"committer_email"`
+	CommittedDate  string          `json:"committed_date"`
+	CreatedAt      string          `json:"created_at"`
+	ParentIDs      []string        `json:"parent_ids"`
+	WebURL         string          `json:"web_url"`
+	Status         string          `json:"status"`
+	LastPipeline   *CommitPipeline `json:"last_pipeline,omitempty"`
+	Stats          *CommitStats    `json:"stats,omitempty"`
+}
+
+// GetCommit returns a single commit, including its top-level Status and LastPipeline
+// (GitLab's native overall CI status). The ref may be a SHA, branch, or tag name.
+func (c *Client) GetCommit(ctx context.Context, projectID, ref string) (*Commit, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(ref))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Sort newest first by ID so the first result is the most recent status. We
-	// sort client-side rather than via order_by/sort because those params were
-	// only added to this endpoint in GitLab 17.9 and are ignored on older instances.
-	sort.Slice(statuses, func(i, j int) bool {
-		return statuses[i].ID > statuses[j].ID
-	})
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-	return statuses, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get commit: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var commit Commit
+	if err := json.NewDecoder(resp.Body).Decode(&commit); err != nil {
+		return nil, fmt.Errorf("failed to decode commit: %v", err)
+	}
+
+	return &commit, nil
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409

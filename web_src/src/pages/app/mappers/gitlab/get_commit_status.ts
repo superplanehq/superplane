@@ -10,18 +10,18 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { baseProps } from "./base";
-import type { CombinedCommitStatus, CommitStatus, GitLabNodeMetadata } from "./types";
+import type { Commit, GitLabNodeMetadata } from "./types";
 import { buildGitlabExecutionSubtitle, shortSha } from "./utils";
 
-interface GetCombinedCommitStatusConfiguration {
+interface GetCommitStatusConfiguration {
   project?: string;
   ref?: string;
 }
 
-export const getCombinedCommitStatusMapper: ComponentBaseMapper = {
+export const getCommitStatusMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
-    const configuration = (context.node.configuration as GetCombinedCommitStatusConfiguration | undefined) ?? {};
+    const configuration = (context.node.configuration as GetCommitStatusConfiguration | undefined) ?? {};
     const metadata = (context.node.metadata as GitLabNodeMetadata | undefined) ?? ({} as GitLabNodeMetadata);
 
     const project = metadata?.project?.name || configuration.project;
@@ -43,8 +43,8 @@ export const getCombinedCommitStatusMapper: ComponentBaseMapper = {
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const combined = outputs?.default?.[0]?.data as CombinedCommitStatus | undefined;
-    return buildGitlabExecutionSubtitle(context.execution, combined?.state);
+    const commit = outputs?.default?.[0]?.data as Commit | undefined;
+    return buildGitlabExecutionSubtitle(context.execution, commit?.status);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
@@ -55,31 +55,28 @@ export const getCombinedCommitStatusMapper: ComponentBaseMapper = {
       return {};
     }
 
-    const combined = payload.data as CombinedCommitStatus;
-    const statuses = combined.statuses || [];
-    const counts = countStates(statuses);
+    const commit = payload.data as Commit;
+    const pipeline = commit.last_pipeline;
 
-    return {
+    const details: Record<string, string> = {
       "Retrieved At": formatTimestamp(undefined, payload.timestamp),
-      State: combined.state || "-",
-      "Total statuses": (combined.total_count ?? statuses.length).toString(),
-      Successful: counts.successful.toString(),
-      Failed: counts.failed.toString(),
-      SHA: combined.sha ? shortSha(combined.sha) : "-",
+      Status: commit.status || "-",
+      Commit: commit.short_id || (commit.id ? shortSha(commit.id) : "-"),
     };
+
+    if (pipeline?.status) {
+      details["Pipeline"] = pipeline.status;
+    }
+
+    if (pipeline?.ref) {
+      details["Ref"] = pipeline.ref;
+    }
+
+    const url = pipeline?.web_url || commit.web_url;
+    if (url) {
+      details["URL"] = url;
+    }
+
+    return details;
   },
 };
-
-function countStates(statuses: CommitStatus[]): { successful: number; failed: number } {
-  return statuses.reduce(
-    (counts, status) => {
-      if (status.status === "success") {
-        counts.successful += 1;
-      } else if (status.status === "failed" || status.status === "canceled") {
-        counts.failed += 1;
-      }
-      return counts;
-    },
-    { successful: 0, failed: 0 },
-  );
-}

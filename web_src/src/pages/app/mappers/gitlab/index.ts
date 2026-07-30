@@ -18,7 +18,7 @@ import { updateReleaseMapper } from "./update_release";
 import { getReleaseMapper } from "./get_release";
 import { deleteReleaseMapper } from "./delete_release";
 import { getIssueMapper } from "./get_issue";
-import { getCombinedCommitStatusMapper } from "./get_combined_commit_status";
+import { getCommitStatusMapper } from "./get_commit_status";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready_for_review";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
@@ -64,7 +64,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateRelease: buildActionStateRegistry("updated"),
   getRelease: buildActionStateRegistry("retrieved"),
   deleteRelease: buildActionStateRegistry("deleted"),
-  getCombinedCommitStatus: buildActionStateRegistry("retrieved"),
+  getCommitStatus: buildActionStateRegistry("retrieved"),
   publishCommitStatus: buildActionStateRegistry("published"),
 };
 
@@ -94,7 +94,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateRelease: updateReleaseMapper,
   getRelease: getReleaseMapper,
   deleteRelease: deleteReleaseMapper,
-  getCombinedCommitStatus: getCombinedCommitStatusMapper,
+  getCommitStatus: getCommitStatusMapper,
   publishCommitStatus: publishCommitStatusMapper,
 };
 

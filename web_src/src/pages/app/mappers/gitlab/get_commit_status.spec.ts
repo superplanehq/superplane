@@ -1,25 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
-import { getCombinedCommitStatusMapper } from "./get_combined_commit_status";
+import { getCommitStatusMapper } from "./get_commit_status";
 
-describe("getCombinedCommitStatusMapper", () => {
-  it("summarizes the combined commit status", () => {
-    const details = getCombinedCommitStatusMapper.getExecutionDetails(
+describe("getCommitStatusMapper", () => {
+  it("shows the commit's overall status and pipeline", () => {
+    const details = getCommitStatusMapper.getExecutionDetails(
       buildDetailsContext({
         outputs: {
           default: [
             {
-              type: "gitlab.combinedCommitStatus",
+              type: "gitlab.commit",
               timestamp: "2026-02-13T18:04:12.000Z",
               data: {
-                state: "failed",
-                sha: "18f3e63d05582537db6d183d9d557be09e1f90c8",
-                total_count: 2,
-                statuses: [
-                  { id: 93, sha: "18f3e63d05582537", status: "success", name: "ci/superplane" },
-                  { id: 92, sha: "18f3e63d05582537", status: "failed", name: "lint" },
-                ],
+                id: "18f3e63d05582537db6d183d9d557be09e1f90c8",
+                short_id: "18f3e63d",
+                status: "failed",
+                web_url: "https://gitlab.com/g/p/-/commit/18f3e63d",
+                last_pipeline: {
+                  id: 1024,
+                  ref: "main",
+                  sha: "18f3e63d05582537db6d183d9d557be09e1f90c8",
+                  status: "failed",
+                  web_url: "https://gitlab.com/g/p/-/pipelines/1024",
+                },
               },
             },
           ],
@@ -29,27 +33,28 @@ describe("getCombinedCommitStatusMapper", () => {
 
     expect(details).toEqual({
       "Retrieved At": expect.any(String),
-      State: "failed",
-      "Total statuses": "2",
-      Successful: "1",
-      Failed: "1",
-      SHA: "18f3e63d",
+      Status: "failed",
+      Commit: "18f3e63d",
+      Pipeline: "failed",
+      Ref: "main",
+      URL: "https://gitlab.com/g/p/-/pipelines/1024",
     });
   });
 
   it("shows the timestamp first and at most 6 details", () => {
-    const details = getCombinedCommitStatusMapper.getExecutionDetails(
+    const details = getCommitStatusMapper.getExecutionDetails(
       buildDetailsContext({
         outputs: {
           default: [
             {
-              type: "gitlab.combinedCommitStatus",
+              type: "gitlab.commit",
               timestamp: "2026-02-13T18:04:12.000Z",
               data: {
-                state: "success",
-                sha: "18f3e63d05582537db6d183d9d557be09e1f90c8",
-                total_count: 1,
-                statuses: [{ id: 93, sha: "18f3e63d05582537", status: "success", name: "ci" }],
+                id: "18f3e63d05582537db6d183d9d557be09e1f90c8",
+                short_id: "18f3e63d",
+                status: "success",
+                web_url: "https://gitlab.com/g/p/-/commit/18f3e63d",
+                last_pipeline: { id: 1, ref: "main", status: "success", web_url: "https://gitlab.com/x" },
               },
             },
           ],
@@ -62,28 +67,32 @@ describe("getCombinedCommitStatusMapper", () => {
     expect(keys.length).toBeLessThanOrEqual(6);
   });
 
-  it("handles an empty combined status", () => {
-    const details = getCombinedCommitStatusMapper.getExecutionDetails(
+  it("falls back to the commit URL when there is no pipeline", () => {
+    const details = getCommitStatusMapper.getExecutionDetails(
       buildDetailsContext({
         outputs: {
           default: [
             {
-              type: "gitlab.combinedCommitStatus",
+              type: "gitlab.commit",
               timestamp: "2026-02-13T18:04:12.000Z",
-              data: { state: "", sha: "main", total_count: 0, statuses: [] },
+              data: {
+                id: "abc123def456",
+                short_id: "abc123de",
+                status: "",
+                web_url: "https://gitlab.com/g/p/-/commit/abc123",
+              },
             },
           ],
         },
       }),
     );
 
-    expect(details["State"]).toBe("-");
-    expect(details["Total statuses"]).toBe("0");
-    expect(details["Successful"]).toBe("0");
+    expect(details["Status"]).toBe("-");
+    expect(details["URL"]).toBe("https://gitlab.com/g/p/-/commit/abc123");
   });
 
   it("handles missing outputs", () => {
-    const details = getCombinedCommitStatusMapper.getExecutionDetails(
+    const details = getCommitStatusMapper.getExecutionDetails(
       buildDetailsContext({
         outputs: {},
       }),
@@ -96,8 +105,8 @@ describe("getCombinedCommitStatusMapper", () => {
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
   const node: NodeInfo = {
     id: "node-1",
-    name: "Get Combined Commit Status",
-    componentName: "gitlab.getCombinedCommitStatus",
+    name: "Get Commit Status",
+    componentName: "gitlab.getCommitStatus",
     isCollapsed: false,
     configuration: {
       project: "123",

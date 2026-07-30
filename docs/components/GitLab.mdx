@@ -39,7 +39,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitLab project" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitLab project" />
-  <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined commit status for a GitLab commit, branch, or tag" />
+  <LinkCard title="Get Commit Status" href="#get-commit-status" description="Get the overall CI status of a GitLab commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
@@ -2273,21 +2273,21 @@ Returns the deleted release object, plus a "tag_deleted" field that is true only
 }
 ```
 
-<a id="get-combined-commit-status"></a>
+<a id="get-commit-status"></a>
 
-## Get Combined Commit Status
+## Get Commit Status
 
-**Component key:** `gitlab.getCombinedCommitStatus`
+**Component key:** `gitlab.getCommitStatus`
 
-The Get Combined Commit Status component reads the combined status for a commit, branch, or tag - a single overall state rolled up from the commit's individual statuses.
+The Get Commit Status component reads a commit's overall CI status.
 
-GitLab has no dedicated combined-status endpoint, so this component lists the commit's statuses and rolls them into one overall **state** (the worst state present), alongside the full **statuses** list and a **total_count**.
+In GitLab a commit's statuses are jobs grouped under pipelines, and GitLab rolls them up for you: every commit carries a single overall **status** and a **last_pipeline**. This component returns that native result - one meaningful state plus a link to the pipeline - rather than a list of every job.
 
 ### Use Cases
 
 - **Status gates**: Check whether a commit is green before continuing
-- **Follow-up to Publish Commit Status**: Read back the aggregate status after reporting one
-- **Notifications**: Send a concise summary when a commit is blocked by a failed status
+- **Follow-up to Publish Commit Status**: Read back a commit's overall state
+- **Notifications**: Report a commit's CI outcome with a link to the pipeline
 
 ### Configuration
 
@@ -2300,67 +2300,49 @@ The connected token needs the `read_api` (or `api`) scope and at least the **Rep
 
 ### Output
 
-Emits a combined commit status object: the overall **state**, the **sha**, the **total_count**, and the latest status per context in **statuses**.
+Emits the commit object, including its overall **status** and **last_pipeline** (id, ref, sha, status, web_url).
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
-    "state": "failed",
-    "statuses": [
-      {
-        "allow_failure": false,
-        "author": {
-          "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
-          "id": 1,
-          "name": "Administrator",
-          "state": "active",
-          "username": "root",
-          "web_url": "https://gitlab.com/root"
-        },
-        "coverage": 92.5,
-        "created_at": "2026-02-13T18:00:00.000Z",
-        "description": "Build passed",
-        "finished_at": "2026-02-13T18:04:12.000Z",
-        "id": 93,
-        "name": "ci/superplane",
-        "pipeline_id": 1024,
-        "ref": "main",
-        "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
-        "started_at": "2026-02-13T18:00:05.000Z",
-        "status": "success",
-        "target_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
-      },
-      {
-        "allow_failure": true,
-        "author": {
-          "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
-          "id": 1,
-          "name": "Administrator",
-          "state": "active",
-          "username": "root",
-          "web_url": "https://gitlab.com/root"
-        },
-        "coverage": null,
-        "created_at": "2026-02-13T17:58:00.000Z",
-        "description": "Lint failed",
-        "finished_at": "2026-02-13T17:59:40.000Z",
-        "id": 92,
-        "name": "lint",
-        "pipeline_id": 1024,
-        "ref": "main",
-        "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
-        "started_at": "2026-02-13T17:58:05.000Z",
-        "status": "failed",
-        "target_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
-      }
+    "author_email": "admin@example.com",
+    "author_name": "Administrator",
+    "authored_date": "2026-02-13T17:55:00.000Z",
+    "committed_date": "2026-02-13T17:55:00.000Z",
+    "committer_email": "admin@example.com",
+    "committer_name": "Administrator",
+    "created_at": "2026-02-13T17:55:00.000Z",
+    "id": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "last_pipeline": {
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "id": 1024,
+      "iid": 21,
+      "project_id": 84237809,
+      "ref": "main",
+      "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+      "source": "push",
+      "status": "failed",
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "web_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+    },
+    "message": "feat: add health endpoint\n",
+    "parent_ids": [
+      "a91957a858320c0e17f3a0eca7cfacbff50ea29a"
     ],
-    "total_count": 2
+    "short_id": "18f3e63d",
+    "stats": {
+      "additions": 24,
+      "deletions": 2,
+      "total": 26
+    },
+    "status": "failed",
+    "title": "feat: add health endpoint",
+    "web_url": "https://gitlab.com/my-group/my-project/-/commit/18f3e63d05582537db6d183d9d557be09e1f90c8"
   },
   "timestamp": "2026-02-13T18:04:12.000Z",
-  "type": "gitlab.combinedCommitStatus"
+  "type": "gitlab.commit"
 }
 ```
 
