@@ -238,3 +238,23 @@ export interface Release {
   evidence_sha?: string;
   _links?: ReleaseLinks;
 }
+
+export interface PipelineMinutesUsageProjectRef {
+  id: string;
+  name: string;
+  fullPath: string;
+}
+
+export interface PipelineMinutesUsageProject {
+  minutes: number;
+  sharedRunnersDuration: number;
+  project?: PipelineMinutesUsageProjectRef;
+}
+
+export interface PipelineMinutesUsage {
+  month: string;
+  monthIso8601: string;
+  minutes: number;
+  sharedRunnersDuration: number;
+  projects: PipelineMinutesUsageProject[];
+}
