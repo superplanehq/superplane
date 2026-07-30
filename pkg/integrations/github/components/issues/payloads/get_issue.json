@@ -3,12 +3,36 @@
     "id": 101,
     "number": 42,
     "title": "Fix flaky build",
+    "body": "The CI build fails intermittently on the integration test suite. Steps to reproduce are in the linked run.",
     "state": "open",
     "comments": 3,
     "html_url": "https://github.com/acme/widgets/issues/42",
+    "created_at": "2026-01-15T09:30:00Z",
+    "updated_at": "2026-01-16T17:50:00Z",
+    "closed_at": null,
     "user": {
-      "login": "octocat"
-    }
+      "login": "octocat",
+      "id": 1,
+      "html_url": "https://github.com/octocat"
+    },
+    "labels": [
+      {
+        "id": 1362934389,
+        "node_id": "MDU6TGFiZWwxMzYyOTM0Mzg5",
+        "url": "https://api.github.com/repos/acme/widgets/labels/bug",
+        "name": "bug",
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working"
+      }
+    ],
+    "assignees": [
+      {
+        "login": "octocat",
+        "id": 1,
+        "html_url": "https://github.com/octocat"
+      }
+    ]
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
