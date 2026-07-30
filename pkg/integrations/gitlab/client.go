@@ -1825,7 +1825,7 @@ type ciMinutesProjectUsageResponse struct {
 	} `json:"ciMinutesProjectMonthlyUsage"`
 }
 
-// GetCiMinutesUsage returns a namespace's CI/CD minutes usage for the given month with a per-project breakdown; a nil namespaceGID queries the current user's personal namespace.
+// GetCiMinutesUsage returns a namespace's CI/CD minutes usage for the given month with a per-project breakdown, a nil namespaceGID for the current user's personal namespace, and a nil usage if GitLab has no namespace-level record for that month.
 func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, date string) (*CiMinutesNamespaceUsage, []CiMinutesProjectUsage, error) {
 	variables := map[string]any{"date": date}
 	if namespaceGID != nil {
@@ -1837,9 +1837,9 @@ func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, da
 		return nil, nil, err
 	}
 
-	var usage CiMinutesNamespaceUsage
+	var usage *CiMinutesNamespaceUsage
 	if len(namespaceResp.CiMinutesUsage.Nodes) > 0 {
-		usage = namespaceResp.CiMinutesUsage.Nodes[0]
+		usage = &namespaceResp.CiMinutesUsage.Nodes[0]
 	}
 
 	projects, err := c.getAllCiMinutesProjectUsage(ctx, variables)
@@ -1847,7 +1847,7 @@ func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, da
 		return nil, nil, err
 	}
 
-	return &usage, projects, nil
+	return usage, projects, nil
 }
 
 // getAllCiMinutesProjectUsage pages through the full per-project usage breakdown, since GitLab caps each response at 100 nodes.

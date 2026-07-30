@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,6 +195,41 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 		assert.Equal(t, "hello-world", result.Projects[0].Project.Name)
 		assert.Equal(t, 180, result.Minutes, "totals must reflect only the selected project")
 		assert.Equal(t, 10800, result.SharedRunnersDuration)
+	})
+
+	t.Run("falls back to summed project usage when the namespace has no record for the month", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `{"data": {"ciMinutesUsage": {"nodes": []}}}`),
+					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
+				},
+			},
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		payload := executionState.Payloads[0].(map[string]any)
+		var result PipelineMinutesUsageResult
+		payloadBytes, _ := json.Marshal(payload["data"])
+		json.Unmarshal(payloadBytes, &result)
+
+		require.Len(t, result.Projects, 2)
+		assert.Equal(t, 245, result.Minutes, "totals must be summed from project usage, not silently left at zero")
+		assert.Equal(t, 14700, result.SharedRunnersDuration)
+		assert.NotEmpty(t, result.Month, "month must be derived from the query date, not left blank")
+		assert.Equal(t, time.Now().Format("2006-01")+"-01", result.MonthIso8601)
 	})
 
 	t.Run("failure", func(t *testing.T) {

@@ -150,20 +150,23 @@ func (c *GetPipelineMinutesUsage) Execute(ctx core.ExecutionContext) error {
 		projects = filterProjectsUsage(projects, config.Projects)
 	}
 
-	result := PipelineMinutesUsageResult{
-		Month:                 usage.Month,
-		MonthIso8601:          usage.MonthIso8601,
-		Minutes:               usage.Minutes,
-		SharedRunnersDuration: usage.SharedRunnersDuration,
-		Projects:              projects,
+	result := PipelineMinutesUsageResult{Projects: projects}
+	if usage != nil {
+		result.Month = usage.Month
+		result.MonthIso8601 = usage.MonthIso8601
+		result.Minutes = usage.Minutes
+		result.SharedRunnersDuration = usage.SharedRunnersDuration
 	}
 
-	if len(config.Projects) > 0 {
-		result.Minutes = 0
-		result.SharedRunnersDuration = 0
-		for _, p := range projects {
-			result.Minutes += p.Minutes
-			result.SharedRunnersDuration += p.SharedRunnersDuration
+	// Recompute totals from the per-project breakdown whenever the namespace record is missing or a project filter narrows it, so totals never silently disagree with what's shown.
+	if usage == nil || len(config.Projects) > 0 {
+		result.Minutes, result.SharedRunnersDuration = sumProjectUsage(projects)
+	}
+
+	if usage == nil {
+		result.MonthIso8601 = date
+		if parsed, err := time.Parse("2006-01-02", date); err == nil {
+			result.Month = parsed.Format("January")
 		}
 	}
 
@@ -196,6 +199,15 @@ func resolveNamespaceGID(client *Client) (*string, error) {
 
 	gid := fmt.Sprintf("gid://gitlab/Group/%d", group.ID)
 	return &gid, nil
+}
+
+// sumProjectUsage totals minutes and shared runner duration across a per-project usage breakdown.
+func sumProjectUsage(projects []CiMinutesProjectUsage) (minutes, sharedRunnersDuration int) {
+	for _, p := range projects {
+		minutes += p.Minutes
+		sharedRunnersDuration += p.SharedRunnersDuration
+	}
+	return minutes, sharedRunnersDuration
 }
 
 // filterProjectsUsage keeps only the usage entries for projects whose numeric ID is in selected.
