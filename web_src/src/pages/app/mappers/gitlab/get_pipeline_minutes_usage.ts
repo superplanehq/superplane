@@ -60,7 +60,10 @@ export const getPipelineMinutesUsageMapper: ComponentBaseMapper = {
       typeof usage.sharedRunnersDuration === "number" ? `${usage.sharedRunnersDuration}s` : "-";
 
     if (usage.projects && usage.projects.length > 0) {
-      details["Projects"] = usage.projects.map((p) => p.project?.name).filter(Boolean).join(", ");
+      details["Projects"] = usage.projects
+        .map((p) => p.project?.name)
+        .filter(Boolean)
+        .join(", ");
     }
 
     return details;
