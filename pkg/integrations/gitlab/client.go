@@ -1775,7 +1775,7 @@ type CiMinutesProjectUsage struct {
 	Project               *CiMinutesProjectRef `json:"project"`
 }
 
-const ciMinutesUsageQuery = `
+const ciMinutesNamespaceUsageQuery = `
 query($namespaceId: NamespaceID, $date: Date) {
   ciMinutesUsage(namespaceId: $namespaceId, date: $date) {
     nodes {
@@ -1785,7 +1785,11 @@ query($namespaceId: NamespaceID, $date: Date) {
       sharedRunnersDuration
     }
   }
-  ciMinutesProjectMonthlyUsage(namespaceId: $namespaceId, date: $date) {
+}`
+
+const ciMinutesProjectUsageQuery = `
+query($namespaceId: NamespaceID, $date: Date, $after: String) {
+  ciMinutesProjectMonthlyUsage(namespaceId: $namespaceId, date: $date, first: 100, after: $after) {
     nodes {
       minutes
       sharedRunnersDuration
@@ -1795,15 +1799,28 @@ query($namespaceId: NamespaceID, $date: Date) {
         fullPath
       }
     }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
   }
 }`
 
-type ciMinutesUsageResponse struct {
+type ciMinutesNamespaceUsageResponse struct {
 	CiMinutesUsage struct {
 		Nodes []CiMinutesNamespaceUsage `json:"nodes"`
 	} `json:"ciMinutesUsage"`
+}
+
+type graphQLPageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type ciMinutesProjectUsageResponse struct {
 	CiMinutesProjectMonthlyUsage struct {
-		Nodes []CiMinutesProjectUsage `json:"nodes"`
+		Nodes    []CiMinutesProjectUsage `json:"nodes"`
+		PageInfo graphQLPageInfo         `json:"pageInfo"`
 	} `json:"ciMinutesProjectMonthlyUsage"`
 }
 
@@ -1814,15 +1831,50 @@ func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, da
 		variables["namespaceId"] = *namespaceGID
 	}
 
-	var resp ciMinutesUsageResponse
-	if err := c.graphQL(ctx, ciMinutesUsageQuery, variables, &resp); err != nil {
+	var namespaceResp ciMinutesNamespaceUsageResponse
+	if err := c.graphQL(ctx, ciMinutesNamespaceUsageQuery, variables, &namespaceResp); err != nil {
 		return nil, nil, err
 	}
 
 	var usage CiMinutesNamespaceUsage
-	if len(resp.CiMinutesUsage.Nodes) > 0 {
-		usage = resp.CiMinutesUsage.Nodes[0]
+	if len(namespaceResp.CiMinutesUsage.Nodes) > 0 {
+		usage = namespaceResp.CiMinutesUsage.Nodes[0]
 	}
 
-	return &usage, resp.CiMinutesProjectMonthlyUsage.Nodes, nil
+	projects, err := c.getAllCiMinutesProjectUsage(ctx, variables)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &usage, projects, nil
+}
+
+// getAllCiMinutesProjectUsage pages through the full per-project usage breakdown, since GitLab caps each response at 100 nodes.
+func (c *Client) getAllCiMinutesProjectUsage(ctx context.Context, baseVariables map[string]any) ([]CiMinutesProjectUsage, error) {
+	var allProjects []CiMinutesProjectUsage
+	after := ""
+
+	for {
+		variables := make(map[string]any, len(baseVariables)+1)
+		for k, v := range baseVariables {
+			variables[k] = v
+		}
+		if after != "" {
+			variables["after"] = after
+		}
+
+		var resp ciMinutesProjectUsageResponse
+		if err := c.graphQL(ctx, ciMinutesProjectUsageQuery, variables, &resp); err != nil {
+			return nil, err
+		}
+
+		allProjects = append(allProjects, resp.CiMinutesProjectMonthlyUsage.Nodes...)
+
+		if !resp.CiMinutesProjectMonthlyUsage.PageInfo.HasNextPage {
+			break
+		}
+		after = resp.CiMinutesProjectMonthlyUsage.PageInfo.EndCursor
+	}
+
+	return allProjects, nil
 }

@@ -12,17 +12,25 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func ciMinutesUsageResponseBody() string {
+func ciMinutesNamespaceUsageResponseBody() string {
 	return `{
 		"data": {
 			"ciMinutesUsage": {
 				"nodes": [{"month": "July", "monthIso8601": "2026-07-01", "minutes": 245, "sharedRunnersDuration": 14700}]
-			},
+			}
+		}
+	}`
+}
+
+func ciMinutesProjectUsageResponseBody() string {
+	return `{
+		"data": {
 			"ciMinutesProjectMonthlyUsage": {
 				"nodes": [
 					{"minutes": 180, "sharedRunnersDuration": 10800, "project": {"id": "gid://gitlab/Project/1", "name": "hello-world", "fullPath": "felixgateru/hello-world"}},
 					{"minutes": 65, "sharedRunnersDuration": 3900, "project": {"id": "gid://gitlab/Project/2", "name": "other-project", "fullPath": "felixgateru/other-project"}}
-				]
+				],
+				"pageInfo": {"hasNextPage": false, "endCursor": ""}
 			}
 		}
 	}`
@@ -44,7 +52,8 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
-					GitlabMockResponse(http.StatusOK, ciMinutesUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesNamespaceUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
 				},
 			},
 			ExecutionState: executionState,
@@ -67,8 +76,10 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 		require.Len(t, result.Projects, 2)
 
 		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
-		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://gitlab.com/api/graphql", httpCtx.Requests[0].URL.String())
+		require.Len(t, httpCtx.Requests, 2)
+		for _, req := range httpCtx.Requests {
+			assert.Equal(t, "https://gitlab.com/api/graphql", req.URL.String())
+		}
 	})
 
 	t.Run("success - resolves group to a namespace GID first", func(t *testing.T) {
@@ -86,7 +97,8 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
 					GitlabMockResponse(http.StatusOK, `{"id": 456}`),
-					GitlabMockResponse(http.StatusOK, ciMinutesUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesNamespaceUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
 				},
 			},
 			ExecutionState: executionState,
@@ -96,14 +108,16 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 3)
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/my-org", httpCtx.Requests[0].URL.String())
 
-		body, _ := io.ReadAll(httpCtx.Requests[1].Body)
-		var reqBody map[string]any
-		json.Unmarshal(body, &reqBody)
-		variables := reqBody["variables"].(map[string]any)
-		assert.Equal(t, "gid://gitlab/Group/456", variables["namespaceId"])
+		for _, req := range httpCtx.Requests[1:] {
+			body, _ := io.ReadAll(req.Body)
+			var reqBody map[string]any
+			json.Unmarshal(body, &reqBody)
+			variables := reqBody["variables"].(map[string]any)
+			assert.Equal(t, "gid://gitlab/Group/456", variables["namespaceId"])
+		}
 	})
 
 	t.Run("filters projects and recomputes totals when selected", func(t *testing.T) {
@@ -121,7 +135,8 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
-					GitlabMockResponse(http.StatusOK, ciMinutesUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesNamespaceUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
 				},
 			},
 			ExecutionState: executionState,
