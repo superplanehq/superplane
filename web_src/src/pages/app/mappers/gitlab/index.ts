@@ -17,6 +17,7 @@ import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { getReleaseMapper } from "./get_release";
 import { deleteReleaseMapper } from "./delete_release";
+import { getPipelineMinutesUsageMapper } from "./get_pipeline_minutes_usage";
 import { getIssueMapper } from "./get_issue";
 import { getCommitStatusMapper } from "./get_commit_status";
 import { publishCommitStatusMapper } from "./publish_commit_status";
@@ -66,6 +67,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteRelease: buildActionStateRegistry("deleted"),
   getCommitStatus: buildActionStateRegistry("retrieved"),
   publishCommitStatus: buildActionStateRegistry("published"),
+  getPipelineMinutesUsage: buildActionStateRegistry("retrieved"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -96,6 +98,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteRelease: deleteReleaseMapper,
   getCommitStatus: getCommitStatusMapper,
   publishCommitStatus: publishCommitStatusMapper,
+  getPipelineMinutesUsage: getPipelineMinutesUsageMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
