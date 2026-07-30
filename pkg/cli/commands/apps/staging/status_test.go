@@ -1,13 +1,16 @@
 package staging
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
@@ -81,6 +84,71 @@ func TestUpdateCommandStagesFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "canvas.yaml")
 	require.Contains(t, stdout.String(), "README.md")
+}
+
+// TestUpdateCommand_ConsoleYAMLValidation locks in the "lenient parse
+// plus shape check" pre-flight applied by `apps staging update`. The
+// command must accept a grandfathered over-cap console (rejected by the
+// strict parser it used to call) so users with an existing over-cap
+// document can still re-stage it — including to reduce it — while
+// still rejecting shape errors such as the wrong `kind`. Cap
+// enforcement lives at commit time via `ValidateConsolePagesDelta`,
+// not in this pre-flight.
+func TestUpdateCommand_ConsoleYAMLValidation(t *testing.T) {
+	overCapConsoleYAML := func() string {
+		var b strings.Builder
+		b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
+		for i := 0; i < yaml.MaxConsolePanelsPerPage+3; i++ {
+			fmt.Fprintf(&b, "    - id: panel-%d\n      type: markdown\n      content: {}\n", i)
+		}
+		b.WriteString("  layout: []\n")
+		return b.String()
+	}
+
+	tests := []struct {
+		name    string
+		content string
+		wantErr string
+	}{
+		{
+			name:    "accepts grandfathered over-cap console",
+			content: overCapConsoleYAML(),
+		},
+		{
+			name:    "rejects wrong kind",
+			content: "apiVersion: v1\nkind: Canvas\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+			wantErr: "unsupported kind",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPut && r.URL.Path == stagingPath(testAppID) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["console.yaml"]}}`))
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			t.Cleanup(server.Close)
+
+			dir := t.TempDir()
+			consolePath := filepath.Join(dir, "console.yaml")
+			require.NoError(t, os.WriteFile(consolePath, []byte(tc.content), 0o644))
+
+			files := []string{consolePath}
+			ctx, _ := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{ActiveApp: testAppID})
+
+			err := (&updateCommand{files: &files}).Execute(ctx)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.wantErr)
+			}
+		})
+	}
 }
 
 func TestCommitCommandPrintsVersion(t *testing.T) {

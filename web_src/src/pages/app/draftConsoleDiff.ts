@@ -1,18 +1,89 @@
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePage, ConsolePanel } from "@/hooks/useCanvasData";
 import * as yaml from "js-yaml";
+import { DEFAULT_CONSOLE_PAGE_ID, DEFAULT_CONSOLE_PAGE_NAME } from "./console/consoleYaml";
 import type { DraftDiffLine, DraftDiffStatus } from "./draftNodeDiff";
 
+/**
+ * Snapshot shape the diff engine operates on. The console is multi-page
+ * and panel ids are only unique within a page, so every internal index
+ * uses a composite `pageId::panelId` key. Two pages that happen to share
+ * a panel id (e.g. two markdown panels both called `overview`) are
+ * treated as distinct panels, and moving a panel across pages surfaces
+ * as a removal + add, not a silent update.
+ */
 type ConsoleSnapshot =
   | {
-      panels?: ConsolePanel[];
-      layout?: ConsoleLayoutItem[];
+      pages?: ConsolePage[];
     }
   | null
   | undefined;
 
+/**
+ * Composite key that combines the page id with the panel id (or layout
+ * item id). We use a delimiter that cannot appear in slugified ids so
+ * the composite key can always be split back into `pageId` + `panelId`.
+ */
+const COMPOSITE_DELIMITER = "\u0000";
+
+type ScopedPanel = { pageId: string; panel: ConsolePanel };
+type ScopedLayout = { pageId: string; item: ConsoleLayoutItem };
+
+/**
+ * Normalize the page list for equality comparisons only. A single
+ * default page (`main`/`Main`) with no panels or layout is
+ * semantically equivalent to zero pages — that is the on-disk shape
+ * committed YAML produces for a fresh or fully-cleared console. Without
+ * this collapse, deleting the last panel on the default page would
+ * false-positive as an uncommitted change and the console header would
+ * show "UNCOMMITTED CHANGES" even though re-exporting produces
+ * byte-identical YAML.
+ */
+function normalizePagesForComparison(pages: ConsolePage[]): ConsolePage[] {
+  if (pages.length !== 1) return pages;
+  const only = pages[0]!;
+  if ((only.panels?.length ?? 0) > 0 || (only.layout?.length ?? 0) > 0) return pages;
+  if (only.id !== DEFAULT_CONSOLE_PAGE_ID) return pages;
+  if (only.name && only.name !== DEFAULT_CONSOLE_PAGE_NAME) return pages;
+  return [];
+}
+
+function normalizedPages(consoleData: ConsoleSnapshot): ConsolePage[] {
+  return normalizePagesForComparison(consoleData?.pages ?? []);
+}
+
+function scopedPanels(consoleData: ConsoleSnapshot): ScopedPanel[] {
+  const out: ScopedPanel[] = [];
+  for (const page of normalizedPages(consoleData)) {
+    for (const panel of page.panels) out.push({ pageId: page.id, panel });
+  }
+  return out;
+}
+
+function scopedLayout(consoleData: ConsoleSnapshot): ScopedLayout[] {
+  const out: ScopedLayout[] = [];
+  for (const page of normalizedPages(consoleData)) {
+    for (const item of page.layout) out.push({ pageId: page.id, item });
+  }
+  return out;
+}
+
+function compositeKey(pageId: string, id: string): string {
+  return `${pageId}${COMPOSITE_DELIMITER}${id}`;
+}
+
+function splitCompositeKey(key: string): { pageId: string; id: string } {
+  const idx = key.indexOf(COMPOSITE_DELIMITER);
+  if (idx < 0) return { pageId: "", id: key };
+  return { pageId: key.slice(0, idx), id: key.slice(idx + COMPOSITE_DELIMITER.length) };
+}
+
 export type DraftConsoleDiffCounts = { added: number; updated: number; removed: number };
 
 export type DraftConsoleDiffItem = {
+  /** Page id this item belongs to. Panel ids are only unique per page,
+   * so downstream consumers that key by panel id (e.g. ConsoleGrid's
+   * `itemsById` map) must also scope by page id to avoid collisions. */
+  pageId: string;
   id: string;
   title: string;
   changeType: DraftDiffStatus;
@@ -57,19 +128,24 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
 
-function comparablePanels(panels: ConsolePanel[] | undefined): unknown[] {
-  return (panels ?? [])
-    .map((panel) => ({
+function comparableScopedPanels(scoped: ScopedPanel[]): unknown[] {
+  return scoped
+    .map(({ pageId, panel }) => ({
+      pageId,
       id: panel.id ?? "",
       type: panel.type ?? "",
       content: panel.content ?? {},
     }))
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => {
+      const byPage = left.pageId.localeCompare(right.pageId);
+      return byPage !== 0 ? byPage : left.id.localeCompare(right.id);
+    });
 }
 
-function comparableLayout(layout: ConsoleLayoutItem[] | undefined): unknown[] {
-  return (layout ?? [])
-    .map((item) => ({
+function comparableScopedLayout(scoped: ScopedLayout[]): unknown[] {
+  return scoped
+    .map(({ pageId, item }) => ({
+      pageId,
       i: item.i ?? "",
       x: item.x ?? 0,
       y: item.y ?? 0,
@@ -78,13 +154,34 @@ function comparableLayout(layout: ConsoleLayoutItem[] | undefined): unknown[] {
       ...(item.minW !== undefined ? { minW: item.minW } : {}),
       ...(item.minH !== undefined ? { minH: item.minH } : {}),
     }))
-    .sort((left, right) => left.i.localeCompare(right.i));
+    .sort((left, right) => {
+      const byPage = left.pageId.localeCompare(right.pageId);
+      return byPage !== 0 ? byPage : left.i.localeCompare(right.i);
+    });
+}
+
+function comparablePagesMetadata(consoleData?: ConsoleSnapshot): unknown[] {
+  // Include page-level metadata (id, name, order) so page-only edits
+  // — adding an empty page, renaming a tab, or reordering pages —
+  // still register as a diff. Without this the flattened
+  // panels/layout arrays are unchanged and the console incorrectly
+  // reports "no changes", which caused staged `console.yaml` writes
+  // to be silently discarded on save. The normalization step collapses
+  // a sole empty default page down to zero pages so a fresh or
+  // fully-cleared console does not false-positive against a committed
+  // legacy console.
+  return normalizedPages(consoleData).map((page, index) => ({
+    order: index,
+    id: page.id ?? "",
+    name: page.name ?? "",
+  }));
 }
 
 function comparableConsoleSnapshot(consoleData?: ConsoleSnapshot): string {
   return stableStringify({
-    panels: comparablePanels(consoleData?.panels),
-    layout: comparableLayout(consoleData?.layout),
+    pages: comparablePagesMetadata(consoleData),
+    panels: comparableScopedPanels(scopedPanels(consoleData)),
+    layout: comparableScopedLayout(scopedLayout(consoleData)),
   });
 }
 
@@ -111,12 +208,12 @@ function layoutSnapshot(item: ConsoleLayoutItem | undefined): string {
   });
 }
 
-function indexPanels(panels: ConsolePanel[] | undefined): Map<string, ConsolePanel> {
-  return new Map((panels ?? []).map((panel) => [panel.id ?? "", panel]));
+function indexScopedPanels(scoped: ScopedPanel[]): Map<string, ConsolePanel> {
+  return new Map(scoped.map(({ pageId, panel }) => [compositeKey(pageId, panel.id ?? ""), panel]));
 }
 
-function indexLayout(layout: ConsoleLayoutItem[] | undefined): Map<string, ConsoleLayoutItem> {
-  return new Map((layout ?? []).map((item) => [item.i ?? "", item]));
+function indexScopedLayout(scoped: ScopedLayout[]): Map<string, ConsoleLayoutItem> {
+  return new Map(scoped.map(({ pageId, item }) => [compositeKey(pageId, item.i ?? ""), item]));
 }
 
 function panelTitle(panel: ConsolePanel | undefined, id: string): string {
@@ -131,8 +228,9 @@ function panelTitle(panel: ConsolePanel | undefined, id: string): string {
   return id || "Untitled panel";
 }
 
-function panelDiffPath(id: string): string {
-  return `console/panels/${id || "unknown"}.yaml`;
+function panelDiffPath(pageId: string, id: string): string {
+  const safeId = id || "unknown";
+  return pageId ? `console/pages/${pageId}/panels/${safeId}.yaml` : `console/panels/${safeId}.yaml`;
 }
 
 function formatDiffValueLines(value: unknown): string[] {
@@ -174,11 +272,12 @@ function comparablePanelFields(panel: ConsolePanel | undefined, layout: ConsoleL
 
 function buildPanelLines(
   prefix: "+" | "-",
+  pageId: string,
   id: string,
   panel: ConsolePanel | undefined,
   layout: ConsoleLayoutItem | undefined,
 ): DraftDiffLine[] {
-  const path = panelDiffPath(id);
+  const path = panelDiffPath(pageId, id);
   const header: DraftDiffLine[] = [
     { prefix: "meta", text: `diff --git a/${path} b/${path}` },
     { prefix: "meta", text: `--- ${prefix === "-" ? `a/${path}` : "/dev/null"}` },
@@ -196,14 +295,18 @@ function buildPanelLines(
   ];
 }
 
-function buildUpdatedPanelLines(
-  id: string,
-  livePanel: ConsolePanel | undefined,
-  draftPanel: ConsolePanel | undefined,
-  liveLayout: ConsoleLayoutItem | undefined,
-  draftLayout: ConsoleLayoutItem | undefined,
-): DraftDiffLine[] {
-  const path = panelDiffPath(id);
+type UpdatedPanelInput = {
+  pageId: string;
+  id: string;
+  livePanel: ConsolePanel | undefined;
+  draftPanel: ConsolePanel | undefined;
+  liveLayout: ConsoleLayoutItem | undefined;
+  draftLayout: ConsoleLayoutItem | undefined;
+};
+
+function buildUpdatedPanelLines(input: UpdatedPanelInput): DraftDiffLine[] {
+  const { pageId, id, livePanel, draftPanel, liveLayout, draftLayout } = input;
+  const path = panelDiffPath(pageId, id);
   const previousFields = comparablePanelFields(livePanel, liveLayout);
   const currentFields = comparablePanelFields(draftPanel, draftLayout);
   const lines: DraftDiffLine[] = [
@@ -229,11 +332,11 @@ export function buildDraftConsoleDiffSummary(
   liveConsole?: ConsoleSnapshot,
   draftConsole?: ConsoleSnapshot,
 ): DraftConsoleDiffSummary {
-  const livePanels = indexPanels(liveConsole?.panels);
-  const draftPanels = indexPanels(draftConsole?.panels);
-  const liveLayout = indexLayout(liveConsole?.layout);
-  const draftLayout = indexLayout(draftConsole?.layout);
-  const ids = Array.from(
+  const livePanels = indexScopedPanels(scopedPanels(liveConsole));
+  const draftPanels = indexScopedPanels(scopedPanels(draftConsole));
+  const liveLayout = indexScopedLayout(scopedLayout(liveConsole));
+  const draftLayout = indexScopedLayout(scopedLayout(draftConsole));
+  const keys = Array.from(
     new Set([...livePanels.keys(), ...draftPanels.keys(), ...liveLayout.keys(), ...draftLayout.keys()]),
   )
     .filter(Boolean)
@@ -243,22 +346,24 @@ export function buildDraftConsoleDiffSummary(
   let updatedCount = 0;
   let removedCount = 0;
 
-  ids.forEach((id) => {
-    const livePanel = livePanels.get(id);
-    const draftPanel = draftPanels.get(id);
-    const liveLayoutItem = liveLayout.get(id);
-    const draftLayoutItem = draftLayout.get(id);
+  keys.forEach((key) => {
+    const { pageId, id } = splitCompositeKey(key);
+    const livePanel = livePanels.get(key);
+    const draftPanel = draftPanels.get(key);
+    const liveLayoutItem = liveLayout.get(key);
+    const draftLayoutItem = draftLayout.get(key);
     const liveExists = !!livePanel || !!liveLayoutItem;
     const draftExists = !!draftPanel || !!draftLayoutItem;
 
     if (!liveExists && draftExists) {
       items.push({
+        pageId,
         id,
         title: panelTitle(draftPanel, id),
         changeType: "added",
         panel: draftPanel,
         layout: draftLayoutItem,
-        lines: buildPanelLines("+", id, draftPanel, draftLayoutItem),
+        lines: buildPanelLines("+", pageId, id, draftPanel, draftLayoutItem),
       });
       addedCount += 1;
       return;
@@ -266,12 +371,13 @@ export function buildDraftConsoleDiffSummary(
 
     if (liveExists && !draftExists) {
       items.push({
+        pageId,
         id,
         title: panelTitle(livePanel, id),
         changeType: "removed",
         panel: livePanel,
         layout: liveLayoutItem,
-        lines: buildPanelLines("-", id, livePanel, liveLayoutItem),
+        lines: buildPanelLines("-", pageId, id, livePanel, liveLayoutItem),
       });
       removedCount += 1;
       return;
@@ -281,12 +387,20 @@ export function buildDraftConsoleDiffSummary(
     const layoutChanged = layoutSnapshot(liveLayoutItem) !== layoutSnapshot(draftLayoutItem);
     if (panelChanged || layoutChanged) {
       items.push({
+        pageId,
         id,
         title: panelTitle(draftPanel ?? livePanel, id),
         changeType: "updated",
         panel: draftPanel,
         layout: draftLayoutItem,
-        lines: buildUpdatedPanelLines(id, livePanel, draftPanel, liveLayoutItem, draftLayoutItem),
+        lines: buildUpdatedPanelLines({
+          pageId,
+          id,
+          livePanel,
+          draftPanel,
+          liveLayout: liveLayoutItem,
+          draftLayout: draftLayoutItem,
+        }),
       });
       updatedCount += 1;
     }

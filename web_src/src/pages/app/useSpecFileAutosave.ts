@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { CanvasesCanvas } from "@/api-client";
-import type { ConsoleLayoutItem, ConsolePanel, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
+import type { ConsolePage, UpdateCanvasConsoleMutationResult } from "@/hooks/useCanvasData";
 
+import { consoleSaveErrorReason } from "./console/consoleSaveErrorMessage";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, isWorkflowSpecPath } from "./lib/workflow-spec-paths";
-import { parseCanvasYamlForImport, parseConsoleYamlForSave } from "./lib/workflow-spec-files";
+import { parseCanvasYamlForImport, parseConsoleYamlForImport } from "./lib/workflow-spec-files";
 
 const SPEC_FILE_AUTOSAVE_DEBOUNCE_MS = 400;
 
@@ -17,7 +18,13 @@ type UseSpecFileAutosaveParams = {
     options?: { showToast?: boolean },
   ) => Promise<{ status: "saved" | "replaced" | "stale" } | undefined | void>;
   updateConsoleMutation: UpdateCanvasConsoleMutationResult;
-  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
+  onEffectiveConsoleChange?: (next: { pages: ConsolePage[] }) => void;
+  /**
+   * Called when a spec file fails to parse. This is how the Files tab
+   * surfaces silent-drop failures — without it, an invalid edit would
+   * disappear on the next debounce without any user-visible signal.
+   */
+  onSpecParseError?: (path: string, error: string) => void;
 };
 
 /**
@@ -26,6 +33,29 @@ type UseSpecFileAutosaveParams = {
  * into the live canvas/console state and persisted immediately (debounced)
  * instead of waiting for an explicit publish.
  */
+/**
+ * Deduplicates parse-error reporting per path. A malformed keystroke
+ * fires the autosave callbacks on every debounce; without this, users
+ * would get the same toast repeatedly for the same broken state.
+ */
+function useParseErrorReporter(onSpecParseError?: (path: string, error: string) => void) {
+  const onSpecParseErrorRef = useRef(onSpecParseError);
+  onSpecParseErrorRef.current = onSpecParseError;
+  const lastReportedErrorRef = useRef<Map<string, string>>(new Map());
+
+  const reportParseError = useCallback((path: string, error: string) => {
+    if (lastReportedErrorRef.current.get(path) === error) return;
+    lastReportedErrorRef.current.set(path, error);
+    onSpecParseErrorRef.current?.(path, error);
+  }, []);
+
+  const clearParseError = useCallback((path: string) => {
+    lastReportedErrorRef.current.delete(path);
+  }, []);
+
+  return { reportParseError, clearParseError };
+}
+
 export function useSpecFileAutosave({
   canvas,
   isReadOnly,
@@ -33,6 +63,7 @@ export function useSpecFileAutosave({
   handleSaveWorkflow,
   updateConsoleMutation,
   onEffectiveConsoleChange,
+  onSpecParseError,
 }: UseSpecFileAutosaveParams) {
   const canvasRef = useRef(canvas);
   canvasRef.current = canvas;
@@ -47,6 +78,8 @@ export function useSpecFileAutosave({
   const onEffectiveConsoleChangeRef = useRef(onEffectiveConsoleChange);
   onEffectiveConsoleChangeRef.current = onEffectiveConsoleChange;
 
+  const { reportParseError, clearParseError } = useParseErrorReporter(onSpecParseError);
+
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
@@ -59,47 +92,88 @@ export function useSpecFileAutosave({
     };
   }, []);
 
-  const applyCanvasSpecLocal = useCallback((content: string) => {
-    const current = canvasRef.current;
-    if (!current) return;
+  const applyCanvasSpecLocal = useCallback(
+    (content: string) => {
+      const current = canvasRef.current;
+      if (!current) return;
 
-    const parsed = parseCanvasYamlForImport(content);
-    if (!parsed.ok) return;
+      const parsed = parseCanvasYamlForImport(content);
+      if (!parsed.ok) {
+        reportParseError(CANVAS_YAML_PATH, parsed.error);
+        return;
+      }
 
-    applyLocalWorkflowUpdateRef.current({
-      ...current,
-      spec: { ...current.spec, ...parsed.spec },
-    });
-  }, []);
+      clearParseError(CANVAS_YAML_PATH);
+      applyLocalWorkflowUpdateRef.current({
+        ...current,
+        spec: { ...current.spec, ...parsed.spec },
+      });
+    },
+    [clearParseError, reportParseError],
+  );
 
-  const applyConsoleSpecLocal = useCallback((content: string) => {
-    const parsed = parseConsoleYamlForSave(content);
-    if (!parsed.ok) return;
+  const applyConsoleSpecLocal = useCallback(
+    (content: string) => {
+      // Use the lenient parser so grandfathered over-cap consoles keep
+      // being previewable while the user edits them down. Structural
+      // errors (malformed YAML, unknown fields, duplicate ids) still
+      // surface. The backend enforces the cap via a delta check on
+      // commit.
+      const parsed = parseConsoleYamlForImport(content);
+      if (!parsed.ok) {
+        reportParseError(CONSOLE_YAML_PATH, parsed.error);
+        return;
+      }
 
-    onEffectiveConsoleChangeRef.current?.({ panels: parsed.panels, layout: parsed.layout });
-  }, []);
+      clearParseError(CONSOLE_YAML_PATH);
+      onEffectiveConsoleChangeRef.current?.({ pages: parsed.pages });
+    },
+    [clearParseError, reportParseError],
+  );
 
-  const persistCanvasSpec = useCallback((content: string) => {
-    const current = canvasRef.current;
-    if (!current) return;
+  const persistCanvasSpec = useCallback(
+    (content: string) => {
+      const current = canvasRef.current;
+      if (!current) return;
 
-    const parsed = parseCanvasYamlForImport(content);
-    if (!parsed.ok) return;
+      const parsed = parseCanvasYamlForImport(content);
+      if (!parsed.ok) {
+        reportParseError(CANVAS_YAML_PATH, parsed.error);
+        return;
+      }
 
-    const updatedWorkflow: CanvasesCanvas = {
-      ...current,
-      spec: { ...current.spec, ...parsed.spec },
-    };
+      clearParseError(CANVAS_YAML_PATH);
+      const updatedWorkflow: CanvasesCanvas = {
+        ...current,
+        spec: { ...current.spec, ...parsed.spec },
+      };
 
-    void handleSaveWorkflowRef.current(updatedWorkflow, { showToast: false });
-  }, []);
+      void handleSaveWorkflowRef.current(updatedWorkflow, { showToast: false });
+    },
+    [clearParseError, reportParseError],
+  );
 
-  const persistConsoleSpec = useCallback((content: string) => {
-    const parsed = parseConsoleYamlForSave(content);
-    if (!parsed.ok) return;
+  const persistConsoleSpec = useCallback(
+    (content: string) => {
+      const parsed = parseConsoleYamlForImport(content);
+      if (!parsed.ok) {
+        reportParseError(CONSOLE_YAML_PATH, parsed.error);
+        return;
+      }
 
-    updateConsoleMutationRef.current.mutate({ panels: parsed.panels, layout: parsed.layout });
-  }, []);
+      clearParseError(CONSOLE_YAML_PATH);
+      // Route mutation-time failures (delta cap, structural, network)
+      // through the same `onSpecParseError` channel parse errors use;
+      // otherwise the Files-tab autosave silently drops the edit while
+      // the mutation rolls the console cache back. `reportParseError`
+      // dedupes identical repeats per path.
+      updateConsoleMutationRef.current.mutate(
+        { pages: parsed.pages },
+        { onError: (error) => reportParseError(CONSOLE_YAML_PATH, consoleSaveErrorReason(error)) },
+      );
+    },
+    [clearParseError, reportParseError],
+  );
 
   const onSpecFileChange = useCallback(
     (path: string, content: string) => {
