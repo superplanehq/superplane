@@ -339,6 +339,114 @@ CREATE TABLE public.email_settings (
 
 
 --
+-- Name: factories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factories (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_agent_assignments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agent_assignments (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    instructions text DEFAULT ''::text NOT NULL,
+    state character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_agents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_agents (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_sources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_sources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    name text NOT NULL,
+    integration_id uuid NOT NULL,
+    configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_assignees; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_assignees (
+    work_order_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    work_order_id uuid NOT NULL,
+    type text NOT NULL,
+    content jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_orders (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    title text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    state character varying(32) DEFAULT 'open'::character varying NOT NULL,
+    result character varying(32) DEFAULT ''::character varying NOT NULL,
+    source_id uuid,
+    source_name text DEFAULT ''::text NOT NULL,
+    source_key text DEFAULT ''::text NOT NULL,
+    attributes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -939,6 +1047,78 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
+-- Name: factories factories_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_organization_id_name_key UNIQUE (organization_id, name);
+
+
+--
+-- Name: factories factories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_agent_assignments factory_agent_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_assignments
+    ADD CONSTRAINT factory_agent_assignments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_agents factory_agents_factory_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agents
+    ADD CONSTRAINT factory_agents_factory_id_name_key UNIQUE (factory_id, name);
+
+
+--
+-- Name: factory_agents factory_agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agents
+    ADD CONSTRAINT factory_agents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_sources factory_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_sources
+    ADD CONSTRAINT factory_sources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_work_order_assignees factory_work_order_assignees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_assignees
+    ADD CONSTRAINT factory_work_order_assignees_pkey PRIMARY KEY (work_order_id, user_id);
+
+
+--
+-- Name: factory_work_order_events factory_work_order_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_events
+    ADD CONSTRAINT factory_work_order_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1399,6 +1579,83 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_factories_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factories_organization_id ON public.factories USING btree (organization_id);
+
+
+--
+-- Name: idx_factory_agent_assignments_agent_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_assignments_agent_id ON public.factory_agent_assignments USING btree (agent_id);
+
+
+--
+-- Name: idx_factory_agent_assignments_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_assignments_factory_id ON public.factory_agent_assignments USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_agent_assignments_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_assignments_pending ON public.factory_agent_assignments USING btree (state) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'started'::character varying])::text[]));
+
+
+--
+-- Name: idx_factory_agent_assignments_work_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agent_assignments_work_order_id ON public.factory_agent_assignments USING btree (work_order_id);
+
+
+--
+-- Name: idx_factory_agents_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_agents_factory_id ON public.factory_agents USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_sources_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_sources_factory_id ON public.factory_sources USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_work_order_assignees_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_order_assignees USING btree (user_id);
+
+
+--
+-- Name: idx_factory_work_order_events_order_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_events_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC, id DESC);
+
+
+--
+-- Name: idx_factory_work_orders_factory_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders USING btree (factory_id, state);
+
+
+--
+-- Name: idx_factory_work_orders_source_dedup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_orders_source_dedup ON public.factory_work_orders USING btree (factory_id, source_id, source_key) WHERE (source_key <> ''::text);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1833,6 +2090,94 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.canvas_subscriptions
     ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_agent_assignments factory_agent_assignments_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_assignments
+    ADD CONSTRAINT factory_agent_assignments_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.factory_agents(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_agent_assignments factory_agent_assignments_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_assignments
+    ADD CONSTRAINT factory_agent_assignments_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_agent_assignments factory_agent_assignments_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agent_assignments
+    ADD CONSTRAINT factory_agent_assignments_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_agents factory_agents_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_agents
+    ADD CONSTRAINT factory_agents_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_sources factory_sources_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_sources
+    ADD CONSTRAINT factory_sources_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_sources factory_sources_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_sources
+    ADD CONSTRAINT factory_sources_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_assignees factory_work_order_assignees_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_assignees
+    ADD CONSTRAINT factory_work_order_assignees_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_assignees factory_work_order_assignees_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_assignees
+    ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_events factory_work_order_events_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_events
+    ADD CONSTRAINT factory_work_order_events_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_orders factory_work_orders_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_orders factory_work_orders_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.factory_sources(id) ON DELETE SET NULL;
 
 
 --
@@ -2275,7 +2620,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260720144835	f
+20260730024822	f
 \.
 
 
