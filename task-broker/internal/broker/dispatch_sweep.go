@@ -3,12 +3,16 @@ package broker
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/superplane/runner/task-broker/internal/dispatch"
 )
 
-const dispatchSweepLimit = 50
+const (
+	dispatchSweepLimit       = 50
+	dispatchSweepConcurrency = 10
+)
 
 func RunDispatchSweepLoop(ctx context.Context, log *slog.Logger, srv *Server, interval, staleAfter time.Duration) {
 	if srv == nil || srv.Dispatch == nil {
@@ -34,17 +38,25 @@ func sweepDispatchOnce(ctx context.Context, log *slog.Logger, srv *Server, stale
 		}
 		return
 	}
+	sem := make(chan struct{}, dispatchSweepConcurrency)
+	var wg sync.WaitGroup
 	for _, c := range candidates {
 		d, needsDispatch := srv.Dispatch.For(c.Provisioner, c.LambdaFunctionName)
 		if !needsDispatch {
 			continue
 		}
-		dispatchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		err := d.Dispatch(dispatchCtx, c.FleetID, c.TaskID)
-		cancel()
-		if err != nil && log != nil {
-			log.Warn("dispatch sweep: dispatch failed, will retry next sweep",
-				slog.String("task_id", c.TaskID), slog.String("fleet_id", c.FleetID), slog.Any("err", err))
-		}
+		sem <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			dispatchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			if err := d.Dispatch(dispatchCtx, c.FleetID, c.TaskID); err != nil && log != nil {
+				log.Warn("dispatch sweep: dispatch failed, will retry next sweep",
+					slog.String("task_id", c.TaskID), slog.String("fleet_id", c.FleetID), slog.Any("err", err))
+			}
+		}()
 	}
+	wg.Wait()
 }

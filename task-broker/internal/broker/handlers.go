@@ -57,8 +57,34 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
+	if req.MaxExecutionTimeoutSeconds != nil && *req.MaxExecutionTimeoutSeconds <= 0 {
+		writeError(w, http.StatusBadRequest, "max_execution_timeout_seconds must be positive")
+		return
+	}
+
 	provisioner := strings.TrimSpace(req.Provisioner)
 	lambdaFunctionName := strings.TrimSpace(req.LambdaFunctionName)
+	maxExecutionTimeoutSeconds := req.MaxExecutionTimeoutSeconds
+	supportsDocker := req.SupportsDocker
+
+	existing, err := s.Store.GetFleet(r.Context(), req.ID)
+	if err != nil {
+		s.logErr("resolve fleet for register", err)
+		writeError(w, http.StatusInternalServerError, "could not persist fleet")
+		return
+	}
+	if existing != nil {
+		if lambdaFunctionName == "" {
+			lambdaFunctionName = existing.LambdaFunctionName
+		}
+		if maxExecutionTimeoutSeconds == nil {
+			maxExecutionTimeoutSeconds = existing.MaxExecutionTimeoutSeconds
+		}
+		if supportsDocker == nil {
+			supportsDocker = existing.SupportsDocker
+		}
+	}
+
 	if provisioner == dispatch.ProvisionerAWSLambda && lambdaFunctionName == "" {
 		writeError(w, http.StatusBadRequest, "lambda_function_name required for provisioner "+dispatch.ProvisionerAWSLambda)
 		return
@@ -70,8 +96,8 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		Size:                       strings.TrimSpace(req.Size),
 		CreatedAt:                  time.Now().UTC(),
 		LambdaFunctionName:         lambdaFunctionName,
-		MaxExecutionTimeoutSeconds: req.MaxExecutionTimeoutSeconds,
-		SupportsDocker:             req.SupportsDocker,
+		MaxExecutionTimeoutSeconds: maxExecutionTimeoutSeconds,
+		SupportsDocker:             supportsDocker,
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -511,7 +537,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
-	s.dispatchTask(ctx, fleet, task.ID)
+	s.dispatchTask(fleet, task.ID)
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
@@ -538,7 +564,7 @@ func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (
 	return &v, ""
 }
 
-func (s *Server) dispatchTask(ctx context.Context, fleet *brokermodels.Fleet, taskID string) {
+func (s *Server) dispatchTask(fleet *brokermodels.Fleet, taskID string) {
 	if s.Dispatch == nil || fleet == nil {
 		return
 	}
@@ -546,15 +572,15 @@ func (s *Server) dispatchTask(ctx context.Context, fleet *brokermodels.Fleet, ta
 	if !needsDispatch {
 		return
 	}
-	dispatchCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	if err := s.Store.MarkTaskDispatched(context.Background(), taskID); err != nil {
+		s.logErr("mark task dispatched", err)
+		return
+	}
+	dispatchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := d.Dispatch(dispatchCtx, fleet.ID, taskID); err != nil {
 		s.warn("dispatch task failed, sweeper will retry",
 			slog.String("task_id", taskID), slog.String("fleet_id", fleet.ID), slog.Any("err", err))
-		return
-	}
-	if err := s.Store.MarkTaskDispatched(context.Background(), taskID); err != nil {
-		s.logErr("mark task dispatched", err)
 	}
 }
 
