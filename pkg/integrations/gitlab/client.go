@@ -1670,3 +1670,212 @@ func readResponseBody(resp *http.Response) string {
 	}
 	return string(body)
 }
+
+type graphQLRequest struct {
+	Query     string         `json:"query"`
+	Variables map[string]any `json:"variables,omitempty"`
+}
+
+type graphQLError struct {
+	Message string `json:"message"`
+}
+
+type graphQLResponse struct {
+	Data   json.RawMessage `json:"data"`
+	Errors []graphQLError  `json:"errors,omitempty"`
+}
+
+// graphQL executes a query against GitLab's GraphQL API and decodes the "data" field into out.
+func (c *Client) graphQL(ctx context.Context, query string, variables map[string]any, out any) error {
+	body, err := json.Marshal(graphQLRequest{Query: query, Variables: variables})
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/graphql", c.baseURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("graphql request failed: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var gqlResp graphQLResponse
+	if err := json.NewDecoder(resp.Body).Decode(&gqlResp); err != nil {
+		return fmt.Errorf("failed to decode graphql response: %v", err)
+	}
+
+	if len(gqlResp.Errors) > 0 {
+		return fmt.Errorf("graphql error: %s", gqlResp.Errors[0].Message)
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	return json.Unmarshal(gqlResp.Data, out)
+}
+
+type Group struct {
+	ID       int    `json:"id"`
+	FullPath string `json:"full_path"`
+}
+
+// GetGroup fetches a single group by numeric ID or full path.
+func (c *Client) GetGroup(groupID string) (*Group, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s", c.baseURL, apiVersion, url.PathEscape(groupID))
+
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get group: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var group Group
+	if err := json.NewDecoder(resp.Body).Decode(&group); err != nil {
+		return nil, fmt.Errorf("failed to decode group: %v", err)
+	}
+
+	return &group, nil
+}
+
+type CiMinutesNamespaceUsage struct {
+	Month                 string `json:"month"`
+	MonthIso8601          string `json:"monthIso8601"`
+	Minutes               int    `json:"minutes"`
+	SharedRunnersDuration int    `json:"sharedRunnersDuration"`
+}
+
+type CiMinutesProjectRef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	FullPath string `json:"fullPath"`
+}
+
+type CiMinutesProjectUsage struct {
+	Minutes               int                  `json:"minutes"`
+	SharedRunnersDuration int                  `json:"sharedRunnersDuration"`
+	Project               *CiMinutesProjectRef `json:"project"`
+}
+
+const ciMinutesNamespaceUsageQuery = `
+query($namespaceId: NamespaceID, $date: Date) {
+  ciMinutesUsage(namespaceId: $namespaceId, date: $date) {
+    nodes {
+      month
+      monthIso8601
+      minutes
+      sharedRunnersDuration
+    }
+  }
+}`
+
+const ciMinutesProjectUsageQuery = `
+query($namespaceId: NamespaceID, $date: Date, $after: String) {
+  ciMinutesProjectMonthlyUsage(namespaceId: $namespaceId, date: $date, first: 100, after: $after) {
+    nodes {
+      minutes
+      sharedRunnersDuration
+      project {
+        id
+        name
+        fullPath
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}`
+
+type ciMinutesNamespaceUsageResponse struct {
+	CiMinutesUsage struct {
+		Nodes []CiMinutesNamespaceUsage `json:"nodes"`
+	} `json:"ciMinutesUsage"`
+}
+
+type graphQLPageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type ciMinutesProjectUsageResponse struct {
+	CiMinutesProjectMonthlyUsage struct {
+		Nodes    []CiMinutesProjectUsage `json:"nodes"`
+		PageInfo graphQLPageInfo         `json:"pageInfo"`
+	} `json:"ciMinutesProjectMonthlyUsage"`
+}
+
+// GetCiMinutesUsage returns a namespace's CI/CD minutes usage for the given month with a per-project breakdown; a nil namespaceGID queries the current user's personal namespace.
+func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, date string) (*CiMinutesNamespaceUsage, []CiMinutesProjectUsage, error) {
+	variables := map[string]any{"date": date}
+	if namespaceGID != nil {
+		variables["namespaceId"] = *namespaceGID
+	}
+
+	var namespaceResp ciMinutesNamespaceUsageResponse
+	if err := c.graphQL(ctx, ciMinutesNamespaceUsageQuery, variables, &namespaceResp); err != nil {
+		return nil, nil, err
+	}
+
+	var usage CiMinutesNamespaceUsage
+	if len(namespaceResp.CiMinutesUsage.Nodes) > 0 {
+		usage = namespaceResp.CiMinutesUsage.Nodes[0]
+	}
+
+	projects, err := c.getAllCiMinutesProjectUsage(ctx, variables)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &usage, projects, nil
+}
+
+// getAllCiMinutesProjectUsage pages through the full per-project usage breakdown, since GitLab caps each response at 100 nodes.
+func (c *Client) getAllCiMinutesProjectUsage(ctx context.Context, baseVariables map[string]any) ([]CiMinutesProjectUsage, error) {
+	var allProjects []CiMinutesProjectUsage
+	after := ""
+
+	for {
+		variables := make(map[string]any, len(baseVariables)+1)
+		for k, v := range baseVariables {
+			variables[k] = v
+		}
+		if after != "" {
+			variables["after"] = after
+		}
+
+		var resp ciMinutesProjectUsageResponse
+		if err := c.graphQL(ctx, ciMinutesProjectUsageQuery, variables, &resp); err != nil {
+			return nil, err
+		}
+
+		allProjects = append(allProjects, resp.CiMinutesProjectMonthlyUsage.Nodes...)
+
+		if !resp.CiMinutesProjectMonthlyUsage.PageInfo.HasNextPage {
+			break
+		}
+		after = resp.CiMinutesProjectMonthlyUsage.PageInfo.EndCursor
+	}
+
+	return allProjects, nil
+}
