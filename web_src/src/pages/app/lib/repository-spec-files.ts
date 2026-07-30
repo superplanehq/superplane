@@ -111,8 +111,7 @@ export async function fetchCanvasVersionWithSpec(
 }
 
 export type ConsoleSpecData = {
-  panels: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["panels"];
-  layout: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["layout"];
+  pages: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["pages"];
   consoleYaml: string;
 };
 
@@ -123,8 +122,7 @@ export function consoleSpecFromYaml(consoleYaml: string): ConsoleSpecData | unde
   }
 
   return {
-    panels: parsed.panels,
-    layout: parsed.layout,
+    pages: parsed.pages,
     consoleYaml,
   };
 }

@@ -26,7 +26,7 @@ function consoleLoaded(panelCount: number): ConsoleQueryLike {
   return {
     isSuccess: true,
     isError: false,
-    data: { panels: Array.from({ length: panelCount }, () => ({})) },
+    data: { pages: [{ panels: Array.from({ length: panelCount }, () => ({})) }] },
   };
 }
 

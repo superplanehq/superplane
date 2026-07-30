@@ -54,7 +54,21 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 				return fmt.Errorf("invalid canvas yaml in %s: %w", trimmedPath, err)
 			}
 		case common.ConsoleYAMLRepositoryPath:
-			if _, err := yaml.ConsoleFromYML(content); err != nil {
+			// Lenient parse + shape check: caps are enforced at commit
+			// time (see commit_canvas_staging.go, which runs a delta
+			// check against the previously committed pages). Staging is
+			// a scratchpad, so a grandfathered console with more than
+			// MaxConsolePanelsPerPage panels must be re-stageable here
+			// even without any authoring changes — otherwise a user who
+			// only wants to *reduce* an over-cap page cannot get their
+			// edit past this pre-flight. The shape check still surfaces
+			// malformed YAML, wrong apiVersion/kind, mixed spec shapes,
+			// or unsupported panel types.
+			parsed, err := yaml.ConsoleFromYMLLenient(content)
+			if err != nil {
+				return fmt.Errorf("invalid console yaml in %s: %w", trimmedPath, err)
+			}
+			if err := parsed.ValidateShape(); err != nil {
 				return fmt.Errorf("invalid console yaml in %s: %w", trimmedPath, err)
 			}
 		}

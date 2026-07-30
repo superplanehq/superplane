@@ -9,6 +9,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// DefaultConsolePageID is the id used for the implicit first page. Legacy
+// single-page consoles that get wrapped into the new pages shape reuse
+// this id so the round-trip stays stable.
+const DefaultConsolePageID = "main"
+
+// DefaultConsolePageName is the human label paired with DefaultConsolePageID
+// when a legacy console is wrapped into a multi-page representation.
+const DefaultConsolePageName = "Main"
+
 type ConsolePanel struct {
 	ID      string         `json:"id"`
 	Type    string         `json:"type"`
@@ -25,18 +34,21 @@ type ConsoleLayoutItem struct {
 	MinH *int   `json:"minH,omitempty"`
 }
 
-func consolePanelsData(panels datatypes.JSONType[[]ConsolePanel]) []ConsolePanel {
-	if data := panels.Data(); data != nil {
-		return data
-	}
-	return []ConsolePanel{}
+// ConsolePage groups panels and their grid layout under one tab. The
+// canvas console stores an ordered list of pages; a fresh canvas has
+// zero pages and materializes an implicit one on first save.
+type ConsolePage struct {
+	ID     string              `json:"id"`
+	Name   string              `json:"name,omitempty"`
+	Panels []ConsolePanel      `json:"panels"`
+	Layout []ConsoleLayoutItem `json:"layout"`
 }
 
-func consoleLayoutData(layout datatypes.JSONType[[]ConsoleLayoutItem]) []ConsoleLayoutItem {
-	if data := layout.Data(); data != nil {
+func consolePagesData(pages datatypes.JSONType[[]ConsolePage]) []ConsolePage {
+	if data := pages.Data(); data != nil {
 		return data
 	}
-	return []ConsoleLayoutItem{}
+	return []ConsolePage{}
 }
 
 func copyVersionConsoleFields(source *CanvasVersion, target *CanvasVersion) {
@@ -44,26 +56,24 @@ func copyVersionConsoleFields(source *CanvasVersion, target *CanvasVersion) {
 		return
 	}
 
-	target.ConsolePanels = datatypes.NewJSONType(consolePanelsData(source.ConsolePanels))
-	target.ConsoleLayout = datatypes.NewJSONType(consoleLayoutData(source.ConsoleLayout))
+	target.ConsolePages = datatypes.NewJSONType(consolePagesData(source.ConsolePages))
 }
 
+// UpdateCanvasVersionConsoleInTransaction replaces the console pages on the
+// given version. `pages` may be empty (fresh / cleared console); callers
+// that want a normalized single-page representation should assemble it
+// before calling.
 func UpdateCanvasVersionConsoleInTransaction(
 	tx *gorm.DB,
 	version *CanvasVersion,
-	panels []ConsolePanel,
-	layout []ConsoleLayoutItem,
+	pages []ConsolePage,
 ) (*CanvasVersion, error) {
-	if panels == nil {
-		panels = []ConsolePanel{}
-	}
-	if layout == nil {
-		layout = []ConsoleLayoutItem{}
+	if pages == nil {
+		pages = []ConsolePage{}
 	}
 
 	now := time.Now()
-	version.ConsolePanels = datatypes.NewJSONType(panels)
-	version.ConsoleLayout = datatypes.NewJSONType(layout)
+	version.ConsolePages = datatypes.NewJSONType(pages)
 	version.UpdatedAt = &now
 
 	if err := tx.Save(version).Error; err != nil {
@@ -76,17 +86,16 @@ func UpdateCanvasVersionConsoleInTransaction(
 func UpsertCanvasVersionConsoleInTransaction(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
-	panels []ConsolePanel,
-	layout []ConsoleLayoutItem,
+	pages []ConsolePage,
 ) (*CanvasVersion, error) {
 	version, err := FindLiveCanvasVersionInTransaction(tx, canvasID)
 	if err != nil {
 		return nil, err
 	}
 
-	return UpdateCanvasVersionConsoleInTransaction(tx, version, panels, layout)
+	return UpdateCanvasVersionConsoleInTransaction(tx, version, pages)
 }
 
-func UpsertCanvasVersionConsole(canvasID uuid.UUID, panels []ConsolePanel, layout []ConsoleLayoutItem) (*CanvasVersion, error) {
-	return UpsertCanvasVersionConsoleInTransaction(database.Conn(), canvasID, panels, layout)
+func UpsertCanvasVersionConsole(canvasID uuid.UUID, pages []ConsolePage) (*CanvasVersion, error) {
+	return UpsertCanvasVersionConsoleInTransaction(database.Conn(), canvasID, pages)
 }
