@@ -56,6 +56,7 @@ This action calls GitLab's GraphQL API, which requires the connected user to hav
 - Returns usage for the current calendar month
 - Includes a per-project breakdown of minutes and shared runner duration
 - When Projects are selected, only usage for those projects is included in the totals
+- If the integration's Group is a subgroup, usage is reported for its root group, since GitLab only tracks compute minutes at the root namespace
 
 ## Configuration
 
@@ -182,6 +183,15 @@ func resolveNamespaceGID(client *Client) (*string, error) {
 	group, err := client.GetGroup(client.groupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve group: %w", err)
+	}
+
+	// GitLab tracks compute minutes on the root namespace only, so a subgroup's own ID would resolve to a namespace with no usage records.
+	rootPath, _, isSubgroup := strings.Cut(group.FullPath, "/")
+	if isSubgroup {
+		group, err = client.GetGroup(rootPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve root group: %w", err)
+		}
 	}
 
 	gid := fmt.Sprintf("gid://gitlab/Group/%d", group.ID)

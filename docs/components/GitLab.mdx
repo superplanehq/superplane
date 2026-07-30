@@ -2556,6 +2556,7 @@ This action calls GitLab's GraphQL API, which requires the connected user to hav
 - Returns usage for the current calendar month
 - Includes a per-project breakdown of minutes and shared runner duration
 - When Projects are selected, only usage for those projects is included in the totals
+- If the integration's Group is a subgroup, usage is reported for its root group, since GitLab only tracks compute minutes at the root namespace
 
 ### Configuration
 

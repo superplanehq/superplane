@@ -1885,7 +1885,7 @@ func Test__Client__GetGroup(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `{"id": 123}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 123, "full_path": "my-org/my-subgroup"}`),
 			},
 		}
 
@@ -1900,6 +1900,7 @@ func Test__Client__GetGroup(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 123, result.ID)
+		assert.Equal(t, "my-org/my-subgroup", result.FullPath)
 
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)

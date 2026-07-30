@@ -1726,7 +1726,8 @@ func (c *Client) graphQL(ctx context.Context, query string, variables map[string
 }
 
 type Group struct {
-	ID int `json:"id"`
+	ID       int    `json:"id"`
+	FullPath string `json:"full_path"`
 }
 
 // GetGroup fetches a single group by numeric ID or full path.

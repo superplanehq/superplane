@@ -96,7 +96,7 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
-					GitlabMockResponse(http.StatusOK, `{"id": 456}`),
+					GitlabMockResponse(http.StatusOK, `{"id": 456, "full_path": "my-org"}`),
 					GitlabMockResponse(http.StatusOK, ciMinutesNamespaceUsageResponseBody()),
 					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
 				},
@@ -108,7 +108,7 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
-		require.Len(t, httpCtx.Requests, 3)
+		require.Len(t, httpCtx.Requests, 3, "a root group must not trigger a second group lookup")
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/my-org", httpCtx.Requests[0].URL.String())
 
 		for _, req := range httpCtx.Requests[1:] {
@@ -117,6 +117,46 @@ func Test__GetPipelineMinutesUsage__Execute(t *testing.T) {
 			json.Unmarshal(body, &reqBody)
 			variables := reqBody["variables"].(map[string]any)
 			assert.Equal(t, "gid://gitlab/Group/456", variables["namespaceId"])
+		}
+	})
+
+	t.Run("success - resolves a subgroup to its root group, since minutes are only tracked there", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+					"groupId":     "my-org/my-subgroup",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `{"id": 789, "full_path": "my-org/my-subgroup"}`),
+					GitlabMockResponse(http.StatusOK, `{"id": 456, "full_path": "my-org"}`),
+					GitlabMockResponse(http.StatusOK, ciMinutesNamespaceUsageResponseBody()),
+					GitlabMockResponse(http.StatusOK, ciMinutesProjectUsageResponseBody()),
+				},
+			},
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		require.Len(t, httpCtx.Requests, 4)
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/my-org%2Fmy-subgroup", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/my-org", httpCtx.Requests[1].URL.String())
+
+		for _, req := range httpCtx.Requests[2:] {
+			body, _ := io.ReadAll(req.Body)
+			var reqBody map[string]any
+			json.Unmarshal(body, &reqBody)
+			variables := reqBody["variables"].(map[string]any)
+			assert.Equal(t, "gid://gitlab/Group/456", variables["namespaceId"], "must use the root group's ID (456), not the subgroup's own ID (789)")
 		}
 	})
 
