@@ -1,0 +1,37 @@
+{
+  "data": {
+    "id": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "short_id": "18f3e63d",
+    "title": "feat: add health endpoint",
+    "message": "feat: add health endpoint\n",
+    "author_name": "Administrator",
+    "author_email": "admin@example.com",
+    "authored_date": "2026-02-13T17:55:00.000Z",
+    "committer_name": "Administrator",
+    "committer_email": "admin@example.com",
+    "committed_date": "2026-02-13T17:55:00.000Z",
+    "created_at": "2026-02-13T17:55:00.000Z",
+    "parent_ids": ["a91957a858320c0e17f3a0eca7cfacbff50ea29a"],
+    "web_url": "https://gitlab.com/my-group/my-project/-/commit/18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "status": "failed",
+    "last_pipeline": {
+      "id": 1024,
+      "iid": 21,
+      "project_id": 84237809,
+      "ref": "main",
+      "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+      "status": "failed",
+      "source": "push",
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "web_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+    },
+    "stats": {
+      "additions": 24,
+      "deletions": 2,
+      "total": 26
+    }
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.commit"
+}
