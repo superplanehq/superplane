@@ -178,6 +178,36 @@ func Test__PublishCommitStatus__Execute(t *testing.T) {
 		assert.NotContains(t, bodyString, `"target_url"`)
 	})
 
+	t.Run("trims name and ref before sending", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 95, "sha": "abc123", "status": "success"}`),
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project": "123",
+				"sha":     "abc123",
+				"state":   "success",
+				"name":    "  ci/superplane  ",
+				"ref":     "  main  ",
+			},
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, `"name":"ci/superplane"`)
+		assert.Contains(t, bodyString, `"ref":"main"`)
+	})
+
 	t.Run("requires sha at execution time", func(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
