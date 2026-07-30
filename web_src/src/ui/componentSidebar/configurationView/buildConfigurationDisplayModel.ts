@@ -1,4 +1,4 @@
-import type { ComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
+import type { SuperplaneComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { isFieldVisible, parseDefaultValues } from "@/lib/components";
 import { EMPTY_DISPLAY_VALUE, formatConfigurationLabel, formatConfigurationValue } from "./formatConfigurationValue";
@@ -8,7 +8,7 @@ export type BuildConfigurationDisplayModelInput = {
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
   integrationName?: string;
-  integrationRef?: ComponentsIntegrationRef;
+  integrationRef?: SuperplaneComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   allowIntegrations?: boolean;
 };
@@ -65,7 +65,7 @@ function appendNotConnectedIntegrationRow(rows: ConfigurationDisplayRow[], typeL
 
 function findSelectedIntegration(
   integrationsOfType: OrganizationsIntegration[],
-  integrationRef?: ComponentsIntegrationRef,
+  integrationRef?: SuperplaneComponentsIntegrationRef,
 ): OrganizationsIntegration | undefined {
   if (!integrationRef?.id) {
     return undefined;

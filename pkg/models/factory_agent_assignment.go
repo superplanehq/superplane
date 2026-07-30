@@ -47,6 +47,7 @@ func CreateFactoryAgentAssignments(
 	assignments := make([]FactoryAgentAssignment, 0, len(params))
 	for _, p := range params {
 		assignments = append(assignments, FactoryAgentAssignment{
+			ID:             uuid.New(),
 			OrganizationID: p.OrganizationID,
 			FactoryID:      p.FactoryID,
 			AgentID:        p.AgentID,

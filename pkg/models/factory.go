@@ -44,6 +44,7 @@ func MapFactoryNameUniqueConstraintError(err error) error {
 func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description string) (*Factory, error) {
 	now := time.Now()
 	factory := &Factory{
+		ID:             uuid.New(),
 		OrganizationID: organizationID,
 		Name:           name,
 		Description:    description,

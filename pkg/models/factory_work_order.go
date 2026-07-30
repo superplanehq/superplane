@@ -95,6 +95,7 @@ func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*
 	}
 
 	order := &FactoryWorkOrder{
+		ID:             uuid.New(),
 		OrganizationID: params.OrganizationID,
 		FactoryID:      params.FactoryID,
 		Title:          params.Title,

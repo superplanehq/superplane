@@ -16,7 +16,7 @@ import type {
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,
-  ComponentsIntegrationRef,
+  SuperplaneComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -2097,7 +2097,7 @@ export function AppPage() {
         });
       }, 2000);
 
-      const integrationRef: ComponentsIntegrationRef = {
+      const integrationRef: SuperplaneComponentsIntegrationRef = {
         id: integrationId,
         name: instanceName,
       };
@@ -2138,7 +2138,7 @@ export function AppPage() {
       nodeId: string,
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
-      integrationRef?: ComponentsIntegrationRef,
+      integrationRef?: SuperplaneComponentsIntegrationRef,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
