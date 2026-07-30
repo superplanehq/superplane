@@ -1850,10 +1850,35 @@ func Test__Client__ListCommitStatuses(t *testing.T) {
 
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?name=ci%2Fsuperplane&order_by=id&page=1&per_page=100&ref=main&sort=desc", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?name=ci%2Fsuperplane&page=1&per_page=100&ref=main", mockClient.Requests[0].URL.String())
 	})
 
-	t.Run("follows pagination across pages", func(t *testing.T) {
+	t.Run("sorts newest first regardless of server order", func(t *testing.T) {
+		// GitLab < 17.9 ignores order_by/sort and returns ascending id order.
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 10, "sha": "abc123", "status": "success", "name": "a"},
+					{"id": 30, "sha": "abc123", "status": "failed", "name": "c"},
+					{"id": 20, "sha": "abc123", "status": "running", "name": "b"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		statuses, err := client.ListCommitStatuses("456", "abc123", nil)
+		require.NoError(t, err)
+		require.Len(t, statuses, 3)
+		assert.Equal(t, []int{30, 20, 10}, []int{statuses[0].ID, statuses[1].ID, statuses[2].ID})
+	})
+
+	t.Run("follows pagination across pages and sorts newest first", func(t *testing.T) {
 		page1 := GitlabMockResponse(http.StatusOK, `[{"id": 1, "sha": "abc123", "status": "success", "name": "a"}]`)
 		page1.Header.Set("X-Next-Page", "2")
 		page2 := GitlabMockResponse(http.StatusOK, `[{"id": 2, "sha": "abc123", "status": "failed", "name": "b"}]`)
@@ -1870,12 +1895,13 @@ func Test__Client__ListCommitStatuses(t *testing.T) {
 		statuses, err := client.ListCommitStatuses("456", "abc123", nil)
 		require.NoError(t, err)
 		require.Len(t, statuses, 2)
-		assert.Equal(t, 1, statuses[0].ID)
-		assert.Equal(t, 2, statuses[1].ID)
+		// Pages arrive ascending (1 then 2); the client sorts them newest first.
+		assert.Equal(t, 2, statuses[0].ID)
+		assert.Equal(t, 1, statuses[1].ID)
 
 		require.Len(t, mockClient.Requests, 2)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=1&per_page=100&sort=desc", mockClient.Requests[0].URL.String())
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?order_by=id&page=2&per_page=100&sort=desc", mockClient.Requests[1].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?page=1&per_page=100", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/repository/commits/abc123/statuses?page=2&per_page=100", mockClient.Requests[1].URL.String())
 	})
 
 	t.Run("failure", func(t *testing.T) {

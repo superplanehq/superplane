@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1586,15 +1587,24 @@ func (c *Client) ListCommitStatuses(projectID, sha string, req *ListCommitStatus
 		}
 	}
 	query.Set("per_page", "100")
-	// Newest first, so the first result is the most recent status.
-	query.Set("order_by", "id")
-	query.Set("sort", "desc")
 
-	return fetchAllResources[CommitStatus](c, func(page int) string {
+	statuses, err := fetchAllResources[CommitStatus](c, func(page int) string {
 		query.Set("page", strconv.Itoa(page))
 		return fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s/statuses?%s",
 			c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha), query.Encode())
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort newest first by ID so the first result is the most recent status. We
+	// sort client-side rather than via order_by/sort because those params were
+	// only added to this endpoint in GitLab 17.9 and are ignored on older instances.
+	sort.Slice(statuses, func(i, j int) bool {
+		return statuses[i].ID > statuses[j].ID
+	})
+
+	return statuses, nil
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409
