@@ -27,12 +27,34 @@
       }
     ],
     "head": {
+      "label": "acme:feature-branch",
       "ref": "feature-branch",
-      "label": "acme:feature-branch"
+      "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repo": {
+        "full_name": "acme/widgets",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456
+      },
+      "user": {
+        "login": "octocat",
+        "id": 1,
+        "html_url": "https://github.com/octocat"
+      }
     },
     "base": {
+      "label": "acme:release",
       "ref": "release",
-      "label": "acme:release"
+      "sha": "7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f901",
+      "repo": {
+        "full_name": "acme/widgets",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456
+      },
+      "user": {
+        "login": "acme",
+        "id": 200001,
+        "html_url": "https://github.com/acme"
+      }
     },
     "user": {
       "login": "octocat",
