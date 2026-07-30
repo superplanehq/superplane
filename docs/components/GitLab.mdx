@@ -39,12 +39,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitLab project" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitLab project" />
+  <LinkCard title="Get Commit Status" href="#get-commit-status" description="Get the overall CI status of a GitLab commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitLab project" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Mark Merge Request Ready for Review" href="#mark-merge-request-ready-for-review" description="Take a draft merge request out of the draft state in a GitLab project" />
+  <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a build/CI status on a GitLab commit" />
   <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
@@ -61,7 +63,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
    - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) with scopes api, read_user, read_api, write_repository, read_repository (the link prefills them), paste it into **Access Token**, and click **Save**.
 
-**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating, updating, or merging merge requests, approving, deploying, and editing issue comments follow the project's roles and protected branch/environment rules.
+**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating, updating, or merging merge requests, approving, deploying, publishing commit statuses, and editing issue comments follow the project's roles and protected branch/environment rules.
 
 <a id="on-branch-created"></a>
 
@@ -2271,6 +2273,79 @@ Returns the deleted release object, plus a "tag_deleted" field that is true only
 }
 ```
 
+<a id="get-commit-status"></a>
+
+## Get Commit Status
+
+**Component key:** `gitlab.getCommitStatus`
+
+The Get Commit Status component reads a commit's overall CI status.
+
+In GitLab a commit's statuses are jobs grouped under pipelines, and GitLab rolls them up for you: every commit carries a single overall **status** and a **last_pipeline**. This component returns that native result - one meaningful state plus a link to the pipeline - rather than a list of every job.
+
+### Use Cases
+
+- **Status gates**: Check whether a commit is green before continuing
+- **Follow-up to Publish Commit Status**: Read back a commit's overall state
+- **Notifications**: Report a commit's CI outcome with a link to the pipeline
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the commit
+- **Ref** (required): Commit SHA, branch name, or tag name to inspect (supports expressions)
+
+### Permissions
+
+The connected token needs the `read_api` (or `api`) scope and at least the **Reporter** role on the project.
+
+### Output
+
+Emits the commit object, including its overall **status** and **last_pipeline** (id, ref, sha, status, web_url).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author_email": "admin@example.com",
+    "author_name": "Administrator",
+    "authored_date": "2026-02-13T17:55:00.000Z",
+    "committed_date": "2026-02-13T17:55:00.000Z",
+    "committer_email": "admin@example.com",
+    "committer_name": "Administrator",
+    "created_at": "2026-02-13T17:55:00.000Z",
+    "id": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "last_pipeline": {
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "id": 1024,
+      "iid": 21,
+      "project_id": 84237809,
+      "ref": "main",
+      "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+      "source": "push",
+      "status": "failed",
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "web_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+    },
+    "message": "feat: add health endpoint\n",
+    "parent_ids": [
+      "a91957a858320c0e17f3a0eca7cfacbff50ea29a"
+    ],
+    "short_id": "18f3e63d",
+    "stats": {
+      "additions": 24,
+      "deletions": 2,
+      "total": 26
+    },
+    "status": "failed",
+    "title": "feat: add health endpoint",
+    "web_url": "https://gitlab.com/my-group/my-project/-/commit/18f3e63d05582537db6d183d9d557be09e1f90c8"
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.commit"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -2718,6 +2793,72 @@ Returns the merge request object after it has been marked ready for review.
 }
 ```
 
+<a id="publish-commit-status"></a>
+
+## Publish Commit Status
+
+**Component key:** `gitlab.publishCommitStatus`
+
+The Publish Commit Status component sets a build/CI status on a specific commit, the way GitLab CI and external CI systems report per-commit check results.
+
+### Use Cases
+
+- **External CI reporting**: Report the outcome of a build, test, or scan run outside GitLab back onto the commit
+- **Gate signalling**: Mark a commit pending while a workflow runs, then success or failed when it finishes
+- **Custom checks**: Surface a workflow's own pass/fail state on the commit and merge request
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the commit
+- **Commit SHA** (required): The commit to attach the status to (supports expressions)
+- **State** (required): One of pending, running, success, failed, canceled, skipped
+- **Name** (optional): Label distinguishing this status from others on the same commit (GitLab defaults to `default`)
+- **Target URL** (optional): URL the status links to, e.g. the build or job page
+- **Description** (optional): Short description shown alongside the status
+- **Ref** (optional): Branch or tag the status is reported for
+- **Coverage** (optional): Total code coverage percentage
+- **Pipeline ID** (optional): Attach the status to a specific pipeline when several ran on the commit
+
+### Permissions
+
+The connected token needs the `api` scope and at least the **Developer** role on the project.
+
+### Output
+
+Returns the created commit status object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allow_failure": false,
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "coverage": 92.5,
+    "created_at": "2026-02-13T18:00:00.000Z",
+    "description": "Build passed",
+    "finished_at": "2026-02-13T18:04:12.000Z",
+    "id": 93,
+    "name": "ci/superplane",
+    "pipeline_id": 1024,
+    "ref": "main",
+    "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "started_at": "2026-02-13T18:00:05.000Z",
+    "status": "success",
+    "target_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.commitStatus"
+}
+```
+
 <a id="remove-merge-request-reviewers"></a>
 
 ## Remove Merge Request Reviewers
@@ -2886,11 +3027,11 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Labels** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the issue's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected removes all assignees, and enabling Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
 
 ### Output
 
@@ -3027,7 +3168,7 @@ The Update Merge Request component modifies an existing GitLab merge request: it
 - **Retitle/redescribe automation**: Update a merge request's title or description as a workflow progresses
 - **Open/close automation**: Close a merge request when it is superseded, or reopen one automatically
 - **Retargeting**: Change the target branch a merge request merges into
-- **Label and assignee management**: Replace a merge request's labels or assignees from a workflow
+- **Label and assignee management**: Add labels to a merge request or set its assignees from a workflow
 
 ### Configuration
 
@@ -3037,10 +3178,10 @@ The Update Merge Request component modifies an existing GitLab merge request: it
 - **Description** (toggle): New description for the merge request
 - **Target Branch** (toggle): Retarget the merge request onto a different branch
 - **State** (toggle): Close or reopen the merge request
-- **Labels** (toggle): Labels to set, replacing any existing labels
+- **Labels** (toggle): Labels to add, keeping any existing labels
 - **Assignees** (toggle): Users to assign, replacing any existing assignees
 
-Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling Labels or Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the merge request's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
 
 ### Permissions
 
