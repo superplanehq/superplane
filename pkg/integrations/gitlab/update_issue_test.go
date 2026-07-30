@@ -194,7 +194,8 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		var reqBody map[string]any
 		json.Unmarshal(body, &reqBody)
 		assert.Equal(t, "close", reqBody["state_event"])
-		assert.Equal(t, "bug", reqBody["labels"])
+		assert.Equal(t, "bug", reqBody["add_labels"])
+		assert.Nil(t, reqBody["labels"])
 		assert.Equal(t, float64(12), reqBody["milestone_id"])
 	})
 
@@ -324,7 +325,7 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		assert.Empty(t, httpCtx.Requests, "no request should be sent when the title is empty")
 	})
 
-	t.Run("clears description, labels, assignees and milestone when toggled on but empty", func(t *testing.T) {
+	t.Run("clears description, assignees and milestone but appends labels when toggled on but empty", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
@@ -361,7 +362,9 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		json.Unmarshal(body, &reqBody)
 
 		assert.Equal(t, "", reqBody["description"])
-		assert.Equal(t, "", reqBody["labels"])
+		// Labels append via add_labels; an empty selection is a harmless no-op and never replaces existing labels.
+		assert.Equal(t, "", reqBody["add_labels"])
+		assert.Nil(t, reqBody["labels"])
 		assert.Equal(t, []any{}, reqBody["assignee_ids"])
 		assert.Equal(t, float64(0), reqBody["milestone_id"])
 

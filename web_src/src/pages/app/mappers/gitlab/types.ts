@@ -42,6 +42,27 @@ export interface GitLabNodeMetadata {
   };
 }
 
+export interface CommitStatus {
+  id: number;
+  sha: string;
+  ref?: string;
+  status: string;
+  name?: string;
+  target_url?: string;
+  description?: string;
+  created_at?: string;
+  coverage?: number | null;
+  pipeline_id?: number;
+  author?: User;
+}
+
+export interface CombinedCommitStatus {
+  state?: string;
+  sha?: string;
+  total_count?: number;
+  statuses?: CommitStatus[];
+}
+
 export interface Note {
   id: number;
   body: string;
