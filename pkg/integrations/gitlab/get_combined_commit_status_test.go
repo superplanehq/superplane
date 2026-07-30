@@ -123,6 +123,50 @@ func Test__GetCombinedCommitStatus__Execute(t *testing.T) {
 		assert.Equal(t, "success", decodeCombined(t, executionState).State)
 	})
 
+	t.Run("in-progress state outranks success so gate is not green", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 93, "sha": "abc123", "status": "success", "name": "ci"},
+					{"id": 94, "sha": "abc123", "status": "scheduled", "name": "deploy"}
+				]`),
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration:  map[string]any{"project": "123", "ref": "abc123"},
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "scheduled", decodeCombined(t, executionState).State)
+	})
+
+	t.Run("unknown state is not reported as success", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 93, "sha": "abc123", "status": "success", "name": "ci"},
+					{"id": 95, "sha": "abc123", "status": "waiting_for_resource", "name": "build"}
+				]`),
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration:  map[string]any{"project": "123", "ref": "abc123"},
+			Integration:    integration,
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+		assert.NotEqual(t, "success", decodeCombined(t, executionState).State)
+	})
+
 	t.Run("no statuses yields empty state and empty array", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		httpCtx := &contexts.HTTPContext{

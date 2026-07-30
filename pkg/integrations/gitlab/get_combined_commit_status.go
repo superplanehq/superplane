@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -18,10 +19,24 @@ var exampleOutputGetCombinedCommitStatus []byte
 
 const CombinedCommitStatusPayloadType = "gitlab.combinedCommitStatus"
 
-// combinedStatePriority orders GitLab build states worst-first; the combined
-// state is the worst state present among a commit's statuses.
+// combinedStatePriority ranks GitLab commit/job states worst-first (most blocking to
+// most complete). The combined state is the worst state present among a commit's
+// statuses. Any state not listed here is treated as blocking (ranked just ahead of
+// "success") so a status gate never passes on an unrecognized or in-progress state.
 var combinedStatePriority = []string{
-	"failed", "canceled", "running", "pending", "manual", "created", "success", "skipped",
+	"failed",
+	"canceled",
+	"canceling",
+	"running",
+	"waiting_for_callback",
+	"waiting_for_resource",
+	"preparing",
+	"pending",
+	"scheduled",
+	"manual",
+	"created",
+	"success",
+	"skipped",
 }
 
 type GetCombinedCommitStatus struct{}
@@ -180,18 +195,27 @@ func (c *GetCombinedCommitStatus) Execute(ctx core.ExecutionContext) error {
 // combinedCommitStatusState rolls a commit's statuses into one overall state
 // (worst wins), mirroring GitHub's combined status. Empty when there are none.
 func combinedCommitStatusState(statuses []CommitStatus) string {
-	present := make(map[string]bool, len(statuses))
-	for _, status := range statuses {
-		present[status.Status] = true
-	}
+	worst := ""
+	worstRank := len(combinedStatePriority)
 
-	for _, state := range combinedStatePriority {
-		if present[state] {
-			return state
+	for _, status := range statuses {
+		if rank := combinedStateRank(status.Status); rank < worstRank {
+			worstRank = rank
+			worst = status.Status
 		}
 	}
 
-	return ""
+	return worst
+}
+
+// combinedStateRank returns a state's worst-first rank. Unknown states rank just
+// ahead of "success" so an unrecognized (possibly in-progress) state is never
+// reported as a green combined status.
+func combinedStateRank(state string) int {
+	if rank := slices.Index(combinedStatePriority, state); rank >= 0 {
+		return rank
+	}
+	return slices.Index(combinedStatePriority, "success") - 1
 }
 
 func (c *GetCombinedCommitStatus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
