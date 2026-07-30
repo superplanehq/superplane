@@ -30,10 +30,7 @@ type Task struct {
 	ErrorMessage                 string     `gorm:""`
 	InfraRetryCount              int        `gorm:"not null;default:0"`
 	CancelRequested              bool       `gorm:"not null;default:false"`
+	WebhookPayloadSizeLimit      int        `gorm:"not null;default:0"`
 	RunnerTerminationRequestedAt *time.Time `gorm:""`
-	// DispatchRequestedAt is set when the broker actively starts an execution
-	// unit for this task (e.g. Lambda invoke). Fleets that pull work on their
-	// own (EC2) leave this nil forever. Used only by the dispatch sweeper to
-	// find tasks whose dispatch attempt is missing or stale.
-	DispatchRequestedAt *time.Time `gorm:""`
+	DispatchRequestedAt          *time.Time `gorm:""`
 }

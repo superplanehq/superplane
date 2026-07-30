@@ -186,11 +186,6 @@ func getenv(key, def string) string {
 	return def
 }
 
-// newDispatchResolver builds the Lambda client used for fleets with
-// Provisioner "aws-lambda". Loading AWS config here never fails hard on
-// missing credentials — it only matters once a Lambda fleet actually
-// dispatches, and misconfiguration then surfaces as a dispatch error that the
-// sweeper retries and logs, not as a broker startup failure.
 func newDispatchResolver(ctx context.Context, log *slog.Logger) *dispatch.Resolver {
 	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
 	if region == "" {

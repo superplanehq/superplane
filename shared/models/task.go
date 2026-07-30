@@ -63,6 +63,8 @@ type Task struct {
 	InfraRetryCount int
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
+	// WebhookPayloadSizeLimit is the maximum accepted webhook POST body in bytes (0 = unlimited).
+	WebhookPayloadSizeLimit int
 	// RunnerTerminationRequestedAt is set internally when fleet-manager is terminating
 	// the runner before the task can be finalized safely.
 	RunnerTerminationRequestedAt *time.Time

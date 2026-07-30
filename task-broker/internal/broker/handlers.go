@@ -34,9 +34,6 @@ type Server struct {
 	RunnerCancel *RunnerCancelHub
 	RunnerDrain  *RunnerDrainHub
 
-	// Dispatch resolves and invokes the execution unit for fleets that cannot
-	// pull work on their own (e.g. Lambda). Nil disables active dispatch
-	// entirely — all fleets behave as they do today (EC2 runners poll).
 	Dispatch *dispatch.Resolver
 
 	TaskCloudWatchLogGroup        string
@@ -502,6 +499,9 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	task.ExecutionTimeoutSeconds = execTimeoutSeconds
+	if req.WebhookPayloadSizeLimit > 0 {
+		task.WebhookPayloadSizeLimit = req.WebhookPayloadSizeLimit
+	}
 	if err := s.Store.CreateTask(ctx, task); err != nil {
 		s.logErr("create task", err)
 		writeError(w, http.StatusInternalServerError, "could not create task")
@@ -515,10 +515,6 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
-// resolveExecutionTimeoutSeconds applies the fleet's execution timeout cap
-// (e.g. Lambda's 15-minute hard limit), if any. An explicit request value
-// above the cap is rejected; an omitted value is clamped to the cap so
-// ordinary tasks are unaffected.
 func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (*int, string) {
 	if fleet == nil || fleet.MaxExecutionTimeoutSeconds == nil {
 		if requested == nil {
@@ -542,9 +538,6 @@ func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (
 	return &v, ""
 }
 
-// dispatchTask actively starts execution for fleets that cannot pull work on
-// their own (e.g. Lambda). Failure here is not fatal to task creation: the
-// task stays queued and the dispatch sweeper will retry it.
 func (s *Server) dispatchTask(ctx context.Context, fleet *brokermodels.Fleet, taskID string) {
 	if s.Dispatch == nil || fleet == nil {
 		return

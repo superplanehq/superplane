@@ -966,8 +966,6 @@ func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
 		t.Fatalf("candidate: %#v", c)
 	}
 
-	// Immediately re-claiming with a long stale window must not return the
-	// same task again — it was just stamped.
 	again, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Minute, 10)
 	if err != nil {
 		t.Fatal(err)
@@ -976,8 +974,6 @@ func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
 		t.Fatalf("expected no candidates immediately after claim: %#v", again)
 	}
 
-	// A near-zero stale window makes the just-claimed task eligible again,
-	// modeling a failed dispatch that needs a retry.
 	time.Sleep(5 * time.Millisecond)
 	retried, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Millisecond, 10)
 	if err != nil {
@@ -1011,8 +1007,6 @@ func TestMarkTaskDispatchedStampsColumn(t *testing.T) {
 	if err := st.MarkTaskDispatched(ctx, taskID); err != nil {
 		t.Fatal(err)
 	}
-	// A dispatched task should not be picked up again by the sweeper within
-	// the stale window.
 	candidates, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Minute, 10)
 	if err != nil {
 		t.Fatal(err)

@@ -150,8 +150,6 @@ func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
 		t.Fatalf("function name = %q", gotFunctionName)
 	}
 
-	// The sweeper should not need to retry it: dispatch_requested_at was
-	// stamped after the successful invoke.
 	candidates, err := st.ClaimDispatchCandidates(context.Background(), dispatch.ProvisionerAWSLambda, time.Minute, 10)
 	if err != nil {
 		t.Fatal(err)

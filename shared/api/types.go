@@ -56,6 +56,9 @@ type CreateTaskRequest struct {
 	// ExecutionTimeoutSeconds is optional wall-clock limit for the runner execution phase (seconds).
 	// Omit to use DefaultExecutionTimeoutSeconds on the runner; if set, must be 1..MaxExecutionTimeoutSecondsRequest.
 	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
+	// WebhookPayloadSizeLimit is the maximum accepted webhook POST body in bytes.
+	// When non-zero, the broker and runner enforce this limit on the result payload.
+	WebhookPayloadSizeLimit int `json:"webhook_payload_size_limit,omitempty"`
 }
 
 // CreateTaskResponse returns the task id.
@@ -90,6 +93,8 @@ type TaskPayload struct {
 	DockerImage   string                `json:"docker_image,omitempty"`
 	// ExecutionTimeoutSeconds is nil when unset at create (runner uses default).
 	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
+	// WebhookPayloadSizeLimit mirrors CreateTaskRequest; forwarded so the runner can enforce it.
+	WebhookPayloadSizeLimit int `json:"webhook_payload_size_limit,omitempty"`
 }
 
 // CompleteTaskRequest is POST /v1/tasks/{id}/complete.
@@ -130,6 +135,7 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 		v := *t.ExecutionTimeoutSeconds
 		p.ExecutionTimeoutSeconds = &v
 	}
+	p.WebhookPayloadSizeLimit = t.WebhookPayloadSizeLimit
 	return p
 }
 

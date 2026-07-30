@@ -9,15 +9,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
 
-// LambdaInvoker is the subset of *lambda.Client used for dispatch, so tests
-// can substitute a fake.
 type LambdaInvoker interface {
 	Invoke(ctx context.Context, in *lambda.InvokeInput, optFns ...func(*lambda.Options)) (*lambda.InvokeOutput, error)
 }
 
-// Lambda dispatches a task by asynchronously invoking a Lambda function.
-// The invoke payload is empty: the invocation is a doorbell that claims its
-// own task from task-broker after it starts running.
 type Lambda struct {
 	Client       LambdaInvoker
 	FunctionName string

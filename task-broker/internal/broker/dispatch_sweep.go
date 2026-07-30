@@ -8,16 +8,8 @@ import (
 	"github.com/superplane/runner/task-broker/internal/dispatch"
 )
 
-// dispatchSweepLimit bounds how many stranded tasks a single sweep pass
-// reserves, so one slow sweep cannot starve other broker work.
 const dispatchSweepLimit = 50
 
-// RunDispatchSweepLoop periodically finds queued tasks on dispatch-driven
-// fleets (e.g. Lambda) whose dispatch was never attempted or is stale — the
-// invoke failed, the broker restarted mid-dispatch, or another replica died
-// after reserving the row — and retries them. It is the only mechanism that
-// recovers from a failed dispatch; the inline attempt in createTask is best
-// effort.
 func RunDispatchSweepLoop(ctx context.Context, log *slog.Logger, srv *Server, interval, staleAfter time.Duration) {
 	if srv == nil || srv.Dispatch == nil {
 		return
