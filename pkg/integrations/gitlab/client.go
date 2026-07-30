@@ -1523,6 +1523,16 @@ type CommitStatus struct {
 	Author       *User    `json:"author,omitempty"`
 }
 
+// CombinedCommitStatus is the rolled-up status of a commit: a single overall state
+// plus the individual statuses. GitLab has no combined-status endpoint, so this is
+// assembled from the commit's statuses (mirrors GitHub's combined status shape).
+type CombinedCommitStatus struct {
+	State      string         `json:"state"`
+	SHA        string         `json:"sha"`
+	TotalCount int            `json:"total_count"`
+	Statuses   []CommitStatus `json:"statuses"`
+}
+
 // CreateCommitStatusRequest mirrors GitLab's POST /projects/:id/statuses/:sha body.
 // Only State is required; the rest are omitted when empty.
 type CreateCommitStatusRequest struct {

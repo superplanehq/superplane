@@ -252,8 +252,8 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Optional fields are omitted when empty (the request struct uses omitempty).
-	// Name and Ref are context identifiers, so trim them to match how GetCommitStatus
-	// filters - otherwise a padded value publishes under a context that won't match on read-back.
+	// Name and Ref are context identifiers, so trim whitespace - otherwise a padded value
+	// publishes under a context that won't match on read-back.
 	// Coverage is a pointer so an explicit 0 is still sent while an unset value is dropped.
 	req := &CreateCommitStatusRequest{
 		State:       config.State,

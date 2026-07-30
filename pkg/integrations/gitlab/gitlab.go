@@ -192,7 +192,7 @@ func (g *GitLab) Actions() []core.Action {
 		&UpdateRelease{},
 		&GetRelease{},
 		&DeleteRelease{},
-		&GetCommitStatus{},
+		&GetCombinedCommitStatus{},
 		&PublishCommitStatus{},
 	}
 }

@@ -56,6 +56,13 @@ export interface CommitStatus {
   author?: User;
 }
 
+export interface CombinedCommitStatus {
+  state?: string;
+  sha?: string;
+  total_count?: number;
+  statuses?: CommitStatus[];
+}
+
 export interface Note {
   id: number;
   body: string;
