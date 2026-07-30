@@ -361,6 +361,65 @@ describe("useConsolePagesState — canvas switch invalidates pending saves", () 
     }
   });
 
+  it("does not queue a save when handleLayoutChange is a no-op", () => {
+    // Regression: `react-grid-layout` fires layout callbacks on every
+    // drag/resize/mouse-up regardless of whether the layout actually
+    // moved. Before this fix `handleLayoutChange` would short-circuit
+    // via `layoutsEqual` but `withActivePage` would still rebuild the
+    // pages array and call `queueSave` — every idle interaction
+    // debounced into a full round-trip through `useUpdateCanvasConsole`
+    // (which now re-fetches the committed baseline and runs delta
+    // validation) even when nothing changed.
+    const page: ConsolePage = {
+      id: "main",
+      name: "Main",
+      panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
+      layout: [{ i: "p1", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }],
+    };
+    const onChange = vi.fn();
+
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() =>
+        useConsolePagesState({
+          pages: [page],
+          onChange,
+          activePageId: "main",
+          onActivePageIdChange: vi.fn(),
+        }),
+      );
+
+      // Feed the same layout back — react-grid-layout does this on
+      // mouse-up. Also add a spurious entry with an unknown id (a
+      // stale reference to a since-deleted panel) so the filter path
+      // still returns an identity-equal `filtered` list.
+      act(() => {
+        result.current.handleLayoutChange([
+          { i: "p1", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 },
+          { i: "ghost", x: 0, y: 6, w: 12, h: 4 },
+        ]);
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+
+      // Sanity: an *actual* move still queues a save so we know the
+      // guard doesn't over-suppress.
+      act(() => {
+        result.current.handleLayoutChange([{ i: "p1", x: 6, y: 3, w: 12, h: 6, minW: 2, minH: 2 }]);
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("resets local editor state on canvas switch even when the pages hash is identical", () => {
     // Regression test for the high-severity finding "Stale pages leak
     // across canvases". The props-sync effect only fires when

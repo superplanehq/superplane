@@ -200,7 +200,25 @@ function usePanelHandlers({ activePageId, setLocalPages, queueSave, onActivePage
     (updater: (page: ConsolePage) => ConsolePage) => {
       setLocalPages((prev) => {
         if (!activePageId) return prev;
-        const next = prev.map((page) => (page.id === activePageId ? updater(page) : page));
+        let changed = false;
+        const next = prev.map((page) => {
+          if (page.id !== activePageId) return page;
+          const updated = updater(page);
+          if (updated !== page) changed = true;
+          return updated;
+        });
+        // Skip the debounced save when the updater short-circuits with
+        // an identity-equal page — currently the "no-op layout" path
+        // in `handleLayoutChange`, where `react-grid-layout` fires
+        // resize/drag-stop events on every mouse-up regardless of
+        // whether the layout actually moved. Without this guard those
+        // no-op events debounce into `useUpdateCanvasConsole`, which
+        // fetches the committed baseline and re-runs delta validation
+        // on every mouse click; the check also lets any future short-
+        // circuiting updater (e.g. `handlePanelContentChange` when the
+        // new content deep-equals the old) opt out of a spurious save
+        // by returning the same page reference.
+        if (!changed) return prev;
         queueSave(next);
         return next;
       });
