@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -860,6 +862,7 @@ type UpdateMergeRequestRequest struct {
 	TargetBranch *string `json:"target_branch,omitempty"`
 	StateEvent   *string `json:"state_event,omitempty"`
 	Labels       *string `json:"labels,omitempty"`
+	AddLabels    *string `json:"add_labels,omitempty"`
 	AssigneeIDs  *[]int  `json:"assignee_ids,omitempty"`
 }
 
@@ -1499,6 +1502,109 @@ func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Relea
 	}
 
 	return nil, errors.New("no published releases found")
+}
+
+// CommitStatus is a GitLab commit build/CI status.
+// See https://docs.gitlab.com/api/commits/#set-the-pipeline-status-of-a-commit
+type CommitStatus struct {
+	ID           int      `json:"id"`
+	SHA          string   `json:"sha"`
+	Ref          string   `json:"ref"`
+	Status       string   `json:"status"`
+	Name         string   `json:"name"`
+	TargetURL    string   `json:"target_url"`
+	Description  string   `json:"description"`
+	CreatedAt    string   `json:"created_at"`
+	StartedAt    string   `json:"started_at"`
+	FinishedAt   string   `json:"finished_at"`
+	AllowFailure bool     `json:"allow_failure"`
+	Coverage     *float64 `json:"coverage"`
+	PipelineID   int      `json:"pipeline_id,omitempty"`
+	Author       *User    `json:"author,omitempty"`
+}
+
+// CreateCommitStatusRequest mirrors GitLab's POST /projects/:id/statuses/:sha body.
+// Only State is required; the rest are omitted when empty.
+type CreateCommitStatusRequest struct {
+	State       string   `json:"state"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	TargetURL   string   `json:"target_url,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Coverage    *float64 `json:"coverage,omitempty"`
+	PipelineID  *int     `json:"pipeline_id,omitempty"`
+}
+
+// CreateCommitStatus sets (publishes) a build/CI status on a commit.
+func (c *Client) CreateCommitStatus(ctx context.Context, projectID, sha string, req *CreateCommitStatusRequest) (*CommitStatus, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/statuses/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create commit status: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var status CommitStatus
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return nil, fmt.Errorf("failed to decode commit status: %v", err)
+	}
+
+	return &status, nil
+}
+
+// ListCommitStatusesRequest holds the optional filters for listing a commit's statuses.
+type ListCommitStatusesRequest struct {
+	Ref  string
+	Name string
+}
+
+// ListCommitStatuses returns the build/CI statuses of a commit (latest per context by
+// default), following pagination so commits with many statuses are not truncated.
+func (c *Client) ListCommitStatuses(projectID, sha string, req *ListCommitStatusesRequest) ([]CommitStatus, error) {
+	query := url.Values{}
+	if req != nil {
+		if req.Ref != "" {
+			query.Set("ref", req.Ref)
+		}
+		if req.Name != "" {
+			query.Set("name", req.Name)
+		}
+	}
+	query.Set("per_page", "100")
+
+	statuses, err := fetchAllResources[CommitStatus](c, func(page int) string {
+		query.Set("page", strconv.Itoa(page))
+		return fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s/statuses?%s",
+			c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha), query.Encode())
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort newest first by ID so the first result is the most recent status. We
+	// sort client-side rather than via order_by/sort because those params were
+	// only added to this endpoint in GitLab 17.9 and are ignored on older instances.
+	sort.Slice(statuses, func(i, j int) bool {
+		return statuses[i].ID > statuses[j].ID
+	})
+
+	return statuses, nil
 }
 
 // mergeRequestConflictMessage extracts GitLab's error message from a 409

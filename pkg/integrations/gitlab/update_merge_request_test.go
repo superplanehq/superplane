@@ -165,7 +165,8 @@ func Test__UpdateMergeRequest__Execute(t *testing.T) {
 		assert.Equal(t, "Updated description", reqBody["description"])
 		assert.Equal(t, "develop", reqBody["target_branch"])
 		assert.Equal(t, "reopen", reqBody["state_event"])
-		assert.Equal(t, "feature,needs-review", reqBody["labels"])
+		assert.Equal(t, "feature,needs-review", reqBody["add_labels"])
+		assert.Nil(t, reqBody["labels"])
 		assert.Equal(t, []any{float64(30)}, reqBody["assignee_ids"])
 	})
 
@@ -212,7 +213,7 @@ func Test__UpdateMergeRequest__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "at least one field must be enabled")
 	})
 
-	t.Run("clears labels and assignees when toggled on but empty", func(t *testing.T) {
+	t.Run("clears description and assignees but appends labels when toggled on but empty", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
@@ -241,7 +242,9 @@ func Test__UpdateMergeRequest__Execute(t *testing.T) {
 		json.Unmarshal(body, &reqBody)
 
 		assert.Equal(t, "", reqBody["description"])
-		assert.Equal(t, "", reqBody["labels"])
+		// Labels append via add_labels; an empty selection is a harmless no-op and never replaces existing labels.
+		assert.Equal(t, "", reqBody["add_labels"])
+		assert.Nil(t, reqBody["labels"])
 		assert.Equal(t, []any{}, reqBody["assignee_ids"])
 
 		// Fields that were never toggled on must be omitted entirely.
