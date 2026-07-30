@@ -193,6 +193,61 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{IDPathParam},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{id}"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/sources"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/events"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assignments"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments/{id}"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/groups"}: {
 			Resource:   "groups",
 			Action:     "read",
@@ -290,6 +345,16 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "PATCH", Pattern: "/api/v1/canvas-folders/{id}/position"}: {
 			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assign"}: {
+			Resource:   "factories",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/close"}: {
+			Resource:   "factories",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -420,6 +485,31 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories"}: {
+			Resource:   "factories",
+			Action:     "create",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/sources"}: {
+			Resource:   "factories",
+			Action:     "create",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders"}: {
+			Resource:   "factories",
+			Action:     "create",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agents"}: {
+			Resource:   "factories",
+			Action:     "create",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"}: {
+			Resource:   "factories",
+			Action:     "create",
+			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
 			Resource:   "groups",
