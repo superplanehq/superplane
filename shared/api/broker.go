@@ -17,15 +17,27 @@ type RegisterFleetRequest struct {
 	Provisioner string `json:"provisioner,omitempty"`
 	Arch        string `json:"arch,omitempty"`
 	Size        string `json:"size,omitempty"`
+	// LambdaFunctionName is required when Provisioner is "aws-lambda"; it is
+	// the function invoked to dispatch tasks on this fleet.
+	LambdaFunctionName string `json:"lambda_function_name,omitempty"`
+	// MaxExecutionTimeoutSeconds caps execution_timeout_seconds accepted for
+	// tasks on this fleet. Omit for no fleet-specific cap.
+	MaxExecutionTimeoutSeconds *int `json:"max_execution_timeout_seconds,omitempty"`
+	// SupportsDocker set to false rejects docker execution_mode tasks on this
+	// fleet at creation time. Omit for unrestricted.
+	SupportsDocker *bool `json:"supports_docker,omitempty"`
 }
 
 // FleetResponse describes a registered runner pool.
 type FleetResponse struct {
-	ID          string `json:"id"`
-	Provisioner string `json:"provisioner,omitempty"`
-	Arch        string `json:"arch,omitempty"`
-	Size        string `json:"size,omitempty"`
-	CreatedAt   int64  `json:"created_at_unix,omitempty"`
+	ID                         string `json:"id"`
+	Provisioner                string `json:"provisioner,omitempty"`
+	Arch                       string `json:"arch,omitempty"`
+	Size                       string `json:"size,omitempty"`
+	CreatedAt                  int64  `json:"created_at_unix,omitempty"`
+	LambdaFunctionName         string `json:"lambda_function_name,omitempty"`
+	MaxExecutionTimeoutSeconds *int   `json:"max_execution_timeout_seconds,omitempty"`
+	SupportsDocker             *bool  `json:"supports_docker,omitempty"`
 }
 
 type FleetTaskCountsResponse struct {

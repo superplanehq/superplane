@@ -61,6 +61,16 @@ type CompleteTaskResult struct {
 	Outcome CompleteTaskOutcome
 }
 
+// DispatchCandidate is a queued task whose fleet needs an active dispatch
+// call (e.g. Lambda invoke), returned by ClaimDispatchCandidates along with
+// the fleet fields needed to build a Dispatcher.
+type DispatchCandidate struct {
+	TaskID             string
+	FleetID            string
+	Provisioner        string
+	LambdaFunctionName string
+}
+
 // Store persists fleets and the task queue.
 type Store interface {
 	CreateFleet(ctx context.Context, f *brokermodels.Fleet) error
@@ -85,4 +95,15 @@ type Store interface {
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
+
+	// MarkTaskDispatched stamps dispatch_requested_at = now() after a
+	// successful active dispatch call (e.g. Lambda invoke accepted).
+	MarkTaskDispatched(ctx context.Context, taskID string) error
+	// ClaimDispatchCandidates reserves up to limit queued tasks for the given
+	// fleet provisioner whose dispatch_requested_at is unset or older than
+	// staleAfter, stamping it to now() as part of the same query (so
+	// concurrent broker replicas do not double-dispatch). Callers must still
+	// call Dispatch; on failure the timestamp already advanced, which is the
+	// intended backoff before the next sweep retries it.
+	ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error)
 }

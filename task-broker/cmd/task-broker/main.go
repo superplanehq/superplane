@@ -11,9 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/superplane/runner/shared/telemetry"
 	"github.com/superplane/runner/shared/webhook"
 	"github.com/superplane/runner/task-broker/internal/broker"
+	"github.com/superplane/runner/task-broker/internal/dispatch"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	"github.com/superplane/runner/task-broker/internal/store"
 	"go.opentelemetry.io/otel"
@@ -69,6 +72,7 @@ func main() {
 		TaskNotify:                    hub,
 		RunnerCancel:                  cancelHub,
 		RunnerDrain:                   drainHub,
+		Dispatch:                      newDispatchResolver(context.Background(), log),
 		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
 		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
 		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
@@ -136,6 +140,20 @@ func main() {
 		}
 	}()
 
+	dispatchSweepInterval := 10 * time.Second
+	if v := getenv("DISPATCH_SWEEP_INTERVAL_SEC", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			dispatchSweepInterval = time.Duration(n) * time.Second
+		}
+	}
+	dispatchStaleAfter := 30 * time.Second
+	if v := getenv("DISPATCH_STALE_AFTER_SEC", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			dispatchStaleAfter = time.Duration(n) * time.Second
+		}
+	}
+	go broker.RunDispatchSweepLoop(ctx, log, srv, dispatchSweepInterval, dispatchStaleAfter)
+
 	if brokerMetrics != nil {
 		sampleInterval := 30 * time.Second
 		if v := getenv("METRICS_SAMPLE_INTERVAL_SEC", ""); v != "" {
@@ -166,4 +184,26 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// newDispatchResolver builds the Lambda client used for fleets with
+// Provisioner "aws-lambda". Loading AWS config here never fails hard on
+// missing credentials — it only matters once a Lambda fleet actually
+// dispatches, and misconfiguration then surfaces as a dispatch error that the
+// sweeper retries and logs, not as a broker startup failure.
+func newDispatchResolver(ctx context.Context, log *slog.Logger) *dispatch.Resolver {
+	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+	if region == "" {
+		region = strings.TrimSpace(os.Getenv("AWS_DEFAULT_REGION"))
+	}
+	var opts []func(*awsconfig.LoadOptions) error
+	if region != "" {
+		opts = append(opts, awsconfig.WithRegion(region))
+	}
+	awscfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		log.Warn("dispatch: load aws config, lambda dispatch disabled", slog.Any("err", err))
+		return &dispatch.Resolver{}
+	}
+	return &dispatch.Resolver{LambdaClient: lambda.NewFromConfig(awscfg)}
 }

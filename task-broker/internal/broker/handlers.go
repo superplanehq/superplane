@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
+	"github.com/superplane/runner/task-broker/internal/dispatch"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
@@ -31,6 +33,11 @@ type Server struct {
 	TaskNotify   *WaitHub
 	RunnerCancel *RunnerCancelHub
 	RunnerDrain  *RunnerDrainHub
+
+	// Dispatch resolves and invokes the execution unit for fleets that cannot
+	// pull work on their own (e.g. Lambda). Nil disables active dispatch
+	// entirely — all fleets behave as they do today (EC2 runners poll).
+	Dispatch *dispatch.Resolver
 
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
@@ -53,12 +60,21 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
+	provisioner := strings.TrimSpace(req.Provisioner)
+	lambdaFunctionName := strings.TrimSpace(req.LambdaFunctionName)
+	if provisioner == dispatch.ProvisionerAWSLambda && lambdaFunctionName == "" {
+		writeError(w, http.StatusBadRequest, "lambda_function_name required for provisioner "+dispatch.ProvisionerAWSLambda)
+		return
+	}
 	f := &brokermodels.Fleet{
-		ID:          req.ID,
-		Provisioner: strings.TrimSpace(req.Provisioner),
-		Arch:        strings.TrimSpace(req.Arch),
-		Size:        strings.TrimSpace(req.Size),
-		CreatedAt:   time.Now().UTC(),
+		ID:                         req.ID,
+		Provisioner:                provisioner,
+		Arch:                       strings.TrimSpace(req.Arch),
+		Size:                       strings.TrimSpace(req.Size),
+		CreatedAt:                  time.Now().UTC(),
+		LambdaFunctionName:         lambdaFunctionName,
+		MaxExecutionTimeoutSeconds: req.MaxExecutionTimeoutSeconds,
+		SupportsDocker:             req.SupportsDocker,
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -382,11 +398,14 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 		return nil
 	}
 	return &api.FleetResponse{
-		ID:          f.ID,
-		Provisioner: f.Provisioner,
-		Arch:        f.Arch,
-		Size:        f.Size,
-		CreatedAt:   f.CreatedAt.Unix(),
+		ID:                         f.ID,
+		Provisioner:                f.Provisioner,
+		Arch:                       f.Arch,
+		Size:                       f.Size,
+		CreatedAt:                  f.CreatedAt.Unix(),
+		LambdaFunctionName:         f.LambdaFunctionName,
+		MaxExecutionTimeoutSeconds: f.MaxExecutionTimeoutSeconds,
+		SupportsDocker:             f.SupportsDocker,
 	}
 }
 
@@ -437,6 +456,16 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid execution_mode")
 		return
 	}
+	if mode == models.ExecutionDocker && fleet.SupportsDocker != nil && !*fleet.SupportsDocker {
+		writeError(w, http.StatusBadRequest, "fleet "+fleet.ID+" does not support docker execution_mode")
+		return
+	}
+
+	execTimeoutSeconds, msg := resolveExecutionTimeoutSeconds(fleet, req.ExecutionTimeoutSeconds)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
 	task := &models.Task{
 		ID:            uuid.NewString(),
@@ -472,10 +501,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid run_mode")
 		return
 	}
-	if req.ExecutionTimeoutSeconds != nil {
-		v := *req.ExecutionTimeoutSeconds
-		task.ExecutionTimeoutSeconds = &v
-	}
+	task.ExecutionTimeoutSeconds = execTimeoutSeconds
 	if err := s.Store.CreateTask(ctx, task); err != nil {
 		s.logErr("create task", err)
 		writeError(w, http.StatusInternalServerError, "could not create task")
@@ -485,7 +511,58 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
+	s.dispatchTask(ctx, fleet, task.ID)
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
+}
+
+// resolveExecutionTimeoutSeconds applies the fleet's execution timeout cap
+// (e.g. Lambda's 15-minute hard limit), if any. An explicit request value
+// above the cap is rejected; an omitted value is clamped to the cap so
+// ordinary tasks are unaffected.
+func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (*int, string) {
+	if fleet == nil || fleet.MaxExecutionTimeoutSeconds == nil {
+		if requested == nil {
+			return nil, ""
+		}
+		v := *requested
+		return &v, ""
+	}
+	capSeconds := *fleet.MaxExecutionTimeoutSeconds
+	if requested != nil {
+		if *requested > capSeconds {
+			return nil, fmt.Sprintf("execution_timeout_seconds exceeds fleet %s limit of %d seconds", fleet.ID, capSeconds)
+		}
+		v := *requested
+		return &v, ""
+	}
+	v := api.DefaultExecutionTimeoutSeconds
+	if v > capSeconds {
+		v = capSeconds
+	}
+	return &v, ""
+}
+
+// dispatchTask actively starts execution for fleets that cannot pull work on
+// their own (e.g. Lambda). Failure here is not fatal to task creation: the
+// task stays queued and the dispatch sweeper will retry it.
+func (s *Server) dispatchTask(ctx context.Context, fleet *brokermodels.Fleet, taskID string) {
+	if s.Dispatch == nil || fleet == nil {
+		return
+	}
+	d, needsDispatch := s.Dispatch.For(fleet.Provisioner, fleet.LambdaFunctionName)
+	if !needsDispatch {
+		return
+	}
+	dispatchCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := d.Dispatch(dispatchCtx, fleet.ID, taskID); err != nil {
+		s.warn("dispatch task failed, sweeper will retry",
+			slog.String("task_id", taskID), slog.String("fleet_id", fleet.ID), slog.Any("err", err))
+		return
+	}
+	if err := s.Store.MarkTaskDispatched(context.Background(), taskID); err != nil {
+		s.logErr("mark task dispatched", err)
+	}
 }
 
 func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {

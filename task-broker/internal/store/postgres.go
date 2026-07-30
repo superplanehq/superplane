@@ -78,8 +78,11 @@ func (s *PostgresStore) Truncate(ctx context.Context) error {
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
 	row := *f
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"provisioner", "arch", "size", "created_at"}),
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"provisioner", "arch", "size", "created_at",
+			"lambda_function_name", "max_execution_timeout_seconds", "supports_docker",
+		}),
 	}).Create(&row).Error
 }
 
