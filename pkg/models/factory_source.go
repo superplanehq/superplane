@@ -39,6 +39,7 @@ func CreateFactorySource(
 
 	now := time.Now()
 	source := &FactorySource{
+		ID:             uuid.New(),
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
 		Name:           name,

@@ -21,6 +21,7 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
+import { FactoryDetailPage, FactoryListPage } from "./pages/factories";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -124,6 +125,10 @@ function AppRouter() {
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
+                <Route path="factories">
+                  <Route index element={withAuthAndPermission(FactoryListPage, "factories", "read")} />
+                  <Route path=":factoryId" element={withAuthAndPermission(FactoryDetailPage, "factories", "read")} />
+                </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 

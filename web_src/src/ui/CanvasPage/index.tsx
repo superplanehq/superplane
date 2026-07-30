@@ -43,7 +43,7 @@ import type {
   CanvasesCanvasNodeExecution,
   ActionsAction,
   ComponentsEdge,
-  ComponentsIntegrationRef,
+  SuperplaneComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -148,7 +148,7 @@ export interface NodeEditData {
   /** Integration catalog label; used to resolve docs.superplane.com path for integration components. */
   integrationLabel?: string;
   blockName?: string;
-  integrationRef?: ComponentsIntegrationRef;
+  integrationRef?: SuperplaneComponentsIntegrationRef;
 }
 
 export interface NewNodeData {
@@ -159,7 +159,7 @@ export interface NewNodeData {
   configuration: Record<string, unknown>;
   position?: { x: number; y: number };
   integrationName?: string;
-  integrationRef?: ComponentsIntegrationRef;
+  integrationRef?: SuperplaneComponentsIntegrationRef;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -279,7 +279,7 @@ export interface CanvasPageProps {
     nodeId: string,
     configuration: Record<string, unknown>,
     nodeName: string,
-    integrationRef?: ComponentsIntegrationRef,
+    integrationRef?: SuperplaneComponentsIntegrationRef,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1185,7 +1185,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: SuperplaneComponentsIntegrationRef) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
@@ -1726,7 +1726,7 @@ function Sidebar({
   onSaveConfiguration?: (
     configuration: Record<string, unknown>,
     nodeName: string,
-    integrationRef?: ComponentsIntegrationRef,
+    integrationRef?: SuperplaneComponentsIntegrationRef,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;

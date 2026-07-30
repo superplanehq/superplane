@@ -422,6 +422,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/factories").Handler(protectedGRPCHandler)
 
 	return nil
 }

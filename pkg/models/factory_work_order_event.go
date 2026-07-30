@@ -32,6 +32,7 @@ func CreateFactoryWorkOrderEvent(
 	}
 
 	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
 		WorkOrderID: workOrderID,
 		Type:        eventType,
 		Content:     datatypes.NewJSONType(content),

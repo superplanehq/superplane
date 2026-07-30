@@ -80,6 +80,7 @@ func CreateFactoryAgent(
 ) (*FactoryAgent, error) {
 	now := time.Now()
 	agent := &FactoryAgent{
+		ID:             uuid.New(),
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
 		Name:           name,

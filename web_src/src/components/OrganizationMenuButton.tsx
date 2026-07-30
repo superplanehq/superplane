@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
   CircleUser,
+  Factory,
   Gauge,
   Key,
   KeyRound,
@@ -102,6 +103,12 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   ];
 
   const sidebarOrganizationLinks = [
+    {
+      label: "Factories",
+      href: organizationId ? `/${organizationId}/factories` : "#",
+      Icon: Factory,
+      permission: { resource: "factories", action: "read" },
+    },
     {
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",
