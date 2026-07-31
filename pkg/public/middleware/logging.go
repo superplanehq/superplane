@@ -57,7 +57,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 					panic(recovered)
 				}
 
-				if shouldCaptureHTTPError(status) {
+				if shouldCaptureHTTPError(r.URL.Path, status) {
 					captureHTTPError(r, status)
 				}
 			}()
@@ -81,7 +81,7 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 	})
 }
 
-// shouldCaptureHTTPError reports whether a response status code represents a
+// shouldCaptureHTTPError reports whether a response represents a
 // server-side error worth forwarding to Sentry.
 //
 // We only capture true server errors (5xx) and deliberately skip status codes
@@ -94,8 +94,15 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 //     by clients hitting the wrong endpoint and should not create Sentry
 //     issues.
 //   - 505 HTTP Version Not Supported is likewise a client-caused mismatch.
-func shouldCaptureHTTPError(status int) bool {
+//   - /ready returns 503 when a required dependency is temporarily unavailable.
+//     Kubernetes acts on that signal, so reporting every probe failure to Sentry
+//     would create noise without identifying a new application defect.
+func shouldCaptureHTTPError(path string, status int) bool {
 	if status < http.StatusInternalServerError {
+		return false
+	}
+
+	if path == "/ready" {
 		return false
 	}
 
