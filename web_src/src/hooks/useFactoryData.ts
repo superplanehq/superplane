@@ -19,7 +19,10 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { hasActiveWorkOrderExecution } from "@/pages/factories/workOrderExecutions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+const WORK_ORDER_POLL_INTERVAL_MS = 5_000;
 
 function factoryListKey(organizationId: string) {
   return ["factories", organizationId] as const;
@@ -84,6 +87,10 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
       return response.data?.orders ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
+    refetchInterval: (query) =>
+      query.state.data?.some((order) => hasActiveWorkOrderExecution(order.executions))
+        ? WORK_ORDER_POLL_INTERVAL_MS
+        : false,
   });
 }
 
@@ -103,6 +110,10 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
       return response.data.order;
     },
     enabled: Boolean(organizationId && factoryId && orderId),
+    refetchInterval: (query) =>
+      query.state.data && hasActiveWorkOrderExecution(query.state.data.executions)
+        ? WORK_ORDER_POLL_INTERVAL_MS
+        : false,
   });
 }
 

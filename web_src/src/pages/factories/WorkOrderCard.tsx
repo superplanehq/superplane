@@ -7,13 +7,14 @@ import { formatTimeAgo } from "@/lib/date";
 import { Loader2, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { factoryWorkOrderRowClassName } from "./factoryPageStyles";
+import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { deriveWorkOrderProgress, getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 interface WorkOrderCardProps {
   order: FactoriesWorkOrder;
   factoryHref: string;
+  organizationId: string;
   createdByLabel?: string;
-  pipelineLabels?: string[];
   canDispatch?: boolean;
   onDispatch?: (orderId: string) => void;
 }
@@ -21,8 +22,8 @@ interface WorkOrderCardProps {
 export function WorkOrderCard({
   order,
   factoryHref,
+  organizationId,
   createdByLabel,
-  pipelineLabels = [],
   canDispatch = false,
   onDispatch,
 }: WorkOrderCardProps) {
@@ -35,6 +36,7 @@ export function WorkOrderCard({
   const assigneeName = order.assignees?.[0]?.name;
   const authorLabel = createdByLabel ?? assigneeName ?? "Unknown";
   const showDispatch = order.state === "STATE_OPEN" && onDispatch && order.id;
+  const hasExecutions = (order.executions?.length ?? 0) > 0;
 
   return (
     <article className={factoryWorkOrderRowClassName} data-testid="work-order-card">
@@ -49,29 +51,11 @@ export function WorkOrderCard({
             <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
               {order.description}
             </p>
-          ) : (
+          ) : !hasExecutions ? (
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{progress.summary}</p>
-          )}
-
-          {pipelineLabels.length > 0 ? (
-            <ul className="mt-4 space-y-1.5">
-              {pipelineLabels.map((label) => (
-                <li key={label} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 dark:border-gray-600">
-                    {displayStatus === "running" ? (
-                      <Loader2 className="h-2.5 w-2.5 animate-spin text-violet-500" aria-hidden />
-                    ) : (
-                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-gray-600" aria-hidden />
-                    )}
-                  </span>
-                  <span>{label}</span>
-                  <span className="text-gray-400 dark:text-gray-500">
-                    {displayStatus === "running" ? "Running" : displayStatus === "successful" ? "Done" : "Planned"}
-                  </span>
-                </li>
-              ))}
-            </ul>
           ) : null}
+
+          <WorkOrderExecutionsList organizationId={organizationId} executions={order.executions} variant="compact" />
         </div>
 
         <Badge

@@ -33,9 +33,7 @@ export function FactoryAppsSidebar({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Apps</h2>
-            <span className={factoryCountBadgeClassName}>
-              {apps.length}
-            </span>
+            <span className={factoryCountBadgeClassName}>{apps.length}</span>
           </div>
           <PermissionTooltip
             allowed={canCreate || permissionsLoading}

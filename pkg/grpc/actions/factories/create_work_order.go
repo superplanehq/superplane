@@ -40,7 +40,12 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
+	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+
 	return &pb.CreateWorkOrderResponse{
-		Order: serializeWorkOrder(order),
+		Order: serialized,
 	}, nil
 }

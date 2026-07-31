@@ -83,7 +83,7 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 	return result
 }
 
-func serializeWorkOrder(order *models.FactoryWorkOrder) *pb.WorkOrder {
+func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
 	return &pb.WorkOrder{
 		Id:          order.ID.String(),
 		Title:       order.Title,
@@ -93,15 +93,72 @@ func serializeWorkOrder(order *models.FactoryWorkOrder) *pb.WorkOrder {
 		CreatedAt:   timestamppb.New(order.CreatedAt),
 		UpdatedAt:   timestamppb.New(order.UpdatedAt),
 		Assignees:   serializeWorkOrderAssignees(order.Assignees),
+		Executions:  serializeWorkOrderExecutions(executions),
 	}
 }
 
-func serializeWorkOrders(orders []models.FactoryWorkOrder) []*pb.WorkOrder {
-	result := make([]*pb.WorkOrder, len(orders))
-	for i := range orders {
-		result[i] = serializeWorkOrder(&orders[i])
+func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionRecord) []*pb.WorkOrderExecution {
+	result := make([]*pb.WorkOrderExecution, 0, len(executions))
+	for _, execution := range executions {
+		result = append(result, serializeWorkOrderExecution(execution))
 	}
 	return result
+}
+
+func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
+	item := &pb.WorkOrderExecution{
+		Id:        execution.ID.String(),
+		Step:      execution.StepName,
+		State:     serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:    serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt: timestamppb.New(execution.CreatedAt),
+		UpdatedAt: timestamppb.New(execution.UpdatedAt),
+		Line: &pb.WorkOrderExecution_LineRef{
+			Id:   execution.LineID.String(),
+			Name: execution.LineName,
+		},
+		Run: &pb.WorkOrderExecution_RunRef{
+			Id:      execution.RunID.String(),
+			AppId:   execution.CanvasID.String(),
+			AppName: execution.CanvasName,
+		},
+	}
+	return item
+}
+
+func serializeWorkOrderExecutionState(status, runState string) pb.WorkOrderExecution_State {
+	if runState == models.CanvasRunStateCancelling {
+		return pb.WorkOrderExecution_STATE_CANCELLING
+	}
+
+	switch status {
+	case models.FactoryWorkOrderExecutionStatusPending:
+		return pb.WorkOrderExecution_STATE_PENDING
+	case models.FactoryWorkOrderExecutionStatusRunning:
+		return pb.WorkOrderExecution_STATE_STARTED
+	case models.FactoryWorkOrderExecutionStatusFinished:
+		return pb.WorkOrderExecution_STATE_FINISHED
+	default:
+		return pb.WorkOrderExecution_STATE_UNKNOWN
+	}
+}
+
+func serializeWorkOrderExecutionResult(executionResult, runResult string) pb.WorkOrderExecution_Result {
+	result := executionResult
+	if result == "" {
+		result = runResult
+	}
+
+	switch result {
+	case models.CanvasRunResultPassed:
+		return pb.WorkOrderExecution_RESULT_PASSED
+	case models.CanvasRunResultFailed:
+		return pb.WorkOrderExecution_RESULT_FAILED
+	case models.CanvasRunResultCancelled:
+		return pb.WorkOrderExecution_RESULT_CANCELLED
+	default:
+		return pb.WorkOrderExecution_RESULT_UNKNOWN
+	}
 }
 
 func serializeWorkOrderState(state string) pb.WorkOrder_State {

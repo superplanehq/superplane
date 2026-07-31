@@ -109,6 +109,54 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 	}).Error
 }
 
+type FactoryWorkOrderExecutionRecord struct {
+	FactoryWorkOrderExecution
+	LineName   string
+	CanvasID   uuid.UUID
+	CanvasName string
+	RunState   string
+	RunResult  string
+}
+
+func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
+	tx *gorm.DB,
+	workOrderIDs []uuid.UUID,
+) (map[uuid.UUID][]FactoryWorkOrderExecutionRecord, error) {
+	result := make(map[uuid.UUID][]FactoryWorkOrderExecutionRecord, len(workOrderIDs))
+	if len(workOrderIDs) == 0 {
+		return result, nil
+	}
+
+	var records []FactoryWorkOrderExecutionRecord
+	err := tx.
+		Table("factory_work_order_executions AS e").
+		Select(`
+			e.*,
+			l.name AS line_name,
+			c.id AS canvas_id,
+			c.name AS canvas_name,
+			r.state AS run_state,
+			r.result AS run_result
+		`).
+		Joins("JOIN factory_lines l ON l.id = e.line_id").
+		Joins("JOIN workflow_runs r ON r.id = e.run_id").
+		Joins("JOIN workflows c ON c.id = r.workflow_id").
+		Where("e.work_order_id IN ?", workOrderIDs).
+		Order("e.created_at ASC").
+		Order("e.id ASC").
+		Scan(&records).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range records {
+		result[record.WorkOrderID] = append(result[record.WorkOrderID], record)
+	}
+
+	return result, nil
+}
+
 func factoryWorkOrderRunInput(order *FactoryWorkOrder) map[string]any {
 	return map[string]any{
 		"work_order": map[string]any{

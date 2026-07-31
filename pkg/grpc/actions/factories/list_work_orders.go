@@ -29,7 +29,12 @@ func ListWorkOrders(ctx context.Context, organizationID string, req *pb.ListWork
 		return nil, factoryErrorToStatus(err, "failed to list work orders")
 	}
 
+	serialized, err := loadAndSerializeWorkOrders(ctx, orders)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list work orders")
+	}
+
 	return &pb.ListWorkOrdersResponse{
-		Orders: serializeWorkOrders(orders),
+		Orders: serialized,
 	}, nil
 }

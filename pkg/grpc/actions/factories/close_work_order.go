@@ -34,7 +34,12 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
+	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
 	return &pb.CloseWorkOrderResponse{
-		Order: serializeWorkOrder(order),
+		Order: serialized,
 	}, nil
 }

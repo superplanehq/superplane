@@ -329,6 +329,44 @@ message WorkOrder {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   repeated Assignee assignees = 8;
+  repeated WorkOrderExecution executions = 9;
+}
+
+message WorkOrderExecution {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_CANCELLING = 3;
+    STATE_FINISHED = 4;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  message LineRef {
+    string id = 1;
+    string name = 2;
+  }
+
+  message RunRef {
+    string id = 1;
+    string app_id = 2;
+    string app_name = 3;
+  }
+
+  string id = 1;
+  LineRef line = 2;
+  string step = 3;
+  State state = 4;
+  Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  RunRef run = 8;
 }
 
 message DescribeWorkOrderRequest {

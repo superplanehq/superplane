@@ -83,7 +83,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
+	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+
 	return &pb.DispatchWorkOrderResponse{
-		Order: serializeWorkOrder(order),
+		Order: serialized,
 	}, nil
 }

@@ -37,9 +37,7 @@ export function LineStepDisplayNode({ stepName, appName, entrypoint, className }
     >
       <p className="text-sm font-medium text-slate-900 dark:text-gray-100">{stepName || "Unnamed step"}</p>
       <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{appName}</p>
-      {entrypoint ? (
-        <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">{entrypoint}</p>
-      ) : null}
+      {entrypoint ? <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">{entrypoint}</p> : null}
     </div>
   );
 }
@@ -52,13 +50,7 @@ interface LineStepFlowProps {
 
 export function LineStepFlow({ children, className, variant = "compact" }: LineStepFlowProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col",
-        variant === "editor" ? "w-full items-stretch" : "items-center",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-col", variant === "editor" ? "w-full items-stretch" : "items-center", className)}>
       {children}
     </div>
   );

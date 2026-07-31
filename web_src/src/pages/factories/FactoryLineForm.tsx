@@ -175,14 +175,7 @@ interface FactoryLineStepEditorProps {
   onChange: (step: DraftStep) => void;
 }
 
-function FactoryLineStepEditor({
-  organizationId,
-  index,
-  step,
-  apps,
-  appById,
-  onChange,
-}: FactoryLineStepEditorProps) {
+function FactoryLineStepEditor({ organizationId, index, step, apps, appById, onChange }: FactoryLineStepEditorProps) {
   const { data: canvas, isLoading: canvasLoading } = useCanvas(organizationId, step.appId, {
     enabled: Boolean(step.appId),
   });
@@ -204,7 +197,10 @@ function FactoryLineStepEditor({
 
         <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-app-${index}`}>App</Label>
-          <Select value={step.appId || undefined} onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}>
+          <Select
+            value={step.appId || undefined}
+            onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}
+          >
             <SelectTrigger id={`factory-line-step-app-${index}`} className={stepFieldClassName}>
               <SelectValue placeholder="Select app" />
             </SelectTrigger>

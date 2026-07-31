@@ -7,7 +7,6 @@ import {
   useFactory,
   useFactoryApps,
   useFactoryWorkOrders,
-  type FactoriesFactoryLine,
 } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -41,22 +40,6 @@ import {
   type WorkOrderOwnerFilter,
   type WorkOrderStatusFilter,
 } from "./workOrderProgress";
-
-function getPipelineLabels(lines: FactoriesFactoryLine[]): string[] {
-  if (lines.length === 0) {
-    return [];
-  }
-
-  const labels = lines.flatMap((line) => {
-    const lineName = line.name?.trim();
-    if (!lineName) {
-      return [];
-    }
-    return [`${lineName} pipeline`];
-  });
-
-  return labels.slice(0, 2);
-}
 
 export function FactoryDetailPage() {
   const navigate = useNavigate();
@@ -105,7 +88,6 @@ export function FactoryDetailPage() {
     const byOwner = filterWorkOrdersByOwner(openWorkOrders, ownerFilter, me?.id);
     return filterWorkOrdersByStatus(byOwner, statusFilter);
   }, [openWorkOrders, ownerFilter, statusFilter, me?.id]);
-  const pipelineLabels = useMemo(() => getPipelineLabels(factoryLines), [factoryLines]);
   const openWorkOrderCount = countOpenWorkOrders(workOrders);
 
   useReportPageReady(!isLoading && Boolean(factory), {
@@ -197,7 +179,8 @@ export function FactoryDetailPage() {
                     <Text className="text-sm text-gray-500">Loading work orders…</Text>
                   ) : filteredWorkOrders.length === 0 ? (
                     <p className="text-sm font-medium text-gray-400 dark:text-gray-400 px-6 py-5 text-center">
-                      No work orders match these filters.<br />
+                      No work orders match these filters.
+                      <br />
                       Create a work order or adjust filters to see more results.
                     </p>
                   ) : (
@@ -207,7 +190,7 @@ export function FactoryDetailPage() {
                           key={order.id}
                           order={order}
                           factoryHref={factoryHref}
-                          pipelineLabels={pipelineLabels}
+                          organizationId={organizationId}
                           canDispatch={canDispatch}
                           onDispatch={(orderId) => setDispatchOrderId(orderId)}
                         />

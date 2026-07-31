@@ -18,6 +18,7 @@ import { Navigate, useParams } from "react-router-dom";
 import { DispatchWorkOrderDialog } from "./DispatchWorkOrderDialog";
 import { factoryCardClassName, factoryPageContentClassName } from "./factoryPageStyles";
 import { FactoryPageShell } from "./FactoryPageShell";
+import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { formatWorkOrderResult, formatWorkOrderState } from "./workOrderPresentation";
 import { deriveWorkOrderProgress, getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
@@ -183,6 +184,13 @@ export function WorkOrderDetailPage() {
                 }
               />
               <DetailField label="Updated" value={timeLabel} />
+            </section>
+
+            <section>
+              <h2 className="text-sm font-medium text-slate-700 dark:text-gray-300">Line executions</h2>
+              <div className="mt-3">
+                <WorkOrderExecutionsList organizationId={organizationId} executions={order.executions} />
+              </div>
             </section>
 
             {factoryLines.length > 0 ? (

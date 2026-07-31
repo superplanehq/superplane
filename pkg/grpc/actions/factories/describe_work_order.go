@@ -29,7 +29,12 @@ func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.Descr
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
+	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe work order")
+	}
+
 	return &pb.DescribeWorkOrderResponse{
-		Order: serializeWorkOrder(order),
+		Order: serialized,
 	}, nil
 }

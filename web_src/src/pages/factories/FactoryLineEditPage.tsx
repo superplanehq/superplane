@@ -46,10 +46,7 @@ export function FactoryLineEditPage() {
     return factory?.lines?.find((entry) => entry.id === lineId) ?? null;
   }, [factory?.lines, isCreate, lineId]);
 
-  usePageTitle([
-    isCreate ? "New Line" : (line?.name ?? "Edit Line"),
-    factory?.name ?? "Factory",
-  ]);
+  usePageTitle([isCreate ? "New Line" : (line?.name ?? "Edit Line"), factory?.name ?? "Factory"]);
 
   const isLoading = factoryLoading || appsLoading;
   const canUpdate = canAct("factories", "update");
@@ -91,9 +88,7 @@ export function FactoryLineEditPage() {
       }
       navigate(factoryHref);
     } catch (error) {
-      showErrorToast(
-        getApiErrorMessage(error, isCreate ? "Failed to create line" : "Failed to update line"),
-      );
+      showErrorToast(getApiErrorMessage(error, isCreate ? "Failed to create line" : "Failed to update line"));
       throw error;
     }
   };

@@ -21,7 +21,13 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { FactoryDetailPage, FactoryListPage, CreateWorkOrderPage, FactoryLineEditPage, WorkOrderDetailPage } from "./pages/factories";
+import {
+  FactoryDetailPage,
+  FactoryListPage,
+  CreateWorkOrderPage,
+  FactoryLineEditPage,
+  WorkOrderDetailPage,
+} from "./pages/factories";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";

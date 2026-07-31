@@ -2,10 +2,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 
 /** Neutral page canvas — warm gray in light mode, not cool slate. */
-export const factoryPageBackgroundClassName = cn(
-  "min-h-full w-full min-w-0 bg-gray-50",
-  appDarkModeClasses.surface,
-);
+export const factoryPageBackgroundClassName = cn("min-h-full w-full min-w-0 bg-gray-50", appDarkModeClasses.surface);
 
 /** Full-width page content with edge padding only — no max-width column. */
 export const factoryPageContentClassName = "w-full min-w-0 px-6 py-8 sm:px-8";
@@ -22,12 +19,9 @@ export const factoryDetailSidebarClassName = cn(
 );
 
 /** Work order list row — flat divider, no floating card. */
-export const factoryWorkOrderRowClassName = cn(
-  "border-b border-gray-200 py-5 last:border-b-0 dark:border-gray-700/70",
-);
+export const factoryWorkOrderRowClassName = cn("border-b border-gray-200 py-5 last:border-b-0 dark:border-gray-700/70");
 
-export const factoryFilterPillActiveClassName =
-  "bg-gray-200/80 text-gray-900 dark:bg-gray-800 dark:text-gray-100";
+export const factoryFilterPillActiveClassName = "bg-gray-200/80 text-gray-900 dark:bg-gray-800 dark:text-gray-100";
 
 export const factoryFilterPillInactiveClassName =
   "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100";

@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { hasActiveWorkOrderExecution, hasFailedWorkOrderExecution } from "./workOrderExecutions";
 
-/** Derived lifecycle phase — progress will come from work order executions once exposed in the UI. */
+/** Derived lifecycle phase from assignees, closure state, and line executions. */
 export type WorkOrderProgressPhase =
   | "unassigned"
   | "needs_attention"
@@ -95,7 +96,20 @@ export function deriveWorkOrderProgress(order: FactoriesWorkOrder): WorkOrderPro
     return { phase: "unassigned", ...PHASE_META.unassigned };
   }
 
-  return { phase: "no_plan", ...PHASE_META.no_plan };
+  const executions = order.executions ?? [];
+  if (executions.length === 0) {
+    return { phase: "no_plan", ...PHASE_META.no_plan };
+  }
+
+  if (hasActiveWorkOrderExecution(executions)) {
+    return { phase: "implementation_in_progress", ...PHASE_META.implementation_in_progress };
+  }
+
+  if (hasFailedWorkOrderExecution(executions)) {
+    return { phase: "verifications_failed", ...PHASE_META.verifications_failed };
+  }
+
+  return { phase: "ready_for_review", ...PHASE_META.ready_for_review };
 }
 
 export function isAssignedToUser(order: FactoriesWorkOrder, userId?: string): boolean {
