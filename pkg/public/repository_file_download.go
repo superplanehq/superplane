@@ -54,6 +54,12 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if !allowsCanvas(ctx, user, canvasID, "read") {
+		log.Warnf("Credential for user %s is not scoped to canvas %s", user.ID.String(), canvasID.String())
+		http.Error(w, "Unauthorized", http.StatusForbidden)
+		return
+	}
+
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		http.Error(w, "path is required", http.StatusBadRequest)

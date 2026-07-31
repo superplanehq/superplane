@@ -16,8 +16,25 @@ func hasRequiredScopedTokenPermissionForScopes(
 		return true
 	}
 
-	permissions, err := permissionsFromScopedTokenScopes(tokenScopesJSON)
-	if err != nil || len(permissions) == 0 {
+	var scopes []string
+	if err := json.Unmarshal([]byte(tokenScopesJSON), &scopes); err != nil {
+		return false
+	}
+
+	return HasScopedTokenPermission(scopes, pathParams, rule)
+}
+
+// HasScopedTokenPermission reports whether scopes allow rule's resource and
+// action on the resources named by pathParams.
+//
+// AuthorizeHTTP applies this to every route served by the gRPC gateway, reading
+// the scopes back out of the x-Token-Scopes header. Routes registered directly
+// on the router never reach that middleware, so they call this instead. Callers
+// must only reach here with a restricted credential: an empty scope list means
+// "no permissions", not "unrestricted".
+func HasScopedTokenPermission(scopes []string, pathParams map[string]string, rule AuthorizationRule) bool {
+	permissions := jwt.PermissionsFromScopes(scopes)
+	if len(permissions) == 0 {
 		return false
 	}
 

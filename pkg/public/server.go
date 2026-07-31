@@ -1397,6 +1397,11 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !allowsCanvas(r.Context(), user, parsedWorkflowID, "read") {
+		http.Error(w, "canvas not found", http.StatusNotFound)
+		return
+	}
+
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {
