@@ -270,16 +270,30 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 // Task is the broker task payload (GET /v1/tasks/:id and webhook body).
 type Task struct {
 	TaskID   string          `json:"task_id"`
+	ID       string          `json:"id"` // GET status uses "id"; webhook uses "task_id"
 	Status   string          `json:"status"`
 	ExitCode *int            `json:"exit_code,omitempty"`
 	Output   string          `json:"output,omitempty"`
 	Error    string          `json:"error,omitempty"`
 	Result   json.RawMessage `json:"result,omitempty"`
 
+	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+
 	TaskLog *TaskLogSink `json:"task_log,omitempty"`
 
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
+}
+
+func (t *Task) brokerTaskID() string {
+	if t == nil {
+		return ""
+	}
+	if id := strings.TrimSpace(t.TaskID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(t.ID)
 }
 
 func (t *Task) effectiveExitCode() int {
