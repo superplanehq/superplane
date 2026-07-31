@@ -22,7 +22,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		return nil, grpcerrors.InvalidArgument(nil, "organization metadata is required")
 	}
 
-	organization, err := models.FindOrganizationByID(orgID)
+	organization, err := models.FindOrganizationByIDOrSlug(orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
@@ -52,6 +52,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
+				Slug:        organization.Slug,
 				Description: organization.Description,
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),

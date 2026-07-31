@@ -101,12 +101,11 @@ func CreateCanvasWithSeedFiles(
 		return nil, err
 	}
 
-	canvasID := uuid.New()
 	versionID := uuid.New()
 
 	now := time.Now()
 	canvas := models.Canvas{
-		ID:             canvasID,
+		ID:             uuid.New(),
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
 		Name:           name,
@@ -118,9 +117,15 @@ func CreateCanvasWithSeedFiles(
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
-		// Create the workflow record
+		// Create the workflow record with slug
 		//
-		err := tx.Clauses(clause.Returning{}).Create(&canvas).Error
+		slug, err := models.GenerateUniqueCanvasSlug(tx, organizationID, name)
+		if err != nil {
+			return err
+		}
+		canvas.Slug = slug
+
+		err = tx.Clauses(clause.Returning{}).Create(&canvas).Error
 		if err != nil {
 			return mapCanvasNameUniqueConstraintError(err)
 		}

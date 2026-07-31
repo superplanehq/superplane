@@ -35,6 +35,7 @@ type RoleManager interface {
 type AuthorizationSetup interface {
 	SetupOrganization(tx *gorm.DB, orgID, ownerID string) error
 	DestroyOrganization(tx *gorm.DB, orgID string) error
+	ResolveOrganizationID(ctx context.Context, identifier string) (string, error)
 }
 
 // User access and role query interface
