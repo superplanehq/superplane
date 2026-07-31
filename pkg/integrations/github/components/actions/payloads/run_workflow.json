@@ -1,11 +1,9 @@
 {
   "data": {
-    "workflow_run": {
-      "id": 9001,
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/acme/widgets/actions/runs/9001"
-    }
+    "id": 9001,
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/acme/widgets/actions/runs/9001"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.workflow.finished"
