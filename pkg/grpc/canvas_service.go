@@ -87,12 +87,8 @@ func (s *CanvasService) findCanvas(ctx context.Context, db *gorm.DB, canvasID st
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
 	}
 
-	id, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
-	}
-
-	canvas, err := models.FindCanvasInTransaction(db, orgID, id)
+	// Try to find by UUID first, then by slug
+	canvas, err := models.FindCanvasByIDOrSlugInTransaction(db, orgID, canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "canvas not found")

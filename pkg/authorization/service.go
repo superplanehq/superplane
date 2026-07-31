@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	uuid "github.com/google/uuid"
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/util"
@@ -83,6 +84,20 @@ func NewAuthService() (*AuthService, error) {
 
 func (a *AuthService) CheckOrganizationPermission(ctx context.Context, userID, orgID, resource, action string) (bool, error) {
 	return a.checkPermission(ctx, userID, orgID, models.DomainTypeOrganization, resource, action)
+}
+
+// ResolveOrganizationID resolves an organization identifier (UUID or slug) to a UUID
+func (a *AuthService) ResolveOrganizationID(ctx context.Context, identifier string) (string, error) {
+	// Try to parse as UUID first
+	if _, err := uuid.Parse(identifier); err == nil {
+		return identifier, nil
+	}
+	// Otherwise treat as slug and look up the organization
+	org, err := models.FindOrganizationBySlugInTransaction(database.DB(ctx), identifier)
+	if err != nil {
+		return "", err
+	}
+	return org.ID.String(), nil
 }
 
 func (a *AuthService) IsValidPermission(domainType string, permission *Permission) bool {

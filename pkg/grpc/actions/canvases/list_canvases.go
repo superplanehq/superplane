@@ -107,6 +107,7 @@ func serializeCanvasSummaries(
 		protoCanvases[i] = &pb.CanvasSummary{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
+			Slug:        canvas.Slug,
 			Description: canvas.Description,
 			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
