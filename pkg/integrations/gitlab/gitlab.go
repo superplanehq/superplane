@@ -194,6 +194,7 @@ func (g *GitLab) Actions() []core.Action {
 		&DeleteRelease{},
 		&GetCommitStatus{},
 		&PublishCommitStatus{},
+		&GetPipelineMinutesUsage{},
 	}
 }
 
