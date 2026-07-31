@@ -1,0 +1,9 @@
+{
+  "type": "dokploy.application.deploy.queued",
+  "data": {
+    "applicationId": "l9xKq2mP4vRt7nB",
+    "title": "Release v1.4.0",
+    "description": "Queued by SuperPlane"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
