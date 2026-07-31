@@ -109,36 +109,52 @@ func (h *Hub) unregisterClient(client *Client) {
 	}
 }
 
-// BroadcastAll sends a message to all connected clients
-func (h *Hub) BroadcastAll(message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+// deliver sends the message to every client, returning the ones whose buffer
+// was full. The caller must release h.mutex before dropping them: eviction
+// takes the write lock, and sync.RWMutex is not reentrant, so evicting while
+// still holding the read lock deadlocks the broadcast permanently.
+func (h *Hub) deliver(clients map[*Client]bool, message []byte) []*Client {
+	var stalled []*Client
 
-	for client := range h.clients {
+	for client := range clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			stalled = append(stalled, client)
 		}
 	}
+
+	return stalled
+}
+
+// dropStalled unregisters clients that stopped reading. Must be called without
+// holding h.mutex.
+func (h *Hub) dropStalled(clients []*Client) {
+	for _, client := range clients {
+		log.Warnf("Dropping client subscribed to workflow %s: send buffer full", client.workflowID)
+		h.unregisterClient(client)
+	}
+}
+
+// BroadcastAll sends a message to all connected clients
+func (h *Hub) BroadcastAll(message []byte) {
+	h.mutex.RLock()
+	stalled := h.deliver(h.clients, message)
+	h.mutex.RUnlock()
+
+	h.dropStalled(stalled)
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	h.mutex.RLock()
-	defer h.mutex.RUnlock()
-
+	var stalled []*Client
 	// Get clients subscribed to this workflow
 	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
-		for client := range clients {
-			select {
-			case client.send <- message:
-			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
-			}
-		}
+		stalled = h.deliver(clients, message)
 	}
+	h.mutex.RUnlock()
+
+	h.dropStalled(stalled)
 }
 
 func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
