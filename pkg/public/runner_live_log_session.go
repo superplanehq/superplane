@@ -47,6 +47,11 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if !allowsCanvas(r.Context(), user, canvasID, "read") {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
 	if err != nil {
 		writeRunnerLiveLogSessionError(w, err)
