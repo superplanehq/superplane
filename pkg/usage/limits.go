@@ -78,12 +78,11 @@ func EnsureCanStartRunnerTask(ctx context.Context, usageService Service, organiz
 		return err
 	}
 
-	// A negative capacity means unlimited. A zero capacity means the limit was not
-	// reported: either usage is missing entirely, or saas predates runner metering and
-	// left the field at its proto3 zero value. Absence must not read as "exhausted",
-	// otherwise every runner task is blocked until saas catches up.
+	// Negative capacity means unlimited (-1). Zero is an explicit hard block
+	// (no runner minutes allowed). Ship saas runner metering with SuperPlane so
+	// capacity is always reported; proto3 zero must not be treated as unlimited.
 	capacity := usage.GetRunnerMinutesBucketCapacity()
-	if capacity <= 0 {
+	if capacity < 0 {
 		return nil
 	}
 	if usage.GetRunnerMinutesBucketLevel() >= capacity {

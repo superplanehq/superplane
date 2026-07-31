@@ -60,6 +60,18 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger)
 	}
 
+	// If other finished usage already exhausted the org budget, stop this
+	// in-flight task so concurrent starts cannot keep burning minutes.
+	if organizationID != "" {
+		if err := ensureRunnerMinutesAvailable(core.ExecutionContext{OrganizationID: organizationID}); err != nil {
+			if cancelErr := broker.CancelTask(taskID); cancelErr != nil {
+				ctx.Logger.WithError(cancelErr).Warn("runner: cancel after limit exceeded failed, will retry")
+			} else {
+				ctx.Logger.WithError(err).Info("runner: canceled in-flight task after runner minutes limit exceeded")
+			}
+		}
+	}
+
 	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
 		"task_id":         taskID,
 		"organization_id": organizationID,
@@ -124,7 +136,14 @@ func processBrokerTaskStatus(
 		return fmt.Errorf("task is not in terminal state")
 	}
 
-	publishRunnerUsage(organizationID, task, logger)
+	// Publish before Emit so poll/webhook retries if RabbitMQ is down.
+	// SaaS dedups on task_id, so a later successful retry is safe.
+	if err := publishRunnerUsage(organizationID, task); err != nil {
+		if logger != nil {
+			logger.WithError(err).Warn("runner: failed to publish usage, will retry")
+		}
+		return fmt.Errorf("publish runner usage: %w", err)
+	}
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
@@ -141,26 +160,27 @@ func processBrokerTaskStatus(
 	return state.Emit(channel, finishedEventType, []any{out})
 }
 
-func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
+// publishRunnerTaskFinished is swapped in tests.
+var publishRunnerTaskFinished = func(organizationID, taskID string, durationSeconds int64) error {
+	return messages.NewRunnerTaskFinishedMessage(organizationID, taskID, durationSeconds).Publish()
+}
+
+func publishRunnerUsage(organizationID string, task *Task) error {
 	organizationID = strings.TrimSpace(organizationID)
 	taskID := task.brokerTaskID()
 	if organizationID == "" || taskID == "" {
-		return
+		return nil
 	}
 	if task.ClaimedAt == nil || task.FinishedAt == nil {
-		return
+		return nil
 	}
 
 	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
 	if seconds == 0 {
-		return
+		return nil
 	}
 
-	if err := messages.NewRunnerTaskFinishedMessage(organizationID, taskID, seconds).Publish(); err != nil {
-		if logger != nil {
-			logger.WithError(err).Warn("runner: failed to publish usage")
-		}
-	}
+	return publishRunnerTaskFinished(organizationID, taskID, seconds)
 }
 
 // billableSeconds rounds a task duration up to the next whole second. Clock skew

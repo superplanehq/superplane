@@ -158,22 +158,42 @@ func TestEnsureCanStartRunnerTaskAllowsUnlimited(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestEnsureCanStartRunnerTaskAllowsWhenUsageMissing(t *testing.T) {
+func TestEnsureCanStartRunnerTaskBlocksWhenUsageMissing(t *testing.T) {
 	service := &fakeLimitService{
 		enabled:               true,
 		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{},
 	}
 
 	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization runner minutes limit exceeded", status.Convert(err).Message())
 }
 
-func TestEnsureCanStartRunnerTaskAllowsWhenCapacityNotReported(t *testing.T) {
+func TestEnsureCanStartRunnerTaskBlocksWhenCapacityZero(t *testing.T) {
 	service := &fakeLimitService{
 		enabled: true,
 		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
 			Usage: &usagepb.OrganizationUsage{
-				EventBucketCapacity: 100,
+				RunnerMinutesBucketLevel:    0,
+				RunnerMinutesBucketCapacity: 0,
+			},
+		},
+	}
+
+	err := EnsureCanStartRunnerTask(context.Background(), service, "org-id")
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization runner minutes limit exceeded", status.Convert(err).Message())
+}
+
+func TestEnsureCanStartRunnerTaskAllowsWhenUnderCapacity(t *testing.T) {
+	service := &fakeLimitService{
+		enabled: true,
+		describeUsageResponse: &usagepb.DescribeOrganizationUsageResponse{
+			Usage: &usagepb.OrganizationUsage{
+				RunnerMinutesBucketLevel:    10,
+				RunnerMinutesBucketCapacity: 3000,
 			},
 		},
 	}
