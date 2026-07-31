@@ -537,7 +537,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
-	s.dispatchTask(fleet, task.ID)
+	go s.dispatchTask(fleet, task.ID)
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
@@ -565,6 +565,12 @@ func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (
 }
 
 func (s *Server) dispatchTask(fleet *brokermodels.Fleet, taskID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.warn("dispatch task panicked, sweeper will retry",
+				slog.String("task_id", taskID), slog.Any("recover", r))
+		}
+	}()
 	if s.Dispatch == nil || fleet == nil {
 		return
 	}

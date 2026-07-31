@@ -123,11 +123,9 @@ func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var invokeCount int
-	var gotFunctionName string
+	invoked := make(chan string, 1)
 	fake := fakeLambdaInvoker(func(_ context.Context, in *lambda.InvokeInput, _ ...func(*lambda.Options)) (*lambda.InvokeOutput, error) {
-		invokeCount++
-		gotFunctionName = *in.FunctionName
+		invoked <- *in.FunctionName
 		return &lambda.InvokeOutput{}, nil
 	})
 
@@ -143,11 +141,16 @@ func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
 	if status != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", status, body)
 	}
-	if invokeCount != 1 {
-		t.Fatalf("expected exactly one lambda invoke, got %d", invokeCount)
-	}
-	if gotFunctionName != "runner-lambda-fn" {
-		t.Fatalf("function name = %q", gotFunctionName)
+
+	// Dispatch happens in a background goroutine now, so wait for it rather than
+	// asserting on it immediately after the HTTP response returns.
+	select {
+	case gotFunctionName := <-invoked:
+		if gotFunctionName != "runner-lambda-fn" {
+			t.Fatalf("function name = %q", gotFunctionName)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for lambda invoke")
 	}
 
 	candidates, err := st.ClaimDispatchCandidates(context.Background(), dispatch.ProvisionerAWSLambda, time.Minute, 10)

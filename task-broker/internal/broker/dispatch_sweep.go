@@ -50,6 +50,12 @@ func sweepDispatchOnce(ctx context.Context, log *slog.Logger, srv *Server, stale
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
+			defer func() {
+				if r := recover(); r != nil && log != nil {
+					log.Warn("dispatch sweep: dispatch panicked, will retry next sweep",
+						slog.String("task_id", c.TaskID), slog.String("fleet_id", c.FleetID), slog.Any("recover", r))
+				}
+			}()
 			dispatchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			if err := d.Dispatch(dispatchCtx, c.FleetID, c.TaskID); err != nil && log != nil {
