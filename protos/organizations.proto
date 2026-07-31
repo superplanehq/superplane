@@ -340,6 +340,7 @@ message OrganizationLimits {
   int64 max_events_per_month = 5;
   int32 max_integrations = 6;
   int64 max_agent_tokens_per_month = 7;
+  int64 max_runner_minutes_per_month = 8;
 }
 
 message OrganizationUsage {
@@ -352,6 +353,10 @@ message OrganizationUsage {
   double agent_token_bucket_capacity = 7;
   google.protobuf.Timestamp agent_token_bucket_last_updated_at = 8;
   google.protobuf.Timestamp next_agent_token_bucket_decrease_at = 9;
+  double runner_minutes_bucket_level = 10;
+  double runner_minutes_bucket_capacity = 11;
+  google.protobuf.Timestamp runner_minutes_bucket_last_updated_at = 12;
+  google.protobuf.Timestamp next_runner_minutes_bucket_decrease_at = 13;
 }
 
 message DescribeUsageRequest {
