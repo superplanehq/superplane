@@ -474,6 +474,8 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dispatcher, needsDispatch := s.resolveDispatcher(fleet)
+
 	task := &models.Task{
 		ID:            uuid.NewString(),
 		FleetID:       fleet.ID,
@@ -486,6 +488,14 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		Environment:   api.CloneEnvironment(req.Environment),
 		Labels:        models.NormalizeOriginLabels(req.Labels),
 		Files:         api.NormalizeFiles(req.Files),
+	}
+	if needsDispatch {
+		// Stamped in the same insert that creates the task, so it's never visible to
+		// the sweeper as an unmarked (dispatch_requested_at IS NULL) candidate; only
+		// the invoke itself races with the sweeper's retry window, and the sweeper
+		// tolerates that as a duplicate, harmless doorbell.
+		dispatchedAt := time.Now().UTC()
+		task.DispatchRequestedAt = &dispatchedAt
 	}
 	switch kind {
 	case models.RunModeJavaScript, models.RunModePython, models.RunModeBash:
@@ -521,7 +531,9 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
-	s.reserveDispatch(fleet, task.ID)
+	if needsDispatch {
+		go s.invokeDispatch(dispatcher, fleet.ID, task.ID)
+	}
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
@@ -548,25 +560,11 @@ func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (
 	return &v, ""
 }
 
-// reserveDispatch marks the task as dispatched synchronously, before the
-// create-task response is written, so it's never visible to the sweeper as an
-// unmarked candidate (which would otherwise race with the invoke below and
-// could trigger a duplicate dispatch). The invoke itself is the slow,
-// network-bound part, so it runs in the background and never delays the
-// response.
-func (s *Server) reserveDispatch(fleet *brokermodels.Fleet, taskID string) {
+func (s *Server) resolveDispatcher(fleet *brokermodels.Fleet) (dispatch.Dispatcher, bool) {
 	if s.Dispatch == nil || fleet == nil {
-		return
+		return nil, false
 	}
-	d, needsDispatch := s.Dispatch.For(fleet.Provisioner, fleet.LambdaFunctionName)
-	if !needsDispatch {
-		return
-	}
-	if err := s.Store.MarkTaskDispatched(context.Background(), taskID); err != nil {
-		s.logErr("mark task dispatched", err)
-		return
-	}
-	go s.invokeDispatch(d, fleet.ID, taskID)
+	return s.Dispatch.For(fleet.Provisioner, fleet.LambdaFunctionName)
 }
 
 func (s *Server) invokeDispatch(d dispatch.Dispatcher, fleetID, taskID string) {
