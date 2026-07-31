@@ -21,7 +21,7 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { FactoryDetailPage, FactoryListPage } from "./pages/factories";
+import { FactoryDetailPage, FactoryListPage, CreateWorkOrderPage, FactoryLineEditPage, WorkOrderDetailPage } from "./pages/factories";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -128,6 +128,22 @@ function AppRouter() {
                 <Route path="factories">
                   <Route index element={withAuthAndPermission(FactoryListPage, "factories", "read")} />
                   <Route path=":factoryId" element={withAuthAndPermission(FactoryDetailPage, "factories", "read")} />
+                  <Route
+                    path=":factoryId/orders/new"
+                    element={withAuthAndPermission(CreateWorkOrderPage, "factories", "create")}
+                  />
+                  <Route
+                    path=":factoryId/orders/:orderId"
+                    element={withAuthAndPermission(WorkOrderDetailPage, "factories", "read")}
+                  />
+                  <Route
+                    path=":factoryId/lines/new"
+                    element={withAuthAndPermission(FactoryLineEditPage, "factories", "update")}
+                  />
+                  <Route
+                    path=":factoryId/lines/:lineId/edit"
+                    element={withAuthAndPermission(FactoryLineEditPage, "factories", "update")}
+                  />
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>

@@ -15,6 +15,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { homeListCardClassName, homePageSubtitleClassName, homePageTitleClassName } from "../home/homePageStyles";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { FactoryPageShell } from "./FactoryPageShell";
+import { factoryPageContentClassName } from "./factoryPageStyles";
 
 export function FactoryListPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -49,13 +50,11 @@ export function FactoryListPage() {
 
   return (
     <FactoryPageShell>
-      <div className="mx-auto w-full max-w-6xl p-8">
+      <div className={factoryPageContentClassName}>
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <Heading className={homePageTitleClassName}>Factories</Heading>
-            <Text className={homePageSubtitleClassName}>
-              Manage software production work — work orders and automations.
-            </Text>
+            <Text className={homePageSubtitleClassName}>Manage software production work — work orders and apps.</Text>
           </div>
           <PermissionTooltip
             allowed={canCreate || permissionsLoading}

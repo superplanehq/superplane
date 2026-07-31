@@ -5,16 +5,12 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
-
-const pageShellClassName = cn("min-h-screen flex flex-col bg-slate-100", appDarkModeClasses.surface);
+import { factoryPageBackgroundClassName } from "./factoryPageStyles";
 
 const pageHeaderClassName = cn(
-  "flex h-10 items-center gap-2 border-b bg-white px-2 sm:px-3",
-  appDarkModeClasses.sidebarEdge,
+  "flex h-10 w-full shrink-0 items-center gap-2 border-b border-gray-200/80 bg-gray-50 px-2 sm:px-3 dark:border-gray-700/70",
   appDarkModeClasses.surface,
 );
-
-const pageContentClassName = cn("w-full flex-grow-1 bg-slate-100", appDarkModeClasses.surface);
 
 interface FactoryPageShellProps {
   children: ReactNode;
@@ -30,7 +26,7 @@ export function FactoryPageShell({ children, backHref, backLabel }: FactoryPageS
   }
 
   return (
-    <div className={pageShellClassName}>
+    <div className={cn("flex min-h-screen w-full min-w-0 flex-col", factoryPageBackgroundClassName)}>
       <header className={pageHeaderClassName}>
         <OrganizationMenuButton organizationId={organizationId} />
         {backHref ? (
@@ -43,8 +39,8 @@ export function FactoryPageShell({ children, backHref, backLabel }: FactoryPageS
           </Link>
         ) : null}
       </header>
-      <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className={pageContentClassName}>{children}</div>
+      <main className="flex w-full min-w-0 flex-1 flex-col">
+        <div className={cn(factoryPageBackgroundClassName, "w-full min-w-0 flex-1")}>{children}</div>
       </main>
     </div>
   );

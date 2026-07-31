@@ -145,6 +145,91 @@ export function countNeedsAttention(orders: FactoriesWorkOrder[]): number {
   return orders.filter((order) => deriveWorkOrderProgress(order).phase === "needs_attention").length;
 }
 
+export type WorkOrderDisplayStatus = "draft" | "ready" | "running" | "successful" | "unsuccessful";
+
+const DISPLAY_STATUS_META: Record<WorkOrderDisplayStatus, { label: string; className: string; filterLabel: string }> = {
+  draft: {
+    label: "Draft",
+    filterLabel: "Draft",
+    className:
+      "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+  },
+  ready: {
+    label: "Ready",
+    filterLabel: "Ready",
+    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+  },
+  running: {
+    label: "Running",
+    filterLabel: "Running",
+    className:
+      "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+  },
+  successful: {
+    label: "Successful",
+    filterLabel: "Successful",
+    className:
+      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  },
+  unsuccessful: {
+    label: "Unsuccessful",
+    filterLabel: "Unsuccessful",
+    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+  },
+};
+
+export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
+  const progress = deriveWorkOrderProgress(order);
+  switch (progress.phase) {
+    case "unassigned":
+      return "draft";
+    case "no_plan":
+    case "planning":
+    case "ready_for_review":
+      return "ready";
+    case "implementation_in_progress":
+    case "verifications_running":
+    case "needs_attention":
+      return "running";
+    case "completed":
+      return "successful";
+    case "rejected":
+    case "verifications_failed":
+      return "unsuccessful";
+    default:
+      return "ready";
+  }
+}
+
+export function getWorkOrderDisplayStatusMeta(status: WorkOrderDisplayStatus) {
+  return DISPLAY_STATUS_META[status];
+}
+
+export type WorkOrderOwnerFilter = "all" | "mine";
+
+export type WorkOrderStatusFilter = "all" | WorkOrderDisplayStatus;
+
+export function filterWorkOrdersByOwner(
+  orders: FactoriesWorkOrder[],
+  ownerFilter: WorkOrderOwnerFilter,
+  userId?: string,
+): FactoriesWorkOrder[] {
+  if (ownerFilter === "all") {
+    return orders;
+  }
+  return filterMyWorkOrders(orders, userId);
+}
+
+export function filterWorkOrdersByStatus(
+  orders: FactoriesWorkOrder[],
+  statusFilter: WorkOrderStatusFilter,
+): FactoriesWorkOrder[] {
+  if (statusFilter === "all") {
+    return orders;
+  }
+  return orders.filter((order) => getWorkOrderDisplayStatus(order) === statusFilter);
+}
+
 /** Open work on the factory queue — excludes closed orders. */
 export const WORK_ORDER_TAB_SECTIONS = WORK_ORDER_SECTIONS.filter((section) => section.id !== "closed");
 

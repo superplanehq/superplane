@@ -3,41 +3,60 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
 import {
   factoryAppsKey,
-  useCreateFactoryLine,
-  useCreateWorkOrder,
+  useDispatchWorkOrder,
   useFactory,
   useFactoryApps,
   useFactoryWorkOrders,
-  useUpdateFactoryLine,
-  useUpdateWorkOrderAssignees,
   type FactoriesFactoryLine,
-  type FactoryLineStep,
 } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { appPath } from "@/lib/appPaths";
-import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateFactoryAppDialog } from "./CreateFactoryAppDialog";
-import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
-import { FactoryAppsPanel } from "./FactoryAppsPanel";
-import { FactoryDetailHeader, type FactoryDetailTab } from "./FactoryDetailHeader";
-import { FactoryLineDialog } from "./FactoryLineDialog";
-import { FactoryLinesPanel } from "./FactoryLinesPanel";
+import { DispatchWorkOrderDialog } from "./DispatchWorkOrderDialog";
+import { FactoryAppsSidebar } from "./FactoryAppsSidebar";
+import { FactoryDetailHeader } from "./FactoryDetailHeader";
+import { FactoryLinesSidebar } from "./FactoryLinesSidebar";
 import { FactoryPageShell } from "./FactoryPageShell";
-import { WorkOrderBoard } from "./WorkOrderBoard";
+import { WorkOrderCard } from "./WorkOrderCard";
+import { WorkOrderFilters } from "./WorkOrderFilters";
 import {
-  MY_WORK_SECTIONS,
-  WORK_ORDER_TAB_SECTIONS,
-  countNeedsAttention,
+  factoryCountBadgeClassName,
+  factoryDetailMainClassName,
+  factoryPageContentClassName,
+  factoryDetailPanelClassName,
+  factoryDetailSidebarClassName,
+} from "./factoryPageStyles";
+import {
   countOpenWorkOrders,
-  filterMyWorkOrders,
+  filterWorkOrdersByOwner,
+  filterWorkOrdersByStatus,
+  type WorkOrderOwnerFilter,
+  type WorkOrderStatusFilter,
 } from "./workOrderProgress";
+
+function getPipelineLabels(lines: FactoriesFactoryLine[]): string[] {
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const labels = lines.flatMap((line) => {
+    const lineName = line.name?.trim();
+    if (!lineName) {
+      return [];
+    }
+    return [`${lineName} pipeline`];
+  });
+
+  return labels.slice(0, 2);
+}
 
 export function FactoryDetailPage() {
   const navigate = useNavigate();
@@ -45,12 +64,10 @@ export function FactoryDetailPage() {
   const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
-  const [createWorkOpen, setCreateWorkOpen] = useState(false);
   const [createAppOpen, setCreateAppOpen] = useState(false);
-  const [lineDialogOpen, setLineDialogOpen] = useState(false);
-  const [editingLine, setEditingLine] = useState<FactoriesFactoryLine | null>(null);
-  const [activeTab, setActiveTab] = useState<FactoryDetailTab>("my-work");
-  const [claimingOrderId, setClaimingOrderId] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("all");
+  const [dispatchOrderId, setDispatchOrderId] = useState<string | null>(null);
 
   const {
     data: factory,
@@ -69,10 +86,7 @@ export function FactoryDetailPage() {
     isFetching: appsFetching,
   } = useFactoryApps(organizationId ?? "", factoryId ?? "");
 
-  const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
-  const updateWorkOrderAssignees = useUpdateWorkOrderAssignees(organizationId ?? "", factoryId ?? "");
-  const createFactoryLine = useCreateFactoryLine(organizationId ?? "", factoryId ?? "");
-  const updateFactoryLine = useUpdateFactoryLine(organizationId ?? "", factoryId ?? "");
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
   const createCanvas = useCreateCanvas(organizationId ?? "");
 
   usePageTitle(factory?.name ? [factory.name, "Factories"] : ["Factory"]);
@@ -80,20 +94,19 @@ export function FactoryDetailPage() {
   const canCreateWork = canAct("factories", "create");
   const canUpdateFactory = canAct("factories", "update");
   const canCreateApps = canAct("canvases", "create");
-  const canAssign = canAct("factories", "update");
+  const canDispatch = canAct("factories", "update");
   const isLoading = factoryLoading || (ordersLoading && workOrders.length === 0);
   const isOrdersLoading = ordersLoading || (ordersFetching && workOrders.length === 0);
   const isAppsLoading = appsLoading || (appsFetching && factoryApps.length === 0);
 
   const factoryLines = factory?.lines ?? [];
-  const myWorkOrders = useMemo(() => filterMyWorkOrders(workOrders, me?.id), [workOrders, me?.id]);
   const openWorkOrders = useMemo(() => workOrders.filter((order) => order.state === "STATE_OPEN"), [workOrders]);
-  const myWorkCount = myWorkOrders.length;
+  const filteredWorkOrders = useMemo(() => {
+    const byOwner = filterWorkOrdersByOwner(openWorkOrders, ownerFilter, me?.id);
+    return filterWorkOrdersByStatus(byOwner, statusFilter);
+  }, [openWorkOrders, ownerFilter, statusFilter, me?.id]);
+  const pipelineLabels = useMemo(() => getPipelineLabels(factoryLines), [factoryLines]);
   const openWorkOrderCount = countOpenWorkOrders(workOrders);
-  const myNeedsAttentionCount = countNeedsAttention(myWorkOrders);
-
-  const tabOrders = activeTab === "my-work" ? myWorkOrders : openWorkOrders;
-  const tabSections = activeTab === "my-work" ? MY_WORK_SECTIONS : WORK_ORDER_TAB_SECTIONS;
 
   useReportPageReady(!isLoading && Boolean(factory), {
     work_order_count: workOrders.length,
@@ -108,10 +121,8 @@ export function FactoryDetailPage() {
     return <Navigate to={`/${organizationId}/factories`} replace />;
   }
 
-  const handleCreateWorkOrder = async (input: { title: string; description: string }) => {
-    await createWorkOrder.mutateAsync(input);
-    setCreateWorkOpen(false);
-  };
+  const factoryHref = `/${organizationId}/factories/${factoryId}`;
+  const createWorkOrderHref = `${factoryHref}/orders/new`;
 
   const handleCreateApp = async (input: { name: string; description: string }) => {
     try {
@@ -134,48 +145,14 @@ export function FactoryDetailPage() {
     }
   };
 
-  const handleSaveLine = async (input: { name: string; steps: FactoryLineStep[] }) => {
-    if (editingLine?.id) {
-      await updateFactoryLine.mutateAsync({
-        lineId: editingLine.id,
-        name: input.name,
-        steps: input.steps,
-      });
-      showSuccessToast("Line updated.");
-    } else {
-      await createFactoryLine.mutateAsync(input);
-      showSuccessToast("Line created.");
-    }
-    setLineDialogOpen(false);
-    setEditingLine(null);
-  };
-
-  const handleClaimWorkOrder = async (orderId: string) => {
-    if (!me?.id) {
-      showErrorToast("Could not determine your user account.");
+  const handleDispatch = async (lineName: string) => {
+    if (!dispatchOrderId) {
       return;
     }
 
-    setClaimingOrderId(orderId);
-    try {
-      await updateWorkOrderAssignees.mutateAsync({ orderId, assigneeIds: [me.id] });
-      showSuccessToast("Work order assigned to you.");
-      setActiveTab("my-work");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to claim work order"));
-    } finally {
-      setClaimingOrderId(null);
-    }
-  };
-
-  const openCreateLineDialog = () => {
-    setEditingLine(null);
-    setLineDialogOpen(true);
-  };
-
-  const openEditLineDialog = (line: FactoriesFactoryLine) => {
-    setEditingLine(line);
-    setLineDialogOpen(true);
+    await dispatchWorkOrder.mutateAsync({ orderId: dispatchOrderId, lineName });
+    setDispatchOrderId(null);
+    showSuccessToast(`Dispatched to ${lineName}.`);
   };
 
   return (
@@ -186,82 +163,76 @@ export function FactoryDetailPage() {
         </div>
       ) : factory ? (
         <>
-          <FactoryDetailHeader
-            factory={factory}
-            backHref={`/${organizationId}/factories`}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            myWorkCount={myWorkCount}
-            workOrdersCount={openWorkOrderCount}
-            linesCount={factoryLines.length}
-            appsCount={factoryApps.length}
-            needsAttentionCount={myNeedsAttentionCount}
-            canCreate={canCreateWork}
-            permissionsLoading={permissionsLoading}
-            onCreateClick={() => setCreateWorkOpen(true)}
-          />
+          <div className={cn(factoryPageContentClassName, "pb-10")}>
+            <FactoryDetailHeader
+              factory={factory}
+              workOrdersCount={openWorkOrderCount}
+              canCreate={canCreateWork}
+              permissionsLoading={permissionsLoading}
+              createHref={createWorkOrderHref}
+            />
 
-          <div className="mx-auto w-full max-w-5xl px-6 py-6 sm:px-8">
-            {activeTab === "lines" ? (
-              <FactoryLinesPanel
-                lines={factoryLines}
-                apps={factoryApps}
-                isLoading={factoryLoading}
-                canUpdate={canUpdateFactory}
-                permissionsLoading={permissionsLoading}
-                onCreateClick={openCreateLineDialog}
-                onEditLine={openEditLineDialog}
-              />
-            ) : null}
-
-            {activeTab === "apps" ? (
-              <FactoryAppsPanel
-                organizationId={organizationId}
-                apps={factoryApps}
-                isLoading={isAppsLoading}
-                canCreate={canCreateApps}
-                permissionsLoading={permissionsLoading}
-                onCreateClick={() => setCreateAppOpen(true)}
-              />
-            ) : null}
-
-            {activeTab === "my-work" || activeTab === "work-orders" ? (
-              ordersError ? (
-                <div className="rounded border border-red-300 bg-white px-4 py-2 text-red-500 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
-                  <Text>Failed to load work orders.</Text>
+            <div className={cn(factoryDetailPanelClassName, "mt-8 grid w-full lg:grid-cols-[minmax(0,1fr)_320px]")}>
+              <section className={factoryDetailMainClassName}>
+                <div className="mb-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Work Orders</h2>
+                    <span className={factoryCountBadgeClassName}>{openWorkOrderCount}</span>
+                  </div>
                 </div>
-              ) : isOrdersLoading ? (
-                <Text className="text-sm text-gray-500">Loading work orders…</Text>
-              ) : (
-                <WorkOrderBoard
-                  orders={tabOrders}
-                  sections={tabSections}
-                  emptyTitle={activeTab === "my-work" ? "Nothing assigned to you" : "No work orders yet"}
-                  emptyDescription={
-                    activeTab === "my-work"
-                      ? "Open the Work orders tab and claim unassigned work, or create new work to get started."
-                      : "Create work manually, or dispatch work to a factory line once lines are configured."
-                  }
-                  canCreate={canCreateWork}
-                  permissionsLoading={permissionsLoading}
-                  onCreateClick={() => setCreateWorkOpen(true)}
-                  canClaim={canAssign}
-                  claimingOrderId={claimingOrderId}
-                  onClaim={activeTab === "work-orders" ? handleClaimWorkOrder : undefined}
-                  onBrowseWorkOrders={activeTab === "my-work" ? () => setActiveTab("work-orders") : undefined}
+
+                <WorkOrderFilters
+                  ownerFilter={ownerFilter}
+                  statusFilter={statusFilter}
+                  onOwnerFilterChange={setOwnerFilter}
+                  onStatusFilterChange={setStatusFilter}
                 />
-              )
-            ) : null}
+
+                <div className="mt-6">
+                  {ordersError ? (
+                    <div className="rounded-lg border border-red-300 px-4 py-3 text-red-500 dark:border-red-800 dark:text-red-400">
+                      <Text>Failed to load work orders.</Text>
+                    </div>
+                  ) : isOrdersLoading ? (
+                    <Text className="text-sm text-gray-500">Loading work orders…</Text>
+                  ) : filteredWorkOrders.length === 0 ? (
+                    <p className="text-sm font-medium text-gray-400 dark:text-gray-400 px-6 py-5 text-center">
+                      No work orders match these filters.<br />
+                      Create a work order or adjust filters to see more results.
+                    </p>
+                  ) : (
+                    <div>
+                      {filteredWorkOrders.map((order) => (
+                        <WorkOrderCard
+                          key={order.id}
+                          order={order}
+                          factoryHref={factoryHref}
+                          pipelineLabels={pipelineLabels}
+                          canDispatch={canDispatch}
+                          onDispatch={(orderId) => setDispatchOrderId(orderId)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <div className={factoryDetailSidebarClassName}>
+                <FactoryAppsSidebar
+                  organizationId={organizationId}
+                  apps={factoryApps}
+                  isLoading={isAppsLoading}
+                  canCreate={canCreateApps}
+                  permissionsLoading={permissionsLoading}
+                  onCreateClick={() => setCreateAppOpen(true)}
+                >
+                  <FactoryLinesSidebar factoryHref={factoryHref} lines={factoryLines} canUpdate={canUpdateFactory} />
+                </FactoryAppsSidebar>
+              </div>
+            </div>
           </div>
         </>
       ) : null}
-
-      <CreateWorkOrderDialog
-        open={createWorkOpen}
-        isSaving={createWorkOrder.isPending}
-        onClose={() => setCreateWorkOpen(false)}
-        onCreate={handleCreateWorkOrder}
-      />
 
       <CreateFactoryAppDialog
         open={createAppOpen}
@@ -270,19 +241,13 @@ export function FactoryDetailPage() {
         onCreate={handleCreateApp}
       />
 
-      <FactoryLineDialog
-        open={lineDialogOpen}
-        mode={editingLine ? "edit" : "create"}
-        organizationId={organizationId}
-        apps={factoryApps}
-        initialName={editingLine?.name}
-        initialSteps={editingLine?.steps}
-        isSaving={createFactoryLine.isPending || updateFactoryLine.isPending}
-        onClose={() => {
-          setLineDialogOpen(false);
-          setEditingLine(null);
-        }}
-        onSave={handleSaveLine}
+      <DispatchWorkOrderDialog
+        open={dispatchOrderId !== null}
+        lines={factoryLines}
+        isSaving={dispatchWorkOrder.isPending}
+        canDispatch={canDispatch || permissionsLoading}
+        onClose={() => setDispatchOrderId(null)}
+        onDispatch={handleDispatch}
       />
     </FactoryPageShell>
   );

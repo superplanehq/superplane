@@ -3,6 +3,8 @@ import {
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
   factoriesDescribeFactory,
+  factoriesDescribeWorkOrder,
+  factoriesDispatchWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
   factoriesListWorkOrders,
@@ -29,6 +31,10 @@ function factoryDetailKey(organizationId: string, factoryId: string) {
 
 function workOrdersKey(organizationId: string, factoryId: string) {
   return ["factories", organizationId, factoryId, "work-orders"] as const;
+}
+
+function workOrderDetailKey(organizationId: string, factoryId: string, orderId: string) {
+  return ["factories", organizationId, factoryId, "work-orders", orderId] as const;
 }
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
@@ -78,6 +84,25 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
       return response.data?.orders ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
+  });
+}
+
+export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {
+  return useQuery({
+    queryKey: workOrderDetailKey(organizationId, factoryId, orderId),
+    queryFn: async (): Promise<FactoriesWorkOrder> => {
+      const response = await factoriesDescribeWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Work order not found");
+      }
+      return response.data.order;
+    },
+    enabled: Boolean(organizationId && factoryId && orderId),
   });
 }
 
@@ -151,8 +176,39 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       }
       return response.data.order;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useDispatchWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; lineName: string }) => {
+      const response = await factoriesDispatchWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            lineName: input.lineName,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to dispatch work order");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
     },
   });
 }
