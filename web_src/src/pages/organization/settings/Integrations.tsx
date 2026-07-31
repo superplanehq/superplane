@@ -1,7 +1,9 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useListKeyboardNavigation } from "@/hooks/useListKeyboardNavigation";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   useAvailableIntegrations,
@@ -11,10 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
-import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "../../../api-client/types.gen";
+import { IntegrationCatalogRow } from "./IntegrationCatalogRow";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
@@ -32,10 +34,15 @@ import {
   settingsEmptyStateIconClassName,
   settingsEmptyStateTitleClassName,
   settingsModalClassName,
-  settingsPanelClassName,
 } from "./settingsPageStyles";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
+
+const NAVIGATION_KEYS = ["ArrowDown", "ArrowUp", "Home", "End"];
+
+function filterCountLabel(matching: number, total: number, isFiltering: boolean): string {
+  return isFiltering ? `${matching} of ${total} integrations` : `${total} integrations`;
+}
 
 interface IntegrationsProps {
   organizationId: string;
@@ -50,6 +57,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
+  // The highlight is a keyboard affordance only: it appears while filtering or
+  // once the arrow keys are used, and never follows the pointer.
+  const [highlightVisible, setHighlightVisible] = useState(false);
   const [isIntegrationSurveyActive, setIsIntegrationSurveyActive] = useState(false);
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -170,41 +180,125 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     });
   }, [filterQuery, integrationCatalog]);
 
+  // Connected providers are shown in their own section above the rest. The
+  // flattened order is what the arrow keys walk, so the highlight moves through
+  // both sections as one list.
+  const { connectedItems, availableItems, orderedItems } = useMemo(() => {
+    const connected = filteredIntegrationCatalog.filter((item) => item.instances.length > 0);
+    const available = filteredIntegrationCatalog.filter((item) => item.instances.length === 0);
+    return { connectedItems: connected, availableItems: available, orderedItems: [...connected, ...available] };
+  }, [filteredIntegrationCatalog]);
+
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim() ?? "";
   }, [selectedIntegration?.instructions]);
 
-  const getNextIntegrationName = (baseName?: string) => {
-    const normalizedBaseName = baseName?.trim() || "integration";
-    if (!integrationNames.has(normalizedBaseName)) {
-      return normalizedBaseName;
-    }
+  const getNextIntegrationName = useCallback(
+    (baseName?: string) => {
+      const normalizedBaseName = baseName?.trim() || "integration";
+      if (!integrationNames.has(normalizedBaseName)) {
+        return normalizedBaseName;
+      }
 
-    let suffix = 2;
-    let candidate = `${normalizedBaseName}-${suffix}`;
-    while (integrationNames.has(candidate)) {
-      suffix += 1;
-      candidate = `${normalizedBaseName}-${suffix}`;
-    }
+      let suffix = 2;
+      let candidate = `${normalizedBaseName}-${suffix}`;
+      while (integrationNames.has(candidate)) {
+        suffix += 1;
+        candidate = `${normalizedBaseName}-${suffix}`;
+      }
 
-    return candidate;
-  };
+      return candidate;
+    },
+    [integrationNames],
+  );
 
-  const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
-    if (!canCreateIntegrations) return;
+  const handleConnectClick = useCallback(
+    (integration: IntegrationsIntegrationDefinition) => {
+      if (!canCreateIntegrations) return;
 
-    if (isCapabilityBasedIntegrationDefinition(integration)) {
-      if (!integration.name) return;
-      analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
-      navigate(`/${organizationId}/settings/integrations/${integration.name}/setup`);
+      if (isCapabilityBasedIntegrationDefinition(integration)) {
+        if (!integration.name) return;
+        analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
+        navigate(`/${organizationId}/settings/integrations/${integration.name}/setup`);
+        return;
+      }
+
+      setSelectedIntegration(integration);
+      setIntegrationName(getNextIntegrationName(integration.name));
+      setConfiguration({});
+      setIsModalOpen(true);
+      analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
+    },
+    [canCreateIntegrations, getNextIntegrationName, navigate, organizationId],
+  );
+
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+
+  const handleActivateRow = useCallback(
+    (index: number) => {
+      // Never act on a highlight the user cannot see.
+      if (!highlightVisible) return;
+      const integrationDef = orderedItems[index]?.integrationDef;
+      if (!integrationDef) return;
+      handleConnectClick(integrationDef);
+    },
+    [handleConnectClick, highlightVisible, orderedItems],
+  );
+
+  const { activeIndex, setActiveIndex, handleKeyDown } = useListKeyboardNavigation({
+    itemCount: orderedItems.length,
+    onActivate: handleActivateRow,
+  });
+
+  // Keep the highlighted row on screen while arrowing through a long catalog.
+  useEffect(() => {
+    if (!highlightVisible || activeIndex < 0) return;
+    rowRefs.current[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex, highlightVisible]);
+
+  // `/` jumps to the filter, matching the convention used across the app. The
+  // global command palette owns the modified variants, so ignore those here.
+  useEffect(() => {
+    const focusFilter = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target?.isContentEditable) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+
+    document.addEventListener("keydown", focusFilter);
+    return () => document.removeEventListener("keydown", focusFilter);
+  }, []);
+
+  const handleFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      if (filterQuery.length === 0) {
+        searchInputRef.current?.blur();
+        return;
+      }
+      event.preventDefault();
+      setFilterQuery("");
+      setActiveIndex(0);
+      setHighlightVisible(false);
       return;
     }
 
-    setSelectedIntegration(integration);
-    setIntegrationName(getNextIntegrationName(integration.name));
-    setConfiguration({});
-    setIsModalOpen(true);
-    analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
+    // The first arrow press reveals the highlight where it already sits rather
+    // than skipping the top result.
+    if (!highlightVisible && NAVIGATION_KEYS.includes(event.key)) {
+      event.preventDefault();
+      setHighlightVisible(true);
+      return;
+    }
+
+    handleKeyDown(event);
   };
   const handleConnect = async () => {
     if (!canCreateIntegrations) return;
@@ -242,6 +336,23 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     createIntegrationMutation.reset();
   };
 
+  const handleConfigureClick = useCallback(
+    (integration: OrganizationsIntegration) => {
+      const providerName = integration.metadata?.integrationName;
+      if (providerName && integration.status?.setupState?.currentStep) {
+        navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+          state: { integrationId: integration.metadata?.id },
+        });
+        return;
+      }
+
+      navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
+        state: { tab: "configuration" },
+      });
+    },
+    [navigate, organizationId],
+  );
+
   const createIntegrationNotice = createIntegrationMutation.isError
     ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
     : null;
@@ -258,19 +369,32 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   return (
     <div className="pt-6">
-      <div className="relative mb-4">
+      <div className="relative mb-2">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
         <Input
+          ref={searchInputRef}
           type="text"
           value={filterQuery}
-          onChange={(e) => setFilterQuery(e.target.value)}
+          onChange={(e) => {
+            setFilterQuery(e.target.value);
+            setActiveIndex(0);
+            setHighlightVisible(e.target.value.trim().length > 0);
+          }}
+          onKeyDown={handleFilterKeyDown}
           placeholder="Filter integrations..."
           className="pl-9 pr-9"
+          autoFocus
+          aria-describedby="integration-filter-count"
         />
         {filterQuery.length > 0 ? (
           <button
             type="button"
-            onClick={() => setFilterQuery("")}
+            onClick={() => {
+              setFilterQuery("");
+              setActiveIndex(0);
+              setHighlightVisible(false);
+              searchInputRef.current?.focus();
+            }}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             aria-label="Clear filter"
           >
@@ -278,6 +402,18 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           </button>
         ) : null}
       </div>
+      <p
+        id="integration-filter-count"
+        role="status"
+        aria-live="polite"
+        className="mb-4 text-xs text-gray-500 dark:text-gray-400"
+      >
+        {filterCountLabel(orderedItems.length, integrationCatalog.length, filterQuery.trim().length > 0)}
+        <span className="sr-only">
+          {" "}
+          Use the arrow keys to move between integrations and press Enter to connect the highlighted one.
+        </span>
+      </p>
       {filteredIntegrationCatalog.length === 0 ? (
         <div className="py-12 text-center">
           <Plug className={cn("mx-auto mb-2 h-6 w-6", settingsEmptyStateIconClassName)} />
@@ -298,128 +434,46 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           ) : null}
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredIntegrationCatalog.map((item) => {
-            const connectedCount = item.instances.length;
-
-            return (
-              <div key={item.providerName} className={settingsPanelClassName}>
-                <div className="p-4 flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 items-center justify-center">
-                      <IntegrationIcon
-                        integrationName={item.providerName}
-                        iconSlug={item.integrationDef?.icon}
-                        className="w-8 h-8 text-gray-500 dark:text-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.providerLabel}</h3>
-                      {item.integrationDef?.description ? (
-                        <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-400">
-                          {item.integrationDef?.description}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <PermissionTooltip
-                    allowed={Boolean(item.integrationDef) && (canCreateIntegrations || permissionsLoading)}
-                    message={
-                      item.integrationDef
-                        ? "You don't have permission to connect integrations."
-                        : "This integration provider is no longer available for new connections."
-                    }
-                  >
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        if (!item.integrationDef) return;
-                        handleConnectClick(item.integrationDef);
-                      }}
-                      className="self-start"
-                      disabled={!item.integrationDef || !canCreateIntegrations}
-                    >
-                      {item.integrationDef ? "Connect" : "Unavailable"}
-                    </Button>
-                  </PermissionTooltip>
+        <div className="space-y-8">
+          {[
+            { title: "Connected", items: connectedItems, offset: 0 },
+            { title: "Available", items: availableItems, offset: connectedItems.length },
+          ]
+            .filter((section) => section.items.length > 0)
+            .map((section) => (
+              <section key={section.title} aria-label={`${section.title} (${section.items.length})`}>
+                <div className="mb-3 flex items-center gap-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {section.title}
+                  </h2>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700/50 dark:text-gray-300">
+                    {section.items.length}
+                  </span>
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
                 </div>
-                {item.instances.length > 0 ? (
-                  <div className="pr-4 pb-4 pl-[60px]">
-                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                      {connectedCount} connected instance{connectedCount === 1 ? "" : "s"}
-                    </p>
-                    {item.instances.map((integration, index) => {
-                      const integrationDisplayName = integration.metadata?.name;
-                      const statusLabel = integration.status?.state
-                        ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
-                        : "Unknown";
+                <ul className="space-y-4">
+                  {section.items.map((item, indexInSection) => {
+                    const flatIndex = section.offset + indexInSection;
 
-                      return (
-                        <div
-                          key={integration.metadata?.id}
-                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700/70 ${index === 0 ? "mt-1" : ""}`}
-                        >
-                          <Plug
-                            className={`w-4 h-4 shrink-0 ${
-                              integration.status?.state === "ready"
-                                ? "text-green-500"
-                                : integration.status?.state === "error"
-                                  ? "text-red-500"
-                                  : "text-amber-600"
-                            }`}
-                          />
-                          <span
-                            className={cn(
-                              "inline-flex w-16 items-center justify-start rounded text-xs font-medium",
-                              integration.status?.state === "ready"
-                                ? "bg-white text-green-500 dark:bg-green-300 dark:text-green-950"
-                                : integration.status?.state === "error"
-                                  ? "bg-white text-red-500 dark:bg-red-300 dark:text-red-950"
-                                  : "bg-white text-amber-600 dark:bg-amber-300 dark:text-amber-950",
-                            )}
-                          >
-                            {statusLabel}
-                          </span>
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                            {integrationDisplayName}
-                          </p>
-                          <div className="ml-auto flex items-center gap-4">
-                            <PermissionTooltip
-                              allowed={canUpdateIntegrations || permissionsLoading}
-                              message="You don't have permission to update integrations."
-                            >
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  if (!canUpdateIntegrations) return;
-                                  const providerName = integration.metadata?.integrationName;
-                                  if (providerName && integration.status?.setupState?.currentStep) {
-                                    navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
-                                      state: { integrationId: integration.metadata?.id },
-                                    });
-                                    return;
-                                  }
-
-                                  navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
-                                    state: { tab: "configuration" },
-                                  });
-                                }}
-                                disabled={!canUpdateIntegrations}
-                              >
-                                Configure
-                              </Button>
-                            </PermissionTooltip>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+                    return (
+                      <IntegrationCatalogRow
+                        key={item.providerName}
+                        entry={item}
+                        isActive={highlightVisible && flatIndex === activeIndex}
+                        canCreateIntegrations={canCreateIntegrations}
+                        canUpdateIntegrations={canUpdateIntegrations}
+                        permissionsLoading={permissionsLoading}
+                        onConnect={handleConnectClick}
+                        onConfigure={handleConfigureClick}
+                        rowRef={(node) => {
+                          rowRefs.current[flatIndex] = node;
+                        }}
+                      />
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
           {isIntegrationSurveyActive ? (
             <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Can't find your integration?{" "}
@@ -434,7 +488,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           ) : null}
         </div>
       )}
-
       {/* Connect Modal */}
       {isModalOpen &&
         selectedIntegration &&
