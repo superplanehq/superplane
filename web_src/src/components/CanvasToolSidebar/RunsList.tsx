@@ -38,7 +38,10 @@ export function RunsList({
 }: RunsListProps) {
   if (isError && runs.length === 0) {
     return (
-      <div role="alert" className="flex flex-col items-center gap-2 px-3 py-6 text-center text-xs text-gray-500">
+      <div
+        role="alert"
+        className="flex flex-col items-center gap-2 px-3 py-6 text-center text-xs text-content-secondary"
+      >
         <AlertCircle className="h-5 w-5 text-red-500" aria-hidden />
         <span>Failed to load runs</span>
         {onRetry ? (
@@ -53,14 +56,14 @@ export function RunsList({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-content-muted" />
       </div>
     );
   }
 
   if (runs.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-[13px] text-gray-500">
+      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-[13px] text-content-secondary">
         <Rabbit className="h-4 w-4" aria-hidden />
         <span>No Runs</span>
       </div>
@@ -69,7 +72,7 @@ export function RunsList({
 
   if (filteredRuns.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-xs text-gray-400">
+      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-xs text-content-muted">
         <span>No runs match your filters</span>
         <button type="button" onClick={onClearFilters} className="text-[11px] text-sky-600 hover:text-sky-800">
           Clear filters

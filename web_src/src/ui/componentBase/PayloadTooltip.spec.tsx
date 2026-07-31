@@ -32,15 +32,15 @@ vi.mock("@tippyjs/react/headless", () => ({
 }));
 
 describe("PayloadTooltip", () => {
-  it("uses dark tooltip surfaces and the dark Monaco theme", () => {
+  it("uses semantic tooltip surfaces and the dark Monaco theme", () => {
     render(
       <PayloadTooltip title="Payload" value={{ ok: true }}>
         <span>payload trigger</span>
       </PayloadTooltip>,
     );
 
-    expect(screen.getByText("Payload").parentElement?.parentElement?.className).toContain("dark:bg-gray-900");
-    expect(screen.getByText("Payload").className).toContain("dark:text-gray-400");
+    expect(screen.getByText("Payload").parentElement?.parentElement?.className).toContain("bg-surface-raised");
+    expect(screen.getByText("Payload").className).toContain("text-content-secondary");
     expect(monacoThemes).toContain("vs-dark");
   });
 

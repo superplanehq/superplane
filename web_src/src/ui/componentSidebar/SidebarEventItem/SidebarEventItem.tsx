@@ -124,7 +124,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     <div
       key={event.title + index}
       className={
-        `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
+        `cursor-pointer p-2 relative rounded-md border-1 border-edge-strong hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
       data-testid="sidebar-event-item"
@@ -146,7 +146,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           <span>{eventStateStyle.label || event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50">
+          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-content-primary/50">
             {event.subtitle}
           </span>
         )}
@@ -156,9 +156,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       <div className="flex items-center mt-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
           {event.triggerEventId && (
-            <span className="text-[13px] text-gray-950/50 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
+            <span className="text-[13px] text-content-primary/50 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
           )}
-          <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
+          <span className="text-sm text-content-primary font-inter truncate text-md min-w-0 font-medium">
+            {event.title}
+          </span>
         </div>
       </div>
 
@@ -166,7 +168,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {showActionsMenu && (isHovered || isDropdownOpen) && (
         <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
           <div
-            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2 dark:bg-gray-900/80"
+            className="h-full bg-surface-raised/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
             onClick={(e) => e.stopPropagation()}
           >
             <SidebarEventActionsMenu
@@ -188,20 +190,20 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div
-          className="mt-3 rounded-sm bg-white outline outline-black/15 text-gray-500 w-full mb-0.5"
+          className="mt-3 rounded-sm bg-surface-raised outline outline-edge-default text-content-secondary w-full mb-0.5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Tab Navigation */}
           {tabData && (
-            <div className="flex justify-between items-center border-b-1 border-gray-200">
+            <div className="flex justify-between items-center border-b-1 border-edge-subtle">
               <div className="flex">
                 {tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
                     className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${
                       activeTab === "current"
-                        ? "text-gray-800 border-b-1 border-black"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        ? "border-b-1 border-action-primary text-content-primary"
+                        : "text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary"
                     }`}
                   >
                     Current
@@ -212,8 +214,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     onClick={() => setActiveTab("root")}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "root"
-                        ? "text-gray-800 border-b-1 border-black"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        ? "border-b-1 border-action-primary text-content-primary"
+                        : "text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary"
                     }`}
                   >
                     Root
@@ -225,8 +227,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   onClick={() => setActiveTab("payload")}
                   className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
                     activeTab === "payload"
-                      ? "text-gray-800 border-b-1 border-black bg-gray-100"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
+                      ? "border-b-1 border-action-primary bg-surface-subtle text-content-primary"
+                      : "border-l-1 border-edge-subtle text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary"
                   }`}
                 >
                   {React.createElement(resolveIcon("code"), { size: 16 })}
@@ -253,7 +255,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         href={stringValue}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        className="text-sm flex-1 text-left w-[70%] text-content-primary cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
                         style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={stringValue}
                         onClick={(e) => e.stopPropagation()}
@@ -262,7 +264,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="w-[70%] flex-1 truncate text-left text-[13px] text-content-primary hover:underline"
                         title={stringValue}
                       >
                         {stringValue}
@@ -290,7 +292,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         href={stringValue}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        className="text-sm flex-1 text-left w-[70%] text-content-primary cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
                         style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={stringValue}
                         onClick={(e) => e.stopPropagation()}
@@ -299,7 +301,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="w-[70%] flex-1 truncate text-left text-[13px] text-content-primary hover:underline"
                         title={stringValue}
                       >
                         {stringValue}
@@ -318,7 +320,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                     <button
                       onClick={() => copyPayloadToClipboard(tabData.payload)}
-                      className="p-1 text-gray-500 hover:text-gray-800"
+                      className="p-1 text-content-secondary hover:text-content-primary"
                     >
                       {React.createElement(resolveIcon("copy"), { size: 16 })}
                     </button>
@@ -329,7 +331,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         setModalPayload(tabData.payload);
                         setIsPayloadModalOpen(true);
                       }}
-                      className="p-1 text-gray-500 hover:text-gray-800"
+                      className="p-1 text-content-secondary hover:text-content-primary"
                     >
                       {React.createElement(resolveIcon("maximize-2"), { size: 16 })}
                     </button>
@@ -371,7 +373,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                         href={value}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                        className="text-sm flex-1 text-left w-[70%] text-content-primary cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
                         style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                         title={value}
                         onClick={(e) => e.stopPropagation()}
@@ -380,7 +382,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                       </a>
                     ) : (
                       <span
-                        className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                        className="w-[70%] flex-1 truncate text-left text-[13px] text-content-primary hover:underline"
                         title={value}
                       >
                         {value}
@@ -396,10 +398,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
       {/* Payload Modal */}
       {isPayloadModalOpen && modalPayload && (
-        <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col dark:bg-gray-900">
-            <div className="flex items-center justify-between p-4 border-b dark:border-gray-800/70">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Payload</h3>
+        <div className="fixed inset-0 bg-overlay-scrim z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-raised rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-edge-subtle">
+              <h3 className="text-lg font-semibold text-content-primary">Payload</h3>
               <div className="flex items-center gap-2">
                 <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                   <Button
@@ -418,13 +420,13 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     setIsPayloadModalOpen(false);
                     setModalPayload(null);
                   }}
-                  className="p-1 hover:text-gray-700"
+                  className="p-1 hover:text-content-secondary"
                 >
                   {React.createElement(resolveIcon("x"), { size: 16 })}
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto bg-white rounded-b-lg dark:bg-gray-900">
+            <div className="flex-1 overflow-auto bg-surface-raised rounded-b-lg">
               <div className="p-4">
                 <JsonView
                   value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}

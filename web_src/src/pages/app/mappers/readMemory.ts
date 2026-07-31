@@ -35,7 +35,7 @@ export const readMemoryMapper: ComponentBaseMapper = {
     return {
       iconSlug: context.componentDefinition.icon ?? "database",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

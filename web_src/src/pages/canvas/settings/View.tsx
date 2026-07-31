@@ -47,7 +47,7 @@ export function SettingsView({ initialValues, canUpdateCanvas, isSaving, onSave,
             type="button"
             variant="ghost"
             size="sm"
-            className="-ml-2 gap-1 px-2 text-slate-600 hover:bg-slate-950/5 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className="-ml-2 gap-1 px-2 text-content-secondary hover:bg-surface-subtle hover:text-content-primary"
             onClick={onBackToCanvas}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />

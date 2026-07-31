@@ -1,5 +1,4 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { nodeCanvasMetadataSectionClassName } from "@/lib/nodeCanvasSections";
 import type {
   TriggerRenderer,
@@ -10,7 +9,7 @@ import type {
   TriggerEventContext,
 } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import { flattenObject, cn } from "@/lib/utils";
+import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
@@ -84,11 +83,9 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
           <div key={index} className="flex items-center justify-between min-w-0">
             <div className="flex items-center min-w-0 flex-1">
               <div className="w-4 h-4 mr-2 flex-shrink-0">
-                <Play size={16} className="text-gray-500 dark:text-gray-400" />
+                <Play size={16} className="text-content-muted" />
               </div>
-              <span className="text-[13px] font-medium font-inter text-gray-500 dark:text-gray-400 truncate">
-                {template.name}
-              </span>
+              <span className="font-inter truncate text-[13px] font-medium text-content-muted">{template.name}</span>
             </div>
             {showTemplateRun && actions && (
               <Button
@@ -120,7 +117,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                     template: template.name,
                   });
                 }}
-                className={cn("flex-shrink-0", appDarkModeClasses.primaryAction)}
+                className="flex-shrink-0 bg-action-primary text-action-primary-content hover:bg-action-primary-hover"
               >
                 Run
               </Button>

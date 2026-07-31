@@ -107,7 +107,7 @@ const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: 
 };
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
-  <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">You used {label} to log in last time</p>
+  <p className="mt-2 text-center text-xs text-content-secondary">You used {label} to log in last time</p>
 );
 
 const ProductUpdatesOptIn: React.FC<{
@@ -116,7 +116,7 @@ const ProductUpdatesOptIn: React.FC<{
 }> = ({ checked, onCheckedChange }) => (
   <label
     htmlFor="signup-product-updates"
-    className="flex cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300"
+    className="flex cursor-pointer items-start gap-2 text-sm text-content-secondary"
   >
     <Checkbox
       id="signup-product-updates"
@@ -129,7 +129,7 @@ const ProductUpdatesOptIn: React.FC<{
 );
 
 const SignupClosedNotice: React.FC = () => (
-  <p className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
+  <p className="text-left text-sm leading-6 text-content-secondary">
     This installation is not accepting new account signups right now. Contact your SuperPlane administrator if you need
     access.
   </p>
@@ -688,19 +688,19 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-400 flex items-center justify-center px-4 py-10 dark:bg-gray-950">
-      <div className="max-w-sm w-full rounded-3xl bg-white p-8 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas px-4 py-10">
+      <div className="w-full max-w-sm rounded-3xl bg-surface-raised p-8 shadow-sm outline outline-edge-subtle">
         <div className="text-center">
           <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8 dark:brightness-0 dark:invert" />
-          <h1 className="mt-2 !text-lg font-medium text-gray-900 dark:text-gray-100">{getHeading()}</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{getSubheading()}</p>
+          <h1 className="mt-2 !text-lg font-medium text-content-primary">{getHeading()}</h1>
+          <p className="mt-1 text-sm text-content-secondary">{getSubheading()}</p>
         </div>
 
         <div className="pt-6">
-          {configLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>}
+          {configLoading && <p className="text-sm text-content-secondary">Loading...</p>}
 
           {configError && (
-            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
+            <div className="mb-4 rounded-md border border-status-danger-edge bg-status-danger-subtle px-3 py-1 text-sm text-status-danger-content">
               {configError}
             </div>
           )}
@@ -709,11 +709,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
 
           {!configLoading && !isSignupMode && !hasAnyFormMethod && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No login methods are configured.</p>
+            <p className="text-sm text-content-secondary">No login methods are configured.</p>
           )}
 
           {!configLoading && visibleFormError && (
-            <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
+            <div className="mb-4 rounded-md border border-status-danger-edge bg-status-danger-subtle px-3 py-1 text-sm text-status-danger-content">
               {visibleFormError}
             </div>
           )}
@@ -771,7 +771,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 <button
                   type="button"
                   onClick={handleMagicCodeBack}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  className="text-sm text-content-secondary underline underline-offset-2"
                 >
                   Use a different email
                 </button>
@@ -913,7 +913,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                     setShowPasswordLogin(true);
                     setFormError(null);
                   }}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  className="text-sm text-content-secondary underline underline-offset-2"
                 >
                   Sign in with password instead
                 </button>
@@ -932,7 +932,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                     setShowPasswordLogin(false);
                     setFormError(null);
                   }}
-                  className="text-sm text-gray-500 underline underline-offset-2 dark:text-gray-400"
+                  className="text-sm text-content-secondary underline underline-offset-2"
                 >
                   Sign in with email code instead
                 </button>
@@ -946,10 +946,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               : useMagicCodePrimary
                 ? magicCodeStep === "email"
                 : canLoginWithPassword) && (
-              <div className="my-5 flex items-center gap-3 text-sm text-gray-800 dark:text-gray-300">
-                <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
+              <div className="my-5 flex items-center gap-3 text-sm text-content-secondary">
+                <div className="h-px flex-1 bg-edge-default" />
                 <span>or</span>
-                <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
+                <div className="h-px flex-1 bg-edge-default" />
               </div>
             )}
 
@@ -1005,11 +1005,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           )}
 
           {!configLoading && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
-            <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+            <div className="mt-6 text-sm text-content-secondary">
               {"Don't have an account? "}
               <Link
                 to={`/signup${redirectQuery}`}
-                className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                className="font-medium text-content-primary underline underline-offset-2"
               >
                 Create an account
               </Link>
@@ -1017,11 +1017,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           )}
 
           {!configLoading && isSignupMode && (
-            <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+            <div className="mt-6 text-sm text-content-secondary">
               Already have an account?{" "}
               <Link
                 to={`/login${redirectQuery}`}
-                className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                className="font-medium text-content-primary underline underline-offset-2"
               >
                 Sign in
               </Link>
@@ -1033,11 +1033,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             magicCodeStep === "email" &&
             !isSignupMode &&
             showSignupEntryPoint && (
-              <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              <div className="mt-6 text-center text-sm text-content-secondary">
                 {"Don't have an account? "}
                 <Link
                   to={`/signup${redirectQuery}`}
-                  className="font-medium text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                  className="font-medium text-content-primary underline underline-offset-2"
                 >
                   Sign up
                 </Link>

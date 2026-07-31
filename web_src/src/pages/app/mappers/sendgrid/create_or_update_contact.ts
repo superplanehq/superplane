@@ -103,8 +103,8 @@ function contactSpecs(node: NodeInfo): ComponentBaseSpec[] | undefined {
         badges: [
           {
             label: listId,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700",
+            bgColor: "bg-action-neutral",
+            textColor: "text-content-secondary",
           },
         ],
       })),

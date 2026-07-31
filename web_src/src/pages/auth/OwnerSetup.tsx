@@ -3,8 +3,6 @@ import { posthog, isPostHogEnabled } from "@/posthog";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -144,16 +142,8 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div
-      className={cn("min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8", appDarkModeClasses.surface)}
-    >
-      <div
-        className={cn(
-          "max-w-md w-full rounded-lg bg-white p-8 shadow-sm",
-          appDarkModeClasses.modalEdge,
-          appDarkModeClasses.surfaceRaised,
-        )}
-      >
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas px-4 py-8">
+      <div className="w-full max-w-md rounded-lg border border-edge-default bg-surface-raised p-8 shadow-sm">
         {step === "owner" && (
           <OwnerStep
             email={email}

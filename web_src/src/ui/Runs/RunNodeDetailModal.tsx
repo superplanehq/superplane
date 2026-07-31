@@ -26,12 +26,12 @@ export function RunNodeDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim px-4 py-6"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-edge-subtle bg-surface-raised shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

@@ -90,7 +90,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: dash0Icon,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
@@ -176,8 +176,8 @@ function getSpecs(configuration: ListIssuesConfiguration): ComponentBaseSpec[] |
         badges: [
           {
             label: rule,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700",
+            bgColor: "bg-action-neutral",
+            textColor: "text-content-secondary",
           },
         ],
       })),
@@ -189,19 +189,19 @@ export const LIST_ISSUES_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   clear: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   degraded: {
     icon: "alert-triangle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-yellow-100",
     badgeColor: "bg-yellow-500",
   },
   critical: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },

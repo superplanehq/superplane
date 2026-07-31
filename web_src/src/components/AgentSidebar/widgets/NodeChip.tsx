@@ -74,7 +74,7 @@ export function NodeChipFromLink({
 
 function getChipStyle(node: SuperplaneComponentsNode | undefined, component?: string, isTrigger?: boolean) {
   const trigger = isTrigger ?? isTriggerNode(node, component);
-  if (!node && !component) return "bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-300";
+  if (!node && !component) return "bg-action-neutral text-content-secondary";
   return trigger
     ? "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:hover:bg-violet-900"
     : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900";
@@ -103,18 +103,14 @@ function NodeHoverIcon({ component, isTrigger }: { component?: string; isTrigger
 function NeighborChip({ neighbor }: { neighbor: NodeNeighbor }) {
   const label = neighbor.direction === "upstream" ? `← ${neighbor.label}` : `${neighbor.label} →`;
   return (
-    <span className="max-w-full truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-gray-800 dark:text-gray-300">
+    <span className="max-w-full truncate rounded-full bg-action-neutral px-2 py-0.5 text-[11px] text-content-secondary">
       {label}
     </span>
   );
 }
 
 function HoverSectionLabel({ children }: { children: string }) {
-  return (
-    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500">
-      {children}
-    </div>
-  );
+  return <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-content-muted">{children}</div>;
 }
 
 function NodeHoverHeader({
@@ -135,12 +131,12 @@ function NodeHoverHeader({
           : "border-blue-200 bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/55",
       )}
     >
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/80 shadow-sm dark:bg-gray-900/70">
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface-overlay/80 shadow-sm">
         <NodeHoverIcon component={component} isTrigger={isTrigger} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-slate-900 dark:text-gray-100">{node.name || node.id}</p>
-        <p className="text-[11px] text-slate-500 dark:text-gray-400">
+        <p className="truncate text-[13px] font-semibold text-content-primary">{node.name || node.id}</p>
+        <p className="text-[11px] text-content-secondary">
           {component || "unknown"} · {isTrigger ? "Trigger" : "Action"}
         </p>
       </div>
@@ -222,7 +218,7 @@ function NodeHoverContent({
                 items={metadataItems}
                 maxVisibleItems={3}
                 iconSize={14}
-                className="flex flex-col gap-1 text-slate-600 dark:text-gray-300"
+                className="flex flex-col gap-1 text-content-secondary"
               />
             </div>
           )}
@@ -235,7 +231,7 @@ function NodeHoverContent({
                   <NeighborChip key={`${neighbor.direction}:${neighbor.id}`} neighbor={neighbor} />
                 ))}
                 {neighbors.overflow > 0 && (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-gray-800 dark:text-gray-400">
+                  <span className="rounded-full bg-action-neutral px-2 py-0.5 text-[11px] text-content-secondary">
                     +{neighbors.overflow} more
                   </span>
                 )}
@@ -254,7 +250,7 @@ function NodeHoverContent({
         </div>
       )}
 
-      <div className="border-t border-slate-100 px-3.5 py-2 text-[11px] text-slate-400 dark:border-gray-800 dark:text-gray-500">
+      <div className="border-t border-edge-subtle px-3.5 py-2 text-[11px] text-content-muted">
         Click to open on canvas
       </div>
     </div>

@@ -74,7 +74,7 @@ export function CanvasActionsMenu({
         {!canManage ? (
           <PermissionTooltip allowed={permissionsLoading} message="You don't have permission to manage this canvas.">
             <button
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 rounded text-content-secondary hover:bg-action-neutral-hover disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Canvas actions"
               disabled
             >
@@ -91,7 +91,7 @@ export function CanvasActionsMenu({
               }}
             >
               <button
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 rounded text-content-secondary hover:bg-action-neutral-hover disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Canvas actions"
                 disabled={deleteCanvasMutation.isPending}
               >
@@ -125,8 +125,8 @@ export function CanvasActionsMenu({
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{canvas.name}"?</DialogTitle>
-        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+        <DialogTitle className="text-content-primary">Delete "{canvas.name}"?</DialogTitle>
+        <DialogDescription className="text-sm text-content-secondary">
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
         <DialogActions>

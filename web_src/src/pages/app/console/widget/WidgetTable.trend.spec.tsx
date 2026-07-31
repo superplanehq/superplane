@@ -188,7 +188,7 @@ describe("WidgetTable trend columns", () => {
     expect(cell.getAttribute("data-trend-kind")).toBe("incomparable");
     expect(cell.getAttribute("data-trend-direction")).toBeNull();
     expect(cell.getAttribute("data-trend-polarity")).toBeNull();
-    expect(cell.className).toContain("text-slate-400");
+    expect(cell.className).toContain("text-content-muted");
     expect(cell.className).not.toContain("text-emerald");
     expect(cell.className).not.toContain("text-red");
     expect(cell.textContent).toBe("-");

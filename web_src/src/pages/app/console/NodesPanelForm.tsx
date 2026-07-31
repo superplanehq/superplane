@@ -39,7 +39,7 @@ export function NodesPanelForm({ value, onChange }: NodesPanelFormProps) {
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -53,24 +53,24 @@ export function NodesPanelForm({ value, onChange }: NodesPanelFormProps) {
           onCheckedChange={(checked) =>
             onChange({ ...value, allowConcurrentRuns: checked === true ? true : undefined })
           }
-          className="mt-0.5 border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
+          className="mt-0.5 border-edge-default data-[state=checked]:border-status-info data-[state=checked]:bg-status-info"
           data-testid="nodes-panel-allow-concurrent-runs"
         />
-        <Label htmlFor={allowConcurrentRunsId} className="text-xs text-slate-700 dark:text-gray-300">
+        <Label htmlFor={allowConcurrentRunsId} className="text-xs text-content-primary">
           Allow concurrent runs — keep Run buttons enabled while a run is in progress so multiple runs can be triggered
           at once. When off (default), buttons are disabled until the current run finishes.
         </Label>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Nodes</Label>
+          <Label className="text-xs font-medium text-content-secondary">Nodes</Label>
           <Button type="button" size="sm" variant="outline" onClick={addEntry} data-testid="nodes-panel-add-entry">
             <Plus className="mr-1 h-3.5 w-3.5" />
             Add node
           </Button>
         </div>
         {value.nodes.length === 0 ? (
-          <p className="rounded border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500 dark:border-gray-600 dark:text-gray-400">
+          <p className="rounded border border-dashed border-edge-default px-3 py-4 text-center text-xs text-content-secondary">
             No nodes yet. Add one to display it in this panel.
           </p>
         ) : (
@@ -106,10 +106,10 @@ function NodesPanelEntryRow({
   const canManualRun = isManualRunNode(resolved?.node);
 
   return (
-    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
+    <div className="space-y-2 rounded border border-edge-default p-2.5">
       <div className="grid grid-cols-12 gap-2">
         <div className="col-span-6 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Node</Label>
+          <Label className="text-[11px] font-medium text-content-secondary">Node</Label>
           <Select value={entry.node || "__none__"} onValueChange={(v) => onChange({ node: v === "__none__" ? "" : v })}>
             <SelectTrigger className="h-8">
               <SelectValue placeholder="Select a node" />
@@ -125,7 +125,7 @@ function NodesPanelEntryRow({
           </Select>
         </div>
         <div className="col-span-5 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Label (optional)</Label>
+          <Label className="text-[11px] font-medium text-content-secondary">Label (optional)</Label>
           <Input
             value={entry.label ?? ""}
             onChange={(e) => onChange({ label: e.target.value || undefined })}
@@ -148,7 +148,7 @@ function NodesPanelEntryRow({
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Description (optional)</Label>
+        <Label className="text-[11px] font-medium text-content-secondary">Description (optional)</Label>
         <Textarea
           value={entry.description ?? ""}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -164,16 +164,16 @@ function NodesPanelEntryRow({
               id={showRunId}
               checked={Boolean(entry.showRun)}
               onCheckedChange={(checked) => onChange({ showRun: checked === true })}
-              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
+              className="border-edge-default data-[state=checked]:border-status-info data-[state=checked]:bg-status-info"
             />
-            <Label htmlFor={showRunId} className="text-xs text-slate-700 dark:text-gray-300">
+            <Label htmlFor={showRunId} className="text-xs text-content-primary">
               Show a manual "Run" button (requires run permission).
             </Label>
           </div>
           {entry.showRun ? <NodesPanelRunFormOptions entry={entry} resolved={resolved} onChange={onChange} /> : null}
         </>
       ) : entry.node && resolved ? (
-        <p className="text-[11px] text-slate-500 dark:text-gray-400">
+        <p className="text-[11px] text-content-secondary">
           Only trigger nodes with a manual run can be fired from the console. Pick the trigger that starts your flow.
         </p>
       ) : null}
@@ -205,7 +205,7 @@ function NodesPanelRunFormOptions({
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Trigger template (optional)</Label>
+        <Label className="text-[11px] font-medium text-content-secondary">Trigger template (optional)</Label>
         <Input
           value={entry.triggerName ?? ""}
           onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
@@ -216,7 +216,7 @@ function NodesPanelRunFormOptions({
       {canOfferInlineForm ? (
         <>
           <div className="space-y-1.5">
-            <Label htmlFor={formModeId} className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
+            <Label htmlFor={formModeId} className="text-[11px] font-medium text-content-secondary">
               Run form
             </Label>
             <Select
@@ -231,7 +231,7 @@ function NodesPanelRunFormOptions({
                 <SelectItem value="inline">Inline (render form in widget)</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-slate-500 dark:text-gray-400">
+            <p className="text-[11px] text-content-secondary">
               Inline renders the template's parameter form directly in the widget body — best for prompt-submission
               style widgets.
             </p>
@@ -247,9 +247,9 @@ function NodesPanelRunFormOptions({
             id={promptConfirmationId}
             checked={Boolean(entry.promptConfirmation)}
             onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
-            className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+            className="border-edge-default data-[state=checked]:border-status-info data-[state=checked]:bg-status-info"
           />
-          <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
+          <Label htmlFor={promptConfirmationId} className="text-xs text-content-primary">
             Prompt confirmation before running (templates with input fields always prompt).
           </Label>
         </div>
@@ -269,8 +269,8 @@ function NodesPanelInlinePresentationOptions({
   const showFieldLabelsId = useId();
 
   return (
-    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
-      <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Inline presentation</Label>
+    <div className="space-y-2 rounded border border-edge-default p-2.5">
+      <Label className="text-[11px] font-medium text-content-secondary">Inline presentation</Label>
       <InlineVisibilityOption
         id={showNodeLabelId}
         label="Show node label above form"
@@ -284,7 +284,7 @@ function NodesPanelInlinePresentationOptions({
         onCheckedChange={(checked) => onChange({ showFieldLabels: checked ? undefined : false })}
       />
       <div className="space-y-1.5">
-        <Label className="text-[11px] text-slate-600 dark:text-gray-400">Submit label (optional)</Label>
+        <Label className="text-[11px] text-content-secondary">Submit label (optional)</Label>
         <Input
           value={entry.submitLabel ?? ""}
           onChange={(e) => onChange({ submitLabel: e.target.value || undefined })}
@@ -313,9 +313,9 @@ function InlineVisibilityOption({
         id={id}
         checked={checked}
         onCheckedChange={(value) => onCheckedChange(value === true)}
-        className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+        className="border-edge-default data-[state=checked]:border-status-info data-[state=checked]:bg-status-info"
       />
-      <Label htmlFor={id} className="text-xs text-slate-700 dark:text-gray-300">
+      <Label htmlFor={id} className="text-xs text-content-primary">
         {label}
       </Label>
     </div>

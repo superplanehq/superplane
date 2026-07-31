@@ -1,7 +1,6 @@
 import JsonView from "@uiw/react-json-view";
 import React from "react";
 import { useTheme } from "@/contexts/useTheme";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
 import { cn, resolveIcon } from "@/lib/utils";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
@@ -34,12 +33,7 @@ export function RunNodeDetailTabSection({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div
-        className={cn(
-          "relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b px-2",
-          appDarkModeClasses.sidebarEdge,
-        )}
-      >
+      <div className="relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b border-edge-default px-2">
         {hasDetailsSection ? (
           <TabButton
             active={activeTab === "details"}
@@ -117,8 +111,8 @@ function TabButton({
       className={cn(
         "mb-[-1px] flex items-center gap-1 self-stretch border-b px-2.5 text-[13px] font-medium transition-colors",
         active
-          ? "border-gray-700 text-gray-800 dark:border-indigo-300 dark:text-indigo-300"
-          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
+          ? "border-action-primary text-action-primary"
+          : "border-transparent text-content-secondary hover:text-content-primary",
       )}
     >
       {React.createElement(resolveIcon(icon), { size: RUN_NODE_ICON_SIZE, className: "h-3.5 w-3.5 shrink-0" })}

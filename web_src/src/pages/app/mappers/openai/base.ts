@@ -22,7 +22,7 @@ export const baseMapper: ComponentBaseMapper = {
     return {
       iconSrc: openAiIcon,
       iconSlug: context.componentDefinition?.icon ?? "sparkles",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "OpenAI",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

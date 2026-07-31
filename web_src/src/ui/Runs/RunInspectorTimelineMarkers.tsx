@@ -18,10 +18,7 @@ export function TimelineRail({
     <div className="flex gap-3">
       <div className="relative flex w-6 shrink-0 flex-col items-center self-stretch">
         {!isLast ? (
-          <div
-            aria-hidden
-            className="absolute top-8 -bottom-5 left-1/2 w-px -translate-x-1/2 bg-slate-200 dark:bg-gray-800"
-          />
+          <div aria-hidden className="absolute top-8 -bottom-5 left-1/2 w-px -translate-x-1/2 bg-edge-default" />
         ) : null}
         <div className="relative z-10">{marker}</div>
       </div>
@@ -34,7 +31,7 @@ export function StepMarker({ type }: { type: TimelineStepType }) {
   const Icon = stepMarkerIcons[type];
 
   return (
-    <span className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-gray-950 dark:ring-gray-800">
+    <span className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-raised text-content-secondary ring-1 ring-edge-subtle">
       <Icon className="h-3.5 w-3.5" />
     </span>
   );
@@ -53,7 +50,7 @@ export function NodeMarker({
   const component = workflowNode?.component;
 
   return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-gray-950 dark:ring-gray-800">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-raised text-content-secondary ring-1 ring-edge-subtle">
       <RunNodeIcon
         iconSrc={getHeaderIconSrc(component)}
         iconSlug={component ? componentIconMap[component] : undefined}

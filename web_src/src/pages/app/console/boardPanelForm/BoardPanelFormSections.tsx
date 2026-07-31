@@ -39,7 +39,7 @@ export function BoardHeaderFields({
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -47,7 +47,7 @@ export function BoardHeaderFields({
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Group rows by</Label>
+        <Label className="text-xs font-medium text-content-secondary">Group rows by</Label>
         <Input
           value={value.render.groupBy}
           onChange={(e) => onChange({ ...value, render: { ...value.render, groupBy: e.target.value } })}
@@ -55,7 +55,7 @@ export function BoardHeaderFields({
           list={fieldOptions.length > 0 ? "table-field-options" : undefined}
           data-testid="board-groupby-field"
         />
-        <p className="text-[11px] text-slate-500 dark:text-gray-400">
+        <p className="text-[11px] text-content-muted">
           Row field whose value places the row into a lane. Values are matched case-insensitively and trimmed.
         </p>
       </div>
@@ -68,10 +68,7 @@ export function BoardHeaderFields({
           }
           data-testid="board-other-lane-toggle"
         />
-        <Label
-          htmlFor="board-other-lane"
-          className="cursor-pointer text-xs font-medium text-slate-600 dark:text-gray-400"
-        >
+        <Label htmlFor="board-other-lane" className="cursor-pointer text-xs font-medium text-content-secondary">
           Show unmatched rows in a trailing &ldquo;Other&rdquo; lane
         </Label>
       </div>
@@ -84,7 +81,7 @@ export function BoardLanesSection({ value, actions }: { value: BoardPanelContent
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Lanes</Label>
+        <Label className="text-xs font-medium text-content-secondary">Lanes</Label>
         <Button type="button" size="sm" variant="outline" onClick={actions.addLane} data-testid="board-add-lane">
           Add lane
         </Button>
@@ -99,7 +96,7 @@ export function BoardLanesSection({ value, actions }: { value: BoardPanelContent
           />
         ))}
         {lanes.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-gray-400">
+          <p className="text-xs text-content-muted">
             Add at least one lane. Each lane matches rows whose <code className="text-[11px]">groupBy</code> value
             equals the lane value.
           </p>
@@ -119,7 +116,7 @@ function BoardLaneRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex gap-2 rounded-lg bg-slate-100 p-2 dark:bg-gray-800" data-testid="board-lane-row">
+    <div className="flex gap-2 rounded-lg bg-surface-subtle p-2" data-testid="board-lane-row">
       <div className="grid min-w-0 flex-1 grid-cols-12 items-center gap-2">
         <Input
           className="col-span-5 h-8"
@@ -155,7 +152,7 @@ function BoardLaneRow({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
+          className="h-6 w-6 cursor-pointer text-content-muted hover:bg-status-danger-subtle hover:text-status-danger-content"
           onClick={onRemove}
           aria-label="Remove lane"
         >
@@ -181,7 +178,7 @@ export function BoardCardSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Card</Label>
+        <Label className="text-xs font-medium text-content-secondary">Card</Label>
         <Button
           type="button"
           size="sm"
@@ -193,7 +190,7 @@ export function BoardCardSection({
         </Button>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[11px] font-medium text-slate-500 dark:text-gray-400">Title field</Label>
+        <Label className="text-[11px] font-medium text-content-muted">Title field</Label>
         <Input
           value={value.render.card.titleField}
           onChange={(e) =>
@@ -219,7 +216,7 @@ export function BoardCardSection({
           />
         ))}
         {cardFields.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-gray-400">
+          <p className="text-xs text-content-muted">
             Optional extra fields shown under the card title. Each field reuses the table column formatting vocabulary.
           </p>
         ) : null}
@@ -241,7 +238,7 @@ export function BoardFiltersSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Filters</Label>
+        <Label className="text-xs font-medium text-content-secondary">Filters</Label>
         <Button type="button" size="sm" variant="outline" onClick={actions.addFilter} data-testid="board-add-filter">
           Add filter
         </Button>
@@ -277,7 +274,7 @@ export function BoardSortSection({
   const datalistId = fieldOptions.length > 0 ? "board-sort-field-options" : undefined;
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort within lane (optional)</Label>
+      <Label className="text-xs font-medium text-content-secondary">Sort within lane (optional)</Label>
       <div className="grid grid-cols-3 gap-2">
         <Input
           className="col-span-2 h-8"
@@ -336,12 +333,12 @@ export function BoardRowActionsSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Row actions</Label>
+        <Label className="text-xs font-medium text-content-secondary">Row actions</Label>
         <Button type="button" size="sm" variant="outline" onClick={actions.addAction} data-testid="board-add-action">
           Add action
         </Button>
       </div>
-      <p className="max-w-xl text-xs text-slate-500 dark:text-gray-400">
+      <p className="max-w-xl text-xs text-content-muted">
         Trigger-only, same rules as the table panel. Buttons appear at the bottom of each card.
       </p>
       <div className="space-y-3">

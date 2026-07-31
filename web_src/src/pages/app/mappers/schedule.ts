@@ -348,7 +348,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSlug: definition.icon,
       iconColor: getColorClass("black"),
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       metadata: [
         {
           icon: "calendar-cog",
@@ -397,23 +397,19 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
 
     return React.createElement(
       "div",
-      { className: "border-t-1 border-gray-200 pt-4" },
+      { className: "border-t-1 border-edge-default pt-4" },
       React.createElement(
         "div",
         { className: "space-y-3" },
         React.createElement(
           "div",
           null,
-          React.createElement(
-            "span",
-            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
-            "Runs on:",
-          ),
+          React.createElement("span", { className: "text-sm font-medium text-content-secondary" }, "Runs on:"),
           React.createElement(
             "div",
             {
               className:
-                "text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre-line",
+                "mt-1 rounded-md border-1 border-orange-950/20 bg-orange-50 px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre-line dark:bg-amber-800",
             },
             scheduleDescription || "Schedule not configured",
           ),
@@ -421,16 +417,12 @@ export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
         React.createElement(
           "div",
           null,
-          React.createElement(
-            "span",
-            { className: "text-sm font-medium text-gray-700 dark:text-gray-300" },
-            "Next run:",
-          ),
+          React.createElement("span", { className: "text-sm font-medium text-content-secondary" }, "Next run:"),
           React.createElement(
             "div",
             {
               className:
-                "text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre-line",
+                "mt-1 rounded-md border-1 border-orange-950/20 bg-orange-50 px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre-line dark:bg-amber-800",
             },
             nextTrigger,
           ),

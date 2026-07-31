@@ -100,7 +100,7 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
     return <SingleNodeBody entry={content.nodes[0]} lock={lock} allowConcurrentRuns={allowConcurrentRuns} />;
   }
   return (
-    <ul className="flex h-full flex-col divide-y divide-slate-100 dark:divide-gray-800" data-testid="nodes-panel-list">
+    <ul className="flex h-full flex-col divide-y divide-edge-subtle" data-testid="nodes-panel-list">
       {content.nodes.map((entry, idx) => (
         <NodesPanelRow
           key={`${entry.node}-${idx}`}
@@ -184,10 +184,10 @@ function singleNodeLayoutStyles(useInlineLayout: boolean) {
     container: useInlineLayout
       ? "flex h-full min-h-0 flex-col items-stretch gap-3 p-4"
       : "flex h-full flex-col items-center justify-center gap-3 p-4",
-    header: "shrink-0 text-[13px] font-semibold text-slate-800 dark:text-gray-100",
+    header: "shrink-0 text-[13px] font-semibold text-content-primary",
     description: useInlineLayout
-      ? "shrink-0 text-[13px] text-slate-500 dark:text-gray-400"
-      : "max-w-full truncate text-center text-[13px] text-slate-500 dark:text-gray-400",
+      ? "shrink-0 text-[13px] text-content-secondary"
+      : "max-w-full truncate text-center text-[13px] text-content-secondary",
     runControl: useInlineLayout ? "flex min-h-0 flex-1 flex-col" : undefined,
   };
 }
@@ -223,9 +223,7 @@ function NodesPanelRow({
           </p>
         ) : null}
         {!configured ? (
-          <p className="truncate text-[13px] text-slate-400 dark:text-gray-500">
-            Pick a node from the editor to display it here.
-          </p>
+          <p className="truncate text-[13px] text-content-muted">Pick a node from the editor to display it here.</p>
         ) : null}
         {configured && !resolved ? (
           <p className="truncate text-[13px] text-amber-600 dark:text-amber-400">
@@ -252,11 +250,9 @@ function rowLayoutStyles(useInlineLayout: boolean) {
     row: useInlineLayout ? "flex flex-col gap-2 px-3 py-3" : "flex items-center gap-3 px-3 py-2",
     text: useInlineLayout ? "min-w-0" : "min-w-0 flex-1",
     name: useInlineLayout
-      ? "text-[13px] font-medium text-slate-800 dark:text-gray-100"
-      : "truncate text-[13px] font-medium text-slate-800 dark:text-gray-100",
-    description: useInlineLayout
-      ? "text-[13px] text-slate-500 dark:text-gray-400"
-      : "truncate text-[13px] text-slate-500 dark:text-gray-400",
+      ? "text-[13px] font-medium text-content-primary"
+      : "truncate text-[13px] font-medium text-content-primary",
+    description: useInlineLayout ? "text-[13px] text-content-secondary" : "truncate text-[13px] text-content-secondary",
   };
 }
 

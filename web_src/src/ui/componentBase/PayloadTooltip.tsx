@@ -85,11 +85,11 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
       render={(attrs) => (
         <div
           {...attrs}
-          className={`rounded-md border-2 border-gray-200 bg-white ${maxWidth} max-h-[400px] overflow-auto text-left shadow-lg dark:border-gray-700 dark:bg-gray-900`}
+          className={`rounded-md border-2 border-edge-subtle bg-surface-raised ${maxWidth} max-h-[400px] overflow-auto text-left shadow-lg`}
           style={{ zIndex: 10000 }}
         >
-          <div className="flex items-center border-b border-gray-200 p-2 dark:border-gray-700">
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</span>
+          <div className="flex items-center border-b border-edge-subtle p-2">
+            <span className="text-sm font-medium text-content-secondary">{title}</span>
           </div>
           <div className="p-2">
             <PayloadEditor contentType={contentType} monacoTheme={monacoTheme} value={value} />

@@ -40,9 +40,9 @@ function PropertyReadonlyDisplay({ draft, trimmedDraft, readonlyHref }: Property
           {readonlyHref}
         </a>
       ) : trimmedDraft === "" ? (
-        <span className="text-gray-400 dark:text-gray-500">No value</span>
+        <span className="text-content-muted">No value</span>
       ) : (
-        <span className="text-gray-800 dark:text-gray-100">{draft}</span>
+        <span className="text-content-primary">{draft}</span>
       )}
     </div>
   );
@@ -175,11 +175,8 @@ function IntegrationPropertyRow({
   const readonlyHref = trimmedDraft !== "" && isUrl(trimmedDraft) ? trimmedDraft : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-200 pb-4 last:border-b-0 last:pb-0 dark:border-gray-800">
-      <Label
-        htmlFor={isEditable && isEditingThis ? inputId : undefined}
-        className="shrink-0 text-gray-800 dark:text-gray-100"
-      >
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-edge-subtle pb-4 last:border-b-0 last:pb-0">
+      <Label htmlFor={isEditable && isEditingThis ? inputId : undefined} className="shrink-0 text-content-primary">
         {title}
       </Label>
       <DescriptionTooltip title={title} description={description} />
@@ -254,11 +251,11 @@ export function PropertiesTab({
   };
 
   if (integrationProperties.length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No properties for this integration.</p>;
+    return <p className="text-sm text-content-secondary">No properties for this integration.</p>;
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
+    <div className="space-y-4 rounded-lg border border-edge-default bg-surface-raised p-4">
       {integrationProperties.map((property) => (
         <IntegrationPropertyRow
           key={property.name}

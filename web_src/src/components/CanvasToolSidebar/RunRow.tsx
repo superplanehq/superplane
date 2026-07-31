@@ -66,7 +66,7 @@ export function RunRow({
       className={cn(
         RUNS_SIDEBAR_RUN_ROW_CLASS,
         "group relative w-full transition-colors",
-        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-slate-50 dark:hover:bg-gray-800",
+        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-action-neutral-hover",
       )}
     >
       <Link
@@ -110,7 +110,7 @@ function RunRowTitleLine({
       <span
         className={cn(
           "min-w-0 flex-1 truncate text-[13px] leading-5",
-          isSelected ? "font-medium text-sky-950 dark:text-gray-50" : "font-medium text-gray-900 dark:text-gray-100",
+          isSelected ? "font-medium text-status-info-content" : "font-medium text-content-primary",
         )}
         title={title}
       >
@@ -127,7 +127,7 @@ function CopyRunLinkButton({ runHref }: { runHref: string }) {
     <button
       type="button"
       title="Copy link to run"
-      className="pointer-events-auto hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+      className="pointer-events-auto hidden shrink-0 rounded p-0.5 text-content-muted hover:bg-action-neutral-hover hover:text-content-primary group-hover:inline-flex"
       onClick={(event) => {
         event.stopPropagation();
         void copyRunLink(runHref);
@@ -168,7 +168,7 @@ function RunRowMetadataLine({
   return (
     <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-2">
       <RunTriggerIdentity triggerName={triggerName} iconSrc={iconSrc} iconSlug={iconSlug} isSelected={isSelected} />
-      <span className="flex min-w-0 shrink-0 items-center gap-2 text-[12px] leading-4 text-gray-500 dark:text-gray-400">
+      <span className="flex min-w-0 shrink-0 items-center gap-2 text-[12px] leading-4 text-content-secondary">
         {durationText ? <span className="shrink-0 tabular-nums">{durationText}</span> : null}
         {createdAt ? (
           <span
@@ -202,12 +202,9 @@ function RunTriggerIdentity({
         iconSlug={iconSlug}
         alt={triggerName}
         size={RUN_NODE_ICON_SIZE}
-        className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          isSelected ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400",
-        )}
+        className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-content-primary" : "text-content-secondary")}
       />
-      <span className="min-w-0 truncate text-[12px] leading-4 text-gray-600 dark:text-gray-400" title={triggerName}>
+      <span className="min-w-0 truncate text-[12px] leading-4 text-content-secondary" title={triggerName}>
         {triggerName}
       </span>
     </span>

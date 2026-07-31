@@ -269,7 +269,7 @@ function IntegrationList({
   onCreateNew: (name: string) => void;
 }) {
   return (
-    <div className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-gray-700/70 dark:border-gray-700/70">
+    <div className="divide-y divide-edge-subtle rounded-md border border-edge-default">
       {integrationData.map((data) =>
         variant === "status" ? (
           <HomeIntegrationConnectRow
@@ -389,7 +389,7 @@ function IntegrationRow({
   return (
     <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">
       <IntegrationIcon integrationName={data.name} className="h-4 w-4 shrink-0" size={16} />
-      <span className="shrink-0 truncate text-sm font-medium text-slate-900 dark:text-gray-100">{displayName}</span>
+      <span className="shrink-0 truncate text-sm font-medium text-content-primary">{displayName}</span>
       {data.allInstances.length > 0 ? (
         <>
           <Select value={selectedId || ""} onValueChange={handleInstanceSelect}>
@@ -419,7 +419,7 @@ function IntegrationRow({
         </>
       ) : (
         <>
-          <span className="min-w-0 flex-1 text-xs font-medium text-gray-400 dark:text-gray-500">Not connected</span>
+          <span className="min-w-0 flex-1 text-xs font-medium text-content-muted">Not connected</span>
           <Button type="button" variant="outline" size="xs" className="shrink-0" onClick={onCreateNew}>
             Connect
           </Button>

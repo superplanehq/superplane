@@ -64,7 +64,7 @@ function renderCategoryIcon(
     );
   }
   if (CategoryIcon) {
-    return <CategoryIcon size={14} className="text-gray-500 dark:text-gray-400" />;
+    return <CategoryIcon size={14} className="text-content-secondary" />;
   }
   return null;
 }
@@ -98,7 +98,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
         {appIconSrc ? (
           <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
         ) : (
-          <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
+          <IconComponent size={14} className="text-content-secondary" />
         )}
       </ItemMedia>
 
@@ -133,7 +133,7 @@ const INTEGRATION_STATE_COLOR: Record<IntegrationState, string> = {
   ready: "text-green-500",
   error: "text-red-500",
   pending: "text-amber-600",
-  notConfigured: "text-gray-500",
+  notConfigured: "text-content-secondary",
 };
 
 export function CategorySection({
@@ -177,15 +177,15 @@ export function CategorySection({
         }
       }}
     >
-      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+      <summary className="relative cursor-pointer hover:text-content-secondary mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
-        <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
+        <span className="relative z-10 flex items-center gap-1 bg-surface-raised pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
           {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon)}
-          <span className="text-[13px] text-gray-800 font-medium pl-1 dark:text-gray-100">{category.name}</span>
+          <span className="text-[13px] text-content-primary font-medium pl-1">{category.name}</span>
         </span>
         {showIntegrationSetupStatus && (
-          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
+          <span className="relative z-10 shrink-0 bg-surface-raised pl-3">
             <Plug size={14} className={integrationStatusColorClass} />
           </span>
         )}

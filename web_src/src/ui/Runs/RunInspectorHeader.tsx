@@ -65,35 +65,35 @@ export function RunInspectorHeader({
   const isStopAction = status === "running";
 
   return (
-    <div className="sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950">
+    <div className="sticky top-0 z-20 border-b border-edge-subtle bg-surface-raised px-4 py-4">
       <div className="flex flex-col gap-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <RunStatusBadge status={status} />
-          <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-gray-900 dark:text-gray-100">
+          <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-content-primary">
             {title}
           </h2>
         </div>
         {parentRunHref ? (
           <Link
             to={parentRunHref}
-            className="inline-flex w-fit items-center gap-1 text-xs font-medium text-gray-600 underline decoration-gray-300 underline-offset-2 transition-colors hover:text-gray-900 hover:decoration-gray-500 dark:text-gray-400 dark:decoration-gray-600 dark:hover:text-gray-100 dark:hover:decoration-gray-400"
+            className="inline-flex w-fit items-center gap-1 text-xs font-medium text-content-secondary underline decoration-edge-default underline-offset-2 transition-colors hover:text-content-primary hover:decoration-edge-strong"
           >
             <CornerLeftUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
             See parent
           </Link>
         ) : null}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-content-secondary">
             {run.createdAt ? <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" /> : null}
             {durationText ? (
               <>
-                <span className="text-gray-300" aria-hidden>
+                <span className="text-content-muted" aria-hidden>
                   ·
                 </span>
                 <span>{durationText}</span>
               </>
             ) : null}
-            <span className="text-gray-300" aria-hidden>
+            <span className="text-content-muted" aria-hidden>
               ·
             </span>
             <span>

@@ -35,11 +35,11 @@ export function UnifiedDiffView({
   const files = useMemo(() => parseDiff(toUnifiedDiffText(lines), { nearbySequences: "zip" }), [lines]);
 
   if (!files.length) {
-    return <p className="text-xs text-slate-600">{emptyMessage}</p>;
+    return <p className="text-xs text-content-secondary">{emptyMessage}</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-md border border-edge-default bg-surface-raised">
       <div className="max-h-96 overflow-auto">
         {files.map((file) => (
           <Diff

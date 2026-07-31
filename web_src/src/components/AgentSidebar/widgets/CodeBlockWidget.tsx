@@ -79,16 +79,16 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
 
   return (
     <>
-      <div className="group my-4 w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-700 dark:bg-gray-900/60">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
+      <div className="group my-4 w-full min-w-0 overflow-hidden rounded-lg border border-edge-default bg-surface-raised">
+        <div className="flex items-center justify-between border-b border-edge-default bg-surface-subtle px-3 py-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-content-secondary">
             {language || "code"}
           </span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => void copyCode(setCopied)}
-              className="cursor-pointer rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              className="cursor-pointer rounded p-1 text-content-muted transition-colors hover:bg-action-neutral-hover hover:text-content-primary"
               aria-label="Copy code"
             >
               {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
@@ -96,7 +96,7 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="cursor-pointer rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              className="cursor-pointer rounded p-1 text-content-muted transition-colors hover:bg-action-neutral-hover hover:text-content-primary"
               aria-label="Expand code"
             >
               <Maximize2 className="size-3.5" />
@@ -128,7 +128,7 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
           />
         }
       >
-        <div className="h-full min-h-0 overflow-hidden rounded border border-slate-200 dark:border-gray-700">
+        <div className="h-full min-h-0 overflow-hidden rounded border border-edge-default">
           <Editor
             height="100%"
             width="100%"

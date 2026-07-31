@@ -21,7 +21,7 @@ export function RunInspectorErrorSummaryCard({
         type="button"
         variant="outline"
         size="sm"
-        className="shrink-0 rounded-sm border-red-300 bg-white text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-gray-950 dark:text-red-300 dark:hover:bg-red-950"
+        className="shrink-0 rounded-sm border-red-300 bg-surface-raised text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
         onClick={onJump}
       >
         Jump to error

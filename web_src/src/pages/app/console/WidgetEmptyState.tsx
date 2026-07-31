@@ -17,7 +17,7 @@ export function WidgetEmptyState({
   return (
     <div
       className={cn(
-        "flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500",
+        "flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-content-muted",
         className,
       )}
       data-testid={testId}

@@ -47,7 +47,7 @@ export const createImageMapper: ComponentBaseMapper = {
     return {
       iconSrc: computeIcon,
       iconSlug: context.componentDefinition?.icon ?? "image",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Create Image",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

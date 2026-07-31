@@ -29,7 +29,7 @@ export function NumberPanelSourceModeToggle({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Source mode</Label>
+      <Label className="text-xs font-medium text-content-secondary">Source mode</Label>
       <div className="flex flex-wrap gap-1">
         <Button
           type="button"

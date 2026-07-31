@@ -48,14 +48,12 @@ export function DiffDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="90vw" className="grid grid-rows-[auto_minmax(0,1fr)] gap-4 p-0">
-        <DialogHeader className="border-b border-slate-950/15 px-5 py-4 dark:border-gray-800/70">
+        <DialogHeader className="border-b border-edge-default px-5 py-4">
           <DialogTitle>Diff</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 overflow-hidden">
           {diffFiles.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-gray-400">
-              No changes
-            </div>
+            <div className="flex h-full items-center justify-center text-sm text-content-secondary">No changes</div>
           ) : (
             <Virtualizer className="h-full overflow-auto" contentClassName="min-w-0">
               <div className="space-y-4 p-4">
@@ -65,7 +63,7 @@ export function DiffDialog({
                     oldFile={oldFile}
                     newFile={newFile}
                     options={diffOptions}
-                    className="overflow-hidden rounded border border-slate-950/15 bg-white dark:border-gray-800/70 dark:bg-gray-900"
+                    className="overflow-hidden rounded border border-edge-default bg-surface-raised"
                   />
                 ))}
               </div>

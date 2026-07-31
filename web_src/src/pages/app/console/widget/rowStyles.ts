@@ -22,7 +22,7 @@ import {
 } from "./types";
 
 export const ROW_STYLE_CLASS: Record<WidgetRowStyleTone, string> = {
-  dimmed: "bg-slate-100 dark:bg-gray-800/60",
+  dimmed: "bg-surface-subtle",
   yellow: "bg-yellow-100 dark:bg-yellow-950/50",
   "yellow-soft": "bg-yellow-50 dark:bg-yellow-950/30",
   orange: "bg-orange-100 dark:bg-orange-950/50",
@@ -36,7 +36,7 @@ export const ROW_STYLE_CLASS: Record<WidgetRowStyleTone, string> = {
 };
 
 export const ROW_STYLE_LABEL: Record<WidgetRowStyleTone, string> = {
-  dimmed: "Dimmed (slate)",
+  dimmed: "Dimmed",
   "yellow-soft": "Yellow (soft)",
   yellow: "Yellow",
   "orange-soft": "Orange (soft)",

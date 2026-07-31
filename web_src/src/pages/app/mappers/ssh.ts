@@ -127,7 +127,7 @@ export const sshMapper: ComponentBaseMapper = {
       iconSlug: context.componentDefinition.icon || "terminal",
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

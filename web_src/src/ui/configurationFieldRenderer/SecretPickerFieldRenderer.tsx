@@ -45,7 +45,7 @@ function SecretPickerEmptyState({ id, canCreate }: { id?: string; canCreate: boo
           <SelectValue placeholder="No secrets available" />
         </SelectTrigger>
       </Select>
-      <p className="text-[10px] text-slate-400">Create a secret in Organization settings first.</p>
+      <p className="text-[10px] text-content-muted">Create a secret in Organization settings first.</p>
     </div>
   );
 }

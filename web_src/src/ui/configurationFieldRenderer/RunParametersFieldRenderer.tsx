@@ -84,7 +84,7 @@ export function RunParametersFieldRenderer({
   if (!appId || !nodeId) {
     return (
       <div data-testid={toTestId(`run-parameters-field-${field.name}`)} className="space-y-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-content-secondary">
           Choose the target app and node before configuring run parameters.
         </p>
       </div>
@@ -102,7 +102,7 @@ export function RunParametersFieldRenderer({
   if (isLoading) {
     return (
       <div data-testid={toTestId(`run-parameters-field-${field.name}`)}>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Loading run parameters...</p>
+        <p className="text-xs text-content-secondary">Loading run parameters...</p>
       </div>
     );
   }
@@ -111,9 +111,9 @@ export function RunParametersFieldRenderer({
     return (
       <div
         data-testid={toTestId(`run-parameters-field-${field.name}`)}
-        className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/40"
+        className="rounded-md border border-edge-subtle bg-surface-default px-3 py-2"
       >
-        <p className="text-xs text-gray-600 dark:text-gray-400">
+        <p className="text-xs text-content-secondary">
           The trigger you selected does not define any parameters. If parameters are needed in your flow, define them in
           the trigger configuration first. Without parameters, the run will still be triggered, but no additional values
           will be passed.
@@ -125,7 +125,7 @@ export function RunParametersFieldRenderer({
   return (
     <div
       data-testid={toTestId(`run-parameters-field-${field.name}`)}
-      className="space-y-4 rounded-md border border-gray-200 dark:border-gray-700 p-3"
+      className="space-y-4 rounded-md border border-edge-subtle p-3"
     >
       {parameterDefinitions.map((parameterField) => {
         const parameterName = parameterField.name!;

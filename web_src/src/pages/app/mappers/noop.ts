@@ -21,7 +21,7 @@ export const noopMapper: ComponentBaseMapper = {
     return {
       iconSlug: context.componentDefinition.icon ?? "circle-off",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

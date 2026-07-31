@@ -131,7 +131,7 @@ export const getUsageMapper: ComponentBaseMapper = {
     return {
       iconSrc: openAiIcon,
       iconSlug: context.componentDefinition?.icon ?? "bar-chart",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title:
         context.node.name ||

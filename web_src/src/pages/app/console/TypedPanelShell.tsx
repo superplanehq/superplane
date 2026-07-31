@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,8 +47,7 @@ export function TypedPanelShell({
     <>
       <div
         className={cn(
-          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg bg-white",
-          appDarkModeClasses.modalEdge,
+          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-edge-default",
           CONSOLE_PANEL_SHELL_SURFACE,
         )}
       >
@@ -61,7 +59,7 @@ export function TypedPanelShell({
           onDoubleClick={readOnly ? undefined : onEdit}
         >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-medium text-slate-700 dark:text-gray-300" title={displayTitle}>
+            <span className="truncate text-[13px] font-medium text-content-primary" title={displayTitle}>
               {displayTitle}
             </span>
           </div>
@@ -80,7 +78,7 @@ export function TypedPanelShell({
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Edit panel"
-                className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="h-6 w-6 cursor-pointer text-content-secondary hover:text-content-primary"
                 data-testid="console-edit-panel"
               >
                 <Pencil className="size-3.5" />
@@ -96,7 +94,7 @@ export function TypedPanelShell({
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Delete panel"
-                className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
+                className="h-6 w-6 cursor-pointer text-content-secondary hover:bg-status-danger-subtle hover:text-status-danger"
                 data-testid="console-delete-panel"
               >
                 <Trash2 className="size-3.5" />
@@ -105,11 +103,7 @@ export function TypedPanelShell({
           ) : null}
         </div>
         <div
-          className={cn(
-            "min-h-0 flex-1 overflow-auto rounded-b-lg bg-white",
-            CONSOLE_PANEL_BODY_SURFACE,
-            bodyClassName,
-          )}
+          className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg", CONSOLE_PANEL_BODY_SURFACE, bodyClassName)}
           onDoubleClick={readOnly ? undefined : onEdit}
           data-testid="typed-panel-body"
         >
@@ -117,7 +111,7 @@ export function TypedPanelShell({
         </div>
       </div>
       <Dialog open={confirmingDelete} onOpenChange={(next) => (next ? null : setConfirmingDelete(false))}>
-        <DialogContent className={cn(appDarkModeClasses.modalEdge, appDarkModeClasses.surface)}>
+        <DialogContent className="border-edge-default bg-surface-overlay">
           <DialogHeader>
             <DialogTitle>Delete this panel?</DialogTitle>
             <DialogDescription>

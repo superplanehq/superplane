@@ -122,10 +122,8 @@ export function FactorySetupPanel({
   return (
     <div className={homeInstallPanelClassName} role="region" aria-label={`${factory.title} setup`}>
       <div className="mb-5">
-        <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">
-          {connectHeading(factory.integrations)}
-        </h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-gray-400">{factory.description}</p>
+        <h3 className="text-base font-medium text-content-primary">{connectHeading(factory.integrations)}</h3>
+        <p className="mt-1 text-sm text-content-secondary">{factory.description}</p>
       </div>
 
       {factory.integrations.length > 0 && (
@@ -199,7 +197,7 @@ function FactoryParamsSection({
         <div key={param.name} className="space-y-1">
           <Label
             htmlFor={`factory-param-${param.name}`}
-            className="mb-2 block text-xs font-semibold text-slate-700 dark:text-gray-300"
+            className="mb-2 block text-xs font-semibold text-content-secondary"
           >
             {param.label}
             {param.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -238,7 +236,7 @@ function FactoryParamsSection({
               onChange={(e) => onChange((prev) => ({ ...prev, [param.name]: e.target.value }))}
             />
           )}
-          {param.description && <p className="text-[10px] text-slate-400 dark:text-gray-500">{param.description}</p>}
+          {param.description && <p className="text-[10px] text-content-muted">{param.description}</p>}
         </div>
       ))}
     </div>
@@ -260,7 +258,7 @@ function StartingTaskSection({
 }) {
   return (
     <div className="mb-5">
-      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Choose starting task</p>
+      <p className="mb-3 text-xs font-semibold text-content-secondary">Choose starting task</p>
       <div className="flex flex-wrap gap-2">
         {tasks.map((task) => {
           const iconMeta = STARTING_TASK_ICONS[task.id];
@@ -278,7 +276,7 @@ function StartingTaskSection({
               className={cn(
                 "h-auto rounded-md px-3 py-2 text-xs font-normal",
                 selected &&
-                  "border-primary/50 bg-primary/5 text-slate-900 dark:border-primary/40 dark:bg-primary/10 dark:text-gray-100",
+                  "border-primary/50 bg-primary/5 text-content-primary dark:border-primary/40 dark:bg-primary/10",
               )}
             >
               {Icon && <Icon className={cn("size-3.5 shrink-0", iconMeta.iconClassName)} />}
@@ -292,7 +290,7 @@ function StartingTaskSection({
         <div className="mt-4">
           <Label
             htmlFor="factory-starting-task-prompt"
-            className="mb-2 block text-xs font-semibold text-slate-700 dark:text-gray-300"
+            className="mb-2 block text-xs font-semibold text-content-secondary"
           >
             Prompt
           </Label>
@@ -301,7 +299,7 @@ function StartingTaskSection({
             readOnly
             value={prompt}
             rows={5}
-            className="min-h-28 resize-none text-xs leading-relaxed text-slate-700 dark:text-gray-300"
+            className="min-h-28 resize-none text-xs leading-relaxed text-content-secondary"
           />
         </div>
       )}

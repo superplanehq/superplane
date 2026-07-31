@@ -48,10 +48,10 @@ function AccountsTable({
   onBlockUnblock,
 }: AccountsTableProps) {
   return (
-    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
+    <div className="overflow-hidden rounded-md bg-surface-raised shadow-sm outline outline-edge-subtle">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 dark:border-gray-700/70">
+          <tr className="border-b border-edge-default">
             <SortableHeader
               label="Name"
               field="name"
@@ -66,7 +66,7 @@ function AccountsTable({
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Access</th>
+            <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Access</th>
             <SortableHeader
               label="Created"
               field="created_at"
@@ -74,7 +74,7 @@ function AccountsTable({
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-right px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Actions</th>
+            <th className="px-4 py-2.5 text-right font-medium text-content-secondary">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -122,8 +122,8 @@ function AccountsListContent({
   if (loading && accounts.length === 0) {
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
+        <div className="h-8 w-8 animate-spin rounded-full border-b border-focus-ring"></div>
+        <Text className="text-content-secondary">Loading accounts...</Text>
       </div>
     );
   }
@@ -131,7 +131,7 @@ function AccountsListContent({
   if (accounts.length === 0) {
     return (
       <div className="text-center py-12">
-        <Text className="text-gray-500 dark:text-gray-400">{search ? "No accounts match." : "No accounts found."}</Text>
+        <Text className="text-content-secondary">{search ? "No accounts match." : "No accounts found."}</Text>
       </div>
     );
   }

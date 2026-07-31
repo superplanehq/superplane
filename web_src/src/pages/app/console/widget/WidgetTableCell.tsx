@@ -77,7 +77,7 @@ export function WidgetTableCell({ col, row, nextRow, hasMoreBelow }: WidgetTable
 }
 
 function EmptyCell() {
-  return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
+  return <td className="px-3 py-1.5 text-content-muted">—</td>;
 }
 
 function BadgeCell({ label }: { label: string }) {
@@ -110,7 +110,7 @@ function TimestampCell({
     return <TextCell label={label} />;
   }
   return (
-    <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">
+    <td className="px-3 py-1.5 text-content-primary">
       <Timestamp
         date={date}
         display={TIMESTAMP_DISPLAY_BY_FORMAT[format]}
@@ -131,11 +131,7 @@ function AvatarCell({ col, row, value }: { col: WidgetTableColumn; row: Record<s
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex cursor-default">
-            <Avatar
-              src={src ?? null}
-              initials={initials}
-              className="size-6 bg-slate-200 text-slate-600 dark:bg-gray-700 dark:text-gray-200"
-            />
+            <Avatar src={src ?? null} initials={initials} className="size-6 bg-action-neutral text-content-secondary" />
           </span>
         </TooltipTrigger>
         {name ? <TooltipContent side="top">{name}</TooltipContent> : null}
@@ -174,10 +170,10 @@ function CodeCell({ label }: { label: string }) {
 }
 
 function TextCell({ label }: { label: string }) {
-  return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{label}</td>;
+  return <td className="px-3 py-1.5 text-content-primary">{label}</td>;
 }
 
-const TREND_MUTED_CLASSES = "text-slate-400 dark:text-gray-500";
+const TREND_MUTED_CLASSES = "text-content-muted";
 const TREND_BETTER_CLASSES = "text-emerald-600 dark:text-emerald-400";
 const TREND_WORSE_CLASSES = "text-red-600 dark:text-red-400";
 
@@ -217,7 +213,7 @@ function ValueWithTrendCell({
   return (
     <td className="px-3 py-1.5 align-middle">
       <span className="inline-flex items-center whitespace-nowrap" data-testid="widget-value-with-trend">
-        <span className="tabular-nums text-slate-700 dark:text-gray-300">{label}</span>
+        <span className="tabular-nums text-content-primary">{label}</span>
         <span className="ml-1.5">
           <TrendChip result={result} display={col.trendDisplay} />
         </span>
@@ -297,13 +293,13 @@ function ProgressCell({ col, row, value }: { col: WidgetTableColumn; row: Record
       <td className="px-3 py-1.5">
         <div className="flex min-w-[80px] items-center gap-2">
           <div
-            className="h-2 min-w-[32px] flex-1 rounded-full bg-slate-200 dark:bg-slate-700"
+            className="h-2 min-w-[32px] flex-1 rounded-full bg-action-neutral"
             aria-hidden="true"
             data-testid="widget-progress-track"
           />
           {labelKind !== "none" ? (
             <span
-              className="shrink-0 whitespace-nowrap tabular-nums text-slate-400 dark:text-gray-500"
+              className="shrink-0 whitespace-nowrap tabular-nums text-content-muted"
               data-testid="widget-progress-label"
             >
               —
@@ -322,7 +318,7 @@ function ProgressCell({ col, row, value }: { col: WidgetTableColumn; row: Record
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className="h-2 min-w-[32px] flex-1 cursor-default overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+              className="h-2 min-w-[32px] flex-1 cursor-default overflow-hidden rounded-full bg-action-neutral"
               role="progressbar"
               aria-valuenow={Math.round(progress.barPercent)}
               aria-valuemin={0}
@@ -341,7 +337,7 @@ function ProgressCell({ col, row, value }: { col: WidgetTableColumn; row: Record
         </Tooltip>
         {labelKind !== "none" ? (
           <span
-            className="shrink-0 whitespace-nowrap tabular-nums text-slate-700 dark:text-gray-300"
+            className="shrink-0 whitespace-nowrap tabular-nums text-content-primary"
             data-testid="widget-progress-label"
           >
             {formatProgressLabel(progress.current, progress.target, progress.percent, labelKind)}

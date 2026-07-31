@@ -31,8 +31,8 @@ export function PayloadEditor({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-slate-600">Payload fields</span>
-        <span className="text-[10px] text-slate-500">
+        <span className="text-[11px] font-medium text-content-secondary">Payload fields</span>
+        <span className="text-[10px] text-content-muted">
           {entries.length === 0 ? "Type below to add" : "Empty row appears automatically"}
         </span>
       </div>
@@ -158,14 +158,14 @@ function PayloadPreview({ entry, sampleRow }: { entry: PayloadDraftEntry; sample
   const text = preview.value;
   if (!text && !hasSample) {
     return (
-      <p className="text-[10px] text-slate-400">
+      <p className="text-[10px] text-content-muted">
         Preview unavailable — no memory data yet. Run your workflow once, then revisit.
       </p>
     );
   }
   return (
-    <p className="text-[10px] text-slate-500" data-testid="payload-preview">
-      <span className="font-medium text-slate-600">Preview:</span>{" "}
+    <p className="text-[10px] text-content-muted" data-testid="payload-preview">
+      <span className="font-medium text-content-secondary">Preview:</span>{" "}
       <code className={CONSOLE_CODE_BADGE_CLASSES}>{text || "(empty)"}</code>
     </p>
   );

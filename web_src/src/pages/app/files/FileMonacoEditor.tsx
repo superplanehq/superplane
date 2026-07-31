@@ -62,7 +62,7 @@ export function FileMonacoEditor({ path, content, language, readOnly, onChange }
   );
 
   return (
-    <div className="min-h-0 flex-1 bg-white dark:bg-gray-900" data-testid="file-editor">
+    <div className="min-h-0 flex-1 bg-surface-raised" data-testid="file-editor">
       <Editor
         key={path}
         height="100%"

@@ -26,7 +26,7 @@ export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisa
                 strokeWidth={2}
                 aria-hidden
               />
-              <span className="col-start-2 row-start-1 min-w-0 text-gray-700 dark:text-gray-300">
+              <span className="col-start-2 row-start-1 min-w-0 text-content-secondary">
                 {step.label?.trim() || step.name || "Step"}
               </span>
             </li>
@@ -49,8 +49,8 @@ export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisa
               <span
                 className={
                   currentStep.type === "DONE"
-                    ? "col-start-2 row-start-1 min-w-0 text-gray-700 dark:text-gray-300"
-                    : "col-start-2 row-start-1 min-w-0 font-medium text-gray-900 dark:text-gray-100"
+                    ? "col-start-2 row-start-1 min-w-0 text-content-secondary"
+                    : "col-start-2 row-start-1 min-w-0 font-medium text-content-primary"
                 }
               >
                 {currentStep.label?.trim() || currentStep.name || "Current step"}
@@ -59,20 +59,18 @@ export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisa
           ) : null}
         </ol>
       ) : (
-        <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
-          Complete a step to build your trail.
-        </p>
+        <p className="text-[10px] leading-snug text-content-secondary">Complete a step to build your trail.</p>
       )}
 
       {onDiscard ? (
-        <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <div className="mt-5 border-t border-edge-default pt-4">
           <div className="flex justify-center">
             <Button
               type="button"
               variant="link"
               onClick={() => onDiscard()}
               disabled={discardDisabled}
-              className="h-auto gap-1.5 px-0 py-0 text-xs font-medium leading-none text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 has-[>svg]:px-0 hover:!no-underline"
+              className="h-auto gap-1.5 px-0 py-0 text-xs font-medium leading-none text-content-secondary hover:text-status-danger has-[>svg]:px-0 hover:!no-underline"
             >
               <Trash2 aria-hidden className="size-[1em] shrink-0 opacity-80" />
               Delete

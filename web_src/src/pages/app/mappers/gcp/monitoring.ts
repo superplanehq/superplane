@@ -88,7 +88,7 @@ export function baseProps(
   return {
     iconSrc: monitoringIcon,
     iconSlug: context.componentDefinition?.icon ?? iconSlug,
-    collapsedBackground: "bg-white",
+    collapsedBackground: "bg-surface-raised",
     collapsed: context.node.isCollapsed,
     title: context.node.name || context.componentDefinition?.label || fallbackTitle,
     eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

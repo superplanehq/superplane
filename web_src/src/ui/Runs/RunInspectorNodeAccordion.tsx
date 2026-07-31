@@ -75,26 +75,26 @@ export function RunInspectorNodeAccordion({
       ref={itemRef}
       value={section.sectionValue}
       className={cn(
-        "scroll-mt-8 border-slate-950/10 dark:border-gray-800",
+        "scroll-mt-8 border-edge-subtle",
         section.isQueued && "border-l-2 border-l-amber-400 dark:border-l-amber-500",
       )}
     >
       <AccordionPrimitive.Header
         className={cn(
-          "flex items-center bg-white transition-colors hover:bg-slate-50 dark:bg-gray-950 dark:hover:bg-gray-900",
+          "flex items-center bg-surface-raised transition-colors hover:bg-action-neutral-hover",
           section.isQueued && "bg-amber-50/80 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/30",
-          section.isQueued && isOpen && "bg-amber-100/80 text-slate-950 dark:bg-amber-950/40 dark:text-gray-100",
+          section.isQueued && isOpen && "bg-amber-100/80 text-content-primary dark:bg-amber-950/40",
           !section.isQueued &&
             isOpen &&
-            "sticky top-8 z-20 bg-[#e1f5ff] text-slate-950 shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:bg-indigo-950 dark:text-gray-100 dark:shadow-[0_1px_0_rgba(31,41,55,0.8)]",
+            "sticky top-8 z-20 bg-[#e1f5ff] text-content-primary shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:bg-indigo-950 dark:shadow-[0_1px_0_rgba(31,41,55,0.8)]",
         )}
       >
         <NodeHeaderButton section={section} onSelectSection={onSelectSection}>
           {section.isQueued ? null : (
             <ChevronRight
               className={cn(
-                "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
-                isOpen && "rotate-90 text-slate-600 dark:text-gray-300",
+                "h-4 w-4 shrink-0 text-content-muted transition-transform duration-200",
+                isOpen && "rotate-90 text-content-secondary",
               )}
             />
           )}
@@ -103,9 +103,9 @@ export function RunInspectorNodeAccordion({
             iconSlug={iconSlug}
             alt={section.nodeName}
             size={RUN_NODE_ICON_SIZE}
-            className="text-slate-500 dark:text-gray-400"
+            className="text-content-secondary"
           />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-900 dark:text-gray-100">
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-content-primary">
             {section.nodeName}
           </span>
         </NodeHeaderButton>
@@ -113,7 +113,7 @@ export function RunInspectorNodeAccordion({
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
-        <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
+        <AccordionContent className="bg-surface-default px-3 pb-3 pt-3">
           <RunInspectorStepTimeline
             section={section}
             componentIconMap={componentIconMap}
@@ -238,13 +238,12 @@ function NodeActionButton({
       type="button"
       disabled={disabled}
       className={cn(
-        "inline-flex h-7 items-center rounded-sm border bg-white px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-950",
+        "inline-flex h-7 items-center rounded-sm border bg-surface-raised px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         tone === "success" &&
           "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/50",
         tone === "danger" &&
           "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/50",
-        tone === "neutral" &&
-          "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800",
+        tone === "neutral" && "border-edge-subtle text-content-secondary hover:bg-action-neutral-hover",
       )}
       onClick={(event) => {
         event.stopPropagation();
@@ -289,7 +288,7 @@ function NodeMetadata({
   rerunPending: boolean;
 }) {
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
+    <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-content-secondary">
       {section.isTrigger ? (
         <Button
           type="button"

@@ -15,7 +15,7 @@ const AdminPagination: React.FC<AdminPaginationProps> = ({ offset, total, pageSi
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
+    <div className="mt-4 flex items-center justify-between text-sm text-content-secondary">
       <Text>
         Showing {offset + 1}–{Math.min(offset + pageSize, total)} of {total}
       </Text>
@@ -23,14 +23,14 @@ const AdminPagination: React.FC<AdminPaginationProps> = ({ offset, total, pageSi
         <button
           onClick={() => onPageChange(offset - pageSize)}
           disabled={offset === 0}
-          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          className="rounded border border-edge-default bg-surface-raised px-3 py-1 text-xs text-content-primary hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-40"
         >
           Previous
         </button>
         <button
           onClick={() => onPageChange(offset + pageSize)}
           disabled={currentPage >= totalPages}
-          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          className="rounded border border-edge-default bg-surface-raised px-3 py-1 text-xs text-content-primary hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next
         </button>

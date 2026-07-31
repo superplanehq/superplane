@@ -1,17 +1,16 @@
 import { cn } from "@/lib/utils";
 
 export const createActionCardClassName = cn(
-  "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors",
-  "dark:border-green-500 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50",
+  "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-status-success-edge bg-status-success-subtle px-4 py-3 transition-colors",
+  "hover:bg-status-success-edge",
 );
 
 export const createActionCardDisabledClassName = cn(
-  "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-slate-300 bg-slate-200/70 px-4 py-3 text-slate-500 transition-colors cursor-not-allowed",
-  "dark:border-slate-600 dark:bg-slate-800/50",
+  "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-edge-strong bg-surface-subtle px-4 py-3 text-content-muted transition-colors cursor-not-allowed",
 );
 
 export const createActionIconClassName =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white dark:bg-green-300 dark:text-green-950";
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-success text-content-inverse";
 
 export const createActionIconDisabledClassName =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-400 text-white dark:bg-slate-500";
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-action-neutral-hover text-content-primary";

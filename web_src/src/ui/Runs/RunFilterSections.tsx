@@ -35,7 +35,7 @@ export function RunFilterHeader({
 }) {
   return (
     <div className={cn("flex items-center justify-between px-3 py-2", className)}>
-      <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{title}</span>
+      <span className="text-[12px] font-medium text-content-secondary">{title}</span>
       <button
         type="button"
         onClick={onClear}
@@ -44,7 +44,7 @@ export function RunFilterHeader({
           "text-[11px]",
           hasFilter
             ? "text-sky-600 hover:text-sky-800 dark:text-indigo-300 dark:hover:text-indigo-200"
-            : "text-gray-400 dark:text-gray-500",
+            : "text-content-muted",
         )}
       >
         Clear
@@ -75,7 +75,7 @@ export function RunStatusFilterSection({
         {RUN_STATUS_FILTER_OPTIONS.map((option) => (
           <label
             key={option.id}
-            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-content-secondary hover:bg-action-neutral-hover"
           >
             <Checkbox
               checked={selectedStatuses.has(option.id)}
@@ -128,14 +128,12 @@ export function RunTriggerFilterSection({
       />
       <div className="max-h-64 overflow-y-auto py-1">
         {triggerOptions.length === 0 ? (
-          <div className="px-3 py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
-            No triggers in this canvas
-          </div>
+          <div className="px-3 py-4 text-center text-[11px] text-content-muted">No triggers in this canvas</div>
         ) : (
           triggerOptions.map((option) => (
             <label
               key={option.id}
-              className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+              className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-content-secondary hover:bg-action-neutral-hover"
             >
               <Checkbox
                 checked={selectedTriggerIds.has(option.id)}
@@ -147,7 +145,7 @@ export function RunTriggerFilterSection({
                 iconSlug={option.iconSlug}
                 alt={option.name}
                 size={RUN_NODE_ICON_SIZE}
-                className="shrink-0 text-gray-500 dark:text-gray-400"
+                className="shrink-0 text-content-secondary"
               />
               <span className="min-w-0 truncate">{option.name}</span>
             </label>

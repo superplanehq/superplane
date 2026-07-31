@@ -27,7 +27,7 @@ function DiffBadgeSegments({ diffCounts }: Pick<DiffSummaryHoverCardProps, "diff
   );
 }
 
-const diffMenuLabelClassName = "text-[13px] font-normal text-gray-800 dark:text-gray-100";
+const diffMenuLabelClassName = "text-[13px] font-normal text-content-primary";
 
 export function DiffSummaryHoverCard({
   diffCounts,
@@ -44,7 +44,7 @@ export function DiffSummaryHoverCard({
       <HoverCardTrigger asChild>
         <button
           type="button"
-          className="flex h-7 cursor-default items-center gap-0.5 rounded-full border border-slate-950/15 bg-white px-2.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50 dark:border-gray-600/70 dark:bg-gray-800 dark:hover:bg-gray-700"
+          className="flex h-7 cursor-default items-center gap-0.5 rounded-full border border-edge-default bg-surface-raised px-2.5 py-1 text-[13px] font-medium transition-colors hover:bg-action-neutral-hover"
         >
           <DiffBadgeSegments diffCounts={diffCounts} />
         </button>
@@ -90,14 +90,14 @@ export function DiffSummaryHoverCard({
           )}
         </div>
         {onShowDiff && (
-          <div className="border-t border-slate-950/15 p-2 dark:border-gray-800/70">
+          <div className="border-t border-edge-default p-2">
             <button
               type="button"
               onClick={onShowDiff}
-              className="flex w-full items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-slate-50 dark:hover:bg-gray-800"
+              className="flex w-full items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-action-neutral-hover"
               data-testid="canvas-show-diff-button"
             >
-              <Eye className="h-4 w-4 shrink-0 text-gray-800 dark:text-gray-100" />
+              <Eye className="h-4 w-4 shrink-0 text-content-primary" />
               <span className={diffMenuLabelClassName}>See Full Diff</span>
             </button>
           </div>

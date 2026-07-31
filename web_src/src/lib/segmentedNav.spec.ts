@@ -9,7 +9,7 @@ import {
 describe("segmentedNav", () => {
   it("uses the standard rounded segmented nav track", () => {
     expect(SEGMENTED_NAV_CLASSES).toContain("rounded-full");
-    expect(SEGMENTED_NAV_CLASSES).toContain("bg-slate-100");
+    expect(SEGMENTED_NAV_CLASSES).toContain("bg-action-neutral");
   });
 
   it("uses a smaller xs track", () => {
@@ -20,6 +20,7 @@ describe("segmentedNav", () => {
   it("uses rounded tabs with 13px text", () => {
     const activeTab = segmentedNavTabClassName(true);
     expect(activeTab).toContain("rounded-full");
+    expect(activeTab).toContain("bg-action-selected");
     expect(activeTab).toContain("text-[13px]");
     expect(activeTab).toContain("font-medium");
     expect(activeTab).not.toContain("font-bold");

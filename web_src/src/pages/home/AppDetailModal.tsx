@@ -46,7 +46,7 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="flex items-center gap-1 text-xs font-medium text-content-secondary hover:text-content-primary"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
@@ -72,21 +72,17 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
           </div>
 
           <div className="mt-5">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Description
-            </h4>
-            <p className="mt-1.5 text-sm leading-relaxed text-gray-800 dark:text-gray-300">{app.description}</p>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-content-secondary">Description</h4>
+            <p className="mt-1.5 text-sm leading-relaxed text-content-primary">{app.description}</p>
           </div>
 
           {app.requirements.length > 0 && (
             <div className="mt-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Requirements
-              </h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-content-secondary">Requirements</h4>
               <ul className="mt-1.5 space-y-1">
                 {app.requirements.map((req) => (
-                  <li key={req} className="flex items-start gap-2 text-sm text-slate-600 dark:text-gray-400">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-400 dark:bg-gray-500" />
+                  <li key={req} className="flex items-start gap-2 text-sm text-content-secondary">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-content-muted" />
                     {req}
                   </li>
                 ))}
@@ -100,7 +96,7 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
             href={repoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="flex items-center gap-1 text-xs font-medium text-content-secondary hover:text-content-primary"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             View on GitHub
@@ -126,11 +122,11 @@ export function LeadIcon({
 }) {
   const iconName = icon || integrations[0];
   const cls = size === "lg" ? "h-6 w-6" : "h-5 w-5";
-  if (!iconName) return <Plus className={`${cls} text-slate-400 dark:text-gray-500`} />;
+  if (!iconName) return <Plus className={`${cls} text-content-muted`} />;
   const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
   if (iconSrc) return <img src={iconSrc} alt={iconName} className={cls} />;
   const FallbackIcon = resolveLucideIcon(iconName);
-  return <FallbackIcon className={`${cls} text-slate-500 dark:text-gray-400`} />;
+  return <FallbackIcon className={`${cls} text-content-secondary`} />;
 }
 
 export function IntegrationIcons({ integrations }: { integrations: string[] }) {

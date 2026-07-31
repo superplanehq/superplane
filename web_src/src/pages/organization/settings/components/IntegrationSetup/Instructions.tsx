@@ -7,14 +7,14 @@ import { CopyButton } from "@/ui/CopyButton";
 import { extractCodeBlock, extractTextFromNode } from "@/lib/markdownCode";
 
 const INSTRUCTIONS_V2_CLASSES =
-  "text-sm text-gray-800 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
+  "text-sm text-content-primary [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
 
 /** Matches horizontal rules inside markdown; reuse for external separators that should align with them. */
-export const INTEGRATION_INSTRUCTIONS_HR_CLASS = "my-4 border-0 border-t border-gray-300 dark:border-gray-600";
+export const INTEGRATION_INSTRUCTIONS_HR_CLASS = "my-4 border-0 border-t border-edge-default";
 
 /** Subtle scrollbar for markdown table overflow (Firefox + WebKit); horizontal bar uses height. */
 const MARKDOWN_TABLE_SCROLL_CLASSES =
-  "[scrollbar-width:thin] [scrollbar-color:rgb(156_163_175)_rgb(243_244_246)] dark:[scrollbar-color:rgb(107_114_128)_rgb(31_41_55)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-400/85 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500/85 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800/90";
+  "[scrollbar-width:thin] [scrollbar-color:var(--content-muted)_var(--surface-subtle)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-content-muted/85 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-surface-subtle";
 
 export interface InstructionsProps {
   description?: string | null;
@@ -42,7 +42,7 @@ export function Instructions({ description, onContinue, className = "" }: Instru
               pre: ({ children }) => {
                 const { code } = extractCodeBlock(children);
                 return (
-                  <div className="relative my-3 overflow-hidden rounded-md border border-black/15 bg-gray-800/80 text-gray-100 dark:border-white/20 dark:bg-gray-800/90">
+                  <div className="relative my-3 overflow-hidden rounded-md border border-edge-strong bg-surface-raised text-content-primary">
                     <div className="absolute right-2 top-2 z-10">
                       <CopyButton text={code} dark />
                     </div>
@@ -51,7 +51,7 @@ export function Instructions({ description, onContinue, className = "" }: Instru
                 );
               },
               blockquote: ({ children }) => (
-                <blockquote className="mb-2 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm last:mb-0 dark:border-gray-600 dark:bg-gray-900/60">
+                <blockquote className="mb-2 rounded-md border border-edge-default bg-surface-subtle p-3 text-sm last:mb-0">
                   {children}
                 </blockquote>
               ),
@@ -76,7 +76,9 @@ export function Instructions({ description, onContinue, className = "" }: Instru
                 }
 
                 const inlineText = extractTextFromNode(children).trim();
-                const codeEl = <code className="rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs">{children}</code>;
+                const codeEl = (
+                  <code className="rounded bg-content-primary/10 px-1.5 py-0.5 font-mono text-xs">{children}</code>
+                );
 
                 if (!inlineText) {
                   return codeEl;
@@ -93,26 +95,20 @@ export function Instructions({ description, onContinue, className = "" }: Instru
               em: ({ children }) => <em className="italic">{children}</em>,
               table: ({ children }) => (
                 <div
-                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
+                  className={`my-3 overflow-x-auto rounded-md border border-edge-default bg-surface-raised ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
                 >
                   <table className="w-full min-w-max border-collapse text-left text-sm">{children}</table>
                 </div>
               ),
-              thead: ({ children }) => (
-                <thead className="border-b border-gray-200 dark:border-gray-600">{children}</thead>
-              ),
-              tbody: ({ children }) => (
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">{children}</tbody>
-              ),
+              thead: ({ children }) => <thead className="border-b border-edge-default">{children}</thead>,
+              tbody: ({ children }) => <tbody className="divide-y divide-edge-subtle">{children}</tbody>,
               tr: ({ children }) => <tr>{children}</tr>,
               th: ({ children }) => (
-                <th className="whitespace-nowrap bg-gray-50 px-3 py-2.5 font-semibold text-gray-900 dark:bg-gray-800/80 dark:text-gray-100">
+                <th className="whitespace-nowrap bg-surface-subtle px-3 py-2.5 font-semibold text-content-primary">
                   {children}
                 </th>
               ),
-              td: ({ children }) => (
-                <td className="px-3 py-2.5 align-top text-gray-800 dark:text-gray-200">{children}</td>
-              ),
+              td: ({ children }) => <td className="px-3 py-2.5 align-top text-content-primary">{children}</td>,
             }}
           >
             {normalizedDescription}

@@ -12,8 +12,8 @@ export function InstallErrorView({ loadError }: InstallErrorViewProps) {
 
   return (
     <InstallShell>
-      <h2 className="mb-4 text-lg font-medium text-slate-900">Install App</h2>
-      <div className="rounded-lg bg-white p-6 shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-800">
+      <h2 className="mb-4 text-lg font-medium text-content-primary">Install App</h2>
+      <div className="rounded-lg bg-surface-raised p-6 shadow-sm outline outline-edge-subtle">
         {usageLimitNotice ? (
           <UsageLimitAlert notice={usageLimitNotice} />
         ) : (

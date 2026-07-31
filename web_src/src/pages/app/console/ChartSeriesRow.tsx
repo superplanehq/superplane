@@ -21,7 +21,7 @@ export function ChartSeriesRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex gap-2 rounded-lg bg-slate-100 p-2">
+    <div className="flex gap-2 rounded-lg bg-surface-subtle p-2">
       <div className="min-w-0 flex-1 space-y-2">
         <div className="grid grid-cols-2 gap-2">
           <Input
@@ -78,7 +78,7 @@ export function ChartSeriesRow({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+          className="h-6 w-6 cursor-pointer text-content-muted hover:bg-status-danger-subtle hover:text-status-danger-content"
           onClick={onRemove}
           aria-label={`Remove series ${index + 1}`}
         >

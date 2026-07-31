@@ -34,7 +34,7 @@ export function FileList({
   onSelect: (path: string) => void;
 }) {
   if (loading) {
-    return <div className="flex-1 p-4 text-sm text-slate-500 dark:text-gray-400">Loading files...</div>;
+    return <div className="flex-1 p-4 text-sm text-content-secondary">Loading files...</div>;
   }
 
   if (errorMessage) {
@@ -42,7 +42,7 @@ export function FileList({
   }
 
   if (paths.length === 0 && newFilePath === null) {
-    return <div className="flex-1 p-4 text-sm text-slate-500 dark:text-gray-400">No files</div>;
+    return <div className="flex-1 p-4 text-sm text-content-secondary">No files</div>;
   }
 
   return (
@@ -96,7 +96,7 @@ function NewFileTreeInput({
   };
 
   return (
-    <div className="flex h-7 shrink-0 items-center px-2 text-xs text-slate-700 dark:text-gray-300">
+    <div className="flex h-7 shrink-0 items-center px-2 text-xs text-content-primary">
       <Input
         ref={inputRef}
         value={path}
@@ -115,7 +115,7 @@ function NewFileTreeInput({
             onCancel();
           }
         }}
-        className="h-6 rounded border-slate-300 px-2 text-xs shadow-none focus-visible:ring-1 dark:border-gray-800/70"
+        className="h-6 rounded border-edge-default px-2 text-xs shadow-none focus-visible:ring-1"
       />
     </div>
   );
@@ -203,7 +203,7 @@ function RepositoryFileTree({
   return (
     <TreesFileTree
       model={model}
-      className="h-full w-full bg-white text-xs text-slate-700 dark:bg-gray-900 dark:text-gray-300"
+      className="h-full w-full bg-surface-raised text-xs text-content-primary"
       renderContextMenu={
         canWrite
           ? (item, context) => (
@@ -237,13 +237,13 @@ function FileTreeContextMenu({
   return (
     <div
       data-file-tree-context-menu-root="true"
-      className="min-w-36 rounded border border-slate-950/15 bg-white p-1 text-xs text-slate-700 shadow-lg dark:border-gray-700/70 dark:bg-gray-900 dark:text-gray-300"
+      className="min-w-36 rounded border border-edge-default bg-surface-overlay p-1 text-xs text-content-primary shadow-lg"
       role="menu"
     >
       <button
         type="button"
         role="menuitem"
-        className="flex h-7 w-full items-center rounded px-2 text-left hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:hover:bg-gray-800 dark:disabled:text-gray-500"
+        className="flex h-7 w-full items-center rounded px-2 text-left hover:bg-surface-subtle disabled:cursor-not-allowed disabled:text-content-muted"
         disabled={!canDelete}
         onClick={() => {
           if (!canDelete) return;

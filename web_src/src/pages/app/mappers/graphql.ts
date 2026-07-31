@@ -21,49 +21,49 @@ import graphqlIcon from "@/assets/icons/graphql.svg";
 const GRAPHQL_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-violet-100",
     badgeColor: "bg-violet-400",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   cancelled: {
     icon: "circle-slash-2",
-    textColor: "text-black",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   error: {
     icon: "alert-triangle",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-black",
-    backgroundColor: "bg-gray-50",
-    badgeColor: "bg-gray-400",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-default",
+    badgeColor: "bg-content-muted",
   },
   queued: {
     icon: "circle-dashed",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-black",
+    textColor: "text-content-primary",
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },
@@ -192,7 +192,7 @@ export const graphqlMapper: ComponentBaseMapper = {
       iconSlug: context.componentDefinition.icon || "network",
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

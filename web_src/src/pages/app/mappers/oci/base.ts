@@ -25,7 +25,7 @@ export const baseMapper: ComponentBaseMapper = {
     return {
       iconSrc: ociIcon,
       iconSlug: context.componentDefinition?.icon ?? "oci",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Oracle Cloud Infrastructure",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

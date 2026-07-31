@@ -33,10 +33,10 @@ export const waitMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: context.componentDefinition.icon || "circle-off",
-      iconColor: "text-gray-800",
+      iconColor: "text-content-primary",
       metadata: getWaitMetadataList(context.node),
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||
@@ -123,20 +123,20 @@ export const WAIT_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   cancelling: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
     label: "Cancelling",
   },
   finished: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   "pushed through": {
     icon: "arrow-right",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
   },
@@ -446,11 +446,11 @@ export const waitCustomFieldRenderer: CustomFieldRenderer = {
     }
 
     return (
-      <div className="border-t-1 border-gray-200 pt-4">
+      <div className="border-t-1 border-edge-default pt-4">
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}:</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-gray-200 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md">
+            <span className="text-sm font-medium text-content-secondary">{title}:</span>
+            <div className="mt-1 rounded-md border-1 border-edge-default bg-surface-raised px-2.5 py-2 text-xs text-content-primary">
               {content}
             </div>
           </div>

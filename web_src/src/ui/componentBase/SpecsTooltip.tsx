@@ -80,18 +80,18 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
       render={(attrs) => (
         <div
           {...attrs}
-          className="max-w-[800px] overflow-auto rounded-md bg-white shadow-md outline-1 outline-slate-300 dark:bg-gray-900 dark:outline-gray-700"
+          className="max-w-[800px] overflow-auto rounded-md bg-surface-raised shadow-md outline-1 outline-edge-strong"
           style={{ zIndex: 10000, maxHeight: "400px" }}
         >
-          <div className="flex items-center border-b border-slate-300 dark:border-gray-700">
-            <span className="px-3 py-1.5 text-[13px] font-medium text-gray-500 dark:text-gray-400">
+          <div className="flex items-center border-b border-edge-strong">
+            <span className="px-3 py-1.5 text-[13px] font-medium text-content-secondary">
               {!hideCount ? specValues.length : ""} {tooltipTitle || specTitle}
             </span>
           </div>
           {specValues.map((value, index) => (
             <div
               key={index}
-              className={`flex max-w-[800px] flex-wrap items-start gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b border-slate-200 dark:border-gray-800"}`}
+              className={`flex max-w-[800px] flex-wrap items-start gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b border-edge-subtle"}`}
             >
               {value.badges.flatMap(renderBadgeLabel)}
             </div>

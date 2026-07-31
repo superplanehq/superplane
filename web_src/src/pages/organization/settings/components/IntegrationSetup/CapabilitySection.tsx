@@ -6,7 +6,7 @@ import { Check, CircleOff, Minus } from "lucide-react";
 import { getGroupToggleState } from "./lib";
 
 function getCapabilitySelectionDotClass(selected: boolean) {
-  return selected ? "bg-green-500" : "bg-gray-400 dark:bg-gray-500";
+  return selected ? "bg-green-500" : "bg-content-muted";
 }
 
 export interface CapabilitySectionProps {
@@ -34,12 +34,12 @@ export function CapabilitySection({
     ) : groupState === "some" ? (
       <Minus className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
     ) : (
-      <CircleOff className="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+      <CircleOff className="size-4 shrink-0 text-content-muted" aria-hidden />
     );
 
   return (
     <div
-      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600"
+      className="overflow-hidden rounded-md border border-edge-default"
       role={section.label ? "group" : undefined}
       aria-label={section.label ? `${section.label} capabilities` : undefined}
     >
@@ -53,8 +53,8 @@ export function CapabilitySection({
               : `Select all capabilities in ${section.label}`
           }
           className={cn(
-            "flex w-full cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800/50 dark:hover:bg-gray-800",
-            selectionDisabled && "!cursor-not-allowed opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/50",
+            "flex w-full cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-edge-subtle bg-surface-subtle px-4 py-3 text-left transition-colors hover:bg-action-neutral-hover",
+            selectionDisabled && "!cursor-not-allowed opacity-70 hover:bg-action-neutral-hover/50",
           )}
           onClick={() => onToggleCapabilityGroup(section.names)}
           onKeyDown={(event) => {
@@ -68,8 +68,8 @@ export function CapabilitySection({
           }}
         >
           <div className="min-w-0">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{section.label}</span>
-            <span className="ml-2 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-medium text-content-primary">{section.label}</span>
+            <span className="ml-2 text-xs tabular-nums text-content-secondary">
               {selectedInSection}/{section.names.length}
             </span>
           </div>
@@ -77,8 +77,8 @@ export function CapabilitySection({
         </button>
       ) : null}
       <div className={cn(section.label && "-mt-px", "overflow-x-auto")}>
-        <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+        <table className="w-full min-w-[520px] divide-y divide-edge-subtle">
+          <tbody className="divide-y divide-edge-subtle bg-surface-raised">
             {section.names.map((capabilityName) => {
               const capability = capabilityByName.get(capabilityName);
               if (!capability) {
@@ -92,10 +92,10 @@ export function CapabilitySection({
                 <tr
                   key={capabilityName}
                   className={cn(
-                    "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-gray-900",
+                    "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     selectionDisabled
                       ? "cursor-not-allowed opacity-70"
-                      : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60",
+                      : "cursor-pointer hover:bg-action-neutral-hover/60",
                   )}
                   onClick={() => onToggleCapability(capabilityName)}
                   onKeyDown={(event) => {
@@ -114,13 +114,13 @@ export function CapabilitySection({
                   <td className="px-4 py-3 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)} aria-hidden />
-                      <span className="font-mono text-sm text-gray-800 dark:text-gray-100">{capabilityName}</span>
+                      <span className="font-mono text-sm text-content-primary">{capabilityName}</span>
                       <CopyButton text={capabilityName} />
                     </div>
                   </td>
                   <td className="px-4 py-3 align-middle">
                     {capability.description ? (
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{capability.description}</div>
+                      <div className="text-sm text-content-secondary">{capability.description}</div>
                     ) : null}
                   </td>
                   <td className="px-4 py-3 align-middle">
@@ -128,7 +128,7 @@ export function CapabilitySection({
                       {checked ? (
                         <Check className="size-3 shrink-0 text-green-600 dark:text-green-400" aria-hidden />
                       ) : (
-                        <CircleOff className="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+                        <CircleOff className="size-3 shrink-0 text-content-muted" aria-hidden />
                       )}
                     </div>
                   </td>

@@ -57,7 +57,7 @@ export function MemorySourceControls({
   return (
     <div className="space-y-2">
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium text-slate-600">Namespace</Label>
+        <Label className="text-[11px] font-medium text-content-secondary">Namespace</Label>
         <Select
           value={source.namespace || undefined}
           onValueChange={(value) => onChange({ ...source, namespace: value })}
@@ -74,7 +74,7 @@ export function MemorySourceControls({
               namespaces.map((ns) => (
                 <SelectItem key={ns.namespace} value={ns.namespace}>
                   {ns.namespace}
-                  <span className="ml-1 text-[11px] text-slate-400">({ns.count})</span>
+                  <span className="ml-1 text-[11px] text-content-muted">({ns.count})</span>
                 </SelectItem>
               ))
             )}
@@ -84,7 +84,7 @@ export function MemorySourceControls({
 
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <Label className="text-[11px] font-medium text-slate-600">Order by</Label>
+          <Label className="text-[11px] font-medium text-content-secondary">Order by</Label>
           <Select
             value={source.orderBy || "createdAt"}
             onValueChange={(value) => onChange({ ...source, orderBy: value })}
@@ -102,7 +102,7 @@ export function MemorySourceControls({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] font-medium text-slate-600">Direction</Label>
+          <Label className="text-[11px] font-medium text-content-secondary">Direction</Label>
           <Select
             value={source.direction ?? "desc"}
             onValueChange={(value) => onChange({ ...source, direction: value as MarkdownVariableDirection })}
@@ -170,7 +170,7 @@ function MemoryResultControls({
 
   return (
     <div className="space-y-1">
-      <Label className="text-[11px] font-medium text-slate-600">Result</Label>
+      <Label className="text-[11px] font-medium text-content-secondary">Result</Label>
       <Select value={mode} onValueChange={(value) => handleModeChange(value as MarkdownVariableMode)}>
         <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-memory-mode">
           <SelectValue />
@@ -182,7 +182,7 @@ function MemoryResultControls({
       </Select>
       {mode === "list" ? (
         <div className="space-y-1 pt-1">
-          <Label className="text-[11px] font-medium text-slate-600">Limit</Label>
+          <Label className="text-[11px] font-medium text-content-secondary">Limit</Label>
           <Input
             type="number"
             inputMode="numeric"
@@ -195,9 +195,9 @@ function MemoryResultControls({
             aria-label="Limit list to N rows"
             data-testid="markdown-variable-memory-limit"
           />
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-content-muted">
             Leave empty to include every match. Use CEL list ops like{" "}
-            <code className="rounded bg-slate-100 px-1 text-[10px]">name.map(r, r.field)</code> in {"{{ }}"}.
+            <code className="rounded bg-action-neutral px-1 text-[10px]">name.map(r, r.field)</code> in {"{{ }}"}.
           </p>
         </div>
       ) : null}
@@ -223,14 +223,14 @@ function MemoryMatchesEditor({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <Label className="text-[11px] font-medium text-slate-600">Match (field equals value)</Label>
+        <Label className="text-[11px] font-medium text-content-secondary">Match (field equals value)</Label>
         <Button type="button" size="sm" variant="outline" className="h-6 gap-1" onClick={addMatch}>
           <Plus className="size-3" />
           Add match
         </Button>
       </div>
       {matches.length === 0 ? (
-        <p className="text-[11px] text-slate-400">Optional. Add a match to pick a specific row.</p>
+        <p className="text-[11px] text-content-muted">Optional. Add a match to pick a specific row.</p>
       ) : (
         <div className="space-y-1.5">
           {matches.map((match, index) => (
@@ -255,7 +255,7 @@ function MemoryMatchesEditor({
                 variant="ghost"
                 onClick={() => removeMatch(index)}
                 aria-label="Remove match"
-                className="h-7 w-7 shrink-0 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                className="h-7 w-7 shrink-0 text-content-muted hover:bg-status-danger-subtle hover:text-status-danger-content"
               >
                 <Trash2 className="size-3" />
               </Button>
@@ -298,7 +298,7 @@ export function RunSourceControls({
   return (
     <div className="space-y-2">
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium text-slate-600">Run</Label>
+        <Label className="text-[11px] font-medium text-content-secondary">Run</Label>
         <Select value={source.select} onValueChange={(value) => setSelect(value as MarkdownRunSelect)}>
           <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-run-select">
             <SelectValue />

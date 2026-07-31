@@ -249,14 +249,14 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         type="button"
         aria-label={`Drag to reorder ${title}`}
         className={cn(
-          "mt-1 flex h-9 w-8 shrink-0 items-center justify-center rounded-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800",
+          "mt-1 flex h-9 w-8 shrink-0 items-center justify-center rounded-sm text-content-secondary hover:bg-action-neutral-hover",
           dragState ? "cursor-grabbing" : "cursor-grab",
           className,
         )}
         onClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => beginDrag(event, index, openItem)}
       >
-        <GripVertical className={cn("h-4 w-4", isActive && "text-gray-900 dark:text-gray-100")} aria-hidden />
+        <GripVertical className={cn("h-4 w-4", isActive && "text-content-primary")} aria-hidden />
       </button>
     );
   };
@@ -269,7 +269,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         event.stopPropagation();
         removeItem(index);
       }}
-      className={cn("group mt-1 text-gray-500 hover:bg-red-50 hover:text-red-500", className)}
+      className={cn("group mt-1 text-content-secondary hover:bg-red-50 hover:text-red-500", className)}
       aria-label={`Remove ${listFieldItemTitle(renderedItems[index], index, itemLabel)}`}
     >
       <Trash2 className="size-4" />
@@ -292,7 +292,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   className="flex items-start gap-2"
                 >
                   {renderDragHandle(index)}
-                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-600">
+                  <div className="relative min-w-0 flex-1 rounded-md border border-edge-strong">
                     <AccordionPrimitive.Header
                       className={cn(
                         "relative z-10 flex h-11 shrink-0",
@@ -307,14 +307,14 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       >
                         <span
                           className={cn(
-                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800",
+                            "min-w-0 flex-1 truncate pr-2 font-medium text-content-primary",
                             isItemOpen && "sr-only",
                           )}
                         >
                           {listFieldItemTitle(item, index, itemLabel)}
                         </span>
                         <span className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-sm group-focus-visible:ring-2 group-focus-visible:ring-ring/50">
-                          <ChevronDown className={cn("size-4 text-gray-500", isItemOpen && "rotate-180")} />
+                          <ChevronDown className={cn("size-4 text-content-secondary", isItemOpen && "rotate-180")} />
                         </span>
                       </AccordionPrimitive.Trigger>
                     </AccordionPrimitive.Header>
@@ -353,9 +353,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             {renderDragHandle(index)}
             <div className="flex-1">
               {itemDefinition?.type === "object" && itemDefinition.schema ? (
-                <div className="rounded-md bg-slate-100 p-4 space-y-4 dark:bg-gray-800">
-                  {renderObjectItemFields(item, index)}
-                </div>
+                <div className="rounded-md bg-surface-subtle p-4 space-y-4">{renderObjectItemFields(item, index)}</div>
               ) : (
                 renderListItemBody(item, index)
               )}

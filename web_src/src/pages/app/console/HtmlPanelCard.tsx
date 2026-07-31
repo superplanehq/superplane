@@ -244,7 +244,7 @@ function HtmlPanelView({
     <>
       <div
         className={cn(
-          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70",
+          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-edge-default bg-surface-raised",
           CONSOLE_PANEL_SHELL_SURFACE,
         )}
       >
@@ -256,7 +256,7 @@ function HtmlPanelView({
         />
         {body.trim() ? (
           <div
-            className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}
+            className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}
             onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="console-html-view"
           >
@@ -268,7 +268,7 @@ function HtmlPanelView({
             onClick={readOnly ? undefined : onEditBody}
             disabled={readOnly}
             className={cn(
-              "console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400",
+              "console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-surface-raised text-[13px] text-content-secondary transition-colors hover:text-content-primary disabled:cursor-default disabled:hover:text-content-secondary",
               CONSOLE_PANEL_BODY_SURFACE,
             )}
             data-testid="console-html-empty"
@@ -302,7 +302,7 @@ function HtmlPanelHeader({
       )}
       onDoubleClick={readOnly ? undefined : onEditTitle}
     >
-      <span className="truncate text-[13px] font-medium text-slate-700 dark:text-gray-300" title={displayTitle}>
+      <span className="truncate text-[13px] font-medium text-content-primary" title={displayTitle}>
         {displayTitle}
       </span>
       {!readOnly ? (
@@ -318,7 +318,7 @@ function HtmlPanelHeader({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Edit panel"
-            className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="h-6 w-6 cursor-pointer text-content-secondary hover:text-content-primary"
             data-testid="console-html-edit-panel"
           >
             <Pencil className="size-3.5" />
@@ -334,7 +334,7 @@ function HtmlPanelHeader({
             onMouseDown={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Delete panel"
-            className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
+            className="h-6 w-6 cursor-pointer text-content-secondary hover:bg-status-danger-subtle hover:text-status-danger"
             data-testid="console-html-delete-panel"
           >
             <Trash2 className="size-3.5" />
@@ -424,7 +424,7 @@ function DeleteConfirmDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
-      <DialogContent className="dark:border-gray-700/70 dark:bg-gray-900">
+      <DialogContent className="border-edge-default bg-surface-overlay">
         <DialogHeader>
           <DialogTitle>Delete this panel?</DialogTitle>
           <DialogDescription>

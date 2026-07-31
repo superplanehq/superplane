@@ -4,7 +4,6 @@ import { ChevronDown, ChevronRight, CircleAlert, CircleX, Search, X } from "luci
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
@@ -237,7 +236,7 @@ export function CanvasLogSidebar({
   return (
     <aside className="ph-no-capture absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
       <div
-        className={cn("flex flex-col border-t bg-white dark:bg-gray-900", appDarkModeClasses.sidebarEdge)}
+        className="flex flex-col border-t border-edge-default bg-surface-raised"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
         <div
@@ -248,12 +247,12 @@ export function CanvasLogSidebar({
           <div
             aria-hidden
             className={cn(
-              "pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50",
-              isResizing && "bg-slate-950/50 dark:bg-gray-500/50",
+              "pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-edge-strong",
+              isResizing && "bg-edge-strong",
             )}
           />
         </div>
-        <div className={cn("flex items-center justify-between pl-4 border-b h-8", appDarkModeClasses.sidebarEdge)}>
+        <div className="flex h-8 items-center justify-between border-b border-edge-default pl-4">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
@@ -261,8 +260,8 @@ export function CanvasLogSidebar({
               className={cn(
                 "group flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
                 activeTab === "errors"
-                  ? "border-gray-800 text-gray-800 dark:border-indigo-300 dark:text-indigo-300"
-                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100",
+                  ? "border-action-primary text-action-primary"
+                  : "border-transparent text-content-secondary hover:text-content-primary",
               )}
             >
               <CircleX
@@ -271,8 +270,8 @@ export function CanvasLogSidebar({
                   unacknowledgedCount > 0
                     ? "text-red-500 dark:text-red-400"
                     : activeTab === "errors"
-                      ? "text-gray-800 dark:text-indigo-300"
-                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
+                      ? "text-content-primary dark:text-indigo-300"
+                      : "text-content-secondary group-hover:text-content-primary",
                 )}
               />
               <span
@@ -281,8 +280,8 @@ export function CanvasLogSidebar({
                   unacknowledgedCount > 0
                     ? "text-red-500 dark:text-red-400"
                     : activeTab === "errors"
-                      ? "text-gray-800 dark:text-indigo-300"
-                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
+                      ? "text-content-primary dark:text-indigo-300"
+                      : "text-content-secondary group-hover:text-content-primary",
                 )}
               >
                 {unacknowledgedCount}
@@ -294,8 +293,8 @@ export function CanvasLogSidebar({
               className={cn(
                 "group flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
                 activeTab === "warnings"
-                  ? "border-gray-800 text-gray-800 dark:border-indigo-300 dark:text-indigo-300"
-                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100",
+                  ? "border-action-primary text-action-primary"
+                  : "border-transparent text-content-secondary hover:text-content-primary",
               )}
             >
               <CircleAlert
@@ -304,8 +303,8 @@ export function CanvasLogSidebar({
                   counts.warning > 0
                     ? "text-orange-500 dark:text-orange-300"
                     : activeTab === "warnings"
-                      ? "text-gray-800 dark:text-indigo-300"
-                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
+                      ? "text-content-primary dark:text-indigo-300"
+                      : "text-content-secondary group-hover:text-content-primary",
                 )}
               />
               <span
@@ -314,8 +313,8 @@ export function CanvasLogSidebar({
                   counts.warning > 0
                     ? "text-orange-500 dark:text-orange-300"
                     : activeTab === "warnings"
-                      ? "text-gray-800 dark:text-indigo-300"
-                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
+                      ? "text-content-primary dark:text-indigo-300"
+                      : "text-content-secondary group-hover:text-content-primary",
                 )}
               >
                 {counts.warning}
@@ -330,16 +329,16 @@ export function CanvasLogSidebar({
             </div>
           </div>
         </div>
-        <div className={cn("px-2 h-8 border-b", appDarkModeClasses.sidebarEdge)}>
-          <InputGroup className="h-8 border-0 bg-transparent shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0 dark:bg-transparent [&_[data-slot=input-group-control]]:!text-[13px]">
+        <div className="h-8 border-b border-edge-default px-2">
+          <InputGroup className="h-8 border-0 bg-transparent shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0 [&_[data-slot=input-group-control]]:!text-[13px]">
             <InputGroupAddon className="border-0 shadow-none !text-[13px]">
-              <Search className="h-4 w-4 -ml-1 text-gray-500 dark:text-gray-400" />
+              <Search className="h-4 w-4 -ml-1 text-content-secondary" />
             </InputGroupAddon>
             <InputGroupInput
               placeholder={searchPlaceholder}
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
-              className="h-7 !text-[13px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0 dark:text-gray-100 dark:placeholder:text-gray-500"
+              className="h-7 !text-[13px] border-0 text-content-primary placeholder:text-content-secondary shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0"
             />
           </InputGroup>
         </div>
@@ -357,9 +356,9 @@ export function CanvasLogSidebar({
         ) : (
           <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
             {filteredEntries.length === 0 ? (
-              <div className="px-4 py-1.5 text-[13px] text-gray-800 dark:text-gray-100">No warnings found.</div>
+              <div className="px-4 py-1.5 text-[13px] text-content-primary">No warnings found.</div>
             ) : (
-              <div className="divide-y divide-gray-200 dark:divide-gray-800/50">
+              <div className="divide-y divide-edge-subtle">
                 {filteredEntries.map((entry) => (
                   <LogEntryRow key={entry.id} entry={entry} />
                 ))}
@@ -377,7 +376,7 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
   const hasDetail = Boolean(entry.detail);
 
   return (
-    <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800 dark:text-gray-100">
+    <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-content-primary">
       <div className="pt-0.5">
         <CircleAlert className="h-4 w-4 text-orange-500 dark:text-orange-300" />
       </div>
@@ -386,26 +385,26 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
           {hasDetail ? (
             <button
               type="button"
-              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-gray-800 dark:hover:text-gray-100"
+              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-content-primary"
               onClick={() => setIsDetailExpanded((prev) => !prev)}
               aria-expanded={isDetailExpanded}
             >
               {isDetailExpanded ? (
-                <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-content-secondary" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <ChevronRight className="h-4 w-4 text-content-secondary" />
               )}
               <div className="min-w-0">{entry.title}</div>
             </button>
           ) : (
             <div className="flex-1 min-w-0 text-xs font-mono mt-0.5">{entry.title}</div>
           )}
-          <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap dark:text-gray-400">
+          <span className="text-xs text-content-secondary tabular-nums whitespace-nowrap">
             {formatLogTimestamp(entry.timestamp)}
           </span>
         </div>
         {entry.detail && isDetailExpanded && (
-          <div className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">{entry.detail}</div>
+          <div className="mt-2 text-[13px] text-content-secondary">{entry.detail}</div>
         )}
       </div>
     </div>

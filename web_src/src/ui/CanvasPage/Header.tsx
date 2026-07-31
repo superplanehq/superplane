@@ -170,7 +170,7 @@ function PageHeader({
   const inEditSession = isEditSessionActive ?? isEditing;
 
   return (
-    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 pl-2 pr-1 sm:pl-3 sm:pr-1.5 dark:border-gray-700/70">
+    <div className="relative z-20 flex h-10 items-center border-b border-edge-default pl-2 pr-1 sm:pl-3 sm:pr-1.5">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
@@ -184,7 +184,7 @@ function PageHeader({
               canUpdateCanvas={showCanvasSettingsMenu}
             />
           ) : (
-            <span className="block truncate text-center text-[13px] font-medium text-slate-900 dark:text-gray-100">
+            <span className="block truncate text-center text-[13px] font-medium text-content-primary">
               {headerTitle}
             </span>
           )}
@@ -195,7 +195,7 @@ function PageHeader({
           <div className="flex items-center">
             {activeDraftBranchLabel ? (
               <span
-                className="hidden text-[13px] font-medium text-slate-600 sm:inline dark:text-gray-400"
+                className="hidden text-[13px] font-medium text-content-secondary sm:inline"
                 data-testid="active-draft-branch-chip"
               >
                 Editing: {activeDraftBranchLabel}
@@ -227,7 +227,7 @@ function SecondaryHeader(props: HeaderProps) {
   const editing = props.isEditing ?? false;
 
   return (
-    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3 dark:border-gray-700/70 dark:bg-gray-900">
+    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-edge-default bg-surface-raised px-3">
       <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center gap-1">
         <CanvasToolSidebarTrigger
           toolSidebarState={props.toolSidebarState}

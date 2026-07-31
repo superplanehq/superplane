@@ -48,7 +48,7 @@ export const TimeRangeFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
           onChange={(nextStart) => updateRange((nextStart as string) || "00:00", end)}
         />
       </div>
-      <span className="text-sm text-gray-500">-</span>
+      <span className="text-sm text-content-secondary">-</span>
       <div className="flex-1">
         <TimeFieldRenderer
           field={{ name: `${field.name || "timeRange"}-end`, label: "End", type: "time" }}

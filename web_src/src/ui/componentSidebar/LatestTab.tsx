@@ -36,7 +36,7 @@ interface LatestTabProps {
 
 function SectionHeader({ label }: { label: string }) {
   return (
-    <h2 className="flex h-9 shrink-0 items-center border-b border-b-slate-950/10 px-3 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:border-gray-800/70 dark:text-gray-400">
+    <h2 className="flex h-9 shrink-0 items-center border-b border-edge-subtle px-3 text-[11px] font-medium uppercase tracking-wide text-content-secondary">
       {label}
     </h2>
   );
@@ -91,7 +91,7 @@ export const LatestTab = ({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <SectionHeader label="Latest" />
         {latestEvents.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">No events found</div>
+          <div className="px-3 py-4 text-center text-xs text-content-secondary">No events found</div>
         ) : (
           <>
             {compactLatestEvents.map((event) => (
@@ -113,7 +113,7 @@ export const LatestTab = ({
                 onClick={handleSeeFullHistory}
                 className={cn(
                   RUNS_SIDEBAR_ROW_CLASS,
-                  "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+                  "w-full text-xs font-medium text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary",
                 )}
               >
                 <TextAlignStart className="h-3.5 w-3.5 shrink-0" />
@@ -126,7 +126,7 @@ export const LatestTab = ({
           <>
             <SectionHeader label="Queued" />
             {nextInQueueEvents.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">Queue is empty</div>
+              <div className="px-3 py-4 text-center text-xs text-content-secondary">Queue is empty</div>
             ) : (
               <>
                 {compactQueueEvents.map((event) => (
@@ -148,7 +148,7 @@ export const LatestTab = ({
                     onClick={handleSeeQueue}
                     className={cn(
                       RUNS_SIDEBAR_ROW_CLASS,
-                      "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+                      "w-full text-xs font-medium text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary",
                     )}
                   >
                     <TextAlignStart className="h-3.5 w-3.5 shrink-0" />
@@ -166,10 +166,10 @@ export const LatestTab = ({
   return (
     <div className="overflow-y-auto pb-20" style={{ maxHeight: "85vh" }}>
       <div className="p-4 border-b-1 border-border text-left">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Latest</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-content-secondary mb-3">Latest</h2>
         <div className="flex flex-col">
           {latestEvents.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm font-medium">No events found</div>
+            <div className="text-center py-4 text-content-secondary text-sm font-medium">No events found</div>
           ) : (
             <>
               {latestEvents.slice(0, 5).map((event, index) => {
@@ -194,7 +194,7 @@ export const LatestTab = ({
               {handleSeeFullHistory && (
                 <button
                   onClick={handleSeeFullHistory}
-                  className="text-sm text-gray-500 font-medium hover:text-gray-800 flex items-center gap-1 mt-4"
+                  className="text-sm text-content-secondary font-medium hover:text-content-primary flex items-center gap-1 mt-4"
                 >
                   <TextAlignStart size={16} />
                   See full history
@@ -206,10 +206,10 @@ export const LatestTab = ({
       </div>
       {!hideQueueEvents && (
         <div className="p-4 text-left">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Queued</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-content-secondary mb-3">Queued</h2>
           <div className="flex flex-col">
             {nextInQueueEvents.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm font-medium">Queue is empty</div>
+              <div className="text-center py-4 text-content-secondary text-sm font-medium">Queue is empty</div>
             ) : (
               <>
                 {nextInQueueEvents.slice(0, 5).map((event, index) => {
@@ -234,7 +234,7 @@ export const LatestTab = ({
                 {totalInQueueCount > 5 && (
                   <button
                     onClick={handleSeeQueue}
-                    className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                    className="text-xs font-medium text-content-secondary hover:underline flex items-center gap-1 px-2 py-1"
                   >
                     <TextAlignStart size={16} />
                     {totalInQueueCount - 5} more in the queue

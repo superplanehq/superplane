@@ -113,7 +113,7 @@ describe("CanvasModeToggle", () => {
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-orange-200");
     const activeTab = screen.getByRole("link", { name: "Canvas (editing)" });
-    expect(activeTab.className).toContain("bg-white");
+    expect(activeTab.className).toContain("bg-surface-raised");
     expect(activeTab.className).toContain("shadow-sm");
     expect(activeTab.className).toContain("font-medium");
     expect(activeTab.className).not.toContain("font-bold");

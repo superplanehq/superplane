@@ -220,9 +220,9 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
   if (isLoading) {
     return (
       <div className="space-y-6 pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
           <div className="px-6 pb-6 min-h-96 flex justify-center items-center">
-            <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+            <p className="text-content-secondary">Loading...</p>
           </div>
         </div>
       </div>
@@ -232,9 +232,9 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
   if (!apiKey) {
     return (
       <div className="space-y-6 pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
           <div className="px-6 pb-6 min-h-96 flex justify-center items-center">
-            <p className="text-gray-500 dark:text-gray-400">API key not found</p>
+            <p className="text-content-secondary">API key not found</p>
           </div>
         </div>
       </div>
@@ -254,7 +254,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
       {/* Back button */}
       <Link
         to={apiKeysHref}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition"
+        className="flex items-center gap-1 text-sm text-content-secondary transition hover:text-content-primary"
         aria-label="Back to API keys"
       >
         <ArrowLeft size={14} />
@@ -262,12 +262,12 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
       </Link>
 
       {/* Details */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
         <div className="px-6 py-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <KeyRound size={20} className="text-gray-500" />
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{apiKey.name}</h2>
+              <KeyRound size={20} className="text-content-secondary" />
+              <h2 className="text-lg font-semibold text-content-primary">{apiKey.name}</h2>
             </div>
             <div className="flex gap-2">
               {!editForm.isEditing && (
@@ -315,7 +315,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
               }}
             >
               <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                <Label className="text-content-primary mb-2">
                   Name <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -327,7 +327,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
                 />
               </div>
               <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">Description</Label>
+                <Label className="text-content-primary mb-2">Description</Label>
                 <Textarea
                   value={editForm.editDescription}
                   onChange={(e) => editForm.setEditDescription(e.target.value)}
@@ -336,7 +336,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
                 />
               </div>
               <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
+                <Label className="text-content-primary mb-2">Access</Label>
                 <Select
                   value={editForm.editAccessMode}
                   onValueChange={(value) => editForm.setEditAccessMode(value as AccessMode)}
@@ -352,23 +352,23 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
               </div>
               {editForm.editAccessMode === "canvas" && (
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                  <Label className="text-content-primary mb-2">
                     Apps <span className="text-red-500">*</span>
                   </Label>
-                  <div className="max-h-44 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+                  <div className="max-h-44 overflow-y-auto rounded-md border border-edge-subtle">
                     {canvases.map((canvas) => {
                       const canvasId = canvas.id || "";
                       return (
                         <label
                           key={canvasId}
-                          className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 dark:border-gray-800"
+                          className="flex items-center gap-2 border-b border-edge-subtle px-3 py-2 text-sm last:border-b-0"
                         >
                           <Checkbox
                             checked={editForm.editCanvasIds.includes(canvasId)}
                             onChange={() => editForm.toggleEditCanvas(canvasId)}
                             data-testid="api-key-detail-edit-canvas"
                           />
-                          <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
+                          <span className="text-content-primary">{canvas.name || "Unnamed"}</span>
                         </label>
                       );
                     })}
@@ -376,7 +376,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
                 </div>
               )}
               <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">Expiration</Label>
+                <Label className="text-content-primary mb-2">Expiration</Label>
                 <Input
                   type="datetime-local"
                   value={editForm.editExpiresAt}
@@ -406,28 +406,28 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
             </form>
           ) : (
             <dl className="grid grid-cols-2 gap-y-4 text-sm">
-              <dt className="text-gray-500 dark:text-gray-400">Description</dt>
-              <dd className="text-gray-800 dark:text-white">{apiKey.description || "—"}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">Access</dt>
-              <dd className="text-gray-800 dark:text-white">{scopeLabel}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">Expires</dt>
-              <dd className="text-gray-800 dark:text-white">{formatDateTime(apiKey.expiresAt)}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">Created by</dt>
-              <dd className="text-gray-800 dark:text-white">{createdByLabel}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">Created at</dt>
-              <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">ID</dt>
-              <dd className="text-gray-800 dark:text-white font-mono text-xs">{apiKey.id}</dd>
+              <dt className="text-content-secondary">Description</dt>
+              <dd className="text-content-primary">{apiKey.description || "—"}</dd>
+              <dt className="text-content-secondary">Access</dt>
+              <dd className="text-content-primary">{scopeLabel}</dd>
+              <dt className="text-content-secondary">Expires</dt>
+              <dd className="text-content-primary">{formatDateTime(apiKey.expiresAt)}</dd>
+              <dt className="text-content-secondary">Created by</dt>
+              <dd className="text-content-primary">{createdByLabel}</dd>
+              <dt className="text-content-secondary">Created at</dt>
+              <dd className="text-content-primary">{createdAt}</dd>
+              <dt className="text-content-secondary">ID</dt>
+              <dd className="text-content-primary font-mono text-xs">{apiKey.id}</dd>
             </dl>
           )}
         </div>
       </div>
 
       {/* Token management */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
         <div className="px-6 py-6">
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-2">API Token</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <h3 className="text-sm font-semibold text-content-primary mb-2">API Token</h3>
+          <p className="text-sm text-content-secondary mb-4">
             {apiKey.hasToken
               ? "This API key has an active token. Regenerating will invalidate the current one."
               : "No token is currently active for this API key."}
@@ -453,12 +453,12 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
 
       {/* Token display modal */}
       {tokenActions.newToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-lg w-full mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
+          <div className="bg-surface-raised rounded-lg shadow-xl max-w-lg w-full mx-4">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <KeyRound className="w-6 h-6 text-green-600" />
-                <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Token Regenerated</h3>
+                <h3 className="text-base font-semibold text-content-primary">Token Regenerated</h3>
               </div>
 
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
@@ -471,7 +471,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
                 <Input
                   readOnly
                   value={tokenActions.newToken}
-                  className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
+                  className="flex-1 font-mono text-sm bg-surface-subtle"
                   data-testid="api-key-token-display"
                 />
                 <CopyButton

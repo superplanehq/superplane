@@ -3935,8 +3935,8 @@ export function AppPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="text-sm text-gray-500">Loading canvas...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-content-muted" />
+          <p className="text-sm text-content-muted">Loading canvas...</p>
         </div>
       </div>
     );
@@ -3948,9 +3948,9 @@ export function AppPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
-          <h1 className="text-4xl font-bold text-gray-700">404</h1>
-          <p className="text-sm text-gray-500">Canvas not found</p>
-          <p className="text-sm text-gray-400">
+          <h1 className="text-4xl font-bold text-content-secondary">404</h1>
+          <p className="text-sm text-content-muted">Canvas not found</p>
+          <p className="text-sm text-content-muted">
             This canvas may have been deleted or you may not have permission to view it.
           </p>
         </div>
@@ -3991,8 +3991,8 @@ export function AppPage() {
     remoteCanvasUpdatePending && !hasLocalSaveActivity ? (
       <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-900">Canvas updated elsewhere</p>
-          <p className="text-[13px] text-black/60">
+          <p className="text-sm font-medium text-content-primary">Canvas updated elsewhere</p>
+          <p className="text-[13px] text-content-secondary">
             A newer canvas version is available. Reloading will discard your unsaved local changes.
           </p>
         </div>

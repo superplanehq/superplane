@@ -125,7 +125,7 @@ export function PanelEditorDialog<T extends object>({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="gap-0 overflow-hidden sm:max-w-3xl dark:border-gray-600 dark:bg-gray-900"
+          className="gap-0 overflow-hidden border-edge-default bg-surface-overlay sm:max-w-3xl"
           closeButtonClassName="top-2 right-2"
         >
           <PanelEditorTabs
@@ -188,7 +188,7 @@ function PanelEditorTabs({
   return (
     <div className="flex w-full flex-col">
       <Tabs value={tab} onValueChange={(value) => onTabChange(value as EditorTab)} className="flex w-full flex-col">
-        <div className="-mx-6 -mt-6 border-b border-slate-950/10 bg-background px-6 pb-3 pt-5 dark:border-gray-600">
+        <div className="-mx-6 -mt-6 border-b border-edge-subtle bg-surface-overlay px-6 pt-5 pb-3">
           <PanelEditorHeader panelType={panelType} hasYamlChanges={hasYamlChanges} onShowDiff={onShowDiff} />
           <TabsList className="mt-3">
             <TabsTrigger value="form" data-testid="panel-editor-tab-form">
@@ -203,7 +203,7 @@ function PanelEditorTabs({
           {formContent}
         </TabsContent>
         <TabsContent value="yaml" className="mt-3">
-          <div className="overflow-hidden rounded-md border border-slate-200 dark:border-gray-600">
+          <div className="overflow-hidden rounded-md border border-edge-default">
             <Editor
               height="50vh"
               language="yaml"
@@ -221,7 +221,7 @@ function PanelEditorTabs({
           </div>
         </TabsContent>
       </Tabs>
-      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-slate-950/10 bg-background px-6 py-4 dark:border-gray-600">
+      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-edge-subtle bg-surface-overlay px-6 py-4">
         {footer}
       </div>
     </div>
@@ -244,7 +244,7 @@ function PanelEditorHeader({
           <DialogTitle className="mb-1 text-base font-medium">
             Edit {PANEL_TYPE_META[panelType].label} panel
           </DialogTitle>
-          <DialogDescription className="text-gray-800 dark:text-gray-400">
+          <DialogDescription className="text-content-secondary">
             {PANEL_TYPE_META[panelType].description}
           </DialogDescription>
         </div>

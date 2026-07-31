@@ -49,7 +49,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
       ref={scrollRef}
       // Explicit selection colors keep highlighted text readable in both themes; without them the
       // browser default leaves light dark-mode text on a light highlight (issue #6372).
-      className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 selection:bg-blue-300/60 selection:text-slate-900 dark:selection:bg-blue-400/45 dark:selection:text-gray-50"
+      className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 selection:bg-blue-300/60 selection:text-content-primary dark:selection:bg-blue-400/45"
       data-testid="agent-chat-messages"
     >
       <div className="mx-auto w-full max-w-[800px] py-3">
@@ -196,15 +196,15 @@ const MessageRow = memo(function MessageRow({
         // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
         // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
         // otherwise the sticky bubble can cover the active Thinking or command rows.
-        shouldStickUserMessage && "sticky top-0 z-10 bg-white dark:bg-gray-900",
+        shouldStickUserMessage && "sticky top-0 z-10 bg-surface-raised",
       )}
     >
       <div
         className={cn(
           "min-w-0 break-words text-sm",
           isUser
-            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900 dark:bg-gray-800 dark:text-gray-100"
-            : "w-full max-w-[720px] text-slate-900 dark:text-gray-100",
+            ? "max-w-[85%] rounded-lg bg-action-neutral px-3 py-1.5 whitespace-pre-wrap text-content-primary"
+            : "w-full max-w-[720px] text-content-primary",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
@@ -218,7 +218,7 @@ const MessageRow = memo(function MessageRow({
         />
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 text-[10px] text-slate-500 dark:text-gray-400">{formatTime(message.createdAt)}</span>
+        <span className="mt-0.5 text-[10px] text-content-secondary">{formatTime(message.createdAt)}</span>
       ) : null}
     </div>
   );
@@ -237,11 +237,11 @@ function MessageImages({ images }: { images: AgentMessage["images"] }) {
             key={index}
             type="button"
             onClick={() => setSelectedImage(image)}
-            className="group relative block cursor-zoom-in overflow-hidden rounded-md border border-slate-200 dark:border-gray-700"
+            className="group relative block cursor-zoom-in overflow-hidden rounded-md border border-edge-default"
             aria-label="Open attachment"
           >
             <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
-            <span className="absolute right-1 bottom-1 rounded bg-slate-950/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <span className="absolute right-1 bottom-1 rounded bg-overlay-scrim p-1 text-content-inverse opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               <Maximize2 className="size-3" aria-hidden />
             </span>
           </button>
@@ -263,7 +263,7 @@ function ImageLightbox({ image, onOpenChange }: { image: MessageImage | null; on
         <DialogDescription className="sr-only">Expanded image attachment from the agent session.</DialogDescription>
         {image ? (
           <>
-            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-slate-950/5 dark:bg-black/30">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-surface-subtle">
               <img
                 src={image.url}
                 alt="attachment"
@@ -311,7 +311,7 @@ function SubagentCard({ messages }: { messages: AgentMessage[] }) {
       <button
         type="button"
         onClick={toggleExpanded}
-        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-gray-100"
+        className="flex cursor-pointer items-center gap-2 text-content-secondary hover:text-content-primary"
       >
         <Bot className="size-4 shrink-0" />
         <span>{agentName}</span>
@@ -345,12 +345,10 @@ function SubagentStatus({ isRunning }: { isRunning: boolean }) {
 function SubagentDetails({ question, response }: { question: string; response: string }) {
   return (
     <div className="mt-2 space-y-2 pl-6">
-      {question ? (
-        <p className="text-xs italic text-slate-500 dark:text-gray-400">"{truncateQuestion(question)}"</p>
-      ) : null}
+      {question ? <p className="text-xs italic text-content-secondary">"{truncateQuestion(question)}"</p> : null}
       {response ? (
         <div className="max-h-60 overflow-y-auto">
-          <p className="whitespace-pre-wrap text-xs text-slate-700 dark:text-gray-300">{response}</p>
+          <p className="whitespace-pre-wrap text-xs text-content-secondary">{response}</p>
         </div>
       ) : null}
     </div>
@@ -398,13 +396,11 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
         onClick={() => setExpanded((current) => !current)}
         className="group flex cursor-pointer items-center gap-2"
       >
-        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200" />
-        <span className="text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200">
-          {label}
-        </span>
+        <Terminal className="size-4 shrink-0 text-content-secondary group-hover:text-content-primary" />
+        <span className="text-content-secondary group-hover:text-content-primary">{label}</span>
         <ChevronRight
           className={cn(
-            "size-3 text-slate-500 transition-transform group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200",
+            "size-3 text-content-secondary transition-transform group-hover:text-content-primary",
             expanded && "rotate-90",
           )}
         />
@@ -439,21 +435,19 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
         disabled={!canExpand}
         className={cn(
           "flex w-full items-center gap-1.5 text-left",
-          running ? "text-slate-700 dark:text-gray-300" : "text-slate-600 dark:text-gray-400",
-          canExpand && "cursor-pointer hover:text-slate-900 dark:hover:text-gray-200",
+          running ? "text-content-secondary" : "text-content-secondary",
+          canExpand && "cursor-pointer hover:text-content-primary",
         )}
       >
         <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
         <span className="truncate">{running ? "Running..." : preview}</span>
       </button>
       {expanded && command ? (
-        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800/70 dark:bg-gray-900">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-800/70 dark:bg-gray-900">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
-              bash
-            </span>
+        <div className="mt-1 overflow-hidden rounded-lg border border-edge-default bg-surface-raised">
+          <div className="flex items-center justify-between border-b border-edge-default bg-surface-subtle px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-content-secondary">bash</span>
           </div>
-          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700 dark:text-gray-300">
+          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-content-secondary">
             {command}
           </pre>
         </div>
@@ -465,7 +459,7 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
 function ThinkingRow() {
   return (
     <div
-      className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500 dark:text-gray-400"
+      className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-content-secondary"
       data-testid="agent-thinking"
     >
       <Loader2 className="size-4 shrink-0 animate-spin" />

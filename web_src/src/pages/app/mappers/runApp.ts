@@ -93,9 +93,9 @@ export const runAppMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: context.componentDefinition.icon || "play",
-      iconColor: "text-gray-800",
+      iconColor: "text-content-primary",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Run App",
       metadata: runAppMetadataList(context.node),
       eventSections: lastExecution ? runAppEventSections(context.nodes, lastExecution, componentName) : undefined,

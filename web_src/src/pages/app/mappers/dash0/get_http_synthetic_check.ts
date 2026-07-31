@@ -39,7 +39,7 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: dash0Icon,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
@@ -251,27 +251,27 @@ export const GET_HTTP_SYNTHETIC_CHECK_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   healthy: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-green-500",
   },
   degraded: {
     icon: "alert-triangle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
   },
   critical: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
   noStatus: {
     icon: "alert-circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-400",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
 };
 

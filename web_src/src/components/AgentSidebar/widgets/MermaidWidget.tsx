@@ -104,9 +104,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   if (!svg) {
     return (
-      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400 dark:text-gray-500">
-        Rendering diagram...
-      </div>
+      <div className="my-4 flex items-center justify-center py-4 text-xs text-content-muted">Rendering diagram...</div>
     );
   }
 
@@ -116,7 +114,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
         type="button"
         onClick={() => setExpanded(true)}
         aria-label="Expand diagram"
-        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-edge-default bg-surface-raised p-3 text-left transition-colors hover:border-edge-strong [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
       >
         <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
       </button>
@@ -144,7 +142,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
               icon={<RotateCcw className="h-3.5 w-3.5" />}
               onClick={() => fitToViewportRef.current?.()}
             />
-            <span className="px-1 text-[11px] tabular-nums text-slate-500 dark:text-gray-400">
+            <span className="px-1 text-[11px] tabular-nums text-content-secondary">
               {Math.round(scale * 100)}%{Math.abs(scale - fitScale) < 0.01 ? " · fitted" : ""}
             </span>
           </>
@@ -214,7 +212,7 @@ function MermaidPanZoom({
   return (
     <div
       ref={viewportRef}
-      className="h-full min-h-0 cursor-grab overflow-hidden bg-slate-50/50 active:cursor-grabbing dark:bg-gray-900"
+      className="h-full min-h-0 cursor-grab overflow-hidden bg-surface-subtle active:cursor-grabbing"
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}

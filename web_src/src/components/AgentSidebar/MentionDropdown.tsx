@@ -42,7 +42,7 @@ function RunStatusDot({ status }: { status?: string }) {
       : status === "RESULT_FAILED"
         ? "bg-red-500"
         : status === "RESULT_CANCELLED"
-          ? "bg-slate-400"
+          ? "bg-content-muted"
           : "bg-amber-500";
   return <span className={cn("size-2.5 rounded-full shrink-0", color)} />;
 }
@@ -64,9 +64,7 @@ function NodeItemList({
   return (
     <>
       {showHeader && (
-        <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-gray-500">
-          Nodes
-        </div>
+        <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-content-muted">Nodes</div>
       )}
       {items.map((item, idx) => (
         <button
@@ -75,7 +73,7 @@ function NodeItemList({
           data-index={idx}
           className={cn(
             "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
-            idx === highlightedIndex ? "bg-slate-100 dark:bg-gray-700" : "hover:bg-slate-50 dark:hover:bg-gray-700",
+            idx === highlightedIndex ? "bg-surface-subtle" : "hover:bg-action-neutral-hover",
           )}
           onMouseEnter={() => onMouseEnter(idx)}
           onMouseDown={(e) => {
@@ -84,8 +82,8 @@ function NodeItemList({
           }}
         >
           <NodeIcon component={item.meta} isTrigger={item.isTrigger} />
-          <span className="flex-1 truncate font-medium text-slate-700 dark:text-gray-200">{item.label}</span>
-          {item.meta && <span className="text-[10px] text-slate-400 dark:text-gray-500">{item.meta}</span>}
+          <span className="flex-1 truncate font-medium text-content-secondary">{item.label}</span>
+          {item.meta && <span className="text-[10px] text-content-muted">{item.meta}</span>}
         </button>
       ))}
     </>
@@ -111,7 +109,7 @@ function RunItemList({
   return (
     <>
       {showHeader && (
-        <div className="mt-1 border-t border-slate-100 px-3 py-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:border-gray-700 dark:text-gray-500">
+        <div className="mt-1 border-t border-edge-subtle px-3 py-1 pt-2 text-[10px] font-medium tracking-wider text-content-muted uppercase">
           Recent Runs
         </div>
       )}
@@ -124,7 +122,7 @@ function RunItemList({
             data-index={idx}
             className={cn(
               "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
-              idx === highlightedIndex ? "bg-slate-100 dark:bg-gray-700" : "hover:bg-slate-50 dark:hover:bg-gray-700",
+              idx === highlightedIndex ? "bg-surface-subtle" : "hover:bg-action-neutral-hover",
             )}
             onMouseEnter={() => onMouseEnter(idx)}
             onMouseDown={(e) => {
@@ -133,8 +131,8 @@ function RunItemList({
             }}
           >
             <RunStatusDot status={item.meta} />
-            <span className="flex-1 truncate font-medium text-slate-700 dark:text-gray-200">{item.label}</span>
-            {item.timeAgo && <span className="text-[10px] text-slate-400 dark:text-gray-500">{item.timeAgo}</span>}
+            <span className="flex-1 truncate font-medium text-content-secondary">{item.label}</span>
+            {item.timeAgo && <span className="text-[10px] text-content-muted">{item.timeAgo}</span>}
           </button>
         );
       })}
@@ -227,10 +225,7 @@ export function MentionDropdown({
   };
 
   return createPortal(
-    <div
-      style={style}
-      className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
-    >
+    <div style={style} className="overflow-hidden rounded-lg border border-edge-default bg-surface-overlay shadow-lg">
       <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
         <NodeItemList
           items={nodes}

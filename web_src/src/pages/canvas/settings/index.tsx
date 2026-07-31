@@ -8,8 +8,6 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { appPath } from "@/lib/appPaths";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { buildSettingsInitialValues } from "./buildInitialValues";
 import { PageHeader } from "./PageHeader";
 import type { SettingsSavePayload } from "./types";
@@ -48,14 +46,11 @@ function LoadingView({ organizationId }: { organizationId: string }) {
   usePageTitle(["Canvas settings"]);
 
   return (
-    <div className={cn("flex h-full flex-col bg-slate-100", appDarkModeClasses.surface)}>
+    <div className="flex h-full flex-col bg-surface-canvas">
       <PageHeader organizationId={organizationId} title="" />
 
       <div className="flex flex-1 items-center justify-center">
-        <Loader2
-          className={cn("h-8 w-8 animate-spin text-slate-400", appDarkModeClasses.textMuted)}
-          aria-label="Loading"
-        />
+        <Loader2 className="h-8 w-8 animate-spin text-content-muted" aria-label="Loading" />
       </div>
     </div>
   );
@@ -65,11 +60,11 @@ function ErrorView({ organizationId, error }: { organizationId?: string; error: 
   usePageTitle(["Canvas settings"]);
 
   return (
-    <div className={cn("flex h-full flex-col bg-slate-100", appDarkModeClasses.surface)}>
+    <div className="flex h-full flex-col bg-surface-canvas">
       {organizationId && <PageHeader organizationId={organizationId} title="" />}
 
       <div className="flex flex-1 items-center justify-center">
-        <p className={cn("text-sm text-slate-600", appDarkModeClasses.textSecondary)}>{error}</p>
+        <p className="text-sm text-content-secondary">{error}</p>
       </div>
     </div>
   );
@@ -94,7 +89,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const onSave = useSaveCallback(resolvedCanvasId, orgId);
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col bg-slate-100", appDarkModeClasses.surface)}>
+    <div className="flex h-full min-h-0 flex-col bg-surface-canvas">
       <PageHeader organizationId={orgId} title={`${canvasName} · Settings`} />
 
       <div className="min-h-0 flex-1 overflow-auto">

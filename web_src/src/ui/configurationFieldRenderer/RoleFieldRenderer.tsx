@@ -42,7 +42,7 @@ export const RoleFieldRenderer = ({
   }
 
   if (isLoading) {
-    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</div>;
+    return <div className="text-sm text-content-secondary">Loading roles...</div>;
   }
 
   if (!roles || roles.length === 0) {
@@ -53,7 +53,7 @@ export const RoleFieldRenderer = ({
             <SelectValue placeholder="No roles available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-gray-400">No roles found in this organization.</p>
+        <p className="text-xs text-content-secondary">No roles found in this organization.</p>
       </div>
     );
   }

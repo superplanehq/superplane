@@ -139,7 +139,7 @@ export const Composite: React.FC<CompositeProps> = ({
         handleComponent: (
           <div
             onClick={onViewMoreEvents}
-            className="cursor-pointer hover:bg-gray-200 transition-colors px-2 py-1 rounded"
+            className="cursor-pointer hover:bg-action-neutral-hover transition-colors px-2 py-1 rounded"
           >
             Click to view more events
           </div>
@@ -161,8 +161,8 @@ export const Composite: React.FC<CompositeProps> = ({
         badges: [
           {
             label: `${key}: ${value}`,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700",
+            bgColor: "bg-surface-subtle",
+            textColor: "text-content-secondary",
           },
         ],
       })),

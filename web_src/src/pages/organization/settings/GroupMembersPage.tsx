@@ -126,7 +126,7 @@ export function GroupMembersPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">Loading group...</p>
+        <p className="text-content-secondary">Loading group...</p>
       </div>
     );
   }
@@ -149,7 +149,7 @@ export function GroupMembersPage() {
             showDivider={false}
           />
         </div>
-        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+        <div className="rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
           <p>{error instanceof Error ? error.message : "Failed to load group data"}</p>
         </div>
       </div>
@@ -175,7 +175,7 @@ export function GroupMembersPage() {
         />
       </div>
 
-      <div className="bg-slate-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <div className="space-y-6 rounded-lg border border-edge-default bg-surface-raised p-6">
         {/* Group header */}
         <div className="flex items-center justify-between">
           <div className="group">
@@ -185,7 +185,7 @@ export function GroupMembersPage() {
                   type="text"
                   value={editedGroupName}
                   onChange={(e) => setEditedGroupName(e.target.value)}
-                  className="text-sm font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  className="text-sm font-normal bg-surface-raised border-edge-default"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSaveGroupName();
                     if (e.key === "Escape") handleCancelGroupName();
@@ -211,13 +211,13 @@ export function GroupMembersPage() {
                 message="You don't have permission to update groups."
               >
                 <div
-                  className="flex items-center gap-2 rounded-md px-2 py-1 transition group-hover:bg-white/50 border-1 border-transparent group-hover:border-gray-300 dark:group-hover:bg-white/10 cursor-text"
+                  className="flex cursor-text items-center gap-2 rounded-md border-1 border-transparent px-2 py-1 transition group-hover:border-edge-default group-hover:bg-action-neutral-hover"
                   onClick={handleEditGroupName}
                 >
-                  <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
+                  <Heading level={2} className="text-2xl font-semibold text-content-primary">
                     {group?.spec?.displayName}
                   </Heading>
-                  <span className="opacity-0 group-hover:opacity-100 text-xs font-medium text-gray-500 border-1 border-gray-300 rounded px-2 py-0.5">
+                  <span className="rounded border-1 border-edge-default px-2 py-0.5 text-xs font-medium text-content-muted opacity-0 group-hover:opacity-100">
                     Edit
                   </span>
                 </div>
@@ -244,7 +244,7 @@ export function GroupMembersPage() {
         </PermissionTooltip>
 
         {/* Group members table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
           <div className="p-6">
             <Table dense>
               <TableBody>
@@ -258,10 +258,8 @@ export function GroupMembersPage() {
                           className="size-8"
                         />
                         <div>
-                          <div className="text-sm font-medium text-gray-800 dark:text-white">
-                            {member.spec?.displayName}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-sm font-medium text-content-primary">{member.spec?.displayName}</div>
+                          <div className="text-xs text-content-secondary">
                             Member since {new Date().toLocaleDateString()}
                           </div>
                         </div>
@@ -280,7 +278,7 @@ export function GroupMembersPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveMember(member.metadata!.id!)}
-                                  className="p-1 rounded text-gray-800 hover:bg-gray-100 transition-colors"
+                                  className="rounded p-1 text-content-primary transition-colors hover:bg-action-neutral-hover"
                                   aria-label="Remove from Group"
                                   disabled={!canUpdateGroups}
                                 >
@@ -297,9 +295,9 @@ export function GroupMembersPage() {
                 ))}
                 {members.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-800 h-[200px] py-6 border-b-0">
+                    <TableCell colSpan={4} className="h-[200px] border-b-0 py-6 text-center text-content-primary">
                       <div className="flex flex-col items-center gap-2">
-                        <Icon name="user" size="xl" className="text-gray-800" />
+                        <Icon name="user" size="xl" className="text-content-primary" />
                         <span className="text-sm">No group members yet</span>
                       </div>
                     </TableCell>

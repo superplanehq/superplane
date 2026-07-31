@@ -244,7 +244,7 @@ function OutputSection({ section, jsonViewStyle }: { section: RunInspectorNodeSe
     <div className="space-y-3">
       {section.outputSections.map((output) => (
         <div key={output.channel} className="space-y-2">
-          <div className="text-xs font-medium text-slate-500 dark:text-gray-400">{output.channel}</div>
+          <div className="text-xs font-medium text-content-secondary">{output.channel}</div>
           <JsonPayload value={output.value} jsonViewStyle={jsonViewStyle} />
         </div>
       ))}
@@ -267,7 +267,7 @@ function outputStatus(section: RunInspectorNodeSection): StatusPill {
   }
 
   return {
-    dotClassName: section.badge?.badgeColor ?? "bg-slate-400",
+    dotClassName: section.badge?.badgeColor ?? "bg-content-muted",
     label: section.badge?.label ?? "Output",
   };
 }

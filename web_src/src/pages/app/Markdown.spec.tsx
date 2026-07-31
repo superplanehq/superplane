@@ -82,7 +82,7 @@ describe("MarkdownContent", () => {
 
     expect(container.firstChild).toHaveClass("[&_a]:text-sky-600");
     expect(container.firstChild).toHaveClass("[&_a]:no-underline");
-    expect(container.firstChild).toHaveClass("[&_code]:bg-gray-950/5");
+    expect(container.firstChild).toHaveClass("[&_code]:bg-action-neutral");
     expect(container.firstChild).not.toHaveClass("[&_a]:underline");
   });
 
@@ -118,10 +118,10 @@ describe("MarkdownContent", () => {
     render(<MarkdownContent content={"| Stage | Note |\n| --- | --- |\n| Build | **Failed** |\n"} />);
     const th = screen.getByRole("columnheader", { name: "Stage" });
     const td = screen.getByRole("cell", { name: "Failed" });
-    expect(th.className).toContain("border-slate-200");
+    expect(th.className).toContain("border-edge-default");
     expect(th.className).toContain("font-semibold");
-    expect(td.className).toContain("border-slate-200");
-    expect(td.className).not.toContain("border-slate-100");
+    expect(td.className).toContain("border-edge-default");
+    expect(td.className).not.toContain("border-edge-subtle");
     expect(screen.getByText("Failed").tagName).toBe("STRONG");
     expect(screen.getByText("Failed").className).toContain("font-semibold");
   });
@@ -133,7 +133,7 @@ describe("MarkdownContent", () => {
     expect(divider.tagName).toBe("HR");
     expect(divider).toHaveAttribute("role", "separator");
     expect(divider.className).toContain("border-t-2");
-    expect(divider.className).toContain("border-slate-300");
+    expect(divider.className).toContain("border-edge-default");
   });
 
   it.each([

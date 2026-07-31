@@ -250,7 +250,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     return (
       <div className="pt-6">
         <div className="flex justify-center items-center h-32">
-          <p className="text-gray-500 dark:text-gray-400">Loading integrations...</p>
+          <p className="text-content-secondary">Loading integrations...</p>
         </div>
       </div>
     );
@@ -259,7 +259,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   return (
     <div className="pt-6">
       <div className="relative mb-4">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-secondary" />
         <Input
           type="text"
           value={filterQuery}
@@ -271,7 +271,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           <button
             type="button"
             onClick={() => setFilterQuery("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary"
             aria-label="Clear filter"
           >
             <X className="w-4 h-4" />
@@ -285,7 +285,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
           </p>
           {isIntegrationSurveyActive ? (
-            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-3 text-sm text-content-secondary">
               Can't find your integration?{" "}
               <button
                 type="button"
@@ -310,15 +310,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       <IntegrationIcon
                         integrationName={item.providerName}
                         iconSlug={item.integrationDef?.icon}
-                        className="w-8 h-8 text-gray-500 dark:text-gray-400"
+                        className="w-8 h-8 text-content-secondary"
                       />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.providerLabel}</h3>
+                      <h3 className="text-sm font-semibold text-content-primary">{item.providerLabel}</h3>
                       {item.integrationDef?.description ? (
-                        <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-400">
-                          {item.integrationDef?.description}
-                        </p>
+                        <p className="mt-0.5 text-sm text-content-secondary">{item.integrationDef?.description}</p>
                       ) : null}
                     </div>
                   </div>
@@ -346,7 +344,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 </div>
                 {item.instances.length > 0 ? (
                   <div className="pr-4 pb-4 pl-[60px]">
-                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mb-2 text-xs text-content-secondary">
                       {connectedCount} connected instance{connectedCount === 1 ? "" : "s"}
                     </p>
                     {item.instances.map((integration, index) => {
@@ -358,7 +356,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       return (
                         <div
                           key={integration.metadata?.id}
-                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700/70 ${index === 0 ? "mt-1" : ""}`}
+                          className={`flex items-center gap-2 py-1.5 border-t border-edge-subtle/70 ${index === 0 ? "mt-1" : ""}`}
                         >
                           <Plug
                             className={`w-4 h-4 shrink-0 ${
@@ -373,17 +371,15 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                             className={cn(
                               "inline-flex w-16 items-center justify-start rounded text-xs font-medium",
                               integration.status?.state === "ready"
-                                ? "bg-white text-green-500 dark:bg-green-300 dark:text-green-950"
+                                ? "bg-status-success-subtle text-status-success-content"
                                 : integration.status?.state === "error"
-                                  ? "bg-white text-red-500 dark:bg-red-300 dark:text-red-950"
-                                  : "bg-white text-amber-600 dark:bg-amber-300 dark:text-amber-950",
+                                  ? "bg-status-danger-subtle text-status-danger-content"
+                                  : "bg-status-warning-subtle text-status-warning-content",
                             )}
                           >
                             {statusLabel}
                           </span>
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                            {integrationDisplayName}
-                          </p>
+                          <p className="text-sm font-medium text-content-primary truncate">{integrationDisplayName}</p>
                           <div className="ml-auto flex items-center gap-4">
                             <PermissionTooltip
                               allowed={canUpdateIntegrations || permissionsLoading}
@@ -421,7 +417,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             );
           })}
           {isIntegrationSurveyActive ? (
-            <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-6 text-center text-sm text-content-secondary">
               Can't find your integration?{" "}
               <button
                 type="button"
@@ -441,7 +437,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         (() => {
           const integrationTypeName = selectedIntegration.name;
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
               <div className={cn(settingsModalClassName, "max-h-[80vh] max-w-2xl overflow-y-auto")}>
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -449,15 +445,15 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       <IntegrationIcon
                         integrationName={integrationTypeName}
                         iconSlug={selectedIntegration.icon}
-                        className="w-6 h-6 text-gray-500 dark:text-gray-400"
+                        className="w-6 h-6 text-content-secondary"
                       />
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                      <h3 className="text-base font-semibold text-content-primary">
                         Connect {selectedIntegration.label || selectedIntegration.name}
                       </h3>
                     </div>
                     <button
                       onClick={handleCloseModal}
-                      className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+                      className="text-content-muted hover:text-content-primary"
                       disabled={createIntegrationMutation.isPending}
                     >
                       <Icon name="x" size="sm" />
@@ -468,9 +464,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     {selectedInstructions && <IntegrationInstructions description={selectedInstructions} />}
                     {/* Integration Name Field */}
                     <div>
-                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                      <Label className="text-content-primary mb-2">
                         Integration Name
-                        <span className="ml-1 text-gray-800 dark:text-gray-100">*</span>
+                        <span className="ml-1 text-content-primary">*</span>
                       </Label>
                       <Input
                         type="text"
@@ -480,9 +476,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         required
                         disabled={!canCreateIntegrations}
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        A unique name for this integration
-                      </p>
+                      <p className="text-xs text-content-secondary mt-2">A unique name for this integration</p>
                     </div>
 
                     {/* Configuration Fields */}

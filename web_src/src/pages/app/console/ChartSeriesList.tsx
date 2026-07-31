@@ -30,7 +30,7 @@ export function ChartSeriesList({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Series</Label>
+        <Label className="text-xs font-medium text-content-secondary">Series</Label>
         <Button type="button" size="sm" variant="outline" onClick={addSeries} data-testid="chart-add-series">
           Add series
         </Button>

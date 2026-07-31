@@ -17,7 +17,7 @@ describe("consoleBadgeClassName", () => {
     expect(consoleBadgeClassName("running")).toContain("bg-blue-500");
   });
 
-  it("falls back to gray for unknown labels", () => {
-    expect(consoleBadgeClassName("api")).toContain("bg-gray-500");
+  it("falls back to muted for unknown labels", () => {
+    expect(consoleBadgeClassName("api")).toContain("bg-content-muted");
   });
 });

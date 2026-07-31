@@ -50,16 +50,16 @@ const GET_LAST_MENTION_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   found: {
     icon: "at-sign",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "Found",
   },
   notFound: {
     icon: "message-circle-off",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
     label: "Not Found",
   },
 };

@@ -89,7 +89,7 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
     return {
       iconSrc: claudeIcon,
       iconSlug: context.componentDefinition?.icon ?? "bot",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title:
         context.node.name ||

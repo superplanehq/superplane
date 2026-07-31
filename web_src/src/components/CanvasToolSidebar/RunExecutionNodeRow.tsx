@@ -46,8 +46,8 @@ export function RunExecutionNodeRow({
         onSelect(nodeId);
       }}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 border-b border-b-slate-950/10 px-3 py-2 text-left transition-colors dark:border-gray-800/70",
-        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-gray-50 dark:hover:bg-gray-800",
+        "flex w-full cursor-pointer items-center gap-2 border-b border-b-edge-subtle px-3 py-2 text-left transition-colors",
+        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-action-neutral-hover",
       )}
     >
       <RunNodeIcon
@@ -55,14 +55,9 @@ export function RunExecutionNodeRow({
         iconSlug={iconSlug}
         alt={nodeName}
         size={RUN_NODE_ICON_SIZE}
-        className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          isSelected ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400",
-        )}
+        className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-content-primary" : "text-content-secondary")}
       />
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
-        {nodeName}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-content-primary">{nodeName}</span>
       {badge ? <EventStatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );

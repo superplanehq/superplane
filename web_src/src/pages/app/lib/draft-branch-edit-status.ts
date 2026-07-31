@@ -17,18 +17,18 @@ export function resolveDraftBranchEditStatus(
 
 export function draftBranchRowBackgroundClassName(isActive: boolean, editStatus: DraftBranchEditStatus): string {
   if (!isActive) {
-    return "bg-slate-50 dark:bg-gray-900";
+    return "bg-surface-subtle";
   }
 
   if (editStatus === "uncommitted") {
-    return "bg-orange-50 dark:bg-gray-800";
+    return "bg-status-warning-subtle";
   }
 
-  return "bg-blue-50 dark:bg-gray-800";
+  return "bg-status-info-subtle";
 }
 
 const grayStatusBadgeClassName =
-  "rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600 dark:bg-gray-800 dark:text-gray-400";
+  "rounded bg-action-neutral px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-content-secondary";
 const activeBlueStatusBadgeClassName =
   "rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-800 dark:bg-blue-400 dark:text-blue-950";
 const activeOrangeStatusBadgeClassName =

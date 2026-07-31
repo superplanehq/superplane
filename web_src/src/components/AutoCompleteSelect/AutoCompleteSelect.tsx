@@ -140,11 +140,11 @@ export function AutoCompleteSelect({
       <div
         ref={refs.setReference}
         className={twMerge(
-          "relative flex items-center w-full min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100",
+          "relative flex items-center w-full min-w-0 px-3 py-2 text-sm bg-surface-raised text-content-primary",
           "border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer",
           error
             ? "border-red-300 dark:border-red-600 focus-within:ring-red-500"
-            : "border-gray-300 dark:border-gray-600 focus-within:ring-blue-500",
+            : "border-edge-default focus-within:ring-blue-500",
           disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
@@ -157,7 +157,7 @@ export function AutoCompleteSelect({
         }}
       >
         {!isOpen && selectedOption && query === "" ? (
-          <span className="flex-1 min-w-0 text-gray-800 dark:text-gray-100 truncate">{selectedOption.label}</span>
+          <span className="flex-1 min-w-0 text-content-primary truncate">{selectedOption.label}</span>
         ) : (
           <input
             ref={inputRef}
@@ -165,7 +165,7 @@ export function AutoCompleteSelect({
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
-            className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="min-w-0 flex-1 border-none bg-transparent outline-none placeholder:text-content-muted"
             placeholder={placeholder}
             value={query}
             onChange={handleInputChange}
@@ -185,10 +185,7 @@ export function AutoCompleteSelect({
           <Icon
             name="chevron-down"
             size="sm"
-            className={twMerge(
-              "ml-2 text-gray-400 dark:text-gray-500 flex-shrink-0 transition-transform",
-              isOpen && "rotate-180",
-            )}
+            className={twMerge("ml-2 text-content-muted flex-shrink-0 transition-transform", isOpen && "rotate-180")}
           />
         </div>
       </div>
@@ -198,18 +195,18 @@ export function AutoCompleteSelect({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-600 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-surface-raised shadow-lg border border-edge-default focus:outline-none"
         >
           <div ref={listRef}>
             {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="px-3 py-2 text-sm text-content-secondary">
                 {query !== "" ? "No options found" : "No connections available"}
               </div>
             ) : (
               Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
                 <div key={groupName}>
                   {Object.keys(groupedOptions).length > 1 && (
-                    <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-600">
+                    <div className="border-b border-edge-default bg-surface-subtle px-3 py-1 text-xs font-medium text-content-secondary">
                       {groupName}
                     </div>
                   )}
@@ -220,7 +217,7 @@ export function AutoCompleteSelect({
                         key={option.value}
                         role="option"
                         aria-selected={isSelected}
-                        className="relative cursor-pointer select-none px-3 py-2 text-sm hover:bg-blue-500 hover:text-white text-gray-800 dark:text-gray-100"
+                        className="relative cursor-pointer px-3 py-2 text-sm text-content-primary select-none hover:bg-action-primary hover:text-action-primary-content"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleOptionSelect(option.value)}
                       >

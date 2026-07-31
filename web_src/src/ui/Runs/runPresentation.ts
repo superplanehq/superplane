@@ -27,7 +27,7 @@ const RUN_STATUS_FILTER_OPTION_META: Record<RunStatusFilter, { label: string; do
   running: { label: "Running", dotClassName: "bg-blue-500" },
   passed: { label: "Passed", dotClassName: "bg-emerald-500" },
   failed: { label: "Failed", dotClassName: "bg-red-500" },
-  cancelled: { label: "Cancelled", dotClassName: "bg-gray-400" },
+  cancelled: { label: "Cancelled", dotClassName: "bg-content-muted" },
 };
 
 export const RUN_STATUS_FILTER_OPTIONS: { id: RunStatusFilter; label: string; dotClassName: string }[] =
@@ -54,8 +54,8 @@ export const RUN_STATUS_META = {
   },
   cancelled: {
     label: "Cancelled",
-    badgeClassName: "bg-slate-200 text-gray-700 dark:bg-slate-900 dark:text-gray-300",
-    dotClassName: "bg-gray-400",
+    badgeClassName: "bg-surface-subtle text-content-secondary",
+    dotClassName: "bg-content-muted",
     icon: MinusCircle,
   },
   passed: {
@@ -66,8 +66,8 @@ export const RUN_STATUS_META = {
   },
   unknown: {
     label: "Unknown",
-    badgeClassName: "bg-slate-200 text-slate-600 dark:bg-slate-900 dark:text-slate-300",
-    dotClassName: "bg-slate-300",
+    badgeClassName: "bg-surface-subtle text-content-secondary",
+    dotClassName: "bg-content-muted",
     icon: CircleDashed,
   },
 } satisfies Record<
@@ -149,7 +149,11 @@ export function getExecutionStatus(execution: CanvasesCanvasNodeExecutionRef) {
   }
 
   if (execution.result === "RESULT_CANCELLED") {
-    return { label: statusLabel, className: "bg-gray-100 text-gray-700 ring-gray-200", dotClassName: "bg-gray-400" };
+    return {
+      label: statusLabel,
+      className: "bg-surface-subtle text-content-secondary ring-edge-subtle",
+      dotClassName: "bg-content-muted",
+    };
   }
 
   if (execution.result === "RESULT_PASSED" || execution.state === "STATE_FINISHED") {
@@ -160,7 +164,11 @@ export function getExecutionStatus(execution: CanvasesCanvasNodeExecutionRef) {
     };
   }
 
-  return { label: statusLabel, className: "bg-slate-100 text-slate-600 ring-slate-200", dotClassName: "bg-slate-300" };
+  return {
+    label: statusLabel,
+    className: "bg-surface-subtle text-content-secondary ring-edge-subtle",
+    dotClassName: "bg-content-muted",
+  };
 }
 
 export function buildNodeMap(workflowNodes: SuperplaneComponentsNode[]) {

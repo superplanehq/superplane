@@ -68,7 +68,7 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
   return (
     <>
       <div
-        className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+        className="overflow-hidden rounded-lg border border-edge-default bg-surface-raised"
         data-testid="outcome-progress"
       >
         <OutcomeHeader
@@ -110,7 +110,7 @@ function OutcomeHeader({
   onDismiss?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/60">
+    <div className="flex items-center justify-between border-b border-edge-default bg-surface-subtle px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm font-medium">🎯 {title}</span>
       </div>
@@ -119,7 +119,7 @@ function OutcomeHeader({
           <button
             type="button"
             onClick={onDismiss}
-            className="text-slate-400 transition-colors hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300"
+            className="text-content-muted transition-colors hover:text-content-primary"
             title="Dismiss"
           >
             <X size={14} />
@@ -144,15 +144,15 @@ function RubricSummary({
   onOpenRubric: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5 dark:border-gray-700">
-      <span className="text-[10px] text-slate-500 dark:text-gray-400">
+    <div className="flex items-center justify-between border-b border-edge-subtle px-3 py-1.5">
+      <span className="text-[10px] text-content-secondary">
         {sectionCount > 0 ? `${sectionCount} sections · ` : ""}
         {criteriaCount} criteria
       </span>
       <button
         type="button"
         onClick={onOpenRubric}
-        className="text-[10px] font-medium text-slate-600 hover:text-slate-800 dark:text-gray-300 dark:hover:text-gray-100"
+        className="text-[10px] font-medium text-content-secondary hover:text-content-primary"
       >
         View rubric
       </button>
@@ -172,7 +172,7 @@ function OutcomeLog({
       <div className="px-3 py-2">
         <div className="flex items-center gap-2 py-0.5">
           <Loader2 size={12} className="shrink-0 animate-spin text-blue-500" />
-          <span className="text-xs text-slate-500 dark:text-gray-400">Starting…</span>
+          <span className="text-xs text-content-secondary">Starting…</span>
         </div>
       </div>
     );
@@ -199,7 +199,7 @@ function IterationLogRow({ entry, iteration }: { entry: IterationEntry; iteratio
       ) : (
         <span className="shrink-0 text-xs">✓</span>
       )}
-      <span className="text-xs text-slate-700 dark:text-gray-300">
+      <span className="text-xs text-content-secondary">
         Iteration {iteration} — {entry.phase === "building" ? "building…" : "finished"}
       </span>
     </div>
@@ -215,7 +215,7 @@ function GradingLogRow({ entry, onOpenExplanation }: { entry: GradingEntry; onOp
         <button
           type="button"
           onClick={onOpenExplanation}
-          className="ml-auto shrink-0 text-[10px] text-slate-500 underline hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+          className="ml-auto shrink-0 text-[10px] text-content-secondary underline hover:text-content-primary"
         >
           see result
         </button>
@@ -233,7 +233,7 @@ function RubricModal({ open, state, onClose }: { open: boolean; state: OutcomeSt
     <CenteredModal
       title={state.title}
       onClose={onClose}
-      titleIcon={<ClipboardList size={16} className="text-slate-600 dark:text-gray-300" />}
+      titleIcon={<ClipboardList size={16} className="text-content-secondary" />}
     >
       {state.categories && state.categories.length > 0 ? (
         <CategorizedCriteriaList categories={state.categories} />
@@ -259,7 +259,7 @@ function ExplanationModal({
 
   return (
     <CenteredModal title="Grading Result" onClose={onClose}>
-      <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-gray-300">{explanation}</p>
+      <p className="whitespace-pre-wrap text-sm text-content-secondary">{explanation}</p>
     </CenteredModal>
   );
 }
@@ -276,28 +276,20 @@ function CenteredModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg bg-white shadow-xl dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-gray-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
+      <div className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg bg-surface-overlay shadow-xl">
+        <div className="flex items-center justify-between border-b border-edge-default px-4 py-3">
           <div className="flex items-center gap-2">
             {titleIcon}
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100">{title}</h2>
+            <h2 className="text-sm font-semibold text-content-primary">{title}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300"
-          >
+          <button type="button" onClick={onClose} className="text-content-muted hover:text-content-primary">
             <X size={16} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        <div className="flex justify-end border-t border-slate-200 px-4 py-3 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xs text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
+        <div className="flex justify-end border-t border-edge-default px-4 py-3">
+          <button type="button" onClick={onClose} className="text-xs text-content-secondary hover:text-content-primary">
             Close
           </button>
         </div>
@@ -311,15 +303,15 @@ function CategorizedCriteriaList({ categories }: { categories: RubricCategory[] 
     <div className="space-y-3">
       {categories.map((category, categoryIndex) => (
         <div key={categoryIndex}>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-content-secondary">
             {category.heading}
           </p>
           {category.criteria.map((criterion, criterionIndex) => (
             <CriteriaRow
               key={criterionIndex}
-              prefix={<span className="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-gray-500">✦</span>}
+              prefix={<span className="mt-0.5 shrink-0 text-xs text-content-muted">✦</span>}
             >
-              <span className="text-sm text-slate-700 dark:text-gray-300">{criterion.text}</span>
+              <span className="text-sm text-content-secondary">{criterion.text}</span>
             </CriteriaRow>
           ))}
         </div>
@@ -335,11 +327,9 @@ function FlatCriteriaList({ criteria }: { criteria: OutcomeState["criteria"] }) 
         <CriteriaRow
           key={index}
           bordered
-          prefix={
-            <span className="mt-0.5 shrink-0 text-sm font-medium text-slate-500 dark:text-gray-400">{index + 1}.</span>
-          }
+          prefix={<span className="mt-0.5 shrink-0 text-sm font-medium text-content-secondary">{index + 1}.</span>}
         >
-          <span className="text-sm text-slate-700 dark:text-gray-300">{criterion.text}</span>
+          <span className="text-sm text-content-secondary">{criterion.text}</span>
         </CriteriaRow>
       ))}
     </>
@@ -357,10 +347,7 @@ function CriteriaRow({
 }) {
   return (
     <div
-      className={cn(
-        "flex items-start gap-2",
-        bordered ? "border-b border-slate-50 py-1.5 last:border-0 dark:border-gray-700" : "py-1",
-      )}
+      className={cn("flex items-start gap-2", bordered ? "border-b border-edge-subtle py-1.5 last:border-0" : "py-1")}
     >
       {prefix}
       {children}

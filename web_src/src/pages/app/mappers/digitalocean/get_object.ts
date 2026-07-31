@@ -33,9 +33,9 @@ const GET_OBJECT_STATE_MAP: EventStateMap = {
   },
   notFound: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
     label: "Not Found",
   },
 };

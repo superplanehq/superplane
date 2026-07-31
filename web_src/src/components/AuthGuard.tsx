@@ -24,10 +24,10 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   // Show loading spinner while fetching account
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="flex min-h-screen items-center justify-center bg-surface-canvas">
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+          <p className="text-sm text-content-secondary">Loading...</p>
         </div>
       </div>
     );

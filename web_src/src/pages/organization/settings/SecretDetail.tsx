@@ -207,7 +207,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
           />
         </div>
         <div className="flex justify-center items-center h-32">
-          <p className="text-gray-500 dark:text-gray-400">{!secretId ? "Secret not found" : "Loading..."}</p>
+          <p className="text-content-secondary">{!secretId ? "Secret not found" : "Loading..."}</p>
         </div>
       </div>
     );
@@ -225,7 +225,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
             showDivider={false}
           />
         </div>
-        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded dark:border-red-800 dark:bg-red-900/20">
+        <div className="rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
           <p>{error instanceof Error ? error.message : "Secret not found or failed to load."}</p>
         </div>
       </div>
@@ -247,10 +247,10 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
         />
       </div>
 
-      <div className="bg-slate-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <div className="space-y-6 rounded-lg border border-edge-default bg-surface-raised p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Key className="w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0" />
+            <Key className="w-5 h-5 text-content-secondary shrink-0" />
             {editingSecretName ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Input
@@ -276,7 +276,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 truncate">
+                <h2 className="text-2xl font-semibold text-content-primary truncate">
                   {secret.metadata?.name || "Unnamed Secret"}
                 </h2>
                 <PermissionTooltip
@@ -288,7 +288,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                     size="sm"
                     onClick={handleStartEditSecretName}
                     disabled={!canUpdateSecrets}
-                    className="shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    className="shrink-0 text-content-muted hover:text-content-primary"
                     title="Edit secret name"
                     data-testid="secret-detail-edit-name"
                   >
@@ -321,9 +321,9 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
           </PermissionTooltip>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        <div className="bg-surface-raised rounded-lg border border-edge-default overflow-hidden">
           <div className="p-6">
-            <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-3">Key-value pairs</h3>
+            <h3 className="text-sm font-medium text-content-primary mb-3">Key-value pairs</h3>
             <div className="space-y-2">
               {keys.map((keyName) => {
                 const isEditing = editingKey === keyName;
@@ -332,14 +332,14 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                     key={keyName}
                     className={
                       isEditing
-                        ? "flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-600 p-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-2"
-                        : "flex items-center gap-2 text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded px-3 py-2"
+                        ? "flex gap-2 items-start rounded-md border border-edge-default p-4 bg-surface-subtle space-y-2"
+                        : "flex items-center gap-2 text-sm font-mono bg-surface-subtle rounded px-3 py-2"
                     }
                   >
                     {isEditing ? (
                       <>
                         <div className="flex-1 min-w-0 space-y-2">
-                          <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
+                          <Label className="text-xs text-content-secondary font-normal">Key</Label>
                           <Input
                             type="text"
                             value={editingKeyName}
@@ -348,15 +348,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                             className="font-mono text-sm"
                             data-testid="secret-detail-edit-key-name"
                           />
-                          <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
-                            Value
-                          </Label>
+                          <Label className="text-xs text-content-secondary font-normal block mt-2">Value</Label>
                           <Textarea
                             value={editingValue}
                             onChange={(e) => setEditingValue(e.target.value)}
                             placeholder="Value"
                             rows={8}
-                            className="font-mono text-sm resize-y bg-white dark:bg-gray-900 ph-no-capture"
+                            className="font-mono text-sm resize-y bg-surface-raised ph-no-capture"
                             autoFocus
                             data-testid="secret-detail-edit-value"
                           />
@@ -377,10 +375,10 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                       </>
                     ) : (
                       <>
-                        <span className="text-gray-700 dark:text-gray-200 shrink-0 w-32 truncate" title={keyName}>
+                        <span className="w-32 shrink-0 truncate text-content-primary" title={keyName}>
                           {keyName}
                         </span>
-                        <span className="text-gray-500 dark:text-gray-400">•••</span>
+                        <span className="text-content-secondary">•••</span>
                         <PermissionTooltip
                           allowed={canUpdateSecrets || permissionsLoading}
                           message="You don't have permission to update secrets."
@@ -395,7 +393,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                               setEditingValue("");
                             }}
                             disabled={!canUpdateSecrets}
-                            className="shrink-0 text-gray-600 dark:text-gray-300"
+                            className="shrink-0 text-content-secondary"
                             title="Edit value"
                             data-testid="secret-detail-edit-key"
                           >
@@ -426,9 +424,9 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                 );
               })}
               {isAddingKey && (
-                <div className="flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-600 border-dashed p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex gap-2 items-start rounded-md border border-dashed border-edge-default bg-surface-subtle p-4">
                   <div className="flex-1 min-w-0 space-y-2">
-                    <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
+                    <Label className="text-xs text-content-secondary font-normal">Key</Label>
                     <Input
                       type="text"
                       value={newKey}
@@ -437,13 +435,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                       className="font-mono text-sm"
                       data-testid="secret-detail-add-key-name"
                     />
-                    <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">Value</Label>
+                    <Label className="text-xs text-content-secondary font-normal block mt-2">Value</Label>
                     <Textarea
                       value={newValue}
                       onChange={(e) => setNewValue(e.target.value)}
                       placeholder="Value"
                       rows={8}
-                      className="font-mono text-sm resize-y bg-white dark:bg-gray-900 ph-no-capture"
+                      className="font-mono text-sm resize-y bg-surface-raised ph-no-capture"
                       data-testid="secret-detail-add-value"
                     />
                     <div className="flex gap-2 mt-2">

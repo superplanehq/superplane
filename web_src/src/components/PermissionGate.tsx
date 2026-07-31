@@ -38,7 +38,7 @@ export function RequirePermission({ resource, action, children }: RequirePermiss
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Checking permissions...</p>
+        <p className="text-content-secondary">Checking permissions...</p>
       </div>
     );
   }
@@ -61,7 +61,7 @@ export function RequireAnyPermission({ checks, children }: RequireAnyPermissionP
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Checking permissions...</p>
+        <p className="text-content-secondary">Checking permissions...</p>
       </div>
     );
   }

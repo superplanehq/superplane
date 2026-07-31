@@ -40,7 +40,7 @@ export function PayloadDialog({ open, onOpenChange, title, payloadString }: Payl
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
-        <div className="flex-1 overflow-hidden border border-gray-200 dark:border-gray-600 rounded-md">
+        <div className="flex-1 overflow-hidden border border-edge-subtle rounded-md">
           <Editor
             height={`${editorHeight}px`}
             defaultLanguage="json"

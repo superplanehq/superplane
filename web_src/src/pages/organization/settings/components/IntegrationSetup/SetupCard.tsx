@@ -57,7 +57,7 @@ export function SetupCard({
   onSetupStepBack,
 }: SetupCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+    <div className="bg-surface-raised rounded-lg border border-edge-default p-6 space-y-6">
       {activeError ? (
         <Alert variant="destructive">
           <AlertTitle>Setup failed</AlertTitle>

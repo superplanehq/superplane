@@ -31,19 +31,17 @@ export const ConfirmBlockDialog: React.FC<ConfirmBlockDialogProps> = ({
       >
         <Ban size={20} />
       </div>
-      <DialogTitle className="text-gray-800 dark:text-gray-100">
-        {isBlocking ? "Block Account" : "Unblock Account"}
-      </DialogTitle>
+      <DialogTitle className="text-content-primary">{isBlocking ? "Block Account" : "Unblock Account"}</DialogTitle>
     </div>
 
-    <DialogDescription className="text-sm text-gray-600 mt-2 space-y-2 dark:text-gray-400">
+    <DialogDescription className="mt-2 space-y-2 text-sm text-content-secondary">
       {isBlocking ? (
         <>
           <p>
             You are about to block <strong>{accountName}</strong> ({accountEmail}).
           </p>
           <p>They will immediately lose access to SuperPlane and see a message to contact support.</p>
-          <ul className="list-disc pl-5 space-y-1 text-gray-500 dark:text-gray-400">
+          <ul className="list-disc space-y-1 pl-5 text-content-secondary">
             <li>Existing sessions and personal API tokens are invalidated</li>
             <li>Organization API keys they created are revoked</li>
             <li>They cannot sign in until an installation admin unblocks them</li>

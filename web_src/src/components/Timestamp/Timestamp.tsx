@@ -107,7 +107,7 @@ export const Timestamp = React.memo(function Timestamp({
 
   const iso = formatISO(resolved);
   const hintClasses = withHint
-    ? "underline decoration-dashed decoration-gray-300 dark:decoration-gray-600 underline-offset-2 cursor-default"
+    ? "cursor-default underline decoration-edge-default decoration-dashed underline-offset-2"
     : "cursor-default";
 
   return (

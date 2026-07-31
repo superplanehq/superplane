@@ -112,10 +112,7 @@ export function WidgetBoard({
   if (!hasVisibleRows) {
     return (
       <div className="flex h-full flex-col">
-        <div
-          className="flex-1 p-4 text-center text-xs text-slate-500 dark:text-gray-400"
-          data-testid="widget-board-empty"
-        >
+        <div className="flex-1 p-4 text-center text-xs text-content-muted" data-testid="widget-board-empty">
           {render.emptyMessage ?? "No data to display."}
         </div>
         {hasMore && onLoadMore ? (
@@ -172,13 +169,13 @@ function BoardLane({
   const laneLabel = bucket.lane.label?.trim() ? bucket.lane.label : bucket.lane.value;
   return (
     <div
-      className="flex h-full min-h-0 min-w-56 flex-1 flex-col rounded-md border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900/40"
+      className="flex h-full min-h-0 min-w-56 flex-1 flex-col rounded-md border border-edge-default bg-surface-raised"
       data-testid="widget-board-lane"
       data-lane-key={bucket.key}
     >
       <div
         className={cn(
-          "flex items-center justify-between rounded-t-md border-b border-slate-200 px-3 py-1.5 dark:border-gray-800",
+          "flex items-center justify-between rounded-t-md border-b border-edge-default px-3 py-1.5",
           laneStyle.header,
         )}
       >
@@ -198,7 +195,7 @@ function BoardLane({
         data-testid="widget-board-lane-body"
       >
         {bucket.rows.length === 0 ? (
-          <p className="p-2 text-center text-[11px] text-slate-400 dark:text-gray-500">Empty lane</p>
+          <p className="p-2 text-center text-[11px] text-content-muted">Empty lane</p>
         ) : (
           bucket.rows.map((row, idx) => (
             <BoardCard key={rowKeyForRow(row, idx)} row={row} index={idx} rowActions={rowActions} render={render} />
@@ -226,10 +223,10 @@ function BoardCard({
 
   return (
     <div
-      className="rounded-md border border-slate-200 bg-white p-2 shadow-sm hover:border-slate-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+      className="rounded-md border border-edge-default bg-surface-raised p-2 shadow-sm hover:border-edge-strong"
       data-testid="widget-board-card"
     >
-      <div className="text-[13px] font-medium leading-tight text-slate-800 dark:text-gray-100">{title}</div>
+      <div className="text-[13px] font-medium leading-tight text-content-primary">{title}</div>
       {(render.card.fields ?? []).length > 0 ? (
         <div className="mt-1.5 space-y-1">
           {(render.card.fields ?? []).map((field, fi) => (
@@ -297,7 +294,7 @@ function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRend
 function BoardSpinner() {
   return (
     <div className="flex h-full items-center justify-center p-4">
-      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+      <Loader2 className="size-4 animate-spin text-content-muted" />
     </div>
   );
 }

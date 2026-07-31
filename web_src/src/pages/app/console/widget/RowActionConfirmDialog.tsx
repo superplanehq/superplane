@@ -79,7 +79,7 @@ export function RowActionConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-0 overflow-hidden pb-6 dark:border-gray-600 dark:bg-gray-900">
+      <DialogContent className="min-w-0 overflow-hidden border-edge-default bg-surface-overlay pb-6">
         <DialogHeader className="min-w-0">
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription className="min-w-0">{confirmBody}</DialogDescription>
@@ -119,9 +119,9 @@ function ConfirmTriggerFact({
 }) {
   return (
     <ConfirmFact label="Trigger">
-      <span className="font-medium text-slate-800 dark:text-gray-100">{resolved?.label ?? fallback}</span>
+      <span className="font-medium text-content-primary">{resolved?.label ?? fallback}</span>
       {resolved?.node.id ? (
-        <span className="ml-1 font-mono text-[10px] text-slate-500 dark:text-gray-400">({resolved.node.id})</span>
+        <span className="ml-1 font-mono text-[10px] text-content-muted">({resolved.node.id})</span>
       ) : null}
       {!resolved ? (
         <span className="ml-1 text-red-600 dark:text-red-400">— node not found on this canvas</span>
@@ -138,7 +138,7 @@ function ConfirmHookFact({ hookName, templateName }: { hookName: string; templat
       <code className={cn(CONSOLE_CODE_BADGE_CLASSES, "text-[11px]")}>{hookName}</code>
       {templateName ? (
         <>
-          <span className="mx-1 text-slate-400 dark:text-gray-500">/</span>
+          <span className="mx-1 text-content-muted">/</span>
           <code className={cn(CONSOLE_CODE_BADGE_CLASSES, "text-[11px]")}>{templateName}</code>
         </>
       ) : null}

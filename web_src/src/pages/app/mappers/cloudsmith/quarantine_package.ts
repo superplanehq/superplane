@@ -23,14 +23,14 @@ export const quarantineStateMap: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   "cloudsmith.package.quarantined": {
     icon: "shield-off",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-orange-500",
     label: "QUARANTINED",
   },
   "cloudsmith.package.released": {
     icon: "shield-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "RELEASED",

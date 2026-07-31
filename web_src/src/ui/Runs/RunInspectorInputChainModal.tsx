@@ -31,7 +31,7 @@ export function InputChainMoreChip({
           event.stopPropagation();
           setOpen(true);
         }}
-        className="flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        className="flex shrink-0 items-center rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary"
       >
         +{count} more
       </button>
@@ -91,8 +91,8 @@ function InputChainModal({
       >
         <DialogTitle className="sr-only">Input chain</DialogTitle>
         <div className="flex min-h-0 flex-1">
-          <div className="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2 dark:border-gray-800 dark:bg-gray-900">
-            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-edge-subtle bg-surface-default p-2">
+            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
               Input chain
             </div>
             {sections.map((section) => (
@@ -103,8 +103,8 @@ function InputChainModal({
                 className={cn(
                   "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
                   selected?.nodeId === section.nodeId
-                    ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200 dark:bg-gray-950 dark:text-gray-100 dark:ring-gray-800"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800",
+                    ? "bg-surface-raised font-medium text-content-primary shadow-sm ring-1 ring-edge-subtle"
+                    : "text-content-secondary hover:bg-action-neutral-hover",
                 )}
               >
                 <NodeMarker section={section} fallbackLabel={section.nodeName} componentIconMap={componentIconMap} />
@@ -113,7 +113,7 @@ function InputChainModal({
             ))}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 pr-10 dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-center justify-between gap-2 border-b border-edge-subtle bg-surface-default px-3 py-1.5 pr-10">
               <div className="flex min-w-0 items-center gap-1.5">
                 {selected ? (
                   <NodeMarker
@@ -122,10 +122,8 @@ function InputChainModal({
                     componentIconMap={componentIconMap}
                   />
                 ) : null}
-                <span className="truncate text-[12px] font-medium text-slate-700 dark:text-gray-200">
-                  {selected?.nodeName}
-                </span>
-                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <span className="truncate text-[12px] font-medium text-content-secondary">{selected?.nodeName}</span>
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-content-secondary">
                   Output
                 </span>
               </div>

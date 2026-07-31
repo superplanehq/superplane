@@ -22,7 +22,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: grafanaIcon,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,

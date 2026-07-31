@@ -31,8 +31,8 @@ export const MARKDOWN_SECTION_PRESETS: Record<MarkdownSectionPresetId, MarkdownS
   overview: {
     id: "overview",
     Icon: LayoutDashboard,
-    iconClassName: "text-slate-600 dark:text-gray-300",
-    barClassName: "bg-slate-100/90 dark:bg-gray-800/80",
+    iconClassName: "text-content-secondary",
+    barClassName: "bg-surface-subtle",
   },
   setup: {
     id: "setup",
@@ -73,8 +73,8 @@ export const MARKDOWN_SECTION_PRESETS: Record<MarkdownSectionPresetId, MarkdownS
   group: {
     id: "group",
     Icon: Folder,
-    iconClassName: "text-slate-500 dark:text-gray-400",
-    barClassName: "bg-slate-100/70 dark:bg-gray-800/60",
+    iconClassName: "text-content-muted",
+    barClassName: "bg-surface-subtle",
   },
 };
 

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { useSidebarWidth } from "./useSidebarWidth";
 
 export function SidebarShell({ children }: { children: ReactNode }) {
@@ -10,10 +9,7 @@ export function SidebarShell({ children }: { children: ReactNode }) {
     <aside
       ref={sidebarRef}
       data-testid="canvas-tool-sidebar"
-      className={cn(
-        "relative z-21 flex h-full shrink-0 flex-col border-r bg-white dark:bg-gray-900",
-        appDarkModeClasses.sidebarEdge,
-      )}
+      className="relative z-21 flex h-full shrink-0 flex-col border-r border-edge-default bg-surface-default"
       style={{ width }}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
@@ -26,8 +22,8 @@ export function SidebarShell({ children }: { children: ReactNode }) {
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-600/50",
-            isResizing && "bg-slate-950/50 dark:bg-gray-600/50",
+            "pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-edge-strong",
+            isResizing && "bg-edge-strong",
           )}
         />
       </div>

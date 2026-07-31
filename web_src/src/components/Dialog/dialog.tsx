@@ -1,6 +1,5 @@
 import clsx from "clsx";
 import type React from "react";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 
 const sizes = {
   xs: "sm:max-w-xs",
@@ -32,13 +31,12 @@ export function Dialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="fixed inset-0 bg-gray-950/20 dark:bg-gray-900/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-overlay-scrim" onClick={onClose} />
       <div
         className={clsx(
           className,
           sizes[size],
-          "relative w-full min-w-0 rounded-2xl bg-white p-8 shadow-lg dark:bg-gray-900",
-          appDarkModeClasses.modalEdge,
+          "relative w-full min-w-0 rounded-2xl border border-edge-default bg-surface-overlay p-8 shadow-lg",
           "overflow-y-auto max-h-[100vh]",
         )}
         {...props}
@@ -53,13 +51,13 @@ export function DialogTitle({ className, ...props }: React.ComponentPropsWithout
   return (
     <h2
       {...props}
-      className={clsx(className, "text-lg/6 font-semibold text-balance text-gray-800 sm:text-base/6 dark:text-white")}
+      className={clsx(className, "text-lg/6 text-balance font-semibold text-content-primary sm:text-base/6")}
     />
   );
 }
 
 export function DialogDescription({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
-  return <div {...props} className={clsx(className, "mt-2 text-pretty text-gray-500 dark:text-gray-400")} />;
+  return <div {...props} className={clsx(className, "mt-2 text-pretty text-content-secondary")} />;
 }
 
 export function DialogBody({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {

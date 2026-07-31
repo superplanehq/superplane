@@ -50,25 +50,23 @@ export function TimelineAccordionCard({
       <AccordionItem
         value={value}
         data-testid={`run-inspector-${value}-accordion`}
-        className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900 [&[data-state=closed]>h3]:border-b-0"
+        className="overflow-hidden rounded-lg border border-edge-subtle bg-surface-raised [&[data-state=closed]>h3]:border-b-0"
       >
-        <AccordionPrimitive.Header className="flex items-center gap-1 border-b border-slate-200 bg-slate-50 py-1.5 pr-2 dark:border-gray-800 dark:bg-gray-900">
+        <AccordionPrimitive.Header className="flex items-center gap-1 border-b border-edge-subtle bg-surface-default py-1.5 pr-2">
           <AccordionPrimitive.Trigger
             data-testid={`run-inspector-${value}-accordion-trigger`}
             className="flex min-w-0 items-center gap-1.5 pl-2 pr-3 text-left hover:no-underline"
           >
             <EventStatusPill {...status} />
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
               {title}
             </span>
             {sourceName ? (
-              <span className="min-w-0 truncate text-[12px] font-medium text-slate-600 dark:text-gray-200">
-                {sourceName}
-              </span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-content-secondary">{sourceName}</span>
             ) : null}
           </AccordionPrimitive.Trigger>
           {sourceTrailing}
-          <span className="ml-auto flex shrink-0 items-center gap-0.5 text-xs text-slate-700 dark:text-gray-200">
+          <span className="ml-auto flex shrink-0 items-center gap-0.5 text-xs text-content-secondary">
             {trailing ? <span className="pr-1">{trailing}</span> : null}
             {canUsePayloadActions ? (
               <>
@@ -87,7 +85,7 @@ export function TimelineAccordionCard({
           </span>
           <AccordionPrimitive.Trigger
             aria-label="Toggle section"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 data-[state=open]:text-slate-600 dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:data-[state=open]:text-gray-300 [&[data-state=open]>svg]:rotate-180"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-content-muted transition-colors hover:bg-action-neutral-hover hover:text-content-primary data-[state=open]:text-content-secondary [&[data-state=open]>svg]:rotate-180"
           >
             <ChevronDown className="h-4 w-4 transition-transform duration-200" />
           </AccordionPrimitive.Trigger>
@@ -160,11 +158,9 @@ export function JsonPayload({
 
 export function DetailBox({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-900">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
-          {title}
-        </span>
+    <div className="overflow-hidden rounded-lg border border-edge-subtle bg-surface-raised">
+      <div className="flex items-center justify-between gap-2 border-b border-edge-subtle bg-surface-default px-3 py-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-content-secondary">{title}</span>
       </div>
       <div className="px-3 py-2.5">{children}</div>
     </div>
@@ -190,22 +186,22 @@ export function ErrorOutputCard({ nodeId, message }: { nodeId: string; message?:
 }
 
 export function EmptySectionText({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-slate-500 dark:text-gray-400">{children}</p>;
+  return <p className="text-sm text-content-secondary">{children}</p>;
 }
 
 function EventStatusPill({ dotClassName, label, tone = "default" }: StatusPill) {
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 ring-1 dark:bg-gray-950",
-        tone === "error" ? "ring-red-200 dark:ring-red-900/70" : "ring-slate-200 dark:ring-gray-800",
+        "flex shrink-0 items-center gap-1.5 rounded-full bg-surface-raised px-2 py-0.5 ring-1",
+        tone === "error" ? "ring-red-200 dark:ring-red-900/70" : "ring-edge-subtle",
       )}
     >
       <span className={cn("h-2 w-2 shrink-0 rounded-full", dotClassName)} />
       <span
         className={cn(
           "text-[11px] font-medium capitalize",
-          tone === "error" ? "text-red-600" : "text-slate-700 dark:text-gray-200",
+          tone === "error" ? "text-red-600" : "text-content-secondary",
         )}
       >
         {label}

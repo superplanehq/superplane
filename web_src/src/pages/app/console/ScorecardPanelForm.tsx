@@ -80,7 +80,7 @@ function TitleField({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+      <Label className="text-xs font-medium text-content-secondary">Title (optional)</Label>
       <Input
         value={value.title ?? ""}
         onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -111,7 +111,7 @@ function AggregationFields({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Aggregation</Label>
+        <Label className="text-xs font-medium text-content-secondary">Aggregation</Label>
         <Select value={aggregation} onValueChange={(v) => onChange({ aggregation: v as WidgetNumberAggregation })}>
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -127,7 +127,7 @@ function AggregationFields({
       </div>
       {aggregationNeedsField ? (
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Field</Label>
+          <Label className="text-xs font-medium text-content-secondary">Field</Label>
           <Input
             list={fields.length > 0 && fieldListId ? fieldListId : undefined}
             value={render.field ?? ""}
@@ -158,7 +158,7 @@ function FormatLabelRow({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Format</Label>
+        <Label className="text-xs font-medium text-content-secondary">Format</Label>
         <Select
           value={render.format ?? "__none__"}
           onValueChange={(v) => onChange({ format: v === "__none__" ? undefined : (v as WidgetColumnFormat) })}
@@ -177,7 +177,7 @@ function FormatLabelRow({
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Label (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Label (optional)</Label>
         <Input
           value={render.label ?? ""}
           onChange={(e) => onChange({ label: e.target.value || undefined })}
@@ -198,7 +198,7 @@ function PrefixSuffixRow({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Prefix (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Prefix (optional)</Label>
         <Input
           value={render.prefix ?? ""}
           onChange={(e) => onChange({ prefix: e.target.value || undefined })}
@@ -206,7 +206,7 @@ function PrefixSuffixRow({
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Suffix (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Suffix (optional)</Label>
         <Input
           value={render.suffix ?? ""}
           onChange={(e) => onChange({ suffix: e.target.value || undefined })}
@@ -226,14 +226,14 @@ function SeriesFields({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Series field (optional)</Label>
+      <Label className="text-xs font-medium text-content-secondary">Series field (optional)</Label>
       <Input
         value={render.sparklineField ?? ""}
         onChange={(e) => onChange({ sparklineField: e.target.value || undefined })}
         placeholder="e.g. openCount"
         data-testid="scorecard-sparkline-field"
       />
-      <p className="text-[11px] text-slate-500 dark:text-gray-400">
+      <p className="text-[11px] text-content-muted">
         Draws the sparkline. When empty, the change chip still renders using the primary field.
       </p>
     </div>
@@ -250,7 +250,7 @@ function StatusFields({
   const better = render.better ?? "up";
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Status direction</Label>
+      <Label className="text-xs font-medium text-content-secondary">Status direction</Label>
       <Select value={better} onValueChange={(v) => onChange({ better: v as WidgetTrendBetter })}>
         <SelectTrigger className="w-full">
           <SelectValue />
@@ -275,7 +275,7 @@ function ChangeFields({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Show change as</Label>
+        <Label className="text-xs font-medium text-content-secondary">Show change as</Label>
         <Select value={showChange} onValueChange={(v) => onChange({ showChange: v as WidgetScorecardShowChange })}>
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -290,7 +290,7 @@ function ChangeFields({
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Change caption (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Change caption (optional)</Label>
         <Input
           value={render.changeCaption ?? ""}
           onChange={(e) => onChange({ changeCaption: e.target.value || undefined })}
@@ -311,19 +311,18 @@ function TargetFields({
   const showProgress = render.showProgress ?? false;
   const showProgressId = useId();
   return (
-    <div className="space-y-2 rounded-lg bg-slate-100 p-3 dark:bg-gray-800">
+    <div className="space-y-2 rounded-lg bg-surface-subtle p-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-300">Target (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Target (optional)</Label>
         <Input
           value={render.target ?? ""}
           onChange={(e) => onChange({ target: e.target.value || undefined })}
           placeholder="e.g. 80 or {{ goal }}"
           data-testid="scorecard-target"
         />
-        <p className="text-[11px] text-slate-500 dark:text-gray-400">
+        <p className="text-[11px] text-content-muted">
           Literal number or a full{" "}
-          <code className="rounded bg-slate-200 px-1 py-0.5 text-[10px] dark:bg-gray-700">{"{{ CEL }}"}</code>{" "}
-          expression.
+          <code className="rounded bg-action-neutral px-1 py-0.5 text-[10px]">{"{{ CEL }}"}</code> expression.
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -333,7 +332,7 @@ function TargetFields({
           onChange={(e) => onChange({ showProgress: e.target.checked ? true : undefined })}
           data-testid="scorecard-show-progress"
         />
-        <Label htmlFor={showProgressId} className="text-xs text-slate-700 dark:text-gray-300">
+        <Label htmlFor={showProgressId} className="text-xs text-content-primary">
           Show progress bar toward target
         </Label>
       </div>

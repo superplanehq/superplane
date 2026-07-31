@@ -25,7 +25,7 @@ const STATUS_LABEL_CLASS: Record<HomeIntegrationStatusKind, string> = {
   ready: "text-emerald-700 dark:text-emerald-300",
   pending: "text-amber-700 dark:text-amber-300",
   error: "text-red-700 dark:text-red-300",
-  none: "text-gray-400 dark:text-gray-500",
+  none: "text-content-muted",
 };
 
 function InstanceSwitchPopover({
@@ -52,14 +52,14 @@ function InstanceSwitchPopover({
           type="button"
           variant="ghost"
           size="xs"
-          className="h-7 w-7 shrink-0 p-0 text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-gray-100"
+          className="h-7 w-7 shrink-0 p-0 text-content-secondary hover:text-content-primary"
           aria-label="Switch integration instance"
         >
           <ArrowLeftRight className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-1">
-        <div className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-gray-500">
+        <div className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">
           Choose instance
         </div>
         <div className="max-h-56 overflow-y-auto">
@@ -75,8 +75,8 @@ function InstanceSwitchPopover({
                 type="button"
                 className={cn(
                   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs",
-                  "hover:bg-slate-100 dark:hover:bg-gray-800",
-                  selected && "bg-slate-50 dark:bg-gray-800/80",
+                  "hover:bg-action-neutral-hover",
+                  selected && "bg-surface-subtle",
                 )}
                 onClick={() => {
                   if (!ready) {
@@ -87,16 +87,16 @@ function InstanceSwitchPopover({
                 }}
               >
                 <StatusDot state={instance.status?.state} />
-                <span className="min-w-0 flex-1 truncate text-slate-800 dark:text-gray-100">{instanceName}</span>
+                <span className="min-w-0 flex-1 truncate text-content-primary">{instanceName}</span>
                 {selected ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" /> : null}
               </button>
             );
           })}
         </div>
-        <div className="mt-1 border-t border-slate-200 pt-1 dark:border-gray-700">
+        <div className="mt-1 border-t border-edge-subtle pt-1">
           <button
             type="button"
-            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-content-secondary hover:bg-action-neutral-hover"
             onClick={onCreateNew}
           >
             Connect new
@@ -136,11 +136,11 @@ export function HomeIntegrationConnectRow({
   return (
     <div className="flex min-h-7 items-center gap-2 px-3 py-2.5">
       <IntegrationIcon integrationName={name} className="h-4 w-4 shrink-0" size={16} />
-      <span className="shrink-0 truncate text-sm font-medium text-slate-900 dark:text-gray-100">{displayName}</span>
+      <span className="shrink-0 truncate text-sm font-medium text-content-primary">{displayName}</span>
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <span className={cn("shrink-0 text-xs font-medium", STATUS_LABEL_CLASS[status.kind])}>{status.label}</span>
         {status.kind === "ready" && selectedName && (
-          <span className="truncate text-xs text-slate-500 dark:text-gray-400">{selectedName}</span>
+          <span className="truncate text-xs text-content-secondary">{selectedName}</span>
         )}
       </div>
       {status.kind === "none" && (

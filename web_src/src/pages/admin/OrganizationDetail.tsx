@@ -15,7 +15,7 @@ const OrganizationDetail: React.FC = () => {
     <div>
       <Link
         to="/admin"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4 dark:text-gray-400 dark:hover:text-gray-200"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-content-secondary hover:text-content-primary"
       >
         <ArrowLeft size={14} />
         All organizations

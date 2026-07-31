@@ -185,8 +185,8 @@ function getSpecs(configuration: ListIncidentsConfiguration): ComponentBaseSpec[
         badges: [
           {
             label: service,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-700",
+            bgColor: "bg-action-neutral",
+            textColor: "text-content-secondary",
           },
         ],
       })),
@@ -198,19 +198,19 @@ export const LIST_INCIDENTS_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   clear: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   low: {
     icon: "alert-triangle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-yellow-100",
     badgeColor: "bg-yellow-500",
   },
   high: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },

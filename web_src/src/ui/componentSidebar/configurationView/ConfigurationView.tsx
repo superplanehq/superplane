@@ -10,10 +10,10 @@ type ConfigurationViewProps = {
 function ConfigurationRow({ row }: { row: ConfigurationDisplayRow }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="w-[120px] shrink-0 truncate text-right text-gray-500" title={row.label}>
+      <span className="w-[120px] shrink-0 truncate text-right text-content-secondary" title={row.label}>
         {row.label}:
       </span>
-      <ConfigurationValueDisplay row={row} className="min-w-0 break-all text-gray-800" />
+      <ConfigurationValueDisplay row={row} className="min-w-0 break-all text-content-primary" />
     </div>
   );
 }

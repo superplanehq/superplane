@@ -104,11 +104,11 @@ export const onAlertCustomFieldRenderer: CustomFieldRenderer = {
     const authHint = buildAuthHint(webhookAuthEnabled);
 
     return (
-      <div className="border-t-1 border-gray-200 pt-4">
+      <div className="border-t-1 border-edge-default pt-4">
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Alertmanager Webhook Setup</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+            <span className="text-sm font-medium text-content-secondary">Alertmanager Webhook Setup</span>
+            <div className="mt-2 rounded-md border-1 border-edge-default bg-surface-subtle px-2.5 py-2 text-xs text-content-primary">
               <ol className="list-decimal ml-4 space-y-1">
                 <li>Save the canvas to generate the webhook URL.</li>
                 <li>Copy the receiver snippet below into your `alertmanager.yml`.</li>
@@ -120,23 +120,21 @@ export const onAlertCustomFieldRenderer: CustomFieldRenderer = {
               </p>
               <p className="mt-2">{authHint}</p>
               <div className="mt-3">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
-                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
+                <span className="text-xs font-medium text-content-secondary">Webhook URL</span>
+                <pre className="mt-1 rounded-md border-1 border-edge-default bg-surface-raised px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre-wrap break-all">
                   {webhookUrl}
                 </pre>
               </div>
               <div className="mt-3">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">alertmanager.yml Snippet</span>
-                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
+                <span className="text-xs font-medium text-content-secondary">alertmanager.yml Snippet</span>
+                <pre className="mt-1 rounded-md border-1 border-edge-default bg-surface-raised px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre-wrap break-all">
                   {alertmanagerSnippet}
                 </pre>
               </div>
               <div className="mt-3">
                 <div>
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                    Reload Alertmanager config
-                  </span>
-                  <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
+                  <span className="text-xs font-medium text-content-secondary">Reload Alertmanager config</span>
+                  <pre className="mt-1 rounded-md border-1 border-edge-default bg-surface-raised px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre-wrap break-all">
                     curl -X POST https://alertmanager.example.com/-/reload
                   </pre>
                 </div>

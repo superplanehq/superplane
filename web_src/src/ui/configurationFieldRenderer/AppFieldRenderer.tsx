@@ -80,7 +80,7 @@ export function AppFieldRenderer({ field, value, onChange, organizationId, readO
             <SelectValue placeholder="No apps available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-content-secondary">
           {allowSelf
             ? "Select an app in this organization to invoke."
             : "Create another app in this organization to subscribe to its events."}

@@ -20,8 +20,7 @@ export interface SecretsTabProps {
   isSavingSecret: (secretName: string | undefined) => boolean;
 }
 
-const READONLY_SECRET_INPUT_CLASS =
-  "cursor-default bg-gray-50 opacity-100 dark:bg-gray-900 [&::placeholder]:opacity-70";
+const READONLY_SECRET_INPUT_CLASS = "cursor-default bg-surface-default opacity-100 [&::placeholder]:opacity-70";
 
 type SecretEditingControlsProps = {
   inputId: string;
@@ -197,8 +196,8 @@ function IntegrationSecretRow({
   const startEdit = () => setEditingFieldKey(fieldKey);
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-200 pb-4 last:border-b-0 last:pb-0 dark:border-gray-800">
-      <Label htmlFor={inputId} className="shrink-0 text-gray-800 dark:text-gray-100">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-edge-subtle pb-4 last:border-b-0 last:pb-0">
+      <Label htmlFor={inputId} className="shrink-0 text-content-primary">
         {title}
       </Label>
       <DescriptionTooltip title={title} description={description} />
@@ -254,7 +253,7 @@ export function SecretsTab({
   return (
     <>
       {integrationSecrets.length > 0 ? (
-        <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
+        <div className="space-y-4 rounded-lg border border-edge-default bg-surface-raised p-4">
           {integrationSecrets.map((secret, index) => (
             <IntegrationSecretRow
               key={secret.name?.trim() || `__secret_${index}`}
@@ -273,7 +272,7 @@ export function SecretsTab({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">No secrets stored for this integration.</p>
+        <p className="text-sm text-content-secondary">No secrets stored for this integration.</p>
       )}
     </>
   );

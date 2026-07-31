@@ -23,16 +23,16 @@ export const reservedIPStateMap: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   "digitalocean.reservedip.assign": {
     icon: "globe",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "ASSIGNED",
   },
   "digitalocean.reservedip.unassign": {
     icon: "globe",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
     label: "UNASSIGNED",
   },
 };

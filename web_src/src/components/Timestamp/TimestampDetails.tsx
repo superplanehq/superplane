@@ -15,8 +15,8 @@ interface TimestampDetailsProps {
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="text-right font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="min-w-0 text-gray-800 dark:text-gray-100">{children}</dd>
+      <dt className="text-right font-medium text-content-secondary">{label}</dt>
+      <dd className="min-w-0 text-content-primary">{children}</dd>
     </>
   );
 }

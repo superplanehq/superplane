@@ -109,7 +109,7 @@ function InstallPageContent() {
           onClose={() => navigate(`/${effectiveOrgId}`)}
         />
       ) : (
-        <p className="text-sm text-slate-500">Select an organization to continue.</p>
+        <p className="text-sm text-content-secondary">Select an organization to continue.</p>
       )}
     </InstallShell>
   );

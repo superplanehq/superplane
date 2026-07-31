@@ -56,14 +56,14 @@ export function NumberPanelMetricsEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3 dark:border-gray-800/70 dark:bg-gray-900">
+    <div className="space-y-3 rounded-md border border-edge-default bg-surface-subtle p-3">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Numbers</Label>
+        <Label className="text-xs font-medium text-content-secondary">Numbers</Label>
         <Button type="button" size="sm" variant="outline" onClick={addMetric} data-testid="number-add-metric">
           Add number
         </Button>
       </div>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-content-muted">
         Each number is configured independently. They render side-by-side and wrap to new lines when the panel is
         narrow.
       </p>
@@ -97,11 +97,11 @@ function MetricRow({
   const updateRender = (patch: Partial<WidgetNumberRender>) => onChange({ render: { ...metric.render, ...patch } });
   return (
     <div
-      className="space-y-2 rounded-md border border-slate-200 bg-white p-3 dark:border-gray-800/70 dark:bg-gray-900"
+      className="space-y-2 rounded-md border border-edge-default bg-surface-raised p-3"
       data-testid={`number-metric-${index}`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Number {index + 1}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Number {index + 1}</span>
         {onRemove ? (
           <Button type="button" size="sm" variant="ghost" onClick={onRemove} data-testid="number-metric-remove">
             <Trash2 className="h-3.5 w-3.5" />
@@ -131,7 +131,7 @@ function MetricNameField({
 }) {
   return (
     <div className="space-y-1">
-      <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Name</Label>
+      <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Name</Label>
       <Input
         value={metric.render.label ?? ""}
         onChange={(e) => onChange({ render: { ...metric.render, label: e.target.value || undefined } })}
@@ -163,7 +163,7 @@ function MetricAggregationFields({
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="space-y-1">
-        <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Aggregation</Label>
+        <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Aggregation</Label>
         <Select
           value={aggregation}
           onValueChange={(v) =>
@@ -190,7 +190,7 @@ function MetricAggregationFields({
       </div>
       {needsField ? (
         <div className="space-y-1">
-          <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Field</Label>
+          <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Field</Label>
           <Input
             list={fieldListId}
             value={metric.render.field ?? ""}

@@ -238,7 +238,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         // Property access with dot notation
         if (expr[i] === ".") {
           tokens.push(
-            <span key={key++} className="text-gray-500 dark:text-gray-400">
+            <span key={key++} className="text-content-secondary">
               .
             </span>,
           );
@@ -373,7 +373,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         for (const op of operators) {
           if (expr.slice(i, i + op.length) === op) {
             tokens.push(
-              <span key={key++} className="text-gray-500 dark:text-gray-400">
+              <span key={key++} className="text-content-secondary">
                 {op}
               </span>,
             );
@@ -449,27 +449,27 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             // Error state - show in red with error message
             parts.push(
               <span key={key++} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
-                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-content-muted">{match[1]}</span>
                 <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
-                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+                <span className="text-content-muted">{match[3]}</span>
               </span>,
             );
           } else {
             // Success state - show in green
             parts.push(
               <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
-                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-content-muted">{match[1]}</span>
                 <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
-                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+                <span className="text-content-muted">{match[3]}</span>
               </span>,
             );
           }
         } else {
           parts.push(
-            <span key={key++} className="bg-slate-100 dark:bg-gray-800 rounded-sm">
-              <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+            <span key={key++} className="bg-surface-subtle rounded-sm">
+              <span className="text-content-muted">{match[1]}</span>
               {tokenizeExpression(match[2])}
-              <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+              <span className="text-content-muted">{match[3]}</span>
             </span>,
           );
         }
@@ -914,16 +914,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     const valuePreviewWidth = 200;
     const valuePreviewCodeBlockClassName =
-      "text-xs font-mono bg-slate-100 dark:bg-gray-800 rounded-lg px-2.5 py-2 text-gray-800 dark:text-gray-200";
+      "rounded-lg bg-surface-subtle px-2.5 py-2 font-mono text-xs text-content-primary";
 
     const renderQuickTip = (tip: string) => {
       const parts = tip.split(/`([^`]+)`/g);
       return parts.map((part, index) =>
         index % 2 === 1 ? (
-          <code
-            key={`code-${index}`}
-            className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
-          >
+          <code key={`code-${index}`} className="bg-surface-subtle px-1 py-0.5 rounded text-content-secondary">
             {part}
           </code>
         ) : (
@@ -1397,7 +1394,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         <span
           data-slot="control"
           className={twMerge([
-            "relative block w-full rounded-md bg-white dark:bg-gray-800",
+            "relative block w-full rounded-md bg-surface-raised",
             "focus-within:ring-ring/50",
             "has-data-disabled:opacity-50",
             fullHeight && "flex min-h-0 flex-1",
@@ -1410,7 +1407,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             aria-hidden="true"
             className={twMerge([
               "font-sm pointer-events-none absolute inset-0 whitespace-pre-wrap break-words overflow-hidden",
-              "rounded-md border border-transparent text-gray-950 dark:text-white",
+              "rounded-md border border-transparent text-content-primary",
               INPUT_SIZE_TYPOGRAPHY[inputSize],
             ])}
           >
@@ -1452,13 +1449,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             placeholder={placeholder}
             disabled={disabled || previewMode}
             className={twMerge([
-              "font-sm bg-transparent border-gray-300 placeholder:text-gray-500 dark:border-gray-600/70 dark:placeholder:text-gray-500",
+              "font-sm border-edge-default bg-transparent placeholder:text-content-muted",
               "relative block w-full min-w-0 appearance-none rounded-md border outline-none resize-none overflow-hidden",
-              "focus:border-gray-500 focus:shadow-none focus:ring-0 dark:focus:border-gray-500",
+              "focus:border-focus-ring focus:ring-0 focus:shadow-none",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
               // Make text transparent but keep caret visible
-              "text-transparent caret-gray-950 dark:caret-white",
+              "text-transparent caret-content-primary",
               INPUT_SIZE_TYPOGRAPHY[inputSize],
               INPUT_SIZE_HEIGHT[inputSize],
               fullHeight && "h-full min-h-0 flex-1 overflow-y-auto",
@@ -1493,15 +1490,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               <span />
             )}
             {/* QuickTip - right side */}
-            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1.5 text-[11px] text-content-secondary">
               {quickTip
                 ? renderQuickTip(quickTip)
                 : [
                     "Use ",
-                    <code
-                      key="default-tip"
-                      className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
-                    >
+                    <code key="default-tip" className="bg-surface-subtle px-1 py-0.5 rounded text-content-secondary">
                       {"{{"}
                     </code>,
                     " to write ",
@@ -1538,16 +1532,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 {shouldShowValuePreview && isOpen && (
                   <div
                     data-testid="autocomplete-value-preview"
-                    className="border border-gray-200 dark:border-gray-600 sm:border-r-0 sm:border-t p-3 bg-white dark:bg-gray-800 sm:rounded-l-lg sm:rounded-br-none h-fit self-start shadow-lg dark:shadow-gray-950/50"
+                    className="h-fit self-start border border-edge-default bg-surface-raised p-3 shadow-lg sm:rounded-l-lg sm:rounded-br-none sm:border-r-0 sm:border-t"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
                     {/* $ selector */}
                     {highlightedSuggestion?.label === "$" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          {highlightedSuggestion.description}
-                        </div>
+                        <div className="text-sm font-medium text-content-primary mb-1">$ (Event Data)</div>
+                        <div className="text-xs text-content-secondary mb-2">{highlightedSuggestion.description}</div>
                         <div className={twMerge(valuePreviewCodeBlockClassName, "text-sky-700 dark:text-sky-400")}>
                           {highlightedSuggestion.nodeCount ?? 0} node
                           {highlightedSuggestion.nodeCount !== 1 ? "s" : ""} available
@@ -1556,17 +1548,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Node suggestions */
                     highlightedSuggestion?.nodeName ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
+                        <div className="text-sm font-medium text-content-primary mb-1">
                           {highlightedSuggestion.componentType || "Component"}
                         </div>
                         {highlightedSuggestion.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                            {highlightedSuggestion.description}
-                          </div>
+                          <div className="text-xs text-content-secondary mb-2">{highlightedSuggestion.description}</div>
                         )}
                         <div className={twMerge(valuePreviewCodeBlockClassName, "space-y-1")}>
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Name</span>
+                            <span className="text-content-secondary">Name</span>
                             <span className="text-sky-700 dark:text-sky-400 truncate ml-2 max-w-[120px]">
                               {highlightedSuggestion.nodeName}
                             </span>
@@ -1574,8 +1564,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           {highlightedSuggestion.nodeId &&
                             highlightedSuggestion.nodeId !== highlightedSuggestion.nodeName && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">ID</span>
-                                <span className="text-gray-700 dark:text-gray-300 truncate ml-2 max-w-[120px]">
+                                <span className="text-content-secondary">ID</span>
+                                <span className="text-content-secondary truncate ml-2 max-w-[120px]">
                                   {highlightedSuggestion.nodeId}
                                 </span>
                               </div>
@@ -1585,13 +1575,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Function suggestions */
                     highlightedSuggestion?.kind === "function" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
+                        <div className="text-sm font-medium text-content-primary mb-1">
                           {highlightedSuggestion.label}()
                         </div>
                         {highlightedSuggestion.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                            {highlightedSuggestion.description}
-                          </div>
+                          <div className="text-xs text-content-secondary mb-2">{highlightedSuggestion.description}</div>
                         )}
                         {highlightedSuggestion.example && (
                           <div
@@ -1609,8 +1597,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       typeof highlightedValue === "object" &&
                       !Array.isArray(highlightedValue) ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Object</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        <div className="text-sm font-medium text-content-primary mb-1">Object</div>
+                        <div className="text-xs text-content-secondary mb-2">
                           {
                             Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
                               .length
@@ -1623,13 +1611,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             .slice(0, 5)
                             .map((key) => (
                               <div key={key} className="truncate">
-                                <span className="text-gray-500 dark:text-gray-400">.</span>
+                                <span className="text-content-secondary">.</span>
                                 <span className="text-sky-700 dark:text-sky-400">{key}</span>
                               </div>
                             ))}
                           {Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
                             .length > 5 && (
-                            <div className="text-gray-600 dark:text-gray-400 mt-1">
+                            <div className="text-content-secondary mt-1">
                               +
                               {Object.keys(highlightedValue as Record<string, unknown>).filter(
                                 (k) => !k.startsWith("__"),
@@ -1642,24 +1630,24 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Array values */
                     Array.isArray(highlightedValue) ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Array</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        <div className="text-sm font-medium text-content-primary mb-1">Array</div>
+                        <div className="text-xs text-content-secondary mb-2">
                           {highlightedValue.length} item{highlightedValue.length !== 1 ? "s" : ""}
                         </div>
                         {highlightedValue.length > 0 && (
                           <div className={valuePreviewCodeBlockClassName}>
-                            <span className="text-gray-500 dark:text-gray-400">[</span>
+                            <span className="text-content-secondary">[</span>
                             <span className="text-purple-700 dark:text-purple-400">{typeof highlightedValue[0]}</span>
-                            <span className="text-gray-500 dark:text-gray-400">, ...]</span>
+                            <span className="text-content-secondary">, ...]</span>
                           </div>
                         )}
                       </>
                     ) : /* String values */
                     typeof highlightedValue === "string" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">String</div>
+                        <div className="text-sm font-medium text-content-primary mb-1">String</div>
                         {highlightedValue.length > 50 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          <div className="text-xs text-content-secondary mb-2">
                             {highlightedValue.length} characters
                           </div>
                         )}
@@ -1674,7 +1662,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Number values */
                     typeof highlightedValue === "number" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Number</div>
+                        <div className="text-sm font-medium text-content-primary mb-1">Number</div>
                         <div
                           className={twMerge(valuePreviewCodeBlockClassName, "text-orange-700 dark:text-orange-400")}
                         >
@@ -1684,7 +1672,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Boolean values */
                     typeof highlightedValue === "boolean" ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Boolean</div>
+                        <div className="text-sm font-medium text-content-primary mb-1">Boolean</div>
                         <div className={valuePreviewCodeBlockClassName}>
                           <span
                             className={
@@ -1698,18 +1686,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     ) : /* Null values */
                     highlightedValue === null ? (
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Null</div>
-                        <div
-                          className={twMerge(valuePreviewCodeBlockClassName, "text-gray-600 dark:text-gray-400 italic")}
-                        >
+                        <div className="text-sm font-medium text-content-primary mb-1">Null</div>
+                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-content-secondary italic")}>
                           null
                         </div>
                       </>
                     ) : (
                       /* Fallback: show type */
                       <>
-                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Type</div>
-                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-gray-700 dark:text-gray-300")}>
+                        <div className="text-sm font-medium text-content-primary mb-1">Type</div>
+                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-content-secondary")}>
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
@@ -1718,7 +1704,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 )}
                 <div
                   ref={suggestionsListRef}
-                  className="overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-600 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none shadow-lg"
+                  className="overflow-auto rounded-b-lg border border-edge-default bg-surface-raised shadow-lg sm:rounded-r-lg sm:rounded-tl-none"
                   style={{
                     width: `${dropdownWidth}px`,
                     height: `${SUGGESTION_LIST_MAX_HEIGHT_PX}px`,
@@ -1741,8 +1727,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         data-suggestion-index={index}
                         className={twMerge([
                           "flex h-9 shrink-0 cursor-pointer items-center gap-2 px-3 text-sm leading-none",
-                          "text-gray-950 dark:text-white",
-                          highlightedIndex === index && "bg-slate-100 dark:bg-gray-700",
+                          "text-content-primary",
+                          highlightedIndex === index && "bg-surface-subtle",
                         ])}
                         onMouseDown={(e) => {
                           isInteractingWithSuggestionsRef.current = true;
@@ -1757,7 +1743,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       >
                         <span className="truncate min-w-0">{getSuggestionDisplayLabel(suggestionItem)}</span>
                         {suggestionItem.kind === "function" && !["root", "previous"].includes(suggestionItem.label) && (
-                          <span className="text-gray-500 dark:text-gray-400 truncate min-w-0">
+                          <span className="text-content-secondary truncate min-w-0">
                             {formatFunctionSignature(suggestionItem)}
                           </span>
                         )}
@@ -1771,10 +1757,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             node
                           </span>
                         )}
-                        <span className="inline-flex h-5 shrink-0 items-center rounded bg-slate-100 px-1.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="inline-flex h-5 shrink-0 items-center rounded bg-action-neutral px-1.5 text-xs font-medium text-content-secondary">
                           {suggestionItem.detail ?? suggestionItem.kind}
                         </span>
-                        <span className="ml-auto inline-flex h-5 shrink-0 items-center rounded border border-gray-300 px-1 text-[10px] leading-none text-gray-400 dark:border-gray-600 dark:text-gray-500">
+                        <span className="ml-auto inline-flex h-5 shrink-0 items-center rounded border border-edge-default px-1 text-[10px] leading-none text-content-muted">
                           Tab
                         </span>
                       </div>
@@ -1789,7 +1775,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           <>
                             <div
                               data-suggestion-section-header
-                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white dark:bg-gray-800 px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
+                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-edge-default bg-surface-raised px-3 text-xs font-medium leading-none text-content-secondary"
                             >
                               Connected nodes data
                             </div>
@@ -1802,7 +1788,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           <>
                             <div
                               data-suggestion-section-header
-                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white dark:bg-gray-800 px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
+                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-edge-default bg-surface-raised px-3 text-xs font-medium leading-none text-content-secondary"
                             >
                               Expr functions
                             </div>
@@ -1824,11 +1810,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         {isOpen && suggestions.length === 0 && inputValue && (
           <div
             className={twMerge([
-              "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg",
-              "dark:bg-gray-800 dark:border-gray-600",
+              "absolute z-50 mt-1 w-full rounded-lg border border-edge-default bg-surface-raised shadow-lg",
             ])}
           >
-            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="px-3 py-2 text-sm text-content-secondary">
               {!exampleObj ? noExampleObjectText : "No suggestions found"}
             </div>
           </div>

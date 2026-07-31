@@ -27,8 +27,8 @@ export function CapabilitySelection({
 
   return (
     <div className="space-y-3">
-      <hr className="border-gray-200 dark:border-gray-800" />
-      <p className="text-sm text-gray-600 dark:text-gray-400">
+      <hr className="border-edge-subtle" />
+      <p className="text-sm text-content-secondary">
         Choose which capabilities to enable for this integration. You need at least one. Use a group row to select or
         clear every capability in that group at once.
       </p>

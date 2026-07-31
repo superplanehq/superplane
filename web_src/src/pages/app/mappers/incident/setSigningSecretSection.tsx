@@ -152,7 +152,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="incident-signing-secret" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+      <Label htmlFor="incident-signing-secret" className="text-xs font-medium text-content-secondary">
         Webhook signing secret
       </Label>
       <div className="flex items-center gap-2">

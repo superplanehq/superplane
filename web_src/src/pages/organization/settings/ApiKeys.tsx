@@ -174,7 +174,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
       <div className="space-y-6 pt-6">
         <div className={settingsTableCardClassName}>
           <div className="flex min-h-96 items-center justify-center px-6 pb-6">
-            <p className="text-gray-500 dark:text-gray-400">Loading API keys...</p>
+            <p className="text-content-secondary">Loading API keys...</p>
           </div>
         </div>
       </div>
@@ -219,7 +219,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
         </div>
       </div>
       {form.isCreateModalOpen && !form.newToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
           <div className={cn(settingsModalClassName, "max-w-lg")}>
             <form
               className="p-6"
@@ -231,13 +231,13 @@ export function APIKeys({ organizationId }: APIKeysProps) {
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <KeyRound className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Create API Key</h3>
+                  <KeyRound className="w-6 h-6 text-content-secondary" />
+                  <h3 className="text-base font-semibold text-content-primary">Create API Key</h3>
                 </div>
                 <button
                   type="button"
                   onClick={form.handleCloseCreateModal}
-                  className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+                  className="text-content-muted hover:text-content-primary"
                   disabled={form.createMutation.isPending}
                 >
                   <Icon name="x" size="sm" />
@@ -246,7 +246,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
 
               <div className="space-y-4">
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                  <Label className="text-content-primary mb-2">
                     Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -259,7 +259,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                   />
                 </div>
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Description</Label>
+                  <Label className="text-content-primary mb-2">Description</Label>
                   <Textarea
                     value={form.description}
                     onChange={(e) => form.setDescription(e.target.value)}
@@ -269,7 +269,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                   />
                 </div>
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                  <Label className="text-content-primary mb-2">
                     Role <span className="text-red-500">*</span>
                   </Label>
                   <Select value={form.role} onValueChange={form.setRole}>
@@ -281,12 +281,12 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                       <SelectItem value="org_admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-content-secondary">
                     Determines what this API key can do within its access scope.
                   </p>
                 </div>
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
+                  <Label className="text-content-primary mb-2">Access</Label>
                   <Select value={form.accessMode} onValueChange={(value) => form.setAccessMode(value as AccessMode)}>
                     <SelectTrigger className="w-full" data-testid="api-key-create-access-mode">
                       <SelectValue placeholder="Select access" />
@@ -299,23 +299,23 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                 </div>
                 {form.accessMode === "canvas" && (
                   <div>
-                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    <Label className="text-content-primary mb-2">
                       Apps <span className="text-red-500">*</span>
                     </Label>
-                    <div className="max-h-44 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+                    <div className="max-h-44 overflow-y-auto rounded-md border border-edge-subtle">
                       {canvases.map((canvas) => {
                         const canvasId = canvas.id || "";
                         return (
                           <label
                             key={canvasId}
-                            className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 dark:border-gray-800"
+                            className="flex items-center gap-2 border-b border-edge-subtle px-3 py-2 text-sm last:border-b-0"
                           >
                             <Checkbox
                               checked={form.selectedCanvasIds.includes(canvasId)}
                               onChange={() => form.toggleCanvas(canvasId)}
                               data-testid="api-key-create-canvas"
                             />
-                            <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
+                            <span className="text-content-primary">{canvas.name || "Unnamed"}</span>
                           </label>
                         );
                       })}
@@ -323,7 +323,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                   </div>
                 )}
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Expiration</Label>
+                  <Label className="text-content-primary mb-2">Expiration</Label>
                   <Input
                     type="datetime-local"
                     value={form.expiresAt}
@@ -366,12 +366,12 @@ export function APIKeys({ organizationId }: APIKeysProps) {
         </div>
       )}
       {form.isCreateModalOpen && form.newToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
           <div className={cn(settingsModalClassName, "max-w-lg")}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <KeyRound className="h-6 w-6 text-green-600 dark:text-green-400" />
-                <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">API Key Created</h3>
+                <h3 className="text-base font-semibold text-content-primary">API Key Created</h3>
               </div>
 
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
@@ -384,7 +384,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                 <Input
                   readOnly
                   value={form.newToken}
-                  className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
+                  className="flex-1 font-mono text-sm bg-surface-subtle"
                   data-testid="api-key-token-display"
                 />
                 <CopyButton

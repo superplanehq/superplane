@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
 
-const SETTINGS_TAB_DIVIDER_CLASS = "border-t border-slate-950/15 pt-6 dark:border-gray-700/70";
+const SETTINGS_TAB_DIVIDER_CLASS = "border-t border-edge-default pt-6";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -483,7 +483,7 @@ export function SettingsTab({
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
             Name
-            <span className="text-gray-800 ml-1">*</span>
+            <span className="text-content-primary ml-1">*</span>
             {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
           </Label>
           <Input
@@ -533,7 +533,7 @@ export function SettingsTab({
         {integrationName && (
           <div className={SETTINGS_TAB_DIVIDER_CLASS}>
             {!allowIntegrations ? (
-              <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
+              <div className="bg-surface-default border border-edge-subtle rounded-md p-3 text-sm text-content-secondary">
                 You don't have permission to view integrations.
               </div>
             ) : integrationsOfType.length === 0 ? (
@@ -543,9 +543,9 @@ export function SettingsTab({
                   <IntegrationIcon
                     integrationName={integrationName}
                     iconSlug={integrationDefinition?.icon}
-                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    className="h-4 w-4 flex-shrink-0 text-content-secondary"
                   />
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                  <span className="text-sm font-semibold text-content-primary truncate">
                     {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
                   </span>
                 </div>
@@ -564,12 +564,12 @@ export function SettingsTab({
                 <div className="flex flex-col gap-2">
                   <Label className="min-w-[100px] text-left">
                     Integration
-                    <span className="text-gray-800 ml-1">*</span>
+                    <span className="text-content-primary ml-1">*</span>
                     {showValidation && validationErrors.has("integration") && (
                       <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
                     )}
                   </Label>
-                  <p className="text-xs text-gray-500">Instance</p>
+                  <p className="text-xs text-content-secondary">Instance</p>
                   <Select
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
@@ -617,7 +617,7 @@ export function SettingsTab({
                 </div>
                 {selectedIntegrationFull && (
                   <>
-                    <p className="py-2 text-xs text-gray-500">Connection</p>
+                    <p className="py-2 text-xs text-content-secondary">Connection</p>
                     {(() => {
                       const hasIntegrationError =
                         selectedIntegrationFull.status?.state === "error" &&
@@ -625,7 +625,7 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                          className={`border border-edge-strong rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
                             selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
@@ -637,10 +637,10 @@ export function SettingsTab({
                             <IntegrationIcon
                               integrationName={selectedIntegrationFull.metadata?.integrationName}
                               iconSlug={integrationDefinition?.icon}
-                              className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                              className="mt-0.5 h-4 w-4 flex-shrink-0 text-content-secondary"
                             />
                             <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                              <h3 className="text-sm font-semibold text-content-primary truncate">
                                 {getIntegrationTypeDisplayName(
                                   undefined,
                                   selectedIntegrationFull.metadata?.integrationName,

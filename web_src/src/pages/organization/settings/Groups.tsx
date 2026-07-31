@@ -180,7 +180,7 @@ export function Groups({ organizationId }: GroupsProps) {
         <div className="px-6 pb-6 min-h-96">
           {loadingGroups ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-gray-500 dark:text-gray-400">Loading groups...</p>
+              <p className="text-content-secondary">Loading groups...</p>
             </div>
           ) : filteredAndSortedGroups.length === 0 ? (
             <div className="flex min-h-96 flex-col items-center justify-center text-center">
@@ -203,39 +203,39 @@ export function Groups({ organizationId }: GroupsProps) {
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Team name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("created")}
                   >
                     <div className="flex items-center gap-2">
                       Created
-                      <Icon name={getSortIcon("created")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("created")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("members")}
                   >
                     <div className="flex items-center gap-2">
                       Members
-                      <Icon name={getSortIcon("members")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("members")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("role")}
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -246,7 +246,7 @@ export function Groups({ organizationId }: GroupsProps) {
                   <TableRow key={index} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Icon name="users" size="sm" className="text-gray-800 dark:text-gray-100" />
+                        <Icon name="users" size="sm" className="text-content-primary" />
                         <Link
                           href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
                           className={settingsTableLinkClassName}
@@ -260,12 +260,12 @@ export function Groups({ organizationId }: GroupsProps) {
                       <Timestamp
                         date={group.metadata?.createdAt}
                         display="relative"
-                        className="text-sm text-gray-500 dark:text-gray-400"
-                        fallback={<span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>}
+                        className="text-sm text-content-secondary"
+                        fallback={<span className="text-sm text-content-secondary">N/A</span>}
                       />
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-sm text-content-secondary">
                         {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                       </span>
                     </TableCell>
@@ -298,7 +298,7 @@ export function Groups({ organizationId }: GroupsProps) {
                                 className="flex flex-col items-start gap-1"
                                 disabled={!canUpdateGroups}
                               >
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                <span className="text-sm font-medium text-content-primary">
                                   {role.spec?.displayName || role.metadata!.name}
                                 </span>
                               </DropdownMenuItem>

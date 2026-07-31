@@ -16,7 +16,7 @@ export function ToolTabsHeader({
 
   return (
     <div
-      className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-slate-950/15 px-4 dark:border-gray-800/70"
+      className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-edge-default px-4"
       role="tablist"
       aria-label="Canvas tools"
     >
@@ -30,16 +30,13 @@ export function ToolTabsHeader({
           className={cn(
             "mr-4 mb-[-1px] flex items-center gap-1.5 border-b text-[13px] font-medium transition-colors",
             selectedTab === value
-              ? "border-gray-700 text-gray-800 dark:border-blue-600 dark:text-blue-400"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
+              ? "border-action-primary text-content-primary"
+              : "border-transparent text-content-secondary hover:text-content-primary",
           )}
         >
           {Icon ? (
             <Icon
-              className={cn(
-                "size-4 shrink-0",
-                selectedTab === value ? "text-gray-800 dark:text-blue-400" : "text-gray-400 dark:text-gray-400",
-              )}
+              className={cn("size-4 shrink-0", selectedTab === value ? "text-action-primary" : "text-content-muted")}
               aria-hidden
             />
           ) : null}

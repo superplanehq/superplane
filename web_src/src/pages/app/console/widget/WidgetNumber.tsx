@@ -77,13 +77,13 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite, v
     if (variant === "inline") {
       return (
         <div className="flex items-center justify-center py-1">
-          <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+          <Loader2 className="size-4 animate-spin text-content-muted" />
         </div>
       );
     }
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+        <Loader2 className="size-4 animate-spin text-content-muted" />
       </div>
     );
   }
@@ -102,7 +102,7 @@ interface NumberDisplayProps {
   variant: WidgetNumberVariant;
 }
 
-const VALUE_CLASS = "text-4xl font-medium text-slate-900 dark:text-gray-100";
+const VALUE_CLASS = "text-4xl font-medium text-content-primary";
 
 function renderValueNode(value: number, format: WidgetColumnFormat | undefined, formatted: string) {
   if (isTimestampNumberFormat(format)) {
@@ -164,8 +164,8 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
       : "flex h-full flex-col items-start justify-center gap-1 p-4";
   const suffixClassName =
     variant === "inline"
-      ? "text-base font-semibold text-slate-900 dark:text-gray-100"
-      : "text-xl font-semibold text-slate-900 dark:text-gray-100";
+      ? "text-base font-semibold text-content-primary"
+      : "text-xl font-semibold text-content-primary";
   const hasSparkline = sparkline != null && sparkline.length > 1;
   const valueBlock =
     formatted == null || value == null ? (

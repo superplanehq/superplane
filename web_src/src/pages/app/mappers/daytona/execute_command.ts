@@ -12,7 +12,7 @@ export const EXECUTE_COMMAND_STATE_MAP: EventStateMap = {
   executed: DEFAULT_EVENT_STATE_MAP.success,
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },

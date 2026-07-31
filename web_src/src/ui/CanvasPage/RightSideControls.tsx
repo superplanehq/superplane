@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { FileCode, FilePlus, Plus } from "lucide-react";
 import { memo, type ReactNode } from "react";
@@ -25,8 +24,7 @@ export const RightSideControls = memo(function RightSideControls(props: RightSid
   if (props.mode === "live") return null;
 
   const railClassName = cn(
-    "flex w-9 flex-col items-center gap-1.5 border-l bg-slate-100 py-2 dark:bg-gray-900",
-    appDarkModeClasses.sidebarEdge,
+    "flex w-9 flex-col items-center gap-1.5 border-l border-edge-default bg-surface-default py-2",
     props.layout === "embedded" ? "shrink-0" : "absolute inset-y-0 right-0 z-10",
   );
 
@@ -129,7 +127,7 @@ function ControlButton({ tooltip, onClick, testId, icon, ariaLabel }: ControlBut
           aria-label={ariaLabel ?? tooltip}
           data-testid={testId}
           className={cn(
-            "h-7 w-7 shrink-0 rounded-md border-0 shadow-none text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+            "h-7 w-7 shrink-0 rounded-md border-0 shadow-none text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary",
           )}
         >
           {icon}

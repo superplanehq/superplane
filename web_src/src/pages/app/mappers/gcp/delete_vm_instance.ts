@@ -36,7 +36,7 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpIcon,
       iconSlug: context.componentDefinition?.icon ?? "trash-2",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Delete VM Instance",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

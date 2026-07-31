@@ -192,19 +192,19 @@ function RuntimeFallbackConfigField({
 
   if (typeof value === "boolean") {
     return (
-      <label className="flex items-center gap-3 text-sm font-medium text-slate-800 dark:text-gray-100">
+      <label className="flex items-center gap-3 text-sm font-medium text-content-primary">
         <span
           className={
             value
               ? "relative inline-flex h-5 w-9 rounded-full bg-blue-500"
-              : "relative inline-flex h-5 w-9 rounded-full bg-slate-200 dark:bg-gray-700"
+              : "relative inline-flex h-5 w-9 rounded-full bg-action-neutral-hover"
           }
         >
           <span
             className={
               value
-                ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
-                : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
+                ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-surface-raised"
+                : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-surface-raised"
             }
           />
         </span>
@@ -218,20 +218,20 @@ function RuntimeFallbackConfigField({
 
     return (
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{label}</span>
+        <span className="text-sm font-medium text-content-primary">{label}</span>
         {displayValue.includes("\n") ? (
           <Textarea
             aria-label={label}
             readOnly
             value={displayValue}
-            className="min-h-24 resize-y border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            className="min-h-24 resize-y border-edge-strong bg-surface-raised text-content-primary"
           />
         ) : (
           <Input
             aria-label={label}
             readOnly
             value={displayValue}
-            className="h-9 border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            className="h-9 border-edge-strong bg-surface-raised text-content-primary"
           />
         )}
       </label>
@@ -240,8 +240,8 @@ function RuntimeFallbackConfigField({
 
   return (
     <div className="space-y-1.5">
-      <div className="text-sm font-medium text-slate-800 dark:text-gray-100">{label}</div>
-      <div className="rounded-md border border-slate-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-950">
+      <div className="text-sm font-medium text-content-primary">{label}</div>
+      <div className="rounded-md border border-edge-subtle bg-surface-raised p-2">
         <JsonPayload value={value} jsonViewStyle={jsonViewStyle} />
       </div>
     </div>

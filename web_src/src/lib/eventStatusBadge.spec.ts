@@ -9,6 +9,10 @@ describe("withEventStatusBadgeClasses", () => {
     expect(withEventStatusBadgeClasses("bg-violet-400")).toBe("bg-violet-400 dark:bg-violet-400 dark:text-violet-950");
   });
 
+  it("passes semantic muted badges through without palette dark overrides", () => {
+    expect(withEventStatusBadgeClasses("bg-content-muted")).toBe("bg-content-muted");
+  });
+
   it("leaves badge colors that already include dark classes unchanged", () => {
     expect(withEventStatusBadgeClasses("bg-emerald-500 dark:bg-emerald-400 dark:text-emerald-950")).toBe(
       "bg-emerald-500 dark:bg-emerald-400 dark:text-emerald-950",

@@ -42,7 +42,7 @@ export function ActionRow({
   const templates = useMemo(() => getTriggerTemplates(selectedNode), [selectedNode]);
 
   return (
-    <div className="space-y-3 rounded-lg bg-slate-100 p-3">
+    <div className="space-y-3 rounded-lg bg-surface-subtle p-3">
       <ActionMainFields
         action={action}
         triggerNodes={triggerNodes}
@@ -135,7 +135,7 @@ function ActionMainFields({
             type="button"
             size="icon"
             variant="ghost"
-            className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+            className="h-6 w-6 cursor-pointer text-content-muted hover:bg-status-danger-subtle hover:text-status-danger-content"
             onClick={onRemove}
             aria-label="Remove row action"
           >
@@ -169,8 +169,8 @@ function ActionTemplateField({
   if (!hasTemplates) {
     return (
       <div className="space-y-1">
-        <Label className="text-[11px] font-medium text-slate-600">
-          Start template <span className="font-normal text-slate-400">(optional)</span>
+        <Label className="text-[11px] font-medium text-content-secondary">
+          Start template <span className="font-normal text-content-muted">(optional)</span>
         </Label>
         <Input
           className="h-8 text-xs"
@@ -186,7 +186,7 @@ function ActionTemplateField({
 
   return (
     <div className="space-y-1">
-      <Label className="text-[11px] font-medium text-slate-600">Start template</Label>
+      <Label className="text-[11px] font-medium text-content-secondary">Start template</Label>
       <div className="grid grid-cols-2 gap-2">
         <Select
           value={selectValue}
@@ -220,7 +220,7 @@ function ActionTemplateField({
             placeholder="Custom template name"
           />
         ) : (
-          <p className="self-center text-[11px] text-slate-500">
+          <p className="self-center text-[11px] text-content-muted">
             {templates.length} templates available. Leave default to use the first.
           </p>
         )}

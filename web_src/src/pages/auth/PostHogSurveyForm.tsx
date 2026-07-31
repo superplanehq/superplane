@@ -64,7 +64,7 @@ interface SurveyChoiceButtonsProps {
 }
 
 const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSelect }) => (
-  <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
+  <div className="-mx-2 divide-y divide-edge-default border-y border-edge-default">
     {choices.map((choice) => {
       const { title, subtitle } = parseChoiceLabel(choice);
 
@@ -72,18 +72,16 @@ const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSe
         <button
           key={choice}
           type="button"
-          className="group flex w-full items-start justify-between gap-4 px-2 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:hover:bg-gray-800"
+          className="group flex w-full items-start justify-between gap-4 px-2 py-4 text-left transition-colors hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:outline-none"
           onClick={() => onSelect(choice)}
         >
           <span className="min-w-0">
-            <span className="block text-sm font-medium leading-5 text-gray-900 dark:text-white">{title}</span>
+            <span className="block text-sm leading-5 font-medium text-content-primary">{title}</span>
             {subtitle && (
-              <span className="mt-1 block text-sm font-normal leading-5 text-gray-500 dark:text-gray-400">
-                {subtitle}
-              </span>
+              <span className="mt-1 block text-sm leading-5 font-normal text-content-secondary">{subtitle}</span>
             )}
           </span>
-          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-colors group-hover:text-gray-900 dark:group-hover:text-white" />
+          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-content-muted transition-colors group-hover:text-content-primary" />
         </button>
       );
     })}
@@ -99,7 +97,7 @@ interface SurveyMultiChoiceProps {
 
 const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selectedChoices, onToggle, onSubmit }) => (
   <div className="space-y-4">
-    <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
+    <div className="-mx-2 divide-y divide-edge-default border-y border-edge-default">
       {choices.map((choice) => {
         const isChecked = selectedChoices.includes(choice);
         const { title, subtitle } = parseChoiceLabel(choice);
@@ -107,18 +105,16 @@ const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selected
         return (
           <label
             key={choice}
-            className="flex cursor-pointer items-start gap-3 px-2 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="flex cursor-pointer items-start gap-3 px-2 py-4 text-left transition-colors hover:bg-surface-subtle"
           >
             <Checkbox
               checked={isChecked}
               onCheckedChange={(checked) => onToggle(choice, checked === true)}
               className="mt-0.5 shrink-0"
             />
-            <span className="min-w-0 text-sm text-gray-800 dark:text-gray-200">
+            <span className="min-w-0 text-sm text-content-primary">
               <span className="block font-medium leading-5">{title}</span>
-              {subtitle && (
-                <span className="mt-1 block font-normal leading-5 text-gray-500 dark:text-gray-400">{subtitle}</span>
-              )}
+              {subtitle && <span className="mt-1 block leading-5 font-normal text-content-secondary">{subtitle}</span>}
             </span>
           </label>
         );
@@ -164,14 +160,14 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
         <div
           key={i}
           className={`h-1 transition-all duration-300 ${
-            i === currentQuestionIndex ? "w-8 bg-gray-900 dark:bg-white" : "w-4 bg-gray-300 dark:bg-gray-600"
+            i === currentQuestionIndex ? "w-8 bg-action-primary" : "w-4 bg-edge-strong"
           }`}
         />
       ))}
     </div>
     <button
       type="button"
-      className="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      className="text-xs text-content-muted transition-colors hover:text-content-secondary"
       onClick={onSkip}
     >
       Skip
@@ -204,12 +200,8 @@ const SurveyQuestionHeader: React.FC<{ question: string | undefined }> = ({ ques
   <div className="space-y-5">
     <img src={superplaneLogo} alt="SuperPlane logo" className="h-8 w-8" />
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        Welcome to SuperPlane
-      </p>
-      <h4 className="text-balance text-2xl font-semibold leading-8 text-gray-950 dark:text-white">
-        {question ?? "Question"}
-      </h4>
+      <p className="text-xs font-medium tracking-wide text-content-secondary uppercase">Welcome to SuperPlane</p>
+      <h4 className="text-balance text-2xl leading-8 font-semibold text-content-primary">{question ?? "Question"}</h4>
     </div>
   </div>
 );

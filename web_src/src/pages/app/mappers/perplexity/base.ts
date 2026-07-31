@@ -53,7 +53,7 @@ export const baseMapper: ComponentBaseMapper = {
     return {
       iconSrc: perplexityIcon,
       iconSlug: context.componentDefinition?.icon ?? "bot",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title:
         context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "Perplexity",
