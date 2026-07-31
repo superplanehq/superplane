@@ -593,6 +593,7 @@ func taskStatusResponse(task *models.Task, s *Server) api.TaskStatusResponse {
 		CreatedAt:       task.CreatedAt.UTC(),
 		ClaimedAt:       task.ClaimedAt,
 		LeaseUntil:      task.LeaseUntil,
+		FinishedAt:      task.FinishedAt,
 		RunnerID:        strings.TrimSpace(task.RunnerID),
 		ExecutionMode:   mode,
 		DockerImage:     strings.TrimSpace(task.DockerImage),
@@ -773,10 +774,12 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 		exit = *task.ExitCode
 	}
 	payload := api.WebhookPayload{
-		TaskID:   task.ID,
-		Status:   string(task.Status),
-		ExitCode: exit,
-		Error:    task.ErrorMessage,
+		TaskID:     task.ID,
+		Status:     string(task.Status),
+		ExitCode:   exit,
+		Error:      task.ErrorMessage,
+		ClaimedAt:  task.ClaimedAt,
+		FinishedAt: task.FinishedAt,
 	}
 	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
 		payload.CloudWatchLogGroup = g

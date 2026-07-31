@@ -45,6 +45,7 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		RunnerTerminationRequestedAt: t.RunnerTerminationRequestedAt,
 		ClaimedAt:                    t.ClaimedAt,
 		LeaseUntil:                   t.LeaseUntil,
+		FinishedAt:                   t.FinishedAt,
 		ExecutionTimeoutSeconds:      t.ExecutionTimeoutSeconds,
 		ExitCode:                     t.ExitCode,
 	}
@@ -157,6 +158,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		RunnerTerminationRequestedAt: row.RunnerTerminationRequestedAt,
 		ClaimedAt:                    row.ClaimedAt,
 		LeaseUntil:                   row.LeaseUntil,
+		FinishedAt:                   row.FinishedAt,
 		ExecutionTimeoutSeconds:      row.ExecutionTimeoutSeconds,
 		ExitCode:                     row.ExitCode,
 	}
@@ -170,6 +172,10 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	if t.LeaseUntil != nil {
 		lt := t.LeaseUntil.UTC()
 		t.LeaseUntil = &lt
+	}
+	if t.FinishedAt != nil {
+		ft := t.FinishedAt.UTC()
+		t.FinishedAt = &ft
 	}
 	if t.RunnerTerminationRequestedAt != nil {
 		rt := t.RunnerTerminationRequestedAt.UTC()
