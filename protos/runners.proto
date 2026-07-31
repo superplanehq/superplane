@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package superplane.runners.v1;
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/runners";
+
+message RunnerTaskFinishedMessage {
+  string organization_id = 1;
+  string task_id = 2;
+  int64 duration_seconds = 3;
+}

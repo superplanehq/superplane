@@ -1347,9 +1347,15 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				recordExecution(execution.WorkflowID, execution.ID)
 			}
 
+			organizationID := ""
+			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+				organizationID = workflow.OrganizationID.String()
+			}
+
 			return &core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
+				OrganizationID: organizationID,
 				NodeID:         execution.NodeID,
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
