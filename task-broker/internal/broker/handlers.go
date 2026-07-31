@@ -64,31 +64,15 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 
 	provisioner := strings.TrimSpace(req.Provisioner)
 	lambdaFunctionName := strings.TrimSpace(req.LambdaFunctionName)
-	maxExecutionTimeoutSeconds := req.MaxExecutionTimeoutSeconds
-	supportsDocker := req.SupportsDocker
-
-	existing, err := s.Store.GetFleet(r.Context(), req.ID)
-	if err != nil {
-		s.logErr("resolve fleet for register", err)
-		writeError(w, http.StatusInternalServerError, "could not persist fleet")
-		return
-	}
-	if existing != nil {
-		if lambdaFunctionName == "" {
-			lambdaFunctionName = existing.LambdaFunctionName
-		}
-		if maxExecutionTimeoutSeconds == nil {
-			maxExecutionTimeoutSeconds = existing.MaxExecutionTimeoutSeconds
-		}
-		if supportsDocker == nil {
-			supportsDocker = existing.SupportsDocker
-		}
-	}
-
 	if provisioner == dispatch.ProvisionerAWSLambda && lambdaFunctionName == "" {
 		writeError(w, http.StatusBadRequest, "lambda_function_name required for provisioner "+dispatch.ProvisionerAWSLambda)
 		return
 	}
+
+	// max_execution_timeout_seconds and supports_docker are merged atomically with
+	// any previously registered values inside Store.CreateFleet (an empty/nil value
+	// here means "not provided"), so re-registering a fleet without repeating them
+	// can't race with or clobber a value set by another caller.
 	f := &brokermodels.Fleet{
 		ID:                         req.ID,
 		Provisioner:                provisioner,
@@ -96,8 +80,8 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		Size:                       strings.TrimSpace(req.Size),
 		CreatedAt:                  time.Now().UTC(),
 		LambdaFunctionName:         lambdaFunctionName,
-		MaxExecutionTimeoutSeconds: maxExecutionTimeoutSeconds,
-		SupportsDocker:             supportsDocker,
+		MaxExecutionTimeoutSeconds: req.MaxExecutionTimeoutSeconds,
+		SupportsDocker:             req.SupportsDocker,
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -537,7 +521,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
-	go s.dispatchTask(fleet, task.ID)
+	s.reserveDispatch(fleet, task.ID)
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
@@ -564,13 +548,13 @@ func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (
 	return &v, ""
 }
 
-func (s *Server) dispatchTask(fleet *brokermodels.Fleet, taskID string) {
-	defer func() {
-		if r := recover(); r != nil {
-			s.warn("dispatch task panicked, sweeper will retry",
-				slog.String("task_id", taskID), slog.Any("recover", r))
-		}
-	}()
+// reserveDispatch marks the task as dispatched synchronously, before the
+// create-task response is written, so it's never visible to the sweeper as an
+// unmarked candidate (which would otherwise race with the invoke below and
+// could trigger a duplicate dispatch). The invoke itself is the slow,
+// network-bound part, so it runs in the background and never delays the
+// response.
+func (s *Server) reserveDispatch(fleet *brokermodels.Fleet, taskID string) {
 	if s.Dispatch == nil || fleet == nil {
 		return
 	}
@@ -582,11 +566,21 @@ func (s *Server) dispatchTask(fleet *brokermodels.Fleet, taskID string) {
 		s.logErr("mark task dispatched", err)
 		return
 	}
+	go s.invokeDispatch(d, fleet.ID, taskID)
+}
+
+func (s *Server) invokeDispatch(d dispatch.Dispatcher, fleetID, taskID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.warn("dispatch invoke panicked, sweeper will retry",
+				slog.String("task_id", taskID), slog.String("fleet_id", fleetID), slog.Any("recover", r))
+		}
+	}()
 	dispatchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := d.Dispatch(dispatchCtx, fleet.ID, taskID); err != nil {
+	if err := d.Dispatch(dispatchCtx, fleetID, taskID); err != nil {
 		s.warn("dispatch task failed, sweeper will retry",
-			slog.String("task_id", taskID), slog.String("fleet_id", fleet.ID), slog.Any("err", err))
+			slog.String("task_id", taskID), slog.String("fleet_id", fleetID), slog.Any("err", err))
 	}
 }
 
