@@ -43,6 +43,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
+  <LinkCard title="Get Pipeline Minutes Usage" href="#get-pipeline-minutes-usage" description="Retrieve CI/CD compute (pipeline) minutes usage for the connected GitLab namespace" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitLab project" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Mark Merge Request Ready for Review" href="#mark-merge-request-ready-for-review" description="Take a draft merge request out of the draft state in a GitLab project" />
@@ -2535,6 +2536,83 @@ Returns pipeline data including status, ref, SHA, and pipeline URL.
   },
   "timestamp": "2026-02-13T18:00:10.000Z",
   "type": "gitlab.pipeline"
+}
+```
+
+<a id="get-pipeline-minutes-usage"></a>
+
+## Get Pipeline Minutes Usage
+
+**Component key:** `gitlab.getPipelineMinutesUsage`
+
+The Get Pipeline Minutes Usage component retrieves CI/CD compute minutes usage for the current calendar month, for the namespace configured on the connected GitLab integration (its group, or the personal namespace if no group is set).
+
+### Prerequisites
+
+This action calls GitLab's GraphQL API, which requires the connected user to have access to the namespace's usage quota data (at least the Owner role for groups).
+
+### Behavior
+
+- Returns usage for the current calendar month
+- Includes a per-project breakdown of minutes and shared runner duration
+- When Projects are selected, only usage for those projects is included in the totals
+- If the integration's Group is a subgroup, usage is reported for its root group, since GitLab only tracks compute minutes at the root namespace
+
+### Configuration
+
+- **Projects** (optional, multiselect): Limit the per-project breakdown and totals to specific projects. Leave empty to include all projects with usage.
+
+### Output
+
+Returns:
+- `month`: The usage month name, e.g. "July"
+- `monthIso8601`: The usage month as an ISO date, e.g. "2026-07-01"
+- `minutes`: Total compute minutes used
+- `sharedRunnersDuration`: Total shared runner duration, in seconds
+- `projects`: Per-project breakdown (minutes, shared runner duration, and project details)
+
+### Use Cases
+
+- **Billing monitoring**: Track CI/CD minutes usage against the namespace's quota
+- **Cost control**: Alert when usage approaches a budget threshold
+- **Usage reporting**: Generate periodic usage reports
+
+### References
+
+- [GitLab compute minutes](https://docs.gitlab.com/ci/pipelines/compute_minutes/)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "minutes": 245,
+    "month": "July",
+    "monthIso8601": "2026-07-01",
+    "projects": [
+      {
+        "minutes": 180,
+        "project": {
+          "fullPath": "felixgateru/hello-world",
+          "id": "gid://gitlab/Project/80508544",
+          "name": "hello-world"
+        },
+        "sharedRunnersDuration": 10800
+      },
+      {
+        "minutes": 65,
+        "project": {
+          "fullPath": "felixgateru/another-project",
+          "id": "gid://gitlab/Project/80508999",
+          "name": "another-project"
+        },
+        "sharedRunnersDuration": 3900
+      }
+    ],
+    "sharedRunnersDuration": 14700
+  },
+  "timestamp": "2026-07-01T00:00:00.000000000Z",
+  "type": "gitlab.pipelineMinutesUsage"
 }
 ```
 

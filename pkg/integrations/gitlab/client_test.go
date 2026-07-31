@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -1877,5 +1878,237 @@ func Test__Client__GetCommit(t *testing.T) {
 		_, err := client.GetCommit(context.Background(), "456", "abc123")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get commit")
+	})
+}
+
+func Test__Client__GetGroup(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 123, "full_path": "my-org/my-subgroup"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetGroup("my-org/my-subgroup")
+
+		require.NoError(t, err)
+		assert.Equal(t, 123, result.ID)
+		assert.Equal(t, "my-org/my-subgroup", result.FullPath)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/my-org%2Fmy-subgroup", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Group Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetGroup("123")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get group")
+	})
+}
+
+func Test__Client__GetCiMinutesUsage(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"data": {
+						"ciMinutesUsage": {
+							"nodes": [{"month": "July", "monthIso8601": "2026-07-01", "minutes": 245, "sharedRunnersDuration": 14700}]
+						}
+					}
+				}`),
+				GitlabMockResponse(http.StatusOK, `{
+					"data": {
+						"ciMinutesProjectMonthlyUsage": {
+							"nodes": [
+								{"minutes": 180, "sharedRunnersDuration": 10800, "project": {"id": "gid://gitlab/Project/1", "name": "hello-world", "fullPath": "felixgateru/hello-world"}}
+							],
+							"pageInfo": {"hasNextPage": false, "endCursor": ""}
+						}
+					}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		namespaceGID := "gid://gitlab/Group/123"
+		usage, projects, err := client.GetCiMinutesUsage(context.Background(), &namespaceGID, "2026-07-01")
+
+		require.NoError(t, err)
+		assert.Equal(t, "July", usage.Month)
+		assert.Equal(t, 245, usage.Minutes)
+
+		require.Len(t, projects, 1)
+		assert.Equal(t, "hello-world", projects[0].Project.Name)
+
+		require.Len(t, mockClient.Requests, 2)
+		for _, req := range mockClient.Requests {
+			assert.Equal(t, http.MethodPost, req.Method)
+			assert.Equal(t, "https://gitlab.com/api/graphql", req.URL.String())
+		}
+
+		body, _ := io.ReadAll(mockClient.Requests[0].Body)
+		var reqBody map[string]any
+		json.Unmarshal(body, &reqBody)
+		variables := reqBody["variables"].(map[string]any)
+		assert.Equal(t, namespaceGID, variables["namespaceId"])
+		assert.Equal(t, "2026-07-01", variables["date"])
+	})
+
+	t.Run("pages through more than one page of project usage", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"data": {"ciMinutesUsage": {"nodes": [{"month": "July"}]}}}`),
+				GitlabMockResponse(http.StatusOK, `{
+					"data": {
+						"ciMinutesProjectMonthlyUsage": {
+							"nodes": [{"minutes": 100, "project": {"id": "gid://gitlab/Project/1", "name": "project-1"}}],
+							"pageInfo": {"hasNextPage": true, "endCursor": "cursor-1"}
+						}
+					}
+				}`),
+				GitlabMockResponse(http.StatusOK, `{
+					"data": {
+						"ciMinutesProjectMonthlyUsage": {
+							"nodes": [{"minutes": 50, "project": {"id": "gid://gitlab/Project/2", "name": "project-2"}}],
+							"pageInfo": {"hasNextPage": false, "endCursor": ""}
+						}
+					}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, projects, err := client.GetCiMinutesUsage(context.Background(), nil, "2026-07-01")
+		require.NoError(t, err)
+
+		require.Len(t, projects, 2, "must follow pageInfo.hasNextPage and return every page, not just the first 100")
+		assert.Equal(t, "project-1", projects[0].Project.Name)
+		assert.Equal(t, "project-2", projects[1].Project.Name)
+
+		require.Len(t, mockClient.Requests, 3)
+		body, _ := io.ReadAll(mockClient.Requests[2].Body)
+		var reqBody map[string]any
+		json.Unmarshal(body, &reqBody)
+		variables := reqBody["variables"].(map[string]any)
+		assert.Equal(t, "cursor-1", variables["after"], "the second page request must pass the previous page's endCursor")
+	})
+
+	t.Run("omits namespaceId variable for personal namespace", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"data": {"ciMinutesUsage": {"nodes": []}}}`),
+				GitlabMockResponse(http.StatusOK, `{"data": {"ciMinutesProjectMonthlyUsage": {"nodes": [], "pageInfo": {"hasNextPage": false, "endCursor": ""}}}}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.GetCiMinutesUsage(context.Background(), nil, "2026-07-01")
+		require.NoError(t, err)
+
+		for _, req := range mockClient.Requests {
+			body, _ := io.ReadAll(req.Body)
+			var reqBody map[string]any
+			json.Unmarshal(body, &reqBody)
+			variables := reqBody["variables"].(map[string]any)
+			assert.NotContains(t, variables, "namespaceId")
+		}
+	})
+
+	t.Run("graphql error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"errors": [{"message": "not authorized to read usage"}]}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.GetCiMinutesUsage(context.Background(), nil, "2026-07-01")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not authorized to read usage")
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusInternalServerError, `{"message": "internal error"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.GetCiMinutesUsage(context.Background(), nil, "2026-07-01")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "graphql request failed")
+	})
+
+	t.Run("project usage page failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"data": {"ciMinutesUsage": {"nodes": [{"month": "July"}]}}}`),
+				GitlabMockResponse(http.StatusInternalServerError, `{"message": "internal error"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.GetCiMinutesUsage(context.Background(), nil, "2026-07-01")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "graphql request failed")
 	})
 }
