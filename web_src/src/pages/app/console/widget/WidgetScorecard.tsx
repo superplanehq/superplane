@@ -42,34 +42,34 @@ interface WidgetScorecardProps {
   totalCount?: number;
 }
 
-const VALUE_CLASS = "text-4xl font-medium text-slate-900 dark:text-gray-100";
-const SUFFIX_CLASS = "text-xl font-semibold text-slate-900 dark:text-gray-100";
+const VALUE_CLASS = "text-4xl font-medium text-content-primary";
+const SUFFIX_CLASS = "text-xl font-semibold text-content-primary";
 
 const STATUS_TEXT: Record<ScorecardStatusPolarity, string> = {
   better: "text-emerald-600 dark:text-emerald-400",
   worse: "text-red-600 dark:text-red-400",
-  flat: "text-slate-500 dark:text-gray-400",
-  none: "text-slate-500 dark:text-gray-400",
+  flat: "text-content-muted",
+  none: "text-content-muted",
 };
 
 const STATUS_DOT: Record<ScorecardStatusPolarity, string> = {
   better: "bg-emerald-500 dark:bg-emerald-400",
   worse: "bg-red-500 dark:bg-red-400",
-  flat: "bg-slate-400 dark:bg-gray-500",
-  none: "bg-slate-300 dark:bg-gray-600",
+  flat: "bg-content-muted",
+  none: "bg-edge-strong",
 };
 
 const STATUS_SPARKLINE: Record<ScorecardStatusPolarity, string> = {
   better: "text-emerald-500 dark:text-emerald-400",
   worse: "text-red-500 dark:text-red-400",
-  flat: "text-slate-400 dark:text-gray-500",
+  flat: "text-content-muted",
   none: "text-sky-500 dark:text-indigo-400",
 };
 
 const STATUS_PROGRESS_BAR: Record<ScorecardStatusPolarity, string> = {
   better: "bg-emerald-500 dark:bg-emerald-400",
   worse: "bg-red-500 dark:bg-red-400",
-  flat: "bg-slate-400 dark:bg-gray-500",
+  flat: "bg-content-muted",
   none: "bg-sky-500 dark:bg-indigo-400",
 };
 
@@ -130,7 +130,7 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+        <Loader2 className="size-4 animate-spin text-content-muted" />
       </div>
     );
   }
@@ -296,7 +296,7 @@ function ChangeChip({
   return (
     <span className="inline-flex flex-wrap items-end gap-x-2">
       {wrappedChip}
-      <span className="text-xs text-slate-500 dark:text-gray-400" data-testid="widget-scorecard-caption">
+      <span className="text-xs text-content-muted" data-testid="widget-scorecard-caption">
         {caption}
       </span>
     </span>
@@ -307,7 +307,7 @@ function ProgressBar({ progress, status }: { progress: ScorecardProgress; status
   return (
     <div className="flex w-full flex-col gap-1" data-testid="widget-scorecard-progress">
       <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-action-neutral"
         aria-hidden
         data-testid="widget-scorecard-progress-track"
       >
@@ -316,7 +316,7 @@ function ProgressBar({ progress, status }: { progress: ScorecardProgress; status
           style={{ width: `${progress.barPercent}%` }}
         />
       </div>
-      <span className="text-xs text-slate-500 dark:text-gray-400" data-testid="widget-scorecard-progress-label">
+      <span className="text-xs text-content-muted" data-testid="widget-scorecard-progress-label">
         {formatProgressLabel(progress)}
       </span>
     </div>

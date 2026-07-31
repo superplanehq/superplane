@@ -24,7 +24,7 @@ export const baseMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpIcon,
       iconSlug: context.componentDefinition?.icon ?? "cloud",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "GCP",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

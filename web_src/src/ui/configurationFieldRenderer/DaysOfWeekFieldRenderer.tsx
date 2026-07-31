@@ -42,8 +42,8 @@ export const DaysOfWeekFieldRenderer: React.FC<FieldRendererProps> = ({ value, o
             className={cn(
               "w-9 h-9 rounded-full text-sm font-medium focus:outline-none",
               isSelected
-                ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                : "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500",
+                ? "bg-action-primary text-action-primary-content"
+                : "bg-surface-raised border border-edge-strong text-content-secondary hover:border-focus-ring",
             )}
             aria-label={day.value}
             aria-pressed={isSelected}

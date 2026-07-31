@@ -66,7 +66,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       key={index}
       className={
         `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b border-slate-950/20 dark:border-gray-600/70" : "") +
+        (index < totalSections - 1 ? " border-b border-edge-strong" : "") +
         ` ${className}`
       }
     >
@@ -103,7 +103,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
             #{section.eventId?.slice(0, 4)}
           </span>
         )}
-        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate dark:text-white/70">
+        <span className="min-w-0 truncate font-inter text-sm font-medium text-content-secondary">
           {section.eventTitle}
         </span>
       </div>
@@ -155,55 +155,55 @@ export type EventStateMap = Record<EventState, EventStateStyle>;
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-violet-100",
     badgeColor: "bg-violet-400",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   cancelled: {
     icon: "circle-slash-2",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-50",
-    badgeColor: "bg-gray-400",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-default",
+    badgeColor: "bg-content-muted",
   },
   queued: {
     icon: "circle-dashed",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-sky-100",
     badgeColor: "bg-blue-500",
   },
   cancelling: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
     label: "Cancelling",
@@ -365,7 +365,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           "group relative flex flex-col rounded-md w-[23rem]",
           getDraftDiffOutlineClassName(draftDiffStatus),
           !draftDiffStatus && hasError && "!outline-orange-500 dark:!outline-orange-400/50",
-          dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-800" : "bg-white dark:bg-gray-800",
+          dimBodyBelowHeader ? "bg-surface-subtle" : "bg-surface-raised",
         )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
@@ -381,7 +381,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onDuplicate();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
               >
                 <DuplicateIcon className="h-4 w-4" />
               </button>
@@ -395,7 +395,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onToggleView();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
               >
                 <ToggleViewIcon className="h-4 w-4" />
               </button>
@@ -409,7 +409,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   event.stopPropagation();
                   onDelete();
                 }}
-                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
               >
                 <DeleteIcon className="h-4 w-4" />
               </button>
@@ -428,7 +428,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {dimBodyBelowHeader ? (
           !isCompactView ? (
-            <div className="min-h-28 w-full shrink-0 bg-slate-200 rounded-b-md dark:bg-gray-800" aria-hidden />
+            <div className="min-h-28 w-full shrink-0 bg-surface-subtle rounded-b-md" aria-hidden />
           ) : null
         ) : (
           <>
@@ -455,9 +455,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 {!hideMetadataList && safeMetadata && safeMetadata.length > 0 && <MetadataList items={safeMetadata} />}
 
                 {safeSpecs && safeSpecs.length > 0 && (
-                  <div className="px-2 py-1.5 border-b border-slate-950/20 dark:border-gray-600/70 text-gray-500 flex flex-col gap-1.5">
+                  <div className="px-2 py-1.5 border-b border-edge-strong text-content-secondary flex flex-col gap-1.5">
                     {safeSpecs.map((spec, index) => (
-                      <div key={index} className="flex items-center text-md text-gray-500 dark:text-gray-400">
+                      <div key={index} className="flex items-center text-content-secondary">
                         <div className="w-4 h-4 mr-2">
                           {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
                         </div>
@@ -467,7 +467,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                             specValues={spec.values}
                             hideCount={hideCount}
                           >
-                            <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
+                            <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-content-secondary rounded-md font-inter font-medium cursor-help">
                               {hideCount ? "" : spec.values.length}{" "}
                               {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                             </span>
@@ -478,7 +478,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                             value={spec.value}
                             contentType={spec.contentType || "json"}
                           >
-                            <span className="text-[13px] bg-gray-500 px-2 py-0.5 rounded-md text-white font-mono font-medium cursor-help">
+                            <span className="text-[13px] bg-content-muted px-2 py-0.5 rounded-md text-content-inverse font-mono font-medium cursor-help">
                               {spec.title}
                             </span>
                           </PayloadTooltip>
@@ -495,7 +495,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                     className={
                       "pb-3" +
                       (!!includeEmptyState || (!!renderedCustomField && safeCustomFieldPosition === "after")
-                        ? " border-b border-slate-950/20"
+                        ? " border-b border-edge-strong"
                         : "")
                     }
                     key={index}

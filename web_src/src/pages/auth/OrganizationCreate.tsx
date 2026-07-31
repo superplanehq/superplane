@@ -10,8 +10,6 @@ import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { analytics } from "@/lib/analytics";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -58,26 +56,20 @@ const OrganizationCreate: React.FC = () => {
   const usageLimitNotice = error ? getUsageLimitNotice(error) : null;
 
   return (
-    <div className={cn("min-h-screen bg-slate-100", appDarkModeClasses.surface)}>
+    <div className="min-h-screen bg-surface-canvas">
       <div className="flex items-center p-6">
         <Link
           to="/?select=true"
-          className="rounded px-2 py-1 text-sm font-medium text-gray-500 hover:bg-gray-950/5 dark:text-gray-400 dark:hover:bg-white/5"
+          className="rounded px-2 py-1 text-sm font-medium text-content-secondary hover:bg-surface-subtle"
         >
           ← Back to Organizations
         </Link>
       </div>
       <div className="flex items-center justify-center p-8">
-        <div
-          className={cn(
-            "w-full max-w-md rounded-lg bg-white p-8 shadow-sm",
-            appDarkModeClasses.modalEdge,
-            appDarkModeClasses.surfaceRaised,
-          )}
-        >
+        <div className="w-full max-w-md rounded-lg border border-edge-default bg-surface-raised p-8 shadow-sm">
           <div className="mb-8 text-center">
-            <h4 className="mb-1 text-xl font-semibold text-gray-800 dark:text-gray-100">Create Organization</h4>
-            <Text className="text-gray-800 dark:text-gray-300">Set up a new SuperPlane organization</Text>
+            <h4 className="mb-1 text-xl font-semibold text-content-primary">Create Organization</h4>
+            <Text className="text-content-secondary">Set up a new SuperPlane organization</Text>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

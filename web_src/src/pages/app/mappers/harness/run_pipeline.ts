@@ -28,19 +28,19 @@ export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
     icon: "loader-circle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-blue-100",
     badgeColor: "bg-blue-500",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },

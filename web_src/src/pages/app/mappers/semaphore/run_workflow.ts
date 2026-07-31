@@ -134,27 +134,27 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
     icon: "loader-circle",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-blue-100",
     badgeColor: "bg-blue-500",
   },
   passed: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   stopped: {
     icon: "circle-stop",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
 };
 
@@ -320,8 +320,8 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
           },
           {
             label: param.value,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-800",
+            bgColor: "bg-action-neutral",
+            textColor: "text-content-primary",
           },
         ],
       })),

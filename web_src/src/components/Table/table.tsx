@@ -26,7 +26,7 @@ export function Table({
       <div className="flow-root">
         <div {...props} className={clsx(className, "-mx-6 overflow-x-auto whitespace-nowrap")}>
           <div className={clsx("inline-block min-w-full align-middle", !bleed && "sm:px-6")}>
-            <table className="min-w-full text-left text-sm/6 text-gray-800 dark:text-white">{children}</table>
+            <table className="min-w-full text-left text-sm/6 text-content-primary">{children}</table>
           </div>
         </div>
       </div>
@@ -35,7 +35,7 @@ export function Table({
 }
 
 export function TableHead({ className, ...props }: React.ComponentPropsWithoutRef<"thead">) {
-  return <thead {...props} className={clsx(className, "text-gray-500 dark:text-gray-400")} />;
+  return <thead {...props} className={clsx(className, "text-content-secondary")} />;
 }
 
 export function TableBody(props: React.ComponentPropsWithoutRef<"tbody">) {
@@ -64,10 +64,10 @@ export function TableRow({
         className={clsx(
           className,
           href &&
-            "has-[[data-row-link][data-focus]]:outline-2 has-[[data-row-link][data-focus]]:-outline-offset-2 has-[[data-row-link][data-focus]]:outline-blue-500 dark:focus-within:bg-white/2.5",
-          striped && "even:bg-gray-950/2.5 dark:even:bg-white/2.5",
-          href && striped && "hover:bg-gray-950/5 dark:hover:bg-white/5",
-          href && !striped && "hover:bg-gray-950/2.5 dark:hover:bg-white/2.5",
+            "has-[[data-row-link][data-focus]]:outline-2 has-[[data-row-link][data-focus]]:-outline-offset-2 has-[[data-row-link][data-focus]]:outline-blue-500 focus-within:bg-surface-subtle",
+          striped && "even:bg-surface-subtle/50",
+          href && striped && "hover:bg-action-neutral-hover",
+          href && !striped && "hover:bg-action-neutral-hover",
         )}
       />
     </TableRowContext.Provider>
@@ -82,8 +82,8 @@ export function TableHeader({ className, ...props }: React.ComponentPropsWithout
       {...props}
       className={clsx(
         className,
-        "border-b border-b-gray-950/10 px-4 py-2 font-medium first:pl-6 last:pr-6 dark:border-b-white/10",
-        grid && "border-l border-l-gray-950/5 first:border-l-0 dark:border-l-white/5",
+        "border-b border-b-edge-subtle px-4 py-2 font-medium first:pl-6 last:pr-6",
+        grid && "border-l border-l-edge-subtle first:border-l-0",
         !bleed && "sm:first:pl-1 sm:last:pr-1",
       )}
     />
@@ -102,8 +102,8 @@ export function TableCell({ className, children, ...props }: React.ComponentProp
       className={clsx(
         className,
         "relative px-4 first:pl-6 last:pr-6",
-        !striped && "border-b border-gray-950/10 dark:border-white/5",
-        grid && "border-l border-l-gray-950/5 first:border-l-0 dark:border-l-white/5",
+        !striped && "border-b border-edge-subtle",
+        grid && "border-l border-l-edge-subtle first:border-l-0",
         dense ? "py-2.5" : "py-4",
         !bleed && "sm:first:pl-1 sm:last:pr-1",
       )}

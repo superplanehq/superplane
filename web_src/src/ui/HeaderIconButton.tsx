@@ -29,7 +29,7 @@ export function HeaderIconButton({
             "flex h-6 w-6 items-center justify-center rounded transition-colors",
             active
               ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-              : "text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+              : "text-content-muted hover:bg-action-neutral-hover hover:text-content-primary",
           )}
         >
           {icon}

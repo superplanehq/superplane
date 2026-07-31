@@ -6,7 +6,7 @@ export function Text({ className, ...props }: React.ComponentPropsWithoutRef<"p"
     <p
       data-slot="text"
       {...props}
-      className={twMerge("text-base/6 text-red-500 sm:text-sm/6 dark:text-red-400", className)}
+      className={twMerge("text-base/6 text-content-secondary sm:text-sm/6", className)}
     />
   );
 }
@@ -16,7 +16,7 @@ export function TextLink({ className, ...props }: React.ComponentPropsWithoutRef
     <Link
       {...props}
       className={twMerge(
-        "text-gray-800 underline decoration-gray-950/50 data-hover:decoration-gray-800 dark:text-white dark:decoration-white/50 dark:data-hover:decoration-white",
+        "text-content-link underline decoration-content-link/50 data-hover:decoration-content-link-hover",
         className,
       )}
     />
@@ -24,7 +24,7 @@ export function TextLink({ className, ...props }: React.ComponentPropsWithoutRef
 }
 
 export function Strong({ className, ...props }: React.ComponentPropsWithoutRef<"strong">) {
-  return <strong {...props} className={twMerge("font-medium text-gray-800 dark:text-white", className)} />;
+  return <strong {...props} className={twMerge("font-medium text-content-primary", className)} />;
 }
 
 export function Code({ className, ...props }: React.ComponentPropsWithoutRef<"code">) {
@@ -32,7 +32,7 @@ export function Code({ className, ...props }: React.ComponentPropsWithoutRef<"co
     <code
       {...props}
       className={twMerge(
-        "rounded-sm border border-gray-950/10 bg-gray-950/2.5 px-0.5 text-sm font-medium text-gray-800 sm:text-[0.8125rem] dark:border-white/20 dark:bg-white/5 dark:text-white",
+        "rounded-sm border border-edge-default bg-surface-subtle px-0.5 text-sm font-medium text-content-primary sm:text-[0.8125rem]",
         className,
       )}
     />

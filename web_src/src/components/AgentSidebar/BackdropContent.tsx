@@ -17,7 +17,7 @@ export function BackdropContent({
   if (command) {
     const start = text.indexOf(command);
     return (
-      <span className="whitespace-pre-wrap break-words text-slate-900 dark:text-gray-100">
+      <span className="whitespace-pre-wrap break-words text-content-primary">
         {text.slice(0, start)}
         <span className="rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">{command}</span>
         {text.slice(start + command.length)}
@@ -27,9 +27,7 @@ export function BackdropContent({
 
   if (mentions.length === 0) {
     // No mentions — render the text normally to maintain layout
-    return (
-      <span className="whitespace-pre-wrap break-words text-slate-900 dark:text-gray-100">{text || "\u00A0"}</span>
-    );
+    return <span className="whitespace-pre-wrap break-words text-content-primary">{text || "\u00A0"}</span>;
   }
 
   // Build segments using tracked startIndex positions for accurate rendering
@@ -64,7 +62,7 @@ export function BackdropContent({
             {seg.text}
           </span>
         ) : (
-          <span key={i} className="whitespace-pre-wrap text-slate-900 dark:text-gray-100">
+          <span key={i} className="whitespace-pre-wrap text-content-primary">
             {seg.text}
           </span>
         ),

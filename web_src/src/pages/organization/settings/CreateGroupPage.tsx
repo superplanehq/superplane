@@ -86,9 +86,9 @@ export function CreateGroupPage() {
 
         {/* Create Group Form */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <div className="bg-surface-raised rounded-lg border border-edge-default p-6">
             {error && (
-              <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-6">
+              <div className="mb-6 rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
                 <p className="text-sm">{error}</p>
               </div>
             )}
@@ -96,10 +96,7 @@ export function CreateGroupPage() {
             <div className="space-y-6">
               {/* Group Name */}
               <div>
-                <label
-                  htmlFor="group-name-input"
-                  className="block text-sm font-medium text-gray-800 dark:text-white mb-2"
-                >
+                <label htmlFor="group-name-input" className="block text-sm font-medium text-content-primary mb-2">
                   Group Name *
                 </label>
                 <Input
@@ -115,15 +112,12 @@ export function CreateGroupPage() {
 
               {/* Role Selection */}
               <div>
-                <label
-                  htmlFor="group-role-select"
-                  className="block text-sm font-medium text-gray-800 dark:text-white mb-2"
-                >
+                <label htmlFor="group-role-select" className="block text-sm font-medium text-content-primary mb-2">
                   Role *
                 </label>
                 {loadingRoles ? (
                   <div className="flex justify-center items-center h-12">
-                    <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
+                    <p className="text-content-secondary">Loading roles...</p>
                   </div>
                 ) : roles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
@@ -159,7 +153,7 @@ export function CreateGroupPage() {
                       </SelectContent>
                     </Select>
                     {selectedRole && (
-                      <p className="mt-2 max-w-lg text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-2 max-w-lg text-xs text-content-secondary">
                         {sortedRoles.find((role) => role.metadata?.name === selectedRole)?.spec?.description || ""}
                       </p>
                     )}

@@ -74,7 +74,7 @@ function SecretsTableRows({
           <TableRow key={secretId} className="last:[&>td]:border-b-0">
             <TableCell>
               <div className="flex items-center gap-2">
-                <Icon name="key" size="sm" className="text-gray-800 dark:text-gray-100" />
+                <Icon name="key" size="sm" className="text-content-primary" />
                 <Link
                   href={getDetailPath(secretId)}
                   className={settingsTableLinkClassName}
@@ -85,7 +85,7 @@ function SecretsTableRows({
               </div>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-content-secondary">
                 {keyCount} key{keyCount === 1 ? "" : "s"}
               </span>
             </TableCell>
@@ -119,7 +119,7 @@ export function Secrets({ organizationId }: SecretsProps) {
       <div className="space-y-6 pt-6">
         <div className={settingsTableCardClassName}>
           <div className="flex min-h-96 items-center justify-center px-6 pb-6">
-            <p className="text-gray-500 dark:text-gray-400">Loading secrets...</p>
+            <p className="text-content-secondary">Loading secrets...</p>
           </div>
         </div>
       </div>

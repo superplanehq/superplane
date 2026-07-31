@@ -11,7 +11,6 @@ import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/use
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { settingsCardClassName } from "./settingsPageStyles";
 
@@ -81,10 +80,7 @@ export function General({ organization }: GeneralProps) {
     <div className="space-y-6 pt-6 text-left">
       <Fieldset className={cn("space-y-6", settingsCardClassName)}>
         <Field className="space-y-4">
-          <Label
-            htmlFor="organization-name-input"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-          >
+          <Label htmlFor="organization-name-input" className="block text-sm font-medium text-content-secondary mb-2">
             Organization Name
           </Label>
           <Input
@@ -134,7 +130,7 @@ export function General({ organization }: GeneralProps) {
                 if (!canDeleteOrg) return;
                 setShowDeleteForm(true);
               }}
-              className="flex items-center gap-2 text-sm text-gray-800 hover:text-red-500 dark:text-gray-100 dark:hover:text-red-400"
+              className="flex items-center gap-2 text-sm text-content-primary hover:text-status-danger"
               disabled={!canDeleteOrg}
             >
               <Trash2 className="h-4 w-4" />
@@ -147,7 +143,7 @@ export function General({ organization }: GeneralProps) {
               <Heading level={3} className="!text-lg text-red-500 dark:text-red-400">
                 Delete Organization
               </Heading>
-              <p className="text-sm max-w-prose text-gray-800 dark:text-red-300 mt-2 mb-6">
+              <p className="text-sm max-w-prose text-status-danger-content mt-2 mb-6">
                 Deleting your organization is permanent and will remove all canvases, members, and settings. This action
                 cannot be undone.
               </p>
@@ -155,7 +151,7 @@ export function General({ organization }: GeneralProps) {
             <Field>
               <Label
                 htmlFor="delete-organization-confirmation-input"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                className="block text-sm font-medium text-content-secondary mb-2"
               >
                 Type "{organization.metadata?.name}" to confirm
               </Label>
@@ -182,7 +178,7 @@ export function General({ organization }: GeneralProps) {
                   }
                   loading={deleteOrganizationMutation.isPending}
                   loadingText="Deleting..."
-                  className={cn(appDarkModeClasses.destructiveSoftAction, "gap-1")}
+                  className="gap-1 bg-status-danger text-content-inverse hover:opacity-90"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete Organization

@@ -15,7 +15,7 @@ export type DisplayCapability = {
 };
 
 /** Same chip styling as inline `code` in Integration setup instructions markdown. */
-export const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs";
+export const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-content-primary/10 px-1.5 py-0.5 font-mono text-xs";
 
 export function getCapabilityLabel(capability: DisplayCapability): string {
   return capability.definition?.label || capability.definition?.name || capability.name || "Unnamed capability";
@@ -52,7 +52,7 @@ export function getCapabilityStatusBadgeClassName(state: IntegrationCapabilitySt
     case "STATE_AVAILABLE":
       return "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200";
     case "STATE_UNAVAILABLE":
-      return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300";
+      return "border-edge-default bg-surface-subtle text-content-secondary";
   }
 }
 
@@ -68,14 +68,14 @@ export function getCapabilityStatusBadgeDotClassName(state: IntegrationCapabilit
     case "STATE_AVAILABLE":
       return "bg-sky-500 dark:bg-sky-400";
     case "STATE_UNAVAILABLE":
-      return "bg-gray-400 dark:bg-gray-500";
+      return "bg-content-muted";
   }
 }
 
 export const getActiveTabClass = (activeTab?: boolean) => {
   return activeTab
-    ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300";
+    ? "border-action-primary text-content-primary"
+    : "border-transparent text-content-muted hover:text-content-secondary";
 };
 
 export type WorkflowGroup = {

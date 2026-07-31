@@ -257,7 +257,7 @@ export function IntegrationCreateDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto border-0 dark:border dark:border-gray-700/70"
+        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto border border-edge-default"
         showCloseButton={!isCreatePending && !updateIntegrationMutation.isPending}
       >
         <DialogHeader>
@@ -265,7 +265,7 @@ export function IntegrationCreateDialog({
             <IntegrationIcon
               integrationName={integrationDefinition.name}
               iconSlug={integrationDefinition.icon}
-              className="h-6 w-6 text-gray-500 dark:text-gray-400"
+              className="h-6 w-6 text-content-secondary"
             />
             <div className="flex items-center gap-2">
               <DialogTitle>{pendingWebhookSetup ? "Complete webhook setup" : `Configure ${displayName}`}</DialogTitle>
@@ -274,7 +274,7 @@ export function IntegrationCreateDialog({
                   href={resolvedHomeHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                  className="inline-flex h-4 w-4 items-center justify-center text-content-secondary hover:text-content-primary transition-colors"
                   aria-label="Open integration settings"
                 >
                   <Settings className="h-4 w-4" />
@@ -298,13 +298,13 @@ export function IntegrationCreateDialog({
           {pendingWebhookSetup ? (
             <>
               {webhookStepDescription ?? (
-                <p className="text-sm text-gray-800 dark:text-gray-200">
+                <p className="text-sm text-content-primary">
                   Copy the webhook URL below and complete the required steps in your integration provider. Then enter
                   any required secrets below.
                 </p>
               )}
               <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">Webhook URL</Label>
+                <Label className="text-content-primary mb-2">Webhook URL</Label>
                 <div className="flex gap-2">
                   <Input type="text" readOnly value={pendingWebhookSetup.webhookUrl} className="font-mono text-sm" />
                   <Button
@@ -350,9 +350,9 @@ export function IntegrationCreateDialog({
             <>
               {!browserActionCompleted && (
                 <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                  <Label className="text-content-primary mb-2">
                     Integration Name
-                    <span className="text-gray-800 ml-1">*</span>
+                    <span className="text-content-primary ml-1">*</span>
                   </Label>
                   <Input
                     type="text"
@@ -360,7 +360,7 @@ export function IntegrationCreateDialog({
                     onChange={(e) => setIntegrationName(e.target.value)}
                     placeholder="e.g., my-app-integration"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                  <p className="text-xs text-content-secondary mt-2">A unique name for this integration</p>
                 </div>
               )}
               {configurationFields.length > 0 && (

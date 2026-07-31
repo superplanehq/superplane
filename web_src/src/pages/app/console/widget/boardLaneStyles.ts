@@ -10,14 +10,14 @@ import type { WidgetBoardLaneColor } from "./types";
  */
 export const BOARD_LANE_STYLE: Record<WidgetBoardLaneColor, { header: string; strip: string; badge: string }> = {
   neutral: {
-    header: "bg-slate-50 text-slate-700 dark:bg-gray-800/60 dark:text-gray-200",
-    strip: "border-l-slate-300 dark:border-l-gray-600",
-    badge: "bg-slate-200 text-slate-700 dark:bg-gray-700 dark:text-gray-200",
+    header: "bg-surface-default text-content-secondary",
+    strip: "border-l-edge-default",
+    badge: "bg-action-neutral-hover text-content-secondary",
   },
   gray: {
-    header: "bg-slate-100 text-slate-800 dark:bg-gray-800 dark:text-gray-100",
-    strip: "border-l-slate-400 dark:border-l-gray-500",
-    badge: "bg-slate-300 text-slate-800 dark:bg-gray-600 dark:text-gray-100",
+    header: "bg-surface-subtle text-content-primary",
+    strip: "border-l-edge-strong",
+    badge: "bg-action-neutral-hover text-content-primary",
   },
   blue: {
     header: "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-100",

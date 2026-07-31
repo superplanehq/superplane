@@ -12,8 +12,8 @@ export const MARKDOWN_ALERT_LABELS: Record<MarkdownAlertType, string> = {
   CAUTION: "Caution",
 };
 
-/** Shared shell for SuperPlane-chrome GitHub alerts (white surface, thin accent). */
-export const MARKDOWN_ALERT_SHELL_CLASSES = "my-3 border-l-2 bg-white px-3 py-2 dark:bg-gray-900/40";
+/** Shared shell for SuperPlane-chrome GitHub alerts (raised surface, thin accent). */
+export const MARKDOWN_ALERT_SHELL_CLASSES = "my-3 border-l-2 bg-surface-raised px-3 py-2";
 
 export const MARKDOWN_ALERT_LABEL_CLASSES = "mb-1 text-[11px] font-semibold tracking-wide";
 

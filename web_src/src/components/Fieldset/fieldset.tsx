@@ -12,7 +12,7 @@ export function Legend({ className, ...props }: { className?: string } & React.C
       {...props}
       className={clsx(
         className,
-        "text-base/6 font-semibold text-gray-800 data-disabled:opacity-50 sm:text-sm/6 dark:text-white",
+        "text-base/6 font-semibold text-content-primary data-disabled:opacity-50 sm:text-sm/6",
       )}
     />
   );
@@ -62,7 +62,7 @@ export function Description({ className, ...props }: React.ComponentPropsWithout
     <div
       data-slot="description"
       {...props}
-      className={clsx(className, "text-base/6 text-gray-500 data-disabled:opacity-50 sm:text-sm/6 dark:text-gray-400")}
+      className={clsx(className, "text-base/6 text-content-secondary data-disabled:opacity-50 sm:text-sm/6")}
     />
   );
 }

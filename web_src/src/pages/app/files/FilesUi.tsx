@@ -45,7 +45,7 @@ export function IconButton({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className={`text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 ${className ?? ""}`}
+          className={`text-content-secondary hover:bg-surface-subtle hover:text-content-primary ${className ?? ""}`}
         >
           {children}
         </Button>

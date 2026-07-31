@@ -28,7 +28,7 @@ export function NumberPanelForm({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -100,7 +100,7 @@ function SimpleAggregationFields({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Aggregation</Label>
+        <Label className="text-xs font-medium text-content-secondary">Aggregation</Label>
         <Select
           value={aggregation}
           onValueChange={(v) =>
@@ -121,7 +121,7 @@ function SimpleAggregationFields({
       </div>
       {aggregationNeedsField ? (
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Field</Label>
+          <Label className="text-xs font-medium text-content-secondary">Field</Label>
           <Input
             list={fields.length > 0 && fieldListId ? fieldListId : undefined}
             value={render.field ?? ""}

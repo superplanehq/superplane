@@ -104,7 +104,7 @@ export function ConfigureIntegrationDialog({
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={!updateMutation.isPending}>
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-content-secondary" />
           </div>
         ) : integrationId && integration ? (
           <>
@@ -113,7 +113,7 @@ export function ConfigureIntegrationDialog({
                 <IntegrationIcon
                   integrationName={integration.metadata?.integrationName}
                   iconSlug={definition?.icon}
-                  className="h-6 w-6 text-gray-500"
+                  className="h-6 w-6 text-content-secondary"
                 />
                 <div className="flex items-center gap-2">
                   <DialogTitle>
@@ -129,7 +129,7 @@ export function ConfigureIntegrationDialog({
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                    className="inline-flex h-4 w-4 items-center justify-center text-content-secondary hover:text-content-primary transition-colors"
                     aria-label="Open integration settings"
                   >
                     <Settings className="h-4 w-4" />
@@ -157,9 +157,9 @@ export function ConfigureIntegrationDialog({
               className="space-y-4"
             >
               <div>
-                <Label className="text-gray-800 mb-2">
+                <Label className="text-content-primary mb-2">
                   Integration Name
-                  <span className="text-gray-800 ml-1">*</span>
+                  <span className="text-content-primary ml-1">*</span>
                 </Label>
                 <Input
                   type="text"
@@ -167,7 +167,7 @@ export function ConfigureIntegrationDialog({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., my-app-integration"
                 />
-                <p className="text-xs text-gray-500 mt-2">A unique name for this integration</p>
+                <p className="text-xs text-content-secondary mt-2">A unique name for this integration</p>
               </div>
 
               {definition?.configuration && definition.configuration.length > 0 ? (
@@ -186,7 +186,7 @@ export function ConfigureIntegrationDialog({
                   );
                 })
               ) : (
-                <p className="text-sm text-gray-500">No configuration fields available.</p>
+                <p className="text-sm text-content-secondary">No configuration fields available.</p>
               )}
 
               <DialogFooter className="gap-2 sm:justify-start pt-4">

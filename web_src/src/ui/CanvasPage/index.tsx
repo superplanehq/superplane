@@ -429,10 +429,10 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   if (layout === "bottom") {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white dark:bg-gray-900">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface-raised">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="text-sm text-gray-500">Loading events...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-content-secondary" />
+          <p className="text-sm text-content-secondary">Loading events...</p>
         </div>
       </div>
     );
@@ -440,13 +440,13 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   return (
     <div
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-surface-raised"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="text-sm text-gray-500">Loading events...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-content-secondary" />
+          <p className="text-sm text-content-secondary">Loading events...</p>
         </div>
       </div>
     </div>
@@ -476,13 +476,13 @@ function CanvasModeFloatingBar({
       className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3"
       data-testid="canvas-mode-floating-bar"
     >
-      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-gray-800">
-        <span className="min-w-0 truncate text-[13px] font-medium text-white dark:text-gray-400">{label}</span>
+      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-action-primary py-1.5 pl-3 pr-1.5 shadow-sm">
+        <span className="min-w-0 truncate text-[13px] font-medium text-action-primary-content">{label}</span>
         <Button
           type="button"
           variant="outline"
           size="xs"
-          className="shrink-0 border-0 shadow-none dark:border dark:border-gray-600/70 dark:shadow-xs"
+          className="shrink-0 border border-edge-strong shadow-none"
           data-testid="canvas-mode-floating-bar-action"
           onClick={onAction}
         >
@@ -1457,7 +1457,7 @@ function CanvasPage(props: CanvasPageProps) {
           agentSuggestions={props.agentSuggestions}
           onSelectAgentSuggestion={props.onSelectAgentSuggestion}
         />
-        {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
+        {props.headerBanner ? <div className="border-b border-edge-strong">{props.headerBanner}</div> : null}
       </div>
 
       {/* Main content area with sidebar and canvas */}
@@ -1504,8 +1504,8 @@ function CanvasPage(props: CanvasPageProps) {
           <div className="relative min-h-0 flex-1">
             {props.runCanvasLoading && props.isRunInspectionMode ? (
               <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm dark:bg-gray-900/80">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-gray-400" />
+                <div className="rounded-lg bg-surface-raised/80 p-3 shadow-sm backdrop-blur-sm">
+                  <Loader2 className="h-5 w-5 animate-spin text-content-secondary" />
                 </div>
               </div>
             ) : null}
@@ -1528,11 +1528,7 @@ function CanvasPage(props: CanvasPageProps) {
               />
             ) : null}
             {props.headerMode === "files" ? (
-              <div
-                className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
-                data-testid="canvas-files-backdrop"
-                aria-hidden
-              />
+              <div className="absolute inset-0 bg-surface-default" data-testid="canvas-files-backdrop" aria-hidden />
             ) : (
               <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
                 <CanvasContent
@@ -3335,7 +3331,7 @@ function CanvasContent({
                   {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5 dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700">
+                  <div className="bg-surface-raised text-content-primary outline-1 outline-edge-default flex h-7 items-center gap-1 rounded-md p-0.5 [&_[data-slot=button]]:hover:bg-action-neutral-hover">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -3349,16 +3345,14 @@ function CanvasContent({
                         >
                           <CircleX
                             className={
-                              unacknowledgedErrorCount > 0
-                                ? "h-3 w-3 text-red-500"
-                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                              unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-content-primary"
                             }
                           />
                           <span
                             className={
                               unacknowledgedErrorCount > 0
                                 ? "tabular-nums text-red-500"
-                                : "tabular-nums text-gray-800 dark:text-gray-100"
+                                : "tabular-nums text-content-primary"
                             }
                           >
                             {unacknowledgedErrorCount}
@@ -3379,14 +3373,14 @@ function CanvasContent({
                             className={
                               logCounts.warning > 0
                                 ? "h-3 w-3 text-orange-500 dark:text-orange-300"
-                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                                : "h-3 w-3 text-content-primary"
                             }
                           />
                           <span
                             className={
                               logCounts.warning > 0
                                 ? "tabular-nums text-orange-500 dark:text-orange-300"
-                                : "tabular-nums text-gray-800 dark:text-gray-100"
+                                : "tabular-nums text-content-primary"
                             }
                           >
                             {logCounts.warning}
@@ -3436,7 +3430,7 @@ function CanvasContent({
                                 event.stopPropagation();
                                 onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
                               }}
-                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                              className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
                             >
                               <LayoutGrid className="h-4 w-4" />
                             </button>
@@ -3458,7 +3452,7 @@ function CanvasContent({
                                 event.stopPropagation();
                                 onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
                               }}
-                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                              className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
                             >
                               <Copy className="h-4 w-4" />
                             </button>
@@ -3498,7 +3492,7 @@ function CanvasContent({
                                 );
                                 setMultiSelectedNodes([]);
                               }}
-                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                              className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

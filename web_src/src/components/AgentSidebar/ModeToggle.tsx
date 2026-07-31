@@ -15,14 +15,13 @@ const modeConfig = {
 } as const;
 
 function indicatorClasses(mode: AgentMode): string {
-  if (mode === "builder") return "border-0 bg-[var(--purple)]";
-  return "bg-slate-500 border-transparent dark:bg-gray-500";
+  if (mode === "builder") return "border-0 bg-agent-mode-builder";
+  return "border-transparent bg-agent-mode-operator";
 }
 
-function labelColor(key: AgentMode, isActive: boolean): string {
-  if (!isActive) return "text-slate-600 hover:text-slate-700 dark:text-gray-300 dark:hover:text-gray-100";
-  if (key === "builder") return "text-white";
-  return "text-white";
+function labelColor(isActive: boolean): string {
+  if (isActive) return "text-agent-mode-content";
+  return "text-content-secondary hover:text-content-primary";
 }
 
 export function ModeToggle({
@@ -77,7 +76,7 @@ export function ModeToggle({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex items-center rounded-full bg-slate-200 dark:bg-gray-700"
+      className="relative inline-flex items-center rounded-full bg-action-neutral-hover"
       data-testid="agent-mode-toggle"
     >
       <div
@@ -108,7 +107,7 @@ export function ModeToggle({
                 disabled={disabled || streaming}
                 className={cn(
                   "relative z-10 rounded-full px-2 py-1 text-xs font-medium leading-none transition-colors duration-200 ease-out",
-                  labelColor(key, isActive),
+                  labelColor(isActive),
                   (disabled || streaming) && !isActive && "cursor-not-allowed opacity-40",
                 )}
                 aria-label={`${config.label} mode`}

@@ -45,9 +45,9 @@ export function DataSourceForm({ value, onChange, hideLimit, loadAllWhenBlank }:
   };
 
   return (
-    <div className="space-y-3 rounded-lg bg-slate-100 p-3">
+    <div className="space-y-3 rounded-lg bg-surface-subtle p-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Source</Label>
+        <Label className="text-xs font-medium text-content-secondary">Source</Label>
         <Select value={value.kind} onValueChange={(v) => setKind(v as "memory" | "executions" | "runs")}>
           <SelectTrigger className="w-full">
             <SelectValue />

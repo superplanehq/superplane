@@ -32,8 +32,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       data-testid={toTestId(`node-${title}-header`)}
       data-view-mode={isCompactView ? "compact" : "expanded"}
       className={
-        "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
-        (isCompactView || mergeWithMutedBodyBelow ? "" : " border-b border-slate-950/20 dark:border-gray-600/70")
+        "canvas-node-drag-handle relative flex w-full flex-col items-center rounded-t-md px-2 py-1.5 text-left text-lg" +
+        (isCompactView || mergeWithMutedBodyBelow ? "" : " border-b border-edge-strong")
       }
     >
       <div className="flex w-full items-center justify-between">
@@ -48,15 +48,11 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
             ) : (
               <Icon
                 size={16}
-                className={
-                  mergeWithMutedBodyBelow ? "text-slate-500 dark:text-slate-400" : resolveNodeIconColorClass(iconColor)
-                }
+                className={mergeWithMutedBodyBelow ? "text-content-secondary" : resolveNodeIconColorClass(iconColor)}
               />
             )}
           </div>
-          <h2 className={cn("text-sm font-semibold", mergeWithMutedBodyBelow && "text-slate-500 dark:text-slate-400")}>
-            {title}
-          </h2>
+          <h2 className={cn("text-sm font-semibold", mergeWithMutedBodyBelow && "text-content-secondary")}>{title}</h2>
         </div>
         {isCompactView && statusBadgeColor ? (
           <span className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor}`} aria-hidden="true" />

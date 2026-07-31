@@ -58,7 +58,7 @@ function editingInactiveClassName(): string {
 
 /** Active edit tab — white pill on the orange nav track in light mode. */
 function editingActiveClassName(): string {
-  return "rounded-full bg-white text-gray-800 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:shadow-none";
+  return "rounded-full bg-surface-raised text-content-primary shadow-sm dark:shadow-none";
 }
 
 function tabClasses(selected: string, value: string, editing: boolean) {
@@ -100,7 +100,7 @@ export function CanvasModeToggle({
       aria-label="Canvas view"
       className={cn(
         "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
-        editing ? editingNavClassName() : "bg-slate-100 dark:bg-gray-800",
+        editing ? editingNavClassName() : "bg-surface-subtle",
       )}
     >
       <Link

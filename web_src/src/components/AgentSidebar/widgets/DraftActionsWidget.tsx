@@ -88,7 +88,7 @@ export function DraftActionsWidget({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="flex-1 truncate text-xs text-slate-600 dark:text-gray-300">{displayMessage}</span>
+      <span className="flex-1 truncate text-xs text-content-secondary">{displayMessage}</span>
       {!isEditing && (
         <Button
           variant="outline"

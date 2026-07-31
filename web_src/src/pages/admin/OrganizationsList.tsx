@@ -30,10 +30,10 @@ interface OrganizationsTableProps {
 
 function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
   return (
-    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
+    <div className="overflow-hidden rounded-md bg-surface-raised shadow-sm outline outline-edge-subtle">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 dark:border-gray-700/70">
+          <tr className="border-b border-edge-default">
             <SortableHeader
               label="Name"
               field="name"
@@ -41,7 +41,7 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Description</th>
+            <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Description</th>
             <SortableHeader
               label="Canvases"
               field="canvas_count"
@@ -69,39 +69,37 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
           {organizations.map((org) => (
             <tr
               key={org.id}
-              className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+              className="border-b border-edge-subtle transition-colors last:border-0 hover:bg-surface-subtle"
             >
               <td className="px-4 py-2.5">
                 <Link
                   to={`/admin/organizations/${org.id}`}
-                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
+                  className="flex items-center gap-2 font-medium text-content-primary transition-colors hover:text-blue-600 dark:hover:text-blue-400"
                 >
-                  <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
+                  <Building size={14} className="shrink-0 text-content-muted" />
                   {org.name || (
-                    <span className="text-gray-400 italic dark:text-gray-500" title={org.id}>
+                    <span className="text-content-muted italic" title={org.id}>
                       {org.id.slice(0, 8)}...
                     </span>
                   )}
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-gray-500 max-w-xs truncate dark:text-gray-400">
-                {org.description || <span className="text-gray-300 dark:text-gray-600">—</span>}
+              <td className="max-w-xs truncate px-4 py-2.5 text-content-secondary">
+                {org.description || <span className="text-content-muted/60">—</span>}
               </td>
               <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                <span className="inline-flex items-center gap-1.5 text-content-secondary">
                   <Palette size={13} />
                   {org.canvas_count}
                 </span>
               </td>
               <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                <span className="inline-flex items-center gap-1.5 text-content-secondary">
                   <User size={13} />
                   {org.member_count}
                 </span>
               </td>
-              <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
-                {formatDate(org.created_at)}
-              </td>
+              <td className="px-4 py-2.5 text-xs whitespace-nowrap text-content-muted">{formatDate(org.created_at)}</td>
             </tr>
           ))}
         </tbody>
@@ -162,8 +160,8 @@ const OrganizationsList: React.FC = () => {
   if (loading && organizations.length === 0) {
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading organizations...</Text>
+        <div className="h-8 w-8 animate-spin rounded-full border-b border-focus-ring"></div>
+        <Text className="text-content-secondary">Loading organizations...</Text>
       </div>
     );
   }
@@ -179,7 +177,7 @@ const OrganizationsList: React.FC = () => {
       />
       {organizations.length === 0 ? (
         <div className="text-center py-12">
-          <Text className="text-gray-500 dark:text-gray-400">
+          <Text className="text-content-secondary">
             {search ? "No organizations match your search." : "No organizations found."}
           </Text>
         </div>

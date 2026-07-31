@@ -66,7 +66,7 @@ export function StartRunModal({
           onParameterValuesChange={setParameterValues}
         />
       ) : (
-        <div className="border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
+        <div className="overflow-hidden rounded-md border border-edge-default">
           <Editor
             height="300px"
             defaultLanguage="json"

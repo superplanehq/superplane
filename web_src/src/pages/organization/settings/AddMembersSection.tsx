@@ -96,11 +96,9 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     };
 
     return (
-      <div
-        className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 ${className}`}
-      >
+      <div className={`bg-surface-raised rounded-lg border border-edge-default p-6 ${className}`}>
         {error && (
-          <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-4">
+          <div className="mb-4 rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
             <p className="text-sm">{error instanceof Error ? error.message : "Failed to fetch data"}</p>
           </div>
         )}
@@ -111,7 +109,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               <Icon
                 name="search"
                 size="sm"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
               />
               <Input
                 name="member-search"
@@ -138,24 +136,24 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
           {loadingMembers ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-gray-500 dark:text-gray-400">Loading members...</p>
+              <p className="text-content-secondary">Loading members...</p>
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto">
               {getFilteredExistingMembers().length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-content-secondary">
                     {memberSearchTerm
                       ? "No members found matching your search"
                       : "All organization members are already in this group"}
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                <div className="divide-y divide-edge-subtle">
                   {getFilteredExistingMembers().map((member) => (
                     <div
                       key={member.metadata!.id!}
-                      className="p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="p-3 flex items-center gap-3 hover:bg-action-neutral-hover"
                     >
                       <Checkbox
                         checked={selectedMembers.has(member.metadata!.id!)}
@@ -178,10 +176,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         className="size-8"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                        <div className="text-sm font-medium text-content-primary truncate">
                           {member.spec?.displayName || member.metadata!.id!}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        <div className="text-xs text-content-secondary truncate">
                           {member.metadata?.email || "API Key"}
                         </div>
                       </div>

@@ -14,14 +14,14 @@ export function ImageAttachmentPreviews({ images, onRemove }: ImageAttachmentPre
       {images.map((image) => (
         <div
           key={image.id}
-          className="group relative size-14 overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-900"
+          className="group relative size-14 overflow-hidden rounded-md border border-edge-default bg-surface-subtle"
         >
           <img src={image.dataUrl} alt={image.name} className="size-full object-cover" />
           <button
             type="button"
             onClick={() => onRemove(image.id)}
             aria-label={`Remove ${image.name}`}
-            className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-slate-900/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+            className="absolute top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-overlay-scrim text-content-inverse opacity-0 transition-opacity group-hover:opacity-100"
           >
             <X className="size-3" aria-hidden />
           </button>

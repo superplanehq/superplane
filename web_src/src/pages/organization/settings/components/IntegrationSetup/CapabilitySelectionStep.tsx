@@ -107,7 +107,7 @@ export function CapabilitySelectionStep({
         </Button>
       </div>
 
-      {hasInstructions ? <hr className="my-8 border-0 border-t border-gray-300 dark:border-gray-600" /> : null}
+      {hasInstructions ? <hr className="my-8 border-0 border-t border-edge-default" /> : null}
 
       <Instructions description={step.instructions} />
     </div>

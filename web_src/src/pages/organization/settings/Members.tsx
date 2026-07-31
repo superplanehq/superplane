@@ -250,10 +250,8 @@ export function Members({ organizationId }: MembersProps) {
           <div className={settingsCardClassName}>
             <div className="flex items-start justify-between gap-6">
               <div>
-                <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
-                  Invite link to add members
-                </Text>
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                <Text className="text-left font-semibold text-content-primary mb-1">Invite link to add members</Text>
+                <Text className="text-sm text-content-secondary">
                   {canManageInviteLink
                     ? "Only people with required roles can see this."
                     : "You don't have permission to manage invite links."}
@@ -263,7 +261,7 @@ export function Members({ organizationId }: MembersProps) {
                       You can also{" "}
                       <button
                         type="button"
-                        className="text-blue-600 hover:underline hover:text-blue-700 disabled:text-gray-400 dark:text-indigo-300 dark:hover:text-indigo-200 dark:disabled:text-gray-500"
+                        className="text-blue-600 hover:text-blue-700 hover:underline disabled:text-content-muted dark:text-indigo-300 dark:hover:text-indigo-200"
                         onClick={handleInviteLinkReset}
                         disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
                       >
@@ -291,16 +289,12 @@ export function Members({ organizationId }: MembersProps) {
             )}
 
             {!inviteLinkEnabled && !loadingInviteLink && (
-              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">Invite link is currently disabled.</div>
+              <div className="mt-4 text-sm text-content-secondary">Invite link is currently disabled.</div>
             )}
 
             {inviteLinkEnabled && inviteLinkUrl && (
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Input
-                  readOnly
-                  value={inviteLinkUrl}
-                  className="flex-1 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300"
-                />
+                <Input readOnly value={inviteLinkUrl} className="flex-1 bg-surface-default text-content-secondary" />
                 <Button
                   variant="outline"
                   onClick={handleCopyInviteLink}
@@ -315,8 +309,8 @@ export function Members({ organizationId }: MembersProps) {
         </PermissionTooltip>
       ) : (
         <div className={settingsCardClassName}>
-          <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
+          <Text className="text-left font-semibold text-content-primary mb-1">Invite link to add members</Text>
+          <Text className="text-sm text-content-secondary">
             Reach out to an organization owner or admin to invite new members.
           </Text>
         </div>
@@ -326,7 +320,7 @@ export function Members({ organizationId }: MembersProps) {
       <div className={settingsTableCardClassName}>
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
-            <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>
+            <Text className="text-sm font-medium text-content-secondary">Members ({members.length})</Text>
           </div>
         </div>
 
@@ -338,46 +332,46 @@ export function Members({ organizationId }: MembersProps) {
           )}
           {loadingMembers ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+              <p className="text-content-secondary">Loading...</p>
             </div>
           ) : (
             <Table dense className="!overflow-x-hidden !whitespace-normal">
               <TableHead>
                 <TableRow>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("name")}
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("email")}
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <Icon name={getSortIcon("email")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("role")}
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    className="cursor-pointer hover:bg-action-neutral-hover"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center gap-2">
                       Status
-                      <Icon name={getSortIcon("status")} size="sm" className="text-gray-400 dark:text-gray-500" />
+                      <Icon name={getSortIcon("status")} size="sm" className="text-content-muted" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -390,7 +384,7 @@ export function Members({ organizationId }: MembersProps) {
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />
                         <div>
-                          <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
+                          <div className="text-sm font-medium text-content-primary">{member.name}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -428,14 +422,14 @@ export function Members({ organizationId }: MembersProps) {
                                     disabled={loadingRoles || !roleChangeAllowed}
                                     className="flex flex-col items-start gap-1"
                                   >
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                    <span className="text-sm font-medium text-content-primary">
                                       {role.spec?.displayName || role.metadata?.name}
                                     </span>
                                   </DropdownMenuItem>
                                 ))}
                                 {loadingRoles && (
                                   <DropdownMenuItem disabled>
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
+                                    <span className="text-sm text-content-secondary">Loading roles...</span>
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
@@ -500,9 +494,9 @@ export function Members({ organizationId }: MembersProps) {
                 {getSortedMembers().length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      <div className="text-gray-500 dark:text-gray-400">
-                        <Icon name="search" className="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
-                        <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">No members yet</p>
+                      <div className="text-content-secondary">
+                        <Icon name="search" className="mx-auto mb-4 h-12 w-12 text-content-muted" />
+                        <p className="text-lg font-medium text-content-primary mb-2">No members yet</p>
                         <p className="text-sm">Add members to get started</p>
                       </div>
                     </TableCell>

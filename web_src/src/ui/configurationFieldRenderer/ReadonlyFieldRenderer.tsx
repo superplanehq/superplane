@@ -57,7 +57,7 @@ export function ReadonlyConfigurationField({
       {expressionPreview?.status === "error" ? (
         <ReadonlyExpressionErrorMessage fieldName={field.name} message={expressionPreview.value} />
       ) : null}
-      {description ? <p className="text-xs leading-normal text-gray-500 dark:text-gray-400">{description}</p> : null}
+      {description ? <p className="text-xs leading-normal text-content-secondary">{description}</p> : null}
     </div>
   );
 }
@@ -70,27 +70,27 @@ function ReadonlyBooleanField({ label, value, description }: { label?: string; v
           className={
             value
               ? "relative inline-flex h-5 w-9 rounded-full bg-blue-500"
-              : "relative inline-flex h-5 w-9 rounded-full bg-slate-200 dark:bg-gray-700"
+              : "relative inline-flex h-5 w-9 rounded-full bg-action-neutral-hover"
           }
           aria-hidden="true"
         >
           <span
             className={
               value
-                ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
-                : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
+                ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-surface-raised"
+                : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-surface-raised"
             }
           />
         </span>
         <ReadonlyFieldLabel label={label} />
       </div>
-      {description ? <p className="text-xs leading-normal text-gray-500 dark:text-gray-400">{description}</p> : null}
+      {description ? <p className="text-xs leading-normal text-content-secondary">{description}</p> : null}
     </div>
   );
 }
 
 function ReadonlyFieldLabel({ label }: { label?: string }) {
-  return <div className="text-sm font-medium text-slate-800 dark:text-gray-100">{label}</div>;
+  return <div className="text-sm font-medium text-content-primary">{label}</div>;
 }
 
 function ReadonlyPreviewToggle({
@@ -145,7 +145,7 @@ function ReadonlyValue({
     return (
       <pre
         className={cn(
-          "max-h-56 overflow-auto rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100",
+          "max-h-56 overflow-auto rounded-md border border-edge-subtle bg-surface-raised p-2 text-xs text-content-primary",
           className,
         )}
       >
@@ -175,7 +175,7 @@ function ReadonlyPrimitiveValue({
   return (
     <div
       className={cn(
-        "min-h-9 w-full whitespace-pre-wrap break-words rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100",
+        "min-h-9 w-full whitespace-pre-wrap break-words rounded-md border border-edge-strong bg-surface-raised px-3 py-2 text-sm text-content-primary",
         className,
       )}
     >
@@ -249,10 +249,10 @@ function ReadonlyExpressionSegment({
   }
 
   return (
-    <span className="rounded-sm bg-slate-100 dark:bg-gray-800">
-      {prefix ? <span className="text-gray-400 dark:text-gray-500">{prefix}</span> : null}
+    <span className="rounded-sm bg-surface-subtle">
+      {prefix ? <span className="text-content-muted">{prefix}</span> : null}
       <span className="font-medium text-violet-700 dark:text-violet-300">{expression}</span>
-      {suffix ? <span className="text-gray-400 dark:text-gray-500">{suffix}</span> : null}
+      {suffix ? <span className="text-content-muted">{suffix}</span> : null}
     </span>
   );
 }

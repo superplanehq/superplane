@@ -25,7 +25,7 @@ export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRo
         <div className="flex items-center gap-4 mb-6">
           <Link
             to={integrationsHref}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            className="text-content-secondary hover:text-content-primary"
             aria-label="Back to integrations"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -33,7 +33,7 @@ export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRo
           <h4 className="text-2xl font-semibold">Integration Details</h4>
         </div>
         <div className="flex justify-center items-center h-32">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-content-secondary" />
         </div>
       </div>
     );
@@ -45,15 +45,15 @@ export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRo
         <div className="flex items-center gap-4 mb-6">
           <Link
             to={integrationsHref}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+            className="text-content-secondary hover:text-content-primary"
             aria-label="Back to integrations"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h4 className="text-2xl font-semibold">Integration Details</h4>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <p className="text-gray-500 dark:text-gray-400">Integration not found</p>
+        <div className="bg-surface-raised rounded-lg border border-edge-default p-6">
+          <p className="text-content-secondary">Integration not found</p>
         </div>
       </div>
     );

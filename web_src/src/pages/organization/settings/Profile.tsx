@@ -57,7 +57,7 @@ export function Profile() {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-gray-500 dark:text-gray-400">Loading profile...</Text>
+          <Text className="text-content-secondary">Loading profile...</Text>
         </div>
       </div>
     );
@@ -67,7 +67,7 @@ export function Profile() {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-red-500">{errorMessage}</Text>
+          <Text className="text-status-danger">{errorMessage}</Text>
         </div>
       </div>
     );
@@ -77,7 +77,7 @@ export function Profile() {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-gray-500 dark:text-gray-400">No user data available</Text>
+          <Text className="text-content-secondary">No user data available</Text>
         </div>
       </div>
     );
@@ -87,7 +87,7 @@ export function Profile() {
 
   return (
     <div className="pt-6 max-w-none">
-      <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-4">
+      <Heading level={2} className="text-lg font-medium text-left text-content-primary mb-4">
         Profile Information
       </Heading>
       <div className="space-y-6">
@@ -102,7 +102,7 @@ export function Profile() {
                 className="w-16 h-16"
               />
               <div>
-                <Heading level={3} className="text-lg font-medium text-gray-800 dark:text-white">
+                <Heading level={3} className="text-lg font-medium text-content-primary">
                   {user.email}
                 </Heading>
               </div>
@@ -111,17 +111,17 @@ export function Profile() {
             {/* User Information */}
             <div className="space-y-4">
               <div>
-                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">User ID</Text>
-                <Text className="text-left text-gray-500 dark:text-gray-400">{user.id}</Text>
+                <Text className="text-sm text-left font-medium text-content-secondary">User ID</Text>
+                <Text className="text-left text-content-secondary">{user.id}</Text>
               </div>
               <div>
-                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Email Address</Text>
-                <Text className="text-left text-gray-500 dark:text-gray-400">{user.email}</Text>
+                <Text className="text-sm text-left font-medium text-content-secondary">Email Address</Text>
+                <Text className="text-left text-content-secondary">{user.email}</Text>
               </div>
 
               <div>
-                <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Member Since</Text>
-                <Text className="text-left text-gray-500 dark:text-gray-400">
+                <Text className="text-sm text-left font-medium text-content-secondary">Member Since</Text>
+                <Text className="text-left text-content-secondary">
                   {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available"}
                 </Text>
               </div>
@@ -143,10 +143,10 @@ export function Profile() {
           </div>
         </div>
 
-        <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
+        <Heading level={2} className="text-lg text-left font-medium text-content-primary mb-0">
           API Token
         </Heading>
-        <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
+        <Text className="text-left text-sm text-content-secondary">
           Use this token to authenticate API requests to SuperPlane. Keep your token secure and do not share it.
         </Text>
 
@@ -156,8 +156,8 @@ export function Profile() {
             {/* Token Status */}
             {!user.hasToken && (
               <div className="flex items-center gap-2">
-                <Icon name="key-round" className="text-gray-500 dark:text-gray-400 text-lg" />
-                <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
+                <Icon name="key-round" className="text-content-secondary text-lg" />
+                <Text className="text-sm font-medium text-content-secondary">No API token generated</Text>
               </div>
             )}
 
@@ -173,7 +173,7 @@ export function Profile() {
               </LoadingButton>
 
               {user.hasToken && !token && (
-                <Text className="text-gray-500 dark:text-gray-400 text-sm">
+                <Text className="text-content-secondary text-sm">
                   Your current token is hidden for security. Generate a new token to view it.
                 </Text>
               )}
@@ -181,13 +181,13 @@ export function Profile() {
 
             {token && (
               <div className="space-y-3">
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">New API Token</Text>
+                <Text className="text-sm font-medium text-content-secondary">New API Token</Text>
                 <div className="flex items-center gap-2 ph-no-capture">
                   <Input
                     type={tokenVisible ? "text" : "password"}
                     value={token}
                     readOnly
-                    className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900"
+                    className="flex-1 font-mono text-sm bg-surface-default"
                   />
                   <Button
                     variant="outline"
@@ -204,10 +204,10 @@ export function Profile() {
                     Copy
                   </CopyButton>
                 </div>
-                <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
+                <div className="rounded-lg border border-status-warning-edge bg-status-warning-subtle p-3">
                   <div className="flex items-start gap-2">
-                    <Icon name="key-round" className="text-amber-800 dark:text-amber-400 text-sm mt-0.5" />
-                    <Text className="text-amber-800 dark:text-amber-200 text-sm">
+                    <Icon name="key-round" className="mt-0.5 text-sm text-status-warning-content" />
+                    <Text className="text-sm text-status-warning-content">
                       <strong>Important:</strong> This token will only be shown once. Make sure to copy and store it
                       securely. If you lose this token, you'll need to generate a new one.
                     </Text>

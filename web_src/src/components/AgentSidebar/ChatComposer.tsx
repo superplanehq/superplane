@@ -56,7 +56,7 @@ export function ChatComposer({
     <footer className="px-3 pb-3 pt-2">
       <div
         ref={c.containerRef}
-        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15 dark:bg-gray-800 dark:outline-gray-700"
+        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-surface-raised shadow-sm outline outline-1 outline-edge-default"
       >
         <ImageAttachmentPreviews images={c.images} onRemove={c.removeImage} />
         <MentionTextarea

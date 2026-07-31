@@ -16,7 +16,7 @@ export const displayMapper: ComponentBaseMapper = {
     return {
       iconSlug: "monitor",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title: title,
       eventSections: [],
       includeEmptyState: !lastExecution,

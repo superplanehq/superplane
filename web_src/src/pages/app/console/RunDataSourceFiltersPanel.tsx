@@ -89,22 +89,22 @@ export function RunDataSourceFiltersPanel({
   return (
     <Collapsible open={open} onOpenChange={setOpen} data-testid={testIdBase}>
       <CollapsibleTrigger
-        className="group flex w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:focus-visible:ring-gray-600"
+        className="group flex w-full items-center gap-2 rounded-md border border-edge-default bg-surface-raised px-2 py-1.5 text-left text-xs text-content-primary hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
         data-testid={`${testIdBase}-toggle`}
         aria-label="Toggle run filters"
       >
         <ChevronDown
           aria-hidden="true"
-          className="size-3.5 shrink-0 text-slate-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90 dark:text-gray-400"
+          className="size-3.5 shrink-0 text-content-secondary transition-transform duration-150 group-data-[state=closed]:-rotate-90"
         />
-        <ListFilter className="size-3.5 shrink-0 text-slate-500 dark:text-gray-400" aria-hidden="true" />
+        <ListFilter className="size-3.5 shrink-0 text-content-secondary" aria-hidden="true" />
         <span className="flex-1 truncate">Filters</span>
         <span
           className={cn(
             "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
             hasActiveFilters
               ? "bg-sky-100 text-sky-700 dark:bg-indigo-900/60 dark:text-indigo-200"
-              : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",
+              : "bg-surface-subtle text-content-secondary",
           )}
         >
           {hasActiveFilters ? activeFilterCount : "All"}
@@ -112,7 +112,7 @@ export function RunDataSourceFiltersPanel({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div
-          className="mt-1 overflow-hidden rounded-md border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+          className="mt-1 overflow-hidden rounded-md border border-edge-default bg-surface-raised"
           data-testid={`${testIdBase}-content`}
         >
           <RunStatusFilterSection
@@ -126,7 +126,7 @@ export function RunDataSourceFiltersPanel({
             onToggleTrigger={toggleTrigger}
             onClearTriggers={clearTriggers}
             hasFilter={hasPersistedTriggerFilter}
-            headerClassName="border-t border-slate-950/10 dark:border-gray-800/70"
+            headerClassName="border-t border-edge-subtle"
           />
         </div>
       </CollapsibleContent>

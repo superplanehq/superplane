@@ -5,7 +5,7 @@ describe("withEventSectionDarkBackground", () => {
   it("adds dark 900/50 backgrounds for light tint classes", () => {
     expect(withEventSectionDarkBackground("bg-violet-100")).toBe("bg-violet-100 dark:bg-violet-900/50");
     expect(withEventSectionDarkBackground("bg-green-100")).toBe("bg-green-100 dark:bg-green-900/50");
-    expect(withEventSectionDarkBackground("bg-gray-50")).toBe("bg-gray-50 dark:bg-gray-900/50");
+    expect(withEventSectionDarkBackground("bg-surface-subtle")).toBe("bg-surface-subtle");
   });
 
   it("leaves background colors that already include dark classes unchanged", () => {
@@ -15,6 +15,6 @@ describe("withEventSectionDarkBackground", () => {
   });
 
   it("leaves non-tint backgrounds unchanged", () => {
-    expect(withEventSectionDarkBackground("bg-gray-800")).toBe("bg-gray-800");
+    expect(withEventSectionDarkBackground("bg-surface-raised")).toBe("bg-surface-raised");
   });
 });

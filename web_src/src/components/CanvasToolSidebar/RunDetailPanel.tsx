@@ -68,7 +68,7 @@ export function RunDetailPanel({
           <button
             type="button"
             onClick={onBack}
-            className="flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className="flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-[13px] font-medium text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary"
             data-testid="run-detail-back"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -128,16 +128,16 @@ export function RunDetailPanel({
       </div>
 
       <div className="shrink-0 border-b border-b-slate-950/10 px-3 py-3">
-        <p className="truncate text-[13px] font-semibold text-gray-900">{presentation.title}</p>
+        <p className="truncate text-[13px] font-semibold text-content-primary">{presentation.title}</p>
         {run.createdAt ? (
           <div className="mt-1 flex items-center gap-1">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-content-secondary">
               <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" />
             </span>
             <button
               type="button"
               title="Copy link to run"
-              className="shrink-0 rounded p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-600"
+              className="shrink-0 rounded p-0.5 text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary"
               onClick={copyRunLink}
             >
               <LinkIcon className="h-3 w-3" />
@@ -148,9 +148,9 @@ export function RunDetailPanel({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto" data-testid="run-detail-node-list">
         {executionsQuery.isLoading ? (
-          <p className="px-3 py-4 text-xs text-gray-400">Loading nodes...</p>
+          <p className="px-3 py-4 text-xs text-content-muted">Loading nodes...</p>
         ) : executionChain.length === 0 ? (
-          <p className="px-3 py-4 text-xs text-gray-400">No executed nodes in this run.</p>
+          <p className="px-3 py-4 text-xs text-content-muted">No executed nodes in this run.</p>
         ) : (
           executionChain.map((nodeId) => {
             const isTrigger = nodeId === triggerNodeId;

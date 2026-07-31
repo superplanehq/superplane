@@ -20,7 +20,6 @@ import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
   ArrowRightLeft,
   Gauge,
@@ -48,15 +47,15 @@ function settingsSidebarNavLinkClass(active: boolean) {
   return cn(
     "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition-colors",
     active
-      ? "bg-sky-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
-      : "text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+      ? "bg-action-neutral-hover text-content-primary"
+      : "text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary",
   );
 }
 
 function settingsSidebarNavIconClass(active: boolean) {
   return cn(
-    "text-gray-500 transition-colors group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
-    active && "text-gray-800 dark:text-gray-100",
+    "text-content-secondary transition-colors group-hover:text-content-primary",
+    active && "text-content-primary",
   );
 }
 
@@ -80,7 +79,7 @@ export function OrganizationSettings() {
   if (userLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">Loading user...</p>
+        <p className="text-content-secondary">Loading user...</p>
       </div>
     );
   }
@@ -88,7 +87,7 @@ export function OrganizationSettings() {
   if (!organizationId) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">Organization not found</p>
+        <p className="text-content-secondary">Organization not found</p>
       </div>
     );
   }
@@ -96,7 +95,7 @@ export function OrganizationSettings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">Loading organization...</p>
+        <p className="text-content-secondary">Loading organization...</p>
       </div>
     );
   }
@@ -104,9 +103,7 @@ export function OrganizationSettings() {
   if (error || (!loading && !organization)) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">
-          {error instanceof Error ? error.message : "Organization not found"}
-        </p>
+        <p className="text-content-secondary">{error instanceof Error ? error.message : "Organization not found"}</p>
       </div>
     );
   }
@@ -300,8 +297,8 @@ export function OrganizationSettings() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar className={cn("w-60 border-r bg-white", appDarkModeClasses.sidebarEdge, appDarkModeClasses.surface)}>
+    <div className="flex h-screen bg-surface-canvas">
+      <Sidebar className="w-60 border-r border-edge-default bg-surface-default">
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
             <Link to={`/${organizationId}`} className="block h-7 w-7" aria-label="Go to Apps">
@@ -312,12 +309,12 @@ export function OrganizationSettings() {
               />
             </Link>
           </SidebarSection>
-          <SidebarSection className={cn("border-t p-4", appDarkModeClasses.sidebarDivider)}>
+          <SidebarSection className="border-t border-edge-default p-4">
             <div>
-              <p className="inline rounded bg-gray-800 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-100 dark:bg-gray-300 dark:text-gray-950">
+              <p className="inline rounded bg-content-primary px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-content-inverse">
                 Org
               </p>
-              <p className="mt-2 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{organizationName}</p>
+              <p className="mt-2 truncate text-sm font-semibold text-content-primary">{organizationName}</p>
               <div className="mt-3 flex flex-col">
                 {organizationLinks.map((link) => {
                   const allowed = canAccessLink(link);
@@ -335,12 +332,12 @@ export function OrganizationSettings() {
                           disabled
                           className={cn(
                             "group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition-colors",
-                            "cursor-not-allowed text-gray-500 opacity-60 hover:bg-transparent hover:text-gray-500 dark:text-gray-400 dark:hover:bg-transparent dark:hover:text-gray-400",
+                            "cursor-not-allowed text-content-secondary opacity-60 hover:bg-transparent hover:text-content-secondary",
                           )}
                         >
-                          <link.Icon size={16} className="text-gray-500 dark:text-gray-400" />
+                          <link.Icon size={16} className="text-content-secondary" />
                           <span className="truncate">{link.label}</span>
-                          <Lock size={12} className="ml-auto text-gray-400" />
+                          <Lock size={12} className="ml-auto text-content-muted" />
                         </button>
                       </PermissionTooltip>
                     );
@@ -371,14 +368,14 @@ export function OrganizationSettings() {
             </div>
           </SidebarSection>
 
-          <SidebarSection className={cn("border-t p-4", appDarkModeClasses.sidebarDivider)}>
+          <SidebarSection className="border-t border-edge-default p-4">
             <div>
               <p className="inline rounded bg-sky-500 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
                 You
               </p>
               <div className="mt-2">
-                <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{userName}</p>
-                <p className="truncate text-[13px] font-medium text-gray-500 dark:text-gray-400">{userEmail}</p>
+                <p className="truncate text-sm font-semibold text-content-primary">{userName}</p>
+                <p className="truncate text-[13px] font-medium text-content-secondary">{userEmail}</p>
               </div>
               <div className="mt-3 flex flex-col">
                 {userLinks.map((link) =>
@@ -406,15 +403,11 @@ export function OrganizationSettings() {
         </SidebarBody>
       </Sidebar>
 
-      <div className={cn("flex-1 overflow-auto bg-slate-100 [scrollbar-gutter:stable]", appDarkModeClasses.surface)}>
+      <div className="flex-1 overflow-auto bg-surface-canvas [scrollbar-gutter:stable]">
         <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
-            <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
-              {activeMeta.title}
-            </h1>
-            <p className={cn("mt-2 text-sm text-gray-800", appDarkModeClasses.textSecondary)}>
-              {activeMeta.description}
-            </p>
+            <h1 className="!text-2xl font-medium text-content-primary">{activeMeta.title}</h1>
+            <p className="mt-2 text-sm text-content-secondary">{activeMeta.description}</p>
           </div>
           <Routes>
             <Route path="" element={<Navigate to="general" replace />} />
@@ -426,7 +419,7 @@ export function OrganizationSettings() {
                     <General organization={organization} />
                   ) : (
                     <div className="flex justify-center items-center h-32">
-                      <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+                      <p className="text-content-secondary">Loading...</p>
                     </div>
                   )}
                 </RequirePermission>

@@ -113,16 +113,16 @@ export function WebhookCustomFieldContent({ nodeId, metadata, config }: WebhookC
   });
 
   return (
-    <div className="border-t-1 border-gray-200 pt-4">
+    <div className="border-t-1 border-edge-default pt-4">
       <div className="space-y-3">
         <div>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+          <span className="text-sm font-medium text-content-secondary">{title}</span>
+          <p className="mt-1 text-sm text-content-secondary">{description}</p>
 
           <div className="mt-3">
             <label
               htmlFor="webhook-url-input"
-              className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
+              className="text-xs font-medium text-content-secondary uppercase tracking-wide"
             >
               Webhook URL
             </label>
@@ -132,16 +132,16 @@ export function WebhookCustomFieldContent({ nodeId, metadata, config }: WebhookC
                 type="text"
                 value={webhookUrl}
                 readOnly
-                className="w-full text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono"
+                className="mt-1 w-full rounded-md border-1 border-orange-950/20 bg-orange-50 px-2.5 py-2 font-mono text-xs text-content-primary dark:bg-amber-800"
               />
               <CopyCodeButton code={webhookUrl} />
             </div>
           </div>
 
           <div className="relative group mt-3">
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Code Example</p>
+            <p className="text-xs font-medium text-content-secondary uppercase tracking-wide">Code Example</p>
             <div className="relative group mt-1">
-              <pre className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre overflow-x-auto">
+              <pre className="mt-1 overflow-x-auto rounded-md border-1 border-orange-950/20 bg-orange-50 px-2.5 py-2 font-mono text-xs text-content-primary whitespace-pre dark:bg-amber-800">
                 {code}
               </pre>
               <CopyCodeButton code={code} />
@@ -157,7 +157,7 @@ export function WebhookCustomFieldContent({ nodeId, metadata, config }: WebhookC
               }}
             />
           ) : (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-sm text-content-secondary">
               Save the canvas to generate a webhook URL and to be able of generating authentication secrets
             </p>
           )}

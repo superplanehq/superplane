@@ -52,7 +52,7 @@ describe("RubricWidget", () => {
     expect(wrapper).not.toBeNull();
     expect(wrapper?.className).toContain("my-4");
     expect(wrapper?.className).toContain("overflow-x-auto");
-    expect(wrapper?.className).toContain("border-slate-200");
+    expect(wrapper?.className).toContain("border-edge-default");
   });
 
   it("renders fenced code blocks inside the rubric widget (inline preview)", () => {
@@ -141,6 +141,6 @@ describe("RubricWidget", () => {
     expect(wrapper).not.toBeNull();
     expect(wrapper?.className).toContain("my-4");
     expect(wrapper?.className).toContain("overflow-x-auto");
-    expect(wrapper?.className).toContain("border-slate-200");
+    expect(wrapper?.className).toContain("border-edge-default");
   });
 });

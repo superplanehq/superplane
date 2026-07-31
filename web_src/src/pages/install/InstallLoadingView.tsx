@@ -10,7 +10,7 @@ export function InstallLoadingView({ message }: InstallLoadingViewProps) {
     <InstallShell>
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600" />
-        <Text className="text-gray-500 dark:text-gray-400">{message}</Text>
+        <Text className="text-content-secondary">{message}</Text>
       </div>
     </InstallShell>
   );

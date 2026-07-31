@@ -24,20 +24,23 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
   return (
     <nav className={clsx("flex items-center space-x-2 text-sm", className)} aria-label="Breadcrumb">
       {/* Divider line */}
-      {showDivider && <div className="h-5 w-px bg-gray-300 dark:bg-gray-600 mr-4" />}
+      {showDivider && <div className="mr-4 h-5 w-px bg-edge-default" />}
 
       {items.map((item, index) => (
         <React.Fragment key={index}>
           <div className="flex items-center">
             {item.current ? (
               // Current page (not clickable)
-              <span className="text-gray-800 dark:text-gray-100 font-medium flex items-center" aria-current="page">
-                {item.icon && <Icon name={item.icon} className="text-gray-700 dark:text-gray-300 mr-1" size="sm" />}
+              <span className="text-content-primary font-medium flex items-center" aria-current="page">
+                {item.icon && <Icon name={item.icon} className="text-content-secondary mr-1" size="sm" />}
                 {item.label}
               </span>
             ) : item.href ? (
               // Clickable link
-              <Link href={item.href} className="text-gray-500 hover:text-gray-800 transition-colors flex items-center">
+              <Link
+                href={item.href}
+                className="flex items-center text-content-secondary transition-colors hover:text-content-primary"
+              >
                 {item.icon && <Icon name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />}
                 {item.label}
               </Link>
@@ -45,15 +48,15 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
               // Clickable button
               <button
                 onClick={item.onClick}
-                className="text-gray-500 hover:text-gray-800 transition-colors flex items-center"
+                className="flex items-center text-content-secondary transition-colors hover:text-content-primary"
               >
                 {item.icon && <Icon name={item.icon} className="text-blue-700 dark:text-blue-400 mr-1" size="sm" />}
                 {item.label}
               </button>
             ) : (
               // Non-clickable item
-              <span className="text-gray-500 dark:text-gray-400 flex items-center">
-                {item.icon && <Icon name={item.icon} className="text-gray-500 dark:text-gray-400 mr-1" size="sm" />}
+              <span className="text-content-secondary flex items-center">
+                {item.icon && <Icon name={item.icon} className="text-content-secondary mr-1" size="sm" />}
                 {item.label}
               </span>
             )}
@@ -61,7 +64,7 @@ export function Breadcrumbs({ items, className, separator = "/", showDivider = t
 
           {/* Separator */}
           {index < items.length - 1 && (
-            <span className="text-gray-400" aria-hidden="true">
+            <span className="text-content-muted" aria-hidden="true">
               {separator}
             </span>
           )}

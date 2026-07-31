@@ -43,7 +43,7 @@ export function Usage({ organizationId }: UsageProps) {
     return (
       <div className="pt-6">
         <div className={settingsCardClassName}>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading usage...</p>
+          <p className="text-sm text-content-secondary">Loading usage...</p>
         </div>
       </div>
     );
@@ -93,16 +93,16 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
       <div className={settingsCardClassName}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
+            <p className="text-sm font-medium text-content-primary">
               {isPreviewMode ? "Usage preview mode" : "Usage tracking active"}
             </p>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-sm text-content-secondary">
               {isPreviewMode
                 ? "Showing the organization usage page in local development without configured usage tracking."
                 : data.statusMessage || "Organization usage is being tracked for this organization."}
             </p>
           </div>
-          <Gauge className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
+          <Gauge className="h-5 w-5 shrink-0 text-content-secondary" />
         </div>
       </div>
 
@@ -132,19 +132,19 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
 
       <div className={settingsCardClassName}>
         <div className="mb-4">
-          <h2 className="text-base font-medium text-gray-900 dark:text-white">Limits</h2>
+          <h2 className="text-base font-medium text-content-primary">Limits</h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {usageCards.map((card) => (
             <div key={card.label} className={settingsInnerMetricCardClassName}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{card.label}</p>
-                  <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">{card.value}</p>
+                  <p className="text-sm font-medium text-content-primary">{card.label}</p>
+                  <p className="mt-1 text-xl font-semibold text-content-primary">{card.value}</p>
                 </div>
-                <card.icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <card.icon className="h-4 w-4 text-content-secondary" />
               </div>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{card.description}</p>
+              <p className="mt-2 text-sm text-content-secondary">{card.description}</p>
             </div>
           ))}
         </div>
@@ -170,14 +170,14 @@ function UsageMetricCard({
     <div className={settingsCardClassName}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+          <p className="text-sm font-medium text-content-primary">{title}</p>
+          <p className="mt-2 text-2xl font-semibold text-content-primary">{value}</p>
         </div>
-        <Icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+        <Icon className="h-5 w-5 text-content-secondary" />
       </div>
-      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+      <p className="mt-2 text-sm text-content-secondary">{subtitle}</p>
       {progress !== null && (
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-subtle">
           <div
             className="h-full rounded-full bg-sky-500 transition-[width] dark:bg-indigo-300"
             style={{ width: `${progress}%` }}

@@ -199,14 +199,12 @@ const SignupAccessSection = ({
   const effectiveEnabled = enabled && !blockedByEnvironment;
 
   return (
-    <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+    <section className="border-t border-edge-default py-6">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Signup access
-          </p>
-          <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">Public signups</h2>
-          <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-xs font-semibold tracking-wide text-content-secondary uppercase">Signup access</p>
+          <h2 className="mt-1 text-base font-semibold text-content-primary">Public signups</h2>
+          <Text className="mt-2 text-sm text-content-secondary">
             Control whether visitors can create new accounts from the signup page. Invite links can still create
             accounts while public signups are closed.
           </Text>
@@ -214,10 +212,10 @@ const SignupAccessSection = ({
 
         <div className="flex items-center justify-between gap-4 lg:justify-end">
           <div className="space-y-1 lg:text-right">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-medium text-content-primary">
               {effectiveEnabled ? "Signups open" : "Signups closed"}
             </p>
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
+            <Text className="text-xs text-content-secondary">
               {getSignupAccessDescription(enabled, blockedByEnvironment)}
             </Text>
           </div>
@@ -239,7 +237,7 @@ const SignupAccessSection = ({
         >
           {saving ? "Saving..." : "Save signup settings"}
         </Button>
-        <Text className="text-xs text-gray-500 dark:text-gray-400">
+        <Text className="text-xs text-content-secondary">
           {blockedByEnvironment
             ? "`BLOCK_SIGNUP` is active, so public signups remain closed until the environment override is removed."
             : "When closed, /signup collects waitlist emails instead of creating accounts."}
@@ -251,14 +249,14 @@ const SignupAccessSection = ({
 
 const PolicyList = ({ title, items, overridden, emptyMessage }: PolicyListProps) => (
   <div className="min-w-0">
-    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h3>
-    <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+    <h3 className="text-sm font-medium text-content-primary">{title}</h3>
+    <Text className="mt-1 text-xs text-content-secondary">
       {overridden ? "Overridden by environment." : "Resolved from installation settings."}
     </Text>
     {items.length === 0 ? (
-      <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</Text>
+      <Text className="mt-3 text-sm text-content-secondary">{emptyMessage}</Text>
     ) : (
-      <ul className="mt-3 max-h-40 space-y-1 overflow-auto font-mono text-xs text-gray-700 dark:text-gray-300">
+      <ul className="mt-3 max-h-40 space-y-1 overflow-auto font-mono text-xs text-content-secondary">
         {items.map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -278,12 +276,12 @@ const NetworkPolicySection = ({
   onChange,
   onSave,
 }: NetworkPolicySectionProps) => (
-  <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+  <section className="border-t border-edge-default py-6">
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Network policy</p>
-        <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">Private network access</h2>
-        <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-xs font-semibold tracking-wide text-content-secondary uppercase">Network policy</p>
+        <h2 className="mt-1 text-base font-semibold text-content-primary">Private network access</h2>
+        <Text className="mt-2 text-sm text-content-secondary">
           Control whether integrations, components, and triggers can reach internal Kubernetes DNS names or private IP
           ranges.
         </Text>
@@ -291,10 +289,10 @@ const NetworkPolicySection = ({
 
       <div className="flex items-center justify-between gap-4 lg:justify-end">
         <div className="space-y-1 lg:text-right">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          <p className="text-sm font-medium text-content-primary">
             {allowPrivateNetworkAccess ? "Private access enabled" : "Private access blocked"}
           </p>
-          <Text className="text-xs text-gray-500 dark:text-gray-400">
+          <Text className="text-xs text-content-secondary">
             {allowPrivateNetworkAccess ? "Internal hosts can be reached." : "SSRF safeguards remain active."}
           </Text>
         </div>
@@ -331,7 +329,7 @@ const NetworkPolicySection = ({
           this toggle.
         </Text>
       ) : (
-        <Text className="text-xs text-gray-500 dark:text-gray-400">
+        <Text className="text-xs text-content-secondary">
           Changes apply without a restart and may take a few seconds to propagate across all app instances.
         </Text>
       )}
@@ -384,9 +382,7 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
           />
         </InputGroup>
         {passwordConfigured ? (
-          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Leave blank to keep the existing SMTP password.
-          </Text>
+          <Text className="mt-1 text-xs text-content-secondary">Leave blank to keep the existing SMTP password.</Text>
         ) : null}
       </div>
 
@@ -416,8 +412,8 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
 
     <div className="flex items-center justify-between gap-4 pt-2">
       <div>
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Use TLS (STARTTLS)</p>
-        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-sm font-medium text-content-primary">Use TLS (STARTTLS)</p>
+        <Text className="mt-1 text-xs text-content-secondary">
           Enable transport encryption when connecting to the SMTP server.
         </Text>
       </div>
@@ -431,22 +427,20 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
 );
 
 const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChange, onSave }: SMTPSectionProps) => (
-  <section className="border-t border-slate-200 py-6 dark:border-gray-700/70">
+  <section className="border-t border-edge-default py-6">
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Email delivery</p>
-        <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">SMTP configuration</h2>
-        <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-xs font-semibold tracking-wide text-content-secondary uppercase">Email delivery</p>
+        <h2 className="mt-1 text-base font-semibold text-content-primary">SMTP configuration</h2>
+        <Text className="mt-2 text-sm text-content-secondary">
           Manage the SMTP credentials used for installation-wide notifications and emails.
         </Text>
       </div>
 
       <div className="flex items-center justify-between gap-4 lg:justify-end">
         <div className="space-y-1 lg:text-right">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {form.enabled ? "SMTP enabled" : "SMTP disabled"}
-          </p>
-          <Text className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-sm font-medium text-content-primary">{form.enabled ? "SMTP enabled" : "SMTP disabled"}</p>
+          <Text className="text-xs text-content-secondary">
             {form.enabled ? "Emails can be sent from this instance." : "Notification email delivery is off."}
           </Text>
         </div>
@@ -461,7 +455,7 @@ const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChan
     {form.enabled ? (
       <SMTPFields form={form} passwordConfigured={passwordConfigured} onFieldChange={onFieldChange} />
     ) : (
-      <Text className="mt-5 text-sm text-gray-500 dark:text-gray-400">
+      <Text className="mt-5 text-sm text-content-secondary">
         Enable SMTP to configure the installation-wide email provider used by SuperPlane notifications.
       </Text>
     )}
@@ -470,9 +464,7 @@ const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChan
       <Button type="button" data-testid="installation-smtp-save" onClick={onSave} disabled={saving || !hasChanges}>
         {saving ? "Saving..." : form.enabled ? "Save SMTP settings" : "Disable SMTP"}
       </Button>
-      <Text className="text-xs text-gray-500 dark:text-gray-400">
-        SMTP changes apply to installation-wide email delivery.
-      </Text>
+      <Text className="text-xs text-content-secondary">SMTP changes apply to installation-wide email delivery.</Text>
     </div>
   </section>
 );
@@ -624,8 +616,8 @@ const InstallationSettings: React.FC = () => {
   if (loading && !settings) {
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading installation settings...</Text>
+        <div className="h-8 w-8 animate-spin rounded-full border-b border-focus-ring"></div>
+        <Text className="text-content-secondary">Loading installation settings...</Text>
       </div>
     );
   }
@@ -636,13 +628,13 @@ const InstallationSettings: React.FC = () => {
   return (
     <div>
       <div className="pb-2">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Installation Settings</h1>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <h1 className="text-xl font-semibold text-content-primary">Installation Settings</h1>
+        <Text className="mt-1 text-sm text-content-secondary">
           Configure installation-wide network policy and email delivery for this SuperPlane instance.
         </Text>
       </div>
 
-      <div className="mt-5 bg-white px-6 dark:bg-gray-900">
+      <div className="mt-5 bg-surface-raised px-6">
         {showSignupAccessSection ? (
           <SignupAccessSection
             enabled={signupsEnabled}

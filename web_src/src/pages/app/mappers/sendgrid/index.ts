@@ -10,7 +10,7 @@ export const SEND_EMAIL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
@@ -36,7 +36,7 @@ export const CREATE_OR_UPDATE_CONTACT_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },

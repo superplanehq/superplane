@@ -31,12 +31,12 @@ export function FileEditor({
   onChange: (value: string) => void;
 }) {
   if (!path) {
-    return <div className="min-h-0 flex-1 bg-white dark:bg-gray-900" />;
+    return <div className="min-h-0 flex-1 bg-surface-raised" />;
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-content-secondary">
         Loading file...
       </div>
     );
@@ -48,7 +48,7 @@ export function FileEditor({
 
   if (deleted) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-content-secondary">
         File marked for deletion
       </div>
     );
@@ -59,7 +59,7 @@ export function FileEditor({
 
   if (disabled && isMarkdown) {
     return (
-      <div className="min-h-0 flex-1 overflow-auto bg-white p-6 dark:bg-gray-900">
+      <div className="min-h-0 flex-1 overflow-auto bg-surface-raised p-6">
         <MarkdownContent
           content={content}
           canvasId={canvasId}
@@ -73,7 +73,7 @@ export function FileEditor({
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-content-secondary">
           Loading editor...
         </div>
       }

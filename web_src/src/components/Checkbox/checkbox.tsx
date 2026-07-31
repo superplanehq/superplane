@@ -57,21 +57,15 @@ export function Checkbox({
         className={clsx([
           "relative isolate flex size-4.5 items-center justify-center rounded-[0.3125rem] sm:size-4",
           disabled ? "!cursor-not-allowed opacity-50" : "!cursor-pointer",
-          "before:absolute before:inset-0 before:-z-10 before:rounded-[calc(0.3125rem-1px)] before:bg-white before:shadow-sm",
+          "before:absolute before:inset-0 before:-z-10 before:rounded-[calc(0.3125rem-1px)] before:bg-surface-raised before:shadow-sm",
           "dark:before:hidden",
-          "dark:bg-white/5",
-          "border border-gray-950/20",
-          !disabled && "hover:border-gray-950/30",
-          "dark:border-white/15",
-          !disabled && "dark:hover:border-white/30",
+          "bg-surface-subtle",
+          "border border-edge-default",
+          !disabled && "hover:border-edge-strong",
           "after:absolute after:inset-0 after:rounded-[calc(0.3125rem-1px)] after:shadow-[inset_0_1px_theme(colors.white/15%)]",
           "dark:after:-inset-px dark:after:hidden dark:after:rounded-[0.3125rem]",
           "focus:outline-2 focus:outline-offset-2 focus:outline-blue-500",
-          checked && [
-            "before:bg-gray-900 border-transparent",
-            "dark:bg-gray-600 dark:border-white/5",
-            "dark:after:block",
-          ],
+          checked && ["before:bg-action-primary border-transparent", "bg-action-primary", "dark:after:block"],
         ])}
         onClick={() => {
           if (!disabled) {
@@ -92,7 +86,7 @@ export function Checkbox({
           className={clsx("absolute inset-0 opacity-0 z-10", disabled ? "!cursor-not-allowed" : "!cursor-pointer")}
         />
         <svg
-          className={clsx("size-4 stroke-white opacity-0 sm:h-3.5 sm:w-3.5", checked && "opacity-100")}
+          className={clsx("size-4 stroke-action-primary-content opacity-0 sm:h-3.5 sm:w-3.5", checked && "opacity-100")}
           viewBox="0 0 14 14"
           fill="none"
         >

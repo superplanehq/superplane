@@ -43,7 +43,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       iconSlug: "clock",
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||
@@ -116,26 +116,26 @@ export const TIME_GATE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   cancelling: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
     label: "Cancelling",
   },
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   opened: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   "pushed through": {
     icon: "arrow-right",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-amber-500",
   },
@@ -237,10 +237,10 @@ function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
             { label: "Allow:", bgColor: "bg-green-100", textColor: "text-green-800" },
             {
               label: days.length > 0 ? formatDaysLabel(days) : "Not configured",
-              bgColor: "bg-gray-100",
-              textColor: "text-gray-700",
+              bgColor: "bg-action-neutral",
+              textColor: "text-content-secondary",
             },
-            { label: timeRangeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: timeRangeLabel, bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
           ],
         },
         ...(excludeDates.length > 0
@@ -248,16 +248,16 @@ function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
               {
                 badges: [
                   { label: "Exclude:", bgColor: "bg-red-100", textColor: "text-red-800" },
-                  { label: excludeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                  { label: timeRangeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                  { label: excludeLabel, bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+                  { label: timeRangeLabel, bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
                 ],
               },
             ]
           : []),
         {
           badges: [
-            { label: "Timezone:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-            { label: timezoneLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: "Timezone:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+            { label: timezoneLabel, bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
           ],
         },
       ],

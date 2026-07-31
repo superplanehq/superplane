@@ -65,8 +65,8 @@ export function FreshOrgLanding({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-14 lg:py-20">
-      <h1 className={cn(homePageTitleClassName, "text-2xl text-gray-800")}>{title}</h1>
-      <p className={cn(homePageSubtitleClassName, "mt-3 max-w-lg font-normal leading-normal text-gray-600")}>
+      <h1 className={cn(homePageTitleClassName, "text-2xl")}>{title}</h1>
+      <p className={cn(homePageSubtitleClassName, "mt-3 max-w-lg font-normal leading-normal")}>
         Set up a Software Factory to automate coding work with agents, from trigger to pull request. Or start from a
         blank app or starter template instead.
       </p>
@@ -145,13 +145,13 @@ function BlankOrBrowseLinks({
   onToggleCatalog: () => void;
 }) {
   return (
-    <p className="mt-8 text-sm font-normal text-gray-600 dark:text-gray-400">
+    <p className="mt-8 text-sm font-normal text-content-secondary">
       <Button
         type="button"
         variant="link"
         disabled={busy}
         onClick={onCreateBlank}
-        className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+        className="h-auto p-0 text-sm font-normal text-content-primary underline decoration-edge-strong underline-offset-4"
       >
         Create a blank app
       </Button>
@@ -160,7 +160,7 @@ function BlankOrBrowseLinks({
         type="button"
         variant="link"
         onClick={onToggleCatalog}
-        className="h-auto p-0 text-sm font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+        className="h-auto p-0 text-sm font-normal text-content-primary underline decoration-edge-strong underline-offset-4"
         aria-expanded={showCatalog}
       >
         {showCatalog ? "Hide starter apps" : "Browse starter apps"}
@@ -184,7 +184,7 @@ function StarterAppsCatalog({
 }) {
   return (
     <div className="mt-10 flex flex-col gap-3">
-      <p className="text-xs font-normal text-gray-600 dark:text-gray-400">Automation starters</p>
+      <p className="text-xs font-normal text-content-secondary">Automation starters</p>
       {apps.map((app) => (
         <StarterAppListItem key={app.repo} app={app} busy={busy} onSetup={() => onSetup(app)} />
       ))}
@@ -201,7 +201,7 @@ function StarterAppListItem({ app, busy, onSetup }: { app: AppEntry; busy: boole
           <div className="shrink-0">
             <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
           </div>
-          <p className="text-base font-medium text-slate-900 dark:text-gray-100">{app.title}</p>
+          <p className="text-base font-medium text-content-primary">{app.title}</p>
         </div>
         <Button type="button" size="sm" onClick={onSetup} disabled={busy}>
           Setup

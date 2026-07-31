@@ -10,9 +10,8 @@ export const EVENT_STATUS_BADGE_BASE_CLASSES =
 const EVENT_STATUS_BADGE_CLASSES: Record<string, string> = {
   "bg-amber-500": "bg-amber-500 dark:bg-amber-400 dark:text-amber-950",
   "bg-blue-500": "bg-blue-500 dark:bg-blue-400 dark:text-blue-950",
+  "bg-content-muted": "bg-content-muted",
   "bg-emerald-500": "bg-emerald-500 dark:bg-emerald-400 dark:text-emerald-950",
-  "bg-gray-400": "bg-gray-400 dark:bg-gray-400 dark:text-gray-950",
-  "bg-gray-500": "bg-gray-500 dark:bg-gray-400 dark:text-gray-950",
   "bg-green-500": "bg-green-500 dark:bg-green-400 dark:text-green-950",
   "bg-indigo-500": "bg-indigo-500 dark:bg-indigo-400 dark:text-indigo-950",
   "bg-orange-500": "bg-orange-500 dark:bg-orange-400 dark:text-orange-950",
@@ -23,7 +22,8 @@ const EVENT_STATUS_BADGE_CLASSES: Record<string, string> = {
   "bg-yellow-600": "bg-yellow-600 dark:bg-yellow-400 dark:text-yellow-950",
 };
 
-const DEFAULT_EVENT_STATUS_BADGE_CLASSES = "dark:bg-gray-400 dark:text-gray-950";
+/** Fallback for unmapped categorical fills; semantic tokens pass through unchanged. */
+const DEFAULT_EVENT_STATUS_BADGE_CLASSES = "dark:bg-content-muted dark:text-content-inverse";
 
 export function withEventStatusBadgeClasses(badgeColor: string): string {
   const trimmed = badgeColor.trim();

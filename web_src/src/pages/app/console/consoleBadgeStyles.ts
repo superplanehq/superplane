@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * (`text-[10px] font-semibold uppercase tracking-wide` on a solid fill).
  */
 export const CONSOLE_BADGE_BASE_CLASSES =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white";
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-content-inverse";
 
 const CONSOLE_STATUS_BADGE_COLOR: Record<string, string> = {
   passed: "bg-emerald-500",
@@ -21,15 +21,15 @@ const CONSOLE_STATUS_BADGE_COLOR: Record<string, string> = {
   high: "bg-orange-500",
   running: "bg-blue-500",
   medium: "bg-yellow-500",
-  cancelled: "bg-gray-500",
-  pending: "bg-gray-500",
-  idle: "bg-gray-500",
-  unknown: "bg-gray-500",
+  cancelled: "bg-content-muted",
+  pending: "bg-content-muted",
+  idle: "bg-content-muted",
+  unknown: "bg-content-muted",
 };
 
 /** Resolve the full Tailwind class list for a console badge label. */
 export function consoleBadgeClassName(value: string, colorClass?: string): string {
   const key = value.trim().toLowerCase();
-  const color = colorClass ?? CONSOLE_STATUS_BADGE_COLOR[key] ?? "bg-gray-500";
+  const color = colorClass ?? CONSOLE_STATUS_BADGE_COLOR[key] ?? "bg-content-muted";
   return cn(CONSOLE_BADGE_BASE_CLASSES, withEventStatusBadgeClasses(color));
 }

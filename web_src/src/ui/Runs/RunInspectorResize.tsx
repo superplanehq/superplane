@@ -22,8 +22,8 @@ export function ResizeHandle({
         aria-hidden
         data-testid="run-inspector-resize-line"
         className={cn(
-          "pointer-events-none absolute top-0 bottom-0 left-[calc(50%-1px)] w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50",
-          isResizing && "bg-slate-950/50 dark:bg-gray-500/50",
+          "pointer-events-none absolute top-0 bottom-0 left-[calc(50%-1px)] w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-edge-strong",
+          isResizing && "bg-edge-strong",
         )}
       />
     </div>

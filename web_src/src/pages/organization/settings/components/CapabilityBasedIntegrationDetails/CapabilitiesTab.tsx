@@ -54,7 +54,7 @@ export function CapabilitiesTab({
   });
 
   if (capabilityByName.size === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No capabilities available.</p>;
+    return <p className="text-sm text-content-secondary">No capabilities available.</p>;
   }
 
   return (

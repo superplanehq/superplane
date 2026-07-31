@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 export function ConfirmFact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="min-w-0 text-slate-700">{children}</div>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-content-muted">{label}</p>
+      <div className="min-w-0 text-content-primary">{children}</div>
     </div>
   );
 }
@@ -13,7 +13,7 @@ export function ConfirmFact({ label, children }: { label: string; children: Reac
 export function ConfirmParametersPreview({ children, testId }: { children: ReactNode; testId: string }) {
   return (
     <pre
-      className="mt-1 max-h-40 w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] leading-snug whitespace-pre text-slate-700"
+      className="mt-1 max-h-40 w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto rounded-md border border-edge-default bg-surface-subtle p-2 font-mono text-[11px] leading-snug whitespace-pre text-content-primary"
       data-testid={testId}
     >
       {children}

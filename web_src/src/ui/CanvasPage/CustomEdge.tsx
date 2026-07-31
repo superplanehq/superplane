@@ -55,8 +55,8 @@ function DeleteEdgeControls({
           }}
           className="edge-label nodrag nopan flex items-center justify-center"
         >
-          <div className="rounded-full bg-slate-100 p-1 dark:bg-gray-800" data-testid="edge-delete-icon">
-            <CircleX size={18} className="text-slate-500 dark:text-gray-400" />
+          <div className="rounded-full bg-surface-subtle p-1" data-testid="edge-delete-icon">
+            <CircleX size={18} className="text-content-secondary" />
           </div>
         </div>
       </EdgeLabelRenderer>

@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
   createActionCardClassName,
   createActionCardDisabledClassName,
@@ -133,19 +132,12 @@ const OrganizationSelect: React.FC = () => {
 
   const listRowMinHeight = "min-h-[58px]";
 
-  const pageShellClassName = cn("min-h-screen flex flex-col bg-slate-100", appDarkModeClasses.surface);
+  const pageShellClassName = "flex min-h-screen flex-col bg-surface-canvas";
 
-  const pageHeaderClassName = cn(
-    "flex h-12 items-center border-b bg-white px-4",
-    appDarkModeClasses.sidebarEdge,
-    appDarkModeClasses.surface,
-  );
+  const pageHeaderClassName = "flex h-12 items-center border-b border-edge-default bg-surface-default px-4";
 
   const organizationRowClassName = cn(
-    "flex items-center justify-between gap-4 rounded-md bg-white px-4 py-3 shadow-sm transition-colors cursor-pointer hover:shadow-md",
-    appDarkModeClasses.modalEdge,
-    appDarkModeClasses.surfaceRaised,
-    "dark:hover:bg-gray-800/90",
+    "flex cursor-pointer items-center justify-between gap-4 rounded-md border border-edge-default bg-surface-raised px-4 py-3 shadow-sm transition-colors hover:bg-surface-subtle hover:shadow-md",
     listRowMinHeight,
   );
 
@@ -160,7 +152,7 @@ const OrganizationSelect: React.FC = () => {
       </span>
       <Heading
         level={3}
-        className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate dark:text-gray-100"
+        className="mb-0 line-clamp-2 truncate !text-base !leading-6 font-medium text-content-primary transition-colors"
       >
         <span className="truncate">New Organization</span>
       </Heading>
@@ -175,8 +167,8 @@ const OrganizationSelect: React.FC = () => {
         </header>
         <div className="p-8 flex justify-center">
           <div className="w-full max-w-[640px] flex flex-col items-center justify-center gap-4 py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-            <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
+            <div className="h-8 w-8 animate-spin rounded-full border-b border-focus-ring"></div>
+            <Text className="text-content-secondary">Loading...</Text>
           </div>
         </div>
       </div>
@@ -192,11 +184,11 @@ const OrganizationSelect: React.FC = () => {
         <div className="w-full max-w-[640px] mx-auto">
           <div className="flex flex-col items-start mb-6">
             <div className="w-full text-left">
-              <Text className="font-medium text-gray-800 block dark:text-gray-100">
+              <Text className="block font-medium text-content-primary">
                 Hey there{account?.name ? `, ${account.name}` : ""}!
               </Text>
               {organizations.length > 0 && (
-                <Text className="font-medium text-gray-500 block dark:text-gray-400">
+                <Text className="block font-medium text-content-secondary">
                   Select one of your organizations below to get started:
                 </Text>
               )}
@@ -211,10 +203,10 @@ const OrganizationSelect: React.FC = () => {
 
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4 space-y-1">
-              <Text className="font-medium text-gray-800 block dark:text-gray-100">
+              <Text className="block font-medium text-content-primary">
                 You're not a member of any organizations yet.
               </Text>
-              <Text className="font-medium text-gray-800 block dark:text-gray-300">
+              <Text className="block font-medium text-content-secondary">
                 {createOrganizationDisabled
                   ? "This account has reached its organization limit."
                   : "Create a new organization to get started!"}
@@ -228,15 +220,15 @@ const OrganizationSelect: React.FC = () => {
                 <Link to={`/${org.id}`} className={organizationRowClassName}>
                   <div className="flex items-center gap-4 min-w-0">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-medium text-white dark:bg-gray-300 dark:text-gray-950"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-action-primary text-sm font-medium text-action-primary-content"
                       aria-hidden
                     >
                       {organizationInitial(org.name)}
                     </span>
-                    <span className="text-base font-medium text-gray-800 dark:text-white truncate">{org.name}</span>
+                    <span className="truncate text-base font-medium text-content-primary">{org.name}</span>
                   </div>
 
-                  <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
+                  <div className="flex shrink-0 items-center gap-3 text-xs font-medium text-content-secondary sm:gap-4 sm:text-sm">
                     <span className="flex items-center gap-1.5 whitespace-nowrap">
                       <LayoutPanelLeft size={14} className="shrink-0" aria-hidden />
                       {formatCount(org.canvasCount ?? 0, "app")}

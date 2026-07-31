@@ -24,13 +24,13 @@ describe("draft-branch-edit-status", () => {
     expect(badge.className).toContain("text-blue-800");
   });
 
-  it("uses gray badge styling for drafts with no changes", () => {
+  it("uses muted badge styling for drafts with no changes", () => {
     const activeBadge = draftBranchStatusBadge("no-changes", true);
     const inactiveBadge = draftBranchStatusBadge("no-changes", false);
 
     expect(activeBadge.label).toBe("No changes");
-    expect(activeBadge.className).toContain("bg-slate-100");
-    expect(activeBadge.className).toContain("text-slate-600");
+    expect(activeBadge.className).toContain("bg-action-neutral");
+    expect(activeBadge.className).toContain("text-content-secondary");
     expect(inactiveBadge.className).toBe(activeBadge.className);
   });
 });

@@ -15,15 +15,15 @@ const CRITERION_MARKDOWN_CLASSES =
   "[&_p]:m-0 [&_p]:inline " +
   "[&_ul]:my-1 [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:my-1 [&_ol]:ml-4 [&_ol]:list-decimal [&_li]:my-0 " +
   "[&_strong]:font-semibold [&_em]:italic " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:text-slate-700 dark:[&_a]:text-gray-200 " +
-  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:font-mono dark:[&_code]:bg-gray-700 " +
-  "[&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre]:text-[11px] dark:[&_pre]:bg-gray-900/80 " +
+  "[&_a]:text-content-link [&_a]:underline [&_a]:underline-offset-2 " +
+  "[&_code]:rounded [&_code]:bg-surface-subtle [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] " +
+  "[&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface-subtle [&_pre]:p-2 [&_pre]:text-[11px] " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_table]:w-full [&_table]:text-[11px] [&_table]:border-collapse " +
-  "[&_thead]:bg-slate-50 dark:[&_thead]:bg-gray-900/60 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 dark:[&_th]:text-gray-200 " +
-  "[&_th]:border-b [&_th]:border-slate-200 dark:[&_th]:border-gray-700 " +
-  "[&_td]:px-2 [&_td]:py-1 [&_td]:text-slate-600 dark:[&_td]:text-gray-300 [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-gray-700 " +
-  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 dark:[&_tbody_tr:nth-child(even)]:bg-gray-900/40 " +
+  "[&_thead]:bg-surface-subtle [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-content-secondary " +
+  "[&_th]:border-b [&_th]:border-edge-default " +
+  "[&_td]:border-b [&_td]:border-edge-subtle [&_td]:px-2 [&_td]:py-1 [&_td]:text-content-secondary " +
+  "[&_tbody_tr:nth-child(even)]:bg-surface-subtle/60 " +
   "[&_tr:last-child_td]:border-b-0";
 
 const RUBRIC_BODY_MARKDOWN_CLASSES =
@@ -33,15 +33,15 @@ const RUBRIC_BODY_MARKDOWN_CLASSES =
   "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
   "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_li]:mb-1 " +
   "[&_strong]:font-semibold [&_em]:italic " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 dark:[&_blockquote]:border-gray-600 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:text-slate-700 dark:[&_a]:text-gray-200 " +
-  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:font-mono dark:[&_code]:bg-gray-700 " +
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-edge-default [&_blockquote]:pl-3 " +
+  "[&_a]:text-content-link [&_a]:underline [&_a]:underline-offset-2 " +
+  "[&_code]:rounded [&_code]:bg-surface-subtle [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_table]:w-full [&_table]:text-[11px] [&_table]:border-collapse " +
-  "[&_thead]:bg-slate-50 dark:[&_thead]:bg-gray-900/60 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 dark:[&_th]:text-gray-200 " +
-  "[&_th]:border-b [&_th]:border-slate-200 dark:[&_th]:border-gray-700 " +
-  "[&_td]:px-2 [&_td]:py-1 [&_td]:text-slate-600 dark:[&_td]:text-gray-300 [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-gray-700 " +
-  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 dark:[&_tbody_tr:nth-child(even)]:bg-gray-900/40 " +
+  "[&_thead]:bg-surface-subtle [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-content-secondary " +
+  "[&_th]:border-b [&_th]:border-edge-default " +
+  "[&_td]:border-b [&_td]:border-edge-subtle [&_td]:px-2 [&_td]:py-1 [&_td]:text-content-secondary " +
+  "[&_tbody_tr:nth-child(even)]:bg-surface-subtle/60 " +
   "[&_tr:last-child_td]:border-b-0";
 
 function RubricMarkdown({
@@ -69,7 +69,7 @@ function RubricMarkdown({
           code: MarkdownCode,
           pre: ({ children: preChildren }) => <>{preChildren}</>,
           table: ({ children: tableChildren, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="my-4 overflow-x-auto rounded-lg border border-edge-default bg-surface-raised">
               <table {...props}>{tableChildren}</table>
             </div>
           ),
@@ -145,12 +145,12 @@ export function RubricWidget({
 
   return (
     <>
-      <div className="my-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="my-4 overflow-hidden rounded-lg border border-edge-default bg-surface-raised">
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/60">
-          <ClipboardList size={14} className="shrink-0 text-slate-600 dark:text-gray-300" />
-          <p className="flex-1 text-xs font-semibold text-slate-900 dark:text-gray-100">{rubricTitle}</p>
-          <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+        <div className="flex items-center gap-2 border-b border-edge-default bg-surface-subtle px-3 py-2">
+          <ClipboardList size={14} className="shrink-0 text-content-secondary" />
+          <p className="flex-1 text-xs font-semibold text-content-primary">{rubricTitle}</p>
+          <span className="text-[10px] font-medium text-content-secondary">
             {hasCategories ? `${categories.length} sections · ` : ""}
             {totalCriteria} criteria
           </span>
@@ -171,13 +171,8 @@ export function RubricWidget({
         />
 
         {/* Actions */}
-        <div className="flex items-center gap-2 border-t border-slate-100 px-3 pb-3 pt-1 dark:border-gray-700">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-slate-500 dark:text-gray-400"
-            onClick={openModal}
-          >
+        <div className="flex items-center gap-2 border-t border-edge-subtle px-3 pt-1 pb-3">
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-content-secondary" onClick={openModal}>
             View Full Plan
           </Button>
           <Button size="sm" className="ml-auto h-7 text-xs" onClick={handleStartBuilding}>
@@ -228,7 +223,7 @@ function RubricPreview({
   return (
     <div className="px-3 py-2">
       {hasCategories && !expanded ? (
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-content-secondary">
           {categories?.[0]?.heading}
         </p>
       ) : null}
@@ -290,16 +285,12 @@ function RubricModal({
         showCloseButton={false}
         className="flex max-h-[80vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-gray-700">
+        <div className="flex items-center justify-between border-b border-edge-default px-4 py-3">
           <div className="flex items-center gap-2">
-            <ClipboardList size={16} className="text-slate-600 dark:text-gray-300" />
-            <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-gray-100">{title}</DialogTitle>
+            <ClipboardList size={16} className="text-content-secondary" />
+            <DialogTitle className="text-sm font-semibold text-content-primary">{title}</DialogTitle>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300"
-          >
+          <button type="button" onClick={onClose} className="text-content-muted hover:text-content-primary">
             <X size={16} />
           </button>
         </div>
@@ -315,7 +306,7 @@ function RubricModal({
             <NumberedCriteriaList criteria={criteria} canvasId={canvasId} organizationId={organizationId} />
           )}
         </div>
-        <div className="flex justify-end border-t border-slate-200 px-4 py-3 dark:border-gray-700">
+        <div className="flex justify-end border-t border-edge-default px-4 py-3">
           <Button variant="ghost" size="sm" className="text-xs" onClick={onClose}>
             Close
           </Button>
@@ -338,7 +329,7 @@ function PreviewToggleButton({
     <button
       type="button"
       onClick={onClick}
-      className="mt-1 flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200"
+      className="mt-1 flex items-center gap-1 text-[10px] text-content-secondary hover:text-content-primary"
     >
       {direction === "down" ? <ChevronDown size={10} /> : <ChevronUp size={10} />}
       {children}
@@ -357,8 +348,8 @@ function FlatCriteriaList({
 }) {
   return criteria.map((criterion, index) => (
     <div key={index} className="flex items-start gap-2 py-0.5">
-      <span className="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-gray-500">✦</span>
-      <div className="min-w-0 flex-1 text-xs text-slate-700 dark:text-gray-300">
+      <span className="mt-0.5 shrink-0 text-xs text-content-muted">✦</span>
+      <div className="min-w-0 flex-1 text-xs text-content-secondary">
         <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
           {criterion.text}
         </RubricMarkdown>
@@ -377,12 +368,9 @@ function NumberedCriteriaList({
   organizationId?: string;
 }) {
   return criteria.map((criterion, index) => (
-    <div
-      key={index}
-      className="flex items-start gap-2 border-b border-slate-50 py-1.5 last:border-0 dark:border-gray-700"
-    >
-      <span className="mt-0.5 shrink-0 text-sm font-medium text-slate-500 dark:text-gray-400">{index + 1}.</span>
-      <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-gray-300">
+    <div key={index} className="flex items-start gap-2 border-b border-edge-subtle py-1.5 last:border-0">
+      <span className="mt-0.5 shrink-0 text-sm font-medium text-content-secondary">{index + 1}.</span>
+      <div className="min-w-0 flex-1 text-sm text-content-secondary">
         <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
           {criterion.text}
         </RubricMarkdown>
@@ -411,11 +399,11 @@ function CategorizedList({
 
         return (
           <div key={ci}>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-content-secondary">
               {cat.heading}
             </p>
             {cat.body ? (
-              <div className={`${showNumbers ? "text-sm" : "text-xs"} text-slate-700 dark:text-gray-300`}>
+              <div className={`${showNumbers ? "text-sm" : "text-xs"} text-content-secondary`}>
                 <RubricMarkdown canvasId={canvasId} organizationId={organizationId}>
                   {cat.body}
                 </RubricMarkdown>
@@ -427,19 +415,17 @@ function CategorizedList({
                   <div
                     key={i}
                     className={`flex items-start gap-2 ${
-                      showNumbers ? "border-b border-slate-50 py-1.5 last:border-0 dark:border-gray-700" : "py-0.5"
+                      showNumbers ? "border-b border-edge-subtle py-1.5 last:border-0" : "py-0.5"
                     }`}
                   >
                     {showNumbers ? (
-                      <span className="mt-0.5 shrink-0 text-sm font-medium text-slate-500 dark:text-gray-400">
+                      <span className="mt-0.5 shrink-0 text-sm font-medium text-content-secondary">
                         {criterionIndex}.
                       </span>
                     ) : (
-                      <span className="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-gray-500">✦</span>
+                      <span className="mt-0.5 shrink-0 text-xs text-content-muted">✦</span>
                     )}
-                    <div
-                      className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700 dark:text-gray-300`}
-                    >
+                    <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-content-secondary`}>
                       <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
                         {c.text}
                       </RubricMarkdown>

@@ -61,31 +61,31 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   approved: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   rejected: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   running: {
     icon: "clock",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-amber-100",
     badgeColor: "bg-orange-500",
   },
@@ -373,7 +373,7 @@ function getApprovalSpecs(items: ApprovalRecord[]): ComponentBaseSpec[] {
         // Pretty-print values
         return {
           badges: [
-            { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: `${label}:`, bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
             { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
           ],
         };

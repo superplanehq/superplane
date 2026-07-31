@@ -1,18 +1,10 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 
-const pageShellClassName = cn("min-h-screen flex flex-col bg-slate-100", appDarkModeClasses.surface);
-
-const pageHeaderClassName = cn(
-  "flex h-10 items-center border-b bg-white px-2 sm:px-3",
-  appDarkModeClasses.sidebarEdge,
-  appDarkModeClasses.surface,
-);
-
-const pageContentClassName = cn("w-full flex-grow-1 bg-slate-100", appDarkModeClasses.surface);
+const pageShellClassName = "flex min-h-screen flex-col bg-surface-canvas";
+const pageHeaderClassName = "flex h-10 items-center border-b border-edge-default bg-surface-default px-2 sm:px-3";
+const pageContentClassName = "w-full flex-grow-1 bg-surface-canvas";
 
 export function HomePageShell({ children }: { children: ReactNode }) {
   const { organizationId } = useParams<{ organizationId: string }>();

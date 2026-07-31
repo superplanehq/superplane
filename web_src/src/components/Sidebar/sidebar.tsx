@@ -13,7 +13,7 @@ export function SidebarHeader({ className, ...props }: React.ComponentPropsWitho
       {...props}
       className={clsx(
         className,
-        "flex flex-col border-b border-gray-950/10 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
+        "flex flex-col border-b border-edge-subtle p-4 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
       )}
     />
   );
@@ -29,7 +29,7 @@ export function SidebarFooter({ className, ...props }: React.ComponentPropsWitho
       {...props}
       className={clsx(
         className,
-        "flex flex-col border-t border-gray-950/10 p-4 dark:border-white/5 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
+        "flex flex-col border-t border-edge-subtle p-4 [&>[data-slot=section]+[data-slot=section]]:mt-2.5",
       )}
     />
   );
@@ -40,7 +40,7 @@ export function SidebarSection({ className, ...props }: React.ComponentPropsWith
 }
 
 export function SidebarDivider({ className, ...props }: React.ComponentPropsWithoutRef<"hr">) {
-  return <hr {...props} className={clsx(className, "my-4 border-t border-gray-950/10 lg:-mx-4 dark:border-white/5")} />;
+  return <hr {...props} className={clsx(className, "my-4 border-t border-edge-subtle lg:-mx-4")} />;
 }
 
 export function SidebarSpacer({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
@@ -48,9 +48,7 @@ export function SidebarSpacer({ className, ...props }: React.ComponentPropsWitho
 }
 
 export function SidebarHeading({ className, ...props }: React.ComponentPropsWithoutRef<"h3">) {
-  return (
-    <h3 {...props} className={clsx(className, "mb-1 px-2 text-xs/6 font-medium text-gray-500 dark:text-gray-400")} />
-  );
+  return <h3 {...props} className={clsx(className, "mb-1 px-2 text-xs/6 font-medium text-content-secondary")} />;
 }
 
 export function SidebarItem({
@@ -66,18 +64,15 @@ export function SidebarItem({
   onClick?: () => void;
 } & React.ComponentPropsWithoutRef<"button">) {
   const classes = clsx(
-    "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-gray-800 sm:py-2 sm:text-sm/5",
-    "hover:bg-gray-950/5 hover:text-gray-950",
-    "active:bg-gray-950/5 active:text-gray-950",
-    "dark:text-white",
-    "dark:hover:bg-white/5 dark:hover:text-white",
-    "dark:active:bg-white/5 dark:active:text-white",
-    current && "bg-gray-950/5 text-gray-800 dark:bg-white/5 dark:text-white",
+    "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-content-primary sm:py-2 sm:text-sm/5",
+    "hover:bg-action-neutral-hover hover:text-content-primary",
+    "active:bg-action-neutral-hover active:text-content-primary",
+    current && "bg-action-neutral text-content-primary",
   );
 
   return (
     <span className={clsx(className, "relative")}>
-      {current && <span className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-gray-800 dark:bg-white" />}
+      {current && <span className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-content-primary" />}
       <button
         {...props}
         onClick={onClick}

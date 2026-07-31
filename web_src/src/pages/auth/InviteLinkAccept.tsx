@@ -87,7 +87,7 @@ export default function InviteLinkAccept() {
     const usageLimitNotice = getUsageLimitNotice(errorMessage);
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+      <div className="flex min-h-screen items-center justify-center bg-surface-default px-6">
         <div className="max-w-md w-full">
           {usageLimitNotice ? (
             <UsageLimitAlert notice={usageLimitNotice} />
@@ -103,10 +103,10 @@ export default function InviteLinkAccept() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+    <div className="flex min-h-screen items-center justify-center bg-surface-default px-6">
       <div className="flex flex-col items-center space-y-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-content-secondary">
           {status === "loading" ? "Joining organization..." : "Preparing invite..."}
         </p>
       </div>

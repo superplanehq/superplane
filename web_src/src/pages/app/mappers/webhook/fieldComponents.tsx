@@ -25,7 +25,7 @@ export const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-white outline-1 outline-black/20 hover:outline-black/30 rounded text-gray-600 dark:text-gray-400"
+      className="absolute top-2 right-2 z-10 rounded bg-surface-overlay p-1 text-content-secondary opacity-0 outline-1 outline-edge-default transition-opacity group-hover:opacity-100 hover:outline-edge-strong"
       title={copied ? "Copied!" : "Copy to clipboard"}
     >
       <Icon name={copied ? "check" : "copy"} size="sm" />
@@ -126,7 +126,7 @@ export const ResetAuthButton: React.FC<{
         <button
           onClick={handleResetAuth}
           disabled={isResetting}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-black hover:bg-gray-700 disabled:bg-gray-400 rounded-md transition-colors"
+          className="inline-flex items-center gap-2 rounded-md bg-action-primary px-3 py-1.5 text-sm font-medium text-action-primary-content transition-colors hover:bg-action-primary-hover disabled:bg-action-neutral"
         >
           <Icon name={isResetting ? "loader" : "refresh-ccw"} size="sm" className={isResetting ? "animate-spin" : ""} />
           {isResetting ? labels.resettingText : labels.buttonText}
@@ -141,7 +141,7 @@ export const ResetAuthButton: React.FC<{
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">{labels.successTitle}</p>
               <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">{labels.successDescription}</p>
               <div className="mt-2 relative group">
-                <pre className="text-sm text-yellow-900 dark:text-yellow-100 bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 p-2 rounded font-mono break-all">
+                <pre className="rounded border border-yellow-300 bg-surface-raised p-2 font-mono text-sm text-yellow-900 break-all dark:border-yellow-600 dark:text-yellow-100">
                   {newSecret}
                 </pre>
                 <CopyCodeButton code={newSecret} />

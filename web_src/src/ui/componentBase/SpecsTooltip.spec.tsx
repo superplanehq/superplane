@@ -50,7 +50,7 @@ describe("SpecsTooltip", () => {
     expect(screen.queryByText("undefined")).not.toBeInTheDocument();
   });
 
-  it("includes dark-mode surface classes for metadata tooltips", () => {
+  it("includes semantic surface classes for metadata tooltips", () => {
     render(
       <SpecsTooltip
         specTitle="input"
@@ -64,7 +64,7 @@ describe("SpecsTooltip", () => {
       </SpecsTooltip>,
     );
 
-    expect(screen.getByText("1 input").parentElement?.parentElement?.className).toContain("dark:bg-gray-900");
-    expect(screen.getByText("1 input").className).toContain("dark:text-gray-400");
+    expect(screen.getByText("1 input").parentElement?.parentElement?.className).toContain("bg-surface-raised");
+    expect(screen.getByText("1 input").className).toContain("text-content-secondary");
   });
 });

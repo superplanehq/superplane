@@ -54,16 +54,16 @@ export const elasticIPAssociationStateMap: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   "aws.ec2.elastic-ip.associated": {
     icon: "link",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "ASSOCIATED",
   },
   "aws.ec2.elastic-ip.disassociated": {
     icon: "unlink",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
     label: "DISASSOCIATED",
   },
 };

@@ -19,21 +19,21 @@ import { Link, useNavigate } from "react-router-dom";
 
 const SWITCHER_HEIGHT_CLASS = "h-7";
 const SWITCHER_WIDTH_CLASS = "w-[320px] min-w-[320px] max-w-full";
-const SWITCHER_BORDER_CLASS = "border border-slate-950/20 dark:border-gray-800/70";
-const SWITCHER_MENU_SURFACE_CLASS = "rounded-md bg-white shadow-md dark:bg-gray-900";
+const SWITCHER_BORDER_CLASS = "border border-edge-strong";
+const SWITCHER_MENU_SURFACE_CLASS = "rounded-md bg-surface-raised shadow-md";
 const SEARCH_ROW_CLASS_NAME = cn(
-  "flex items-center gap-2 bg-white px-2.5 text-[13px] dark:bg-gray-900",
+  "flex items-center gap-2 bg-surface-raised px-2.5 text-[13px]",
   SWITCHER_HEIGHT_CLASS,
-  "rounded-none border-0 border-b border-slate-950/10 ring-0 dark:border-gray-800/70",
+  "rounded-none border-0 border-b border-edge-subtle ring-0",
 );
 const TRIGGER_SURFACE_CLASS_NAME = cn(
-  "rounded-md bg-transparent transition-colors group-hover/switcher:bg-slate-100 dark:group-hover/switcher:bg-gray-800",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40",
+  "rounded-md bg-transparent transition-colors group-hover/switcher:bg-action-neutral-hover",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40",
 );
 const TRIGGER_ICON_CLASS_NAME =
-  "size-3.5 shrink-0 text-slate-400 transition-colors group-hover/trigger:text-slate-800 dark:text-gray-400 dark:group-hover/trigger:text-gray-100";
+  "size-3.5 shrink-0 text-content-muted transition-colors group-hover/trigger:text-content-primary";
 const ACTIONS_ICON_CLASS_NAME =
-  "size-3.5 shrink-0 text-slate-400 transition-colors group-hover/actions:text-slate-800 dark:text-gray-400 dark:group-hover/actions:text-gray-100";
+  "size-3.5 shrink-0 text-content-muted transition-colors group-hover/actions:text-content-primary";
 const TRIGGER_CLASS_NAME = cn(
   "group/trigger flex items-center gap-2 px-2.5 text-[13px]",
   SWITCHER_HEIGHT_CLASS,
@@ -372,7 +372,7 @@ function ProjectSearchPopover({
           className={cn(TRIGGER_CLASS_NAME, open && "pointer-events-none invisible")}
         >
           <Search className={TRIGGER_ICON_CLASS_NAME} aria-hidden="true" />
-          <span className="min-w-0 truncate font-medium text-slate-800 dark:text-gray-100">{displayName}</span>
+          <span className="min-w-0 truncate font-medium text-content-primary">{displayName}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -385,12 +385,12 @@ function ProjectSearchPopover({
           "w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 outline-none",
         )}
       >
-        <Command shouldFilter className="bg-white dark:bg-gray-900">
+        <Command shouldFilter className="bg-surface-raised">
           <div className={SEARCH_ROW_CLASS_NAME}>
-            <Search className="size-3.5 shrink-0 text-slate-400 dark:text-gray-400" aria-hidden="true" />
+            <Search className="size-3.5 shrink-0 text-content-muted" aria-hidden="true" />
             <CommandPrimitive.Input
               placeholder="Search Apps"
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:font-normal placeholder:text-slate-400 dark:text-gray-100 dark:placeholder:text-gray-400"
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-content-primary outline-none placeholder:font-normal placeholder:text-content-muted"
             />
           </div>
           <ProjectSearchList
@@ -420,7 +420,7 @@ function ProjectSearchList({
   if (isLoading) {
     return (
       <CommandList className="max-h-[280px]">
-        <div className="px-3 py-6 text-center text-[13px] text-slate-500 dark:text-gray-400">Loading projects...</div>
+        <div className="px-3 py-6 text-center text-[13px] text-content-secondary">Loading projects...</div>
       </CommandList>
     );
   }
@@ -435,7 +435,7 @@ function ProjectSearchList({
             value={`${project.name} ${project.id}`}
             keywords={[project.name]}
             onSelect={() => onSelect(project.id)}
-            className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+            className="cursor-pointer text-[13px] data-[selected=true]:bg-status-info-subtle data-[selected=true]:text-status-info-content"
             asChild
           >
             <Link
@@ -445,9 +445,7 @@ function ProjectSearchList({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
-              {project.id === activeCanvasId ? (
-                <Check className="size-3.5 shrink-0 text-slate-600 dark:text-gray-400" />
-              ) : null}
+              {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-content-secondary" /> : null}
             </Link>
           </CommandItem>
         ))}

@@ -114,7 +114,7 @@ describe("WidgetTable row styles — background tone", () => {
     expect(rows[2].className).not.toMatch(/(?:^|\s)bg-(red|orange|yellow|sky|emerald|slate)-(50|100)(?:\s|$)/);
     // Default hover wash should remain on untinted rows so they keep the
     // existing hover affordance.
-    expect(rows[2].className).toContain("hover:bg-slate-50/60");
+    expect(rows[2].className).toContain("hover:bg-surface-subtle");
   });
 
   it("first matching rule wins when multiple rules match the same row", () => {

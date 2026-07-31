@@ -66,33 +66,33 @@ export const MERGE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-400",
   },
   cancelled: {
     icon: "circle-slash-2",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   timeout: {
     icon: "clock",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
 };
 

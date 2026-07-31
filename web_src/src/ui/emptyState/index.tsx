@@ -24,8 +24,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       : "text-yellow-700 bg-orange-100 dark:bg-orange-300/70 dark:text-orange-950";
   const titleClassName =
     tone === "neutral" ? "text-green-700 dark:text-green-300" : "text-yellow-700 dark:text-orange-300/70";
-  const descriptionClassName =
-    tone === "neutral" ? "text-slate-400 dark:text-gray-500" : "text-gray-400 dark:text-gray-500";
+  const descriptionClassName = "text-content-muted";
 
   if (compact) {
     return (

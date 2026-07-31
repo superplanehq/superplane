@@ -40,8 +40,8 @@ export function FullscreenContentDialog({
         className={cn("flex flex-col gap-0 overflow-hidden p-0", FULLSCREEN_DIALOG_SIZE_CLASSES[size])}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 pr-10 dark:border-gray-800 dark:bg-gray-900">
-          <DialogTitle className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
+        <div className="flex items-center justify-between gap-2 border-b border-edge-subtle bg-surface-default px-3 py-1.5 pr-10">
+          <DialogTitle className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-content-secondary">
             {title}
           </DialogTitle>
           {headerActions ? <span className="flex items-center gap-0.5">{headerActions}</span> : null}

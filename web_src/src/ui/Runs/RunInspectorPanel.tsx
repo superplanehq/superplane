@@ -10,8 +10,6 @@ import {
 import { useAccount } from "@/contexts/useAccount";
 import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { RunInspectorChrome } from "./RunInspectorChrome";
 import { RunInspectorHeader } from "./RunInspectorHeader";
 import { ResizeHandle } from "./RunInspectorResize";
@@ -65,10 +63,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
 
   return (
     <aside
-      className={cn(
-        "relative z-20 flex h-full shrink-0 flex-col border-l bg-white shadow-sm dark:bg-gray-950",
-        appDarkModeClasses.sidebarEdge,
-      )}
+      className="relative z-20 flex h-full shrink-0 flex-col border-l border-edge-default bg-surface-raised shadow-sm"
       style={{ width: model.inspectorWidth.width }}
       data-testid="run-inspector-panel"
       aria-label="Run inspector"

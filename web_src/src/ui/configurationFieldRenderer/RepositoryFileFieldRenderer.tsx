@@ -44,7 +44,7 @@ export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ fiel
         ))}
         {isError && <div className="px-2 py-1.5 text-sm text-red-500">Failed to load files</div>}
         {!isLoading && !isError && files.length === 0 && (
-          <div className="px-2 py-1.5 text-sm text-slate-500">No files found</div>
+          <div className="px-2 py-1.5 text-sm text-content-secondary">No files found</div>
         )}
       </SelectContent>
     </Select>

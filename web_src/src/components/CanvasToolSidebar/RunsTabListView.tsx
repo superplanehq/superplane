@@ -66,7 +66,7 @@ export function RunsTabListView({
 }: RunsTabListViewProps) {
   return (
     <div
-      className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
+      className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-default transition-transform duration-300 ease-in-out ${
         isActive ? "translate-x-0" : "-translate-x-full"
       } ${isActive ? "pointer-events-auto" : "pointer-events-none"}`}
     >
@@ -103,7 +103,7 @@ export function RunsTabListView({
       </div>
 
       {hasAnyFilter && runs.length > 0 ? (
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-950/15 bg-slate-50 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-800/70 dark:bg-gray-900 dark:text-gray-400">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-edge-default bg-surface-subtle px-3 py-1.5 text-[11px] text-content-secondary">
           <span>
             Showing {filteredRuns.length} of {runs.length} loaded
           </span>

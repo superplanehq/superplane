@@ -137,8 +137,8 @@ export function NodeRunConfirmDialog({
               />
             </div>
           ) : (
-            <p className="text-slate-600" data-testid={`${testId}-confirm-message`}>
-              Run <span className="font-medium text-slate-800">{resolved?.label ?? template.name}</span>?
+            <p className="text-content-secondary" data-testid={`${testId}-confirm-message`}>
+              Run <span className="font-medium text-content-primary">{resolved?.label ?? template.name}</span>?
             </p>
           )}
         </div>

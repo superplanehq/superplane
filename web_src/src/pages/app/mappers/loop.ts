@@ -23,19 +23,19 @@ export const LOOP_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   done: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
   },
   next: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-indigo-100",
     badgeColor: "bg-indigo-500",
   },
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-orange-100",
     badgeColor: "bg-yellow-600",
   },

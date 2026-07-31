@@ -34,7 +34,7 @@ export function RunInspectorChrome({
   };
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-950/10 px-2 py-1.5 dark:border-gray-800">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-edge-subtle px-2 py-1.5">
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -42,7 +42,7 @@ export function RunInspectorChrome({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary"
               data-testid="run-panel-close"
             >
               <PanelRightClose className="h-4 w-4" />
@@ -113,9 +113,8 @@ function RunNavigationButton({
 }
 
 const chromeIconButtonClassName = cn(
-  "flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors",
-  "hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40",
-  "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+  "flex h-7 w-7 items-center justify-center rounded-full text-content-secondary transition-colors",
+  "hover:bg-action-neutral-hover hover:text-content-primary disabled:cursor-not-allowed disabled:opacity-40",
 );
 
 async function copyRunLink(runId: string) {

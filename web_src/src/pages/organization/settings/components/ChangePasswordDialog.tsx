@@ -96,7 +96,7 @@ function PasswordField({ id, label, autoComplete, value, onChange, disabled, min
         className="ph-no-capture"
         required
       />
-      {hint && <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
+      {hint && <p className="text-xs text-content-secondary">{hint}</p>}
     </div>
   );
 }
@@ -212,7 +212,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
             minLength={MIN_PASSWORD_LENGTH}
           />
           {formError && (
-            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            <p className="text-sm text-status-danger" role="alert">
               {formError}
             </p>
           )}

@@ -21,13 +21,13 @@ import { MARKDOWN_TABLE_SELECTOR_CLASSES } from "../markdownTableStyles";
  * that survive the curated Tailwind safelist).
  */
 const HTML_ROOT_CLASSES =
-  "max-w-none text-[13px] text-slate-800 " +
+  "max-w-none text-[13px] text-content-primary " +
   `${MARKDOWN_HEADING_MARGIN_SELECTOR_CLASSES} ${MARKDOWN_HEADING_TYPOGRAPHY_SELECTOR_CLASSES}` +
   "[&_p]:mb-2 [&_p]:leading-relaxed " +
   "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal " +
   "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 " +
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-edge-default [&_blockquote]:pl-3 " +
+  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-surface-subtle [&_pre]:p-2 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   `${MARKDOWN_TABLE_SELECTOR_CLASSES} `;
 
@@ -79,7 +79,7 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
 export function HtmlBodyLoading() {
   return (
     <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="console-html-loading">
-      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+      <Loader2 className="size-4 animate-spin text-content-muted" />
     </div>
   );
 }

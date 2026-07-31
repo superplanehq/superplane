@@ -106,8 +106,8 @@ interface KeyValuePairsSectionProps {
 
 function KeyValuePairsSection({ pairs, disabled, onUpdate, onAdd, onRemove }: KeyValuePairsSectionProps) {
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-      <Label className="text-gray-800 dark:text-gray-100 mb-2 block">
+    <div className="border-t border-edge-subtle pt-4">
+      <Label className="text-content-primary mb-2 block">
         Key-Value Pairs <span className="text-red-500">*</span>
       </Label>
       <div className="space-y-3">
@@ -199,13 +199,13 @@ export function CreateSecretDialog({
       <DialogContent showCloseButton={!isPending}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <Key className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <Key className="w-5 h-5 text-content-secondary" />
             Create Secret
           </DialogTitle>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit} data-testid="secrets-create-form">
           <div className="space-y-2">
-            <Label htmlFor="create-secret-name" className="text-gray-800 dark:text-gray-100">
+            <Label htmlFor="create-secret-name" className="text-content-primary">
               Secret Name <span className="text-red-500">*</span>
             </Label>
             <Input

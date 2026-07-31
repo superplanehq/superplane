@@ -81,7 +81,7 @@ function runnerLogLines(orphanLines: string[], sections: Array<{ text: string; l
 
 function runnerLogsStatus(section: RunInspectorNodeSection): StatusPill {
   return {
-    dotClassName: section.badge?.badgeColor ?? "bg-slate-400",
+    dotClassName: section.badge?.badgeColor ?? "bg-content-muted",
     label: section.badge?.label ?? "Logs",
     tone: section.errorMessage ? "error" : "default",
   };

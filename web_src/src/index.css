@@ -24,72 +24,50 @@ button {
   cursor: pointer;
 }
 
-.react-flow.light {
-  --xy-background-pattern-dots-color-default: #96a0a6;
-  --xy-background-color-default: #f4f5f8;
-}
-
+.react-flow.light,
 .react-flow.dark {
-  --xy-background-pattern-dots-color-default: #374151;
-  --xy-background-color-default: #111827;
+  --xy-background-pattern-dots-color-default: var(--content-muted);
+  --xy-background-color-default: var(--surface-canvas);
 }
 
 div.monaco-editor {
   --vscode-focusBorder: transparent;
-  --vscode-editorLineHighlightBackground: rgb(248 250 252);
+  --vscode-editor-background: var(--surface-default);
+  --vscode-editorGutter-background: var(--surface-default);
+  --vscode-editor-foreground: var(--content-primary);
+  --vscode-editorLineHighlightBackground: var(--surface-default);
   --vscode-editorLineHighlightBorder: transparent;
 }
 
-/* Current line: slate-50 background only, no top/bottom border */
+/* Keep the current line on the standard editor surface without top/bottom borders. */
 div.monaco-editor .margin-view-overlays .current-line,
 div.monaco-editor .view-overlays .current-line {
-  background-color: rgb(248 250 252) !important;
+  background-color: var(--surface-default) !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
 .workflow-file-editor-monaco .monaco-editor {
-  --vscode-scrollbarSlider-background: rgb(2 6 23 / 0.2);
-  --vscode-scrollbarSlider-hoverBackground: rgb(2 6 23 / 0.4);
-  --vscode-scrollbarSlider-activeBackground: rgb(2 6 23 / 0.45);
-  --vscode-editorStickyScroll-shadow: rgb(2 6 23 / 0.1);
-  --vscode-editorStickyScroll-border: rgb(2 6 23 / 0.2);
+  --vscode-scrollbarSlider-background: color-mix(in oklab, var(--content-primary) 20%, transparent);
+  --vscode-scrollbarSlider-hoverBackground: color-mix(in oklab, var(--content-primary) 40%, transparent);
+  --vscode-scrollbarSlider-activeBackground: color-mix(in oklab, var(--content-primary) 45%, transparent);
+  --vscode-editorStickyScroll-shadow: color-mix(in oklab, var(--content-primary) 10%, transparent);
+  --vscode-editorStickyScroll-border: var(--edge-default);
 }
 
 .workflow-file-editor-monaco .monaco-editor .sticky-widget {
-  box-shadow: 0 3px 0 rgb(2 6 23 / 0.1) !important;
-}
-
-.dark div.monaco-editor {
-  --vscode-focusBorder: transparent;
-  --vscode-editor-background: rgb(31 41 55);
-  --vscode-editorGutter-background: rgb(31 41 55);
-  --vscode-editor-foreground: rgb(243 244 246);
-  --vscode-editorLineHighlightBackground: rgb(31 41 55);
-  --vscode-editorLineHighlightBorder: transparent;
+  box-shadow: 0 3px 0 color-mix(in oklab, var(--content-primary) 10%, transparent) !important;
 }
 
 .dark div.monaco-editor .margin,
 .dark div.monaco-editor .monaco-editor-background {
-  background-color: rgb(31 41 55) !important;
+  background-color: var(--surface-default) !important;
 }
 
 .dark div.monaco-editor .margin-view-overlays .current-line,
 .dark div.monaco-editor .view-overlays .current-line {
-  background-color: rgb(31 41 55) !important;
-}
-
-.dark .workflow-file-editor-monaco .monaco-editor {
-  --vscode-scrollbarSlider-background: rgb(156 163 175 / 0.25);
-  --vscode-scrollbarSlider-hoverBackground: rgb(156 163 175 / 0.4);
-  --vscode-scrollbarSlider-activeBackground: rgb(156 163 175 / 0.5);
-  --vscode-editorStickyScroll-shadow: rgb(0 0 0 / 0.2);
-  --vscode-editorStickyScroll-border: rgb(75 85 99 / 0.5);
-}
-
-.dark .workflow-file-editor-monaco .monaco-editor .sticky-widget {
-  box-shadow: 0 3px 0 rgb(0 0 0 / 0.2) !important;
+  background-color: var(--surface-default) !important;
 }
 
 .canvas-conflict-current-line {
@@ -124,9 +102,9 @@ div.monaco-editor .view-overlays .current-line {
   width: 100%;
   height: 100%;
   padding: 2px 8px;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-top: 1px solid var(--edge-default);
+  border-bottom: 1px solid var(--edge-default);
+  background: var(--surface-default);
   pointer-events: auto;
   position: relative;
   top: -6px;
@@ -147,7 +125,7 @@ div.monaco-editor .view-overlays .current-line {
   background: transparent;
   font-size: 11px;
   line-height: 18px;
-  color: #2563eb;
+  color: var(--content-link);
   text-decoration: underline;
   text-underline-offset: 2px;
   pointer-events: auto;
@@ -156,20 +134,20 @@ div.monaco-editor .view-overlays .current-line {
 }
 
 .canvas-conflict-inline-action-button:hover {
-  color: #1d4ed8;
+  color: var(--content-link-hover);
 }
 
 .canvas-conflict-inline-action-button:focus-visible {
-  outline: 1px solid #93c5fd;
+  outline: 1px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-/* Reusable 1px 45deg diagonal line pattern (gray-950/10), 8px between lines */
+/* Reusable 1px 45deg diagonal edge pattern, 8px between lines. */
 .bg-stripe-diagonal {
   background-image: repeating-linear-gradient(
     45deg,
-    rgb(3 7 18 / 0.1) 0,
-    rgb(3 7 18 / 0.1) 1px,
+    var(--edge-subtle) 0,
+    var(--edge-subtle) 1px,
     transparent 1px,
     transparent 9px
   );

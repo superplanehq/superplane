@@ -101,11 +101,11 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
 export const onIssueCustomFieldRenderer: CustomFieldRenderer = {
   render: (_node: NodeInfo) => {
     return (
-      <div className="border-t-1 border-gray-200 pt-4">
+      <div className="border-t-1 border-edge-default pt-4">
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Relic Webhook Setup</span>
-            <p className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+            <span className="text-sm font-medium text-content-secondary">New Relic Webhook Setup</span>
+            <p className="mt-2 rounded-md border-1 border-edge-default bg-surface-subtle px-2.5 py-2 text-xs text-content-primary">
               SuperPlane automatically creates a Webhook Notification Channel in your New Relic account. Just attach it
               to your alert workflow to start receiving alerts.
             </p>

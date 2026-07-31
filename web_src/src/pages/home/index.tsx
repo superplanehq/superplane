@@ -18,8 +18,6 @@ import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 
 export function HomePage() {
   usePageTitle(["Home"]);
@@ -77,7 +75,7 @@ export function HomePage() {
         </div>
 
         {canvasError ? (
-          <div className="rounded border border-red-300 bg-white px-4 py-2 text-red-500 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
+          <div className="rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
             <Text>{canvasError}</Text>
           </div>
         ) : (
@@ -172,7 +170,7 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5 dark:bg-white/5`}>
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-surface-subtle`}>
           <CanvasCardsGrid
             canvases={folderedLayout.unfiledCanvases}
             canvasFolders={canvasFolders}
@@ -251,13 +249,11 @@ function buildFolderedLayout(
 function CanvasesSearchEmptyState() {
   return (
     <div className="text-center py-12">
-      <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
-      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
+      <Palette className="mx-auto text-content-muted mb-4" size={48} aria-hidden />
+      <Heading level={3} className="text-lg text-content-primary mb-2">
         No apps found
       </Heading>
-      <Text className="text-gray-500 dark:text-gray-400 mb-6">
-        Nothing matches that filter, try another word or clear it
-      </Text>
+      <Text className="text-content-secondary mb-6">Nothing matches that filter, try another word or clear it</Text>
     </div>
   );
 }
@@ -265,8 +261,8 @@ function CanvasesSearchEmptyState() {
 function CanvasesEmptyState() {
   return (
     <div className="text-center py-12">
-      <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
-      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
+      <Palette className="mx-auto text-content-muted mb-4" size={48} aria-hidden />
+      <Heading level={3} className="text-lg text-content-primary mb-2">
         No apps yet
       </Heading>
     </div>
@@ -275,17 +271,17 @@ function CanvasesEmptyState() {
 
 function LoadingView() {
   return (
-    <div className={cn("min-h-screen flex items-center justify-center bg-slate-100", appDarkModeClasses.surface)}>
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas">
       <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600 dark:border-blue-400"></div>
-      <p className="ml-3 text-gray-500 dark:text-gray-400">Loading...</p>
+      <p className="ml-3 text-content-secondary">Loading...</p>
     </div>
   );
 }
 
 function ErrorView() {
   return (
-    <div className={cn("py-8 text-center bg-slate-100 min-h-screen", appDarkModeClasses.surface)}>
-      <p className="text-gray-500 dark:text-gray-400">Unable to load user information</p>
+    <div className="min-h-screen bg-surface-canvas py-8 text-center">
+      <p className="text-content-secondary">Unable to load user information</p>
     </div>
   );
 }
@@ -297,9 +293,7 @@ function Header() {
         <Heading level={2} className="!text-2xl mb-1">
           Apps
         </Heading>
-        <Text className="text-gray-800 dark:text-gray-400">
-          Overview of all mapped automations across your organization.
-        </Text>
+        <Text className="text-content-secondary">Overview of all mapped automations across your organization.</Text>
       </div>
     </div>
   );

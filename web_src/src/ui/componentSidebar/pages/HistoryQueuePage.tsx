@@ -74,7 +74,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {events.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">No events found</div>
+          <div className="px-3 py-4 text-center text-xs text-content-secondary">No events found</div>
         ) : (
           <>
             {events.map((event) => (
@@ -98,7 +98,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 disabled={loadingMoreItems}
                 className={cn(
                   RUNS_SIDEBAR_ROW_CLASS,
-                  "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:disabled:text-gray-500",
+                  "w-full text-xs font-medium text-content-secondary transition-colors hover:bg-action-neutral-hover hover:text-content-primary disabled:cursor-not-allowed disabled:text-content-muted",
                 )}
               >
                 {!loadingMoreItems ? <Plus className="h-3.5 w-3.5 shrink-0" /> : null}
@@ -116,11 +116,11 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
       <div className="flex flex-col gap-3 pb-15">
         {page === "history" && (
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Run History</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-content-secondary mb-1">Run History</h2>
           </div>
         )}
         {events.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">No events found</div>
+          <div className="text-center py-8 text-content-secondary text-sm">No events found</div>
         ) : (
           <>
             {events.map((event, index) => (
@@ -143,7 +143,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 <button
                   onClick={onLoadMoreItems}
                   disabled={loadingMoreItems}
-                  className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
+                  className="flex items-center gap-1 text-sm font-medium text-content-secondary hover:text-content-primary disabled:text-content-muted disabled:cursor-not-allowed rounded-md px-2 py-1.5 border border-border shadow-xs"
                 >
                   {loadingMoreItems ? null : <Plus size={16} />}
                   {loadingMoreItems ? "Loading..." : `Show ${showMoreCount > 10 ? "10" : showMoreCount} more`}

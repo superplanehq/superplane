@@ -80,10 +80,10 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       typeof integration.status.metadata.webhookSigningSecretConfigured === "boolean" &&
       integration.status.metadata.webhookSigningSecretConfigured === true;
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+      <div className="bg-surface-raised rounded-lg border border-edge-default">
         <div className="p-6">
           <h2 className="text-lg font-medium mb-4">Webhook</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          <p className="text-sm text-content-secondary mb-3">
             {webhookConfigured
               ? "Webhook is configured. You can copy the URL below if needed."
               : "Add this URL in your external service to receive webhooks. Complete any setup steps described in the instructions above."}
@@ -200,7 +200,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <Link
           to={integrationsHref}
-          className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+          className="text-content-secondary hover:text-content-primary"
           aria-label="Back to integrations"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -259,7 +259,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
 
         {instructionsContent}
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+        <div className="bg-surface-raised rounded-lg border border-edge-default">
           <div className="p-6">
             <h2 className="text-lg font-medium mb-4">Configuration</h2>
             {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (
@@ -270,9 +270,9 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
               >
                 <form onSubmit={handleConfigSubmit} className="space-y-4">
                   <div>
-                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    <Label className="text-content-primary mb-2">
                       Integration Name
-                      <span className="text-gray-800 ml-1">*</span>
+                      <span className="ml-1 text-content-primary">*</span>
                     </Label>
                     <Input
                       type="text"
@@ -281,7 +281,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                       placeholder="e.g., my-app-integration"
                       disabled={!canUpdateIntegrations}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                    <p className="text-xs text-content-secondary mt-2">A unique name for this integration</p>
                   </div>
 
                   {configLoaded &&
@@ -316,32 +316,32 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                 </form>
               </PermissionTooltip>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
+              <p className="text-sm text-content-secondary">No configuration fields available.</p>
             )}
           </div>
         </div>
 
         {webhookSection}
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+        <div className="bg-surface-raised rounded-lg border border-edge-default">
           <div className="p-6">
             <h2 className="text-lg font-medium mb-4">Integration Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Integration ID</h3>
-                <p className="text-sm text-gray-800 dark:text-gray-100 font-mono">{integration.metadata?.id}</p>
+                <h3 className="text-sm font-medium text-content-secondary mb-1">Integration ID</h3>
+                <p className="text-sm text-content-primary font-mono">{integration.metadata?.id}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Used By */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+        <div className="bg-surface-raised rounded-lg border border-edge-default">
           <div className="p-6">
             <h2 className="text-lg font-medium mb-4">Used By</h2>
             {workflowGroups.length > 0 ? (
               <>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                <p className="text-sm text-content-secondary mb-3">
                   This integration is currently used in the following canvases:
                 </p>
                 <div className="space-y-2">
@@ -349,35 +349,31 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                     <button
                       key={group.canvasId}
                       onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
-                      className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                      className="w-full flex items-center gap-2 p-3 bg-surface-subtle/50 rounded-md border border-edge-default hover:bg-action-neutral-hover transition-colors text-left"
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                          Canvas: {group.canvasName}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-sm font-medium text-content-primary">Canvas: {group.canvasName}</p>
+                        <p className="text-xs text-content-secondary mt-1">
                           Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}
                           {group.nodes.map((node) => node.nodeName).join(", ")}
                         </p>
                       </div>
-                      <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                      <ExternalLink className="w-4 h-4 text-content-muted shrink-0" />
                     </button>
                   ))}
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                This integration is not used in any workflow yet.
-              </p>
+              <p className="text-sm text-content-secondary">This integration is not used in any workflow yet.</p>
             )}
           </div>
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
+        <div className="bg-surface-raised rounded-lg border border-red-200 dark:border-red-800">
           <div className="p-6">
             <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
-            <p className="text-sm text-gray-800 dark:text-gray-100 mb-4">
+            <p className="text-sm text-content-primary mb-4">
               Once you delete this integration, all its data will be permanently deleted. This action cannot be undone.
             </p>
             <PermissionTooltip
@@ -404,13 +400,13 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim">
+          <div className="bg-surface-raised rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
+              <h3 className="text-lg font-semibold text-content-primary mb-2">
                 Delete {integration?.metadata?.name || "integration"}?
               </h3>
-              <p className="text-sm text-gray-800 dark:text-gray-100 mb-6">
+              <p className="text-sm text-content-primary mb-6">
                 This cannot be undone. All data will be permanently deleted.
               </p>
               <div className="flex justify-start gap-3">

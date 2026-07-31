@@ -95,7 +95,7 @@ export function ApiKeysContent({
           <TableRow key={apiKey.id} className="last:[&>td]:border-b-0">
             <TableCell>
               <div className="flex items-center gap-2">
-                <KeyRound size={16} className="text-gray-500 dark:text-gray-400" />
+                <KeyRound size={16} className="text-content-secondary" />
                 <Link
                   href={getDetailPath(apiKey.id || "")}
                   className={settingsTableLinkClassName}
@@ -106,21 +106,21 @@ export function ApiKeysContent({
               </div>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{apiKey.description || "-"}</span>
+              <span className="text-sm text-content-secondary">{apiKey.description || "-"}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{scopeLabel(apiKey.canvasIds)}</span>
+              <span className="text-sm text-content-secondary">{scopeLabel(apiKey.canvasIds)}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateTime(apiKey.expiresAt)}</span>
+              <span className="text-sm text-content-secondary">{formatDateTime(apiKey.expiresAt)}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-content-secondary">
                 {apiKey.createdByName ? apiKey.createdByName?.trim() : "-"}
               </span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{tokenStatus(apiKey)}</span>
+              <span className="text-sm text-content-secondary">{tokenStatus(apiKey)}</span>
             </TableCell>
             <TableCell>
               <div className="flex justify-end">

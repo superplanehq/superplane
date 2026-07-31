@@ -37,15 +37,15 @@ export const DEPLOY_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
   cancelled: {
     icon: "circle-slash-2",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
   },
   rollback: {
     icon: "rotate-ccw",

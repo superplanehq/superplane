@@ -10,30 +10,22 @@ export function StepsWidget({ items }: StepsWidgetProps) {
   const firstPending = items.findIndex((i) => !i.done);
 
   return (
-    <div className="my-4 space-y-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+    <div className="my-4 space-y-1 rounded-lg border border-edge-default bg-surface-raised p-3">
       {items.map((item, i) => {
         const isActive = i === firstPending;
         return (
           <div
             key={i}
-            className={cn(
-              "flex items-center gap-2 text-xs",
-              !item.done && !isActive && "text-slate-400 dark:text-gray-500",
-            )}
+            className={cn("flex items-center gap-2 text-xs", !item.done && !isActive && "text-content-muted")}
           >
             {item.done ? (
               <Check className="size-3.5 text-green-600 shrink-0" />
             ) : isActive ? (
-              <Loader2 className="size-3.5 shrink-0 animate-spin text-slate-600 dark:text-gray-300" />
+              <Loader2 className="size-3.5 shrink-0 animate-spin text-content-secondary" />
             ) : (
-              <div className="size-3.5 shrink-0 rounded-full border border-slate-300 dark:border-gray-600" />
+              <div className="size-3.5 shrink-0 rounded-full border border-edge-default" />
             )}
-            <span
-              className={cn(
-                item.done && "text-slate-600 dark:text-gray-300",
-                isActive && "font-medium text-slate-900 dark:text-gray-100",
-              )}
-            >
+            <span className={cn(item.done && "text-content-secondary", isActive && "font-medium text-content-primary")}>
               {item.text}
             </span>
           </div>

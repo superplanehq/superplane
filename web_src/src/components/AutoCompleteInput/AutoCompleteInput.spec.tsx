@@ -140,7 +140,7 @@ describe("AutoCompleteInput suggestions", () => {
     rerender(renderInput({ __root: { data: { name: "DCO", sha: "d6f3c8a2e8b7" } } }));
 
     await waitFor(() => {
-      expect(document.querySelector('[data-suggestion-index="1"]')).toHaveClass("bg-slate-100");
+      expect(document.querySelector('[data-suggestion-index="1"]')).toHaveClass("bg-surface-subtle");
     });
   });
 

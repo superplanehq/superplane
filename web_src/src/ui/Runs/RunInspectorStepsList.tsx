@@ -62,12 +62,12 @@ export function RunInspectorStepsList({
       <RunInspectorStepsHeader status={status} errorCount={errorSummaries.length} stepCount={sections.length} />
 
       {isLoading ? (
-        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">
+        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-content-secondary">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading run steps...
         </div>
       ) : sections.length === 0 ? (
-        <div className="px-4 py-8 text-sm text-slate-500 dark:text-gray-400">No executed nodes in this run.</div>
+        <div className="px-4 py-8 text-sm text-content-secondary">No executed nodes in this run.</div>
       ) : (
         <Accordion type="single" collapsible value={selectedValue} onValueChange={onValueChange}>
           {sections.map((section) => (

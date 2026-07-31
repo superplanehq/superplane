@@ -7,7 +7,6 @@ import type {
 } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/app/lib/canvas-runs";
@@ -27,7 +26,7 @@ function NodeIcon({
   }
   return React.createElement(resolveIcon(iconSlug || "box"), {
     size: 14,
-    className: "text-gray-500 dark:text-gray-400",
+    className: "text-content-muted",
   });
 }
 
@@ -45,7 +44,7 @@ function AcknowledgeButton({
         e.stopPropagation();
         onAcknowledgeErrors([executionId]);
       }}
-      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 transition-colors whitespace-nowrap"
+      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-content-muted hover:bg-surface-subtle hover:text-content-primary transition-colors whitespace-nowrap"
     >
       Acknowledge
     </button>
@@ -89,8 +88,8 @@ function ErrorItemRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-4 py-1.5 min-h-8 text-gray-800 dark:text-gray-100",
-        isClickable && "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+        "flex items-center gap-2 px-4 py-1.5 min-h-8 text-content-primary",
+        isClickable && "cursor-pointer hover:bg-surface-subtle transition-colors",
       )}
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}
@@ -106,10 +105,10 @@ function ErrorItemRow({
         <NodeIcon node={item.node} componentIconMap={componentIconMap} />
       </div>
       <div className="flex flex-1 items-center gap-2 min-w-0">
-        <span className="text-xs text-gray-700 dark:text-gray-200 truncate">{nodeName}</span>
+        <span className="text-xs text-content-primary truncate">{nodeName}</span>
         <div
           className={cn(
-            "uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white",
+            "uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-content-inverse",
             withEventStatusBadgeClasses(badgeColor),
           )}
         >
@@ -124,7 +123,7 @@ function ErrorItemRow({
       {onAcknowledgeErrors && item.execution.id && (
         <AcknowledgeButton executionId={item.execution.id} onAcknowledgeErrors={onAcknowledgeErrors} />
       )}
-      <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums whitespace-nowrap">
+      <span className="text-xs text-content-muted tabular-nums whitespace-nowrap">
         {item.execution.createdAt ? (
           <Timestamp date={item.execution.createdAt} display="relative" relativeStyle="abbreviated" />
         ) : (
@@ -189,15 +188,15 @@ export function ErrorsConsoleContent({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className={cn("flex items-center gap-2 px-4 py-1.5 border-b", appDarkModeClasses.sidebarEdge)}>
-        <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-2 border-b border-edge-default px-4 py-1.5">
+        <span className="text-[11px] font-medium text-content-secondary">
           {errorItems.length} unacknowledged {errorItems.length === 1 ? "error" : "errors"}
         </span>
         {onAcknowledgeErrors && allErrorIds.length > 0 && (
           <button
             type="button"
             onClick={() => onAcknowledgeErrors(allErrorIds)}
-            className="ml-auto rounded-md px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 transition-colors"
+            className="ml-auto rounded-md px-2 py-0.5 text-[11px] font-medium text-content-secondary hover:bg-surface-subtle hover:text-content-primary transition-colors"
           >
             Acknowledge all
           </button>
@@ -206,12 +205,12 @@ export function ErrorsConsoleContent({
       <div className="flex-1 overflow-auto">
         {errorItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-            <CircleX className="h-6 w-6 text-gray-300 dark:text-gray-600 mb-2" />
-            <p className="text-[13px] font-medium text-gray-600 dark:text-gray-300">No unacknowledged errors</p>
-            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">All errors have been acknowledged.</p>
+            <CircleX className="h-6 w-6 text-content-muted mb-2" />
+            <p className="text-[13px] font-medium text-content-secondary">No unacknowledged errors</p>
+            <p className="mt-0.5 text-xs text-content-muted">All errors have been acknowledged.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-800/50">
+          <div className="divide-y divide-edge-subtle">
             {errorItems.map((item) => (
               <ErrorItemRow
                 key={item.execution.id}

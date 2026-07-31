@@ -10,7 +10,7 @@ export function RunNodeIcon({
   iconSlug,
   alt,
   size = 16,
-  className = "shrink-0 text-gray-500",
+  className = "shrink-0 text-content-secondary",
 }: {
   componentName?: string;
   iconSrc?: string;

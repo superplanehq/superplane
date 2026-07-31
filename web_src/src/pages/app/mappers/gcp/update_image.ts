@@ -43,7 +43,7 @@ export const updateImageMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpComputeIcon,
       iconSlug: context.componentDefinition?.icon ?? "image",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Update Image",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

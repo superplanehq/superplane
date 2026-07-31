@@ -53,26 +53,24 @@ export function VersionRow({
       <span
         className={cn(
           "min-w-0 flex-1 truncate text-xs",
-          isActive
-            ? "font-semibold text-sky-900 dark:text-indigo-300"
-            : "font-medium text-slate-900 dark:text-gray-100",
+          isActive ? "font-semibold text-status-info-content" : "font-medium text-content-primary",
         )}
       >
         {versionLabel}
       </span>
       {isCurrentLive ? (
-        <span className="shrink-0 rounded bg-sky-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-800 dark:bg-gray-700 dark:text-indigo-300">
+        <span className="shrink-0 rounded bg-status-info-subtle px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-status-info-content uppercase">
           Current
         </span>
       ) : null}
-      <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500 dark:text-gray-400">{ownerName}</span>
+      <span className="max-w-[40%] shrink-0 truncate text-[11px] text-content-secondary">{ownerName}</span>
       {timestamp ? (
         <Timestamp
           date={timestamp}
           display="relative"
           relativeStyle="abbreviated"
           includeAgo={false}
-          className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-gray-400"
+          className="shrink-0 text-xs tabular-nums text-content-secondary"
         />
       ) : null}
     </div>
@@ -96,6 +94,6 @@ function versionRowClassName(isActive: boolean): string {
   return cn(
     RUNS_SIDEBAR_ROW_CLASS,
     "group w-full cursor-pointer text-left transition-colors",
-    isActive ? "bg-sky-100 dark:bg-gray-800" : "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800",
+    isActive ? "bg-status-info-subtle" : "bg-surface-default hover:bg-action-neutral-hover",
   );
 }

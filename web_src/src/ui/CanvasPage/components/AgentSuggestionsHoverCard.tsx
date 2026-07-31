@@ -53,7 +53,7 @@ export function AgentSuggestionsHoverCard({
         >
           {children}
           <span
-            className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-violet-600/20 after:absolute after:inset-0 after:rounded-full after:ring-2 after:ring-white dark:bg-violet-500 dark:ring-violet-400/25 dark:after:ring-gray-900"
+            className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-violet-600/20 after:absolute after:inset-0 after:rounded-full after:ring-2 after:ring-surface-default dark:bg-violet-500 dark:ring-violet-400/25"
             aria-hidden="true"
             data-testid="agent-suggestions-badge"
           >
@@ -88,13 +88,13 @@ export function AgentSuggestionsHoverCard({
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-200">
                   <Sparkle className="size-3.5" aria-hidden="true" />
                 </span>
-                <span className="text-[13px] font-medium text-slate-800 dark:text-gray-100">{suggestion.label}</span>
+                <span className="text-[13px] font-medium text-content-primary">{suggestion.label}</span>
               </Button>
             </li>
           ))}
         </ul>
-        <div className="border-t border-slate-950/10 px-3 py-2 dark:border-gray-800/70">
-          <p className="text-[11px] text-slate-500 dark:text-gray-400">Sends a prompt to Agent</p>
+        <div className="border-t border-edge-subtle px-3 py-2">
+          <p className="text-[11px] text-content-secondary">Sends a prompt to Agent</p>
         </div>
       </PopoverContent>
     </Popover>

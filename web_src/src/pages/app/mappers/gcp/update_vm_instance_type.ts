@@ -39,7 +39,7 @@ export const updateVMInstanceTypeMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpIcon,
       iconSlug: context.componentDefinition?.icon ?? "cpu",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Update VM Machine Type",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

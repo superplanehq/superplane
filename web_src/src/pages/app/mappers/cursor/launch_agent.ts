@@ -40,7 +40,7 @@ export const launchAgentMapper: ComponentBaseMapper = {
     return {
       iconSrc: cursorIcon,
       iconSlug: context.componentDefinition?.icon ?? "cpu",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title:
         context.node.name ||

@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { SEGMENTED_NAV_TAB_ACTIVE_CLASSES, SEGMENTED_NAV_TAB_INACTIVE_CLASSES } from "@/lib/segmentedNav";
 import type { ThemePreference } from "@/lib/themePreference";
 import { useTheme } from "@/contexts/useTheme";
@@ -16,8 +15,8 @@ export function ThemePreferenceControl() {
   const { preference, setPreference } = useTheme();
 
   return (
-    <div className={cn("-mx-4 mt-2 border-t px-4 pt-4 pb-3", appDarkModeClasses.sidebarDivider)}>
-      <div className="inline-flex h-8 w-fit gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800">
+    <div className="-mx-4 mt-2 border-t border-edge-default px-4 pt-4 pb-3">
+      <div className="inline-flex h-8 w-fit gap-1 rounded-full bg-action-neutral p-1">
         {OPTIONS.map(({ value, label, Icon }) => {
           const isActive = preference === value;
 

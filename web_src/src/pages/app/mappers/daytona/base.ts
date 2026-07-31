@@ -25,7 +25,7 @@ export const baseMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: daytonaIcon,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

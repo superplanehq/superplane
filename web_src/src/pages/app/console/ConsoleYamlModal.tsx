@@ -51,10 +51,10 @@ export function ConsoleYamlModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="large"
-        className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0 dark:border-gray-600 dark:bg-gray-900"
+        className="flex h-full max-h-[90vh] w-[90vw] flex-col gap-0 overflow-hidden border-edge-default bg-surface-overlay p-0"
       >
-        <DialogHeader className="border-b border-slate-200 px-4 py-3 dark:border-gray-600">
-          <DialogTitle className="flex items-center gap-2 text-sm font-mono text-slate-600 dark:text-gray-400">
+        <DialogHeader className="border-b border-edge-default px-4 py-3">
+          <DialogTitle className="flex items-center gap-2 font-mono text-sm text-content-secondary">
             {filename}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -283,8 +283,8 @@ function ConsoleYamlToolbar({
   onDownload: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 dark:border-gray-600 dark:bg-gray-900">
-      <span className="text-xs text-slate-500 dark:text-gray-400">
+    <div className="flex items-center justify-between border-b border-edge-default bg-surface-raised px-4 py-2">
+      <span className="text-xs text-content-secondary">
         {isDirty ? "Editor has unsaved YAML edits" : "Showing live console YAML"}
       </span>
       <div className="flex items-center gap-2">
@@ -350,7 +350,7 @@ function ConsoleYamlFooter({
   onApply: () => void;
 }) {
   return (
-    <DialogFooter className="border-t border-slate-200 px-4 py-3 dark:border-gray-600">
+    <DialogFooter className="border-t border-edge-default px-4 py-3">
       <Button variant="outline" onClick={onClose}>
         Close
       </Button>
@@ -376,7 +376,7 @@ function ReplaceConsoleDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="dark:border-gray-600 dark:bg-gray-900">
+      <DialogContent className="border-edge-default bg-surface-overlay">
         <DialogHeader>
           <DialogTitle>Replace console?</DialogTitle>
           <DialogDescription>

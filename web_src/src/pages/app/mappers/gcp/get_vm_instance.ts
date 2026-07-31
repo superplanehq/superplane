@@ -42,7 +42,7 @@ export const getVMInstanceMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpComputeIcon,
       iconSlug: context.componentDefinition?.icon ?? "search",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Get VM Instance",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

@@ -18,7 +18,7 @@ export function CopyWebhookUrlButton({ webhookUrl }: { webhookUrl: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 border-1 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
+      className="inline-flex items-center gap-1.5 rounded border-1 border-edge-default bg-surface-raised px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-subtle"
       title={copied ? "Copied!" : "Copy webhook URL"}
     >
       <Icon name={copied ? "check" : "copy"} size="sm" />

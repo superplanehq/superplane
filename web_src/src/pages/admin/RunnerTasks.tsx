@@ -33,11 +33,11 @@ const statusBadgeClass = (status: string, cancelRequested: boolean) => {
 
   switch (status) {
     case "queued":
-      return "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-300";
+      return "bg-surface-subtle text-content-secondary";
     case "claimed":
       return "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300";
     default:
-      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+      return "bg-surface-subtle text-content-secondary";
   }
 };
 
@@ -62,33 +62,33 @@ const RelativeTimestamp = ({ value }: { value?: string }) => (
   <Timestamp
     date={value}
     display="relative"
-    className="text-gray-600 whitespace-nowrap dark:text-gray-400"
-    fallback={<span className="text-gray-400 dark:text-gray-500">—</span>}
+    className="whitespace-nowrap text-content-secondary"
+    fallback={<span className="text-content-muted">—</span>}
   />
 );
 
 const RunnerTasksTable = ({ tasks }: { tasks: RunnerTask[] }) => (
-  <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
+  <div className="overflow-hidden rounded-md bg-surface-raised shadow-sm outline outline-edge-subtle">
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b border-slate-100 dark:border-gray-700/70">
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Task ID</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Status</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Fleet</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Runner</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Execution</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Created</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Claimed</th>
-          <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Lease until</th>
+        <tr className="border-b border-edge-default">
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Task ID</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Status</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Fleet</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Runner</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Execution</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Created</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Claimed</th>
+          <th className="px-4 py-2.5 text-left font-medium text-content-secondary">Lease until</th>
         </tr>
       </thead>
       <tbody>
         {tasks.map((task) => (
           <tr
             key={task.id}
-            className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+            className="border-b border-edge-subtle transition-colors last:border-0 hover:bg-surface-subtle"
           >
-            <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100" title={task.id}>
+            <td className="px-4 py-2.5 font-mono text-xs text-content-primary" title={task.id}>
               {task.id}
             </td>
             <td className="px-4 py-2.5">
@@ -98,11 +98,9 @@ const RunnerTasksTable = ({ tasks }: { tasks: RunnerTask[] }) => (
                 {formatStatus(task.status, task.cancel_requested ?? false)}
               </span>
             </td>
-            <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{task.fleet_id || "—"}</td>
-            <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">
-              {task.runner_id?.trim() || "—"}
-            </td>
-            <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{formatExecutionMode(task)}</td>
+            <td className="px-4 py-2.5 font-mono text-xs text-content-secondary">{task.fleet_id || "—"}</td>
+            <td className="px-4 py-2.5 font-mono text-xs text-content-secondary">{task.runner_id?.trim() || "—"}</td>
+            <td className="px-4 py-2.5 text-content-secondary">{formatExecutionMode(task)}</td>
             <td className="px-4 py-2.5">
               <RelativeTimestamp value={task.created_at} />
             </td>
@@ -162,8 +160,8 @@ const RunnerTasks: React.FC = () => {
   if (loading && configured === null) {
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading runner tasks...</Text>
+        <div className="h-8 w-8 animate-spin rounded-full border-b border-focus-ring"></div>
+        <Text className="text-content-secondary">Loading runner tasks...</Text>
       </div>
     );
   }
@@ -172,35 +170,35 @@ const RunnerTasks: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Runner Tasks</h1>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-xl font-semibold text-content-primary">Runner Tasks</h1>
+          <Text className="mt-1 text-sm text-content-secondary">
             Active tasks on the task broker (queued or claimed). Refreshes every {REFRESH_INTERVAL_MS / 1000} seconds.
           </Text>
         </div>
-        <Text className="text-xs text-gray-500 dark:text-gray-400">
+        <Text className="text-xs text-content-secondary">
           {tasks.length} active task{tasks.length === 1 ? "" : "s"}
         </Text>
       </div>
 
       {!configured ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <Terminal size={24} className="mx-auto text-gray-400 dark:text-gray-500" />
-          <Text className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+        <div className="rounded-xl border border-dashed border-edge-default bg-surface-raised p-8 text-center shadow-sm">
+          <Terminal size={24} className="mx-auto text-content-muted" />
+          <Text className="mt-3 text-sm text-content-secondary">
             Runner task broker is not configured. Set{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-gray-800 dark:text-gray-200">
+            <code className="rounded bg-surface-subtle px-1 py-0.5 font-mono text-xs text-content-primary">
               TASK_BROKER_BASE_URL
             </code>{" "}
             and{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-gray-800 dark:text-gray-200">
+            <code className="rounded bg-surface-subtle px-1 py-0.5 font-mono text-xs text-content-primary">
               TASK_BROKER_AUTH_TOKEN
             </code>{" "}
             on the app server.
           </Text>
         </div>
       ) : tasks.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <Terminal size={24} className="mx-auto text-gray-400 dark:text-gray-500" />
-          <Text className="mt-3 text-sm text-gray-600 dark:text-gray-400">No active runner tasks right now.</Text>
+        <div className="rounded-xl border border-edge-default bg-surface-raised p-8 text-center shadow-sm">
+          <Terminal size={24} className="mx-auto text-content-muted" />
+          <Text className="mt-3 text-sm text-content-secondary">No active runner tasks right now.</Text>
         </div>
       ) : (
         <RunnerTasksTable tasks={tasks} />

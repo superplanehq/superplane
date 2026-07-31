@@ -86,7 +86,7 @@ export function ConsoleView({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600 dark:text-red-400">
         <p className="font-medium">Failed to load console</p>
-        <p className="text-slate-500 dark:text-gray-400">{errorMessage}</p>
+        <p className="text-content-secondary">{errorMessage}</p>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function ConsoleView({
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-400 dark:text-gray-500" />
+        <Loader2 className="h-5 w-5 animate-spin text-content-muted" />
       </div>
     );
   }
@@ -209,18 +209,16 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
     <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="console-empty-state">
       <div
         className={cn(
-          "flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white dark:border-gray-700/70",
+          "flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-edge-default bg-surface-raised",
           CONSOLE_PANEL_SHELL_SURFACE,
         )}
       >
         <div className="flex flex-col items-center px-4 pb-6 pt-8 text-center sm:px-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-gray-800">
-            <LayoutGrid className="h-6 w-6 text-sky-600 dark:text-gray-300" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-status-info-subtle">
+            <LayoutGrid className="h-6 w-6 text-status-info" />
           </div>
-          <h3 className="mt-4 text-lg font-medium tracking-tight text-slate-900 dark:text-gray-100">
-            Build your console
-          </h3>
-          <p className="mx-auto mt-1 max-w-xs text-sm leading-normal text-gray-500 dark:text-gray-400">
+          <h3 className="mt-4 text-lg font-medium tracking-tight text-content-primary">Build your console</h3>
+          <p className="mx-auto mt-1 max-w-xs text-sm leading-normal text-content-secondary">
             Console panels surface the most important docs, links, and live data for this canvas.
           </p>
           {onAddFirstPanel ? (
@@ -238,25 +236,25 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
           ) : null}
         </div>
 
-        <div className="mt-6 grid w-full gap-3 border-t border-slate-950/15 px-4 pb-8 pt-6 dark:border-gray-700/70 sm:grid-cols-3 sm:px-6">
+        <div className="mt-6 grid w-full gap-3 border-t border-edge-default px-4 pt-6 pb-8 sm:grid-cols-3 sm:px-6">
           <div className="rounded-xl px-2 py-3 text-left">
-            <FileText className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Document with markdown</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
+            <FileText className="h-5 w-5 text-status-info" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-content-primary">Document with markdown</h4>
+            <p className="mt-1 text-sm leading-normal text-content-secondary">
               Write runbooks, links, and notes in markdown.
             </p>
           </div>
           <div className="rounded-xl px-2 py-3 text-left">
-            <Table2 className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Show live data</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
+            <Table2 className="h-5 w-5 text-status-info" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-content-primary">Show live data</h4>
+            <p className="mt-1 text-sm leading-normal text-content-secondary">
               Tables, charts, and KPIs over executions or memory.
             </p>
           </div>
           <div className="rounded-xl px-2 py-3 text-left">
-            <Workflow className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Surface key nodes</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
+            <Workflow className="h-5 w-5 text-status-info" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-content-primary">Surface key nodes</h4>
+            <p className="mt-1 text-sm leading-normal text-content-secondary">
               Pin a node with its live status and an optional Run button.
             </p>
           </div>
@@ -324,7 +322,7 @@ function AddPanelDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-2xl dark:border-gray-700/70 dark:bg-gray-900">
+      <DialogContent className="border-edge-default bg-surface-overlay sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-base font-medium">Add panel</DialogTitle>
         </DialogHeader>
@@ -363,19 +361,17 @@ function AddPanelDialog({
                     aria-checked={selected}
                     onClick={() => setType(t)}
                     className={cn(
-                      "flex flex-col items-start gap-1 rounded-md border bg-white p-3 text-left transition-colors dark:bg-gray-900",
-                      "hover:border-sky-400 hover:bg-sky-50 dark:hover:border-gray-500 dark:hover:bg-gray-800",
-                      selected
-                        ? "border-sky-500 bg-sky-50 dark:border-gray-500 dark:bg-gray-800"
-                        : "border-slate-200 dark:border-gray-700/70",
+                      "flex flex-col items-start gap-1 rounded-md border bg-surface-raised p-3 text-left transition-colors",
+                      "hover:border-status-info-edge hover:bg-status-info-subtle",
+                      selected ? "border-status-info-edge bg-status-info-subtle" : "border-edge-default",
                     )}
                     data-testid={`add-panel-type-${t}`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <Icon className="h-4 w-4 text-slate-600 dark:text-gray-400" aria-hidden />
-                      <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{meta.label}</span>
+                      <Icon className="h-4 w-4 text-content-secondary" aria-hidden />
+                      <span className="text-sm font-medium text-content-primary">{meta.label}</span>
                     </div>
-                    <span className="text-xs leading-normal text-gray-500 dark:text-gray-400">{meta.description}</span>
+                    <span className="text-xs leading-normal text-content-secondary">{meta.description}</span>
                   </button>
                 );
               })}

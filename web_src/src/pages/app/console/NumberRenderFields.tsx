@@ -19,13 +19,13 @@ type VariantStyles = {
 // visual differences live here instead of being duplicated per call site.
 const VARIANT_STYLES: Record<NumberRenderFieldVariant, VariantStyles> = {
   default: {
-    label: "text-xs font-medium text-slate-600",
+    label: "text-xs font-medium text-content-secondary",
     field: "space-y-1.5",
     gridGap: "gap-3",
     optionalSuffix: " (optional)",
   },
   compact: {
-    label: "text-[10px] font-medium uppercase tracking-wide text-slate-500",
+    label: "text-[10px] font-medium uppercase tracking-wide text-content-muted",
     field: "space-y-1",
     gridGap: "gap-2",
     optionalSuffix: "",

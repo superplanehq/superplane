@@ -5,8 +5,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock, normalizeIntegrationName } from "./filter";
@@ -221,25 +219,20 @@ function OpenBuildingBlocksSidebar({
       >
         <div
           aria-hidden
-          className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50 ${
-            isResizing ? "bg-slate-950/50 dark:bg-gray-500/50" : ""
+          className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-edge-strong ${
+            isResizing ? "bg-edge-strong" : ""
           }`}
         />
       </div>
 
-      <div
-        className={cn(
-          "border-l h-full flex flex-col overflow-hidden bg-white dark:bg-gray-900",
-          appDarkModeClasses.sidebarEdge,
-        )}
-      >
+      <div className="flex h-full flex-col overflow-hidden border-l border-edge-default bg-surface-raised">
         <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
           <h2 className="min-w-0 text-sm font-medium">Select Component</h2>
           <button
             type="button"
             onClick={() => onToggle(false)}
             data-testid="close-sidebar-button"
-            className="shrink-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 dark:hover:bg-gray-800/50"
+            className="shrink-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-action-neutral-hover"
             aria-label="Close sidebar"
           >
             <X size={16} className="shrink-0" />
@@ -250,7 +243,7 @@ function OpenBuildingBlocksSidebar({
           <div className="flex items-center gap-2 px-5 pt-3 shrink-0">
             <div className="flex-1 relative min-w-0">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none dark:text-gray-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
                 size={16}
               />
               <Input
@@ -314,7 +307,7 @@ function OpenBuildingBlocksSidebar({
             {disabled && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+                  <div className="absolute inset-0 bg-surface-raised/60 z-30 cursor-not-allowed" />
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={10}>
                   <p>{disabledTooltip}</p>

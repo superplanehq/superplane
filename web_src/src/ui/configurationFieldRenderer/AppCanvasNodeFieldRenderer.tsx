@@ -87,7 +87,7 @@ export function AppCanvasNodeFieldRenderer({
             <SelectValue placeholder="Select an app first" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Choose the target app before selecting a node.</p>
+        <p className="text-xs text-content-secondary">Choose the target app before selecting a node.</p>
       </div>
     );
   }
@@ -120,7 +120,7 @@ export function AppCanvasNodeFieldRenderer({
             <SelectValue placeholder="No matching nodes available" />
           </SelectTrigger>
         </Select>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-content-secondary">
           The selected app has no nodes that match this field&apos;s requirements.
         </p>
       </div>

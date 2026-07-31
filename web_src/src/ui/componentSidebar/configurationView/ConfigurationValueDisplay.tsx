@@ -22,7 +22,7 @@ function IntegrationStatusBadge({ row, className }: { row: ConfigurationDisplayR
 
   return (
     <span className={cn("inline-flex flex-wrap items-center gap-2", className)}>
-      {showSummary ? <span className="text-[13px] text-gray-800 dark:text-gray-100">{row.displayText}</span> : null}
+      {showSummary ? <span className="text-[13px] text-content-primary">{row.displayText}</span> : null}
       <span
         className={cn(
           "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium",
@@ -41,7 +41,7 @@ function ChipList({ chips, className }: { chips: string[]; className?: string })
       {chips.map((chip) => (
         <span
           key={chip}
-          className="inline-flex max-w-full truncate rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          className="inline-flex max-w-full truncate rounded bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-content-secondary"
           title={chip}
         >
           {chip}
@@ -53,7 +53,7 @@ function ChipList({ chips, className }: { chips: string[]; className?: string })
 
 export function ConfigurationValueDisplay({ row, className }: ConfigurationValueDisplayProps) {
   if (row.kind === "empty" || row.displayText === EMPTY_DISPLAY_VALUE) {
-    return <span className={cn("text-gray-400 dark:text-gray-500", className)}>{EMPTY_DISPLAY_VALUE}</span>;
+    return <span className={cn("text-content-muted", className)}>{EMPTY_DISPLAY_VALUE}</span>;
   }
 
   if (row.kind === "integration" && row.integrationStatus) {
@@ -84,7 +84,7 @@ export function ConfigurationValueDisplay({ row, className }: ConfigurationValue
   return (
     <span
       className={cn(
-        "min-w-0 whitespace-pre-wrap break-words text-gray-800 dark:text-gray-100",
+        "min-w-0 whitespace-pre-wrap break-words text-content-primary",
         isMonospace && "font-mono text-[12px]",
         className,
       )}

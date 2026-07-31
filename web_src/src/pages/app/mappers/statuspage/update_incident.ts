@@ -99,8 +99,8 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const typeLabel = configuration?.incidentType === "scheduled" ? "Scheduled" : "Realtime";
   values.push({
     badges: [
-      { label: "Type:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-      { label: typeLabel, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+      { label: "Type:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+      { label: typeLabel, bgColor: "bg-action-neutral", textColor: "text-content-primary" },
     ],
   });
 
@@ -108,8 +108,8 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
   if (status) {
     values.push({
       badges: [
-        { label: "Status:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: status, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+        { label: "Status:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+        { label: status, bgColor: "bg-action-neutral", textColor: "text-content-primary" },
       ],
     });
   }
@@ -118,16 +118,16 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
     const bodyPreview = truncateForDisplay(configuration.body, 50);
     values.push({
       badges: [
-        { label: "Body:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: bodyPreview, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+        { label: "Body:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+        { label: bodyPreview, bgColor: "bg-action-neutral", textColor: "text-content-primary" },
       ],
     });
   }
   if (configuration?.impactOverride) {
     values.push({
       badges: [
-        { label: "Impact:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: configuration.impactOverride, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+        { label: "Impact:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+        { label: configuration.impactOverride, bgColor: "bg-action-neutral", textColor: "text-content-primary" },
       ],
     });
   }
@@ -139,8 +139,12 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
         : `${configuration.components.length} component(s)`;
     values.push({
       badges: [
-        { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
+        { label: "Components:", bgColor: "bg-action-neutral", textColor: "text-content-secondary" },
+        {
+          label: truncateForDisplay(componentLabel, 60),
+          bgColor: "bg-action-neutral",
+          textColor: "text-content-primary",
+        },
       ],
     });
   }

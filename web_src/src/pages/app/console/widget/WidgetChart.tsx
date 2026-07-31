@@ -138,7 +138,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+        <Loader2 className="size-4 animate-spin text-content-muted" />
       </div>
     );
   }
@@ -148,9 +148,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1 p-3" data-testid="widget-chart">
-      {render.title ? (
-        <div className="text-xs font-medium text-slate-600 dark:text-gray-400">{render.title}</div>
-      ) : null}
+      {render.title ? <div className="text-xs font-medium text-content-secondary">{render.title}</div> : null}
       <div className="min-h-0 flex-1">
         {render.type === "donut" ? (
           <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} isDark={isDark} />

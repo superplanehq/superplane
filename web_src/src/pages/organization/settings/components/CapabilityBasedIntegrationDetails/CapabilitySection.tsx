@@ -57,7 +57,7 @@ function CapabilityStatusCell({ capability, effectiveState, description }: Capab
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-content-muted hover:text-content-primary"
                   aria-label={`Description for ${capability.name}`}
                 >
                   <Info className="size-4 shrink-0" aria-hidden />
@@ -69,7 +69,7 @@ function CapabilityStatusCell({ capability, effectiveState, description }: Capab
             </Tooltip>
           ) : null}
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm text-gray-800 dark:text-gray-100">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm text-content-primary">
           <span className="min-w-0 break-all">{capability.name}</span>
           <CopyButton text={capability.name} />
         </div>
@@ -218,22 +218,22 @@ export function CapabilitySection({
 
   return (
     <div
-      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600"
+      className="overflow-hidden rounded-md border border-edge-default"
       role={section.label ? "group" : undefined}
       aria-label={section.label ? `${section.label} capabilities` : undefined}
     >
       {section.label ? (
-        <div className="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-900 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-100">
+        <div className="border-b border-edge-subtle bg-surface-subtle px-4 py-2.5 text-sm font-medium text-content-primary">
           {section.label}
         </div>
       ) : null}
       <div className={cn(section.label && "-mt-px", "overflow-x-auto")}>
-        <table className="table-fixed w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
+        <table className="table-fixed w-full min-w-[520px] divide-y divide-edge-subtle">
           <colgroup>
             <col className="w-[77%]" />
             <col className="w-[23%]" />
           </colgroup>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+          <tbody className="divide-y divide-edge-subtle bg-surface-raised">
             {section.names.map((capabilityName, rowIndex) => {
               const capability = capabilityByName.get(capabilityName);
               if (!capability) {

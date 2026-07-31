@@ -9,7 +9,7 @@ import { isErrorValue } from "./runNodeDetailModel";
 
 const DETAIL_VALUE_PREVIEW_CHARACTER_LIMIT = 160;
 const appRunLinkClassName =
-  "inline-flex w-fit items-center gap-1 font-medium text-gray-600 underline decoration-gray-300 underline-offset-2 transition-colors hover:text-gray-900 hover:decoration-gray-500 dark:text-gray-400 dark:decoration-gray-600 dark:hover:text-gray-100 dark:hover:decoration-gray-400";
+  "inline-flex w-fit items-center gap-1 font-medium text-content-secondary underline decoration-edge-default underline-offset-2 transition-colors hover:text-content-primary hover:decoration-edge-strong";
 
 export function RunNodeDetailDetailsView({
   details,
@@ -24,14 +24,14 @@ export function RunNodeDetailDetailsView({
     <div className="flex flex-col gap-1.5 text-[13px]">
       {statusBadge ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Status:</span>
+          <span className="w-[120px] shrink-0 truncate text-left text-content-secondary">Status:</span>
           <EventStatusBadge badgeColor={statusBadge.badgeColor} label={statusBadge.label} />
         </div>
       ) : null}
       {relativeTime ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Relative time:</span>
-          <span className="min-w-0 break-all text-gray-800 dark:text-gray-100">
+          <span className="w-[120px] shrink-0 truncate text-left text-content-secondary">Relative time:</span>
+          <span className="min-w-0 break-all text-content-primary">
             <Timestamp date={relativeTime} display="relative" relativeStyle="abbreviated" />
           </span>
         </div>
@@ -40,7 +40,7 @@ export function RunNodeDetailDetailsView({
         if (isErrorValue(value)) {
           return (
             <div key={key} className="flex items-start gap-2">
-              <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
+              <span className="w-[120px] shrink-0 truncate text-left text-content-secondary" title={key}>
                 {key}:
               </span>
               <span className="min-w-0 break-all font-medium text-red-600 dark:text-red-400">{value.message}</span>
@@ -50,7 +50,7 @@ export function RunNodeDetailDetailsView({
 
         return (
           <div key={key} className="flex items-start gap-2">
-            <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
+            <span className="w-[120px] shrink-0 truncate text-left text-content-secondary" title={key}>
               {key}:
             </span>
             <DetailValue value={value} />
@@ -67,7 +67,7 @@ function DetailValue({ value }: { value: unknown }) {
   const canExpand = stringValue.length > DETAIL_VALUE_PREVIEW_CHARACTER_LIMIT;
   const displayValue =
     canExpand && !expanded ? `${stringValue.slice(0, DETAIL_VALUE_PREVIEW_CHARACTER_LIMIT).trimEnd()}...` : stringValue;
-  const valueClassName = "min-w-0 break-words whitespace-pre-wrap text-gray-800 dark:text-gray-100";
+  const valueClassName = "min-w-0 break-words whitespace-pre-wrap text-content-primary";
   const linkClassName =
     "min-w-0 break-words whitespace-pre-wrap text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-indigo-300 dark:hover:text-indigo-200";
 

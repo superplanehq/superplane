@@ -59,7 +59,7 @@ export function MarkdownBody({
 export function MarkdownBodyLoading() {
   return (
     <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="console-markdown-loading">
-      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+      <Loader2 className="size-4 animate-spin text-content-muted" />
     </div>
   );
 }

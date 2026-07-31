@@ -44,9 +44,9 @@ const UPDATE_MEMORY_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   notFound: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
+    textColor: "text-content-primary",
+    backgroundColor: "bg-surface-subtle",
+    badgeColor: "bg-content-muted",
     label: "Not Found",
   },
 };
@@ -72,7 +72,7 @@ export const updateMemoryMapper: ComponentBaseMapper = {
     return {
       iconSlug: context.componentDefinition.icon ?? "database",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

@@ -41,8 +41,8 @@ export function PayloadPreview({
   const iconSize = labelSize === "md" ? 16 : 12;
   const labelClass =
     labelSize === "md"
-      ? "text-[13px] font-medium text-gray-500 dark:text-gray-400"
-      : "text-[11px] font-medium text-gray-400 uppercase tracking-wide dark:text-gray-500";
+      ? "text-[13px] font-medium text-content-secondary"
+      : "text-[11px] font-medium text-content-muted uppercase tracking-wide";
 
   return (
     <>
@@ -50,15 +50,12 @@ export function PayloadPreview({
         <p className={labelClass}>{label}</p>
         <div className="flex items-center gap-1">
           {showCopy && (
-            <button
-              onClick={handleCopy}
-              className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
-            >
+            <button onClick={handleCopy} className="p-1 text-content-secondary hover:text-content-primary">
               {copied ? <Check size={iconSize} /> : <Copy size={iconSize} />}
             </button>
           )}
           <button
-            className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+            className="p-1 text-content-secondary hover:text-content-primary"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();

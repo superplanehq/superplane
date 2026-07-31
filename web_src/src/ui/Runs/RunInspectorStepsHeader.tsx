@@ -15,9 +15,9 @@ export function RunInspectorStepsHeader({
   const dotClassName = errorCount > 0 ? "bg-red-500" : statusMeta.dotClassName;
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-950/10 bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 dark:text-gray-400">
+    <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-edge-subtle bg-surface-raised/95 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-content-secondary backdrop-blur">
       <span>Steps</span>
-      <span className="ml-2 inline-flex items-center gap-2 font-medium normal-case tracking-normal text-slate-500 dark:text-gray-400">
+      <span className="ml-2 inline-flex items-center gap-2 font-medium normal-case tracking-normal text-content-secondary">
         <span className={cn("h-2 w-2 rounded-full", dotClassName)} />
         {label}
       </span>

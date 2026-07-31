@@ -109,8 +109,7 @@ describe("ConversationTranscript user messages", () => {
 
     // Explicit `selection:` utilities keep dark-mode selected text readable (issue #6372).
     const transcript = screen.getByTestId("agent-chat-messages");
-    expect(transcript).toHaveClass("selection:text-slate-900");
-    expect(transcript).toHaveClass("dark:selection:text-gray-50");
+    expect(transcript).toHaveClass("selection:text-content-primary");
   });
 
   it("keeps compact user messages sticky", () => {

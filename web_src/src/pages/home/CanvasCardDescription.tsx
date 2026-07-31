@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { useTruncatedText } from "@/hooks/useTruncatedText";
 import { useState, type MouseEvent, type ReactNode } from "react";
 
-const descriptionClassName = "text-left text-sm leading-normal text-gray-800 dark:text-gray-400";
+const descriptionClassName = "text-left text-sm leading-normal text-content-secondary";
 
 export function CanvasCardDescription({ description }: { description: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -51,11 +51,7 @@ function DescriptionToggle({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline text-gray-500 hover:text-gray-700 dark:hover:text-gray-400"
-    >
+    <button type="button" onClick={onClick} className="inline text-content-muted hover:text-content-primary">
       {children}
     </button>
   );

@@ -30,7 +30,7 @@ export function ChartPanelForm({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+        <Label className="text-xs font-medium text-content-secondary">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}

@@ -115,7 +115,7 @@ export function Roles({ organizationId }: RolesProps) {
         <div className="px-6 pb-6">
           {loadingRoles ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
+              <p className="text-content-secondary">Loading roles...</p>
             </div>
           ) : (
             <Table dense>
@@ -129,7 +129,7 @@ export function Roles({ organizationId }: RolesProps) {
               <TableBody>
                 {filteredAndSortedRoles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <TableCell colSpan={3} className="text-center py-8 text-content-secondary">
                       No roles found
                     </TableCell>
                   </TableRow>
@@ -144,7 +144,7 @@ export function Roles({ organizationId }: RolesProps) {
                           <div className="flex justify-end">
                             {isDefault ? (
                               <div className="flex items-center gap-2">
-                                <span className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                <span className="rounded bg-surface-subtle px-2 py-1 text-xs text-content-secondary">
                                   Default Role
                                 </span>
                                 <TooltipProvider delayDuration={200}>
@@ -224,7 +224,7 @@ function EditRoleButton({ canUpdate, href }: { canUpdate: boolean; href: string 
     );
   }
   return (
-    <span className="cursor-not-allowed rounded-sm p-1 text-gray-400 dark:text-gray-500" aria-label="Edit role">
+    <span className="cursor-not-allowed rounded-sm p-1 text-content-muted" aria-label="Edit role">
       <Icon name="edit" size="sm" />
     </span>
   );

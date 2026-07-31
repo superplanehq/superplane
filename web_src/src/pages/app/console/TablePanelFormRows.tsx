@@ -173,10 +173,10 @@ function ShowTrendToggle({
               : { showTrend: undefined, trendBetter: undefined, trendDisplay: undefined },
           )
         }
-        className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
+        className="border-edge-default data-[state=checked]:border-status-info data-[state=checked]:bg-status-info"
         data-testid="table-column-show-trend"
       />
-      <Label htmlFor={showTrendId} className="text-xs text-slate-700 dark:text-gray-300">
+      <Label htmlFor={showTrendId} className="text-xs text-content-primary">
         Show trend
       </Label>
     </div>
@@ -197,7 +197,7 @@ export function ColumnRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex gap-2 rounded-lg bg-slate-100 p-2 dark:bg-gray-800">
+    <div className="flex gap-2 rounded-lg bg-surface-subtle p-2">
       <div className="grid min-w-0 flex-1 grid-cols-12 items-center gap-2">
         <Input
           className="col-span-4 h-8"
@@ -269,7 +269,7 @@ export function ColumnRow({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
+          className="h-6 w-6 cursor-pointer text-content-muted hover:bg-status-danger-subtle hover:text-status-danger-content"
           onClick={onRemove}
           aria-label="Remove column"
         >
@@ -293,7 +293,7 @@ export function FilterRow({
 }) {
   const needsValue = filter.op !== "exists" && filter.op !== "not_exists";
   return (
-    <div className="grid grid-cols-12 gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
+    <div className="grid grid-cols-12 gap-2 rounded border border-edge-default p-2">
       <Input
         className="col-span-4 h-8"
         value={filter.field}
@@ -343,7 +343,7 @@ export function RowStyleRow({
 }) {
   const needsValue = rule.op !== "exists" && rule.op !== "not_exists";
   return (
-    <div className="grid grid-cols-12 gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
+    <div className="grid grid-cols-12 gap-2 rounded border border-edge-default p-2">
       <Input
         className="col-span-3 h-8"
         value={rule.field}
@@ -384,7 +384,7 @@ export function RowStyleRow({
             <SelectItem key={tone} value={tone}>
               <span className="inline-flex items-center gap-2">
                 <span
-                  className={`inline-block h-3 w-4 rounded-sm border border-slate-300 dark:border-gray-600 ${ROW_STYLE_CLASS[tone]}`}
+                  className={`inline-block h-3 w-4 rounded-sm border border-edge-default ${ROW_STYLE_CLASS[tone]}`}
                   aria-hidden
                 />
                 <span>{ROW_STYLE_LABEL[tone]}</span>

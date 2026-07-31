@@ -156,7 +156,7 @@ function PreviewStatus({ loading, error }: { loading: boolean; error: string | n
   if (loading) {
     return (
       <div className="mb-5">
-        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-content-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Loading configuration...
         </div>
@@ -210,7 +210,7 @@ function InstallActions({
         variant="link"
         disabled={!canSkip}
         onClick={onSkip}
-        className="ml-4 h-auto p-0 text-xs font-normal text-gray-800 underline decoration-gray-300 underline-offset-4 dark:text-gray-200 dark:decoration-gray-600"
+        className="ml-4 h-auto p-0 text-xs font-normal text-content-primary underline decoration-edge-strong underline-offset-4"
       >
         Take me to the app without connecting
       </Button>
@@ -223,14 +223,14 @@ function AppInfoHeader({ app }: { app: AppEntry }) {
     <div className="mb-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-medium text-slate-900 dark:text-gray-100">{app.title}</h3>
-          {app.description && <p className="mt-2 text-sm text-slate-600 dark:text-gray-400">{app.description}</p>}
+          <h3 className="text-base font-medium text-content-primary">{app.title}</h3>
+          {app.description && <p className="mt-2 text-sm text-content-secondary">{app.description}</p>}
         </div>
         <a
           href={`https://${app.repo}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex shrink-0 items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-content-secondary hover:text-content-primary"
         >
           <ExternalLink className="h-3 w-3" />
           GitHub
@@ -261,10 +261,10 @@ function AppNameSection({ value, onChange }: { value: string; onChange: (name: s
 
 function RequirementsList({ requirements }: { requirements: string[] }) {
   return (
-    <ul className="mt-4 space-y-0.5 text-sm text-slate-600 dark:text-gray-400">
+    <ul className="mt-4 space-y-0.5 text-sm text-content-secondary">
       {requirements.map((req) => (
         <li key={req} className="flex items-start gap-1.5">
-          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-slate-400 dark:bg-gray-500" />
+          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-content-muted" />
           {req}
         </li>
       ))}
@@ -287,7 +287,7 @@ function ParamsSection({
 }) {
   return (
     <>
-      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Configuration</p>
+      <p className="mb-3 text-xs font-semibold text-content-secondary">Configuration</p>
       <div className="space-y-3">
         {params.map((param) => (
           <div key={param.name} className="space-y-1">
@@ -329,7 +329,7 @@ function ParamsSection({
                 onChange={(e) => onChange((prev) => ({ ...prev, [param.name]: e.target.value }))}
               />
             )}
-            {param.description && <p className="text-[10px] text-slate-400 dark:text-gray-500">{param.description}</p>}
+            {param.description && <p className="text-[10px] text-content-muted">{param.description}</p>}
           </div>
         ))}
       </div>

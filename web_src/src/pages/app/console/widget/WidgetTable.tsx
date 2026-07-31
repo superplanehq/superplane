@@ -131,7 +131,7 @@ export function WidgetTable({
     // dead-ending on the empty message.
     return (
       <div data-testid="widget-table-empty-wrap">
-        <div className="p-4 text-center text-xs text-slate-500 dark:text-gray-400" data-testid="widget-table-empty">
+        <div className="p-4 text-center text-xs text-content-muted" data-testid="widget-table-empty">
           {render.emptyMessage ?? "No data to display."}
         </div>
         {hasMore && onLoadMore ? (
@@ -222,11 +222,11 @@ function WidgetTableGrid({
                 key={rowKey}
                 data-row-tone={toneClass ? "true" : undefined}
                 className={cn(
-                  "border-b border-black/10 last:border-0 dark:border-gray-800",
+                  "border-b border-edge-subtle last:border-0",
                   // Drop the default hover wash when a tone is applied so the
                   // tint isn't overridden — the row already has a deliberate
                   // background and a hover bg would mask it.
-                  toneClass ? toneClass : "hover:bg-slate-50/60 dark:hover:bg-gray-800/60",
+                  toneClass ? toneClass : "hover:bg-surface-subtle",
                 )}
               >
                 {render.columns.map((col, ci) => (
@@ -270,7 +270,7 @@ export function WidgetLoadMoreFooter({
 }) {
   return (
     <div
-      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/60"
+      className="flex items-center justify-center border-t border-edge-subtle bg-surface-subtle px-3 py-2"
       data-testid="widget-table-load-more"
     >
       <Button
@@ -292,7 +292,7 @@ export function WidgetLoadMoreFooter({
 function WidgetSpinner() {
   return (
     <div className="flex h-full items-center justify-center p-4">
-      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
+      <Loader2 className="size-4 animate-spin text-content-muted" />
     </div>
   );
 }

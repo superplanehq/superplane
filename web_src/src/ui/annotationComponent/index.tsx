@@ -203,7 +203,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   );
 
   // Shared text styling for both modes
-  const textStyles = "text-sm leading-normal text-gray-800 dark:text-white/80";
+  const textStyles = "text-sm leading-normal text-content-primary";
   const showNoteActions = canvasMode === "edit" && !hideActionsButton;
   const isNoteEditable = canvasMode === "edit";
 
@@ -250,39 +250,30 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           className={cn(
             "group relative flex flex-col rounded-md outline",
             getDraftDiffOutlineClassName(draftDiffStatus),
-            dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-700" : colorStyles.container,
+            dimBodyBelowHeader ? "bg-surface-subtle" : colorStyles.container,
           )}
         >
           <div
             className={cn(
               "canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab",
-              dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-700" : colorStyles.background,
+              dimBodyBelowHeader ? "bg-surface-subtle" : colorStyles.background,
             )}
           >
             <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
               <span
-                className={cn(
-                  "h-px w-full",
-                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
-                )}
+                className={cn("h-px w-full", dimBodyBelowHeader ? "bg-content-muted/30" : "bg-content-primary/15")}
               />
               <span
-                className={cn(
-                  "h-px w-full",
-                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
-                )}
+                className={cn("h-px w-full", dimBodyBelowHeader ? "bg-content-muted/30" : "bg-content-primary/15")}
               />
               <span
-                className={cn(
-                  "h-px w-full",
-                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
-                )}
+                className={cn("h-px w-full", dimBodyBelowHeader ? "bg-content-muted/30" : "bg-content-primary/15")}
               />
             </div>
           </div>
 
           {dimBodyBelowHeader ? (
-            <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md dark:bg-gray-700" aria-hidden />
+            <div className="flex-1 min-h-24 shrink-0 bg-surface-subtle rounded-b-md" aria-hidden />
           ) : (
             <>
               {showNoteActions && (
@@ -324,7 +315,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           event.stopPropagation();
                           onDuplicate();
                         }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                        className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
                         aria-label="Duplicate note"
                       >
                         <Copy size={16} />
@@ -338,7 +329,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           event.stopPropagation();
                           onDelete();
                         }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                        className="flex items-center justify-center p-1 text-content-secondary transition hover:text-content-primary"
                         aria-label="Delete note"
                       >
                         <Trash2 size={16} />
@@ -385,12 +376,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       className={cn(
                         "nodrag h-full w-full resize-none bg-transparent outline-none",
                         textStyles,
-                        "placeholder:text-black/50 dark:placeholder:text-white/45",
+                        "placeholder:text-content-primary/50",
                       )}
                       placeholder="Start typing..."
                       aria-label={`${title} note`}
                     />
-                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none dark:bg-black/20 dark:text-white/50">
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-content-primary/5 text-[10px] text-content-primary/40 pointer-events-none select-none">
                       Markdown supported
                     </span>
                   </>
@@ -464,7 +455,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         {annotationText}
                       </ReactMarkdown>
                     ) : (
-                      <span className="text-black/50 dark:text-white/45">
+                      <span className="text-content-primary/50">
                         {isNoteEditable ? "Double click to add and edit notes..." : "No notes"}
                       </span>
                     )}
@@ -490,9 +481,9 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       viewBox="0 0 12 12"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
-                      className="opacity-30 text-gray-900 dark:text-gray-400 dark:opacity-50"
+                      className="opacity-30 text-content-primary dark:opacity-50"
                     >
-                      <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
+                      <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="currentColor" />
                       <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
                     </svg>
                   </span>

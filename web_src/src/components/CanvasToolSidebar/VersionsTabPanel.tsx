@@ -70,7 +70,7 @@ export function VersionsTabPanel({
         <section>
           <VersionsSectionHeader label="Version History" />
           {hasNoVersions ? (
-            <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">No commit history yet.</p>
+            <p className="px-3 py-2 text-xs text-content-secondary">No commit history yet.</p>
           ) : (
             <VersionRowList items={liveItems} onUseVersion={onUseVersion} />
           )}
@@ -115,7 +115,9 @@ function useVersionsPanelData({
 function VersionsSectionHeader({ label }: { label: string }) {
   return (
     <div className={cn(RUNS_SIDEBAR_ROW_CLASS, "justify-between pr-1.5")}>
-      <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="min-w-0 truncate text-[11px] font-medium tracking-wide text-content-secondary uppercase">
+        {label}
+      </span>
     </div>
   );
 }
@@ -130,9 +132,7 @@ function VersionsNotices({
   return (
     <>
       {!canEditCanvasVersion && !canvasDeletedRemotely ? (
-        <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">
-          You do not have permission to edit this canvas.
-        </p>
+        <p className="px-3 py-2 text-xs text-content-secondary">You do not have permission to edit this canvas.</p>
       ) : null}
       {canvasDeletedRemotely ? (
         <p className="px-3 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>

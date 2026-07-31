@@ -22,14 +22,14 @@ export const IF_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   true: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "Resolved: true",
   },
   false: {
     icon: "circle-check",
-    textColor: "text-gray-800",
+    textColor: "text-content-primary",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
     label: "Resolved: false",
@@ -98,7 +98,7 @@ export const ifMapper: ComponentBaseMapper = {
     return {
       iconSlug: "split",
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       title:
         context.node.name ||
         context.componentDefinition.label ||

@@ -201,14 +201,14 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   return (
     <>
       <div className="flex flex-col gap-2 relative">
-        <div className="border rounded-md border-gray-300 dark:border-gray-600 p-1" style={{ height: "200px" }}>
+        <div className="border rounded-md border-edge-strong p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button
                 type="button"
                 aria-label={`Copy ${label}`}
                 onClick={() => copyToClipboard(editorValue)}
-                className="p-1 rounded text-gray-500 hover:text-gray-800"
+                className="p-1 rounded text-content-secondary hover:text-content-primary"
               >
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
               </button>
@@ -219,7 +219,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
                 aria-label={`Expand ${label} editor`}
                 data-testid={toTestId(`${testId}-expand`)}
                 onClick={() => setIsModalOpen(true)}
-                className="p-1 text-gray-500 hover:text-gray-800"
+                className="p-1 text-content-secondary hover:text-content-primary"
               >
                 {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
               </button>
@@ -252,7 +252,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
                 e.stopPropagation();
                 copyToClipboard(draft);
               }}
-              className="flex items-center gap-1 rounded bg-gray-50 px-3 py-1 text-sm text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              className="flex items-center gap-1 rounded bg-surface-default px-3 py-1 text-sm text-content-primary hover:bg-action-neutral-hover"
             >
               {React.createElement(resolveIcon("copy"), { size: 14 })}
               Copy
@@ -356,7 +356,7 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
       onInteractOutside={handleInteractOutside}
       data-testid={testId}
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-edge-subtle px-4 py-3 pr-12">
         <DialogTitle className="truncate">{title}</DialogTitle>
         <DialogDescription className="sr-only">
           Expanded editor for {title}. Save to apply your changes or cancel to discard them.
@@ -366,7 +366,7 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
         {children({ value: draft, onChange: setDraft })}
       </div>
-      <DialogFooter className="shrink-0 border-t border-gray-200 px-4 py-3 dark:border-gray-600">
+      <DialogFooter className="shrink-0 border-t border-edge-subtle px-4 py-3">
         <Button type="button" variant="outline" onClick={handleCancel} data-testid="expandable-editor-cancel">
           Cancel
         </Button>
@@ -391,7 +391,7 @@ const ExpandFieldButton: React.FC<ExpandFieldButtonProps> = ({ onClick, label, t
       aria-label={label}
       data-testid={testId}
       onClick={onClick}
-      className="absolute right-1.5 top-1.5 z-10 rounded bg-white/80 p-1 text-gray-500 backdrop-blur-sm hover:text-gray-800 dark:bg-gray-800/80 dark:text-gray-400 dark:hover:text-gray-100"
+      className="absolute right-1.5 top-1.5 z-10 rounded bg-surface-raised/80 p-1 text-content-secondary backdrop-blur-sm hover:text-content-primary"
     >
       {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
     </button>

@@ -39,8 +39,8 @@ export interface EventSourceProps {
   collapsed?: boolean;
 }
 
-const DEFAULT_SECTION_TONE = "bg-gray-100";
-const DEFAULT_BADGE_TONE = "bg-gray-950";
+const DEFAULT_SECTION_TONE = "bg-surface-subtle";
+const DEFAULT_BADGE_TONE = "bg-action-primary";
 
 export const EventSource: React.FC<EventSourceProps> = ({
   title,
@@ -74,7 +74,7 @@ export const EventSource: React.FC<EventSourceProps> = ({
           className={cn(
             "flex h-20 w-20 items-center justify-center rounded-full text-white",
             badgeTone,
-            selected ? "border-[3px] border-black" : "border border-border",
+            selected ? "border-[3px] border-action-primary" : "border border-border",
           )}
         >
           {badgeImageSrc ? (
@@ -84,7 +84,7 @@ export const EventSource: React.FC<EventSourceProps> = ({
           )}
           {badgeLabel ? <span className="sr-only">{badgeLabel}</span> : null}
         </div>
-        <CardTitle className="text-base font-semibold text-neutral-900 pt-1">{title}</CardTitle>
+        <CardTitle className="text-base font-semibold text-content-primary pt-1">{title}</CardTitle>
         <Button variant="linkSubdued" className="justify-center text-sm" asChild>
           <a href={resource.href} target="_blank" rel="noreferrer" className="flex items-center">
             <ResourceIcon className="size-4" />
@@ -111,12 +111,12 @@ export const EventSource: React.FC<EventSourceProps> = ({
       <Card
         className={cn(
           "flex h-full w-full flex-col overflow-hidden p-0",
-          selected ? "border-[3px] border-black shadow-none" : "border border-border shadow-sm",
+          selected ? "border-[3px] border-action-primary shadow-none" : "border border-border shadow-sm",
         )}
       >
-        <CardHeader className={cn("space-y-2 rounded-none pb-4 text-base text-neutral-900", sectionTone)}>
+        <CardHeader className={cn("space-y-2 rounded-none pb-4 text-base text-content-primary", sectionTone)}>
           <CardTitle>{title}</CardTitle>
-          <CardDescription className="flex flex-col items-start gap-2 py-2 text-sm text-neutral-900">
+          <CardDescription className="flex flex-col items-start gap-2 py-2 text-sm text-content-primary">
             <Button variant="linkSubdued" className="justify-start" asChild>
               <a href={resource.href} target="_blank" rel="noreferrer" className="flex items-center gap-2">
                 <ResourceIcon />
@@ -139,7 +139,7 @@ export const EventSource: React.FC<EventSourceProps> = ({
                       </Badge>
                     </HoverCardTrigger>
                     <HoverCardContent className="w-56 space-y-2 text-xs">
-                      <p className="text-sm font-medium text-neutral-900">Active filters</p>
+                      <p className="text-sm font-medium text-content-primary">Active filters</p>
                       <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
                         {filters.map((filter) => (
                           <li key={filter}>{filter}</li>
@@ -168,11 +168,11 @@ export const EventSource: React.FC<EventSourceProps> = ({
           </CardDescription>
         </CardHeader>
         {content ? (
-          <CardContent className={cn("rounded-none p-6 text-sm leading-relaxed text-neutral-900", sectionTone)}>
+          <CardContent className={cn("rounded-none p-6 text-sm leading-relaxed text-content-primary", sectionTone)}>
             {content}
           </CardContent>
         ) : null}
-        <CardFooter className="flex flex-col items-start gap-3 bg-white p-6 pt-4 text-neutral-900">
+        <CardFooter className="flex flex-col items-start gap-3 bg-surface-raised p-6 pt-4 text-content-primary">
           <div className="text-sm font-semibold text-muted-foreground">
             {events && events.length === 1 ? "Latest Event" : "Latest Events"}
           </div>

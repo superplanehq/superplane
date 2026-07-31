@@ -54,10 +54,10 @@ export function NumberPanelCompositeSourcesEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3 dark:border-gray-800/70 dark:bg-gray-900">
+    <div className="space-y-3 rounded-md border border-edge-default bg-surface-subtle p-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Combine</Label>
+          <Label className="text-xs font-medium text-content-secondary">Combine</Label>
           <Select
             value={dataSource.combine}
             onValueChange={(v) => updateDataSource({ ...dataSource, combine: v as WidgetNumberCombine })}
@@ -77,12 +77,12 @@ export function NumberPanelCompositeSourcesEditor({
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-slate-600">Memory sources</Label>
+          <Label className="text-xs font-medium text-content-secondary">Memory sources</Label>
           <Button type="button" size="sm" variant="outline" onClick={addSource} data-testid="number-add-source">
             Add source
           </Button>
         </div>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-content-muted">
           Each source aggregates its own namespace independently; the partials are combined with the operator above.
         </p>
         <div className="space-y-2">
@@ -130,10 +130,10 @@ function MemorySourceRow({
   const fieldListId = fields.length > 0 ? `number-source-fields-${canvasId ?? ""}-${sourceRowId}` : undefined;
 
   return (
-    <div className="space-y-2 rounded-md border border-slate-200 bg-white p-2 dark:border-gray-800/70 dark:bg-gray-900">
+    <div className="space-y-2 rounded-md border border-edge-default bg-surface-raised p-2">
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Namespace</Label>
+          <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Namespace</Label>
           <Input
             list={namespaceListId}
             value={source.namespace}
@@ -143,7 +143,7 @@ function MemorySourceRow({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Aggregation</Label>
+          <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Aggregation</Label>
           <Select
             value={source.aggregation}
             onValueChange={(v) =>
@@ -168,7 +168,7 @@ function MemorySourceRow({
       </div>
       {needsField ? (
         <div className="space-y-1">
-          <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Field</Label>
+          <Label className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Field</Label>
           <Input
             list={fieldListId}
             value={source.field ?? ""}

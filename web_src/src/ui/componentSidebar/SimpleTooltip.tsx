@@ -18,7 +18,7 @@ export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content,
       render={(attrs) => (
         <div
           {...attrs}
-          className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words"
+          className="bg-content-primary text-content-inverse text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words"
         >
           {content}
         </div>

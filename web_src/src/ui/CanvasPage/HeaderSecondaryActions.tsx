@@ -300,8 +300,8 @@ function ExitEditButton({
       aria-label="Finish editing"
       className="group flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <span className="text-[13px] font-medium text-slate-600 dark:text-gray-400">Finish Editing</span>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-950 transition-colors group-hover:bg-slate-950/5 dark:text-gray-100 dark:group-hover:bg-gray-800/50">
+      <span className="text-[13px] font-medium text-content-secondary">Finish Editing</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-content-primary transition-colors group-hover:bg-action-neutral-hover">
         <X className="h-4 w-4" aria-hidden />
       </span>
     </button>

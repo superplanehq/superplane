@@ -77,11 +77,11 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
   const isLast = currentIndex === questions.length - 1;
 
   return (
-    <div className="my-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+    <div className="my-4 overflow-hidden rounded-lg border border-edge-default bg-surface-raised">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/60">
-        <p className="text-xs font-medium text-slate-900 dark:text-gray-100">{current.prompt}</p>
-        <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
+      <div className="flex items-center justify-between border-b border-edge-default bg-surface-subtle px-3 py-2">
+        <p className="text-xs font-medium text-content-primary">{current.prompt}</p>
+        <span className="text-[10px] font-medium text-content-secondary">
           {currentIndex + 1}/{questions.length}
         </span>
       </div>
@@ -115,10 +115,10 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
               value={customInputs[currentIndex]}
               onChange={handleCustomInputChange}
               className={cn(
-                "flex-1 rounded border px-3 py-2 text-xs outline-none transition-colors dark:text-gray-100 dark:placeholder:text-gray-500",
+                "flex-1 rounded border px-3 py-2 text-xs text-content-primary outline-none transition-colors placeholder:text-content-muted",
                 customInputs[currentIndex] && answers[currentIndex] === customInputs[currentIndex].trim()
-                  ? "border-slate-400 bg-slate-50 ring-1 ring-slate-300 dark:border-gray-500 dark:bg-gray-700 dark:ring-gray-600"
-                  : "border-slate-200 bg-white focus:border-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-gray-500",
+                  ? "border-edge-strong bg-action-neutral ring-1 ring-focus-ring"
+                  : "border-edge-default bg-surface-raised focus:border-focus-ring",
               )}
             />
           </div>
@@ -184,11 +184,7 @@ function SurveyStepDot({
       onClick={handleClick}
       className={cn(
         "size-2 rounded-full transition-colors",
-        isActive
-          ? "bg-slate-700 dark:bg-gray-300"
-          : isAnswered
-            ? "bg-slate-400 dark:bg-gray-500"
-            : "bg-slate-200 dark:bg-gray-700",
+        isActive ? "bg-content-primary" : isAnswered ? "bg-content-muted" : "bg-edge-default",
       )}
       aria-label={`Question ${index + 1}`}
     />
@@ -217,12 +213,12 @@ function SurveyOptionButton({
       className={cn(
         "h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs",
         selected
-          ? "bg-slate-100 text-slate-900 ring-1 ring-slate-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
-          : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100",
+          ? "bg-action-neutral text-content-primary ring-1 ring-focus-ring"
+          : "text-content-secondary hover:bg-action-neutral-hover hover:text-content-primary",
       )}
       onClick={handleClick}
     >
-      <span className="mr-2 inline-flex size-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-700 dark:bg-gray-700 dark:text-gray-200">
+      <span className="mr-2 inline-flex size-5 shrink-0 items-center justify-center rounded bg-action-neutral text-[10px] font-semibold text-content-secondary">
         {String.fromCharCode(65 + index)}
       </span>
       {option}
@@ -248,7 +244,7 @@ function SurveyNavigation({
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 text-xs text-slate-500 dark:text-gray-400"
+        className="h-7 text-xs text-content-secondary"
         disabled={isFirst}
         onClick={onPrevious}
       >
@@ -261,7 +257,7 @@ function SurveyNavigation({
           Continue →
         </Button>
       ) : (
-        <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 dark:text-gray-400" onClick={onNext}>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-content-secondary" onClick={onNext}>
           Next
           <ChevronRight size={12} className="ml-1" />
         </Button>

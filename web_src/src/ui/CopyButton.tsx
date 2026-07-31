@@ -87,7 +87,7 @@ export function CopyButton({
       data-testid={dataTestId}
       className={cn(
         "p-1 rounded transition-colors shrink-0",
-        dark ? "hover:bg-gray-700" : "hover:bg-gray-200 dark:hover:bg-gray-700",
+        dark ? "hover:bg-gray-700" : "hover:bg-action-neutral-hover",
         className,
       )}
       title={copied ? "Copied to clipboard" : "Copy to clipboard"}
@@ -95,7 +95,7 @@ export function CopyButton({
       {copied ? (
         <Check size={13} className={dark ? "text-green-400" : "text-green-600 dark:text-green-400"} />
       ) : (
-        <Copy size={13} className={dark ? "text-gray-400 hover:text-gray-200" : "text-gray-400"} />
+        <Copy size={13} className={dark ? "text-content-muted hover:text-gray-200" : "text-content-muted"} />
       )}
     </button>
   );

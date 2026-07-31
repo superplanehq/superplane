@@ -79,8 +79,8 @@ const WelcomeSurvey: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-400 px-4 py-10">
-      <div className="w-full max-w-xl rounded-lg bg-white px-8 py-9 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 sm:px-10">
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas px-4 py-10">
+      <div className="w-full max-w-xl rounded-lg bg-surface-raised px-8 py-9 shadow-sm outline outline-edge-subtle sm:px-10">
         <PostHogSurveyForm survey={survey} redirectTo={redirectTo} onComplete={handleSurveyComplete} />
       </div>
     </div>

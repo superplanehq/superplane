@@ -85,7 +85,7 @@ export function IntegrationStatusIndicator({
           <button
             type="button"
             onClick={handleToggle}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 h-8 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-500 dark:border-orange-500 text-orange-500 dark:text-orange-400 hover:bg-white dark:hover:bg-gray-900 transition-colors text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 h-8 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-500 dark:border-orange-500 text-orange-500 dark:text-orange-400 hover:bg-surface-raised transition-colors text-xs font-medium cursor-pointer"
           >
             <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
             <span>
@@ -100,11 +100,11 @@ export function IntegrationStatusIndicator({
   }
 
   return (
-    <div className="w-80 bg-white dark:bg-gray-900 border border-orange-500 dark:border-orange-500 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="w-80 bg-surface-raised border border-orange-500 dark:border-orange-500 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full px-3 py-2 flex items-center justify-between cursor-pointer bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/40 dark:to-gray-900"
+        className="w-full px-3 py-2 flex items-center justify-between cursor-pointer bg-gradient-to-b from-orange-50 to-surface-raised dark:from-orange-950/40"
       >
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
@@ -122,7 +122,7 @@ export function IntegrationStatusIndicator({
           return (
             <div
               key={integration.integrationName}
-              className={`flex items-center gap-3 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-opacity duration-300 ${
+              className={`flex items-center gap-3 px-3 py-2.5 border-b border-edge-subtle last:border-b-0 transition-opacity duration-300 ${
                 integration.justConnected ? "opacity-50" : ""
               }`}
             >
@@ -133,12 +133,12 @@ export function IntegrationStatusIndicator({
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                  <p className="text-sm font-medium text-content-primary truncate">{displayName}</p>
                   {integration.state && (
                     <IntegrationStateBadge state={integration.state} description={integration.stateDescription} />
                   )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-content-secondary">
                   {integration.affectedNodeCount} {integration.affectedNodeCount === 1 ? "node" : "nodes"}
                 </p>
               </div>

@@ -180,7 +180,7 @@ export const runnerMapper: ComponentBaseMapper = {
       iconSlug,
       iconColor,
       collapsed: context.node.isCollapsed,
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       eventSections: lastExecution ? runnerEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: [],

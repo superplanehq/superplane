@@ -15,8 +15,8 @@ function ConfigurationGroupHeader({ header, className, hideSummary = false }: Co
 
   return (
     <div className={cn("flex items-baseline justify-between gap-2", className)}>
-      <p className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">{header.label}</p>
-      {hasSummary ? <span className="text-[11px] text-gray-500 dark:text-gray-400">{header.displayText}</span> : null}
+      <p className="text-[12px] font-semibold text-content-secondary">{header.label}</p>
+      {hasSummary ? <span className="text-[11px] text-content-secondary">{header.displayText}</span> : null}
     </div>
   );
 }
@@ -39,7 +39,7 @@ export function ConfigurationNestedGroup({
   return (
     <div className={cn("min-w-0 mt-1", className)}>
       <ConfigurationGroupHeader header={header} hideSummary={hideHeaderSummaries} />
-      <div className={cn("relative ml-1.5 mt-1.5 min-w-0 border-l border-slate-950/10 pl-3", contentClassName)}>
+      <div className={cn("relative ml-1.5 mt-1.5 min-w-0 border-l border-edge-subtle pl-3", contentClassName)}>
         <div className="flex flex-col gap-1.5">{children}</div>
       </div>
     </div>

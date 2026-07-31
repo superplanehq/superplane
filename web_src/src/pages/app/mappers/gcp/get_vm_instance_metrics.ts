@@ -68,7 +68,7 @@ export const getVMInstanceMetricsMapper: ComponentBaseMapper = {
     return {
       iconSrc: gcpIcon,
       iconSlug: context.componentDefinition?.icon ?? "chart-line",
-      collapsedBackground: "bg-white",
+      collapsedBackground: "bg-surface-raised",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Get VM Metrics",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,

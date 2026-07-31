@@ -459,7 +459,7 @@ export function CreateRolePage() {
   if (permissionsLoading) {
     return (
       <div className="flex justify-center items-center min-h-[40vh]">
-        <p className="text-gray-500">Checking permissions...</p>
+        <p className="text-content-secondary">Checking permissions...</p>
       </div>
     );
   }
@@ -483,11 +483,11 @@ export function CreateRolePage() {
         <div className="mb-6">
           <div className="flex items-center text-left">
             <div>
-              <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">
+              <Heading level={2} className="text-2xl font-medium text-content-primary mb-2">
                 {isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create New Role"}
               </Heading>
               {isReadOnly && (
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                <Text className="text-sm text-content-secondary">
                   Default roles are read-only and cannot be edited.
                 </Text>
               )}
@@ -498,15 +498,15 @@ export function CreateRolePage() {
         {/* Role Form */}
         <div className="space-y-6">
           {isLoading ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="bg-surface-raised rounded-lg border border-edge-default p-6">
               <div className="flex justify-center items-center h-32">
-                <p className="text-gray-500 dark:text-gray-400">Loading role data...</p>
+                <p className="text-content-secondary">Loading role data...</p>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="bg-surface-raised rounded-lg border border-edge-default p-6">
               {error && (
-                <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-6">
+                <div className="mb-6 rounded border border-status-danger-edge bg-status-danger-subtle px-4 py-2 text-status-danger-content">
                   <p className="text-sm">{error instanceof Error ? error.message : "Failed to load role data"}</p>
                 </div>
               )}
@@ -514,10 +514,7 @@ export function CreateRolePage() {
               <div className="space-y-1">
                 {/* Role Name */}
                 <div>
-                  <label
-                    htmlFor="role-name-input"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
+                  <label htmlFor="role-name-input" className="block text-sm font-medium text-content-secondary mb-2">
                     Role Name *
                   </label>
                   <Input
@@ -539,14 +536,12 @@ export function CreateRolePage() {
 
                 {/* Permissions */}
                 <div className="pt-4 mb-4">
-                  <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">
-                    Organization Permissions
-                  </h2>
-                  <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  <h2 className="text-base font-semibold text-content-primary mb-2">Organization Permissions</h2>
+                  <Text className="text-sm text-content-secondary">
                     Select the permissions this role should have within the organization.
                   </Text>
                   {isReadOnly && (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <Text className="text-xs text-content-secondary mt-1">
                       Permissions are read-only for default roles.
                     </Text>
                   )}
@@ -556,11 +551,11 @@ export function CreateRolePage() {
                   {ORGANIZATION_PERMISSIONS.map((category) => (
                     <div key={category.category} className="space-y-4">
                       <div className="flex items-center mb-3">
-                        <h3 className="text-md font-semibold text-gray-800 dark:text-white">{category.category}</h3>
+                        <h3 className="text-md font-semibold text-content-primary">{category.category}</h3>
                         {!isReadOnly && (
                           <button
                             type="button"
-                            className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
+                            className="ml-3 cursor-pointer border-none bg-transparent text-xs font-medium text-content-muted"
                             onClick={() => handleCategoryToggle(category.permissions)}
                           >
                             {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}

@@ -153,8 +153,8 @@ function CanvasFolderDeleteDialog({
 }) {
   return (
     <Dialog open={open} onClose={onClose} size="lg" className="text-left">
-      <DialogTitle className="text-gray-800 dark:text-white">Remove "{folder.title}"?</DialogTitle>
-      <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+      <DialogTitle className="text-content-primary">Remove "{folder.title}"?</DialogTitle>
+      <DialogDescription className="text-sm text-content-secondary">
         This will remove only the folder. The canvases will remain available.
       </DialogDescription>
       <DialogActions>

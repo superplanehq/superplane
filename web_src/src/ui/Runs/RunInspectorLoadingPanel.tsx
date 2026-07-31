@@ -1,6 +1,4 @@
 import { Loader2 } from "lucide-react";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { RunInspectorChrome } from "./RunInspectorChrome";
 import { ResizeHandle } from "./RunInspectorResize";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
@@ -10,17 +8,14 @@ export function RunInspectorLoadingPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <aside
-      className={cn(
-        "relative z-20 flex h-full shrink-0 flex-col border-l border-slate-950/10 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100",
-        appDarkModeClasses,
-      )}
+      className="relative z-20 flex h-full shrink-0 flex-col border-l border-edge-subtle bg-surface-raised text-content-primary"
       style={{ width: inspectorWidth.width }}
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={inspectorWidth.startResize} isResizing={inspectorWidth.isResizing} />
       <RunInspectorChrome onClose={onClose} />
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-gray-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-content-secondary" />
       </div>
     </aside>
   );

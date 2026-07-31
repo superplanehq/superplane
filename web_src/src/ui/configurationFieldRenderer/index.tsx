@@ -333,7 +333,7 @@ export const ConfigurationFieldRenderer = ({
           <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
           <Label className="block text-left flex-1 min-w-0">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
+            {isRequired && <span className="text-content-primary ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -364,7 +364,7 @@ export const ConfigurationFieldRenderer = ({
         )}
 
         {fieldDescription && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
+          <p className="text-xs text-content-secondary text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
     );
@@ -378,7 +378,7 @@ export const ConfigurationFieldRenderer = ({
           {renderField()}
           <Label className="text-left cursor-pointer">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
+            {isRequired && <span className="text-content-primary ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -404,7 +404,7 @@ export const ConfigurationFieldRenderer = ({
         )}
 
         {fieldDescription && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
+          <p className="text-xs text-content-secondary text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
     );
@@ -417,7 +417,7 @@ export const ConfigurationFieldRenderer = ({
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left flex-1 min-w-0">
           {fieldLabel}
-          {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
+          {isRequired && <span className="text-content-primary ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
               (!enableRealtimeValidation &&
@@ -451,7 +451,7 @@ export const ConfigurationFieldRenderer = ({
 
       {/* Display field description */}
       {fieldDescription && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
+        <p className="text-xs text-content-secondary text-left leading-normal">{fieldDescription}</p>
       )}
     </div>
   );
