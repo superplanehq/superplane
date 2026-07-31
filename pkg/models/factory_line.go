@@ -2,10 +2,12 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/superplanehq/superplane/pkg/core"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -20,6 +22,8 @@ const (
 var (
 	ErrFactoryLineNotFound          = errors.New("factory line not found")
 	ErrFactoryLineNameAlreadyExists = errors.New("factory line name already exists")
+	ErrFactoryLineHasNoSteps        = errors.New("factory line has no steps")
+	ErrFactoryLineStepNotOnRun      = errors.New("factory line step entrypoint must use the onRun trigger")
 )
 
 type FactoryLineStep struct {
@@ -56,17 +60,12 @@ func MapFactoryLineNameUniqueConstraintError(err error) error {
 	return err
 }
 
-func CreateFactoryLine(
-	tx *gorm.DB,
-	organizationID, factoryID uuid.UUID,
-	name string,
-	steps []FactoryLineStep,
-) (*FactoryLine, error) {
+func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) (*FactoryLine, error) {
 	now := time.Now()
 	line := &FactoryLine{
 		ID:             uuid.New(),
-		OrganizationID: organizationID,
-		FactoryID:      factoryID,
+		OrganizationID: f.OrganizationID,
+		FactoryID:      f.ID,
 		Name:           name,
 		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
 		CreatedAt:      now,
@@ -80,10 +79,106 @@ func CreateFactoryLine(
 	return line, nil
 }
 
+type FactoryLineStepResult struct {
+	Run       *CanvasRun
+	Execution *FactoryWorkOrderExecution
+}
+
+const onRunTriggerName = "onRun"
+
+func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	steps := []FactoryLineStep(l.Steps)
+	if stepIndex < 0 || stepIndex >= len(steps) {
+		return nil, fmt.Errorf("step index %d out of range", stepIndex)
+	}
+
+	step := steps[stepIndex]
+
+	node, err := FindCanvasNode(tx, step.AppID, step.Entrypoint)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("entrypoint %q not found", step.Entrypoint)
+		}
+		return nil, err
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil || ref.Trigger.Name != onRunTriggerName {
+		return nil, ErrFactoryLineStepNotOnRun
+	}
+
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, step.AppID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	run := &CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: step.AppID,
+		NodeID:     step.Entrypoint,
+		VersionID:  liveVersion.ID,
+		Callbacks: datatypes.JSONSlice[core.RunCallback]{
+			{
+				When: core.RunCallbackWhenPending,
+				On:   core.RunCallbackOnEntry,
+				Hook: "onMessage",
+			},
+		},
+		Input:     NewJSONValue(factoryWorkOrderRunInput(order)),
+		State:     CanvasRunStatePending,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+
+	if err := tx.Create(run).Error; err != nil {
+		return nil, err
+	}
+
+	execution := &FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		WorkOrderID:    order.ID,
+		LineID:         l.ID,
+		StepIndex:      stepIndex,
+		StepName:       step.Name,
+		RunID:          run.ID,
+		Status:         FactoryWorkOrderExecutionStatusPending,
+		Result:         "",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	if err := tx.Clauses(clause.Returning{}).Create(execution).Error; err != nil {
+		return nil, err
+	}
+
+	return &FactoryLineStepResult{
+		Run:       run,
+		Execution: execution,
+	}, nil
+}
+
 func FindFactoryLine(tx *gorm.DB, organizationID, factoryID, lineID uuid.UUID) (*FactoryLine, error) {
 	var line FactoryLine
 	err := tx.
 		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, lineID).
+		First(&line).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryLineNotFound
+		}
+		return nil, err
+	}
+
+	return &line, nil
+}
+
+func FindFactoryLineByID(tx *gorm.DB, organizationID, lineID uuid.UUID) (*FactoryLine, error) {
+	var line FactoryLine
+	err := tx.
+		Where("organization_id = ? AND id = ?", organizationID, lineID).
 		First(&line).
 		Error
 	if err != nil {

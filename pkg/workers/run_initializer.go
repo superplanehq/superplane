@@ -210,6 +210,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			return fmt.Errorf("start run: %w", err)
 		}
 
+		if err := markFactoryWorkOrderExecutionRunning(tx, runID); err != nil {
+			return fmt.Errorf("mark factory work order execution running: %w", err)
+		}
+
 		stateUpdated = true
 		return nil
 	})
@@ -270,4 +274,16 @@ func (w *RunInitializer) failRun(
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
 		DispatchFinished()
+}
+
+func markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := models.FindFactoryWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.MarkRunning(tx)
 }

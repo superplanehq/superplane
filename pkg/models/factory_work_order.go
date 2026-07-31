@@ -56,22 +56,18 @@ type ListFactoryWorkOrdersFilters struct {
 	Unassigned  *bool
 }
 
-type CreateFactoryWorkOrderParams struct {
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	Title          string
-	Description    string
-	AssigneeIDs    []uuid.UUID
-}
-
-func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*FactoryWorkOrder, error) {
+func (f *Factory) CreateWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	assigneeIDs []uuid.UUID,
+) (*FactoryWorkOrder, error) {
 	now := time.Now()
 	order := &FactoryWorkOrder{
 		ID:             uuid.New(),
-		OrganizationID: params.OrganizationID,
-		FactoryID:      params.FactoryID,
-		Title:          params.Title,
-		Description:    params.Description,
+		OrganizationID: f.OrganizationID,
+		FactoryID:      f.ID,
+		Title:          title,
+		Description:    description,
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
 		CreatedAt:      now,
@@ -82,13 +78,13 @@ func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*
 		return nil, err
 	}
 
-	if len(params.AssigneeIDs) > 0 {
-		if err := replaceFactoryWorkOrderAssignees(tx, order.ID, params.AssigneeIDs, now); err != nil {
+	if len(assigneeIDs) > 0 {
+		if err := replaceFactoryWorkOrderAssignees(tx, order.ID, assigneeIDs, now); err != nil {
 			return nil, err
 		}
 	}
 
-	return FindFactoryWorkOrder(tx, params.OrganizationID, params.FactoryID, order.ID)
+	return FindFactoryWorkOrder(tx, f.OrganizationID, f.ID, order.ID)
 }
 
 func FindFactoryWorkOrder(tx *gorm.DB, organizationID, factoryID, orderID uuid.UUID) (*FactoryWorkOrder, error) {
