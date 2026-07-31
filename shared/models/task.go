@@ -68,9 +68,7 @@ type Task struct {
 	// RunnerTerminationRequestedAt is set internally when fleet-manager is terminating
 	// the runner before the task can be finalized safely.
 	RunnerTerminationRequestedAt *time.Time
-	// DispatchRequestedAt is set internally when the broker has asked a
-	// provisioner (e.g. AWS Lambda) to pick up this task.
-	DispatchRequestedAt *time.Time
+	DispatchRequestedAt          *time.Time
 }
 
 // EnvironmentVariable is one task-scoped environment variable.

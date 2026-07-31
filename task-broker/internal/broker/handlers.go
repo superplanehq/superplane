@@ -69,10 +69,6 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// max_execution_timeout_seconds and supports_docker are merged atomically with
-	// any previously registered values inside Store.CreateFleet (an empty/nil value
-	// here means "not provided"), so re-registering a fleet without repeating them
-	// can't race with or clobber a value set by another caller.
 	f := &brokermodels.Fleet{
 		ID:                         req.ID,
 		Provisioner:                provisioner,
@@ -490,10 +486,6 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		Files:         api.NormalizeFiles(req.Files),
 	}
 	if needsDispatch {
-		// Stamped in the same insert that creates the task, so it's never visible to
-		// the sweeper as an unmarked (dispatch_requested_at IS NULL) candidate; only
-		// the invoke itself races with the sweeper's retry window, and the sweeper
-		// tolerates that as a duplicate, harmless doorbell.
 		dispatchedAt := time.Now().UTC()
 		task.DispatchRequestedAt = &dispatchedAt
 	}

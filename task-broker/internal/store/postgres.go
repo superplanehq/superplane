@@ -74,12 +74,6 @@ func (s *PostgresStore) Truncate(ctx context.Context) error {
 	return s.db.WithContext(ctx).Exec("TRUNCATE TABLE fleets, tasks RESTART IDENTITY CASCADE").Error
 }
 
-// CreateFleet upserts a fleet. provisioner/arch/size/created_at are always
-// overwritten by the caller's values, since they're expected to be fully
-// resent on every registration. lambda_function_name, max_execution_timeout_seconds,
-// and supports_docker are merged atomically in SQL instead: an empty/nil value
-// in f means "not provided" and keeps whatever the fleet already had, so a
-// caller that doesn't know about these fields can't clobber them on conflict.
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
 	return s.db.WithContext(ctx).Raw(`
 INSERT INTO fleets (id, provisioner, arch, size, created_at, lambda_function_name, max_execution_timeout_seconds, supports_docker)

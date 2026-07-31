@@ -142,8 +142,6 @@ func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
 		t.Fatalf("status=%d body=%s", status, body)
 	}
 
-	// Dispatch happens in a background goroutine now, so wait for it rather than
-	// asserting on it immediately after the HTTP response returns.
 	select {
 	case gotFunctionName := <-invoked:
 		if gotFunctionName != "runner-lambda-fn" {
