@@ -41,6 +41,8 @@ export interface UseMentionsReturn {
   setCursorPos: (pos: number) => void;
   /** Insert a mention at the current trigger position. Returns the new cursor position. */
   insertMention: (item: MentionItem) => number;
+  /** Add text and tracked mentions to the composer without sending. */
+  prefill: (text: string, items: MentionItem[]) => void;
   /** Get the serialized markdown output for sending */
   getMarkdown: () => string;
   /** All tracked mentions */
@@ -90,6 +92,42 @@ function pruneMentions(text: string, mentions: InsertedMention[]): InsertedMenti
     const expected = `@${m.label}`;
     return text.slice(m.startIndex, m.startIndex + expected.length) === expected;
   });
+}
+
+function findMentionOccurrence(text: string, displayText: string, fromIndex: number): number {
+  let searchIndex = fromIndex;
+  while (searchIndex < text.length) {
+    const startIndex = text.indexOf(displayText, searchIndex);
+    if (startIndex < 0) return -1;
+    const startsAtBoundary = startIndex === 0 || /\s/.test(text[startIndex - 1] ?? "");
+    const endIndex = startIndex + displayText.length;
+    const endsAtBoundary = endIndex === text.length || /[\s.,!?;:()[\]{}]/.test(text[endIndex] ?? "");
+    if (startsAtBoundary && endsAtBoundary) return startIndex;
+    searchIndex = startIndex + displayText.length;
+  }
+  return -1;
+}
+
+function appendMentionPrefill(
+  value: string,
+  mentions: InsertedMention[],
+  text: string,
+  items: MentionItem[],
+): { value: string; mentions: InsertedMention[] } {
+  const separator = value && !value.endsWith("\n") ? "\n" : "";
+  const prefillStart = value.length + separator.length;
+  const nextSearchByLabel = new Map<string, number>();
+  const trackedMentions = items.flatMap((item) => {
+    const displayText = `@${item.label}`;
+    const relativeStart = findMentionOccurrence(text, displayText, nextSearchByLabel.get(displayText) ?? 0);
+    if (relativeStart < 0) return [];
+    nextSearchByLabel.set(displayText, relativeStart + displayText.length);
+    return [{ ...item, displayText, startIndex: prefillStart + relativeStart }];
+  });
+  return {
+    value: `${value}${separator}${text}`,
+    mentions: [...pruneMentions(value, mentions), ...trackedMentions],
+  };
 }
 
 export function useMentions(): UseMentionsReturn {
@@ -163,6 +201,17 @@ export function useMentions(): UseMentionsReturn {
     [value, cursorPos, trigger.start],
   );
 
+  const prefill = useCallback(
+    (text: string, items: MentionItem[]) => {
+      const next = appendMentionPrefill(value, mentions, text, items);
+      setRawValue(next.value);
+      setCursorPos(next.value.length);
+      setMentions(next.mentions);
+      setDismissed(true);
+    },
+    [mentions, value],
+  );
+
   const getMarkdown = useCallback(() => {
     const sorted = [...mentions].sort((a, b) => b.startIndex - a.startIndex);
     let result = value;
@@ -208,6 +257,7 @@ export function useMentions(): UseMentionsReturn {
     cursorPos,
     setCursorPos: setCursorPosWrapped,
     insertMention,
+    prefill,
     getMarkdown,
     mentions,
     isEmpty,

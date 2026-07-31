@@ -3,6 +3,57 @@ import { describe, expect, it } from "vitest";
 import { useMentions } from "./useMentions";
 
 describe("useMentions", () => {
+  it("prefills a tracked node mention without serializing it until send", () => {
+    const { result } = renderHook(() => useMentions());
+
+    act(() => {
+      result.current.prefill("How can I improve @Deploy?", [{ type: "node", id: "deploy", label: "Deploy" }]);
+    });
+
+    expect(result.current.value).toBe("How can I improve @Deploy?");
+    expect(result.current.getMarkdown()).toBe("How can I improve [Deploy](node:deploy)?");
+  });
+
+  it("preserves an existing draft when adding node context", () => {
+    const { result } = renderHook(() => useMentions());
+
+    act(() => {
+      result.current.setValue("Please focus on reliability.");
+    });
+    act(() => {
+      result.current.prefill("How can I improve @Deploy?", [{ type: "node", id: "deploy", label: "Deploy" }]);
+    });
+
+    expect(result.current.value).toBe("Please focus on reliability.\nHow can I improve @Deploy?");
+    expect(result.current.getMarkdown()).toBe("Please focus on reliability.\nHow can I improve [Deploy](node:deploy)?");
+  });
+
+  it("tracks repeated prefilled labels one-to-one", () => {
+    const { result } = renderHook(() => useMentions());
+
+    act(() => {
+      result.current.prefill("Compare @Deploy with @Deploy.", [
+        { type: "node", id: "deploy-a", label: "Deploy" },
+        { type: "node", id: "deploy-b", label: "Deploy" },
+      ]);
+    });
+
+    expect(result.current.getMarkdown()).toBe("Compare [Deploy](node:deploy-a) with [Deploy](node:deploy-b).");
+  });
+
+  it("does not confuse labels that are prefixes of each other", () => {
+    const { result } = renderHook(() => useMentions());
+
+    act(() => {
+      result.current.prefill("Compare @Deploy with @Deployment.", [
+        { type: "node", id: "deploy", label: "Deploy" },
+        { type: "node", id: "deployment", label: "Deployment" },
+      ]);
+    });
+
+    expect(result.current.getMarkdown()).toBe("Compare [Deploy](node:deploy) with [Deployment](node:deployment).");
+  });
+
   describe("detectTrigger (via hook)", () => {
     it("no trigger when no @ present", () => {
       const { result } = renderHook(() => useMentions());

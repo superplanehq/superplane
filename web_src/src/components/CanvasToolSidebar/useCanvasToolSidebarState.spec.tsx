@@ -1,5 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearAgentComposerPrefill,
+  consumeAgentComposerPrefill,
+  requestAgentComposerPrefill,
+} from "@/components/AgentSidebar/composerPrefill";
 import { useCanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const featureFlags = vi.hoisted(() => ({ enabled: false }));
@@ -51,6 +56,7 @@ describe("useCanvasToolSidebarState", () => {
   beforeEach(() => {
     featureFlags.enabled = false;
     window.localStorage.clear();
+    clearAgentComposerPrefill();
   });
 
   it("invokes onBeforeClose when toggling from open to closed", () => {
@@ -66,6 +72,19 @@ describe("useCanvasToolSidebarState", () => {
 
     expect(onBeforeClose).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+  });
+
+  it("clears queued component context when the sidebar closes", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-a", "true");
+    requestAgentComposerPrefill("canvas-a", {
+      text: "Review @Deploy",
+      mentions: [{ type: "node", id: "deploy", label: "Deploy" }],
+    });
+    render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+
+    expect(consumeAgentComposerPrefill("canvas-a")).toBeNull();
   });
 
   it("toggles the tool sidebar on Cmd/Ctrl+B outside editable fields", () => {

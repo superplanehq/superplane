@@ -56,6 +56,7 @@ import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { useCanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
+import { requestAgentComposerPrefill } from "@/components/AgentSidebar/composerPrefill";
 import {
   useCanvasToolSidebarState,
   type CanvasToolSidebarState,
@@ -859,6 +860,25 @@ function CanvasPage(props: CanvasPageProps) {
     onAgentStagingReady: props.onAgentStagingReady,
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
+  const { openToolSidebar } = toolSidebarState;
+  const canAskAgent =
+    Boolean(props.canvasId) &&
+    toolSidebarState.isAgentEnabled &&
+    toolSidebarState.showToolSidebarToggle &&
+    !toolSidebarState.agentUnavailable;
+  const handleAskAgentAboutNode = useCallback(
+    (nodeId: string, nodeName?: string) => {
+      if (!canAskAgent) return;
+      const resolvedNode = props.workflowNodes?.find((node) => node.id === nodeId);
+      const label = nodeName?.trim() || resolvedNode?.name?.trim() || nodeId;
+      requestAgentComposerPrefill(props.canvasId ?? "", {
+        text: `How can I improve @${label}?`,
+        mentions: [{ type: "node", id: nodeId, label }],
+      });
+      openToolSidebar();
+    },
+    [canAskAgent, openToolSidebar, props.canvasId, props.workflowNodes],
+  );
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = allowsRunsSidebar(props.headerMode) && props.toolSidebarRunsContent != null;
   const runningRunsCount = useMemo(
@@ -1045,8 +1065,7 @@ function CanvasPage(props: CanvasPageProps) {
             configuration: defaultConfiguration,
             position: pendingNode.position,
             sourceConnection: pendingNode.data.sourceConnection as
-              | { nodeId: string; handleId: string | null }
-              | undefined,
+              { nodeId: string; handleId: string | null } | undefined,
             integrationName: block.integrationName,
           });
 
@@ -1342,6 +1361,7 @@ function CanvasPage(props: CanvasPageProps) {
         canReadIntegrations={props.canReadIntegrations}
         canCreateIntegrations={props.canCreateIntegrations}
         canUpdateIntegrations={props.canUpdateIntegrations}
+        onAskAgentAboutNode={canAskAgent ? handleAskAgentAboutNode : undefined}
       />
     ),
     [
@@ -1381,6 +1401,8 @@ function CanvasPage(props: CanvasPageProps) {
       props.workflowNodes,
       readOnly,
       state,
+      handleAskAgentAboutNode,
+      canAskAgent,
     ],
   );
 
@@ -1635,6 +1657,7 @@ function CanvasPage(props: CanvasPageProps) {
               })
             }
             onClose={() => props.onRunNodeDetailClose?.()}
+            onAskAgentAboutNode={canAskAgent ? handleAskAgentAboutNode : undefined}
           />
         ) : runInspectorOpen ? (
           <RunInspectorLoadingPanel onClose={() => props.onRunNodeDetailClose?.()} />
@@ -1694,6 +1717,7 @@ function Sidebar({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  onAskAgentAboutNode,
   layout = "sidebar",
 }: {
   layout?: "sidebar" | "bottom";
@@ -1741,6 +1765,7 @@ function Sidebar({
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  onAskAgentAboutNode?: (nodeId: string, nodeName?: string) => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1903,6 +1928,11 @@ function Sidebar({
       resolveRunId={resolveRunId}
       fetchRunId={fetchRunId}
       onSelectRun={onSelectRun}
+      onAskAgentAboutNode={
+        state.componentSidebar.selectedNodeId
+          ? () => onAskAgentAboutNode?.(state.componentSidebar.selectedNodeId!, editingNodeData?.nodeName)
+          : undefined
+      }
     />
   );
 }
