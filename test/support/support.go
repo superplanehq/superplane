@@ -370,6 +370,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		OrganizationID: orgID,
 		LiveVersionID:  &liveVersionID,
 		Name:           RandomName("canvas"),
+		Slug:           models.GenerateCanvasSlug(RandomName("canvas")),
 		Description:    "Test canvas",
 		CreatedBy:      &userID,
 		CreatedAt:      &now,

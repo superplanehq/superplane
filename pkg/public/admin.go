@@ -376,7 +376,7 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 func (s *Server) adminListCanvases(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["orgId"]
 
-	if _, err := models.FindOrganizationByID(orgID); err != nil {
+	if _, err := models.FindOrganizationByIDOrSlug(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
 		return
 	}
@@ -418,7 +418,7 @@ func (s *Server) adminListCanvases(w http.ResponseWriter, r *http.Request) {
 func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["orgId"]
 
-	if _, err := models.FindOrganizationByID(orgID); err != nil {
+	if _, err := models.FindOrganizationByIDOrSlug(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
 		return
 	}
@@ -778,13 +778,18 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 
 	parsedOrgID, err := uuid.Parse(orgID)
 	if err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	if _, err := models.FindOrganizationByID(orgID); err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
+		// Try to look up by slug
+		org, err := models.FindOrganizationBySlugInTransaction(database.Conn(), orgID)
+		if err != nil {
+			http.Error(w, "Organization not found", http.StatusNotFound)
+			return
+		}
+		parsedOrgID = org.ID
+	} else {
+		if _, err := models.FindOrganizationByIDInTransaction(database.Conn(), orgID); err != nil {
+			http.Error(w, "Organization not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
@@ -805,13 +810,18 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 
 	parsedOrgID, err := uuid.Parse(orgID)
 	if err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	if _, err := models.FindOrganizationByID(orgID); err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
+		// Try to look up by slug
+		org, err := models.FindOrganizationBySlugInTransaction(database.Conn(), orgID)
+		if err != nil {
+			http.Error(w, "Organization not found", http.StatusNotFound)
+			return
+		}
+		parsedOrgID = org.ID
+	} else {
+		if _, err := models.FindOrganizationByIDInTransaction(database.Conn(), orgID); err != nil {
+			http.Error(w, "Organization not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	if err := models.DisableExperimentalFeature(parsedOrgID, featureID); err != nil {

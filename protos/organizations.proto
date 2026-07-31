@@ -262,9 +262,10 @@ message Organization {
   message Metadata {
     string id = 1;
     string name = 2;
-    string description = 3;
-    google.protobuf.Timestamp created_at = 4;
-    google.protobuf.Timestamp updated_at = 5;
+    string slug = 3;
+    string description = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
   }
 
   message Spec {

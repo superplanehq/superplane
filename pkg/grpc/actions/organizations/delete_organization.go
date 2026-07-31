@@ -18,7 +18,7 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	organization, err := models.FindOrganizationByID(orgID)
+	organization, err := models.FindOrganizationByIDOrSlug(orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
