@@ -8,15 +8,46 @@ type SentMagicCodeEmail struct {
 	MagicLink string
 }
 
+type SentOrganizationMemberJoinedEmail struct {
+	ToEmail          string
+	MemberName       string
+	MemberEmail      string
+	OrganizationName string
+	SettingsURL      string
+}
+
 type NoopEmailService struct {
-	mu              sync.Mutex
-	magicCodeEmails []SentMagicCodeEmail
+	mu                             sync.Mutex
+	magicCodeEmails                []SentMagicCodeEmail
+	organizationMemberJoinedEmails []SentOrganizationMemberJoinedEmail
 }
 
 func NewNoopEmailService() *NoopEmailService {
 	return &NoopEmailService{
-		magicCodeEmails: []SentMagicCodeEmail{},
+		magicCodeEmails:                []SentMagicCodeEmail{},
+		organizationMemberJoinedEmails: []SentOrganizationMemberJoinedEmail{},
 	}
+}
+
+func (s *NoopEmailService) SendOrganizationMemberJoinedEmail(toEmail, memberName, memberEmail, organizationName, settingsURL string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.organizationMemberJoinedEmails = append(s.organizationMemberJoinedEmails, SentOrganizationMemberJoinedEmail{
+		ToEmail:          toEmail,
+		MemberName:       memberName,
+		MemberEmail:      memberEmail,
+		OrganizationName: organizationName,
+		SettingsURL:      settingsURL,
+	})
+	return nil
+}
+
+func (s *NoopEmailService) SentOrganizationMemberJoinedEmails() []SentOrganizationMemberJoinedEmail {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	emails := make([]SentOrganizationMemberJoinedEmail, len(s.organizationMemberJoinedEmails))
+	copy(emails, s.organizationMemberJoinedEmails)
+	return emails
 }
 
 func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
@@ -45,4 +76,5 @@ func (s *NoopEmailService) Reset() {
 	defer s.mu.Unlock()
 
 	s.magicCodeEmails = []SentMagicCodeEmail{}
+	s.organizationMemberJoinedEmails = []SentOrganizationMemberJoinedEmail{}
 }
