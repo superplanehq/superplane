@@ -256,10 +256,17 @@ func Test__CachedReadinessCheck(t *testing.T) {
 			secondResult <- check(ctx)
 		}()
 		cancel()
+
+		select {
+		case err := <-secondResult:
+			require.ErrorIs(t, err, context.Canceled)
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("canceled readiness waiter did not return while a check was active")
+		}
+
 		close(release)
 
 		require.NoError(t, <-firstResult)
-		require.ErrorIs(t, <-secondResult, context.Canceled)
 		require.EqualValues(t, 1, calls.Load())
 	})
 

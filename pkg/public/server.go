@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -1170,13 +1169,18 @@ func checkDatabaseReadiness(ctx context.Context) error {
 }
 
 func newCachedReadinessCheck(check func(context.Context) error, cacheDuration time.Duration) func(context.Context) error {
-	var mutex sync.Mutex
+	checkToken := make(chan struct{}, 1)
+	checkToken <- struct{}{}
 	var checkedAt time.Time
 	var checkErr error
 
 	return func(ctx context.Context) error {
-		mutex.Lock()
-		defer mutex.Unlock()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-checkToken:
+		}
+		defer func() { checkToken <- struct{}{} }()
 
 		if err := ctx.Err(); err != nil {
 			return err
