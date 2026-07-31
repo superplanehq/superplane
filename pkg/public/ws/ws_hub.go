@@ -111,33 +111,47 @@ func (h *Hub) unregisterClient(client *Client) {
 
 // BroadcastAll sends a message to all connected clients
 func (h *Hub) BroadcastAll(message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	var toUnregister []*Client
 
+	h.mutex.RLock()
 	for client := range h.clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			// If the client's buffer is full, assume it's gone and unregister it.
+			// Do this after releasing the read lock to avoid deadlocking on the
+			// write lock taken by unregisterClient.
+			toUnregister = append(toUnregister, client)
 		}
+	}
+	h.mutex.RUnlock()
+
+	for _, client := range toUnregister {
+		h.unregisterClient(client)
 	}
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	var toUnregister []*Client
 
+	h.mutex.RLock()
 	// Get clients subscribed to this workflow
 	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
 		for client := range clients {
 			select {
 			case client.send <- message:
 			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
+				// If the client's buffer is full, assume it's gone and unregister it.
+				// Do this after releasing the read lock to avoid deadlocking on the
+				// write lock taken by unregisterClient.
+				toUnregister = append(toUnregister, client)
 			}
 		}
+	}
+	h.mutex.RUnlock()
+
+	for _, client := range toUnregister {
+		h.unregisterClient(client)
 	}
 }
 
