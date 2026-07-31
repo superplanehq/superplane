@@ -188,13 +188,6 @@ RETURNING id`,
 	return s.GetTask(ctx, id)
 }
 
-func (s *PostgresStore) MarkTaskDispatched(ctx context.Context, taskID string) error {
-	return s.db.WithContext(ctx).Exec(
-		`UPDATE tasks SET dispatch_requested_at = ? WHERE id = ?`,
-		time.Now().UTC(), taskID,
-	).Error
-}
-
 func (s *PostgresStore) ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error) {
 	provisioner = strings.TrimSpace(provisioner)
 	if provisioner == "" {

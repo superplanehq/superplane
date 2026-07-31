@@ -93,6 +93,5 @@ type Store interface {
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
 
-	MarkTaskDispatched(ctx context.Context, taskID string) error
 	ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error)
 }

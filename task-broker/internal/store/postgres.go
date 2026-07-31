@@ -9,6 +9,7 @@ import (
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // PostgresStore implements Store using PostgreSQL via GORM.
@@ -75,21 +76,13 @@ func (s *PostgresStore) Truncate(ctx context.Context) error {
 }
 
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
-	return s.db.WithContext(ctx).Raw(`
-INSERT INTO fleets (id, provisioner, arch, size, created_at, lambda_function_name, max_execution_timeout_seconds, supports_docker)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (id) DO UPDATE SET
-	provisioner = EXCLUDED.provisioner,
-	arch = EXCLUDED.arch,
-	size = EXCLUDED.size,
-	created_at = EXCLUDED.created_at,
-	lambda_function_name = COALESCE(NULLIF(EXCLUDED.lambda_function_name, ''), fleets.lambda_function_name),
-	max_execution_timeout_seconds = COALESCE(EXCLUDED.max_execution_timeout_seconds, fleets.max_execution_timeout_seconds),
-	supports_docker = COALESCE(EXCLUDED.supports_docker, fleets.supports_docker)
-RETURNING id, provisioner, arch, size, created_at, lambda_function_name, max_execution_timeout_seconds, supports_docker`,
-		f.ID, f.Provisioner, f.Arch, f.Size, f.CreatedAt,
-		f.LambdaFunctionName, f.MaxExecutionTimeoutSeconds, f.SupportsDocker,
-	).Scan(f).Error
+	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"provisioner", "arch", "size", "created_at",
+			"lambda_function_name", "max_execution_timeout_seconds", "supports_docker",
+		}),
+	}).Create(f).Error
 }
 
 func (s *PostgresStore) DeleteFleet(ctx context.Context, id string) error {

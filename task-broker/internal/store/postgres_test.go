@@ -983,35 +983,3 @@ func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
 		t.Fatalf("expected stale task reclaimed: %#v", retried)
 	}
 }
-
-func TestMarkTaskDispatchedStampsColumn(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-	ctx := context.Background()
-	now := time.Now().UTC()
-
-	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID: "fleet-lambda", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: now, LambdaFunctionName: "fn",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	taskID := uuid.NewString()
-	if err := st.CreateTask(ctx, &models.Task{
-		ID: taskID, FleetID: "fleet-lambda", Command: []string{"echo", "hi"},
-		WebhookURL: "https://example.com/hook", Status: models.StatusQueued, CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := st.MarkTaskDispatched(ctx, taskID); err != nil {
-		t.Fatal(err)
-	}
-	candidates, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Minute, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(candidates) != 0 {
-		t.Fatalf("expected no candidates after MarkTaskDispatched: %#v", candidates)
-	}
-}
