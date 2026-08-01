@@ -1,17 +1,28 @@
 package github
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/logger"
 )
+
+func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
+	step := (&SetupProvider{}).FirstStep(core.SetupStepContext{})
+	ownerFieldIndex := slices.IndexFunc(step.Inputs, func(field configuration.Field) bool {
+		return field.Name == common.PropertyOwner
+	})
+	require.NotEqual(t, -1, ownerFieldIndex)
+	assert.Equal(t, "GitHub user account / organization name", step.Inputs[ownerFieldIndex].Label)
+}
 
 func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	g := &SetupProvider{}
