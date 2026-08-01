@@ -49,11 +49,7 @@ export function useRepositoryPathLists(
 ) {
   const repositoryAndPendingPaths = useMemo(() => {
     return Array.from(
-      new Set([
-        ...repositoryPaths,
-        ...stagedRepositoryPaths,
-        ...pendingChanges.filter((change) => change.type === "added").map((change) => change.path),
-      ]),
+      new Set([...repositoryPaths, ...stagedRepositoryPaths, ...pendingChanges.map((change) => change.path)]),
     ).sort();
   }, [pendingChanges, repositoryPaths, stagedRepositoryPaths]);
   const allPaths = useMemo(

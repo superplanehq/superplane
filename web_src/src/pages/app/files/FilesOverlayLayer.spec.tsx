@@ -10,7 +10,7 @@ import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
 import { FilesOverlayLayer } from "./FilesOverlayLayer";
 
-const repositoryFiles = [{ path: "README.md" }];
+let repositoryFiles = [{ path: "README.md" }];
 const repositoryFileContents: Record<string, string> = {
   "README.md": "# readme",
   "notes/scratchpad.json": '{ "hello": "agent" }',
@@ -136,6 +136,7 @@ vi.mock("@pierre/trees/react", () => ({
 
 describe("FilesOverlayLayer", () => {
   beforeEach(() => {
+    repositoryFiles = [{ path: "README.md" }];
     stagedPaths = [];
     repositoryFileQueryStages = [];
     queryClient.clear();
@@ -176,7 +177,7 @@ describe("FilesOverlayLayer", () => {
   it("keeps deleted files visible with committed content and a committed read", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { rerender } = render(
       <FilesOverlayLayer
         isFilesMode
         canvasId="canvas-1"
@@ -197,6 +198,22 @@ describe("FilesOverlayLayer", () => {
     expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme");
     expect(screen.queryByText("File marked for deletion")).not.toBeInTheDocument();
     expect(repositoryFileQueryStages.at(-1)).toEqual({ path: "README.md", stage: false });
+
+    repositoryFiles = [];
+    rerender(
+      <FilesOverlayLayer
+        isFilesMode
+        canvasId="canvas-1"
+        versionId="version-1"
+        isEditing
+        canWrite
+        files={[{ path: "canvas.yaml", content: "canvas: true", language: "yaml" }]}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("file-tree-row-README.md")).getByRole("button", { name: "README.md" }),
+    ).toHaveAttribute("data-git-status", "deleted");
   });
 
   it("keeps the first edit after switching away and back to a repository file", async () => {
