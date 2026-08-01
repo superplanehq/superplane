@@ -44,6 +44,27 @@ func TestValidateStatusMatcher(t *testing.T) {
 	assert.EqualError(t, ValidateStatusMatcher("700"), "invalid HTTP status matcher: 700")
 }
 
+func TestValidateAuthorization(t *testing.T) {
+	username := "deploy"
+	password := configuration.SecretKeyRef{Secret: "credentials", Key: "password"}
+
+	require.NoError(t, ValidateAuthorization(&AuthorizationSpec{
+		Type:     AuthorizationTypeBasicAuth,
+		Username: &username,
+		Password: &password,
+	}))
+	assert.EqualError(
+		t,
+		ValidateAuthorization(&AuthorizationSpec{Type: AuthorizationTypeBasicAuth}),
+		"authorization basic auth: username is required",
+	)
+	assert.EqualError(
+		t,
+		ValidateAuthorization(&AuthorizationSpec{Type: AuthorizationTypeCustomHeader}),
+		"authorization custom header: header name is required",
+	)
+}
+
 func TestApplyAuthorization(t *testing.T) {
 	secrets := &secretsContext{
 		values: map[string][]byte{
@@ -55,13 +76,14 @@ func TestApplyAuthorization(t *testing.T) {
 	t.Run("bearer token", func(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 		require.NoError(t, err)
+		credential := configuration.SecretKeyRef{
+			Secret: "credentials",
+			Key:    "token",
+		}
 
 		header, err := ApplyAuthorization(secrets, &AuthorizationSpec{
-			Type: AuthorizationTypeBearer,
-			Credential: configuration.SecretKeyRef{
-				Secret: "credentials",
-				Key:    "token",
-			},
+			Type:       AuthorizationTypeBearer,
+			Credential: &credential,
 		}, request)
 		require.NoError(t, err)
 		assert.Equal(t, "Authorization", header)
@@ -71,14 +93,16 @@ func TestApplyAuthorization(t *testing.T) {
 	t.Run("basic auth", func(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 		require.NoError(t, err)
+		username := "deploy"
+		password := configuration.SecretKeyRef{
+			Secret: "credentials",
+			Key:    "password",
+		}
 
 		header, err := ApplyAuthorization(secrets, &AuthorizationSpec{
 			Type:     AuthorizationTypeBasicAuth,
-			Username: "deploy",
-			Password: configuration.SecretKeyRef{
-				Secret: "credentials",
-				Key:    "password",
-			},
+			Username: &username,
+			Password: &password,
 		}, request)
 		require.NoError(t, err)
 		assert.Equal(t, "Authorization", header)

@@ -23,12 +23,12 @@ type Header struct {
 }
 
 type AuthorizationSpec struct {
-	Type       string                     `json:"type" mapstructure:"type"`
-	Credential configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
-	Username   string                     `json:"username,omitempty" mapstructure:"username"`
-	Password   configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
-	HeaderName string                     `json:"headerName,omitempty" mapstructure:"headerName"`
-	Value      configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
+	Type       string                      `json:"type" mapstructure:"type"`
+	Credential *configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
+	Username   *string                     `json:"username,omitempty" mapstructure:"username"`
+	Password   *configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
+	HeaderName *string                     `json:"headerName,omitempty" mapstructure:"headerName"`
+	Value      *configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
 }
 
 func AuthorizationField() configuration.Field {
@@ -137,12 +137,12 @@ func ValidateAuthorization(spec *AuthorizationSpec) error {
 	case AuthorizationTypeBearer:
 		return validateSecretKeyRef("authorization bearer credential", spec.Credential)
 	case AuthorizationTypeBasicAuth:
-		if spec.Username == "" {
+		if spec.Username == nil || *spec.Username == "" {
 			return fmt.Errorf("authorization basic auth: username is required")
 		}
 		return validateSecretKeyRef("authorization basic auth password", spec.Password)
 	case AuthorizationTypeCustomHeader:
-		if spec.HeaderName == "" {
+		if spec.HeaderName == nil || *spec.HeaderName == "" {
 			return fmt.Errorf("authorization custom header: header name is required")
 		}
 		return validateSecretKeyRef("authorization custom header value", spec.Value)
@@ -154,6 +154,9 @@ func ValidateAuthorization(spec *AuthorizationSpec) error {
 func ApplyAuthorization(secrets core.SecretsContext, spec *AuthorizationSpec, request *http.Request) (string, error) {
 	if spec == nil {
 		return "", nil
+	}
+	if err := ValidateAuthorization(spec); err != nil {
+		return "", err
 	}
 	if secrets == nil {
 		return "", fmt.Errorf("authorization: secrets context is not available")
@@ -172,15 +175,15 @@ func ApplyAuthorization(secrets core.SecretsContext, spec *AuthorizationSpec, re
 		if err != nil {
 			return "", err
 		}
-		request.SetBasicAuth(spec.Username, string(password))
+		request.SetBasicAuth(*spec.Username, string(password))
 		return "Authorization", nil
 	case AuthorizationTypeCustomHeader:
 		value, err := resolveAuthorizationSecret(secrets, "custom header value", spec.Value)
 		if err != nil {
 			return "", err
 		}
-		request.Header.Set(spec.HeaderName, string(value))
-		return spec.HeaderName, nil
+		request.Header.Set(*spec.HeaderName, string(value))
+		return *spec.HeaderName, nil
 	default:
 		return "", fmt.Errorf("authorization: invalid type: %s", spec.Type)
 	}
@@ -229,11 +232,11 @@ func MatchesStatus(statusCode int, matcher string) bool {
 	return false
 }
 
-func validateSecretKeyRef(name string, ref configuration.SecretKeyRef) error {
-	if ref.IsSet() {
+func validateSecretKeyRef(name string, ref *configuration.SecretKeyRef) error {
+	if ref != nil && ref.IsSet() {
 		return nil
 	}
-	if ref.Secret != "" || ref.Key != "" {
+	if ref != nil && (ref.Secret != "" || ref.Key != "") {
 		return fmt.Errorf("%s: both organization secret and key name are required", name)
 	}
 	return fmt.Errorf("%s: organization secret and key are required", name)
@@ -242,8 +245,11 @@ func validateSecretKeyRef(name string, ref configuration.SecretKeyRef) error {
 func resolveAuthorizationSecret(
 	secrets core.SecretsContext,
 	name string,
-	ref configuration.SecretKeyRef,
+	ref *configuration.SecretKeyRef,
 ) ([]byte, error) {
+	if ref == nil {
+		return nil, fmt.Errorf("authorization %s: organization secret and key are required", name)
+	}
 	value, err := secrets.GetKey(ref.Secret, ref.Key)
 	if err != nil {
 		if errors.Is(err, core.ErrSecretKeyNotFound) {
