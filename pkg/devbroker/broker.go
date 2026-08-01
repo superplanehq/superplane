@@ -16,6 +16,7 @@ package devbroker
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -264,6 +265,15 @@ func (s *Server) run(t *task, req createTaskRequest) {
 	t.Status = statusRunning
 	t.ClaimedAt = &now
 	s.mu.Unlock()
+
+	// Names only — values are credentials. Which variables SuperPlane passed is
+	// the first thing you need when a task fails to authenticate.
+	names := make([]string, 0, len(req.Environment))
+	for _, variable := range req.Environment {
+		names = append(names, variable.Name)
+	}
+	log.Printf("task %s: %d command(s), %d file(s), environment: %s",
+		t.ID, len(req.Commands), len(req.Files), strings.Join(names, ", "))
 
 	output, exitCode, err := s.execute(t, dir, req)
 	result := readResultFile(dir)
