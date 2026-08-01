@@ -24,13 +24,13 @@ func validIntegrationConfig() map[string]any {
 const projectsResponse = `[
   {
     "projectId": "proj-1",
-    "name": "acme",
+    "name": "storefront",
     "environments": [
       {
         "environmentId": "env-1",
         "name": "production",
         "applications": [
-          {"applicationId": "app-1", "name": "storefront", "applicationStatus": "done"},
+          {"applicationId": "app-1", "name": "web", "applicationStatus": "done"},
           {"applicationId": "app-2", "name": "api", "applicationStatus": "idle"}
         ]
       }
@@ -179,14 +179,14 @@ func Test__Dokploy__ListResources(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resources, 2)
 		assert.Equal(t, resourceTypeApplication, resources[0].Type)
-		assert.Equal(t, "acme / production / storefront", resources[0].Name)
+		assert.Equal(t, "storefront / production / web", resources[0].Name)
 		assert.Equal(t, "app-1", resources[0].ID)
-		assert.Equal(t, "acme / production / api", resources[1].Name)
+		assert.Equal(t, "storefront / production / api", resources[1].Name)
 		assert.Equal(t, "app-2", resources[1].ID)
 	})
 
 	t.Run("applications without an id are skipped", func(t *testing.T) {
-		httpCtx := okResponse(`[{"projectId":"p","name":"acme","environments":[{"environmentId":"e","name":"prod","applications":[{"applicationId":"","name":"broken"},{"applicationId":"app-1","name":"ok"}]}]}]`)
+		httpCtx := okResponse(`[{"projectId":"p","name":"storefront","environments":[{"environmentId":"e","name":"prod","applications":[{"applicationId":"","name":"broken"},{"applicationId":"app-1","name":"ok"}]}]}]`)
 
 		resources, err := integration.ListResources(resourceTypeApplication, core.ListResourcesContext{
 			HTTP:        httpCtx,
@@ -226,9 +226,9 @@ func Test__Dokploy__displayName(t *testing.T) {
 	t.Run("omits blank segments", func(t *testing.T) {
 		summary := ApplicationSummary{
 			ApplicationID: "app-1",
-			Name:          "storefront",
-			ProjectName:   "acme",
+			Name:          "web",
+			ProjectName:   "storefront",
 		}
-		assert.Equal(t, "acme / storefront", displayName(summary))
+		assert.Equal(t, "storefront / web", displayName(summary))
 	})
 }

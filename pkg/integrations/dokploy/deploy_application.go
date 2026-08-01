@@ -33,7 +33,7 @@ func (d *DeployApplication) Description() string {
 }
 
 func (d *DeployApplication) Documentation() string {
-	return `The Deploy Application component queues a deployment for a Dokploy application. It does not wait for the deployment to finish — the execution emits as soon as Dokploy accepts the request.
+	return `The Deploy Application component queues a deployment for a Dokploy application. It does not wait for the deployment to finish. The execution emits as soon as Dokploy accepts the request.
 
 ## How It Works
 

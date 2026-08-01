@@ -5,10 +5,10 @@
     "applications": [
       {
         "applicationId": "l9xKq2mP4vRt7nB",
-        "name": "storefront",
+        "name": "web",
         "status": "done",
         "projectId": "pR3tYw8kLm1QzXc",
-        "project": "acme",
+        "project": "storefront",
         "environmentId": "eV6bN4jH9sDf2Kl",
         "environment": "production"
       },
@@ -17,7 +17,7 @@
         "name": "api",
         "status": "idle",
         "projectId": "pR3tYw8kLm1QzXc",
-        "project": "acme",
+        "project": "storefront",
         "environmentId": "eV6bN4jH9sDf2Kl",
         "environment": "production"
       }

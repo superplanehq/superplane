@@ -19,7 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 1. **Base URL:** Use your Dokploy instance URL (for example `https://dokploy.example.com`). Dokploy is self-hosted, so this is the address of your own server.
 2. **API Key:** In Dokploy, go to **Settings → API/CLI** and generate a new API key, then copy it.
-3. The API key inherits the permissions of the user that created it — SuperPlane will only see the projects and applications that user can access.
+3. The API key inherits the permissions of the user that created it, so SuperPlane only sees the projects and applications that user can access.
 
 <a id="deploy-application"></a>
 
@@ -27,7 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 **Component key:** `dokploy.deployApplication`
 
-The Deploy Application component queues a deployment for a Dokploy application. It does not wait for the deployment to finish — the execution emits as soon as Dokploy accepts the request.
+The Deploy Application component queues a deployment for a Dokploy application. It does not wait for the deployment to finish. The execution emits as soon as Dokploy accepts the request.
 
 ### How It Works
 
@@ -92,8 +92,8 @@ Dokploy exposes no endpoint that lists applications directly, so they are read t
         "applicationId": "l9xKq2mP4vRt7nB",
         "environment": "production",
         "environmentId": "eV6bN4jH9sDf2Kl",
-        "name": "storefront",
-        "project": "acme",
+        "name": "web",
+        "project": "storefront",
         "projectId": "pR3tYw8kLm1QzXc",
         "status": "done"
       },
@@ -102,7 +102,7 @@ Dokploy exposes no endpoint that lists applications directly, so they are read t
         "environment": "production",
         "environmentId": "eV6bN4jH9sDf2Kl",
         "name": "api",
-        "project": "acme",
+        "project": "storefront",
         "projectId": "pR3tYw8kLm1QzXc",
         "status": "idle"
       }
