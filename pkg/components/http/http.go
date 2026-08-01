@@ -4,19 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/components/httpcommon"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -34,33 +33,23 @@ const (
 	SuccessOutputChannel = "success"
 	FailureOutputChannel = "failure"
 
-	AuthorizationTypeBearer       = "bearer"
-	AuthorizationTypeBasicAuth    = "basic_auth"
-	AuthorizationTypeCustomHeader = "custom_header"
+	AuthorizationTypeBearer       = httpcommon.AuthorizationTypeBearer
+	AuthorizationTypeBasicAuth    = httpcommon.AuthorizationTypeBasicAuth
+	AuthorizationTypeCustomHeader = httpcommon.AuthorizationTypeCustomHeader
 )
 
 func init() {
 	registry.RegisterAction("http", &HTTP{})
 }
 
-type Header struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
+type Header = httpcommon.Header
 
 type KeyValue struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-type AuthorizationSpec struct {
-	Type       string                     `json:"type" mapstructure:"type"`
-	Credential configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
-	Username   string                     `json:"username,omitempty" mapstructure:"username"`
-	Password   configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
-	HeaderName string                     `json:"headerName,omitempty" mapstructure:"headerName"`
-	Value      configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
-}
+type AuthorizationSpec = httpcommon.AuthorizationSpec
 
 type Spec struct {
 	Method         string             `json:"method"`
@@ -195,7 +184,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("method is required")
 	}
 
-	if err := validateAuthorizationSpec(spec.Authorization); err != nil {
+	if err := httpcommon.ValidateAuthorization(spec.Authorization); err != nil {
 		return err
 	}
 
@@ -254,87 +243,6 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func validateAuthorizationSpec(a *AuthorizationSpec) error {
-	if a == nil {
-		return nil
-	}
-
-	switch a.Type {
-	case "":
-		return fmt.Errorf("authorization: type is required when authorization is set")
-	case AuthorizationTypeBearer:
-		return validateSecretKeyRef("authorization bearer credential", a.Credential)
-	case AuthorizationTypeBasicAuth:
-		if a.Username == "" {
-			return fmt.Errorf("authorization basic auth: username is required")
-		}
-		return validateSecretKeyRef("authorization basic auth password", a.Password)
-	case AuthorizationTypeCustomHeader:
-		if a.HeaderName == "" {
-			return fmt.Errorf("authorization custom header: header name is required")
-		}
-		return validateSecretKeyRef("authorization custom header value", a.Value)
-	default:
-		return fmt.Errorf("authorization: invalid type: %s", a.Type)
-	}
-}
-
-func validateSecretKeyRef(name string, ref configuration.SecretKeyRef) error {
-	if ref.IsSet() {
-		return nil
-	}
-	if ref.Secret != "" || ref.Key != "" {
-		return fmt.Errorf("%s: both organization secret and key name are required", name)
-	}
-	return fmt.Errorf("%s: organization secret and key are required", name)
-}
-
-func applyAuthorizationHeader(secrets core.SecretsContext, spec Spec, req *http.Request) error {
-	if spec.Authorization == nil {
-		return nil
-	}
-	if secrets == nil {
-		return fmt.Errorf("authorization: secrets context is not available")
-	}
-
-	switch spec.Authorization.Type {
-	case AuthorizationTypeBearer:
-		value, err := resolveAuthorizationSecret(secrets, "bearer credential", spec.Authorization.Credential)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+string(value))
-	case AuthorizationTypeBasicAuth:
-		password, err := resolveAuthorizationSecret(secrets, "basic auth password", spec.Authorization.Password)
-		if err != nil {
-			return err
-		}
-		req.SetBasicAuth(spec.Authorization.Username, string(password))
-	case AuthorizationTypeCustomHeader:
-		value, err := resolveAuthorizationSecret(secrets, "custom header value", spec.Authorization.Value)
-		if err != nil {
-			return err
-		}
-		req.Header.Set(spec.Authorization.HeaderName, string(value))
-	default:
-		return fmt.Errorf("authorization: invalid type: %s", spec.Authorization.Type)
-	}
-
-	return nil
-}
-
-func resolveAuthorizationSecret(secrets core.SecretsContext, name string, ref configuration.SecretKeyRef) ([]byte, error) {
-	value, err := secrets.GetKey(ref.Secret, ref.Key)
-	if err != nil {
-		if errors.Is(err, core.ErrSecretKeyNotFound) {
-			return nil, fmt.Errorf("authorization %s: %w", name, err)
-		}
-		return nil, fmt.Errorf("authorization %s: resolve secret: %w", name, err)
-	}
-
-	return value, nil
 }
 
 func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
@@ -733,7 +641,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := validateAuthorizationSpec(spec.Authorization); err != nil {
+	if err := httpcommon.ValidateAuthorization(spec.Authorization); err != nil {
 		return err
 	}
 
@@ -891,9 +799,11 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 		}
 	}
 
-	if err := applyAuthorizationHeader(secrets, spec, req); err != nil {
+	sensitiveHeader, err := httpcommon.ApplyAuthorization(secrets, spec.Authorization, req)
+	if err != nil {
 		return nil, err
 	}
+	req = registry.WithSensitiveHeaders(req, sensitiveHeader)
 
 	logger.Infof("[%s] %s", spec.Method, spec.URL)
 	resp, err := httpCtx.Do(req)
@@ -1016,25 +926,7 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 }
 
 func (e *HTTP) isSuccessfulResponse(statusCode int, successCodes string) bool {
-	codes := strings.Split(successCodes, ",")
-	for _, code := range codes {
-		code = strings.TrimSpace(code)
-
-		if strings.HasSuffix(code, "xx") {
-			prefix := strings.TrimSuffix(code, "xx")
-			statusStr := strconv.Itoa(statusCode)
-			if strings.HasPrefix(statusStr, prefix) {
-				return true
-			}
-		} else {
-			expectedCode, err := strconv.Atoi(code)
-			if err == nil && statusCode == expectedCode {
-				return true
-			}
-		}
-	}
-
-	return false
+	return httpcommon.MatchesStatus(statusCode, successCodes)
 }
 
 func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
