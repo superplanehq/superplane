@@ -142,7 +142,7 @@ func TestRecordUpdateCheckRoundTrips(t *testing.T) {
 }
 
 func TestRecordUpdateCheckPreservesExistingKeys(t *testing.T) {
-	path := writeConfigFile(t, "output: json\ncurrentContext: acme\n")
+	path := writeConfigFile(t, "output: json\ncurrentContext: my-org\n")
 
 	if err := recordUpdateCheck(path, time.Now()); err != nil {
 		t.Fatalf("recordUpdateCheck: %v", err)
@@ -155,11 +155,11 @@ func TestRecordUpdateCheckPreservesExistingKeys(t *testing.T) {
 	}
 
 	if got := config.GetString(ConfigKeyOutput); got != "json" {
-		t.Fatalf("output = %q, want %q — existing keys must survive the write", got, "json")
+		t.Fatalf("output = %q, want %q; existing keys must survive the write", got, "json")
 	}
 
-	if got := config.GetString(ConfigKeyCurrentContext); got != "acme" {
-		t.Fatalf("currentContext = %q, want %q — existing keys must survive the write", got, "acme")
+	if got := config.GetString(ConfigKeyCurrentContext); got != "my-org" {
+		t.Fatalf("currentContext = %q, want %q; existing keys must survive the write", got, "my-org")
 	}
 
 	if config.GetTime(ConfigKeyLastUpdateCheck).IsZero() {

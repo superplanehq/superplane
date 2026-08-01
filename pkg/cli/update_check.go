@@ -105,7 +105,7 @@ func recordUpdateCheck(configFile string, now time.Time) error {
 	config := viper.New()
 	config.SetConfigFile(configFile)
 
-	// A missing or empty file is fine — the key is written into a new one.
+	// A missing or empty file is fine; the key is written into a new one.
 	_ = config.ReadInConfig()
 
 	config.Set(ConfigKeyLastUpdateCheck, now.UTC().Format(time.RFC3339))
