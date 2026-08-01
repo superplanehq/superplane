@@ -25,18 +25,24 @@ stop_watchers
 # Runner components need a task broker, which self-hosted installations don't
 # have. Run one in this container so localhost resolves the same way for both
 # sides: the API reaches the broker, the broker reaches the API's webhooks.
+#
 # Built before air starts — two concurrent `go build` runs race on the shared
-# build cache and make air fail with "exit status 1".
+# build cache and make air fail with "exit status 1". The binary goes outside
+# ./tmp because air deletes that directory when it exits.
 if [[ "${START_DEV_BROKER:-yes}" == "yes" ]]; then
-  go build -o ./tmp/dev-broker ./cmd/dev-broker
-  ./tmp/dev-broker &
+  go build -o /tmp/dev-broker ./cmd/dev-broker
+  /tmp/dev-broker >/tmp/dev-broker.log 2>&1 &
 fi
 
 air &
+air_pid=$!
 
 cd web_src
 npm run dev &
+vite_pid=$!
 cd ..
 
-wait -n
+# Wait on the API and UI only. Waiting on every job would let a broker crash —
+# a development convenience — take the whole stack down with it.
+wait -n "$air_pid" "$vite_pid"
 exit $?

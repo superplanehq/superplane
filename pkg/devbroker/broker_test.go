@@ -103,6 +103,70 @@ func TestServer_ReportsFailedCommands(t *testing.T) {
 	}
 }
 
+func TestServer_ReturnsResultFileContents(t *testing.T) {
+	webhooks := make(chan map[string]any, 1)
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		webhooks <- payload
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer callback.Close()
+
+	srv := httptest.NewServer(New(Options{AuthToken: testAuthToken, WorkDir: t.TempDir()}).Handler())
+	defer srv.Close()
+
+	createTask(t, srv, map[string]any{
+		"fleet_id":    "e1-large-amd64",
+		"webhook_url": callback.URL,
+		"commands": []map[string]string{
+			// Runner scripts write their structured result here; the runner is
+			// responsible for creating the file and reporting its contents.
+			{"command": `echo '{"pr":42}' > "$SUPERPLANE_RESULT_FILE"`},
+		},
+	})
+
+	select {
+	case payload := <-webhooks:
+		require.Equal(t, "succeeded", payload["status"])
+		result, ok := payload["result"].(map[string]any)
+		require.True(t, ok, "result missing from webhook payload: %v", payload["result"])
+		assert.EqualValues(t, 42, result["pr"])
+	case <-time.After(10 * time.Second):
+		t.Fatal("no webhook received")
+	}
+}
+
+func TestServer_ProvidesPayloadFile(t *testing.T) {
+	webhooks := make(chan map[string]any, 1)
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		webhooks <- payload
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer callback.Close()
+
+	srv := httptest.NewServer(New(Options{AuthToken: testAuthToken, WorkDir: t.TempDir()}).Handler())
+	defer srv.Close()
+
+	createTask(t, srv, map[string]any{
+		"fleet_id":    "e1-large-amd64",
+		"webhook_url": callback.URL,
+		"commands": []map[string]string{
+			{"command": `test -f "$SUPERPLANE_PAYLOAD_FILE" && cat "$SUPERPLANE_PAYLOAD_FILE"`},
+		},
+	})
+
+	select {
+	case payload := <-webhooks:
+		assert.Equal(t, "succeeded", payload["status"])
+		assert.Contains(t, payload["output"], "{")
+	case <-time.After(10 * time.Second):
+		t.Fatal("no webhook received")
+	}
+}
+
 func TestServer_RejectsWrongToken(t *testing.T) {
 	srv := httptest.NewServer(New(Options{AuthToken: testAuthToken, WorkDir: t.TempDir()}).Handler())
 	defer srv.Close()

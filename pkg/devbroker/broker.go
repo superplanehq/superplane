@@ -33,8 +33,16 @@ const (
 	statusCanceled  = "canceled"
 
 	defaultTimeout = time.Hour
-	// taskDirEnv is where SuperPlane's scripts expect their files to land.
-	taskDirEnv = "SUPERPLANE_TASK_DIR"
+
+	// A runner is expected to provide these three paths. Scripts read upstream
+	// canvas data from the payload file and write their structured result to the
+	// result file, which the runner reports back as the task's result.
+	taskDirEnv     = "SUPERPLANE_TASK_DIR"
+	payloadFileEnv = "SUPERPLANE_PAYLOAD_FILE"
+	resultFileEnv  = "SUPERPLANE_RESULT_FILE"
+
+	payloadFileName = "payload.json"
+	resultFileName  = "result.json"
 )
 
 // Options configures a Server.
@@ -86,6 +94,9 @@ type task struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
+
+	// Result carries whatever the script wrote to SUPERPLANE_RESULT_FILE.
+	Result json.RawMessage `json:"result,omitempty"`
 
 	ExecutionMode   string `json:"execution_mode,omitempty"`
 	CancelRequested bool   `json:"cancel_requested,omitempty"`
@@ -241,6 +252,13 @@ func (s *Server) run(t *task, req createTaskRequest) {
 		return
 	}
 
+	// Scripts read the payload unconditionally, so it must exist even when
+	// SuperPlane sent no upstream data.
+	if err := ensurePayloadFile(dir); err != nil {
+		s.finish(t, statusFailed, nil, "", err.Error())
+		return
+	}
+
 	s.mu.Lock()
 	now := time.Now().UTC()
 	t.Status = statusRunning
@@ -248,11 +266,16 @@ func (s *Server) run(t *task, req createTaskRequest) {
 	s.mu.Unlock()
 
 	output, exitCode, err := s.execute(t, dir, req)
+	result := readResultFile(dir)
 
 	if t.CancelRequested {
 		s.finish(t, statusCanceled, &exitCode, output, "")
 		return
 	}
+
+	s.mu.Lock()
+	t.Result = result
+	s.mu.Unlock()
 
 	status := statusSucceeded
 	message := ""
@@ -275,7 +298,11 @@ func (s *Server) execute(t *task, dir string, req createTaskRequest) (string, in
 	}
 	deadline := time.After(timeout)
 
-	environment := append(os.Environ(), taskDirEnv+"="+dir)
+	environment := append(os.Environ(),
+		taskDirEnv+"="+dir,
+		payloadFileEnv+"="+filepath.Join(dir, payloadFileName),
+		resultFileEnv+"="+filepath.Join(dir, resultFileName),
+	)
 	for _, variable := range req.Environment {
 		environment = append(environment, variable.Name+"="+variable.Value)
 	}
@@ -353,6 +380,36 @@ func (s *Server) finish(t *task, status string, exitCode *int, output, message s
 		return
 	}
 	res.Body.Close()
+}
+
+// ensurePayloadFile creates an empty payload when SuperPlane didn't send one,
+// so scripts that read it unconditionally don't fail on a missing file.
+func ensurePayloadFile(dir string) error {
+	path := filepath.Join(dir, payloadFileName)
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+
+	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+		return fmt.Errorf("write payload file: %w", err)
+	}
+
+	return nil
+}
+
+// readResultFile returns the script's structured result, or nil when it wrote
+// nothing valid — the result is optional and must never fail the task.
+func readResultFile(dir string) json.RawMessage {
+	content, err := os.ReadFile(filepath.Join(dir, resultFileName))
+	if err != nil || len(content) == 0 {
+		return nil
+	}
+
+	if !json.Valid(content) {
+		return nil
+	}
+
+	return json.RawMessage(content)
 }
 
 func writeFiles(dir string, files []file) error {
