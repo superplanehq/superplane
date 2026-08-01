@@ -114,6 +114,7 @@ func (g *GitHub) Actions() []core.Action {
 		&checks.ListCheckRunsForRef{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
+		&contents.GetFileContent{},
 		&contents.GetRelease{},
 		&contents.UpdateRelease{},
 		&contents.DeleteRelease{},

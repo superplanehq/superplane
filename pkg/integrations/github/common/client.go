@@ -242,6 +242,11 @@ func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref s
 	return c.underlying.Repositories.GetCombinedStatus(ctx, owner, name, ref, opts)
 }
 
+func (c *Client) GetContents(ctx context.Context, repository string, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetContents(ctx, owner, name, path, opts)
+}
+
 func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
