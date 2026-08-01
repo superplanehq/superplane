@@ -30,6 +30,24 @@ describe("calculateDropdownPosition", () => {
 });
 
 describe("AutoCompleteInput preview toggle", () => {
+  it("shows the payload source label when provided", () => {
+    render(
+      <AutoCompleteInput
+        exampleObj={{ __root: { data: { name: "DCO" } } }}
+        value=""
+        onChange={vi.fn()}
+        placeholder="{{ root().data.foo }}"
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        showValuePreview
+        payloadSourceLabel="Latest real payload"
+      />,
+    );
+
+    expect(screen.getByTestId("autocomplete-payload-source")).toHaveTextContent("Latest real payload");
+  });
+
   it("shows preview for blank inputs when value preview is enabled", () => {
     render(
       <AutoCompleteInput

@@ -9,6 +9,8 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
@@ -48,6 +50,8 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       expressionMode="raw"
       inputSize="md"
       showValuePreview
+      payloadSourceLabel={payloadSourceLabel}
+      payloadSourceIsExample={payloadSourceIsExample}
       quickTip="Tip: type `$` to browse node payloads."
       className=""
       data-testid={toTestId(`expression-field-${field.name}`)}

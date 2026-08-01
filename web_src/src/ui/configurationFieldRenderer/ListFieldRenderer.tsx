@@ -44,6 +44,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   validationErrors,
   fieldPath = field.name || "",
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
   readOnly = false,
 }) => {
@@ -186,6 +188,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           organizationId={organizationId}
           hasError={hasNestedError}
           autocompleteExampleObj={autocompleteExampleObj}
+          payloadSourceLabel={payloadSourceLabel}
+          payloadSourceIsExample={payloadSourceIsExample}
           readOnly={readOnly}
         />
       );

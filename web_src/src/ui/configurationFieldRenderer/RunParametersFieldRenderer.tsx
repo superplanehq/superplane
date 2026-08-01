@@ -50,6 +50,8 @@ export function RunParametersFieldRenderer({
   organizationId,
   allowExpressions = false,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   readOnly = false,
   validationErrors,
   fieldPath,
@@ -144,6 +146,8 @@ export function RunParametersFieldRenderer({
             organizationId={organizationId}
             allowExpressions={allowExpressions}
             autocompleteExampleObj={autocompleteExampleObj}
+            payloadSourceLabel={payloadSourceLabel}
+            payloadSourceIsExample={payloadSourceIsExample}
             validationErrors={validationErrors}
             fieldPath={`${baseFieldPath}.${parameterName}`}
             readOnly={readOnly}

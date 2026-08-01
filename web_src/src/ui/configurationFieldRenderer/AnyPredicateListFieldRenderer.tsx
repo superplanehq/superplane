@@ -16,6 +16,8 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
 }) => {
   const predicates: Predicate[] = Array.isArray(value) ? value : [];
@@ -69,6 +71,8 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
                 suffix=" }}"
                 inputSize="md"
                 showValuePreview
+                payloadSourceLabel={payloadSourceLabel}
+                payloadSourceIsExample={payloadSourceIsExample}
                 quickTip="Tip: type `{{` to start an expression."
                 className=""
               />

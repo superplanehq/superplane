@@ -48,7 +48,7 @@ import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useCanvasStagingResync } from "@/hooks/useCanvasStagingResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
-import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
+import { buildAutocompleteExampleResult } from "./buildAutocompleteExampleObj";
 import { useAutocompleteExampleContext } from "./useAutocompleteExampleContext";
 import { CommitStagingDialog } from "./CommitStagingDialog";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -1804,18 +1804,21 @@ export function AppPage() {
     [canvasNodes, visibleNodeExecutionsMap, visibleNodeEventsMap, visibleNodeQueueItemsMap],
   );
 
+  // Authoring (Preview + `$` browser) reads the raw execution/event maps so it
+  // sees real payloads. Canvas overlays use the separate `visibleNode*` maps,
+  // which are emptied when live activity is hidden in edit mode.
   const autocompleteExampleContext = useAutocompleteExampleContext({
     canvas,
     canvasNodes,
     canvasNodesById,
     incomingNodeIdsByTargetId,
-    visibleNodeExecutionsMap,
-    visibleNodeEventsMap,
+    nodeExecutionsMap,
+    nodeEventsMap,
     allComponentsByName,
     allTriggersByName,
   });
-  const getAutocompleteExampleObj = useCallback(
-    (nodeId: string) => buildAutocompleteExampleObj(nodeId, autocompleteExampleContext),
+  const getAutocompleteExampleResult = useCallback(
+    (nodeId: string) => buildAutocompleteExampleResult(nodeId, autocompleteExampleContext),
     [autocompleteExampleContext],
   );
 
@@ -4161,7 +4164,7 @@ export function AppPage() {
           loadSidebarData={loadSidebarData}
           getTabData={getTabData}
           getNodeEditData={getNodeEditData}
-          getAutocompleteExampleObj={getAutocompleteExampleObj}
+          getAutocompleteExampleResult={getAutocompleteExampleResult}
           getCustomField={getCustomField}
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
