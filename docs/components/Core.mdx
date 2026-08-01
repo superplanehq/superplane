@@ -23,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
+  <LinkCard title="Ansible" href="#ansible" description="Run an Ansible playbook or ad-hoc command against an inventory." />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
@@ -415,6 +416,62 @@ A single `memory.added` event is emitted with all written rows and the total `co
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "memory.added"
+}
+```
+
+<a id="ansible"></a>
+
+## Ansible
+
+**Component key:** `ansible`
+
+Run Ansible from a SuperPlane workflow. The SuperPlane node acts as the Ansible control node and reaches managed hosts through the inventory you provide.
+
+### Modes
+
+- **Playbook**: Provide playbook YAML inline. It is run with `ansible-playbook` and the JSON output callback so the play recap (ok/changed/unreachable/failed per host) is captured.
+- **Ad-hoc**: Run a single module against a host pattern, e.g. module `ping`, or module `shell` with arguments `uptime`.
+
+### Configuration
+
+- **Inventory**: Inline inventory (INI or YAML). Defaults to `localhost ansible_connection=local` so it works without any remote hosts.
+- **Playbook** (playbook mode): The playbook YAML to run.
+- **Host pattern / Module / Module arguments** (ad-hoc mode): The target pattern, module name, and module arguments.
+- **Extra variables**: Optional `name=value` pairs passed via `-e`.
+- **Limit**: Optional `--limit` host pattern.
+- **Become**: Run with privilege escalation (`--become`).
+- **Verbosity**: 0-4, mapped to `-v`..`-vvvv`.
+- **Timeout (seconds)**: Maximum run time before the execution errors out.
+
+### Output
+
+- **success**: Ansible exited with status 0.
+- **failed**: Ansible ran but exited non-zero (e.g. a task failed or a host was unreachable).
+
+If Ansible cannot be run at all (binary missing, timeout, invalid working directory), the run finishes in the **error** state.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "recap": {
+      "localhost": {
+        "changed": 1,
+        "failures": 0,
+        "ignored": 0,
+        "ok": 2,
+        "rescued": 0,
+        "skipped": 0,
+        "unreachable": 0
+      }
+    },
+    "stderr": "",
+    "stdout": "{\"stats\": {\"localhost\": {\"ok\": 2, \"changed\": 1, \"unreachable\": 0, \"failures\": 0, \"skipped\": 0, \"rescued\": 0, \"ignored\": 0}}}"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "ansible.playbook.executed"
 }
 ```
 
