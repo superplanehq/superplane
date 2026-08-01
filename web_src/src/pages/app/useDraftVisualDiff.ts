@@ -175,6 +175,7 @@ export function useDraftVisualDiff({
         ...prepared,
         draggable: false,
         selectable: false,
+        connectable: false,
         data: {
           ...prepared.data,
           _draftDiffStatus: "removed",

@@ -2566,8 +2566,11 @@ export function AppPage() {
         },
       };
 
+      // Never stage an edge from a node that is not part of the draft (e.g. a
+      // removed ghost node) — mirrors the handleEdgeCreate guard.
+      const draftNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
       const newEdge =
-        data.sourceNodeId && data.sourceHandleId !== undefined
+        data.sourceNodeId && data.sourceHandleId !== undefined && draftNodeIds.has(data.sourceNodeId)
           ? ({
               sourceId: data.sourceNodeId,
               targetId: newNodeId,
@@ -2702,6 +2705,12 @@ export function AppPage() {
   const handleEdgeCreate = useCallback(
     async (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!canvas || !organizationId || !canvasId) return;
+
+      // React Flow completes connections by handle proximity, so a drop can
+      // still reference a node that is not part of the draft (e.g. a removed
+      // ghost node). Never stage an edge with a missing endpoint.
+      const nodeIds = new Set((canvas.spec?.nodes || []).map((node) => node.id));
+      if (!nodeIds.has(sourceId) || !nodeIds.has(targetId)) return;
 
       // Save snapshot before making changes
 

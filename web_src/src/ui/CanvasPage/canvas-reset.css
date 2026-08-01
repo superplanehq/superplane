@@ -135,6 +135,13 @@
   pointer-events: none;
 }
 
+/* Removed ghost nodes are tombstones: without this, the enlarged hit area
+   above re-enables pointer events on handles whose own pointer-events are
+   disabled, letting connection drags start from a deleted node. */
+.sp-canvas .sp-block-removed .react-flow__handle::before {
+  pointer-events: none;
+}
+
 .sp-canvas .react-flow__handle:not(.sp-append-source-hitbox):hover,
 .sp-canvas .react-flow__handle.sp-append-source-hitbox:hover {
   border-color: var(--sp-handle-border-hover) !important;

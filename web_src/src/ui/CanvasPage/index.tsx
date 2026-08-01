@@ -97,6 +97,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
+import { isConnectableCanvasNode, isValidCanvasConnection } from "./connectionValidity";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
@@ -962,6 +963,9 @@ function CanvasPage(props: CanvasPageProps) {
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       if (readOnly) return;
       if (!sourceConnection || !props.onPlaceholderAdd) return;
+      // Never grow the canvas out of a node that cannot accept connections,
+      // e.g. a removed ghost node rendered by the draft visual diff.
+      if (!isConnectableCanvasNode(state.nodes || [], sourceConnection.nodeId)) return;
 
       // Save placeholder immediately to backend
       const placeholderId = await props.onPlaceholderAdd({
@@ -2482,6 +2486,11 @@ function CanvasContent({
     [onEdgeCreate, isReadOnly],
   );
 
+  const isValidConnection = useCallback(
+    (connection: Connection | CanvasEdge) => isValidCanvasConnection(stateRef.current.nodes || [], connection),
+    [],
+  );
+
   const handleDragOver = useCallback(
     (event: React.DragEvent) => {
       if (isReadOnly) return;
@@ -3284,6 +3293,7 @@ function CanvasContent({
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+            isValidConnection={isValidConnection}
             onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
             onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
             onDragOver={isReadOnly ? undefined : handleDragOver}

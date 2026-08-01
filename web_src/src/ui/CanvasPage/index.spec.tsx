@@ -238,7 +238,7 @@ describe("CanvasPage connection drop", () => {
     expect(screen.queryByText("Version history")).not.toBeInTheDocument();
   });
 
-  it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
+  it("does not close the building blocks sidebar from the pane click that follows a connection drop", async () => {
     const onPlaceholderAdd = vi.fn(() => new Promise<string>(() => {}));
 
     render(
@@ -246,7 +246,24 @@ describe("CanvasPage connection drop", () => {
         <CanvasPage
           title="Canvas"
           headerMode="version-live"
-          nodes={[]}
+          nodes={[
+            {
+              id: "source",
+              position: { x: 100, y: 200 },
+              width: 240,
+              data: {
+                label: "Source",
+                state: "pending",
+                type: "component",
+                outputChannels: ["default"],
+                component: {
+                  title: "Source",
+                  iconSlug: "box",
+                  collapsed: false,
+                },
+              },
+            },
+          ]}
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
@@ -257,6 +274,9 @@ describe("CanvasPage connection drop", () => {
       </MemoryRouter>,
     );
 
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("canvas-add-component-button"));
+    });
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
 
     act(() => {
