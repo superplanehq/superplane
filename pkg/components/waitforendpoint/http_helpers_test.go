@@ -1,4 +1,4 @@
-package httpcommon
+package waitforendpoint
 
 import (
 	"encoding/base64"

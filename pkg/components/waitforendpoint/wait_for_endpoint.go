@@ -14,7 +14,6 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/components/httpcommon"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -53,16 +52,16 @@ type WaitForEndpoint struct {
 }
 
 type Spec struct {
-	URL                   string                        `json:"url"`
-	Method                string                        `json:"method"`
-	ExpectedStatus        *string                       `json:"expectedStatus,omitempty"`
-	Condition             *string                       `json:"condition,omitempty"`
-	IntervalSeconds       *int                          `json:"intervalSeconds,omitempty"`
-	TimeoutSeconds        *int                          `json:"timeoutSeconds,omitempty"`
-	RequestTimeoutSeconds *int                          `json:"requestTimeoutSeconds,omitempty"`
-	MaxResponseBytes      *int                          `json:"maxResponseBytes,omitempty"`
-	Headers               *[]httpcommon.Header          `json:"headers,omitempty"`
-	Authorization         *httpcommon.AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	URL                   string             `json:"url"`
+	Method                string             `json:"method"`
+	ExpectedStatus        *string            `json:"expectedStatus,omitempty"`
+	Condition             *string            `json:"condition,omitempty"`
+	IntervalSeconds       *int               `json:"intervalSeconds,omitempty"`
+	TimeoutSeconds        *int               `json:"timeoutSeconds,omitempty"`
+	RequestTimeoutSeconds *int               `json:"requestTimeoutSeconds,omitempty"`
+	MaxResponseBytes      *int               `json:"maxResponseBytes,omitempty"`
+	Headers               *[]Header          `json:"headers,omitempty"`
+	Authorization         *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
 }
 
 type Metadata struct {
@@ -264,7 +263,7 @@ func (c *WaitForEndpoint) Configuration() []configuration.Field {
 			TypeOptions: numberOptions(minMaxResponseBytes, maxMaxResponseBytes),
 		},
 		headersField(),
-		httpcommon.AuthorizationField(),
+		AuthorizationField(),
 	}
 }
 
@@ -431,7 +430,7 @@ func (c *WaitForEndpoint) performAttempt(
 		}
 	}
 
-	sensitiveHeader, err := httpcommon.ApplyAuthorization(secrets, spec.Authorization, request)
+	sensitiveHeader, err := ApplyAuthorization(secrets, spec.Authorization, request)
 	if err != nil {
 		return attemptResult{}, err
 	}
@@ -477,7 +476,7 @@ func (c *WaitForEndpoint) performAttempt(
 		result.ResolvedURL = response.Request.URL.String()
 	}
 
-	if !httpcommon.MatchesStatus(response.StatusCode, spec.expectedStatus()) {
+	if !MatchesStatus(response.StatusCode, spec.expectedStatus()) {
 		return result, nil
 	}
 
@@ -618,10 +617,10 @@ func validateSpec(spec Spec) error {
 	if spec.method() != http.MethodGet && spec.method() != http.MethodHead {
 		return fmt.Errorf("method must be GET or HEAD")
 	}
-	if err := httpcommon.ValidateStatusMatcher(spec.expectedStatus()); err != nil {
+	if err := ValidateStatusMatcher(spec.expectedStatus()); err != nil {
 		return err
 	}
-	if err := httpcommon.ValidateAuthorization(spec.Authorization); err != nil {
+	if err := ValidateAuthorization(spec.Authorization); err != nil {
 		return err
 	}
 
