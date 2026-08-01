@@ -22,6 +22,20 @@ type FilesQueryLike = {
 type SelectedFileQueryLike = {
   isLoading: boolean;
   error: unknown;
+  data?: {
+    path?: string;
+    content?: string;
+  };
+};
+
+type SelectedFileContentOptions = {
+  selectedPath: string | null;
+  selectedGeneratedFile: AppFile | undefined;
+  selectedChange: PendingFileChange | undefined;
+  selectedSpecDraft: string | undefined;
+  selectedFileQuery: SelectedFileQueryLike;
+  loadedContentByPath: Record<string, string>;
+  committedContentByPath: Record<string, string>;
 };
 
 export function getRepositoryFileListLoading(
@@ -57,19 +71,25 @@ export function getRepositoryFileListErrorMessage(
   return undefined;
 }
 
-function resolveSelectedFileContent(
-  selectedPath: string | null,
-  selectedGeneratedFile: AppFile | undefined,
-  selectedChange: PendingFileChange | undefined,
-  selectedSpecDraft: string | undefined,
-  loadedContentByPath: Record<string, string>,
-): string {
+function resolveSelectedFileContent({
+  selectedPath,
+  selectedGeneratedFile,
+  selectedChange,
+  selectedSpecDraft,
+  selectedFileQuery,
+  loadedContentByPath,
+  committedContentByPath,
+}: SelectedFileContentOptions): string {
   if (selectedSpecDraft !== undefined) {
     return selectedSpecDraft;
   }
 
   if (selectedChange?.type === "added" || selectedChange?.type === "modified") {
     return selectedChange.content;
+  }
+
+  if (selectedChange?.type === "deleted" && selectedPath) {
+    return committedContentByPath[selectedPath] ?? selectedFileQuery.data?.content ?? "";
   }
 
   if (selectedGeneratedFile) {
@@ -83,14 +103,21 @@ function resolveSelectedFileContent(
   return loadedContentByPath[selectedPath] ?? "";
 }
 
-function isSelectedFileContentLoaded(
-  selectedPath: string | null,
-  selectedGeneratedFile: AppFile | undefined,
-  selectedPathExistsInRepository: boolean,
-  loadedContentByPath: Record<string, string>,
-): boolean {
+function isSelectedFileContentLoaded({
+  selectedPath,
+  selectedGeneratedFile,
+  selectedChange,
+  selectedPathExistsInRepository,
+  selectedFileQuery,
+  loadedContentByPath,
+  committedContentByPath,
+}: Omit<SelectedFileContentOptions, "selectedSpecDraft"> & { selectedPathExistsInRepository: boolean }): boolean {
   if (selectedGeneratedFile || !selectedPath || !selectedPathExistsInRepository) {
     return true;
+  }
+
+  if (selectedChange?.type === "deleted") {
+    return committedContentByPath[selectedPath] !== undefined || selectedFileQuery.data?.content !== undefined;
   }
 
   return loadedContentByPath[selectedPath] !== undefined;
@@ -102,6 +129,7 @@ export function getSelectedFileViewState({
   selectedChange,
   selectedSpecDraft,
   loadedContentByPath,
+  committedContentByPath = {},
   selectedPathExistsInRepository,
   selectedFileQuery,
   canManageRepositoryFiles,
@@ -111,24 +139,30 @@ export function getSelectedFileViewState({
   selectedChange?: PendingFileChange;
   selectedSpecDraft?: string;
   loadedContentByPath: Record<string, string>;
+  committedContentByPath?: Record<string, string>;
   selectedPathExistsInRepository: boolean;
   selectedFileQuery: SelectedFileQueryLike;
   canManageRepositoryFiles: boolean;
 }) {
   const selectedIsDeleted = selectedChange?.type === "deleted";
-  const selectedContent = resolveSelectedFileContent(
+  const selectedContent = resolveSelectedFileContent({
     selectedPath,
     selectedGeneratedFile,
     selectedChange,
     selectedSpecDraft,
+    selectedFileQuery,
     loadedContentByPath,
-  );
-  const selectedContentLoaded = isSelectedFileContentLoaded(
+    committedContentByPath,
+  });
+  const selectedContentLoaded = isSelectedFileContentLoaded({
     selectedPath,
     selectedGeneratedFile,
+    selectedChange,
     selectedPathExistsInRepository,
+    selectedFileQuery,
     loadedContentByPath,
-  );
+    committedContentByPath,
+  });
   const editorLoading =
     !!selectedGeneratedFile?.loading ||
     (!!selectedPath && selectedPathExistsInRepository && !selectedContentLoaded && selectedFileQuery.isLoading);

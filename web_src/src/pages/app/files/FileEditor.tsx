@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 import { MarkdownContent } from "../Markdown";
 import { getFileMonacoLanguage } from "./lib/monaco-language";
+import type { FileChangeStatus } from "./types";
 
 const FileMonacoEditor = lazy(() =>
   import("./FileMonacoEditor").then((module) => ({ default: module.FileMonacoEditor })),
@@ -12,7 +13,7 @@ export function FileEditor({
   content,
   canvasId,
   organizationId,
-  deleted,
+  status,
   language,
   loading,
   errorMessage,
@@ -23,7 +24,7 @@ export function FileEditor({
   content: string;
   canvasId?: string;
   organizationId?: string;
-  deleted: boolean;
+  status?: FileChangeStatus;
   language?: string;
   loading: boolean;
   errorMessage?: string;
@@ -46,18 +47,11 @@ export function FileEditor({
     return <div className="p-4 text-sm text-red-600">{errorMessage}</div>;
   }
 
-  if (deleted) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
-        File marked for deletion
-      </div>
-    );
-  }
-
   const resolvedLanguage = language ?? getFileMonacoLanguage(path);
   const isMarkdown = resolvedLanguage === "markdown";
+  const deleted = status === "deleted";
 
-  if (disabled && isMarkdown) {
+  if (disabled && isMarkdown && !deleted) {
     return (
       <div className="min-h-0 flex-1 overflow-auto bg-white p-6 dark:bg-gray-900">
         <MarkdownContent
@@ -78,7 +72,14 @@ export function FileEditor({
         </div>
       }
     >
-      <FileMonacoEditor path={path} content={content} language={language} readOnly={disabled} onChange={onChange} />
+      <FileMonacoEditor
+        path={path}
+        content={content}
+        language={language}
+        status={status}
+        readOnly={disabled}
+        onChange={onChange}
+      />
     </Suspense>
   );
 }

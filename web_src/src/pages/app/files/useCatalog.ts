@@ -81,7 +81,9 @@ type UseRepositorySelectedFileQueryOptions = {
   canvasId?: string;
   selectedPath: string | null;
   repositoryPathSet: Set<string>;
+  committedRepositoryPathSet: Set<string>;
   generatedFilesByPath: Map<string, AppFile>;
+  selectedChange?: PendingFileChange;
   versionId?: string;
   stage?: boolean;
 };
@@ -90,18 +92,23 @@ export function useRepositorySelectedFileQuery({
   canvasId,
   selectedPath,
   repositoryPathSet,
+  committedRepositoryPathSet,
   generatedFilesByPath,
+  selectedChange,
   versionId,
   stage = false,
 }: UseRepositorySelectedFileQueryOptions) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
-  const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
+  const selectedIsDeleted = selectedChange?.type === "deleted";
+  const selectedPathExistsInRepository = selectedPath
+    ? repositoryPathSet.has(selectedPath) || (selectedIsDeleted && committedRepositoryPathSet.has(selectedPath))
+    : false;
   const selectedFileQuery = useCanvasRepositoryFile(
     canvasId ?? "",
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
     versionId,
-    stage,
+    selectedIsDeleted ? false : stage,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };
