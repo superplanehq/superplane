@@ -80,7 +80,9 @@ func (i *Claude) Instructions() string {
 
 ## Claude Code OAuth tokens
 
-The API Key field also accepts a Claude Code OAuth token (` + "`sk-ant-oat…`" + `, from ` + "`claude setup-token`" + `), which bills against a Claude subscription instead of API credits. Such a token carries inference scope only, so it covers **Text Prompt** and nothing else: **Run Agent**, **Run Code Agent**, **Create Batch Message**, file attachments, and usage reports all need a regular API key and fail with a scope error otherwise.
+The API Key field also accepts a Claude Code OAuth token (` + "`sk-ant-oat…`" + `, from ` + "`claude setup-token`" + `), which bills against a Claude subscription instead of API credits.
+
+Such a token carries inference scope only. It covers **Text Prompt**, and it is also what the **Run Claude Code** component needs to run the CLI on a subscription. Everything that touches workspace resources — **Run Agent**, **Run Code Agent**, **Create Batch Message**, file attachments, and usage reports — still requires a regular API key and fails with a scope error otherwise.
 
 ## Files & artifacts
 
