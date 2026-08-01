@@ -39,9 +39,9 @@ func Test__Dokploy_ListApplications__Execute(t *testing.T) {
 		require.Len(t, applications, 2)
 
 		assert.Equal(t, "app-1", applications[0]["applicationId"])
-		assert.Equal(t, "storefront", applications[0]["name"])
+		assert.Equal(t, "web", applications[0]["name"])
 		assert.Equal(t, "done", applications[0]["status"])
-		assert.Equal(t, "acme", applications[0]["project"])
+		assert.Equal(t, "storefront", applications[0]["project"])
 		assert.Equal(t, "production", applications[0]["environment"])
 		assert.Equal(t, "api", applications[1]["name"])
 

@@ -45,7 +45,7 @@ func (d *Dokploy) Instructions() string {
 
 1. **Base URL:** Use your Dokploy instance URL (for example ` + "`https://dokploy.example.com`" + `). Dokploy is self-hosted, so this is the address of your own server.
 2. **API Key:** In Dokploy, go to **Settings → API/CLI** and generate a new API key, then copy it.
-3. The API key inherits the permissions of the user that created it — SuperPlane will only see the projects and applications that user can access.
+3. The API key inherits the permissions of the user that created it, so SuperPlane only sees the projects and applications that user can access.
 `
 }
 
