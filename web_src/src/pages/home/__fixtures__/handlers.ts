@@ -218,7 +218,7 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
         name: "organization",
         type: "string",
         description:
-          "Name of the GitHub organization to install the app into, as it appears in its URL (for example, github.com/acme-inc). Leave empty to install the app into your personal GitHub account.",
+          "Name of the GitHub organization to install the app into, as it appears in its URL (github.com/your-org). Leave empty to install the app into your personal GitHub account.",
         required: false,
         label: "GitHub Organization",
         visibilityConditions: [],

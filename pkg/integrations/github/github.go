@@ -103,8 +103,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 			Name:        "organization",
 			Label:       "GitHub Organization",
 			Type:        configuration.FieldTypeString,
-			Description: "Name of the GitHub organization to install the app into, as it appears in its URL (for example, github.com/acme-inc). Leave empty to install the app into your personal GitHub account.",
-			Placeholder: "acme-inc",
+			Description: "Name of the GitHub organization to install the app into, as it appears in its URL (github.com/your-org). Leave empty to install the app into your personal GitHub account.",
+			Placeholder: "your-org",
 		},
 	}
 }
