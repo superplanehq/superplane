@@ -47,7 +47,7 @@ func (i *Claude) Configuration() []configuration.Field {
 			Label:       "API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Claude API key",
+			Description: "Claude API key, or a Claude Code OAuth token (sk-ant-oat...). OAuth tokens are inference-only: actions like Run Managed Agent or Create Batch Message will fail with a scope error.",
 			Required:    true,
 		},
 		{

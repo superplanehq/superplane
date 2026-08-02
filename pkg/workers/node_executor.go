@@ -387,6 +387,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithPendingRunCreated(onPendingRunCreated),
 	}
 
+	var integrationInstance *models.Integration
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
@@ -399,6 +400,7 @@ func (w *NodeExecutor) executeActionNode(
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
+		integrationInstance = instance
 		logger = logging.WithIntegration(logger, *instance)
 		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
@@ -406,6 +408,15 @@ func (w *NodeExecutor) executeActionNode(
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute action: %v", err)
+
+		var authErr *core.AuthError
+		if integrationInstance != nil && errors.As(err, &authErr) {
+			ctx.Integration.Error(err.Error())
+			if saveErr := tx.Save(integrationInstance).Error; saveErr != nil {
+				logger.Errorf("failed to save integration after auth error: %v", saveErr)
+			}
+		}
+
 		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
 	}
 

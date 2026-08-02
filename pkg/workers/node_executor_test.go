@@ -6,11 +6,15 @@ import (
 	"log"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -272,6 +276,123 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
+}
+
+func Test__NodeExecutor_MarksIntegrationUnhealthyOnAuthError(t *testing.T) {
+	r := support.Setup(t)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Actions: []core.Action{
+			impl.NewDummyAction(impl.DummyActionOptions{
+				Name: "dummy.dummy",
+				ExecuteFunc: func(ctx core.ExecutionContext) error {
+					return core.NewAuthError(errors.New("credentials are invalid or expired"))
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+	integration.State = models.IntegrationStateReady
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID:            componentNode,
+				Type:              models.NodeTypeComponent,
+				Ref:               datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "dummy.dummy"}}),
+				AppInstallationID: &integration.ID,
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	executor := newTestNodeExecutor(t, r)
+	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
+
+	updatedIntegration, err := models.FindUnscopedIntegration(integration.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.IntegrationStateError, updatedIntegration.State)
+	assert.Contains(t, updatedIntegration.StateDescription, "credentials are invalid or expired")
+}
+
+func Test__NodeExecutor_DoesNotMarkIntegrationUnhealthyOnNonAuthError(t *testing.T) {
+	r := support.Setup(t)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Actions: []core.Action{
+			impl.NewDummyAction(impl.DummyActionOptions{
+				Name: "dummy.dummy",
+				ExecuteFunc: func(ctx core.ExecutionContext) error {
+					return errors.New("some transient failure")
+				},
+			}),
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+	integration.State = models.IntegrationStateReady
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID:            componentNode,
+				Type:              models.NodeTypeComponent,
+				Ref:               datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "dummy.dummy"}}),
+				AppInstallationID: &integration.ID,
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	executor := newTestNodeExecutor(t, r)
+	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
+
+	updatedIntegration, err := models.FindUnscopedIntegration(integration.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.IntegrationStateReady, updatedIntegration.State)
 }
 
 func countConcurrentExecutionResults(t *testing.T, results []error) (successCount int, lockedCount int) {

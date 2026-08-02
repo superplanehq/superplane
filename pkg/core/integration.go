@@ -10,6 +10,28 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
+// AuthError marks an error returned from an integration action as caused by
+// invalid or expired credentials, as opposed to any other execution failure.
+// Integration clients should wrap the error they'd otherwise return (e.g. on
+// an HTTP 401) with NewAuthError so the node executor can mark the
+// integration unhealthy, instead of the failure only surfacing on the
+// individual run.
+type AuthError struct {
+	err error
+}
+
+func NewAuthError(err error) *AuthError {
+	return &AuthError{err: err}
+}
+
+func (e *AuthError) Error() string {
+	return e.err.Error()
+}
+
+func (e *AuthError) Unwrap() error {
+	return e.err
+}
+
 type Integration interface {
 	/*
 	 * The name of the integration.
