@@ -20,7 +20,11 @@ type AuthError struct {
 	err error
 }
 
-func NewAuthError(err error) *AuthError {
+// NewAuthError returns the error interface, not the concrete *AuthError
+// type, so callers can't accidentally store a nil *AuthError in an error
+// variable — which would make err != nil true even though the value is
+// nil, since a typed nil pointer boxed into an interface is non-nil.
+func NewAuthError(err error) error {
 	return &AuthError{err: err}
 }
 
