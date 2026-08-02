@@ -272,6 +272,7 @@ func (w *ExecutionTerminator) cancelComponent(
 	ctx.Logger = logger
 	if err := action.Cancel(ctx); err != nil {
 		logger.Errorf("failed to cancel component execution %s: %v", execution.ID, err)
+		return err
 	}
 
 	return nil
