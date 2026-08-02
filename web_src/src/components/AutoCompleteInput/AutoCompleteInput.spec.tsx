@@ -27,6 +27,40 @@ describe("calculateDropdownPosition", () => {
 
     expect(position.left).toBe(630);
   });
+
+  it("clamps top position so dropdown is not cropped vertically when space above is also tight", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 790 },
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      dropdownWidth: 350,
+      dropdownHeight: 750,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+      edgePadding: 16,
+      gap: 4,
+    });
+
+    // maxTop = 800 - 750 - 16 = 34
+    expect(position.top).toBe(34);
+  });
+
+  it("flips dropdown above cursor when space below cursor is insufficient", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 720 },
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      dropdownWidth: 350,
+      dropdownHeight: 244,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+      edgePadding: 16,
+      gap: 4,
+    });
+
+    // cursor.y (720) - cursorLineHeight (24) - dropdownHeight (244) - gap (4) = 448
+    expect(position.top).toBe(448);
+  });
 });
 
 describe("AutoCompleteInput preview toggle", () => {
