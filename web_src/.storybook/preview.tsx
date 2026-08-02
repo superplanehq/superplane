@@ -44,7 +44,6 @@ const preview: Preview = {
     theme: {
       name: "Theme",
       description: "App preview theme",
-      defaultValue: "light",
       toolbar: {
         title: "Theme",
         icon: "mirror",
@@ -55,6 +54,10 @@ const preview: Preview = {
         dynamicTitle: true,
       },
     },
+  },
+  initialGlobals: {
+    theme: "light",
+    backgrounds: { value: "light" },
   },
   decorators: [
     (Story, { globals }) => {
@@ -83,17 +86,10 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      default: "light",
-      values: [
-        {
-          name: "light",
-          value: "#ffffff",
-        },
-        {
-          name: "dark",
-          value: "#1a1a1a",
-        },
-      ],
+      options: {
+        light: { name: "light", value: "#ffffff" },
+        dark: { name: "dark", value: "#1a1a1a" },
+      },
     },
   },
 };
