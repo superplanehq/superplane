@@ -23,8 +23,13 @@ type AuthError struct {
 // NewAuthError returns the error interface, not the concrete *AuthError
 // type, so callers can't accidentally store a nil *AuthError in an error
 // variable — which would make err != nil true even though the value is
-// nil, since a typed nil pointer boxed into an interface is non-nil.
+// nil, since a typed nil pointer boxed into an interface is non-nil. It
+// returns nil when err is nil, so wrapping never turns a nil error into a
+// non-nil one (which would also panic in AuthError.Error()).
 func NewAuthError(err error) error {
+	if err == nil {
+		return nil
+	}
 	return &AuthError{err: err}
 }
 
