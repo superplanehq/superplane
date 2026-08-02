@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -51,6 +52,10 @@ Each push event includes:
 - **repository**: Repository information
 - **push.changes**: Array of reference changes with new/old commit details
 - **actor**: Information about who pushed
+
+A single push can update more than one ref at once (for example ` + "`git push --all`" + `, or
+pushing a branch and a tag together). One event is emitted per updated ref that matches
+the configured refs, and ` + "`push.changes`" + ` holds only the ref that triggered the event.
 
 ## Webhook Setup
 
@@ -170,7 +175,10 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	}
 
 	//
-	// Extract the ref from the push changes and filter.
+	// A single push can update several refs at once - for example
+	// `git push --all`, or pushing a branch and a tag together.
+	// Bitbucket reports each one as an entry in `push.changes`,
+	// so every change is filtered and emitted on its own.
 	//
 	config := OnPushConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
@@ -178,18 +186,20 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	ref := extractRef(data)
-	if ref == "" {
-		return http.StatusOK, nil, nil
-	}
+	for _, change := range extractChanges(data) {
+		ref := extractRef(change)
+		if ref == "" {
+			continue
+		}
 
-	if !configuration.MatchesAnyPredicate(config.Refs, ref) {
-		return http.StatusOK, nil, nil
-	}
+		if !configuration.MatchesAnyPredicate(config.Refs, ref) {
+			continue
+		}
 
-	err = ctx.Events.Emit("bitbucket.push", data)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		err = ctx.Events.Emit("bitbucket.push", payloadForChange(data, change))
+		if err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		}
 	}
 
 	return http.StatusOK, nil, nil
@@ -199,24 +209,51 @@ func (p *OnPush) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-// extractRef extracts the ref name from a Bitbucket push payload.
-func extractRef(data map[string]any) string {
+// extractChanges returns the ref changes carried by a Bitbucket push payload.
+func extractChanges(data map[string]any) []map[string]any {
 	push, ok := data["push"].(map[string]any)
 	if !ok {
-		return ""
+		return nil
 	}
 
-	changes, ok := push["changes"].([]any)
-	if !ok || len(changes) == 0 {
-		return ""
-	}
-
-	firstChange, ok := changes[0].(map[string]any)
+	rawChanges, ok := push["changes"].([]any)
 	if !ok {
-		return ""
+		return nil
 	}
 
-	newRef, ok := firstChange["new"].(map[string]any)
+	changes := make([]map[string]any, 0, len(rawChanges))
+	for _, rawChange := range rawChanges {
+		change, ok := rawChange.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		changes = append(changes, change)
+	}
+
+	return changes
+}
+
+// payloadForChange returns the push payload narrowed down to a single ref change,
+// so that `push.changes` always describes the ref that triggered the event.
+func payloadForChange(data map[string]any, change map[string]any) map[string]any {
+	push, ok := data["push"].(map[string]any)
+	if !ok {
+		return data
+	}
+
+	narrowedPush := maps.Clone(push)
+	narrowedPush["changes"] = []any{change}
+
+	payload := maps.Clone(data)
+	payload["push"] = narrowedPush
+
+	return payload
+}
+
+// extractRef extracts the ref name from a single Bitbucket push change.
+func extractRef(change map[string]any) string {
+	newRef, ok := change["new"].(map[string]any)
 	if !ok {
 		return ""
 	}

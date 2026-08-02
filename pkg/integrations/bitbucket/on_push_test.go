@@ -258,20 +258,62 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 		require.Equal(t, 1, eventContext.Count())
 		assert.Equal(t, "bitbucket.push", eventContext.Payloads[0].Type)
 	})
+
+	t.Run("matching ref is not the first change -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"push":{"changes":[
+			{"new":{"type":"branch","name":"feature-1"}},
+			{"new":{"type":"branch","name":"main"}}
+		]}}`)
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(pushWebhookRequest(body, "refs/heads/main", eventContext))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "refs/heads/main", refOfEmittedPayload(t, eventContext.Payloads[0].Data))
+	})
+
+	t.Run("several matching refs -> one event per matching ref", func(t *testing.T) {
+		body := []byte(`{"push":{"changes":[
+			{"new":{"type":"branch","name":"main"}},
+			{"new":{"type":"branch","name":"feature-1"}},
+			{"new":{"type":"tag","name":"v1.2.3"}}
+		]}}`)
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(pushWebhookRequest(body, "refs/heads/main", eventContext,
+			configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: "refs/tags/v1.2.3"},
+		))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 2, eventContext.Count())
+		assert.Equal(t, "refs/heads/main", refOfEmittedPayload(t, eventContext.Payloads[0].Data))
+		assert.Equal(t, "refs/tags/v1.2.3", refOfEmittedPayload(t, eventContext.Payloads[1].Data))
+	})
+
+	t.Run("no matching ref among several changes -> no event is emitted", func(t *testing.T) {
+		body := []byte(`{"push":{"changes":[
+			{"new":{"type":"branch","name":"feature-1"}},
+			{"new":{"type":"branch","name":"feature-2"}}
+		]}}`)
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(pushWebhookRequest(body, "refs/heads/main", eventContext))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
+	})
 }
 
 func Test__ExtractRef(t *testing.T) {
 	t.Run("extracts branch ref", func(t *testing.T) {
 		ref := extractRef(map[string]any{
-			"push": map[string]any{
-				"changes": []any{
-					map[string]any{
-						"new": map[string]any{
-							"type": "branch",
-							"name": "main",
-						},
-					},
-				},
+			"new": map[string]any{
+				"type": "branch",
+				"name": "main",
 			},
 		})
 
@@ -280,15 +322,9 @@ func Test__ExtractRef(t *testing.T) {
 
 	t.Run("extracts tag ref", func(t *testing.T) {
 		ref := extractRef(map[string]any{
-			"push": map[string]any{
-				"changes": []any{
-					map[string]any{
-						"new": map[string]any{
-							"type": "tag",
-							"name": "v1.2.3",
-						},
-					},
-				},
+			"new": map[string]any{
+				"type": "tag",
+				"name": "v1.2.3",
 			},
 		})
 
@@ -297,19 +333,124 @@ func Test__ExtractRef(t *testing.T) {
 
 	t.Run("missing ref returns empty string", func(t *testing.T) {
 		ref := extractRef(map[string]any{
-			"push": map[string]any{
-				"changes": []any{
-					map[string]any{
-						"new": map[string]any{
-							"type": "branch",
-						},
-					},
-				},
+			"new": map[string]any{
+				"type": "branch",
 			},
 		})
 
 		assert.Empty(t, ref)
 	})
+
+	t.Run("deleted ref returns empty string", func(t *testing.T) {
+		ref := extractRef(map[string]any{
+			"new": nil,
+			"old": map[string]any{
+				"type": "branch",
+				"name": "main",
+			},
+		})
+
+		assert.Empty(t, ref)
+	})
+}
+
+func Test__ExtractChanges(t *testing.T) {
+	t.Run("no push key returns no changes", func(t *testing.T) {
+		assert.Empty(t, extractChanges(map[string]any{}))
+	})
+
+	t.Run("changes is not a list returns no changes", func(t *testing.T) {
+		assert.Empty(t, extractChanges(map[string]any{
+			"push": map[string]any{"changes": "not-a-list"},
+		}))
+	})
+
+	t.Run("returns every change and skips malformed ones", func(t *testing.T) {
+		changes := extractChanges(map[string]any{
+			"push": map[string]any{
+				"changes": []any{
+					map[string]any{"new": map[string]any{"type": "branch", "name": "main"}},
+					"not-a-change",
+					map[string]any{"new": map[string]any{"type": "tag", "name": "v1.2.3"}},
+				},
+			},
+		})
+
+		require.Len(t, changes, 2)
+		assert.Equal(t, "refs/heads/main", extractRef(changes[0]))
+		assert.Equal(t, "refs/tags/v1.2.3", extractRef(changes[1]))
+	})
+}
+
+func Test__PayloadForChange(t *testing.T) {
+	t.Run("keeps the rest of the payload and narrows changes to one", func(t *testing.T) {
+		tagChange := map[string]any{"new": map[string]any{"type": "tag", "name": "v1.2.3"}}
+		data := map[string]any{
+			"actor":      map[string]any{"nickname": "johndoe"},
+			"repository": map[string]any{"name": "my-repo"},
+			"push": map[string]any{
+				"changes": []any{
+					map[string]any{"new": map[string]any{"type": "branch", "name": "main"}},
+					tagChange,
+				},
+			},
+		}
+
+		payload := payloadForChange(data, tagChange)
+
+		assert.Equal(t, data["actor"], payload["actor"])
+		assert.Equal(t, data["repository"], payload["repository"])
+		assert.Equal(t, []any{tagChange}, payload["push"].(map[string]any)["changes"])
+	})
+
+	t.Run("does not modify the original payload", func(t *testing.T) {
+		tagChange := map[string]any{"new": map[string]any{"type": "tag", "name": "v1.2.3"}}
+		originalChanges := []any{
+			map[string]any{"new": map[string]any{"type": "branch", "name": "main"}},
+			tagChange,
+		}
+		data := map[string]any{
+			"push": map[string]any{"changes": originalChanges},
+		}
+
+		payloadForChange(data, tagChange)
+
+		assert.Equal(t, originalChanges, data["push"].(map[string]any)["changes"])
+	})
+}
+
+// pushWebhookRequest builds a signed repo:push request for a trigger listening on refs.
+func pushWebhookRequest(body []byte, ref string, events *contexts.EventContext, extraRefs ...configuration.Predicate) core.WebhookRequestContext {
+	headers := http.Header{}
+	headers.Set("X-Event-Key", "repo:push")
+	headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+
+	refs := append(
+		[]configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: ref}},
+		extraRefs...,
+	)
+
+	return core.WebhookRequestContext{
+		Body:    body,
+		Headers: headers,
+		Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+		Configuration: map[string]any{
+			"repository": "hello",
+			"refs":       refs,
+		},
+		Events: events,
+	}
+}
+
+// refOfEmittedPayload returns the ref described by an emitted push payload.
+func refOfEmittedPayload(t *testing.T, payload any) string {
+	data, ok := payload.(map[string]any)
+	require.True(t, ok)
+
+	changes := extractChanges(data)
+	require.Len(t, changes, 1)
+
+	return extractRef(changes[0])
 }
 
 func signBitbucketPayload(secret string, body []byte) string {
