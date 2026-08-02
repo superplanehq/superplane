@@ -411,8 +411,7 @@ func (w *NodeExecutor) executeActionNode(
 
 		var authErr *core.AuthError
 		if integrationInstance != nil && errors.As(err, &authErr) {
-			ctx.Integration.Error(err.Error())
-			if saveErr := tx.Save(integrationInstance).Error; saveErr != nil {
+			if saveErr := integrationInstance.MarkError(tx, err.Error()); saveErr != nil {
 				logger.Errorf("failed to save integration after auth error: %v", saveErr)
 			}
 		}
