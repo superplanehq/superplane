@@ -261,7 +261,7 @@ spec:
                   pullRequest(number:$pr){
                     reviewThreads(first:100,after:$cursor){
                       pageInfo{ hasNextPage endCursor }
-                      nodes{ id comments(first:100){ nodes{ id } } }
+                      nodes{ id comments(last:100){ nodes{ id } } }
                     }
                   }
                 }
@@ -272,6 +272,10 @@ spec:
               # only gives the review comment (PRRC_) and GitHub exposes no direct lookup between
               # them. Walk the PR's review threads to find the one holding this comment. Paginated
               # deliberately: long PRs are exactly where this feature matters.
+              #
+              # comments(last:100), not first:100. The comment that triggered this run is by
+              # definition the newest in its thread, so on a thread longer than one page the first
+              # page is the one guaranteed NOT to contain it.
               THREAD_ID=""
               CURSOR=""
               while : ; do
