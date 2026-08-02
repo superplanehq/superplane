@@ -1397,6 +1397,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed, err := s.authorizeCanvasRead(r.Context(), user, parsedWorkflowID)
+	if err != nil {
+		log.Errorf("Failed to check canvas websocket permission: %v", err)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if !allowed {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {

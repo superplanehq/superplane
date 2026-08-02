@@ -20,21 +20,6 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	allowed, err := s.authService.CheckOrganizationPermission(r.Context(),
-		user.ID.String(),
-		user.OrganizationID.String(),
-		"canvases",
-		"read",
-	)
-	if err != nil {
-		http.Error(w, "Authorization check failed", http.StatusInternalServerError)
-		return
-	}
-	if !allowed {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	vars := mux.Vars(r)
 	canvasID, err := uuid.Parse(strings.TrimSpace(vars["canvas_id"]))
 	if err != nil {
@@ -44,6 +29,16 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 	executionID, err := uuid.Parse(strings.TrimSpace(vars["execution_id"]))
 	if err != nil {
 		http.Error(w, "Invalid execution id", http.StatusBadRequest)
+		return
+	}
+
+	allowed, err := s.authorizeCanvasRead(r.Context(), user, canvasID)
+	if err != nil {
+		http.Error(w, "Authorization check failed", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
