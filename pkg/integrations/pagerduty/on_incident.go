@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnIncident struct{}
@@ -193,9 +191,8 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusForbidden, nil, fmt.Errorf("missing signature")
 	}
 
-	// Extract version and signature value (format: v1=<signature>)
-	parts := strings.SplitN(signature, "=", 2)
-	if len(parts) != 2 || parts[0] != "v1" {
+	signatures := parseWebhookSignatures(signature)
+	if len(signatures) == 0 {
 		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
 	}
 
@@ -204,9 +201,8 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %v", err)
 	}
 
-	// Verify signature using HMAC SHA256
-	if err := crypto.VerifySignature(secret, ctx.Body, parts[1]); err != nil {
-		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %v", err)
+	if err := verifyWebhookSignatures(signatures, secret, ctx.Body); err != nil {
+		return http.StatusForbidden, nil, err
 	}
 
 	// Parse webhook payload
