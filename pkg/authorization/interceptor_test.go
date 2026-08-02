@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestResourceIDsFromPathParams(t *testing.T) {
@@ -246,6 +248,94 @@ func TestPermissionsFromScopedTokenScopes(t *testing.T) {
 		assert.Equal(t, "read", permissions[0].Action)
 		assert.Equal(t, []string{"canvas-123"}, permissions[0].Resources)
 	})
+}
+
+func TestGatewayAuthorizerDeniesRoutesWithoutAuthorizationRule(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(allowingPermissionChecker{})
+	r := httptestRequest(t, map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": "11111111-1111-4111-8111-111111111111",
+	})
+
+	_, err := authorizer.AuthorizeHTTP(
+		context.Background(),
+		r,
+		HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/unregistered-route"},
+		map[string]string{},
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestGatewayAuthorizerAllowsMeAndWidgetsWithOrgRead(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(actionPermissionChecker{
+		"org:read": true,
+	})
+	organizationID := "11111111-1111-4111-8111-111111111111"
+	r := httptestRequest(t, map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": organizationID,
+	})
+
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/me"},
+		{Method: http.MethodPost, Pattern: "/api/v1/me/token"},
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets"},
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets/{name}"},
+	}
+
+	for _, route := range routes {
+		t.Run(route.String(), func(t *testing.T) {
+			rule, ok := DefaultAuthorizationRules()[route]
+			require.True(t, ok)
+			assert.Equal(t, "org", rule.Resource)
+			assert.Equal(t, "read", rule.Action)
+
+			ctx, err := authorizer.AuthorizeHTTP(context.Background(), r, route, map[string]string{"name": "markdown"})
+			require.NoError(t, err)
+			assert.Equal(t, organizationID, ctx.Value(OrganizationContextKey))
+		})
+	}
+}
+
+func TestGatewayAuthorizerRejectsScopedTokenForMeToken(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(actionPermissionChecker{
+		"org:read": true,
+	})
+	r := httptestRequest(t, map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": "11111111-1111-4111-8111-111111111111",
+		"x-token-scopes":    marshalScopes(t, []string{"canvases:read:canvas-123"}),
+	})
+
+	_, err := authorizer.AuthorizeHTTP(
+		context.Background(),
+		r,
+		HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/me/token"},
+		map[string]string{},
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestGatewayAuthorizerAllowsAccountAuthenticatedInviteAccept(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(denyingPermissionChecker{})
+	route := HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/invite-links/{token}/accept"}
+
+	rule, ok := DefaultAuthorizationRules()[route]
+	require.True(t, ok)
+	assert.True(t, rule.AccountAuthenticated)
+
+	r := httptestRequest(t, map[string]string{
+		"x-account-id": "33333333-3333-4333-8333-333333333333",
+	})
+	_, err := authorizer.AuthorizeHTTP(context.Background(), r, route, map[string]string{"token": "tok"})
+	require.NoError(t, err)
+
+	rMissing := httptestRequest(t, map[string]string{})
+	_, err = authorizer.AuthorizeHTTP(context.Background(), rMissing, route, map[string]string{"token": "tok"})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
 }
 
 func TestGatewayAuthorizerSetsOrganizationContext(t *testing.T) {
