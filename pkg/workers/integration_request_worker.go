@@ -218,17 +218,24 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(request *models.Integ
 		HTTP:            w.registry.HTTPContext(),
 	}
 
-	if err := hookProvider.HandleHook(hookCtx); err != nil {
-		logger.Errorf("error handling action: %v", err)
+	hookErr := hookProvider.HandleHook(hookCtx)
+	if hookErr != nil {
+		logger.Errorf("error handling action: %v", hookErr)
 	}
 
 	//
-	// Phase 3: persist instance state and complete the claimed request.
+	// Phase 3: persist instance state. Only complete the request when the hook
+	// succeeded - otherwise leave it pending so the lease can expire and another
+	// worker (or this one) can retry.
 	//
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(integration).Error; err != nil {
 			logger.Errorf("failed to save integration %s: %v", integration.ID, err)
 			return fmt.Errorf("failed to save integration: %w", err)
+		}
+
+		if hookErr != nil {
+			return hookErr
 		}
 
 		return request.Complete(tx)

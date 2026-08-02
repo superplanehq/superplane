@@ -458,15 +458,16 @@ func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
 	request := &requests[0]
 
 	//
-	// Process request
+	// Process request - HandleHook failure must not complete the request so the
+	// lease can expire and the worker can retry.
 	//
-	require.NoError(t, worker.LockAndProcessRequest(*request))
+	require.Error(t, worker.LockAndProcessRequest(*request))
 
 	//
-	// Reload request, verify it was completed, even though the action failed.
+	// Reload request, verify it stayed pending despite the action failure.
 	//
 	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStatePending, request.State)
 	assert.True(t, hookCalled)
 }
