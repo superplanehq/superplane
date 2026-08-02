@@ -246,17 +246,58 @@ spec:
                   pullRequest(number:$pr){
                     reviewThreads(first:100,after:$cursor){
                       pageInfo{ hasNextPage endCursor }
-                      nodes{ id comments(first:100){ nodes{ id } } }
+                      nodes{
+                        id
+                        comments(first:100){
+                          pageInfo{ hasNextPage endCursor }
+                          nodes{ id }
+                        }
+                      }
                     }
                   }
                 }
               }
               GRAPHQL
 
+              # A single thread can hold more than 100 comments, and the triggering
+              # @superplaneagent reply may sit past that first page. When the first page of a
+              # thread's comments does not contain it, keep paging that thread's comments.
+              read -r -d '' THREAD_COMMENTS_QUERY <<'GRAPHQL' || true
+              query($threadId:ID!,$cursor:String){
+                node(id:$threadId){
+                  ... on PullRequestReviewThread {
+                    comments(first:100,after:$cursor){
+                      pageInfo{ hasNextPage endCursor }
+                      nodes{ id }
+                    }
+                  }
+                }
+              }
+              GRAPHQL
+
+              # Page a single thread's comments, starting after the first page we already checked.
+              # $1: thread node id. $2: endCursor of that already-checked first page.
+              thread_contains_comment() {
+                local thread_id="$1" cursor="$2" response
+                while [ -n "$cursor" ] && [ "$cursor" != "null" ]; do
+                  response="$(gh api graphql -f "query=$THREAD_COMMENTS_QUERY" -f "threadId=$thread_id" -f "cursor=$cursor")"
+                  if printf '%s' "$response" | jq -e --arg c "$COMMENT_NODE_ID" \
+                    'any(.data.node.comments.nodes[]?; .id == $c)' > /dev/null; then
+                    return 0
+                  fi
+                  if [ "$(printf '%s' "$response" | jq -r '.data.node.comments.pageInfo.hasNextPage')" != "true" ]; then
+                    break
+                  fi
+                  cursor="$(printf '%s' "$response" | jq -r '.data.node.comments.pageInfo.endCursor')"
+                done
+                return 1
+              }
+
               # resolveReviewThread takes a PullRequestReviewThread (PRRT_) node, but the trigger
               # only gives the review comment (PRRC_) and GitHub exposes no direct lookup between
-              # them. Walk the PR's review threads to find the one holding this comment. Paginated
-              # deliberately: long PRs are exactly where this feature matters.
+              # them. Walk the PR's review threads to find the one holding this comment. Both the
+              # thread list and each thread's comment list are paged: long PRs and long threads are
+              # exactly where this feature matters.
               THREAD_ID=""
               CURSOR=""
               while : ; do
@@ -271,6 +312,22 @@ spec:
                 THREAD_ID="$(printf '%s' "$RESPONSE" | jq -r --arg c "$COMMENT_NODE_ID" '
                   [ .data.repository.pullRequest.reviewThreads.nodes[]
                     | select(any(.comments.nodes[]?; .id == $c)) | .id ] | first // ""')"
+                if [ -n "$THREAD_ID" ]; then
+                  break
+                fi
+
+                # The comment was on no thread's first page. For every thread that has further
+                # comment pages, keep paging that thread's comments until the comment turns up.
+                while IFS=$'\t' read -r CANDIDATE_ID CANDIDATE_CURSOR; do
+                  [ -n "$CANDIDATE_ID" ] || continue
+                  if thread_contains_comment "$CANDIDATE_ID" "$CANDIDATE_CURSOR"; then
+                    THREAD_ID="$CANDIDATE_ID"
+                    break
+                  fi
+                done < <(printf '%s' "$RESPONSE" | jq -r '
+                  .data.repository.pullRequest.reviewThreads.nodes[]
+                  | select(.comments.pageInfo.hasNextPage)
+                  | "\(.id)\t\(.comments.pageInfo.endCursor)"')
                 if [ -n "$THREAD_ID" ]; then
                   break
                 fi
