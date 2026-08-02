@@ -3,12 +3,14 @@ package organizations
 import (
 	"context"
 	"slices"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/grpc/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"gorm.io/gorm"
 )
 
 func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID, userID string) (*pb.RemoveUserResponse, error) {
@@ -27,27 +29,37 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.FailedPrecondition(nil, "cannot remove the last organization owner")
 	}
 
-	//
-	// TODO: this should all be inside of a transaction
-	// Remove organization roles
-	//
 	roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-		return nil, grpcerrors.Internal(err, "error determing user roles")
+		log.Errorf("Error determining user roles for %s: %v", user.ID.String(), err)
+		return nil, grpcerrors.Internal(err, "error determining user roles")
 	}
 
-	for _, role := range roles {
-		err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
-		if err != nil {
-			log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
-			return nil, grpcerrors.Internal(err, "error removing role")
+	// Delete the user and remove roles atomically. The user soft-delete and
+	// role removal are performed together so a partial failure cannot leave the
+	// user in an inconsistent state (e.g. roles removed but still active).
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		if err := tx.Unscoped().
+			Model(user).
+			Update("deleted_at", now).
+			Update("updated_at", now).
+			Update("token_hash", nil).
+			Error; err != nil {
+			return err
 		}
-	}
 
-	err = user.Delete()
+		for _, role := range roles{
+			if err := authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization); err != nil {
+				return err 
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "error deleting user")
+		log.Errorf("Error removing user %s: %v", user.ID.String(), orgID, err)
+		return nil, grpcerrors.Internal(err, "error removing user")
 	}
 
 	return &pb.RemoveUserResponse{}, nil
