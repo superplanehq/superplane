@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/protos/users"
@@ -16,7 +17,7 @@ import (
 
 func Test_AddUserToGroup(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
 	groupName := support.RandomName("test-group")

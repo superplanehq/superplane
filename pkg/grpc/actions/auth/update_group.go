@@ -4,6 +4,7 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -13,6 +14,11 @@ import (
 )
 
 func UpdateGroup(ctx context.Context, domainType string, domainID string, groupName string, groupSpec *pb.Group_Spec, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
+	requesterID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
 	if groupName == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "group name must be specified")
 	}
@@ -49,6 +55,12 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 	if groupSpec != nil {
 		if groupSpec.Role != "" {
 			updatingRole = groupSpec.Role
+		}
+
+		if updatingRole != currentRole {
+			if err := ensureCanGrantRole(ctx, authService, requesterID, domainType, domainID, updatingRole); err != nil {
+				return nil, err
+			}
 		}
 
 		err = authService.UpdateGroup(domainID, domainType, groupName, updatingRole, displayName, description)
