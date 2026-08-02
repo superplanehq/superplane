@@ -41,7 +41,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	allowed, err := s.checkRepositoryReadPermission(ctx, user)
+	allowed, err := s.authorizeCanvasRead(ctx, user, canvasID)
 	if err != nil {
 		log.Errorf("Failed to check permission: %v", err)
 		http.Error(w, "Unauthorized", http.StatusForbidden)
@@ -90,18 +90,6 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		log.Errorf("Failed to copy file: %v", err)
 		http.Error(w, "Failed to copy file", http.StatusInternalServerError)
 	}
-}
-
-func (s *Server) checkRepositoryReadPermission(ctx context.Context, user *models.User) (allowed bool, err error) {
-	ctx, done := telemetry.Span(ctx, "repository.check_permission")
-	defer done(&err)
-
-	return s.authService.CheckOrganizationPermission(ctx,
-		user.ID.String(),
-		user.OrganizationID.String(),
-		"canvases",
-		"read",
-	)
 }
 
 func (s *Server) findFileReader(ctx context.Context, db *gorm.DB, r *http.Request, user *models.User, canvas *models.Canvas, path string) (reader io.ReadCloser, err error) {
