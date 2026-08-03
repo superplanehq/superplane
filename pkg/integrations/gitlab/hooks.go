@@ -25,6 +25,7 @@ type Hook struct {
 	NoteEvents               bool   `json:"note_events"`
 	ConfidentialIssuesEvents bool   `json:"confidential_issues_events"`
 	PipelineEvents           bool   `json:"pipeline_events"`
+	JobEvents                bool   `json:"job_events"`
 	WikiPageEvents           bool   `json:"wiki_page_events"`
 	DeploymentEvents         bool   `json:"deployment_events"`
 	ReleasesEvents           bool   `json:"releases_events"`
@@ -40,6 +41,7 @@ type HookEvents struct {
 	NoteEvents               bool
 	ConfidentialIssuesEvents bool
 	PipelineEvents           bool
+	JobEvents                bool
 	WikiPageEvents           bool
 	DeploymentEvents         bool
 	ReleasesEvents           bool
@@ -85,6 +87,7 @@ func (c *HooksClient) CreateHook(projectID string, webhookURL string, secret str
 		"note_events":                events.NoteEvents,
 		"confidential_issues_events": events.ConfidentialIssuesEvents,
 		"pipeline_events":            events.PipelineEvents,
+		"job_events":                 events.JobEvents,
 		"wiki_page_events":           events.WikiPageEvents,
 		"deployment_events":          events.DeploymentEvents,
 		"releases_events":            events.ReleasesEvents,
