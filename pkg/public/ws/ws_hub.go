@@ -105,39 +105,54 @@ func (h *Hub) unregisterClient(client *Client) {
 				}
 			}
 		}
-		log.Debugf("Client unregistered, remaining clients: %d", len(h.clients))
+		log.Warnf("Client unregistered (likely due to full send buffer), remaining clients: %d", len(h.clients))
 	}
 }
 
 // BroadcastAll sends a message to all connected clients
 func (h *Hub) BroadcastAll(message []byte) {
 	h.mutex.RLock()
-	defer h.mutex.RUnlock()
-
+	// Collect stalled clients while holding read lock
+	var stalledClients []*Client
 	for client := range h.clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			// If the client's buffer is full, mark it for eviction
+			stalledClients = append(stalledClients, client)
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing read lock
+	// to prevent deadlock with write lock in unregisterClient
+	for _, client := range stalledClients {
+		h.unregisterClient(client)
 	}
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	h.mutex.RLock()
-	defer h.mutex.RUnlock()
-
+	// Collect stalled clients while holding read lock
+	var stalledClients []*Client
+	
 	// Get clients subscribed to this workflow
 	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
 		for client := range clients {
 			select {
 			case client.send <- message:
 			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
+				// If the client's buffer is full, mark it for eviction
+				stalledClients = append(stalledClients, client)
 			}
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing read lock
+	// to prevent deadlock with write lock in unregisterClient
+	for _, client := range stalledClients {
+		h.unregisterClient(client)
 	}
 }
 
@@ -247,7 +262,7 @@ func (c *Client) readPump() {
 
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(message []byte) {
-	// Handle client messages
-	log.Infof("Received message: %s", string(message))
+	// Handle client messages - note: only log at debug level to avoid log floods
+	log.Debugf("Received message from client: %d bytes", len(message))
 	return
 }
