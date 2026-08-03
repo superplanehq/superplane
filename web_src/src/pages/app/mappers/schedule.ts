@@ -209,7 +209,6 @@ export function calculateNextTrigger(configuration: ScheduleConfiguration, refer
       currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
       currentWeekStart.setHours(0, 0, 0, 0);
 
-      // First look for a configured day still ahead in the current week
       for (let i = 0; i < 7; i++) {
         const checkDate = new Date(currentWeekStart);
         checkDate.setDate(checkDate.getDate() + i);
@@ -225,8 +224,7 @@ export function calculateNextTrigger(configuration: ScheduleConfiguration, refer
         }
       }
 
-      // Current week exhausted: the next active week starts a full interval
-      // after the current week's start
+      // Current week exhausted: the next active week starts a full interval later
       const nextIntervalStart = new Date(currentWeekStart);
       nextIntervalStart.setDate(nextIntervalStart.getDate() + interval * 7);
 
