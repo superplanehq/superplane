@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -63,6 +64,18 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
+	var factoryID *uuid.UUID
+	if req.FactoryId != nil {
+		factoryIDStr := strings.TrimSpace(req.GetFactoryId())
+		if factoryIDStr != "" {
+			id, err := uuid.Parse(factoryIDStr)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, "invalid factory_id")
+			}
+			factoryID = &id
+		}
+	}
+
 	return canvases.CreateCanvas(
 		ctx,
 		s.registry,
@@ -73,6 +86,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		uuid.MustParse(organizationID),
 		req.GetName(),
 		req.GetDescription(),
+		factoryID,
 		s.usageService,
 	)
 }

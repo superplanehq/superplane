@@ -1,5 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
@@ -12,6 +14,7 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
+import { HomeFactoriesSection } from "./HomeFactoriesSection";
 import { HomePageShell } from "./HomePageShell";
 import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
@@ -29,6 +32,8 @@ export function HomePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const {
     editingCanvas,
     openEdit,
@@ -63,13 +68,15 @@ export function HomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases) {
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases && !factoriesEnabled) {
     return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 
   return (
     <HomePageShell>
       <div className="mx-auto w-full max-w-6xl p-8">
+        {factoriesEnabled ? <HomeFactoriesSection organizationId={organizationId} /> : null}
+
         <Header />
 
         <div className="mb-6">
