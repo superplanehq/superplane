@@ -43,15 +43,26 @@ func (s *PostgresStore) ListActiveTasks(ctx context.Context) ([]*models.Task, er
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*models.Task, 0, len(rows))
-	for i := range rows {
-		t, err := taskModelFromRow(&rows[i])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	return tasksFromRows(rows)
+}
+
+const tasksByRunnerIDLimit = 5
+
+func (s *PostgresStore) TasksByRunnerID(ctx context.Context, runnerID string) ([]*models.Task, error) {
+	runnerID = strings.TrimSpace(runnerID)
+	if runnerID == "" {
+		return nil, fmt.Errorf("runner_id required")
 	}
-	return out, nil
+	var rows []brokermodels.Task
+	err := s.db.WithContext(ctx).
+		Where("runner_id = ?", runnerID).
+		Order("created_at DESC, id DESC").
+		Limit(tasksByRunnerIDLimit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return tasksFromRows(rows)
 }
 
 func (s *PostgresStore) CountTasksByFleet(ctx context.Context, fleetID string) (int, int, error) {

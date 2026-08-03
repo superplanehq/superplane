@@ -2,25 +2,33 @@ package models
 
 import "strings"
 
-// Well-known task label keys for origin attribution (Dash0 alerts).
+// Well-known task label keys for origin attribution (alerts / Dash0).
 const (
-	LabelCanvasName = "canvas_name"
-	LabelNodeName   = "node_name"
+	LabelCanvasID       = "canvas_id"
+	LabelOrganizationID = "organization_id"
+	LabelCanvasName     = "canvas_name"
+	LabelNodeName       = "node_name"
 )
 
 const maxLabelValueLen = 128
 
-// NormalizeOriginLabels keeps only canvas_name / node_name, trimmed and length-capped.
+var originLabelKeys = []string{
+	LabelCanvasID,
+	LabelOrganizationID,
+	LabelCanvasName,
+	LabelNodeName,
+}
+
+// NormalizeOriginLabels keeps only known origin keys, trimmed and length-capped.
 func NormalizeOriginLabels(in map[string]string) map[string]string {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make(map[string]string, 2)
-	if v := normalizeLabelValue(in[LabelCanvasName]); v != "" {
-		out[LabelCanvasName] = v
-	}
-	if v := normalizeLabelValue(in[LabelNodeName]); v != "" {
-		out[LabelNodeName] = v
+	out := make(map[string]string, len(originLabelKeys))
+	for _, key := range originLabelKeys {
+		if v := normalizeLabelValue(in[key]); v != "" {
+			out[key] = v
+		}
 	}
 	if len(out) == 0 {
 		return nil

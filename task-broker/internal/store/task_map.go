@@ -183,3 +183,15 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	}
 	return t, nil
 }
+
+func tasksFromRows(rows []brokermodels.Task) ([]*models.Task, error) {
+	out := make([]*models.Task, 0, len(rows))
+	for i := range rows {
+		t, err := taskModelFromRow(&rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}

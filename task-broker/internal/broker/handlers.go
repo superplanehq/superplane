@@ -549,11 +549,27 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
-	tasks, err := s.Store.ListActiveTasks(r.Context())
-	if err != nil {
-		s.logErr("list active tasks", err)
-		writeError(w, http.StatusInternalServerError, "could not list tasks")
-		return
+	var tasks []*models.Task
+	var err error
+	if _, ok := r.URL.Query()["runner_id"]; ok {
+		runnerID := strings.TrimSpace(r.URL.Query().Get("runner_id"))
+		if runnerID == "" {
+			writeError(w, http.StatusBadRequest, "runner_id required")
+			return
+		}
+		tasks, err = s.Store.TasksByRunnerID(r.Context(), runnerID)
+		if err != nil {
+			s.logErr("list tasks by runner", err)
+			writeError(w, http.StatusInternalServerError, "could not list tasks")
+			return
+		}
+	} else {
+		tasks, err = s.Store.ListActiveTasks(r.Context())
+		if err != nil {
+			s.logErr("list active tasks", err)
+			writeError(w, http.StatusInternalServerError, "could not list tasks")
+			return
+		}
 	}
 	out := make([]api.TaskStatusResponse, 0, len(tasks))
 	for _, task := range tasks {
@@ -599,6 +615,7 @@ func taskStatusResponse(task *models.Task, s *Server) api.TaskStatusResponse {
 		DockerImage:     strings.TrimSpace(task.DockerImage),
 		Error:           task.ErrorMessage,
 		CancelRequested: task.CancelRequested,
+		Labels:          task.Labels,
 	}
 	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
 		resp.CloudWatchLogGroup = g

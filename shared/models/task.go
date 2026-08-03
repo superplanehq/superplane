@@ -39,8 +39,8 @@ type Task struct {
 	SetupCommands []string
 	// Environment is a task-scoped process environment sent only to runners.
 	Environment []EnvironmentVariable
-	// Labels are optional caller-origin attributes (e.g. canvas_name, node_name)
-	// used for metrics. Not sent to runners.
+	// Labels are optional caller-origin attributes (canvas_id, organization_id,
+	// canvas_name, node_name) used for metrics/alerting. Not sent to runners.
 	Labels map[string]string
 	// Files are materialized under SUPERPLANE_TASK_DIR before execution.
 	Files      []TaskFile
