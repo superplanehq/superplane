@@ -19,12 +19,13 @@ func ListWorkOrders(ctx context.Context, organizationID string, req *pb.ListWork
 		return nil, factoryErrorToStatus(err, "failed to list work orders")
 	}
 
-	tx := database.DB(ctx)
-	if _, err := loadFactory(tx, orgID, factoryID); err != nil {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work orders")
 	}
 
-	orders, err := models.ListFactoryWorkOrders(tx, orgID, factoryID, listWorkOrderFilters(req))
+	orders, err := factory.ListWorkOrders(db, listWorkOrderFilters(req))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work orders")
 	}

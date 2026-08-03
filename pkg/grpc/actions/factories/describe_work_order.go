@@ -24,7 +24,13 @@ func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.Descr
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
-	order, err := models.FindFactoryWorkOrder(database.DB(ctx), orgID, factoryID, orderID)
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe work order")
+	}
+
+	order, err := factory.FindWorkOrder(db, orderID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}

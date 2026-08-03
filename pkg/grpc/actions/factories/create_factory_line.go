@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -24,18 +25,18 @@ func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.Creat
 		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to create factory line")
 	}
 
-	tx := database.DB(ctx)
-	factory, err := loadFactory(tx, orgID, factoryID)
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
 
-	steps, err := parseLineSteps(tx, orgID, factoryID, req.GetSteps())
+	steps, err := parseLineSteps(db, orgID, factoryID, req.GetSteps())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
 
-	line, err := factory.CreateLine(tx, name, steps)
+	line, err := factory.CreateLine(db, name, steps)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}

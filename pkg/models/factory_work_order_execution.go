@@ -16,7 +16,7 @@ const (
 
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
-	ErrFactoryWorkOrderLineActive        = errors.New("work order already has an active execution on this line")
+	ErrFactoryWorkOrderExecutionActive   = errors.New("work order already has an active execution")
 	ErrFactoryWorkOrderNotOpen           = errors.New("work order is not open")
 )
 
@@ -35,36 +35,9 @@ type FactoryWorkOrderExecution struct {
 	FinishedAt     *time.Time
 }
 
-func (FactoryWorkOrderExecution) TableName() string {
-	return "factory_work_order_executions"
-}
-
-func FindFactoryWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
+func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
 	var execution FactoryWorkOrderExecution
 	err := tx.Where("run_id = ?", runID).First(&execution).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderExecutionNotFound
-		}
-		return nil, err
-	}
-
-	return &execution, nil
-}
-
-func FindActiveFactoryWorkOrderExecution(
-	tx *gorm.DB,
-	workOrderID, lineID uuid.UUID,
-) (*FactoryWorkOrderExecution, error) {
-	var execution FactoryWorkOrderExecution
-	err := tx.
-		Where("work_order_id = ? AND line_id = ?", workOrderID, lineID).
-		Where("status IN ?", []string{
-			FactoryWorkOrderExecutionStatusPending,
-			FactoryWorkOrderExecutionStatusRunning,
-		}).
-		First(&execution).
-		Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderExecutionNotFound

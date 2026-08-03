@@ -25,12 +25,13 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
-	tx := database.DB(ctx)
-	if _, err := loadFactory(tx, orgID, factoryID); err != nil {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
-	line, err := models.FindFactoryLine(tx, orgID, factoryID, lineID)
+	line, err := factory.FindLine(db, lineID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
@@ -46,7 +47,7 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 
 	var steps []models.FactoryLineStep
 	if len(req.GetSteps()) > 0 {
-		steps, err = parseLineSteps(tx, orgID, factoryID, req.GetSteps())
+		steps, err = parseLineSteps(db, orgID, factoryID, req.GetSteps())
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory line")
 		}
@@ -56,7 +57,7 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		return nil, factoryErrorToStatus(invalidArgument("name or steps must be provided"), "failed to update factory line")
 	}
 
-	if err := line.Update(tx, name, steps); err != nil {
+	if err := line.Update(db, name, steps); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 

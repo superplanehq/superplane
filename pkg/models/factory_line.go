@@ -159,10 +159,10 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 	}, nil
 }
 
-func FindFactoryLine(tx *gorm.DB, organizationID, factoryID, lineID uuid.UUID) (*FactoryLine, error) {
+func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
 	var line FactoryLine
 	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, lineID).
+		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, lineID).
 		First(&line).
 		Error
 	if err != nil {
@@ -191,10 +191,10 @@ func FindFactoryLineByID(tx *gorm.DB, organizationID, lineID uuid.UUID) (*Factor
 	return &line, nil
 }
 
-func FindFactoryLineByName(tx *gorm.DB, organizationID, factoryID uuid.UUID, name string) (*FactoryLine, error) {
+func (f *Factory) FindLineByName(tx *gorm.DB, name string) (*FactoryLine, error) {
 	var line FactoryLine
 	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND name = ?", organizationID, factoryID, name).
+		Where("organization_id = ? AND factory_id = ? AND name = ?", f.OrganizationID, f.ID, name).
 		First(&line).
 		Error
 	if err != nil {
@@ -207,10 +207,10 @@ func FindFactoryLineByName(tx *gorm.DB, organizationID, factoryID uuid.UUID, nam
 	return &line, nil
 }
 
-func ListFactoryLines(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]FactoryLine, error) {
+func (f *Factory) ListLines(tx *gorm.DB) ([]FactoryLine, error) {
 	var lines []FactoryLine
 	err := tx.
-		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
 		Order("name ASC").
 		Order("id ASC").
 		Find(&lines).

@@ -36,15 +36,6 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func loadFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*models.Factory, error) {
-	factory, err := models.FindFactory(tx, organizationID, factoryID)
-	if err != nil {
-		return nil, err
-	}
-
-	return factory, nil
-}
-
 func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
 	if len(assigneeIDs) == 0 {
 		return nil, nil

@@ -19,13 +19,13 @@ func DescribeFactory(ctx context.Context, organizationID, factoryID string) (*pb
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}
 
-	factory, err := models.FindFactory(database.DB(ctx), orgID, id)
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, id)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}
 
-	tx := database.DB(ctx)
-	lines, err := models.ListFactoryLines(tx, orgID, id)
+	lines, err := factory.ListLines(db)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}

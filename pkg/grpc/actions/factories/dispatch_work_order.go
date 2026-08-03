@@ -38,41 +38,47 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var pendingRun *models.CanvasRun
 
 	err = tx.Transaction(func(tx *gorm.DB) error {
-		var dispatchErr error
-		order, dispatchErr = models.FindFactoryWorkOrder(tx, orgID, factoryID, orderID)
-		if dispatchErr != nil {
-			return dispatchErr
+		factory, err := models.FindFactory(tx, orgID, factoryID)
+		if err != nil {
+			return err
+		}
+
+		order, err = factory.FindWorkOrder(tx, orderID)
+		if err != nil {
+			return err
 		}
 
 		if order.State != models.FactoryWorkOrderStateOpen {
 			return models.ErrFactoryWorkOrderNotOpen
 		}
 
-		line, dispatchErr := models.FindFactoryLineByName(tx, orgID, factoryID, lineName)
-		if dispatchErr != nil {
-			return dispatchErr
-		}
-
-		_, dispatchErr = models.FindActiveFactoryWorkOrderExecution(tx, order.ID, line.ID)
-		if dispatchErr == nil {
-			return models.ErrFactoryWorkOrderLineActive
-		}
-		if !errors.Is(dispatchErr, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return dispatchErr
+		line, err := factory.FindLineByName(tx, lineName)
+		if err != nil {
+			return err
 		}
 
 		if len(line.Steps) == 0 {
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		result, dispatchErr := line.StartStep(tx, order, 0)
-		if dispatchErr != nil {
-			return dispatchErr
+		_, err = order.FindActiveExecution(tx)
+		if err == nil {
+			return models.ErrFactoryWorkOrderExecutionActive
+		}
+
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		result, err := line.StartStep(tx, order, 0)
+		if err != nil {
+			return err
 		}
 
 		pendingRun = result.Run
 		return nil
 	})
+
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}

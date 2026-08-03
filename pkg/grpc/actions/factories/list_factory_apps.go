@@ -19,12 +19,13 @@ func ListFactoryApps(ctx context.Context, organizationID string, req *pb.ListFac
 		return nil, factoryErrorToStatus(err, "failed to list factory apps")
 	}
 
-	tx := database.DB(ctx)
-	if _, err := loadFactory(tx, orgID, factoryID); err != nil {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory apps")
 	}
 
-	canvases, err := models.ListFactoryCanvases(tx, orgID, factoryID)
+	canvases, err := factory.ListCanvases(db)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory apps")
 	}

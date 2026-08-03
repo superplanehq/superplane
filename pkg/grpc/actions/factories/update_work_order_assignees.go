@@ -34,7 +34,17 @@ func UpdateWorkOrderAssignees(
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}
 
-	order, err := models.UpdateFactoryWorkOrderAssignees(tx, orgID, factoryID, orderID, assigneeIDs)
+	factory, err := models.FindFactory(tx, orgID, factoryID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+
+	order, err := factory.FindWorkOrder(tx, orderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+
+	order, err = order.UpdateAssignees(tx, assigneeIDs)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}

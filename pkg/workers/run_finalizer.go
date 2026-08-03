@@ -513,12 +513,7 @@ func advanceFactoryLineAfterRunFinished(tx *gorm.DB, runID uuid.UUID) (*factoryL
 		return nil, err
 	}
 
-	workOrder, err := models.FindFactoryWorkOrder(
-		tx,
-		execution.OrganizationID,
-		line.FactoryID,
-		execution.WorkOrderID,
-	)
+	workOrder, err := models.FindUnscopedWorkOrder(tx, execution.WorkOrderID)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"gorm.io/gorm"
 )
 
 func loadAndSerializeWorkOrder(ctx context.Context, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
@@ -39,13 +38,4 @@ func loadAndSerializeWorkOrders(ctx context.Context, orders []models.FactoryWork
 	}
 
 	return result, nil
-}
-
-func loadAndSerializeWorkOrderInTx(tx *gorm.DB, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
-	executionsByOrderID, err := models.ListFactoryWorkOrderExecutionsByWorkOrderIDs(tx, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
-
-	return serializeWorkOrder(order, executionsByOrderID[order.ID]), nil
 }
