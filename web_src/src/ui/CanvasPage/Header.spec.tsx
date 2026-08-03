@@ -10,6 +10,13 @@ vi.mock("@/components/OrganizationMenuButton", () => ({
   OrganizationMenuButton: () => null,
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => featureId === "factories",
+    enabledExperimentalFeatures: ["factories"],
+  }),
+}));
+
 vi.mock("./components/CanvasProjectSwitcher", () => ({
   CanvasProjectSwitcher: () => null,
 }));
@@ -73,6 +80,7 @@ function renderHeader(
     activeDraftBranchLabel?: string;
     onExitEditMode?: () => void;
     canvasName?: string;
+    factoryId?: string;
   },
 ) {
   render(
@@ -83,6 +91,8 @@ function renderHeader(
           element={
             <Header
               canvasName={options && "canvasName" in options ? options.canvasName : "Test Canvas"}
+              organizationId="org-1"
+              factoryId={options?.factoryId}
               mode={mode}
               isEditing={options?.isEditing}
               activeDraftBranchLabel={options?.activeDraftBranchLabel}
@@ -108,6 +118,20 @@ describe("Header", () => {
 
   it("renders without crashing when canvasName is undefined", () => {
     expect(() => renderHeader("version-live", { canvasName: undefined })).not.toThrow();
+  });
+
+  it("shows return to factory link when factoryId is set", () => {
+    renderHeader("version-live", { factoryId: "factory-123" });
+
+    const link = screen.getByTestId("return-to-factory-link");
+    expect(link).toHaveTextContent("Return to factory");
+    expect(link).toHaveAttribute("href", "/org-1/factories/factory-123");
+  });
+
+  it("hides return to factory link when factoryId is absent", () => {
+    renderHeader("version-live");
+
+    expect(screen.queryByTestId("return-to-factory-link")).not.toBeInTheDocument();
   });
 
   it("shows the active draft label and exit control in edit mode", () => {
