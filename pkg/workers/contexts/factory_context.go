@@ -32,6 +32,9 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	if err == nil {
 		return nil, errors.New("cannot create work order while executing another work order")
 	}
+	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		return nil, err
+	}
 
 	if c.canvas.FactoryID == nil {
 		return nil, errors.New("app is not owned by a factory")

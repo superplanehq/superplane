@@ -49,10 +49,14 @@ func (c *CreateWorkOrder) Color() string {
 
 func (c *CreateWorkOrder) ExampleOutput() map[string]any {
 	return map[string]any{
-		"workOrder": map[string]any{
-			"id":          "123",
-			"title":       "Work Order 1",
-			"description": "Work Order 1 description",
+		"timestamp": "2026-01-01T00:00:00Z",
+		"type":      "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{
+				"id":          "123",
+				"title":       "Work Order 1",
+				"description": "Work Order 1 description",
+			},
 		},
 	}
 }
