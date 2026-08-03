@@ -202,7 +202,7 @@ const buildSurveyResponseProps = (survey: PostHogSurvey, responses: SurveyRespon
 
 const SurveyQuestionHeader: React.FC<{ question: string | undefined }> = ({ question }) => (
   <div className="space-y-5">
-    <img src={superplaneLogo} alt="SuperPlane logo" className="h-8 w-8" />
+    <img src={superplaneLogo} alt="SuperPlane logo" className="h-8 w-8 dark:brightness-0 dark:invert" />
     <div className="space-y-2">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
         Welcome to SuperPlane
