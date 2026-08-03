@@ -235,6 +235,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		})
 	}
 
+	var savedExecution *models.CanvasNodeExecution
+	var savedNode *models.CanvasNode
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -271,23 +274,34 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated)
-		if processErr != nil {
+
+		if err := execution.StartInTransaction(tx); err != nil {
+			w.logger.Errorf("failed to start execution %s: %v", id.String(), err)
 			metricOutcome = executorOutcomeFailed
-			metricReason = classifyAttemptFailure(processErr, execution)
-			return processErr
+			metricReason = executorReasonInternal
+			return fmt.Errorf("failed to start execution: %w", err)
 		}
 
-		if execution.Result == models.CanvasNodeExecutionResultFailed {
-			metricOutcome = executorOutcomeFailed
-			metricReason = classifyAttemptFailure(nil, execution)
-		}
-
+		savedExecution = execution
+		savedNode = node
 		return nil
 	})
 
 	if err != nil {
 		return err
+	}
+
+	db := database.DB(context.Background())
+	processErr := w.executeActionNode(db, savedExecution, savedNode, onNewEvents, onMemoryChanged, onPendingRunCreated)
+
+	if processErr != nil {
+		metricOutcome = executorOutcomeFailed
+		metricReason = classifyAttemptFailure(processErr, savedExecution)
+	} else {
+		if savedExecution.Result == models.CanvasNodeExecutionResultFailed {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(nil, savedExecution)
+		}
 	}
 
 	for _, event := range newEvents {
@@ -310,7 +324,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 }
 
 func (w *NodeExecutor) executeActionNode(
-	tx *gorm.DB,
+	db *gorm.DB,
 	execution *models.CanvasNodeExecution,
 	node *models.CanvasNode,
 	onNewEvents func([]models.CanvasEvent),
@@ -322,12 +336,6 @@ func (w *NodeExecutor) executeActionNode(
 		execution,
 	)
 
-	err := execution.StartInTransaction(tx)
-	if err != nil {
-		logger.Errorf("failed to start execution: %v", err)
-		return fmt.Errorf("failed to start execution: %w", err)
-	}
-
 	ref := node.Ref.Data()
 	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -335,7 +343,7 @@ func (w *NodeExecutor) executeActionNode(
 		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
-	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
+	inputEvent, err := models.FindCanvasEventInTransaction(db, execution.EventID)
 	if err != nil {
 		logger.Errorf("failed to find input event: %v", err)
 		return fmt.Errorf("failed to find input event: %w", err)
@@ -343,13 +351,13 @@ func (w *NodeExecutor) executeActionNode(
 
 	input := inputEvent.Data.Data()
 
-	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(db, node.WorkflowID)
 	if err != nil {
 		logger.Errorf("failed to find workflow: %v", err)
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
-	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+	builder := contexts.NewNodeConfigurationBuilder(db, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
 		WithIncomingEventID(&execution.EventID).
@@ -369,26 +377,26 @@ func (w *NodeExecutor) executeActionNode(
 		BaseURL:        w.baseURL,
 		Configuration:  execution.Configuration.Data(),
 		Data:           input,
-		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
-		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
+		HTTP:           w.registry.HTTPContext(),
+		Metadata:       contexts.NewExecutionMetadataContext(db, execution),
+		NodeMetadata:   contexts.NewNodeMetadataContext(db, node),
+		ExecutionState: contexts.NewExecutionStateContext(db, execution, onNewEvents),
+		Requests:       contexts.NewExecutionRequestContext(db, execution),
+		Auth:           contexts.NewAuthReader(db, workflow.OrganizationID, w.authService, nil),
+		Secrets:        contexts.NewSecretsContext(db, w.registry, workflow.OrganizationID, w.encryptor),
+		CanvasMemory: contexts.NewCanvasMemoryContext(db, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
 		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
-		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Webhook:     contexts.NewNodeWebhookContext(context.Background(), db, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
-		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
-		Runs: contexts.NewRunExecutionContext(tx, workflow, node, execution).
+		Apps:        contexts.NewAppExecutionContext(db, workflow, node, execution),
+		Runs: contexts.NewRunExecutionContext(db, workflow, node, execution).
 			WithPendingRunCreated(onPendingRunCreated),
 	}
 
 	if node.AppInstallationID != nil {
-		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		instance, err := models.FindUnscopedIntegrationInTransaction(db, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				logger.Errorf("integration %s not found", *node.AppInstallationID)
@@ -400,7 +408,7 @@ func (w *NodeExecutor) executeActionNode(
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
+		ctx.Integration = contexts.NewIntegrationContext(db, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	ctx.Logger = logger
@@ -411,7 +419,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	logger.Info("Action executed successfully")
 
-	return tx.Save(execution).Error
+	return nil
 }
 
 const (
