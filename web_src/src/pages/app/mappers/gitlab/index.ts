@@ -23,6 +23,7 @@ import { getCommitStatusMapper } from "./get_commit_status";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready_for_review";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
+import { onCommitStatusTriggerRenderer } from "./on_commit_status";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
 import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
@@ -103,6 +104,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onBranchCreated: onBranchCreatedTriggerRenderer,
+  onCommitStatus: onCommitStatusTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onIssueComment: onIssueCommentTriggerRenderer,
   onMergeComment: onMergeCommentTriggerRenderer,
