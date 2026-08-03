@@ -34,6 +34,9 @@ var exampleDataOnPushBytes []byte
 //go:embed example_data_on_branch_created.json
 var exampleDataOnBranchCreatedBytes []byte
 
+//go:embed example_data_on_commit_status.json
+var exampleDataOnCommitStatusBytes []byte
+
 //go:embed example_data_on_release.json
 var exampleDataOnReleaseBytes []byte
 
@@ -69,6 +72,9 @@ var exampleDataOnPush map[string]any
 
 var exampleDataOnBranchCreatedOnce sync.Once
 var exampleDataOnBranchCreated map[string]any
+
+var exampleDataOnCommitStatusOnce sync.Once
+var exampleDataOnCommitStatus map[string]any
 
 var exampleDataOnReleaseOnce sync.Once
 var exampleDataOnRelease map[string]any
@@ -113,6 +119,10 @@ func (p *OnPush) ExampleData() map[string]any {
 
 func (t *OnBranchCreated) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBranchCreatedOnce, exampleDataOnBranchCreatedBytes, &exampleDataOnBranchCreated)
+}
+
+func (t *OnCommitStatus) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnCommitStatusOnce, exampleDataOnCommitStatusBytes, &exampleDataOnCommitStatus)
 }
 
 func (r *OnRelease) ExampleData() map[string]any {

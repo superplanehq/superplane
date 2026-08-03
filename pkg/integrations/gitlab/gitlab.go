@@ -201,6 +201,7 @@ func (g *GitLab) Actions() []core.Action {
 func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnBranchCreated{},
+		&OnCommitStatus{},
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnMergeComment{},

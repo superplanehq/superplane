@@ -66,6 +66,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"github.onWorkflowRun":     "{{ root().data.workflow_run.name }} {{ root().data.workflow_run.conclusion }} #{{ root().data.workflow_run.run_number }}",
 
 	"gitlab.onBranchCreated": "{{ root().data.ref }}",
+	"gitlab.onCommitStatus":  "{{ root().data.object_attributes.ref }} {{ root().data.object_attributes.status }} - {{ root().data.object_attributes.sha[:7] }}",
 	"gitlab.onIssue":         "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onIssueComment":  "#{{ root().data.issue.iid }} - {{ root().data.issue.title }}",
 	"gitlab.onMergeComment":  "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",
