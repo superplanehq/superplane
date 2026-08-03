@@ -1,6 +1,9 @@
 package models
 
 import (
+	"errors"
+	"math/rand"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +19,7 @@ import (
 type Organization struct {
 	ID                          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name                        string    `gorm:"uniqueIndex"`
+	Slug                        string    `gorm:"uniqueIndex:idx_organizations_slug,where:deleted_at IS NULL"`
 	Description                 string
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
@@ -170,14 +174,112 @@ func FindOrganizationByName(name string) (*Organization, error) {
 	return &organization, nil
 }
 
+func FindOrganizationBySlug(slug string) (*Organization, error) {
+	return FindOrganizationBySlugInTransaction(database.Conn(), slug)
+}
+
+func FindOrganizationBySlugInTransaction(tx *gorm.DB, slug string) (*Organization, error) {
+	organization := Organization{}
+
+	err := tx.
+		Where("slug = ?", slug).
+		Where("deleted_at IS NULL").
+		First(&organization).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
+func FindOrganizationByIDOrSlug(identifier string) (*Organization, error) {
+	return FindOrganizationByIDOrSlugInTransaction(database.Conn(), identifier)
+}
+
+func FindOrganizationByIDOrSlugInTransaction(tx *gorm.DB, identifier string) (*Organization, error) {
+	// Try to parse as UUID first
+	if _, err := uuid.Parse(identifier); err == nil {
+		return FindOrganizationByIDInTransaction(tx, identifier)
+	}
+	// Otherwise treat as slug
+	return FindOrganizationBySlugInTransaction(tx, identifier)
+}
+
+// GenerateSlug creates a URL-friendly slug from a name
+func GenerateSlug(name string) string {
+	// Convert to lowercase, replace non-alphanumeric with hyphens
+	slug := strings.ToLower(name)
+	slug = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(slug, "-")
+	// Trim leading/trailing hyphens
+	slug = strings.Trim(slug, "-")
+	// Limit length
+	if len(slug) > 100 {
+		slug = slug[:100]
+	}
+	return slug
+}
+
+// GenerateUniqueSlug generates a unique slug by appending a random suffix if needed
+func GenerateUniqueSlug(tx *gorm.DB, name string) (string, error) {
+	baseSlug := GenerateSlug(name)
+	slug := baseSlug
+
+	// Check if slug exists
+	var count int64
+	err := tx.Model(&Organization{}).
+		Where("slug = ? AND deleted_at IS NULL", slug).
+		Count(&count).Error
+	if err != nil {
+		return "", err
+	}
+
+	if count == 0 {
+		return slug, nil
+	}
+
+	// Slug exists, add random suffix
+	for i := 0; i < 10; i++ {
+		suffix := generateRandomSuffix(6)
+		slug = baseSlug + "-" + suffix
+		err := tx.Model(&Organization{}).
+			Where("slug = ? AND deleted_at IS NULL", slug).
+			Count(&count).Error
+		if err != nil {
+			return "", err
+		}
+		if count == 0 {
+			return slug, nil
+		}
+	}
+
+	return "", errors.New("failed to generate unique slug after 10 attempts")
+}
+
+func generateRandomSuffix(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
 func CreateOrganization(name, description string) (*Organization, error) {
 	return CreateOrganizationInTransaction(database.Conn(), name, description)
 }
 
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
+	slug, err := GenerateUniqueSlug(tx, name)
+	if err != nil {
+		return nil, err
+	}
+
 	organization := Organization{
 		Name:                        name,
+		Slug:                        slug,
 		Description:                 description,
 		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{},
@@ -185,7 +287,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		UpdatedAt:                   &now,
 	}
 
-	err := tx.
+	err = tx.
 		Clauses(clause.Returning{}).
 		Create(&organization).
 		Error
@@ -200,6 +302,10 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 	}
 
 	if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		if strings.Contains(err.Error(), "idx_organizations_slug") {
+			// Retry with a new slug
+			return CreateOrganizationInTransaction(tx, name, description)
+		}
 		return nil, ErrNameAlreadyUsed
 	}
 

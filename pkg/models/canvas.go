@@ -3,7 +3,10 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +27,7 @@ type Canvas struct {
 	LiveVersionID               *uuid.UUID
 	CanvasFolderID              *uuid.UUID `gorm:"column:folder_id"`
 	Name                        string
+	Slug                        string `gorm:"uniqueIndex:idx_workflows_organization_slug,where:deleted_at IS NULL"`
 	Description                 string
 	CreatedBy                   *uuid.UUID
 	DismissedAgentSuggestionIDs datatypes.JSONSlice[string]
@@ -189,6 +193,88 @@ func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid
 	}
 
 	return &canvas, nil
+}
+
+func FindCanvasBySlug(organizationID uuid.UUID, slug string) (*Canvas, error) {
+	return FindCanvasBySlugInTransaction(database.Conn(), organizationID, slug)
+}
+
+func FindCanvasBySlugInTransaction(tx *gorm.DB, organizationID uuid.UUID, slug string) (*Canvas, error) {
+	var canvas Canvas
+	err := tx.
+		Where("slug = ? AND organization_id = ?", slug, organizationID).
+		Where("deleted_at IS NULL").
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
+}
+
+func FindCanvasByIDOrSlug(organizationID uuid.UUID, identifier string) (*Canvas, error) {
+	return FindCanvasByIDOrSlugInTransaction(database.Conn(), organizationID, identifier)
+}
+
+func FindCanvasByIDOrSlugInTransaction(tx *gorm.DB, organizationID uuid.UUID, identifier string) (*Canvas, error) {
+	// Try to parse as UUID first
+	if _, err := uuid.Parse(identifier); err == nil {
+		return FindCanvasInTransaction(tx, organizationID, uuid.MustParse(identifier))
+	}
+	// Otherwise treat as slug
+	return FindCanvasBySlugInTransaction(tx, organizationID, identifier)
+}
+
+// GenerateSlug creates a URL-friendly slug from a name
+func GenerateCanvasSlug(name string) string {
+	// Convert to lowercase, replace non-alphanumeric with hyphens
+	slug := strings.ToLower(name)
+	slug = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(slug, "-")
+	// Trim leading/trailing hyphens
+	slug = strings.Trim(slug, "-")
+	// Limit length
+	if len(slug) > 100 {
+		slug = slug[:100]
+	}
+	return slug
+}
+
+// GenerateUniqueCanvasSlug generates a unique slug by appending a random suffix if needed
+func GenerateUniqueCanvasSlug(tx *gorm.DB, organizationID uuid.UUID, name string) (string, error) {
+	baseSlug := GenerateCanvasSlug(name)
+	slug := baseSlug
+
+	// Check if slug exists
+	var count int64
+	err := tx.Model(&Canvas{}).
+		Where("slug = ? AND organization_id = ? AND deleted_at IS NULL", slug, organizationID).
+		Count(&count).Error
+	if err != nil {
+		return "", err
+	}
+
+	if count == 0 {
+		return slug, nil
+	}
+
+	// Slug exists, add random suffix
+	for i := 0; i < 10; i++ {
+		suffix := generateRandomSuffix(6)
+		slug = baseSlug + "-" + suffix
+		err := tx.Model(&Canvas{}).
+			Where("slug = ? AND organization_id = ? AND deleted_at IS NULL", slug, organizationID).
+			Count(&count).Error
+		if err != nil {
+			return "", err
+		}
+		if count == 0 {
+			return slug, nil
+		}
+	}
+
+	return "", errors.New("failed to generate unique canvas slug after 10 attempts")
 }
 
 func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
@@ -468,4 +554,40 @@ func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func generateRandomSuffix(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+// CreateCanvasInTransaction creates a new canvas with a generated slug
+func CreateCanvasInTransaction(tx *gorm.DB, organizationID uuid.UUID, name, description string, createdBy *uuid.UUID) (*Canvas, error) {
+	now := time.Now()
+	slug, err := GenerateUniqueCanvasSlug(tx, organizationID, name)
+	if err != nil {
+		return nil, err
+	}
+
+	canvas := Canvas{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		Name:           name,
+		Slug:           slug,
+		Description:    description,
+		CreatedBy:      createdBy,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	err = tx.Clauses(clause.Returning{}).Create(&canvas).Error
+	if err != nil {
+		return nil, MapCanvasNameUniqueConstraintError(err)
+	}
+
+	return &canvas, nil
 }

@@ -36,6 +36,7 @@ func SerializeCanvas(
 			Id:                          canvas.ID.String(),
 			OrganizationId:              canvas.OrganizationID.String(),
 			Name:                        canvas.Name,
+			Slug:                        canvas.Slug,
 			Description:                 canvas.Description,
 			CreatedAt:                   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:                   timestamppb.New(*canvas.UpdatedAt),

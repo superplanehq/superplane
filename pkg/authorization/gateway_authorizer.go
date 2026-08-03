@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,6 +51,14 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		log.Errorf("Organization not found in request headers")
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
+
+	// Resolve organization ID from slug to UUID if needed
+	resolvedOrgID, err := a.resolveOrganizationID(ctx, organizationID)
+	if err != nil {
+		log.Errorf("Failed to resolve organization ID: %v", err)
+		return nil, status.Error(codes.NotFound, "Not found")
+	}
+	organizationID = resolvedOrgID
 
 	allowed, err := checkOrganizationRulePermission(ctx, a.auth, userID, organizationID, rule)
 	if err != nil {
@@ -124,4 +134,18 @@ func firstHTTPHeader(r *http.Request, key string) string {
 	}
 
 	return r.Header.Get(key)
+}
+
+// resolveOrganizationID resolves an organization identifier (UUID or slug) to a UUID
+func (a *GatewayAuthorizer) resolveOrganizationID(ctx context.Context, identifier string) (string, error) {
+	// Try to parse as UUID first
+	if _, err := uuid.Parse(identifier); err == nil {
+		return identifier, nil
+	}
+	// Otherwise treat as slug and look up the organization
+	org, err := models.FindOrganizationBySlugInTransaction(database.DB(ctx), identifier)
+	if err != nil {
+		return "", err
+	}
+	return org.ID.String(), nil
 }
