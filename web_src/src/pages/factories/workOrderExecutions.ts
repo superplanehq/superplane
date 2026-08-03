@@ -3,6 +3,7 @@ import type {
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
 } from "@/api-client";
+import { appRunPath } from "@/lib/appPaths";
 
 export interface WorkOrderExecutionDisplayMeta {
   label: string;
@@ -59,6 +60,30 @@ const EXECUTION_RESULT_META: Record<
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
   },
 };
+
+export function getWorkOrderExecutionRunHref(
+  organizationId: string,
+  execution: FactoriesWorkOrderExecution,
+): string | null {
+  if (execution.run?.appId && execution.run.id) {
+    return appRunPath(organizationId, execution.run.appId, execution.run.id);
+  }
+
+  return null;
+}
+
+export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution): string {
+  if (
+    execution.state === "STATE_FINISHED" ||
+    execution.result === "RESULT_PASSED" ||
+    execution.result === "RESULT_FAILED" ||
+    execution.result === "RESULT_CANCELLED"
+  ) {
+    return execution.updatedAt ?? execution.createdAt ?? "";
+  }
+
+  return execution.createdAt ?? execution.updatedAt ?? "";
+}
 
 export function isActiveWorkOrderExecution(execution: FactoriesWorkOrderExecution): boolean {
   return (

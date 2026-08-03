@@ -411,6 +411,7 @@ CREATE TABLE public.factory_work_orders (
     description text DEFAULT ''::text NOT NULL,
     state character varying(32) DEFAULT 'open'::character varying NOT NULL,
     result character varying(32) DEFAULT ''::character varying NOT NULL,
+    created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -2074,6 +2075,14 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 ALTER TABLE ONLY public.factory_work_order_executions
     ADD CONSTRAINT factory_work_order_executions_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_orders factory_work_orders_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_created_by_id_fkey FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE RESTRICT;
 
 
 --

@@ -4,7 +4,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -35,7 +38,17 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	order, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), assigneeIDs)
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
+	createdByID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to create work order")
+	}
+
+	order, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), createdByID, assigneeIDs)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}

@@ -5,11 +5,11 @@ import { getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 const STATUS_FILTERS: Array<{ id: WorkOrderStatusFilter; label: string }> = [
   { id: "all", label: "All statuses" },
-  { id: "draft", label: "Draft" },
-  { id: "ready", label: "Ready" },
+  { id: "open", label: "Open" },
   { id: "running", label: "Running" },
-  { id: "successful", label: "Successful" },
-  { id: "unsuccessful", label: "Unsuccessful" },
+  { id: "failed", label: "Failed" },
+  { id: "completed", label: "Completed" },
+  { id: "rejected", label: "Rejected" },
 ];
 
 interface WorkOrderFiltersProps {
@@ -28,11 +28,14 @@ export function WorkOrderFilters({
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3" data-testid="work-order-filters">
       <div className="flex flex-wrap items-center gap-2">
+        <FilterPill active={ownerFilter === "mine"} onClick={() => onOwnerFilterChange("mine")}>
+          My Work
+        </FilterPill>
+        <FilterPill active={ownerFilter === "unassigned"} onClick={() => onOwnerFilterChange("unassigned")}>
+          Unassigned
+        </FilterPill>
         <FilterPill active={ownerFilter === "all"} onClick={() => onOwnerFilterChange("all")}>
           All
-        </FilterPill>
-        <FilterPill active={ownerFilter === "mine"} onClick={() => onOwnerFilterChange("mine")}>
-          Mine
         </FilterPill>
       </div>
 

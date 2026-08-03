@@ -15,9 +15,6 @@ interface WorkOrderBoardProps {
   permissionsLoading: boolean;
   onCreateClick: () => void;
   sections?: WorkOrderSectionDefinition[];
-  canClaim?: boolean;
-  claimingOrderId?: string | null;
-  onClaim?: (orderId: string) => void;
   onBrowseWorkOrders?: () => void;
 }
 
@@ -29,9 +26,6 @@ export function WorkOrderBoard({
   permissionsLoading,
   onCreateClick,
   sections = WORK_ORDER_SECTIONS,
-  canClaim = false,
-  claimingOrderId = null,
-  onClaim,
   onBrowseWorkOrders,
 }: WorkOrderBoardProps) {
   const grouped = groupWorkOrdersBySection(orders, sections);
@@ -60,14 +54,7 @@ export function WorkOrderBoard({
   return (
     <div className="space-y-4">
       {grouped.map(({ section, orders: sectionOrders }) => (
-        <WorkOrderSection
-          key={section.id}
-          section={section}
-          orders={sectionOrders}
-          canClaim={canClaim}
-          claimingOrderId={claimingOrderId}
-          onClaim={onClaim}
-        />
+        <WorkOrderSection key={section.id} section={section} orders={sectionOrders} />
       ))}
     </div>
   );
@@ -76,15 +63,9 @@ export function WorkOrderBoard({
 function WorkOrderSection({
   section,
   orders,
-  canClaim,
-  claimingOrderId,
-  onClaim,
 }: {
   section: WorkOrderSectionDefinition;
   orders: FactoriesWorkOrder[];
-  canClaim?: boolean;
-  claimingOrderId?: string | null;
-  onClaim?: (orderId: string) => void;
 }) {
   const isAttention = section.tone === "attention";
 
@@ -126,12 +107,7 @@ function WorkOrderSection({
       <ul className="divide-y divide-slate-200 dark:divide-gray-700/70">
         {orders.map((order) => (
           <li key={order.id}>
-            <WorkOrderListItem
-              order={order}
-              canClaim={canClaim}
-              isClaiming={claimingOrderId === order.id}
-              onClaim={onClaim}
-            />
+            <WorkOrderListItem order={order} />
           </li>
         ))}
       </ul>

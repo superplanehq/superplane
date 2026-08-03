@@ -7,15 +7,17 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateWorkOrder, useFactory } from "@/hooks/useFactoryData";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { factoryFormCardClassName, factoryPageContentClassName } from "./factoryPageStyles";
 import { FactoryPageShell } from "./FactoryPageShell";
+import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
 
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -25,6 +27,7 @@ export function CreateWorkOrderPage() {
   const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [titleError, setTitleError] = useState("");
 
   const {
@@ -33,6 +36,17 @@ export function CreateWorkOrderPage() {
     error: factoryError,
   } = useFactory(organizationId ?? "", factoryId ?? "");
   const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const { data: users = [] } = useOrganizationUsers(organizationId ?? "");
+
+  const selectedAssigneeLabels = useMemo(() => {
+    const labelById = new Map(
+      users
+        .filter((user) => user.metadata?.id)
+        .map((user) => [user.metadata!.id!, user.metadata?.email || user.spec?.displayName || user.metadata!.id!]),
+    );
+
+    return assigneeIds.map((id) => labelById.get(id)).filter((label): label is string => Boolean(label));
+  }, [assigneeIds, users]);
 
   usePageTitle(["New Work Order", factory?.name ?? "Factory"]);
 
@@ -61,6 +75,7 @@ export function CreateWorkOrderPage() {
       const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
         description: description.trim(),
+        assigneeIds,
       });
       if (order.id) {
         navigate(`${factoryHref}/orders/${order.id}`);
@@ -93,7 +108,7 @@ export function CreateWorkOrderPage() {
               Describe the work
             </h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Capture one concrete software change. The Work Order will remain a draft until it is approved.
+              Capture one concrete software change. Assign owners and dispatch it to a line when ready.
             </p>
 
             <div className="mt-8 space-y-6 border-t border-slate-200 pt-8 dark:border-gray-700/70">
@@ -134,6 +149,28 @@ export function CreateWorkOrderPage() {
                   rows={16}
                   placeholder="Describe what should change, why it matters, and anything the apps must preserve."
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assignees</Label>
+                <WorkOrderAssigneesPopover
+                  organizationId={organizationId}
+                  selectedIds={assigneeIds}
+                  onChange={setAssigneeIds}
+                  disabled={createWorkOrder.isPending}
+                  align="start"
+                >
+                  <Button type="button" variant="outline" data-testid="work-order-assignees-button">
+                    {assigneeIds.length === 0 ? "Select assignees" : `${assigneeIds.length} selected`}
+                  </Button>
+                </WorkOrderAssigneesPopover>
+                {selectedAssigneeLabels.length > 0 ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedAssigneeLabels.join(", ")}</p>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Optional. Select one or more people to own this work order.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-3 pt-2">

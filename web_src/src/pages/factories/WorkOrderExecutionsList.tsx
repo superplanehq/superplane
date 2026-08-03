@@ -1,17 +1,19 @@
 import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
-import { appRunPath } from "@/lib/appPaths";
+import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
   Check,
   CircleDashed,
-  ExternalLink,
+  CornerDownRight,
   Loader2,
   MinusCircle,
   XCircle,
 } from "lucide-react";
 import {
+  getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
+  getWorkOrderExecutionRunHref,
   groupWorkOrderExecutionsByLine,
   type WorkOrderExecutionLineGroup,
 } from "./workOrderExecutions";
@@ -19,7 +21,7 @@ import {
 interface WorkOrderExecutionsListProps {
   organizationId: string;
   executions?: FactoriesWorkOrderExecution[];
-  variant?: "default" | "compact";
+  variant?: "default" | "compact" | "inline";
   emptyMessage?: string;
 }
 
@@ -32,7 +34,25 @@ export function WorkOrderExecutionsList({
   const groups = groupWorkOrderExecutionsByLine(executions);
 
   if (groups.length === 0) {
-    return variant === "compact" ? null : <p className="text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>;
+    return variant === "compact" || variant === "inline" ? null : (
+      <p className="text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>
+    );
+  }
+
+  if (variant === "inline") {
+    return (
+      <ul className="space-y-1.5">
+        {groups.flatMap((group) =>
+          group.executions.map((execution, index) => (
+            <CompactExecutionRow
+              key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
+              organizationId={organizationId}
+              execution={execution}
+            />
+          )),
+        )}
+      </ul>
+    );
   }
 
   if (variant === "compact") {
@@ -93,12 +113,18 @@ function CompactExecutionRow({
 }) {
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
-  const runHref =
-    execution.run?.appId && execution.run.id ? appRunPath(organizationId, execution.run.appId, execution.run.id) : null;
+  const runHref = getWorkOrderExecutionRunHref(organizationId, execution);
 
   return (
-    <li className="text-sm">
-      <ExecutionStepMeta execution={execution} stepLabel={stepLabel} meta={meta} runHref={runHref} />
+    <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+      <ExecutionStepMeta
+        execution={execution}
+        stepLabel={stepLabel}
+        meta={meta}
+        runHref={runHref}
+        showTimestamp
+      />
     </li>
   );
 }
@@ -113,8 +139,7 @@ function ExecutionRow({
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
   const appName = execution.run?.appName?.trim();
-  const runHref =
-    execution.run?.appId && execution.run.id ? appRunPath(organizationId, execution.run.appId, execution.run.id) : null;
+  const runHref = getWorkOrderExecutionRunHref(organizationId, execution);
 
   return (
     <li className="px-4 py-3">
@@ -136,35 +161,55 @@ function ExecutionStepMeta({
   stepLabel,
   meta,
   runHref,
+  showTimestamp = false,
   size = "sm",
   stepClassName = "text-gray-700 dark:text-gray-300",
 }: {
   execution: FactoriesWorkOrderExecution;
   stepLabel: string;
   meta: ReturnType<typeof getWorkOrderExecutionDisplayMeta>;
-  runHref: string | null;
+  runHref?: string | null;
+  showTimestamp?: boolean;
   size?: "sm" | "md";
   stepClassName?: string;
 }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2">
+  const stepAt = showTimestamp ? getExecutionStepTimestamp(execution) : "";
+  const stepLabelContent = (
+    <span className={cn("min-w-0 font-medium", !showTimestamp && "truncate")}>
+      {stepLabel}
+      {stepAt ? (
+        <>
+          {" "}
+          <time className="text-xs font-normal text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(stepAt))}</time>
+        </>
+      ) : null}
+    </span>
+  );
+  const linkContent = (
+    <>
       <ExecutionStatusIcon execution={execution} meta={meta} size={size} />
-      <span className={cn("min-w-0 truncate font-medium", stepClassName)}>{stepLabel}</span>
-      {runHref ? <ViewRunLink href={runHref} /> : null}
-    </div>
+      {stepLabelContent}
+    </>
   );
-}
+  const linkClassName = cn(
+    "pointer-events-auto inline-flex w-fit max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-sm no-underline transition-colors",
+    "text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/40 dark:hover:text-gray-100",
+    stepClassName,
+  );
+  const staticClassName = cn(
+    "inline-flex w-fit max-w-full items-center gap-2 text-sm",
+    stepClassName || "text-gray-700 dark:text-gray-300",
+  );
 
-function ViewRunLink({ href }: { href: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex shrink-0 items-center gap-1 text-xs leading-none font-medium text-gray-600 no-underline hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-    >
-      View run
-      <ExternalLink className="h-3 w-3" aria-hidden />
-    </Link>
-  );
+  if (runHref) {
+    return (
+      <Link href={runHref} className={linkClassName}>
+        {linkContent}
+      </Link>
+    );
+  }
+
+  return <div className={staticClassName}>{linkContent}</div>;
 }
 
 function ExecutionStatusIcon({

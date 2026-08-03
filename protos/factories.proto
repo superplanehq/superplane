@@ -316,11 +316,6 @@ message WorkOrder {
     RESULT_REJECTED = 2;
   }
 
-  message Assignee {
-    string id = 1;
-    string name = 2;
-  }
-
   string id = 1;
   string title = 2;
   string description = 3;
@@ -328,8 +323,14 @@ message WorkOrder {
   Result result = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
-  repeated Assignee assignees = 8;
+  repeated UserRef assignees = 8;
   repeated WorkOrderExecution executions = 9;
+  UserRef created_by = 10;
+}
+
+message UserRef {
+  string id = 1;
+  string name = 2;
 }
 
 message WorkOrderExecution {

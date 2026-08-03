@@ -1,4 +1,5 @@
 import {
+  factoriesCloseWorkOrder,
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
@@ -15,6 +16,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderResult,
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
@@ -146,7 +148,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { title: string; description: string }) => {
+    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[] }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
           organizationId,
@@ -154,6 +156,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
           body: {
             title: input.title,
             description: input.description,
+            assigneeIds: input.assigneeIds,
           },
         }),
       );
@@ -212,6 +215,34 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       );
       if (!response.data?.order) {
         throw new Error("Failed to dispatch work order");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useCloseWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; result: FactoriesWorkOrderResult }) => {
+      const response = await factoriesCloseWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            result: input.result,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to close work order");
       }
       return response.data.order;
     },

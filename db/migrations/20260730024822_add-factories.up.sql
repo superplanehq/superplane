@@ -21,6 +21,7 @@ CREATE TABLE factory_work_orders (
   description     TEXT NOT NULL DEFAULT '',
   state           VARCHAR(32) NOT NULL DEFAULT 'open',
   result          VARCHAR(32) NOT NULL DEFAULT '',
+  created_by_id   UUID REFERENCES users(id) ON DELETE RESTRICT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

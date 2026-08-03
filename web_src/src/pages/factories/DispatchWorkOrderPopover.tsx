@@ -1,31 +1,30 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { useEffect, useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { useEffect, useState, type ReactNode } from "react";
 
-interface DispatchWorkOrderDialogProps {
-  open: boolean;
+interface DispatchWorkOrderPopoverProps {
   lines: FactoriesFactoryLine[];
   isSaving: boolean;
   canDispatch: boolean;
-  onClose: () => void;
+  align?: "start" | "center" | "end";
   onDispatch: (lineName: string) => Promise<void>;
+  children: ReactNode;
 }
 
-export function DispatchWorkOrderDialog({
-  open,
+export function DispatchWorkOrderPopover({
   lines,
   isSaving,
   canDispatch,
-  onClose,
+  align = "end",
   onDispatch,
-}: DispatchWorkOrderDialogProps) {
+  children,
+}: DispatchWorkOrderPopoverProps) {
+  const [open, setOpen] = useState(false);
   const [lineName, setLineName] = useState("");
 
   useEffect(() => {
@@ -34,11 +33,11 @@ export function DispatchWorkOrderDialog({
     }
   }, [open, lines]);
 
-  const handleClose = () => {
+  const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
     }
-    onClose();
+    setOpen(nextOpen);
   };
 
   const handleDispatch = async () => {
@@ -49,37 +48,27 @@ export function DispatchWorkOrderDialog({
 
     try {
       await onDispatch(lineName);
+      setOpen(false);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to dispatch work order"));
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          handleClose();
-        }
-      }}
-    >
-      <DialogContent showCloseButton={false} className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Dispatch to line</DialogTitle>
-        </DialogHeader>
-
-        {lines.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Configure at least one factory line before dispatching work orders.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            <Label htmlFor="dispatch-line-select">Line</Label>
+    <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent align={align} className="w-72 p-3" sideOffset={8}>
+        <div className="space-y-3">
+          {lines.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Configure at least one factory line before dispatching work orders.
+            </p>
+          ) : (
             <Select value={lineName} onValueChange={setLineName}>
-              <SelectTrigger id="dispatch-line-select" data-testid="dispatch-line-select">
+              <SelectTrigger id="dispatch-line-select" className="w-full" data-testid="dispatch-line-select">
                 <SelectValue placeholder="Select a line" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper">
                 {lines.map((line) => (
                   <SelectItem key={line.id ?? line.name} value={line.name ?? ""}>
                     {line.name}
@@ -87,26 +76,22 @@ export function DispatchWorkOrderDialog({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        )}
+          )}
 
-        <DialogFooter className="flex-row justify-start gap-3 sm:justify-start">
           <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
             <LoadingButton
               onClick={() => void handleDispatch()}
               disabled={!canDispatch || lines.length === 0 || !lineName}
               loading={isSaving}
               loadingText="Dispatching..."
+              className="w-full"
               data-testid="dispatch-work-order-submit"
             >
               Dispatch
             </LoadingButton>
           </PermissionTooltip>
-          <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving}>
-            Cancel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

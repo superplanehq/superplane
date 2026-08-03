@@ -94,6 +94,23 @@ func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.Fact
 		UpdatedAt:   timestamppb.New(order.UpdatedAt),
 		Assignees:   serializeWorkOrderAssignees(order.Assignees),
 		Executions:  serializeWorkOrderExecutions(executions),
+		CreatedBy:   serializeWorkOrderCreator(order),
+	}
+}
+
+func serializeWorkOrderCreator(order *models.FactoryWorkOrder) *pb.UserRef {
+	if order.CreatedByID == nil {
+		return nil
+	}
+
+	name := order.CreatedByID.String()
+	if order.CreatedBy != nil {
+		name = order.CreatedBy.Name
+	}
+
+	return &pb.UserRef{
+		Id:   order.CreatedByID.String(),
+		Name: name,
 	}
 }
 
@@ -183,14 +200,14 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 	}
 }
 
-func serializeWorkOrderAssignees(assignees []models.FactoryWorkOrderAssignee) []*pb.WorkOrder_Assignee {
-	result := make([]*pb.WorkOrder_Assignee, 0, len(assignees))
+func serializeWorkOrderAssignees(assignees []models.FactoryWorkOrderAssignee) []*pb.UserRef {
+	result := make([]*pb.UserRef, 0, len(assignees))
 	for _, assignee := range assignees {
 		name := assignee.UserID.String()
 		if assignee.User != nil {
 			name = assignee.User.Name
 		}
-		result = append(result, &pb.WorkOrder_Assignee{
+		result = append(result, &pb.UserRef{
 			Id:   assignee.UserID.String(),
 			Name: name,
 		})

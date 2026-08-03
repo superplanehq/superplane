@@ -27,9 +27,11 @@ type FactoryWorkOrder struct {
 	Description    string
 	State          string
 	Result         string
+	CreatedByID    *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
+	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
 }
 
@@ -59,6 +61,7 @@ type ListFactoryWorkOrdersFilters struct {
 func (f *Factory) CreateWorkOrder(
 	tx *gorm.DB,
 	title, description string,
+	createdByID uuid.UUID,
 	assigneeIDs []uuid.UUID,
 ) (*FactoryWorkOrder, error) {
 	now := time.Now()
@@ -70,6 +73,7 @@ func (f *Factory) CreateWorkOrder(
 		Description:    description,
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
+		CreatedByID:    &createdByID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -90,6 +94,7 @@ func (f *Factory) CreateWorkOrder(
 func FindFactoryWorkOrder(tx *gorm.DB, organizationID, factoryID, orderID uuid.UUID) (*FactoryWorkOrder, error) {
 	var order FactoryWorkOrder
 	err := tx.
+		Preload("CreatedBy").
 		Preload("Assignees").
 		Preload("Assignees.User").
 		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, orderID).
@@ -112,6 +117,7 @@ func ListFactoryWorkOrders(
 ) ([]FactoryWorkOrder, error) {
 	query := tx.
 		Model(&FactoryWorkOrder{}).
+		Preload("CreatedBy").
 		Preload("Assignees").
 		Preload("Assignees.User").
 		Where("factory_work_orders.organization_id = ?", organizationID).
@@ -183,21 +189,30 @@ func CloseFactoryWorkOrder(
 	organizationID, factoryID, orderID uuid.UUID,
 	result string,
 ) (*FactoryWorkOrder, error) {
-	order, err := FindFactoryWorkOrder(tx, organizationID, factoryID, orderID)
-	if err != nil {
-		return nil, err
-	}
-
 	now := time.Now()
-	order.State = FactoryWorkOrderStateClosed
-	order.Result = result
-	order.UpdatedAt = now
-
-	if err := tx.Save(order).Error; err != nil {
-		return nil, err
+	update := tx.Model(&FactoryWorkOrder{}).
+		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, orderID).
+		Where("state = ?", FactoryWorkOrderStateOpen).
+		Updates(map[string]any{
+			"state":      FactoryWorkOrderStateClosed,
+			"result":     result,
+			"updated_at": now,
+		})
+	if update.Error != nil {
+		return nil, update.Error
+	}
+	if update.RowsAffected == 0 {
+		order, err := FindFactoryWorkOrder(tx, organizationID, factoryID, orderID)
+		if err != nil {
+			return nil, err
+		}
+		if order.State != FactoryWorkOrderStateOpen {
+			return nil, ErrFactoryWorkOrderNotOpen
+		}
+		return nil, ErrFactoryWorkOrderNotFound
 	}
 
-	return order, nil
+	return FindFactoryWorkOrder(tx, organizationID, factoryID, orderID)
 }
 
 func replaceFactoryWorkOrderAssignees(tx *gorm.DB, workOrderID uuid.UUID, assigneeIDs []uuid.UUID, now time.Time) error {

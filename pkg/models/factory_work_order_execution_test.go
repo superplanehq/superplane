@@ -21,7 +21,7 @@ func Test__FactoryLine__StartStep__CreatesPendingRunAndExecution(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(database.Conn(), "Fix login bug", "", nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Fix login bug", "", uuid.New(), nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(database.Conn(), "bug", nil)

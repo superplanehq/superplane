@@ -19,7 +19,6 @@ import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateFactoryAppDialog } from "./CreateFactoryAppDialog";
-import { DispatchWorkOrderDialog } from "./DispatchWorkOrderDialog";
 import { FactoryAppsSidebar } from "./FactoryAppsSidebar";
 import { FactoryDetailHeader } from "./FactoryDetailHeader";
 import { FactoryLinesSidebar } from "./FactoryLinesSidebar";
@@ -48,9 +47,8 @@ export function FactoryDetailPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
   const [createAppOpen, setCreateAppOpen] = useState(false);
-  const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("all");
-  const [dispatchOrderId, setDispatchOrderId] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("mine");
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("open");
 
   const {
     data: factory,
@@ -83,11 +81,10 @@ export function FactoryDetailPage() {
   const isAppsLoading = appsLoading || (appsFetching && factoryApps.length === 0);
 
   const factoryLines = factory?.lines ?? [];
-  const openWorkOrders = useMemo(() => workOrders.filter((order) => order.state === "STATE_OPEN"), [workOrders]);
   const filteredWorkOrders = useMemo(() => {
-    const byOwner = filterWorkOrdersByOwner(openWorkOrders, ownerFilter, me?.id);
+    const byOwner = filterWorkOrdersByOwner(workOrders, ownerFilter, me?.id);
     return filterWorkOrdersByStatus(byOwner, statusFilter);
-  }, [openWorkOrders, ownerFilter, statusFilter, me?.id]);
+  }, [workOrders, ownerFilter, statusFilter, me?.id]);
   const openWorkOrderCount = countOpenWorkOrders(workOrders);
 
   useReportPageReady(!isLoading && Boolean(factory), {
@@ -127,13 +124,8 @@ export function FactoryDetailPage() {
     }
   };
 
-  const handleDispatch = async (lineName: string) => {
-    if (!dispatchOrderId) {
-      return;
-    }
-
-    await dispatchWorkOrder.mutateAsync({ orderId: dispatchOrderId, lineName });
-    setDispatchOrderId(null);
+  const handleDispatch = async (orderId: string, lineName: string) => {
+    await dispatchWorkOrder.mutateAsync({ orderId, lineName });
     showSuccessToast(`Dispatched to ${lineName}.`);
   };
 
@@ -191,8 +183,10 @@ export function FactoryDetailPage() {
                           order={order}
                           factoryHref={factoryHref}
                           organizationId={organizationId}
-                          canDispatch={canDispatch}
-                          onDispatch={(orderId) => setDispatchOrderId(orderId)}
+                          lines={factoryLines}
+                          canDispatch={canDispatch || permissionsLoading}
+                          isDispatching={dispatchWorkOrder.isPending}
+                          onDispatch={(lineName) => handleDispatch(order.id!, lineName)}
                         />
                       ))}
                     </div>
@@ -222,15 +216,6 @@ export function FactoryDetailPage() {
         isSaving={createCanvas.isPending}
         onClose={() => setCreateAppOpen(false)}
         onCreate={handleCreateApp}
-      />
-
-      <DispatchWorkOrderDialog
-        open={dispatchOrderId !== null}
-        lines={factoryLines}
-        isSaving={dispatchWorkOrder.isPending}
-        canDispatch={canDispatch || permissionsLoading}
-        onClose={() => setDispatchOrderId(null)}
-        onDispatch={handleDispatch}
       />
     </FactoryPageShell>
   );
