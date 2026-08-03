@@ -173,6 +173,8 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   /** Display name for the canvas header (center title). */
   title?: string;
+  /** When set, the app is owned by this factory and the header shows a return link. */
+  factoryId?: string;
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
@@ -1403,6 +1405,7 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContentHeader
           canvasName={props.title ?? ""}
           organizationId={props.organizationId}
+          factoryId={props.factoryId}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
@@ -1910,6 +1913,7 @@ function Sidebar({
 function CanvasContentHeader({
   canvasName,
   organizationId,
+  factoryId,
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
@@ -1966,6 +1970,7 @@ function CanvasContentHeader({
 }: {
   canvasName: string;
   organizationId?: string;
+  factoryId?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -2034,6 +2039,7 @@ function CanvasContentHeader({
     <Header
       canvasName={canvasName}
       organizationId={organizationId}
+      factoryId={factoryId}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}

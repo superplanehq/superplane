@@ -90,6 +90,36 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	assert.True(t, sort.StringsAreSorted(canvasNames), "canvases should be sorted by name in ascending order")
 }
 
+func Test__ListCanvases__ExcludesFactoryOwnedCanvases(t *testing.T) {
+	r := support.Setup(t)
+
+	orgCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Test Factory", "")
+	require.NoError(t, err)
+
+	factoryCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().Model(factoryCanvas).Update("factory_id", factory.ID).Error)
+
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	require.NoError(t, err)
+	require.Len(t, response.Canvases, 1)
+	assert.Equal(t, orgCanvas.ID.String(), response.Canvases[0].Id)
+	assert.Nil(t, findCanvasSummary(response.Canvases, factoryCanvas.ID.String()))
+}
+
 func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	r := support.Setup(t)
 
