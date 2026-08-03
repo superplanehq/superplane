@@ -72,6 +72,7 @@ CREATE INDEX idx_factory_lines_factory_id ON factory_lines (factory_id);
 CREATE TABLE factory_work_order_executions (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID NOT NULL,
+  factory_id      UUID NOT NULL REFERENCES factories(id) ON DELETE RESTRICT,
   work_order_id   UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
   line_id         UUID NOT NULL REFERENCES factory_lines(id) ON DELETE RESTRICT,
   step_index      INT NOT NULL,

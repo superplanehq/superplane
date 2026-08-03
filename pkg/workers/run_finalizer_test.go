@@ -543,7 +543,7 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	assert.Equal(t, "runApp", parentExecution.NodeID)
 }
 
-func Test__RunFinalizer__AdvancesFactoryLineAfterRunFinished(t *testing.T) {
+func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -590,22 +590,24 @@ func Test__RunFinalizer__AdvancesFactoryLineAfterRunFinished(t *testing.T) {
 		"finished_at": &now,
 	}).Error)
 
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 	var pending *factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = advanceFactoryLineAfterRunFinished(tx, firstResult.Run.ID)
+		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
 		return advanceErr
 	}))
 
 	require.NotNil(t, pending)
 	assert.Equal(t, secondApp.ID, pending.workflowID)
 
-	firstExecution, err := models.FindFactoryWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
 	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
 
-	secondExecution, err := models.FindFactoryWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
 	assert.Equal(t, "step-two", secondExecution.StepName)

@@ -386,6 +386,7 @@ CREATE TABLE public.factory_work_order_assignees (
 CREATE TABLE public.factory_work_order_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
     work_order_id uuid NOT NULL,
     line_id uuid NOT NULL,
     step_index integer NOT NULL,
@@ -2051,6 +2052,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_executions factory_work_order_executions_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_executions
+    ADD CONSTRAINT factory_work_order_executions_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --

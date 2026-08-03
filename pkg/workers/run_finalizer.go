@@ -378,17 +378,6 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 
 	logger.Info("Run finalized")
 
-	var nextFactoryLineRun *factoryLinePendingRun
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var advanceErr error
-		nextFactoryLineRun, advanceErr = advanceFactoryLineAfterRunFinished(tx, runID)
-		return advanceErr
-	})
-	if err != nil {
-		logger.WithError(err).Errorf("Error advancing factory line after run finished: %v", err)
-		return err
-	}
-
 	if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
 	}
@@ -403,6 +392,21 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
 			return err
 		}
+	}
+
+	//
+	// If the run is part of a factory work order execution, we advance the factory line.
+	//
+	var nextFactoryLineRun *factoryLinePendingRun
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		nextFactoryLineRun, advanceErr = w.executeNextFactoryLineStep(tx, runID)
+		return advanceErr
+	})
+
+	if err != nil {
+		logger.WithError(err).Errorf("Error advancing factory line after run finished: %v", err)
+		return err
 	}
 
 	if nextFactoryLineRun != nil {
@@ -482,8 +486,11 @@ type factoryLinePendingRun struct {
 	runID      uuid.UUID
 }
 
-func advanceFactoryLineAfterRunFinished(tx *gorm.DB, runID uuid.UUID) (*factoryLinePendingRun, error) {
-	execution, err := models.FindFactoryWorkOrderExecutionByRunID(tx, runID)
+func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) (*factoryLinePendingRun, error) {
+	//
+	// Finish current factory work order execution.
+	//
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
 			return nil, nil
@@ -508,19 +515,26 @@ func advanceFactoryLineAfterRunFinished(tx *gorm.DB, runID uuid.UUID) (*factoryL
 		return nil, nil
 	}
 
-	line, err := models.FindFactoryLineByID(tx, execution.OrganizationID, execution.LineID)
+	//
+	// Start next step in the factory line.
+	//
+	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
 	if err != nil {
 		return nil, err
 	}
 
-	workOrder, err := models.FindUnscopedWorkOrder(tx, execution.WorkOrderID)
+	line, err := factory.FindLine(tx, execution.LineID)
 	if err != nil {
 		return nil, err
 	}
 
-	steps := []models.FactoryLineStep(line.Steps)
+	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+
 	nextIndex := execution.StepIndex + 1
-	if nextIndex >= len(steps) {
+	if nextIndex >= len(line.Steps) {
 		return nil, nil
 	}
 

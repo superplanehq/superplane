@@ -138,6 +138,7 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 	execution := &FactoryWorkOrderExecution{
 		ID:             uuid.New(),
 		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
 		WorkOrderID:    order.ID,
 		LineID:         l.ID,
 		StepIndex:      stepIndex,

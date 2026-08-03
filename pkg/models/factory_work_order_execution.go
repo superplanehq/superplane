@@ -23,6 +23,7 @@ var (
 type FactoryWorkOrderExecution struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	LineID         uuid.UUID
 	StepIndex      int
