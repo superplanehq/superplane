@@ -460,6 +460,7 @@ export const useCreateCanvas = (organizationId: string) => {
       data: {
         name: string;
         description?: string;
+        factoryId?: string;
         method?: "ui" | "cli" | "yaml_import" | "template";
         templateId?: string;
       } & CanvasGraphData,
@@ -469,6 +470,7 @@ export const useCreateCanvas = (organizationId: string) => {
           body: {
             name: data.name,
             description: data.description || "",
+            factoryId: data.factoryId,
           },
         }),
       );

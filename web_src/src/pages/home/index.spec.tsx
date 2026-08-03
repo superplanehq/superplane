@@ -85,6 +85,14 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("./useEditApp", () => ({
   useEditApp: () => ({
     editingCanvas: null,

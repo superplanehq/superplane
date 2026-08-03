@@ -44,6 +44,7 @@ import (
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -356,6 +357,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbFactories.RegisterFactoriesHandlerServer(ctx, grpcGatewayMux, services.Factories)
+	if err != nil {
+		return err
+	}
+
 	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
@@ -416,6 +422,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/factories").Handler(protectedGRPCHandler)
 
 	return nil
 }
