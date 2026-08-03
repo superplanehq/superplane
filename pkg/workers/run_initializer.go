@@ -273,6 +273,10 @@ func (w *RunInitializer) failRun(
 		return err
 	}
 
+	if err := w.finishFactoryWorkOrderExecutionForRun(tx, run.ID, models.CanvasRunResultFailed); err != nil {
+		return err
+	}
+
 	return NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
@@ -289,4 +293,16 @@ func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID
 	}
 
 	return execution.MarkRunning(tx)
+}
+
+func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) error {
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.MarkFinished(tx, result)
 }

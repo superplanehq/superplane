@@ -5,8 +5,10 @@ import (
 	"errors"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -37,6 +39,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
 
+	var logger *log.Entry
+
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -48,6 +52,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
+		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
 		if order.State != models.FactoryWorkOrderStateOpen {
 			return models.ErrFactoryWorkOrderNotOpen
 		}
@@ -85,7 +90,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 
 	if pendingRun != nil {
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
 		}
 	}
 
