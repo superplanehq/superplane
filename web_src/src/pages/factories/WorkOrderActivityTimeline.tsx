@@ -155,9 +155,7 @@ function StepStatusIcon({ execution }: { execution: FactoriesWorkOrderExecution 
   }
 
   if (meta.isActive) {
-    return (
-      <Loader2 className={cn(iconClassName, "animate-spin text-violet-500")} aria-label={meta.label} />
-    );
+    return <Loader2 className={cn(iconClassName, "animate-spin text-violet-500")} aria-label={meta.label} />;
   }
 
   if (execution.result === "RESULT_CANCELLED") {

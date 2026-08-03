@@ -2,14 +2,7 @@ import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import {
-  Check,
-  CircleDashed,
-  CornerDownRight,
-  Loader2,
-  MinusCircle,
-  XCircle,
-} from "lucide-react";
+import { Check, CircleDashed, CornerDownRight, Loader2, MinusCircle, XCircle } from "lucide-react";
 import {
   getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
@@ -118,13 +111,7 @@ function CompactExecutionRow({
   return (
     <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
       <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
-      <ExecutionStepMeta
-        execution={execution}
-        stepLabel={stepLabel}
-        meta={meta}
-        runHref={runHref}
-        showTimestamp
-      />
+      <ExecutionStepMeta execution={execution} stepLabel={stepLabel} meta={meta} runHref={runHref} showTimestamp />
     </li>
   );
 }
@@ -180,7 +167,9 @@ function ExecutionStepMeta({
       {stepAt ? (
         <>
           {" "}
-          <time className="text-xs font-normal text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(stepAt))}</time>
+          <time className="text-xs font-normal text-gray-500 dark:text-gray-400">
+            {formatTimeAgo(new Date(stepAt))}
+          </time>
         </>
       ) : null}
     </span>
@@ -232,12 +221,7 @@ function ExecutionStatusIcon({
   }
 
   if (meta.isActive) {
-    return (
-      <Loader2
-        className={cn(iconClassName, "animate-spin text-violet-500")}
-        aria-label={meta.label}
-      />
-    );
+    return <Loader2 className={cn(iconClassName, "animate-spin text-violet-500")} aria-label={meta.label} />;
   }
 
   if (execution.result === "RESULT_CANCELLED") {

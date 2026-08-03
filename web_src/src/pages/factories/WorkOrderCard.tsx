@@ -9,10 +9,7 @@ import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./factoryPageStyles";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
-import {
-  getWorkOrderDisplayStatus,
-  getWorkOrderDisplayStatusMeta,
-} from "./workOrderProgress";
+import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 interface WorkOrderCardProps {
   order: FactoriesWorkOrder;

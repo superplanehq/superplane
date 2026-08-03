@@ -30,6 +30,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { posthog } from "@/posthog";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -40,6 +42,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const canReadOrg = permissionsLoading || canAct("org", "read");
   const { data: usageStatus, error: usageError } = useOrganizationUsage(
     organizationId || "",
@@ -103,12 +107,16 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   ];
 
   const sidebarOrganizationLinks = [
-    {
-      label: "Factories",
-      href: organizationId ? `/${organizationId}/factories` : "#",
-      Icon: Factory,
-      permission: { resource: "factories", action: "read" },
-    },
+    ...(factoriesEnabled
+      ? [
+          {
+            label: "Factories",
+            href: organizationId ? `/${organizationId}/factories` : "#",
+            Icon: Factory,
+            permission: { resource: "factories", action: "read" },
+          },
+        ]
+      : []),
     {
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",

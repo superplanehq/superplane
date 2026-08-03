@@ -46,14 +46,14 @@ export function factoryAppsKey(organizationId: string, factoryId: string) {
   return ["factories", organizationId, factoryId, "apps"] as const;
 }
 
-export function useFactories(organizationId: string) {
+export function useFactories(organizationId: string, enabled = true) {
   return useQuery({
     queryKey: factoryListKey(organizationId),
     queryFn: async (): Promise<FactoriesFactory[]> => {
       const response = await factoriesListFactories(withOrganizationHeader({ organizationId }));
       return response.data?.factories ?? [];
     },
-    enabled: Boolean(organizationId),
+    enabled: Boolean(organizationId) && enabled,
   });
 }
 

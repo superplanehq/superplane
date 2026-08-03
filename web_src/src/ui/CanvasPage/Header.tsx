@@ -3,6 +3,8 @@ import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useC
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Link } from "@/components/Link/link";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
@@ -175,14 +177,14 @@ function PageHeader({
   }>();
   const activeCanvasId = appId || canvasIdParam || workflowId;
   const inEditSession = isEditSessionActive ?? isEditing;
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const showFactoryReturnLink = Boolean(organizationId && factoryId && hasExperimentalFeature(FEATURE_FACTORIES));
 
   return (
     <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 pl-2 pr-1 sm:pl-3 sm:pr-1.5 dark:border-gray-700/70">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center gap-1">
         <OrganizationMenuButton organizationId={organizationId} />
-        {organizationId && factoryId ? (
-          <FactoryReturnLink organizationId={organizationId} factoryId={factoryId} />
-        ) : null}
+        {showFactoryReturnLink ? <FactoryReturnLink organizationId={organizationId!} factoryId={factoryId!} /> : null}
       </div>
       <div className="pointer-events-none absolute inset-x-0 flex items-center justify-center px-24">
         <div className="pointer-events-auto">

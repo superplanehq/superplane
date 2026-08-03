@@ -6,7 +6,13 @@ import { Text } from "@/components/Text/text";
 import { Link } from "@/components/Link/link";
 import type { FactoriesWorkOrderResult } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCloseWorkOrder, useDispatchWorkOrder, useFactory, useUpdateWorkOrderAssignees, useWorkOrder } from "@/hooks/useFactoryData";
+import {
+  useCloseWorkOrder,
+  useDispatchWorkOrder,
+  useFactory,
+  useUpdateWorkOrderAssignees,
+  useWorkOrder,
+} from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -104,10 +110,8 @@ export function WorkOrderDetailPage() {
     }
   };
 
-  const isCompleting =
-    closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
-  const isRejecting =
-    closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
+  const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
+  const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
   const isClosing = closeWorkOrder.isPending;
 
   return (

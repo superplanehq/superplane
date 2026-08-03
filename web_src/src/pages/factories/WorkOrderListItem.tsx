@@ -2,14 +2,7 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
-import {
-  CheckCircle2,
-  ChevronRight,
-  Loader2,
-  PlayCircle,
-  XCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckCircle2, ChevronRight, Loader2, PlayCircle, XCircle, type LucideIcon } from "lucide-react";
 import {
   getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,

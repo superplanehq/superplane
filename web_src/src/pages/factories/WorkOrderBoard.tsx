@@ -60,13 +60,7 @@ export function WorkOrderBoard({
   );
 }
 
-function WorkOrderSection({
-  section,
-  orders,
-}: {
-  section: WorkOrderSectionDefinition;
-  orders: FactoriesWorkOrder[];
-}) {
+function WorkOrderSection({ section, orders }: { section: WorkOrderSectionDefinition; orders: FactoriesWorkOrder[] }) {
   const isAttention = section.tone === "attention";
 
   return (
