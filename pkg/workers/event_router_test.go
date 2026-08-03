@@ -12,8 +12,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/triggers/onerror"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
@@ -83,6 +85,171 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
 	assert.False(t, terminalEventConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_InvalidTargetFromRootEventCreatesFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNodeID := "trigger-1"
+	invalidNodeID := "invalid-component"
+	onErrorNodeID := "on-error"
+	stateReason := "field 'timeoutSeconds': must be a number"
+	configuration := map[string]any{"timeoutSeconds": "10"}
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNodeID, Type: models.NodeTypeTrigger},
+			{
+				NodeID:        invalidNodeID,
+				Name:          "Invalid HTTP Request",
+				Type:          models.NodeTypeComponent,
+				Configuration: datatypes.NewJSONType(configuration),
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "http"},
+				}),
+			},
+			{
+				NodeID: onErrorNodeID,
+				Name:   "On Error",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: onerror.TriggerName},
+				}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNodeID, TargetID: invalidNodeID, Channel: "default"},
+		},
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, invalidNodeID).
+		Updates(map[string]any{
+			"state":        models.CanvasNodeStateError,
+			"state_reason": stateReason,
+		}).Error)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, invalidNodeID, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+
+	execution := executions[0]
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, execution.ResultReason)
+	assert.Equal(t, stateReason, execution.ResultMessage)
+	assert.Equal(t, configuration, execution.Configuration.Data())
+	assert.Equal(t, event.ID, execution.RootEventID)
+	assert.Equal(t, event.ID, execution.EventID)
+	assert.Nil(t, execution.PreviousExecutionID)
+
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, invalidNodeID, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+
+	onErrorEvents, err := models.ListCanvasEvents(database.Conn(), canvas.ID, onErrorNodeID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, onErrorEvents, 1)
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	require.NoError(t, NewRunFinalizer(amqpURL, r.Registry).finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
+}
+
+func Test__EventRouter_InvalidTargetFromExecutionEventCreatesFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNodeID := "trigger-1"
+	sourceNodeID := "component-1"
+	invalidNodeID := "invalid-component"
+	stateReason := "integration is not configured"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNodeID, Type: models.NodeTypeTrigger},
+			{NodeID: sourceNodeID, Type: models.NodeTypeComponent},
+			{
+				NodeID: invalidNodeID,
+				Type:   models.NodeTypeComponent,
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNodeID, TargetID: sourceNodeID, Channel: "default"},
+			{SourceID: sourceNodeID, TargetID: invalidNodeID, Channel: "default"},
+		},
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, invalidNodeID).
+		Updates(map[string]any{
+			"state":        models.CanvasNodeStateError,
+			"state_reason": stateReason,
+		}).Error)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+	require.NoError(t, rootEvent.Routed())
+
+	previousExecution := support.CreateCanvasNodeExecution(t, canvas.ID, sourceNodeID, rootEvent.ID, rootEvent.ID)
+	previousExecution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(previousExecution).Error)
+	_, err = previousExecution.Pass(map[string][]any{"default": {map[string]any{"ok": true}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, sourceNodeID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	outputEvent := events[0]
+
+	require.NoError(t, router.LockAndProcessEvent(logger, outputEvent, time.Now()))
+
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, invalidNodeID, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+
+	execution := executions[0]
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, execution.ResultReason)
+	assert.Equal(t, stateReason, execution.ResultMessage)
+	assert.Equal(t, rootEvent.ID, execution.RootEventID)
+	assert.Equal(t, run.ID, execution.RunID)
+	assert.Equal(t, outputEvent.ID, execution.EventID)
+	require.NotNil(t, execution.PreviousExecutionID)
+	assert.Equal(t, previousExecution.ID, *execution.PreviousExecutionID)
+
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, invalidNodeID, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
