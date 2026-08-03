@@ -21,7 +21,7 @@ type Task struct {
 	ClaimedAt                    *time.Time `gorm:""`
 	LeaseUntil                   *time.Time `gorm:""`
 	FinishedAt                   *time.Time `gorm:""`
-	RunnerID                     string     `gorm:""`
+	RunnerID                     string     `gorm:"index:idx_tasks_runner_id"`
 	ExecutionMode                string     `gorm:"not null;default:host"`
 	DockerImage                  string     `gorm:""`
 	ExecutionTimeoutSeconds      *int       `gorm:""`

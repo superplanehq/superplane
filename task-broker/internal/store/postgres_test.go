@@ -359,6 +359,57 @@ func TestPostgresStoreListActiveTasks(t *testing.T) {
 	}
 }
 
+func TestPostgresStoreTasksByRunnerID(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	create := func(id string, status models.TaskStatus, runnerID string, createdAt time.Time) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    "fleet-a",
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  createdAt,
+			RunnerID:   runnerID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("older-claimed", models.StatusClaimed, "i-aaa", now)
+	create("newer-done", models.StatusSucceeded, "i-aaa", now.Add(time.Second))
+	create("other-runner", models.StatusSucceeded, "i-bbb", now.Add(2*time.Second))
+	create("cleared-runner", models.StatusFailed, "", now.Add(3*time.Second))
+
+	got, err := st.TasksByRunnerID(ctx, "i-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("tasks: got %d want 2: %#v", len(got), got)
+	}
+	if got[0].ID != "newer-done" || got[1].ID != "older-claimed" {
+		t.Fatalf("order/ids: %#v", got)
+	}
+
+	empty, err := st.TasksByRunnerID(ctx, "i-missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("missing runner: %#v", empty)
+	}
+
+	if _, err := st.TasksByRunnerID(ctx, "   "); err == nil {
+		t.Fatal("expected error for empty runner_id")
+	}
+}
+
 func TestUnclaimTask(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
