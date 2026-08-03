@@ -354,6 +354,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	var finalized bool
+	var nextFactoryLineRun *factoryLinePendingRun
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
@@ -362,6 +363,14 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			outcome = executorOutcomeSkipped
 			reason = skipReason
 		}
+		if err != nil {
+			return err
+		}
+		if !finalized {
+			return nil
+		}
+
+		nextFactoryLineRun, err = w.executeNextFactoryLineStep(tx, runID)
 		return err
 	})
 
@@ -392,21 +401,6 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
 			return err
 		}
-	}
-
-	//
-	// If the run is part of a factory work order execution, we advance the factory line.
-	//
-	var nextFactoryLineRun *factoryLinePendingRun
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var advanceErr error
-		nextFactoryLineRun, advanceErr = w.executeNextFactoryLineStep(tx, runID)
-		return advanceErr
-	})
-
-	if err != nil {
-		logger.WithError(err).Errorf("Error advancing factory line after run finished: %v", err)
-		return err
 	}
 
 	if nextFactoryLineRun != nil {

@@ -614,6 +614,130 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
 }
 
+func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", r.User, nil)
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Name:       "step-one",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Name:       "step-two",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: secondEntry,
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		firstResult, startErr = line.StartStep(tx, order, 0)
+		return startErr
+	}))
+
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state": models.CanvasRunStateStarted,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, finalizer.finalizeRun(firstApp.ID, firstResult.Run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), firstApp.ID, firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
+
+	var secondRun models.CanvasRun
+	require.NoError(t, database.Conn().
+		Where("workflow_id = ? AND state = ?", secondApp.ID, models.CanvasRunStatePending).
+		First(&secondRun).Error)
+
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), secondRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, secondExecution.StepIndex)
+	assert.Equal(t, "step-two", secondExecution.StepName)
+}
+
+func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", r.User, nil)
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, _ := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Name:       "step-one",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Name:       "step-two",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: "missing-entrypoint",
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		firstResult, startErr = line.StartStep(tx, order, 0)
+		return startErr
+	}))
+
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state": models.CanvasRunStateStarted,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	err = finalizer.finalizeRun(firstApp.ID, firstResult.Run.ID, runFinalizerTriggerEventTerminal)
+	require.Error(t, err)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), firstApp.ID, firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, firstExecution.Status)
+}
+
 func createFactoryAppWithOnRunTrigger(
 	t *testing.T,
 	r *support.ResourceRegistry,

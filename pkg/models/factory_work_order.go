@@ -43,8 +43,8 @@ func (o *FactoryWorkOrder) IsOpen() bool {
 }
 
 type FactoryWorkOrderAssignee struct {
-	WorkOrderID uuid.UUID
-	UserID      uuid.UUID
+	WorkOrderID uuid.UUID `gorm:"primaryKey"`
+	UserID      uuid.UUID `gorm:"primaryKey"`
 	CreatedAt   time.Time
 
 	User *User `gorm:"foreignKey:UserID"`
@@ -65,14 +65,19 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 	return &order, nil
 }
 
-func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) (*FactoryWorkOrder, error) {
+func (o *FactoryWorkOrder) UpdateAssignees(db *gorm.DB, assigneeIDs []uuid.UUID) (*FactoryWorkOrder, error) {
 	now := time.Now()
-	if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
-		return nil, err
-	}
 
-	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
+			return err
+		}
+
+		o.UpdatedAt = now
+		return tx.Model(o).Update("updated_at", now).Error
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -88,7 +93,11 @@ func (o *FactoryWorkOrder) Close(tx *gorm.DB, result string) (*FactoryWorkOrder,
 	o.State = FactoryWorkOrderStateClosed
 	o.Result = result
 	o.UpdatedAt = now
-	err := tx.Model(o).Updates(o).Error
+	err := tx.Model(o).Updates(map[string]any{
+		"state":      o.State,
+		"result":     o.Result,
+		"updated_at": o.UpdatedAt,
+	}).Error
 	if err != nil {
 		return nil, err
 	}
