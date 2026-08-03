@@ -85,11 +85,11 @@ func (s *agentStagingEditSteps) start() {
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureClaudeManagedAgents))
 	require.NoError(s.t, s.session.Page().AddInitScript(pw.Script{Content: pw.String(`
-		() => {
+		(() => {
 			window.localStorage.setItem("canvasAgentMode", "operator");
 			window.localStorage.setItem("canvasAgentSidebarOpen", "false");
 			window.sessionStorage.clear();
-		}
+		})();
 	`)}))
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent Staging Edit "+uuid.NewString(), s.t, s.session)
