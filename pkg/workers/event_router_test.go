@@ -257,3 +257,127 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
 	assert.NotNil(t, updatedRun.FinishedAt)
 }
+
+func markNodeAsErrored(t *testing.T, canvasID uuid.UUID, nodeID string, reason string) {
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).
+		Updates(map[string]any{
+			"state":        models.CanvasNodeStateError,
+			"state_reason": reason,
+		}).Error)
+}
+
+func Test__EventRouter_RootEventToNodeInErrorStateRecordsFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	brokenNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{NodeID: brokenNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: brokenNode, Channel: "default"},
+		},
+	)
+
+	reason := "field 'timeoutSeconds': must be a number"
+	markNodeAsErrored(t, canvas.ID, brokenNode, reason)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+
+	//
+	// The broken node cannot execute, so it must not be queued.
+	//
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, brokenNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	//
+	// It must still show up in the execution trace as failed, carrying the
+	// node's state reason, instead of being silently skipped.
+	//
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, brokenNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, executions[0].Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, executions[0].ResultReason)
+	assert.Equal(t, reason, executions[0].ResultMessage)
+}
+
+func Test__EventRouter_ExecutionEventToNodeInErrorStateFailsRun(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	healthyNode := "component-1"
+	brokenNode := "component-2"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{NodeID: healthyNode, Type: models.NodeTypeComponent},
+			{NodeID: brokenNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: healthyNode, Channel: "default"},
+			{SourceID: healthyNode, TargetID: brokenNode, Channel: "default"},
+		},
+	)
+
+	reason := "field 'timeoutSeconds': must be a number"
+	markNodeAsErrored(t, canvas.ID, brokenNode, reason)
+
+	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
+	require.NoError(t, err)
+	require.NoError(t, triggerEvent.Routed())
+
+	//
+	// The upstream node succeeds and emits downstream, towards the broken node.
+	//
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, healthyNode, triggerEvent.ID, triggerEvent.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, healthyNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	require.NoError(t, router.LockAndProcessEvent(logger, events[0], time.Now()))
+
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, brokenNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, executions[0].Result)
+	assert.Equal(t, reason, executions[0].ResultMessage)
+
+	//
+	// A run whose branch never ran must not be reported as passed.
+	//
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
+}

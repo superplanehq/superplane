@@ -2,6 +2,8 @@ package workers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -17,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type EventRouter struct {
@@ -170,6 +173,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
+	collector := NewMessageCollector(event.WorkflowID, logger)
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
@@ -179,7 +183,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
-		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
+		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent, collector)
 		if err != nil {
 			outcome = executorOutcomeFailed
 			reason = classifyProcessError(err)
@@ -196,6 +200,8 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	if outcome == executorOutcomeSkipped {
 		return nil
 	}
+
+	collector.Publish()
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
@@ -233,7 +239,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent, collector *MessageCollector) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
 		return nil, uuid.Nil, err
@@ -245,7 +251,7 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 	}
 
 	if event.ExecutionID == nil {
-		return w.processRootEvent(tx, canvas, liveEdges, event)
+		return w.processRootEvent(tx, canvas, liveEdges, event, collector)
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
@@ -253,7 +259,7 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, uuid.Nil, err
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
+	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event, collector)
 	return queueItems, execution.RunID, err
 }
 
@@ -268,7 +274,7 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent, collector *MessageCollector) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
@@ -303,6 +309,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			if err := w.recordErroredNodeExecution(tx, targetNode, event, run.ID, event.ID, collector); err != nil {
+				return nil, uuid.Nil, err
+			}
+
 			continue
 		}
 
@@ -337,6 +347,7 @@ func (w *EventRouter) processExecutionEvent(
 	edges []models.Edge,
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
+	collector *MessageCollector,
 ) ([]models.CanvasNodeQueueItem, error) {
 	run, err := models.FindCanvasRunInTransaction(tx, execution.WorkflowID, execution.RunID)
 	if err != nil {
@@ -364,6 +375,10 @@ func (w *EventRouter) processExecutionEvent(
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			if err := w.recordErroredNodeExecution(tx, targetNode, event, execution.RunID, execution.RootEventID, collector); err != nil {
+				return nil, err
+			}
+
 			continue
 		}
 
@@ -388,4 +403,55 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
+}
+
+// A node in error state cannot execute, so it is never queued. Recording a failed
+// execution keeps the failure visible in the run's execution trace and stops the
+// run from being reported as passed while one of its branches never ran.
+//
+// This mirrors how a configuration build error is handled once a queue item is
+// processed - see NodeQueueWorker.handleNodeConfigurationError.
+func (w *EventRouter) recordErroredNodeExecution(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	event *models.CanvasEvent,
+	runID uuid.UUID,
+	rootEventID uuid.UUID,
+	collector *MessageCollector,
+) error {
+	now := time.Now()
+	execution := models.CanvasNodeExecution{
+		WorkflowID:          node.WorkflowID,
+		NodeID:              node.NodeID,
+		RootEventID:         rootEventID,
+		RunID:               runID,
+		EventID:             event.ID,
+		PreviousExecutionID: event.ExecutionID,
+		State:               models.CanvasNodeExecutionStateFinished,
+		Configuration:       node.Configuration,
+		Result:              models.CanvasNodeExecutionResultFailed,
+		ResultReason:        models.CanvasNodeExecutionResultReasonError,
+		ResultMessage:       erroredNodeResultMessage(node),
+		CreatedAt:           &now,
+		UpdatedAt:           &now,
+	}
+
+	if err := tx.Create(&execution).Error; err != nil {
+		return err
+	}
+
+	//
+	// The errored node could not execute, so notify the canvas' On Error nodes.
+	//
+	contexts.DispatchOnError(tx, &execution, collector.OnNewEvents)
+	collector.AddExecutionID(&execution.ID)
+	return nil
+}
+
+func erroredNodeResultMessage(node *models.CanvasNode) string {
+	if node.StateReason != nil && strings.TrimSpace(*node.StateReason) != "" {
+		return *node.StateReason
+	}
+
+	return fmt.Sprintf("node %s is in error state", node.NodeID)
 }
