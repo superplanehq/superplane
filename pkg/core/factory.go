@@ -10,7 +10,7 @@ type WorkOrderParams struct {
 }
 
 type WorkOrder struct {
-	ID          string
-	Title       string
-	Description string
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
 }

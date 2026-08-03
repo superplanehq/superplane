@@ -36,7 +36,7 @@ func (c *CreateWorkOrder) Description() string {
 }
 
 func (c *CreateWorkOrder) Documentation() string {
-	return `The Create Work Order component creates a new work order in the factory.`
+	return `The Create Work Order component creates a new work order in the factory. This component can only be used in factory-owned apps.`
 }
 
 func (c *CreateWorkOrder) Icon() string {
@@ -98,7 +98,9 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"workOrder.created",
-		[]any{workOrder},
+		[]any{map[string]any{
+			"workOrder": workOrder,
+		}},
 	)
 }
 

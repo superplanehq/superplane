@@ -384,10 +384,7 @@ func (w *NodeExecutor) executeActionNode(
 		OIDC:        w.oidcProvider,
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
-	}
-
-	if workflow.FactoryID != nil {
-		ctx.Factory = contexts.NewFactoryContext(tx, workflow, execution)
+		Factory:     contexts.NewFactoryContext(tx, workflow, execution),
 	}
 
 	if node.AppInstallationID != nil {
