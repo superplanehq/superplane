@@ -23,6 +23,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: () => false,
     enabledExperimentalFeatures: [],
+    isLoading: false,
   }),
 }));
 

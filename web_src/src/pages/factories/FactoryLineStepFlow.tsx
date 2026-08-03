@@ -1,14 +1,6 @@
-import type { FactoryApp } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-
-export function appNameForStep(appId: string | undefined, apps: FactoryApp[]): string {
-  if (!appId) {
-    return "Unknown app";
-  }
-  return apps.find((app) => app.id === appId)?.name ?? appId;
-}
 
 export function LineStepArrow({ className }: { className?: string }) {
   return (

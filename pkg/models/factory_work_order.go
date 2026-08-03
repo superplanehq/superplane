@@ -38,6 +38,10 @@ func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
 }
 
+func (o *FactoryWorkOrder) IsOpen() bool {
+	return o.State == FactoryWorkOrderStateOpen
+}
+
 type FactoryWorkOrderAssignee struct {
 	WorkOrderID uuid.UUID
 	UserID      uuid.UUID

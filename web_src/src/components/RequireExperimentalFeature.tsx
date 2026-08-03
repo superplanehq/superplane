@@ -9,7 +9,15 @@ interface RequireExperimentalFeatureProps {
 
 export function RequireExperimentalFeature({ featureId, children }: RequireExperimentalFeatureProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
-  const { has } = useExperimentalFeature(organizationId);
+  const { has, isLoading } = useExperimentalFeature(organizationId);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
 
   if (!has(featureId)) {
     return <Navigate to={organizationId ? `/${organizationId}` : "/"} replace />;

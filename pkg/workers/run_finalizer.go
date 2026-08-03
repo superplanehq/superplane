@@ -533,6 +533,10 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
+	if !workOrder.IsOpen() {
+		return nil, nil
+	}
+
 	nextIndex := execution.StepIndex + 1
 	if nextIndex >= len(line.Steps) {
 		return nil, nil

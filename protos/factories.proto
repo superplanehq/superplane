@@ -39,6 +39,7 @@ service Factories {
   rpc CreateFactory(CreateFactoryRequest) returns (CreateFactoryResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create factory";
