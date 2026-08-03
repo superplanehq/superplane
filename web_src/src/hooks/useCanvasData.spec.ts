@@ -407,7 +407,7 @@ describe("useUpdateCanvasConsole", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await result.current.mutateAsync({ panels: [], layout: [] });
+    await result.current.mutateAsync({ pages: [] });
 
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledOnce();
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledWith(
@@ -421,13 +421,28 @@ describe("useUpdateCanvasConsole", () => {
 
   it("surfaces dashboard save failures", async () => {
     const queryClient = createQueryClient();
+    // Committed is empty, staged carries a panel — the mutation takes
+    // the stage-operations branch (putCanvasStaging) rather than the
+    // discard branch. `putCanvasStaging` is mocked to reject so we
+    // can assert the error surfaces to the caller.
+    mockConsoleRepositoryFileFetch(afterConsoleYaml, { committedYaml: emptyConsoleYaml });
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
     });
 
-    await expect(result.current.mutateAsync({ panels: [], layout: [] })).rejects.toThrow("request failed");
+    await expect(
+      result.current.mutateAsync({
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        ],
+      }),
+    ).rejects.toThrow("request failed");
   });
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
@@ -440,8 +455,13 @@ describe("useUpdateCanvasConsole", () => {
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        },
+      ],
       consoleYaml: emptyConsoleYaml,
     });
     canvasesPutCanvasStaging.mockReturnValue(savePromise);
@@ -457,14 +477,24 @@ describe("useUpdateCanvasConsole", () => {
 
     act(() => {
       result.current.mutate({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        ],
       });
     });
 
     await waitFor(() => {
       expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+          },
+        ],
       });
     });
 
@@ -479,9 +509,18 @@ describe("useUpdateCanvasConsole", () => {
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
-      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        },
+      ],
     });
+    // Baseline fetch runs before the intentional putCanvasStaging
+    // failure — stub it so the delta cap check has a previous version
+    // to compare against and reaches the failing mutation call.
+    mockConsoleRepositoryFileFetch(emptyConsoleYaml);
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
@@ -490,13 +529,49 @@ describe("useUpdateCanvasConsole", () => {
 
     await expect(
       result.current.mutateAsync({
-        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        pages: [
+          {
+            id: "main",
+            panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+            layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+          },
+        ],
       }),
     ).rejects.toThrow("request failed");
 
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
-      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      pages: [
+        {
+          id: "main",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+        },
+      ],
     });
+  });
+
+  it("rejects staging when the delta cap is exceeded against a fresh baseline", async () => {
+    // Canvas has no committed pages. Trying to stage a 21-panel page
+    // must fail before the staging request goes out, mirroring the
+    // backend `ValidateConsolePagesDelta` check.
+    const queryClient = createQueryClient();
+    mockConsoleRepositoryFileFetch(emptyConsoleYaml);
+
+    const overCapPanels = Array.from({ length: 21 }, (_v, i) => ({
+      id: `p${i}`,
+      type: "markdown" as const,
+      content: {},
+    }));
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        pages: [{ id: "main", panels: overCapPanels, layout: [] }],
+      }),
+    ).rejects.toThrow(/Too many panels/);
+
+    expect(canvasesPutCanvasStaging).not.toHaveBeenCalled();
   });
 });

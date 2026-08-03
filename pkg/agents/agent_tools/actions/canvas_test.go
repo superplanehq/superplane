@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -430,6 +431,100 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, consoleYAML, staged)
+}
+
+// TestAppAgentTool_PatchStagingAcceptsGrandfatheredOverCapConsoleYAML
+// locks in the shift from strict `ConsoleFromYML` to the lenient parse
+// + `ValidateShape` pre-flight used by every write-to-staging path.
+// The agent's `patch_staging` tool must accept a grandfathered console
+// with more than `MaxConsolePanelsPerPage` panels — otherwise an agent
+// working against an existing over-cap document cannot even re-stage
+// the file to shrink it below the cap. Cap enforcement lives at
+// commit time via `ValidateConsolePagesDelta`.
+func TestAppAgentTool_PatchStagingAcceptsGrandfatheredOverCapConsoleYAML(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	liveVersion := requireLiveVersion(t, canvas.ID)
+
+	var b strings.Builder
+	b.WriteString("apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: ")
+	b.WriteString(canvas.ID.String())
+	b.WriteString("\nspec:\n  panels:\n")
+	for i := 0; i < yaml.MaxConsolePanelsPerPage+3; i++ {
+		fmt.Fprintf(&b, "    - id: panel-%d\n      type: markdown\n      content: {}\n", i)
+	}
+	b.WriteString("  layout: []\n")
+	overCapConsoleYAML := b.String()
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:      "patch_staging",
+		VersionID:   liveVersion.ID.String(),
+		ConsoleYAML: overCapConsoleYAML,
+	})
+
+	require.NoError(t, err)
+	update, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Equal(t, "patch_staging", update.Action)
+
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
+		ctx,
+		canvas,
+		&liveVersion,
+		canvasRepository.ConsoleYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, overCapConsoleYAML, staged)
+}
+
+// TestAppAgentTool_PatchStagingRejectsMalformedConsoleYAML confirms the
+// pre-flight still surfaces document-level shape errors (wrong `kind`
+// here). Grandfathering only relaxes cap enforcement; `ValidateShape`
+// must continue to fail fast on documents that no client should
+// produce.
+func TestAppAgentTool_PatchStagingRejectsMalformedConsoleYAML(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	liveVersion := requireLiveVersion(t, canvas.ID)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	_, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:      "patch_staging",
+		VersionID:   liveVersion.ID.String(),
+		ConsoleYAML: "apiVersion: v1\nkind: Canvas\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported kind")
 }
 
 func TestAppAgentTool_ListResources(t *testing.T) {

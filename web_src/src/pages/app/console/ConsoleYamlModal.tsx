@@ -13,36 +13,32 @@ import {
 } from "@/components/ui/dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useTheme } from "@/contexts/useTheme";
-import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
+import type { ConsolePage } from "@/hooks/useCanvasData";
 
-import { consoleToYaml, consoleYamlFilename, parseConsoleYaml } from "./consoleYaml";
+import { consoleToYaml, consoleYamlFilename } from "./consoleYaml";
+import { parseConsoleYamlForImport } from "../lib/workflow-spec-files";
 
 export type ConsoleYamlModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  panels: ConsolePanel[];
-  layout: ConsoleLayoutItem[];
+  pages: ConsolePage[];
   canvasId?: string;
   canvasName?: string;
   /** When provided, the modal allows importing YAML. When omitted, it is view-only. */
-  onImport?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => Promise<void>;
+  onImport?: (next: { pages: ConsolePage[] }) => Promise<void>;
   isImporting?: boolean;
 };
 
 export function ConsoleYamlModal({
   open,
   onOpenChange,
-  panels,
-  layout,
+  pages,
   canvasId,
   canvasName,
   onImport,
   isImporting,
 }: ConsoleYamlModalProps) {
-  const exportedYaml = useMemo(
-    () => consoleToYaml({ panels, layout, canvasId, canvasName }),
-    [panels, layout, canvasId, canvasName],
-  );
+  const exportedYaml = useMemo(() => consoleToYaml({ pages, canvasId, canvasName }), [pages, canvasId, canvasName]);
   const filename = useMemo(() => consoleYamlFilename(canvasName), [canvasName]);
   const editor = useConsoleYamlEditor({ open, exportedYaml, filename, onImport, onOpenChange });
   const isDirty = editor.text !== exportedYaml;
@@ -104,7 +100,7 @@ function useConsoleYamlEditor({
   open: boolean;
   exportedYaml: string;
   filename: string;
-  onImport?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => Promise<void>;
+  onImport?: (next: { pages: ConsolePage[] }) => Promise<void>;
   onOpenChange: (open: boolean) => void;
 }) {
   const [text, setText] = useState(exportedYaml);
@@ -153,7 +149,12 @@ function useConsoleYamlEditor({
 
   const handleApplyClick = useCallback(() => {
     setParseError(null);
-    const result = parseConsoleYaml(text);
+    // Same lenient-with-structural-checks parser used by the Files-tab
+    // autosave path so grandfathered over-cap consoles can be
+    // re-imported without hitting the panel cap. The backend commit
+    // path enforces the cap via delta comparison against the
+    // previously committed pages.
+    const result = parseConsoleYamlForImport(text);
     if (!result.ok) {
       setParseError(result.error);
       return;
@@ -163,14 +164,14 @@ function useConsoleYamlEditor({
 
   const handleConfirmReplace = useCallback(async () => {
     if (!onImport) return;
-    const result = parseConsoleYaml(text);
+    const result = parseConsoleYamlForImport(text);
     if (!result.ok) {
       setParseError(result.error);
       setConfirmingReplace(false);
       return;
     }
     try {
-      await onImport({ panels: result.data.spec.panels, layout: result.data.spec.layout });
+      await onImport({ pages: result.pages });
       setConfirmingReplace(false);
       onOpenChange(false);
       showSuccessToast("Console imported from YAML");

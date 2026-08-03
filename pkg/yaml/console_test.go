@@ -3,6 +3,7 @@ package yaml
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -673,10 +674,10 @@ spec:
 	require.Len(t, variables, 2)
 }
 
-func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
+func TestConsoleFromYML_RejectsTooManyPanelsPerPage(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
-	for i := 0; i < MaxConsolePanels+1; i++ {
+	for i := 0; i < MaxConsolePanelsPerPage+1; i++ {
 		b.WriteString("    - id: p")
 		b.WriteString(strings.Repeat("a", 1))
 		b.WriteString(strings.Repeat("b", i+1))
@@ -692,9 +693,8 @@ func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	canvasID := uuid.New()
 	canvasVersion := &models.CanvasVersion{
-		WorkflowID:    canvasID,
-		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{}),
-		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{}),
+		WorkflowID:   canvasID,
+		ConsolePages: datatypes.NewJSONType([]models.ConsolePage{}),
 	}
 
 	out, err := VersionToConsoleYML("Canvas Name", canvasVersion)
@@ -704,11 +704,15 @@ func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	assert.NotContains(t, string(out), canvasID.String())
 	assert.NotContains(t, string(out), "name: Canvas Name")
 
+	// Empty consoles export as the legacy single-page shape so existing
+	// apps see no diff noise. The exported YAML must not carry a pages
+	// list yet.
+	assert.NotContains(t, string(out), "pages:")
+
 	parsed, err := ConsoleFromYML([]byte(out))
 	require.NoError(t, err)
 	require.Equal(t, KindConsole, parsed.Kind)
-	assert.Empty(t, parsed.Spec.Panels)
-	assert.Empty(t, parsed.Spec.Layout)
+	assert.Empty(t, parsed.Pages())
 }
 
 func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
@@ -716,40 +720,58 @@ func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 	minW, minH := 2, 1
 	canvasVersion := &models.CanvasVersion{
 		WorkflowID: canvasID,
-		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{
-			{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hello"}},
-		}),
-		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{
-			{I: "p1", X: 0, Y: 0, W: 4, H: 2, MinW: &minW, MinH: &minH},
+		ConsolePages: datatypes.NewJSONType([]models.ConsolePage{
+			{
+				ID:   models.DefaultConsolePageID,
+				Name: models.DefaultConsolePageName,
+				Panels: []models.ConsolePanel{
+					{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hello"}},
+				},
+				Layout: []models.ConsoleLayoutItem{
+					{I: "p1", X: 0, Y: 0, W: 4, H: 2, MinW: &minW, MinH: &minH},
+				},
+			},
 		}),
 	}
 
 	out, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 
+	// Single-page consoles export as the legacy shape (no `pages:` key)
+	// so existing apps stay diff-clean.
+	assert.NotContains(t, string(out), "pages:")
+
 	parsed, err := ConsoleFromYML([]byte(out))
 	require.NoError(t, err)
-	require.Len(t, parsed.Spec.Panels, 1)
-	require.Equal(t, "p1", parsed.Spec.Panels[0].ID)
-	require.Equal(t, "markdown", parsed.Spec.Panels[0].Type)
-	require.Equal(t, "hello", parsed.Spec.Panels[0].Content["body"])
-	require.Len(t, parsed.Spec.Layout, 1)
-	require.Equal(t, 4, parsed.Spec.Layout[0].W)
-	require.NotNil(t, parsed.Spec.Layout[0].MinW)
-	assert.Equal(t, 2, *parsed.Spec.Layout[0].MinW)
+	pages := parsed.Pages()
+	require.Len(t, pages, 1)
+	require.Equal(t, models.DefaultConsolePageID, pages[0].ID)
+	require.Len(t, pages[0].Panels, 1)
+	require.Equal(t, "p1", pages[0].Panels[0].ID)
+	require.Equal(t, "markdown", pages[0].Panels[0].Type)
+	require.Equal(t, "hello", pages[0].Panels[0].Content["body"])
+	require.Len(t, pages[0].Layout, 1)
+	require.Equal(t, 4, pages[0].Layout[0].W)
+	require.NotNil(t, pages[0].Layout[0].MinW)
+	assert.Equal(t, 2, *pages[0].Layout[0].MinW)
 }
 
 func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 	canvasID := uuid.New()
 	canvasVersion := &models.CanvasVersion{
 		WorkflowID: canvasID,
-		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{
-			{ID: "a", Type: "markdown", Content: map[string]any{"body": "hi"}},
-			{ID: "b", Type: "markdown", Content: map[string]any{"body": "hey"}},
-		}),
-		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{
-			{I: "a", X: 0, Y: 0, W: 1, H: 1},
-			{I: "b", X: 1, Y: 0, W: 1, H: 1},
+		ConsolePages: datatypes.NewJSONType([]models.ConsolePage{
+			{
+				ID: models.DefaultConsolePageID,
+				Panels: []models.ConsolePanel{
+					{ID: "a", Type: "markdown", Content: map[string]any{"body": "hi"}},
+					{ID: "b", Type: "markdown", Content: map[string]any{"body": "hey"}},
+				},
+				Layout: []models.ConsoleLayoutItem{
+					{I: "a", X: 0, Y: 0, W: 1, H: 1},
+					{I: "b", X: 1, Y: 0, W: 1, H: 1},
+				},
+			},
 		}),
 	}
 
@@ -758,6 +780,423 @@ func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 	second, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 	assert.Equal(t, string(first), string(second))
+}
+
+// TestCanvasVersionToConsoleYML_ExportsMultiPageShape verifies that a
+// console with 2+ pages serializes as `spec.pages[]` (not the legacy
+// `panels`/`layout`), and that the exported YAML round-trips back into
+// the same page list. This is the flip side of the round-trip tests
+// above which cover the legacy-until-multi rule.
+func TestCanvasVersionToConsoleYML_ExportsMultiPageShape(t *testing.T) {
+	canvasID := uuid.New()
+	canvasVersion := &models.CanvasVersion{
+		WorkflowID: canvasID,
+		ConsolePages: datatypes.NewJSONType([]models.ConsolePage{
+			{
+				ID:   "overview",
+				Name: "Overview",
+				Panels: []models.ConsolePanel{
+					{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hi"}},
+				},
+				Layout: []models.ConsoleLayoutItem{{I: "p1", X: 0, Y: 0, W: 4, H: 2}},
+			},
+			{
+				ID:     "details",
+				Name:   "Details",
+				Panels: []models.ConsolePanel{},
+				Layout: []models.ConsoleLayoutItem{},
+			},
+		}),
+	}
+
+	out, err := VersionToConsoleYML("Canvas Name", canvasVersion)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "pages:")
+	// The legacy top-level keys must not appear when we emit pages, so
+	// the resulting document does not mix the two shapes.
+	assert.NotContains(t, string(out), "\npanels:")
+	assert.NotContains(t, string(out), "\nlayout:")
+
+	parsed, err := ConsoleFromYML([]byte(out))
+	require.NoError(t, err)
+	pages := parsed.Pages()
+	require.Len(t, pages, 2)
+	assert.Equal(t, "overview", pages[0].ID)
+	assert.Equal(t, "Overview", pages[0].Name)
+	require.Len(t, pages[0].Panels, 1)
+	assert.Equal(t, "details", pages[1].ID)
+	assert.Empty(t, pages[1].Panels)
+}
+
+// TestConsoleFromYML_ParsesMultiPageShape exercises the direct multi-page
+// input path (as opposed to round-tripping from a version).
+func TestConsoleFromYML_ParsesMultiPageShape(t *testing.T) {
+	raw := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  pages:
+    - id: overview
+      name: Overview
+      panels:
+        - id: intro
+          type: markdown
+          content:
+            body: "# Hello"
+      layout:
+        - i: intro
+          x: 0
+          y: 0
+          w: 12
+          h: 6
+    - id: details
+      name: Details
+      panels: []
+      layout: []
+`
+
+	parsed, err := ConsoleFromYML([]byte(raw))
+	require.NoError(t, err)
+	pages := parsed.Pages()
+	require.Len(t, pages, 2)
+	assert.Equal(t, "overview", pages[0].ID)
+	assert.Equal(t, "Overview", pages[0].Name)
+	require.Len(t, pages[0].Panels, 1)
+	require.Len(t, pages[0].Layout, 1)
+	assert.Equal(t, "details", pages[1].ID)
+	assert.Empty(t, pages[1].Panels)
+}
+
+func TestConsoleFromYML_RejectsMixingPagesAndLegacy(t *testing.T) {
+	raw := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: intro
+      type: markdown
+      content: {}
+  pages:
+    - id: overview
+      panels: []
+      layout: []
+`
+
+	_, err := ConsoleFromYML([]byte(raw))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pages cannot be combined with")
+}
+
+func TestConsoleFromYML_RejectsTooManyPages(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  pages:\n")
+	for i := 0; i < MaxConsolePages+1; i++ {
+		fmt.Fprintf(&b, "    - id: page-%d\n      panels: []\n      layout: []\n", i)
+	}
+
+	_, err := ConsoleFromYML([]byte(b.String()))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many pages")
+}
+
+func TestConsoleFromYML_RejectsDuplicatePageIDs(t *testing.T) {
+	raw := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  pages:
+    - id: dup
+      panels: []
+      layout: []
+    - id: dup
+      panels: []
+      layout: []
+`
+
+	_, err := ConsoleFromYML([]byte(raw))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate page id")
+}
+
+// TestConsoleFromYML_LegacyEmpty_WrapsAsZeroPages verifies that a legacy
+// empty console (`panels: []` / `layout: []`) parses into zero canonical
+// pages rather than being wrapped into an empty implicit page. This keeps
+// fresh-canvas storage semantically identical to today's empty state.
+func TestConsoleFromYML_LegacyEmpty_WrapsAsZeroPages(t *testing.T) {
+	raw := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels: []
+  layout: []
+`
+	parsed, err := ConsoleFromYML([]byte(raw))
+	require.NoError(t, err)
+	assert.Empty(t, parsed.Pages())
+}
+
+// TestValidateShape_AcceptsGrandfatheredOverCap_RejectsShapeErrors is
+// the contract test for the lenient-parse-plus-shape-check pattern
+// used by every write-to-staging path (commit_canvas_staging,
+// `apps console set`, `apps staging update`, the agent `patch_staging`
+// tool). All of those paths must accept a grandfathered document that
+// exceeds MaxConsolePanelsPerPage — otherwise a user with an over-cap
+// console cannot re-stage the file even to reduce it — while still
+// rejecting document-level shape errors (wrong apiVersion, wrong
+// kind, mixed spec shapes, unsupported panel types, missing/duplicate
+// ids). Cap enforcement is deferred to commit time via
+// `ValidateConsolePagesDelta`.
+func TestValidateShape_AcceptsGrandfatheredOverCap_RejectsShapeErrors(t *testing.T) {
+	overCap := func() []byte {
+		var b strings.Builder
+		b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
+		for i := 0; i < MaxConsolePanelsPerPage+3; i++ {
+			fmt.Fprintf(&b, "    - id: panel-%d\n      type: markdown\n      content: {}\n", i)
+		}
+		b.WriteString("  layout: []\n")
+		return []byte(b.String())
+	}
+
+	// 1. Grandfathered over-cap document: lenient parse must accept
+	//    it and ValidateShape must not surface a cap-related error.
+	//    This is what unblocks `apps staging update`, `patch_staging`,
+	//    and the commit flow for existing over-cap consoles.
+	parsed, err := ConsoleFromYMLLenient(overCap())
+	require.NoError(t, err)
+	require.NoError(t, parsed.ValidateShape())
+
+	// 2. Structural / shape errors still surface via ValidateShape,
+	//    so switching a write path from strict `ConsoleFromYML` to
+	//    `ConsoleFromYMLLenient + ValidateShape` does not silently
+	//    accept malformed input. Each case below mirrors a class of
+	//    error that a real client could produce (wrong kind, wrong
+	//    apiVersion, mixed spec shapes, unsupported panel type).
+	shapeErrorCases := []struct {
+		name    string
+		yaml    string
+		wantMsg string
+	}{
+		{
+			name:    "wrong kind",
+			yaml:    "apiVersion: v1\nkind: Canvas\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+			wantMsg: "unsupported kind",
+		},
+		{
+			name:    "wrong apiVersion",
+			yaml:    "apiVersion: v2\nkind: Console\nmetadata: {}\nspec: {panels: [], layout: []}\n",
+			wantMsg: "unsupported apiVersion",
+		},
+		{
+			name: "mixed spec shapes",
+			yaml: "apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n" +
+				"  panels: []\n" +
+				"  pages:\n    - id: main\n      panels: []\n      layout: []\n",
+			wantMsg: "pages cannot be combined with",
+		},
+		{
+			name: "unsupported panel type",
+			yaml: "apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n" +
+				"  panels:\n    - id: p1\n      type: mystery-panel\n      content: {}\n" +
+				"  layout: []\n",
+			wantMsg: "unsupported type",
+		},
+	}
+	for _, tc := range shapeErrorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, parseErr := ConsoleFromYMLLenient([]byte(tc.yaml))
+			// The mixed-shapes and unsupported-panel cases parse
+			// cleanly at the JSON-decode layer but must fail on
+			// ValidateShape. The wrong-apiVersion/wrong-kind cases
+			// also parse cleanly (they are string fields) and must
+			// fail on ValidateShape. All four hit ValidateShape.
+			require.NoError(t, parseErr)
+			err := doc.ValidateShape()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantMsg)
+		})
+	}
+}
+
+// TestConsoleFromYMLLenient_GrandfathersOverCapPanels verifies that an
+// existing (pre-cap) console with more than MaxConsolePanelsPerPage
+// panels still parses on the read path via ConsoleFromYMLLenient, while
+// the strict ConsoleFromYML rejects the same document on the save path.
+// This is the grandfathering contract: render existing data, block new
+// commits that would push a page over the cap.
+func TestConsoleFromYMLLenient_GrandfathersOverCapPanels(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
+	for i := 0; i < MaxConsolePanelsPerPage+3; i++ {
+		fmt.Fprintf(&b, "    - id: panel-%d\n      type: markdown\n      content: {}\n", i)
+	}
+	b.WriteString("  layout: []\n")
+	raw := []byte(b.String())
+
+	// Save path rejects the over-cap document.
+	_, err := ConsoleFromYML(raw)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// Read path accepts it — the caller can render whatever is already
+	// stored without hitting a validation wall.
+	parsed, err := ConsoleFromYMLLenient(raw)
+	require.NoError(t, err)
+	require.Len(t, parsed.Pages(), 1)
+	require.Len(t, parsed.Pages()[0].Panels, MaxConsolePanelsPerPage+3)
+}
+
+// TestValidateConsolePagesDelta_GrandfathersOverCapReductions verifies
+// the commit-time grandfathering rule: a page that already exceeded
+// MaxConsolePanelsPerPage in the previous version may be shrunk, kept
+// the same, or grown up to (but not beyond) its previous size without
+// tripping the cap. This is what lets migrated over-cap consoles
+// progressively reduce down to the cap instead of getting wedged.
+func TestValidateConsolePagesDelta_GrandfathersOverCapReductions(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 5
+	previous := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	// Reduce over-cap page but still over cap → allowed.
+	reduced := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over - 2), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(reduced, previous))
+
+	// Stay at the same over-cap size → allowed.
+	same := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(same, previous))
+
+	// Grow beyond the previous over-cap size → rejected.
+	grown := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over + 1), Layout: nil}}
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// Fresh page (no prior counterpart) must respect the cap. Panel
+	// ids are prefixed differently from the shared helper so the
+	// positional-with-subset grandfathering rule cannot match — this
+	// test is specifically about a *new* page inhabiting a slot that
+	// happened to be grandfathered, which must NOT inherit the
+	// allowance.
+	freshPanels := make([]models.ConsolePanel, MaxConsolePanelsPerPage+1)
+	for i := range freshPanels {
+		freshPanels[i] = models.ConsolePanel{
+			ID:      fmt.Sprintf("fresh-%d", i),
+			Type:    "markdown",
+			Content: map[string]any{},
+		}
+	}
+	fresh := []models.ConsolePage{{ID: "extra", Panels: freshPanels, Layout: nil}}
+	err = ValidateConsolePagesDelta(fresh, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+}
+
+// TestValidateConsolePagesDelta_AllowsGrandfatheredPageRename verifies
+// that renaming an over-cap page (id change) does not break its
+// grandfathering. Before the positional fallback the delta lookup was
+// keyed strictly by id, so `main` → `overview` with the same panels
+// would surface as a fresh over-cap page.
+func TestValidateConsolePagesDelta_AllowsGrandfatheredPageRename(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 4
+	previous := []models.ConsolePage{{ID: "main", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	renamed := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	require.NoError(t, ValidateConsolePagesDelta(renamed, previous))
+
+	// But a rename that also grows the page past the previous size
+	// should still fail: grandfathering caps at the previous count.
+	grown := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over + 1), Layout: nil}}
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+}
+
+// TestValidateConsolePagesDelta_RejectsOverCapPageDuplication guards
+// the "positional grandfathering" fallback against being used to
+// smuggle a duplicate of an over-cap page into a second tab. A user
+// who keeps a grandfathered page under its original id and inserts a
+// new page above it (or renames it while keeping the old id elsewhere)
+// used to slip past the delta cap: the new insert would inherit the
+// previous positional slot's allowance, while the old id still passed
+// exact-id grandfathering — producing two grandfathered copies of the
+// same content. The delta enforcement now tracks which previous slots
+// are claimed by exact-id matches and refuses positional inheritance
+// of an already-claimed slot.
+func TestValidateConsolePagesDelta_RejectsOverCapPageDuplication(t *testing.T) {
+	over := MaxConsolePanelsPerPage + 4
+	previous := []models.ConsolePage{{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+
+	// The exploit: keep "big" (exact-id inherits the allowance) and
+	// insert a positionally-first duplicate that copies the same
+	// panel ids. Both new pages would look grandfathered in isolation
+	// but they share the *same* previous slot.
+	dup := []models.ConsolePage{
+		{ID: "big-clone", Panels: makeModelConsolePanelsN(over), Layout: nil},
+		{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil},
+	}
+	err := ValidateConsolePagesDelta(dup, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// Sanity: the *reverse* order (dup at index 1) is also rejected
+	// because index 1 is out of range for `previous`, so positional
+	// grandfathering has nothing to inherit either way.
+	dupReversed := []models.ConsolePage{
+		{ID: "big", Panels: makeModelConsolePanelsN(over), Layout: nil},
+		{ID: "big-clone", Panels: makeModelConsolePanelsN(over), Layout: nil},
+	}
+	err = ValidateConsolePagesDelta(dupReversed, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many panels")
+
+	// A legitimate rename (no dup) still works — the previous slot
+	// is not claimed by any exact-id match, so positional inheritance
+	// applies. This locks in that the fix does not overcorrect.
+	renamed := []models.ConsolePage{{ID: "overview", Panels: makeModelConsolePanelsN(over), Layout: nil}}
+	require.NoError(t, ValidateConsolePagesDelta(renamed, previous))
+}
+
+// TestValidateConsolePagesDelta_GrandfathersOverCapPageCount verifies
+// that a console with more than MaxConsolePages does not fail delta
+// validation as long as the count does not grow.
+func TestValidateConsolePagesDelta_GrandfathersOverCapPageCount(t *testing.T) {
+	over := MaxConsolePages + 2
+	previous := makeModelConsolePagesN(over)
+
+	// Same over-cap page count → allowed.
+	require.NoError(t, ValidateConsolePagesDelta(previous, previous))
+
+	// Reduce back below the cap → allowed.
+	reduced := makeModelConsolePagesN(MaxConsolePages)
+	require.NoError(t, ValidateConsolePagesDelta(reduced, previous))
+
+	// Add another page beyond the previous over-cap count → rejected.
+	grown := makeModelConsolePagesN(over + 1)
+	err := ValidateConsolePagesDelta(grown, previous)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too many pages")
+}
+
+func makeModelConsolePanelsN(n int) []models.ConsolePanel {
+	out := make([]models.ConsolePanel, n)
+	for i := 0; i < n; i++ {
+		out[i] = models.ConsolePanel{
+			ID:      fmt.Sprintf("p-%d", i),
+			Type:    "markdown",
+			Content: map[string]any{},
+		}
+	}
+	return out
+}
+
+func makeModelConsolePagesN(n int) []models.ConsolePage {
+	out := make([]models.ConsolePage, n)
+	for i := 0; i < n; i++ {
+		out[i] = models.ConsolePage{
+			ID:     fmt.Sprintf("page-%d", i),
+			Panels: []models.ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}},
+			Layout: nil,
+		}
+	}
+	return out
 }
 
 func TestValidateConsoleContent_RejectsInvalidLayout(t *testing.T) {

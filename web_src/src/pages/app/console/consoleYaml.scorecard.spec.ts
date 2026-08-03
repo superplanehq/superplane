@@ -28,11 +28,11 @@ describe("console YAML — scorecard panels", () => {
       },
     ];
     const layout = [{ i: "papercuts", x: 0, y: 0, w: 6, h: 4 }];
-    const text = consoleToYaml({ panels, layout });
+    const text = consoleToYaml({ pages: [{ id: "main", panels, layout }] });
     const result = parseConsoleYaml(text);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
+    expect(result.data.spec.pages[0]!.panels).toEqual(panels);
   });
 
   it("rejects a scorecard panel with an unknown better value", () => {
