@@ -4,11 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"gorm.io/gorm"
 )
 
 func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
@@ -37,30 +35,12 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	var order *models.FactoryWorkOrder
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		var createErr error
-		order, createErr = models.CreateFactoryWorkOrder(tx, models.CreateFactoryWorkOrderParams{
-			OrganizationID: orgID,
-			FactoryID:      factoryID,
-			Title:          title,
-			Description:    req.GetDescription(),
-			AssigneeIDs:    assigneeIDs,
-		})
-		if createErr != nil {
-			return createErr
-		}
-
-		content := map[string]any{}
-		if userID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
-			content["actor_id"] = userID
-		}
-		if len(assigneeIDs) > 0 {
-			content["assignee_ids"] = assigneeIDsToStrings(assigneeIDs)
-		}
-
-		_, createErr = models.CreateFactoryWorkOrderEvent(tx, order.ID, workOrderEventTypeCreated, content)
-		return createErr
+	order, err := models.CreateFactoryWorkOrder(tx, models.CreateFactoryWorkOrderParams{
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		Title:          title,
+		Description:    req.GetDescription(),
+		AssigneeIDs:    assigneeIDs,
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")

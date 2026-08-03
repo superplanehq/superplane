@@ -19,7 +19,7 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
-  SuperplaneComponentsIntegrationRef,
+  ComponentsIntegrationRef,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
@@ -136,13 +136,13 @@ interface ComponentSidebarProps {
   onNodeConfigSave?: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
-    integrationRef?: SuperplaneComponentsIntegrationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
-  integrationRef?: SuperplaneComponentsIntegrationRef;
+  integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;

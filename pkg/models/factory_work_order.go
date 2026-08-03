@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -19,22 +17,7 @@ const (
 	FactoryWorkOrderResultRejected  = "rejected"
 )
 
-const factoryWorkOrderSourceDedupIndex = "idx_factory_work_orders_source_dedup"
-
 var ErrFactoryWorkOrderNotFound = errors.New("factory work order not found")
-var ErrFactoryWorkOrderSourceAlreadyExists = errors.New("factory work order for source already exists")
-
-type FactoryWorkOrderAttribute struct {
-	Type  string `json:"type"`
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type FactoryWorkOrderSourceRef struct {
-	ID   *uuid.UUID
-	Name string
-	Key  string
-}
 
 type FactoryWorkOrder struct {
 	ID             uuid.UUID
@@ -44,10 +27,6 @@ type FactoryWorkOrder struct {
 	Description    string
 	State          string
 	Result         string
-	SourceID       *uuid.UUID
-	SourceName     string
-	SourceKey      string
-	Attributes     datatypes.JSONSlice[FactoryWorkOrderAttribute]
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -83,17 +62,10 @@ type CreateFactoryWorkOrderParams struct {
 	Title          string
 	Description    string
 	AssigneeIDs    []uuid.UUID
-	Attributes     []FactoryWorkOrderAttribute
-	Source         *FactoryWorkOrderSourceRef
 }
 
 func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*FactoryWorkOrder, error) {
 	now := time.Now()
-	attributes := params.Attributes
-	if attributes == nil {
-		attributes = []FactoryWorkOrderAttribute{}
-	}
-
 	order := &FactoryWorkOrder{
 		ID:             uuid.New(),
 		OrganizationID: params.OrganizationID,
@@ -102,19 +74,12 @@ func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*
 		Description:    params.Description,
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
-		Attributes:     datatypes.NewJSONSlice(attributes),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 
-	if params.Source != nil {
-		order.SourceID = params.Source.ID
-		order.SourceName = params.Source.Name
-		order.SourceKey = params.Source.Key
-	}
-
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
-		return nil, mapFactoryWorkOrderSourceDedupError(err)
+		return nil, err
 	}
 
 	if len(params.AssigneeIDs) > 0 {
@@ -124,19 +89,6 @@ func CreateFactoryWorkOrder(tx *gorm.DB, params CreateFactoryWorkOrderParams) (*
 	}
 
 	return FindFactoryWorkOrder(tx, params.OrganizationID, params.FactoryID, order.ID)
-}
-
-func mapFactoryWorkOrderSourceDedupError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.ConstraintName == factoryWorkOrderSourceDedupIndex {
-		return ErrFactoryWorkOrderSourceAlreadyExists
-	}
-
-	return err
 }
 
 func FindFactoryWorkOrder(tx *gorm.DB, organizationID, factoryID, orderID uuid.UUID) (*FactoryWorkOrder, error) {
@@ -207,7 +159,7 @@ func ListFactoryWorkOrders(
 	return orders, nil
 }
 
-func AssignFactoryWorkOrder(
+func UpdateFactoryWorkOrderAssignees(
 	tx *gorm.DB,
 	organizationID, factoryID, orderID uuid.UUID,
 	assigneeIDs []uuid.UUID,
@@ -271,26 +223,4 @@ func replaceFactoryWorkOrderAssignees(tx *gorm.DB, workOrderID uuid.UUID, assign
 	}
 
 	return tx.Create(&assignees).Error
-}
-
-func FindFactoryWorkOrderBySourceKey(
-	tx *gorm.DB,
-	factoryID, sourceID uuid.UUID,
-	sourceKey string,
-) (*FactoryWorkOrder, error) {
-	var order FactoryWorkOrder
-	err := tx.
-		Preload("Assignees").
-		Preload("Assignees.User").
-		Where("factory_id = ? AND source_id = ? AND source_key = ?", factoryID, sourceID, sourceKey).
-		First(&order).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderNotFound
-		}
-		return nil, err
-	}
-
-	return &order, nil
 }

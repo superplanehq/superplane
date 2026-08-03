@@ -11,19 +11,13 @@ import {
   CircleDashed,
   ClipboardList,
   Eye,
-  GitBranch,
   Loader2,
   ShieldAlert,
   Wrench,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import {
-  deriveWorkOrderProgress,
-  getWorkOrderBranch,
-  getWorkOrderDisplayKey,
-  type WorkOrderProgressPhase,
-} from "./workOrderProgress";
+import { deriveWorkOrderProgress, getWorkOrderDisplayKey, type WorkOrderProgressPhase } from "./workOrderProgress";
 
 const PHASE_ICON: Record<WorkOrderProgressPhase, LucideIcon> = {
   unassigned: CircleDashed,
@@ -65,7 +59,6 @@ export function WorkOrderListItem({
 }: WorkOrderListItemProps) {
   const progress = deriveWorkOrderProgress(order);
   const Icon = PHASE_ICON[progress.phase];
-  const branch = getWorkOrderBranch(order);
   const updatedAt = order.updatedAt ?? order.createdAt;
   const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
   const showClaim = progress.phase === "unassigned" && onClaim && order.id;
@@ -102,12 +95,6 @@ export function WorkOrderListItem({
 
       <div className="flex shrink-0 items-center gap-3 self-center text-xs text-gray-500 dark:text-gray-400">
         <span className="whitespace-nowrap">{timeLabel}</span>
-        {branch ? (
-          <span className="hidden items-center gap-1 sm:inline-flex">
-            <GitBranch className="h-3.5 w-3.5" aria-hidden />
-            <span className="max-w-[10rem] truncate font-mono">{branch}</span>
-          </span>
-        ) : null}
         {showClaim ? (
           <PermissionTooltip allowed={canClaim} message="You don't have permission to claim work orders.">
             <LoadingButton

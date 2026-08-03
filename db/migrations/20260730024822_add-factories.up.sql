@@ -13,34 +13,6 @@ CREATE TABLE factories (
 
 CREATE INDEX idx_factories_organization_id ON factories (organization_id);
 
-CREATE TABLE factory_sources (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  organization_id UUID NOT NULL,
-  factory_id      UUID NOT NULL REFERENCES factories(id) ON DELETE RESTRICT,
-  name            TEXT NOT NULL,
-  integration_id  UUID NOT NULL REFERENCES app_installations(id) ON DELETE RESTRICT,
-  configuration   JSONB NOT NULL DEFAULT '{}',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_factory_sources_factory_id ON factory_sources (factory_id);
-
-CREATE TABLE factory_agents (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  organization_id UUID NOT NULL,
-  factory_id      UUID NOT NULL REFERENCES factories(id) ON DELETE RESTRICT,
-  name            TEXT NOT NULL,
-  description     TEXT NOT NULL DEFAULT '',
-  spec            JSONB NOT NULL DEFAULT '{}',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-  UNIQUE (factory_id, name)
-);
-
-CREATE INDEX idx_factory_agents_factory_id ON factory_agents (factory_id);
-
 CREATE TABLE factory_work_orders (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID NOT NULL,
@@ -49,19 +21,11 @@ CREATE TABLE factory_work_orders (
   description     TEXT NOT NULL DEFAULT '',
   state           VARCHAR(32) NOT NULL DEFAULT 'open',
   result          VARCHAR(32) NOT NULL DEFAULT '',
-  source_id       UUID REFERENCES factory_sources(id) ON DELETE SET NULL,
-  source_name     TEXT NOT NULL DEFAULT '',
-  source_key      TEXT NOT NULL DEFAULT '',
-  attributes      JSONB NOT NULL DEFAULT '[]',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_factory_work_orders_factory_state ON factory_work_orders (factory_id, state);
-
-CREATE UNIQUE INDEX idx_factory_work_orders_source_dedup
-  ON factory_work_orders (factory_id, source_id, source_key)
-  WHERE source_key <> '';
 
 CREATE TABLE factory_work_order_assignees (
   work_order_id UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
@@ -74,34 +38,58 @@ CREATE TABLE factory_work_order_assignees (
 CREATE INDEX idx_factory_work_order_assignees_user_id
   ON factory_work_order_assignees (user_id);
 
-CREATE TABLE factory_work_order_events (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  work_order_id UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
-  type          TEXT NOT NULL,
-  content       JSONB NOT NULL DEFAULT '{}',
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+--
+-- Factory-owned apps (workflows / canvases with factory_id set).
+--
+ALTER TABLE workflows
+  ADD COLUMN factory_id UUID REFERENCES factories(id) ON DELETE RESTRICT;
 
-CREATE INDEX idx_factory_work_order_events_order_created
-  ON factory_work_order_events (work_order_id, created_at DESC, id DESC);
+CREATE INDEX idx_workflows_factory_id ON workflows (factory_id)
+  WHERE factory_id IS NOT NULL;
 
-CREATE TABLE factory_agent_assignments (
+--
+-- Factory lines: named pipelines of runApp steps stored as JSON.
+-- Each step: { "name", "type": "runApp", "app_id", "entrypoint" }.
+--
+CREATE TABLE factory_lines (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID NOT NULL,
   factory_id      UUID NOT NULL REFERENCES factories(id) ON DELETE RESTRICT,
-  agent_id        UUID NOT NULL REFERENCES factory_agents(id) ON DELETE RESTRICT,
-  work_order_id   UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
-  instructions    TEXT NOT NULL DEFAULT '',
-  state           VARCHAR(32) NOT NULL DEFAULT 'pending',
+  name            TEXT NOT NULL,
+  steps           JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (factory_id, name)
 );
 
-CREATE INDEX idx_factory_agent_assignments_factory_id ON factory_agent_assignments (factory_id);
-CREATE INDEX idx_factory_agent_assignments_agent_id ON factory_agent_assignments (agent_id);
-CREATE INDEX idx_factory_agent_assignments_work_order_id ON factory_agent_assignments (work_order_id);
-CREATE INDEX idx_factory_agent_assignments_pending
-  ON factory_agent_assignments (state)
-  WHERE state IN ('pending', 'started');
+CREATE INDEX idx_factory_lines_factory_id ON factory_lines (factory_id);
+
+--
+-- Tracks a work order progressing through a factory line, one row per step run.
+--
+CREATE TABLE factory_work_order_executions (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL,
+  work_order_id   UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
+  line_id         UUID NOT NULL REFERENCES factory_lines(id) ON DELETE RESTRICT,
+  step_index      INT NOT NULL,
+  step_name       TEXT NOT NULL,
+  run_id          UUID NOT NULL REFERENCES workflow_runs(id) ON DELETE RESTRICT,
+  status          VARCHAR(32) NOT NULL DEFAULT 'pending',
+  result          VARCHAR(32) NOT NULL DEFAULT '',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at     TIMESTAMPTZ,
+
+  UNIQUE (run_id)
+);
+
+CREATE INDEX idx_factory_work_order_executions_work_order_created
+  ON factory_work_order_executions (work_order_id, created_at DESC);
+
+CREATE INDEX idx_factory_work_order_executions_work_order_line_active
+  ON factory_work_order_executions (work_order_id, line_id)
+  WHERE status IN ('pending', 'running');
 
 COMMIT;

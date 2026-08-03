@@ -3,11 +3,9 @@ package factories
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"gorm.io/gorm"
 )
 
 func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWorkOrderRequest) (*pb.CloseWorkOrderResponse, error) {
@@ -31,25 +29,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	tx := database.DB(ctx)
-	var order *models.FactoryWorkOrder
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		var closeErr error
-		order, closeErr = models.CloseFactoryWorkOrder(tx, orgID, factoryID, orderID, result)
-		if closeErr != nil {
-			return closeErr
-		}
-
-		content := map[string]any{
-			"result": result,
-		}
-		if userID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
-			content["actor_id"] = userID
-		}
-
-		_, closeErr = models.CreateFactoryWorkOrderEvent(tx, order.ID, workOrderEventTypeClosed, content)
-		return closeErr
-	})
+	order, err := models.CloseFactoryWorkOrder(database.DB(ctx), orgID, factoryID, orderID, result)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

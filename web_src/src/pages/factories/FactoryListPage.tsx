@@ -54,7 +54,7 @@ export function FactoryListPage() {
           <div>
             <Heading className={homePageTitleClassName}>Factories</Heading>
             <Text className={homePageSubtitleClassName}>
-              Manage software production work — work orders, sources, and agents.
+              Manage software production work — work orders and automations.
             </Text>
           </div>
           <PermissionTooltip

@@ -16,7 +16,7 @@ import type {
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,
-  SuperplaneComponentsIntegrationRef,
+  ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -2073,7 +2073,7 @@ export function AppPage() {
         });
       }, 2000);
 
-      const integrationRef: SuperplaneComponentsIntegrationRef = {
+      const integrationRef: ComponentsIntegrationRef = {
         id: integrationId,
         name: instanceName,
       };
@@ -2114,7 +2114,7 @@ export function AppPage() {
       nodeId: string,
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
-      integrationRef?: SuperplaneComponentsIntegrationRef,
+      integrationRef?: ComponentsIntegrationRef,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -4146,6 +4146,7 @@ export function AppPage() {
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
+          factoryId={canvas?.metadata?.factoryId ?? liveCanvas?.metadata?.factoryId}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           showCanvasSettingsMenu={canUpdateCanvas}

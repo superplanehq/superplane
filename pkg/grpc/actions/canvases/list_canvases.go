@@ -32,7 +32,7 @@ func ListCanvases(
 		return nil, grpcerrors.InvalidArgument(err, "invalid user id")
 	}
 
-	canvases, err := models.ListCanvases(organizationID)
+	canvases, err := models.ListOrganizationCanvases(database.DB(ctx), organizationUUID)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
 		return nil, grpcerrors.Internal(err, "failed to list canvases")

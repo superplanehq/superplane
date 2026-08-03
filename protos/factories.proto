@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package Superplane.Factories;
 
-import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -60,28 +59,44 @@ service Factories {
   }
 
   //
-  // Sources APIs
+  // Factory line APIs
   //
 
-  rpc ListSources(ListSourcesRequest) returns (ListSourcesResponse) {
+  rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/sources"
+      post: "/api/v1/factories/{factory_id}/lines"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory sources";
-      description: "Returns a list of sources for a factory";
+      summary: "Create factory line";
+      description: "Creates a new line for a factory";
       tags: "Factory";
     };
   }
 
-  rpc AddSource(AddSourceRequest) returns (AddSourceResponse) {
+  rpc UpdateFactoryLine(UpdateFactoryLineRequest) returns (UpdateFactoryLineResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/sources"
+      patch: "/api/v1/factories/{factory_id}/lines/{line_id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Add factory source";
-      description: "Adds a new source to a factory";
+      summary: "Update factory line";
+      description: "Updates a factory line";
+      tags: "Factory";
+    };
+  }
+
+  //
+  // Factory app APIs
+  //
+
+  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/apps"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory apps";
+      description: "Returns canvases owned by a factory";
       tags: "Factory";
     };
   }
@@ -124,25 +139,26 @@ service Factories {
     };
   }
 
-  rpc ListWorkOrderEvents(ListWorkOrderEventsRequest) returns (ListWorkOrderEventsResponse) {
+  rpc UpdateWorkOrderAssignees(UpdateWorkOrderAssigneesRequest) returns (UpdateWorkOrderAssigneesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/events"
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/assignees"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory work order events";
-      description: "Returns a list of events for a work order";
+      summary: "Update a work order's assignees";
+      description: "Updates the assignees of a work order";
       tags: "Factory";
     };
   }
 
-  rpc AssignWorkOrder(AssignWorkOrderRequest) returns (AssignWorkOrderResponse) {
+  rpc DispatchWorkOrder(DispatchWorkOrderRequest) returns (DispatchWorkOrderResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/assign"
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Assign factory work order";
-      description: "Assigns a work order to a user";
+      summary: "Dispatch a work order";
+      description: "Dispatches a work order to a factory line";
       tags: "Factory";
     };
   }
@@ -155,89 +171,6 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Close factory work order";
       description: "Closes a work order";
-      tags: "Factory";
-    };
-  }
-
-  rpc ListAgentAssignmentsForOrder(ListAgentAssignmentsForOrderRequest) returns (ListAgentAssignmentsForOrderResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/assignments"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List agent assignments for a work order";
-      description: "Returns a list of agent assignments for a work order";
-      tags: "Factory";
-    };
-  }
-
-  //
-  // Agents APIs
-  //
-
-  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/agents"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create factory agent";
-      description: "Creates a new agent for a factory";
-      tags: "Factory";
-    };
-  }
-
-  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/agents"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory agents";
-      description: "Returns a list of agents for a factory";
-      tags: "Factory";
-    };
-  }
-
-  rpc DescribeAgent(DescribeAgentRequest) returns (DescribeAgentResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/agents/{agent_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe factory agent";
-      description: "Returns an agent by its ID";
-      tags: "Factory";
-    };
-  }
-
-  rpc ListAgentAssignments(ListAgentAssignmentsRequest) returns (ListAgentAssignmentsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List agent assignments for an agent";
-      description: "Returns a list of agent assignments for an agent";
-      tags: "Factory";
-    };
-  }
-
-  rpc CreateAgentAssignment(CreateAgentAssignmentRequest) returns (CreateAgentAssignmentResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create factory agent assignment";
-      description: "Creates a new agent assignment for an agent";
-      tags: "Factory";
-    };
-  }
-
-  rpc DescribeAgentAssignment(DescribeAgentAssignmentRequest) returns (DescribeAgentAssignmentResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments/{id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe agent assignment for an agent";
-      description: "Returns an agent assignment by its ID";
       tags: "Factory";
     };
   }
@@ -271,44 +204,66 @@ message DescribeFactoryResponse {
 }
 
 message Factory {
+  message App {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
   string id = 1;
   string name = 2;
   string description = 3;
+  repeated FactoryLine lines = 4;
 }
 
-//
-// Factory sources
-//
+message FactoryLine {
+  message Step {
+    string name = 1;
+    string type = 2;
+    optional AppStep app = 3;
+  }
 
-message ListSourcesRequest {
-  string factory_id = 1;
-}
+  message AppStep {
+    string app = 1;
+    string entrypoint = 2;
+  }
 
-message ListSourcesResponse {
-  repeated FactorySource sources = 1;
-}
-
-message FactorySource {
   string id = 1;
   string name = 2;
-  IntegrationRef integration = 3;
-  google.protobuf.Struct configuration = 4;
+  repeated Step steps = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
 }
 
-message AddSourceRequest {
+message CreateFactoryLineRequest {
   string factory_id = 1;
   string name = 2;
-  IntegrationRef integration = 3;
-  google.protobuf.Struct configuration = 4;
+  repeated FactoryLine.Step steps = 3;
 }
 
-message AddSourceResponse {
-  FactorySource source = 1;
+message CreateFactoryLineResponse {
+  FactoryLine line = 1;
 }
 
-message IntegrationRef {
-  optional string id = 1;
-  optional string name = 2;
+message UpdateFactoryLineRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  optional string name = 3;
+  repeated FactoryLine.Step steps = 4;
+}
+
+message UpdateFactoryLineResponse {
+  FactoryLine line = 1;
+}
+
+message ListFactoryAppsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryAppsResponse {
+  repeated Factory.App apps = 1;
 }
 
 //
@@ -366,25 +321,6 @@ message WorkOrder {
     string name = 2;
   }
 
-  message Attribute {
-    enum Type {
-      TYPE_UNSPECIFIED = 0;
-      TYPE_STRING = 1;
-      TYPE_NUMBER = 2;
-      TYPE_URL = 3;
-    }
-
-    Type type = 1;
-    string name = 2;
-    string value = 3;
-  }
-
-  message SourceRef {
-    string id = 1;
-    string name = 2;
-    string key = 3;
-  }
-
   string id = 1;
   string title = 2;
   string description = 3;
@@ -393,15 +329,6 @@ message WorkOrder {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   repeated Assignee assignees = 8;
-  repeated Attribute attributes = 9;
-  SourceRef source = 10;
-}
-
-message WorkOrderEvent {
-  string id = 1;
-  string type = 2;
-  google.protobuf.Struct content = 3;
-  google.protobuf.Timestamp created_at = 4;
 }
 
 message DescribeWorkOrderRequest {
@@ -413,158 +340,22 @@ message DescribeWorkOrderResponse {
   WorkOrder order = 1;
 }
 
-message ListWorkOrderEventsRequest {
-  string factory_id = 1;
-  string order_id = 2;
-}
-
-message ListWorkOrderEventsResponse {
-  repeated WorkOrderEvent events = 1;
-}
-
-message AssignWorkOrderRequest {
+message UpdateWorkOrderAssigneesRequest {
   string factory_id = 1;
   string order_id = 2;
   repeated string assignee_ids = 3;
 }
 
-message AssignWorkOrderResponse {
+message UpdateWorkOrderAssigneesResponse {
   WorkOrder order = 1;
 }
 
-message CreateAgentAssignmentRequest {
-  string factory_id = 1;
-  string agent_id = 2;
-  string instructions = 3;
-  repeated string order_ids = 4;
-}
-
-message CreateAgentAssignmentResponse {
-  repeated AgentAssignment assignments = 1;
-}
-
-message ListAgentAssignmentsRequest {
-  string factory_id = 1;
-  string agent_id = 2;
-}
-
-message ListAgentAssignmentsResponse {
-  repeated AgentAssignment assignments = 1;
-}
-
-message ListAgentAssignmentsForOrderRequest {
+message DispatchWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
+  string line_name = 3;
 }
 
-message ListAgentAssignmentsForOrderResponse {
-  repeated AgentAssignment assignments = 1;
-}
-
-message DescribeAgentAssignmentRequest {
-  string factory_id = 1;
-  string agent_id = 2;
-  string id = 3;
-}
-
-message DescribeAgentAssignmentResponse {
-  AgentAssignment assignment = 1;
-}
-
-message AgentAssignment {
-  enum State {
-    STATE_UNSPECIFIED = 0;
-    STATE_PENDING = 1;
-    STATE_STARTED = 2;
-    STATE_COMPLETED = 3;
-    STATE_FAILED = 4;
-  }
-
-  string id = 1;
-  string agent_id = 2;
-  string order_id = 3;
-  string instructions = 4;
-  State state = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp updated_at = 7;
-}
-
-//
-// Agents
-//
-
-message CreateAgentRequest {
-  string factory_id = 1;
-  string name = 2;
-  string description = 3;
-}
-
-message CreateAgentResponse {
-  FactoryAgent agent = 1;
-}
-
-message DescribeAgentRequest {
-  string factory_id = 1;
-  string agent_id = 2;
-}
-
-message DescribeAgentResponse {
-  FactoryAgent agent = 1;
-}
-
-message ListAgentsRequest {
-  string factory_id = 1;
-}
-
-message ListAgentsResponse {
-  repeated FactoryAgent agents = 1;
-}
-
-message FactoryAgent {
-  message Machine {
-    string type = 1;
-  }
-
-  message EnvSource {
-    enum Source {
-      TYPE_UNSPECIFIED = 0;
-      TYPE_SECRET = 1;
-      TYPE_INTEGRATION = 2;
-    }
-
-    message SecretRef {
-      string name = 1;
-      string key = 2;
-    }
-
-    Source source = 1;
-    optional SecretRef secret = 2;
-    optional IntegrationRef integration = 3;
-  }
-
-  message EnvVar {
-    enum Source {
-      SOURCE_UNSPECIFIED = 0;
-      SOURCE_SECRET = 1;
-      SOURCE_INLINE = 2;
-    }
-
-    message SecretKeyRef {
-      string name = 1;
-      string key = 2;
-    }
-
-    Source source = 1;
-    optional SecretKeyRef secret = 2;
-    optional string value = 3;
-  }
-
-  string id = 1;
-  string name = 2;
-  string description = 3;
-  string kind = 4;
-  Machine machine = 5;
-  string model = 6;
-  repeated EnvSource env_from = 7;
-  repeated EnvVar env = 8;
+message DispatchWorkOrderResponse {
+  WorkOrder order = 1;
 }

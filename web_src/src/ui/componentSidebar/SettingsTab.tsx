@@ -1,4 +1,4 @@
-import type { SuperplaneComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
+import type { ComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,13 +35,13 @@ interface SettingsTabProps {
   onSave: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
-    integrationRef?: SuperplaneComponentsIntegrationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   onCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
-  integrationRef?: SuperplaneComponentsIntegrationRef;
+  integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   integrationDefinition?: { name?: string; label?: string; icon?: string };
   autocompleteExampleObj?: Record<string, unknown> | null;
@@ -56,7 +56,7 @@ interface SettingsTabProps {
 function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
-  integrationRef?: SuperplaneComponentsIntegrationRef,
+  integrationRef?: ComponentsIntegrationRef,
 ): string {
   return JSON.stringify({
     configuration,
@@ -101,9 +101,7 @@ export function SettingsTab({
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<SuperplaneComponentsIntegrationRef | undefined>(
-    integrationRef,
-  );
+  const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));

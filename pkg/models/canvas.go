@@ -21,6 +21,7 @@ const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 type Canvas struct {
 	ID                          uuid.UUID
 	OrganizationID              uuid.UUID
+	FactoryID                   *uuid.UUID
 	LiveVersionID               *uuid.UUID
 	CanvasFolderID              *uuid.UUID `gorm:"column:folder_id"`
 	Name                        string
@@ -294,6 +295,35 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 		Find(&canvases).
 		Error
 
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
+func ListOrganizationCanvases(tx *gorm.DB, organizationID uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+	err := tx.
+		Where("organization_id = ? AND factory_id IS NULL", organizationID).
+		Order("name ASC").
+		Find(&canvases).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
+func ListFactoryCanvases(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+	err := tx.
+		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		Order("name ASC").
+		Order("id ASC").
+		Find(&canvases).
+		Error
 	if err != nil {
 		return nil, err
 	}

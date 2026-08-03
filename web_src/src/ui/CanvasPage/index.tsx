@@ -43,7 +43,7 @@ import type {
   CanvasesCanvasNodeExecution,
   ActionsAction,
   ComponentsEdge,
-  SuperplaneComponentsIntegrationRef,
+  ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -148,7 +148,7 @@ export interface NodeEditData {
   /** Integration catalog label; used to resolve docs.superplane.com path for integration components. */
   integrationLabel?: string;
   blockName?: string;
-  integrationRef?: SuperplaneComponentsIntegrationRef;
+  integrationRef?: ComponentsIntegrationRef;
 }
 
 export interface NewNodeData {
@@ -159,7 +159,7 @@ export interface NewNodeData {
   configuration: Record<string, unknown>;
   position?: { x: number; y: number };
   integrationName?: string;
-  integrationRef?: SuperplaneComponentsIntegrationRef;
+  integrationRef?: ComponentsIntegrationRef;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -173,6 +173,8 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   /** Display name for the canvas header (center title). */
   title?: string;
+  /** When set, the app is owned by this factory and the header shows a return link. */
+  factoryId?: string;
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
@@ -279,7 +281,7 @@ export interface CanvasPageProps {
     nodeId: string,
     configuration: Record<string, unknown>,
     nodeName: string,
-    integrationRef?: SuperplaneComponentsIntegrationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1185,7 +1187,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: SuperplaneComponentsIntegrationRef) => {
+    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
@@ -1403,6 +1405,7 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContentHeader
           canvasName={props.title ?? ""}
           organizationId={props.organizationId}
+          factoryId={props.factoryId}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
@@ -1726,7 +1729,7 @@ function Sidebar({
   onSaveConfiguration?: (
     configuration: Record<string, unknown>,
     nodeName: string,
-    integrationRef?: SuperplaneComponentsIntegrationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1910,6 +1913,7 @@ function Sidebar({
 function CanvasContentHeader({
   canvasName,
   organizationId,
+  factoryId,
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
@@ -1966,6 +1970,7 @@ function CanvasContentHeader({
 }: {
   canvasName: string;
   organizationId?: string;
+  factoryId?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -2034,6 +2039,7 @@ function CanvasContentHeader({
     <Header
       canvasName={canvasName}
       organizationId={organizationId}
+      factoryId={factoryId}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}

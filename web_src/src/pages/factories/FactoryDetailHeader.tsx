@@ -8,7 +8,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { SlidersHorizontal } from "lucide-react";
 
-export type FactoryDetailTab = "my-work" | "work-orders";
+export type FactoryDetailTab = "my-work" | "work-orders" | "lines" | "apps";
 
 interface FactoryDetailHeaderProps {
   factory: FactoriesFactory;
@@ -17,6 +17,8 @@ interface FactoryDetailHeaderProps {
   onTabChange: (tab: FactoryDetailTab) => void;
   myWorkCount: number;
   workOrdersCount: number;
+  linesCount: number;
+  appsCount: number;
   needsAttentionCount: number;
   canCreate: boolean;
   permissionsLoading: boolean;
@@ -30,6 +32,8 @@ export function FactoryDetailHeader({
   onTabChange,
   myWorkCount,
   workOrdersCount,
+  linesCount,
+  appsCount,
   needsAttentionCount,
   canCreate,
   permissionsLoading,
@@ -93,6 +97,14 @@ export function FactoryDetailHeader({
             <TabsTrigger value="work-orders" data-testid="factory-tab-work-orders">
               Work orders
               {workOrdersCount > 0 ? <TabCountBadge count={workOrdersCount} /> : null}
+            </TabsTrigger>
+            <TabsTrigger value="lines" data-testid="factory-tab-lines">
+              Lines
+              {linesCount > 0 ? <TabCountBadge count={linesCount} /> : null}
+            </TabsTrigger>
+            <TabsTrigger value="apps" data-testid="factory-tab-apps">
+              Apps
+              {appsCount > 0 ? <TabCountBadge count={appsCount} /> : null}
             </TabsTrigger>
           </TabsList>
         </Tabs>

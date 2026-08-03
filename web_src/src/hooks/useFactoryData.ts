@@ -1,12 +1,21 @@
 import {
-  factoriesAssignWorkOrder,
   factoriesCreateFactory,
+  factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
   factoriesDescribeFactory,
   factoriesListFactories,
+  factoriesListFactoryApps,
   factoriesListWorkOrders,
+  factoriesUpdateFactoryLine,
+  factoriesUpdateWorkOrderAssignees,
 } from "@/api-client";
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoryApp,
+  FactoryLineStep,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -20,6 +29,10 @@ function factoryDetailKey(organizationId: string, factoryId: string) {
 
 function workOrdersKey(organizationId: string, factoryId: string) {
   return ["factories", organizationId, factoryId, "work-orders"] as const;
+}
+
+export function factoryAppsKey(organizationId: string, factoryId: string) {
+  return ["factories", organizationId, factoryId, "apps"] as const;
 }
 
 export function useFactories(organizationId: string) {
@@ -119,12 +132,12 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
-export function useAssignWorkOrder(organizationId: string, factoryId: string) {
+export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: { orderId: string; assigneeIds: string[] }) => {
-      const response = await factoriesAssignWorkOrder(
+      const response = await factoriesUpdateWorkOrderAssignees(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
@@ -134,7 +147,7 @@ export function useAssignWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to assign work order");
+        throw new Error("Failed to update work order assignees");
       }
       return response.data.order;
     },
@@ -143,3 +156,73 @@ export function useAssignWorkOrder(organizationId: string, factoryId: string) {
     },
   });
 }
+
+export function useFactoryApps(organizationId: string, factoryId: string) {
+  return useQuery({
+    queryKey: factoryAppsKey(organizationId, factoryId),
+    queryFn: async (): Promise<FactoryApp[]> => {
+      const response = await factoriesListFactoryApps(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+        }),
+      );
+      return response.data?.apps ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId),
+  });
+}
+
+export function useCreateFactoryLine(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name: string; steps: FactoryLineStep[] }) => {
+      const response = await factoriesCreateFactoryLine(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          body: {
+            name: input.name,
+            steps: input.steps,
+          },
+        }),
+      );
+      if (!response.data?.line) {
+        throw new Error("Failed to create factory line");
+      }
+      return response.data.line;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useUpdateFactoryLine(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { lineId: string; name?: string; steps?: FactoryLineStep[] }) => {
+      const response = await factoriesUpdateFactoryLine(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, lineId: input.lineId },
+          body: {
+            name: input.name,
+            steps: input.steps,
+          },
+        }),
+      );
+      if (!response.data?.line) {
+        throw new Error("Failed to update factory line");
+      }
+      return response.data.line;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export type { FactoryApp, FactoriesFactoryLine, FactoryLineStep };

@@ -203,47 +203,17 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/sources"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders"}: {
 			Resource:   "factories",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/apps"}: {
+			Resource:   "factories",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/events"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assignments"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"}: {
-			Resource:   "factories",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments/{id}"}: {
 			Resource:   "factories",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
@@ -348,12 +318,22 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assign"}: {
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/assignees"}: {
+			Resource:   "factories",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"}: {
 			Resource:   "factories",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/close"}: {
+			Resource:   "factories",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/lines/{line_id}"}: {
 			Resource:   "factories",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
@@ -491,24 +471,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/sources"}: {
-			Resource:   "factories",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders"}: {
 			Resource:   "factories",
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agents"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/lines"}: {
 			Resource:   "factories",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/agents/{agent_id}/assignments"}: {
-			Resource:   "factories",
-			Action:     "create",
+			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {

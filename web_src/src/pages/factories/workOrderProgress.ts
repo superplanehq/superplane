@@ -1,6 +1,6 @@
-import type { FactoriesWorkOrder, WorkOrderAttribute } from "@/api-client";
+import type { FactoriesWorkOrder } from "@/api-client";
 
-/** Derived lifecycle phase — progress lives on related records; UI derives until API exposes it. */
+/** Derived lifecycle phase — progress will come from work order executions once exposed in the UI. */
 export type WorkOrderProgressPhase =
   | "unassigned"
   | "needs_attention"
@@ -78,36 +78,11 @@ const PHASE_META: Record<WorkOrderProgressPhase, Pick<WorkOrderProgress, "stageL
   rejected: { stageLabel: "Rejected", summary: "Rejected" },
 };
 
-function attributeMap(attributes?: WorkOrderAttribute[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const attribute of attributes ?? []) {
-    if (attribute.name && attribute.value !== undefined) {
-      map.set(attribute.name, attribute.value);
-    }
-  }
-  return map;
-}
-
-export function getWorkOrderAttribute(order: FactoriesWorkOrder, name: string): string | undefined {
-  return attributeMap(order.attributes).get(name);
-}
-
 export function getWorkOrderDisplayKey(order: FactoriesWorkOrder): string {
-  const fromAttribute = getWorkOrderAttribute(order, "key");
-  if (fromAttribute) {
-    return fromAttribute;
-  }
-  if (order.source?.key) {
-    return order.source.key;
-  }
   if (order.id) {
     return order.id.slice(0, 8);
   }
   return "—";
-}
-
-export function getWorkOrderBranch(order: FactoriesWorkOrder): string | undefined {
-  return getWorkOrderAttribute(order, "branch") ?? getWorkOrderAttribute(order, "git.branch");
 }
 
 export function deriveWorkOrderProgress(order: FactoriesWorkOrder): WorkOrderProgress {
@@ -116,45 +91,8 @@ export function deriveWorkOrderProgress(order: FactoriesWorkOrder): WorkOrderPro
     return { phase, ...PHASE_META[phase] };
   }
 
-  const attrs = attributeMap(order.attributes);
-  const planStatus = attrs.get("plan.status");
-  const implementationStatus = attrs.get("implementation.status");
-  const verificationStatus = attrs.get("verification.status");
-  const needsAttention =
-    attrs.get("needs_attention") === "true" ||
-    Boolean(attrs.get("attention.reason")) ||
-    planStatus === "needs_attention";
-
-  if (needsAttention) {
-    return { phase: "needs_attention", ...PHASE_META.needs_attention };
-  }
-
   if (!order.assignees?.length) {
     return { phase: "unassigned", ...PHASE_META.unassigned };
-  }
-
-  if (verificationStatus === "running") {
-    return { phase: "verifications_running", ...PHASE_META.verifications_running };
-  }
-
-  if (verificationStatus === "failed") {
-    return { phase: "verifications_failed", ...PHASE_META.verifications_failed };
-  }
-
-  if (implementationStatus === "in_progress" || implementationStatus === "running") {
-    return { phase: "implementation_in_progress", ...PHASE_META.implementation_in_progress };
-  }
-
-  if (planStatus === "draft" || planStatus === "in_progress") {
-    return { phase: "planning", ...PHASE_META.planning };
-  }
-
-  if (verificationStatus === "passed" && (implementationStatus === "completed" || implementationStatus === "done")) {
-    return { phase: "ready_for_review", ...PHASE_META.ready_for_review };
-  }
-
-  if (!planStatus || planStatus === "none") {
-    return { phase: "no_plan", ...PHASE_META.no_plan };
   }
 
   return { phase: "no_plan", ...PHASE_META.no_plan };

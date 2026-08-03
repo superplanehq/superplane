@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type {
   AuthorizationDomainType,
-  SuperplaneComponentsIntegrationRef,
+  ComponentsIntegrationRef,
   ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -35,7 +35,7 @@ export const STORY_DOMAIN_ID = "org_storybook";
 export const STORY_DOMAIN_TYPE: AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION";
 export const STORY_ORGANIZATION_ID = STORY_DOMAIN_ID;
 export const STORY_INTEGRATION_ID = "int_github_primary";
-export const STORY_INTEGRATION_REF: SuperplaneComponentsIntegrationRef = {
+export const STORY_INTEGRATION_REF: ComponentsIntegrationRef = {
   id: STORY_INTEGRATION_ID,
   name: "GitHub Production",
 };

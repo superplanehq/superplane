@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
@@ -37,24 +36,6 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func parseAgentID(agentID string) (uuid.UUID, error) {
-	id, err := uuid.Parse(agentID)
-	if err != nil {
-		return uuid.Nil, invalidArgument("invalid agent id")
-	}
-
-	return id, nil
-}
-
-func parseAssignmentID(id string) (uuid.UUID, error) {
-	assignmentID, err := uuid.Parse(id)
-	if err != nil {
-		return uuid.Nil, invalidArgument("invalid assignment id")
-	}
-
-	return assignmentID, nil
-}
-
 func loadFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*models.Factory, error) {
 	factory, err := models.FindFactory(tx, organizationID, factoryID)
 	if err != nil {
@@ -62,44 +43,6 @@ func loadFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*models.Fact
 	}
 
 	return factory, nil
-}
-
-func resolveIntegrationRef(tx *gorm.DB, organizationID uuid.UUID, ref *pb.IntegrationRef) (uuid.UUID, error) {
-	if ref == nil {
-		return uuid.Nil, invalidArgument("integration is required")
-	}
-
-	if ref.Id != nil && *ref.Id != "" {
-		integrationID, err := uuid.Parse(*ref.Id)
-		if err != nil {
-			return uuid.Nil, invalidArgument("invalid integration id")
-		}
-
-		if _, err := models.FindIntegrationInTransaction(tx, organizationID, integrationID); err != nil {
-			return uuid.Nil, err
-		}
-
-		return integrationID, nil
-	}
-
-	if ref.Name != nil && *ref.Name != "" {
-		integration, err := models.FindIntegrationByName(tx, organizationID, *ref.Name)
-		if err != nil {
-			return uuid.Nil, err
-		}
-
-		return integration.ID, nil
-	}
-
-	return uuid.Nil, invalidArgument("integration id or name is required")
-}
-
-func structToMap(value *structpb.Struct) map[string]any {
-	if value == nil {
-		return map[string]any{}
-	}
-
-	return value.AsMap()
 }
 
 func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
@@ -170,20 +113,4 @@ func closeWorkOrderResult(result pb.WorkOrder_Result) (string, error) {
 	default:
 		return "", invalidArgument("result must be completed or rejected")
 	}
-}
-
-func parseOrderIDs(orderIDs []string) ([]uuid.UUID, error) {
-	if len(orderIDs) == 0 {
-		return nil, invalidArgument("order_ids is required")
-	}
-
-	parsed := make([]uuid.UUID, 0, len(orderIDs))
-	for _, orderID := range orderIDs {
-		id, err := parseOrderID(orderID)
-		if err != nil {
-			return nil, err
-		}
-		parsed = append(parsed, id)
-	}
-	return parsed, nil
 }
