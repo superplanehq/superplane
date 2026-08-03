@@ -4146,6 +4146,7 @@ export function AppPage() {
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
+          factoryId={canvas?.metadata?.factoryId ?? liveCanvas?.metadata?.factoryId}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           showCanvasSettingsMenu={canUpdateCanvas}
