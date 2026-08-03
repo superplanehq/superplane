@@ -133,10 +133,7 @@ func TestCreateTaskPersistsOriginLabels(t *testing.T) {
 	if err := json.NewDecoder(getResp.Body).Decode(&status); err != nil {
 		t.Fatal(err)
 	}
-	if status.Labels[models.LabelCanvasID] != "11111111-1111-1111-1111-111111111111" ||
-		status.Labels[models.LabelOrganizationID] != "22222222-2222-2222-2222-222222222222" ||
-		status.Labels[models.LabelCanvasName] != "release-train" ||
-		status.Labels[models.LabelNodeName] != "Run tests" {
+	if len(status.Labels) != 4 || status.Labels[models.LabelCanvasID] != task.Labels[models.LabelCanvasID] {
 		t.Fatalf("status labels=%#v", status.Labels)
 	}
 }

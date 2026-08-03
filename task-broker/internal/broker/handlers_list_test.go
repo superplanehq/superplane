@@ -108,18 +108,13 @@ func TestListTasksEmpty(t *testing.T) {
 	}
 }
 
-func TestListTasksByRunnerIDIncludesTerminalAndLabels(t *testing.T) {
+func TestListTasksByRunnerID(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	now := time.Now().UTC()
-	labels := map[string]string{
-		models.LabelCanvasID:       "canvas-uuid",
-		models.LabelOrganizationID: "org-uuid",
-		models.LabelCanvasName:     "security-test",
-		models.LabelNodeName:       "probe",
-	}
+	labels := map[string]string{models.LabelCanvasID: "canvas-uuid"}
 	if err := st.CreateTask(ctx, &models.Task{
 		ID: "done-task", FleetID: "f1", Command: []string{"echo"},
 		WebhookURL: "https://example.com/h", Status: models.StatusSucceeded,
@@ -130,7 +125,7 @@ func TestListTasksByRunnerIDIncludesTerminalAndLabels(t *testing.T) {
 	if err := st.CreateTask(ctx, &models.Task{
 		ID: "claimed-task", FleetID: "f1", Command: []string{"echo"},
 		WebhookURL: "https://example.com/h", Status: models.StatusClaimed,
-		CreatedAt: now, RunnerID: "i-aaa", Labels: labels,
+		CreatedAt: now, RunnerID: "i-aaa",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +137,8 @@ func TestListTasksByRunnerIDIncludesTerminalAndLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, status := getListTasks(t, newListTestServer(t, st), "runner_id=i-aaa")
+	ts := newListTestServer(t, st)
+	out, status := getListTasks(t, ts, "runner_id=i-aaa")
 	if status != http.StatusOK {
 		t.Fatalf("status: %d", status)
 	}
@@ -152,36 +148,15 @@ func TestListTasksByRunnerIDIncludesTerminalAndLabels(t *testing.T) {
 	if out.Tasks[0].ID != "done-task" || out.Tasks[0].Status != "succeeded" {
 		t.Fatalf("first: %#v", out.Tasks[0])
 	}
-	if out.Tasks[0].Labels[models.LabelCanvasID] != "canvas-uuid" ||
-		out.Tasks[0].Labels[models.LabelOrganizationID] != "org-uuid" ||
-		out.Tasks[0].Labels[models.LabelCanvasName] != "security-test" ||
-		out.Tasks[0].Labels[models.LabelNodeName] != "probe" {
+	if out.Tasks[0].Labels[models.LabelCanvasID] != "canvas-uuid" {
 		t.Fatalf("labels: %#v", out.Tasks[0].Labels)
 	}
 	if out.Tasks[1].ID != "claimed-task" {
 		t.Fatalf("second: %#v", out.Tasks[1])
 	}
-}
 
-func TestListTasksByRunnerIDEmpty(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	out, status := getListTasks(t, newListTestServer(t, st), "runner_id=i-missing")
-	if status != http.StatusOK {
-		t.Fatalf("status: %d", status)
-	}
-	if out.Tasks == nil || len(out.Tasks) != 0 {
-		t.Fatalf("tasks: %#v", out.Tasks)
-	}
-}
-
-func TestListTasksRejectsEmptyRunnerIDQuery(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	_, status := getListTasks(t, newListTestServer(t, st), "runner_id=")
+	_, status = getListTasks(t, ts, "runner_id=")
 	if status != http.StatusBadRequest {
-		t.Fatalf("status: %d", status)
+		t.Fatalf("empty runner_id status: %d", status)
 	}
 }

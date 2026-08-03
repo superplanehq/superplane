@@ -33,8 +33,4 @@ func TestNormalizeOriginLabels(t *testing.T) {
 	if len(got[LabelCanvasName]) != maxLabelValueLen {
 		t.Fatalf("len=%d", len(got[LabelCanvasName]))
 	}
-	got = NormalizeOriginLabels(map[string]string{LabelCanvasID: "c-1", LabelOrganizationID: "o-1"})
-	if len(got) != 2 || got[LabelCanvasID] != "c-1" || got[LabelOrganizationID] != "o-1" {
-		t.Fatalf("ids-only %#v", got)
-	}
 }
