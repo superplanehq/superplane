@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -87,6 +88,45 @@ func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 	assert.Contains(t, msg, "invalid console yaml")
+}
+
+func Test__CommitCanvasStaging__RejectsDuplicateEdges(t *testing.T) {
+	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
+
+	staged := `apiVersion: v1
+kind: Canvas
+metadata:
+  name: ` + canvas.Name + `
+spec:
+  nodes:
+    - id: node-1
+      name: Source
+      type: TYPE_ACTION
+      component: http
+    - id: node-2
+      name: Target
+      type: TYPE_ACTION
+      component: noop
+  edges:
+    - sourceId: node-1
+      targetId: node-2
+      channel: success
+    - sourceId: node-1
+      targetId: node-2
+      channel: success
+`
+
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
+	})
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Duplicate edges", "", r.AuthService)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, msg, "invalid canvas yaml")
+	assert.Contains(t, errors.Unwrap(err).Error(), "duplicate edge from node-1 to node-2 on channel success")
 }
 
 func Test__CommitCanvasStaging__RequiresStagedChanges(t *testing.T) {

@@ -293,6 +293,17 @@ export function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   };
 }
 
+export function edgeExists(
+  edges: ComponentsEdge[] | undefined,
+  sourceId: string,
+  targetId: string,
+  channel: string,
+): boolean {
+  return (edges || []).some(
+    (edge) => edge.sourceId === sourceId && edge.targetId === targetId && edge.channel === channel,
+  );
+}
+
 export function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
