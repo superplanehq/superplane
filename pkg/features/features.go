@@ -15,6 +15,10 @@ type Feature struct {
 // per-organization basis until the integration is generally available.
 const FeatureClaudeManagedAgents = "claude_managed_agents"
 
+// FeatureFactories enables software factories (work orders, lines, factory apps)
+// for a organization until the feature is generally available.
+const FeatureFactories = "factories"
+
 func released() *bool {
 	v := true
 	return &v
@@ -22,6 +26,7 @@ func released() *bool {
 
 var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
+	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 }
 
 func All() []Feature {

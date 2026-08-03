@@ -214,6 +214,7 @@ func (s *Service) createCanvas(ctx context.Context, organizationID uuid.UUID, ca
 		organizationID,
 		canvas.Metadata.Name,
 		canvas.Metadata.Description,
+		nil,
 		nodes,
 		edges,
 		s.UsageService,

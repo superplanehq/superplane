@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -13,6 +15,7 @@ import { InstallProgressPanel } from "./InstallProgressPanel";
 import type { CanvasFolderData } from "./types";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallFactory } from "./useInstallFactory";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 interface FreshOrgLandingProps {
   folder?: CanvasFolderData;
@@ -21,15 +24,17 @@ interface FreshOrgLandingProps {
 }
 
 /**
- * Factory-first new-app landing. Setup Factory primary CTA, with quiet escape
- * hatches for blank apps and the starter catalog (catalog hidden until Browse).
- * Factory setup installs a bundled template, then starts the Manual Run.
+ * New-app landing. When factories are disabled, offers the template-based
+ * "Setup Factory" onboarding. When enabled, only blank app / starter catalog.
  */
 export function FreshOrgLanding({
   folder,
   folderContextPending = false,
   title = "Create a new app",
 }: FreshOrgLandingProps) {
+  const organizationId = useOrganizationId() ?? undefined;
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const showLegacyFactoryOnboarding = !hasExperimentalFeature(FEATURE_FACTORIES);
   const factory = getFactoryDefinition();
   const { createApp, isSaving } = useCreateApp({ folder });
   const { installFactory, isInstalling } = useInstallFactory({ folder });
@@ -67,10 +72,11 @@ export function FreshOrgLanding({
     <div className="mx-auto w-full max-w-3xl px-8 py-14 lg:py-20">
       <h1 className={cn(homePageTitleClassName, "text-2xl text-gray-800")}>{title}</h1>
       <p className={cn(homePageSubtitleClassName, "mt-3 max-w-lg font-normal leading-normal text-gray-600")}>
-        Set up a Software Factory to automate coding work with agents, from trigger to pull request. Or start from a
-        blank app or starter template instead.
+        {showLegacyFactoryOnboarding
+          ? "Set up a Software Factory to automate coding work with agents, from trigger to pull request. Or start from a blank app or starter template instead."
+          : "Start from a blank app or choose a starter template to map your first automation."}
       </p>
-      {!inFocusedSetup && (
+      {showLegacyFactoryOnboarding && !inFocusedSetup && (
         <div className="mt-7">
           <Button
             type="button"
@@ -88,7 +94,7 @@ export function FreshOrgLanding({
         </div>
       )}
 
-      {showFactorySetup && (
+      {showLegacyFactoryOnboarding && showFactorySetup && (
         <FactorySetupPanel
           factory={factory}
           busy={busy}
@@ -105,15 +111,17 @@ export function FreshOrgLanding({
       )}
 
       {!inFocusedSetup && (
-        <BlankOrBrowseLinks
-          busy={busy}
-          showCatalog={showCatalog}
-          onCreateBlank={() => {
-            if (busy) return;
-            void createApp(generateCanvasName());
-          }}
-          onToggleCatalog={() => setShowCatalog((open) => !open)}
-        />
+        <div className={showLegacyFactoryOnboarding ? undefined : "mt-7"}>
+          <BlankOrBrowseLinks
+            busy={busy}
+            showCatalog={showCatalog}
+            onCreateBlank={() => {
+              if (busy) return;
+              void createApp(generateCanvasName());
+            }}
+            onToggleCatalog={() => setShowCatalog((open) => !open)}
+          />
+        </div>
       )}
 
       {!inFocusedSetup && showCatalog && (
