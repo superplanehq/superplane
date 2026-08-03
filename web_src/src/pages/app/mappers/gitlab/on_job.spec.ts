@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { onCommitStatusTriggerRenderer } from "./on_commit_status";
+import { onJobTriggerRenderer } from "./on_job";
 import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -8,8 +8,8 @@ import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDe
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
-    name: "On Commit Status",
-    componentName: "gitlab.onCommitStatus",
+    name: "On Job",
+    componentName: "gitlab.onJob",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -19,8 +19,8 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
 
 function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
   return {
-    name: "onCommitStatus",
-    label: "On Commit Status",
+    name: "onJob",
+    label: "On Job",
     description: "",
     icon: "gitlab",
     color: "orange",
@@ -34,32 +34,21 @@ function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
     createdAt: new Date().toISOString(),
     data: {},
     nodeId: "node-1",
-    type: "gitlab.commitStatusChanged",
+    type: "gitlab.job",
     ...overrides,
   };
 }
 
 function buildEventData() {
   return {
-    object_kind: "pipeline",
-    object_attributes: {
-      id: 12345,
-      iid: 321,
-      ref: "main",
-      sha: "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
-      status: "success",
-      source: "external",
-      url: "https://gitlab.com/group/example-project/-/pipelines/12345",
-    },
-    builds: [
-      { id: 998877, stage: "external", name: "security-scan", status: "success" },
-      { id: 998876, stage: "test", name: "unit-tests", status: "success" },
-    ],
-    commit: {
-      id: "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
-      title: "Cache dependencies between CI jobs",
-      url: "https://gitlab.com/group/example-project/-/commit/f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
-    },
+    object_kind: "build",
+    ref: "main",
+    sha: "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    build_id: 998876,
+    build_name: "unit-tests",
+    build_stage: "test",
+    build_status: "success",
+    pipeline_id: 12345,
     project: {
       id: 987,
       name: "example-project",
@@ -71,89 +60,83 @@ function buildEventData() {
 
 // ── getTitleAndSubtitle ─────────────────────────────────────────────
 
-describe("onCommitStatusTriggerRenderer.getTitleAndSubtitle", () => {
-  it("uses the short commit SHA in the title", () => {
+describe("onJobTriggerRenderer.getTitleAndSubtitle", () => {
+  it("uses the job name in the title", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(onCommitStatusTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Commit f4f6c5a0");
+    expect(onJobTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Job: unit-tests");
   });
 
-  it("falls back to the commit object when object_attributes has no SHA", () => {
-    const data = { ...buildEventData(), object_attributes: { status: "failed" } };
-    const ctx: TriggerEventContext = { event: buildEvent({ data }) };
-    expect(onCommitStatusTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Commit f4f6c5a0");
-  });
-
-  it("falls back to a default title when no SHA is present", () => {
+  it("falls back to a default title when the job name is missing", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: {} }) };
-    expect(onCommitStatusTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Commit Status");
+    expect(onJobTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Job");
   });
 
   it("handles undefined event data gracefully", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: undefined }) };
-    expect(() => onCommitStatusTriggerRenderer.getTitleAndSubtitle(ctx)).not.toThrow();
+    expect(() => onJobTriggerRenderer.getTitleAndSubtitle(ctx)).not.toThrow();
   });
 });
 
 // ── getRootEventValues ──────────────────────────────────────────────
 
-describe("onCommitStatusTriggerRenderer.getRootEventValues", () => {
-  it("extracts commit status details from event data", () => {
+describe("onJobTriggerRenderer.getRootEventValues", () => {
+  it("extracts job details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onCommitStatusTriggerRenderer.getRootEventValues(ctx);
+    const values = onJobTriggerRenderer.getRootEventValues(ctx);
+    expect(values["Job"]).toBe("unit-tests");
     expect(values["Status"]).toBe("success");
-    expect(values["Status Names"]).toBe("security-scan, unit-tests");
+    expect(values["Stage"]).toBe("test");
     expect(values["Ref"]).toBe("main");
-    expect(values["Commit"]).toBe("f4f6c5a0");
-    expect(values["Pipeline URL"]).toBe("https://gitlab.com/group/example-project/-/pipelines/12345");
+    expect(values["Job URL"]).toBe("https://gitlab.com/group/example-project/-/jobs/998876");
   });
 
   it("includes received at as the first value", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onCommitStatusTriggerRenderer.getRootEventValues(ctx);
+    const values = onJobTriggerRenderer.getRootEventValues(ctx);
     expect(Object.keys(values)[0]).toBe("Received At");
     expect(values["Received At"]).not.toBe("-");
   });
 
   it("returns at most 6 values", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onCommitStatusTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
+    expect(Object.keys(onJobTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
-  it("skips builds without a name", () => {
-    const data = { ...buildEventData(), builds: [{ id: 1, status: "success" }, { name: "lint" }] };
+  it("omits the job URL when the project web_url is missing", () => {
+    const data = { ...buildEventData(), project: undefined };
     const ctx: TriggerEventContext = { event: buildEvent({ data }) };
-    expect(onCommitStatusTriggerRenderer.getRootEventValues(ctx)["Status Names"]).toBe("lint");
+    expect(onJobTriggerRenderer.getRootEventValues(ctx)["Job URL"]).toBe("-");
   });
 
   it("returns placeholders when event data is missing", () => {
-    const values = onCommitStatusTriggerRenderer.getRootEventValues({ event: buildEvent({ data: {} }) });
+    const values = onJobTriggerRenderer.getRootEventValues({ event: buildEvent({ data: {} }) });
+    expect(values["Job"]).toBe("-");
     expect(values["Status"]).toBe("-");
-    expect(values["Status Names"]).toBe("-");
+    expect(values["Stage"]).toBe("-");
     expect(values["Ref"]).toBe("-");
-    expect(values["Commit"]).toBe("-");
-    expect(values["Pipeline URL"]).toBe("-");
+    expect(values["Job URL"]).toBe("-");
   });
 });
 
 // ── getTriggerProps ─────────────────────────────────────────────────
 
-describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
+describe("onJobTriggerRenderer.getTriggerProps", () => {
   it("returns props with correct title from node name", () => {
     const ctx: TriggerRendererContext = {
-      node: buildNode({ name: "My Commit Status Trigger" }),
+      node: buildNode({ name: "My Job Trigger" }),
       definition: buildDefinition(),
       lastEvent: buildEvent(),
     };
-    expect(onCommitStatusTriggerRenderer.getTriggerProps(ctx).title).toBe("My Commit Status Trigger");
+    expect(onJobTriggerRenderer.getTriggerProps(ctx).title).toBe("My Job Trigger");
   });
 
   it("falls back to definition label when node name is empty", () => {
     const ctx: TriggerRendererContext = {
       node: buildNode({ name: "" }),
-      definition: buildDefinition({ label: "On Commit Status" }),
+      definition: buildDefinition({ label: "On Job" }),
       lastEvent: buildEvent(),
     };
-    expect(onCommitStatusTriggerRenderer.getTriggerProps(ctx).title).toBe("On Commit Status");
+    expect(onJobTriggerRenderer.getTriggerProps(ctx).title).toBe("On Job");
   });
 
   it("includes project metadata and configured filters", () => {
@@ -162,18 +145,18 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
         metadata: { project: { id: 987, name: "group/example-project" } },
         configuration: {
           statuses: ["success", "failed"],
-          names: [{ type: "equals", value: "security-scan" }],
-          refs: [{ type: "equals", value: "main" }],
+          names: [{ type: "equals", value: "deploy" }],
+          refs: [{ type: "matches", value: "release/.*" }],
         },
       }),
       definition: buildDefinition(),
       lastEvent: buildEvent(),
     };
-    const props = onCommitStatusTriggerRenderer.getTriggerProps(ctx);
+    const props = onJobTriggerRenderer.getTriggerProps(ctx);
     expect(props.metadata?.find((m) => String(m.label).includes("group/example-project"))).toBeDefined();
     expect(props.metadata?.find((m) => String(m.label).includes("success, failed"))).toBeDefined();
-    expect(props.metadata?.find((m) => String(m.label).includes("security-scan"))).toBeDefined();
-    expect(props.metadata?.find((m) => m.icon === "git-branch" && String(m.label).includes("main"))).toBeDefined();
+    expect(props.metadata?.find((m) => String(m.label).includes("deploy"))).toBeDefined();
+    expect(props.metadata?.find((m) => String(m.label).includes("release/.*"))).toBeDefined();
   });
 
   it("omits metadata when project and filters are not configured", () => {
@@ -182,7 +165,7 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
       definition: buildDefinition(),
       lastEvent: buildEvent(),
     };
-    expect(onCommitStatusTriggerRenderer.getTriggerProps(ctx).metadata).toEqual([]);
+    expect(onJobTriggerRenderer.getTriggerProps(ctx).metadata).toEqual([]);
   });
 
   it("includes lastEventData when lastEvent is provided", () => {
@@ -191,9 +174,9 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
       definition: buildDefinition(),
       lastEvent: buildEvent({ data: buildEventData() }),
     };
-    const props = onCommitStatusTriggerRenderer.getTriggerProps(ctx);
+    const props = onJobTriggerRenderer.getTriggerProps(ctx);
     expect(props.lastEventData).toBeDefined();
-    expect(props.lastEventData!.title).toBe("Commit f4f6c5a0");
+    expect(props.lastEventData!.title).toBe("Job: unit-tests");
     expect(props.lastEventData!.state).toBe("triggered");
   });
 
@@ -203,6 +186,6 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
       definition: buildDefinition(),
       lastEvent: undefined,
     };
-    expect(onCommitStatusTriggerRenderer.getTriggerProps(ctx).lastEventData).toBeUndefined();
+    expect(onJobTriggerRenderer.getTriggerProps(ctx).lastEventData).toBeUndefined();
   });
 });

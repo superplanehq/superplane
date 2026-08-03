@@ -13,6 +13,9 @@ var exampleDataOnIssueBytes []byte
 //go:embed example_data_on_issue_comment.json
 var exampleDataOnIssueCommentBytes []byte
 
+//go:embed example_data_on_job.json
+var exampleDataOnJobBytes []byte
+
 //go:embed example_data_on_merge_comment.json
 var exampleDataOnMergeCommentBytes []byte
 
@@ -34,9 +37,6 @@ var exampleDataOnPushBytes []byte
 //go:embed example_data_on_branch_created.json
 var exampleDataOnBranchCreatedBytes []byte
 
-//go:embed example_data_on_commit_status.json
-var exampleDataOnCommitStatusBytes []byte
-
 //go:embed example_data_on_release.json
 var exampleDataOnReleaseBytes []byte
 
@@ -51,6 +51,9 @@ var exampleDataOnIssue map[string]any
 
 var exampleDataOnIssueCommentOnce sync.Once
 var exampleDataOnIssueComment map[string]any
+
+var exampleDataOnJobOnce sync.Once
+var exampleDataOnJob map[string]any
 
 var exampleDataOnMergeCommentOnce sync.Once
 var exampleDataOnMergeComment map[string]any
@@ -73,9 +76,6 @@ var exampleDataOnPush map[string]any
 var exampleDataOnBranchCreatedOnce sync.Once
 var exampleDataOnBranchCreated map[string]any
 
-var exampleDataOnCommitStatusOnce sync.Once
-var exampleDataOnCommitStatus map[string]any
-
 var exampleDataOnReleaseOnce sync.Once
 var exampleDataOnRelease map[string]any
 
@@ -91,6 +91,10 @@ func (i *OnIssue) ExampleData() map[string]any {
 
 func (m *OnIssueComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
+func (t *OnJob) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnJobOnce, exampleDataOnJobBytes, &exampleDataOnJob)
 }
 
 func (m *OnMergeComment) ExampleData() map[string]any {
@@ -119,10 +123,6 @@ func (p *OnPush) ExampleData() map[string]any {
 
 func (t *OnBranchCreated) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBranchCreatedOnce, exampleDataOnBranchCreatedBytes, &exampleDataOnBranchCreated)
-}
-
-func (t *OnCommitStatus) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnCommitStatusOnce, exampleDataOnCommitStatusBytes, &exampleDataOnCommitStatus)
 }
 
 func (r *OnRelease) ExampleData() map[string]any {

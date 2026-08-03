@@ -4,46 +4,29 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { Predicate } from "../utils";
 import { formatPredicate, stringOrDash } from "../utils";
-import { buildGitlabSubtitle, shortSha } from "./utils";
+import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
 
-interface OnCommitStatusConfiguration {
+interface OnJobConfiguration {
   statuses?: string[];
   names?: Predicate[];
   refs?: Predicate[];
 }
 
-interface CommitStatusBuild {
-  id?: number;
-  name?: string;
-  stage?: string;
-  status?: string;
-}
-
-interface CommitStatusPipelineAttributes {
-  id?: number;
-  iid?: number;
+interface OnJobEventData {
+  object_kind?: string;
   ref?: string;
   sha?: string;
-  status?: string;
-  source?: string;
-  url?: string;
-}
-
-interface OnCommitStatusEventData {
-  object_kind?: string;
-  object_attributes?: CommitStatusPipelineAttributes;
-  builds?: CommitStatusBuild[];
-  commit?: {
-    id?: string;
-    title?: string;
-    url?: string;
-  };
+  build_id?: number;
+  build_name?: string;
+  build_stage?: string;
+  build_status?: string;
+  pipeline_id?: number;
   project?: {
-    id: number;
-    name: string;
-    path_with_namespace: string;
-    web_url: string;
+    id?: number;
+    name?: string;
+    path_with_namespace?: string;
+    web_url?: string;
   };
 }
 
@@ -51,22 +34,23 @@ function formatReceivedAt(createdAt?: string): string {
   return createdAt ? new Date(createdAt).toLocaleString() : "-";
 }
 
-function commitSha(eventData?: OnCommitStatusEventData): string {
-  const sha = eventData?.object_attributes?.sha || eventData?.commit?.id;
-  return sha ? shortSha(sha) : "-";
+// GitLab's job payload has no job URL, so build it from the project's web_url.
+function jobUrl(eventData?: OnJobEventData): string {
+  const webUrl = eventData?.project?.web_url;
+  const buildId = eventData?.build_id;
+  if (!webUrl || !buildId) {
+    return "-";
+  }
+
+  return `${webUrl}/-/jobs/${buildId}`;
 }
 
-function statusNames(eventData?: OnCommitStatusEventData): string {
-  const names = (eventData?.builds || []).map((build) => build.name).filter((name): name is string => !!name);
-  return names.length ? names.join(", ") : "-";
+function jobTitle(eventData?: OnJobEventData): string {
+  const name = eventData?.build_name;
+  return name ? `Job: ${name}` : "Job";
 }
 
-function commitStatusTitle(eventData?: OnCommitStatusEventData): string {
-  const sha = commitSha(eventData);
-  return sha !== "-" ? `Commit ${sha}` : "Commit Status";
-}
-
-function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnCommitStatusConfiguration) {
+function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnJobConfiguration) {
   const metadataItems = [];
 
   if (metadata?.project?.name) {
@@ -100,34 +84,33 @@ function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnCom
   return metadataItems;
 }
 
-export const onCommitStatusTriggerRenderer: TriggerRenderer = {
+export const onJobTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
-    const eventData = context.event?.data as OnCommitStatusEventData;
+    const eventData = context.event?.data as OnJobEventData;
 
     return {
-      title: commitStatusTitle(eventData),
-      subtitle: buildGitlabSubtitle(eventData?.object_attributes?.status || "", context.event?.createdAt),
+      title: jobTitle(eventData),
+      subtitle: buildGitlabSubtitle(eventData?.build_status || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnCommitStatusEventData;
-    const attributes = eventData?.object_attributes;
+    const eventData = context.event?.data as OnJobEventData;
 
     return {
       "Received At": formatReceivedAt(context.event?.createdAt),
-      Status: stringOrDash(attributes?.status),
-      "Status Names": statusNames(eventData),
-      Ref: stringOrDash(attributes?.ref),
-      Commit: commitSha(eventData),
-      "Pipeline URL": stringOrDash(attributes?.url),
+      Job: stringOrDash(eventData?.build_name),
+      Status: stringOrDash(eventData?.build_status),
+      Stage: stringOrDash(eventData?.build_stage),
+      Ref: stringOrDash(eventData?.ref),
+      "Job URL": jobUrl(eventData),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as GitLabNodeMetadata;
-    const configuration = node.configuration as unknown as OnCommitStatusConfiguration;
+    const configuration = node.configuration as unknown as OnJobConfiguration;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -138,11 +121,11 @@ export const onCommitStatusTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnCommitStatusEventData;
+      const eventData = lastEvent.data as OnJobEventData;
 
       props.lastEventData = {
-        title: commitStatusTitle(eventData),
-        subtitle: buildGitlabSubtitle(eventData?.object_attributes?.status || "", lastEvent.createdAt),
+        title: jobTitle(eventData),
+        subtitle: buildGitlabSubtitle(eventData?.build_status || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
