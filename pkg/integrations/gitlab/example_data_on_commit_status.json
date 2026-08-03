@@ -1,0 +1,187 @@
+{
+  "data": {
+    "object_kind": "pipeline",
+    "object_attributes": {
+      "id": 12345,
+      "iid": 321,
+      "name": "Pipeline for branch: main",
+      "ref": "main",
+      "tag": false,
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "before_sha": "9d1a3c4e7b2f8a6d5c0e1b3a7f9d2c4e6b8a0f13",
+      "source": "push",
+      "status": "success",
+      "detailed_status": "passed",
+      "stages": ["build", "test", "external"],
+      "created_at": "2026-02-13 17:56:00 UTC",
+      "finished_at": "2026-02-13 18:00:00 UTC",
+      "duration": 240,
+      "queued_duration": 4,
+      "protected_ref": true,
+      "default_branch": true,
+      "variables": [
+        {
+          "key": "DEPLOY_ENVIRONMENT",
+          "value": "staging"
+        }
+      ],
+      "url": "https://gitlab.com/group/example-project/-/pipelines/12345"
+    },
+    "merge_request": {
+      "id": 4521,
+      "iid": 12,
+      "title": "Improve CI pipeline",
+      "source_branch": "improve-ci-pipeline",
+      "source_project_id": 987,
+      "target_branch": "main",
+      "target_project_id": 987,
+      "state": "opened",
+      "merge_status": "can_be_merged",
+      "detailed_merge_status": "mergeable",
+      "url": "https://gitlab.com/group/example-project/-/merge_requests/12"
+    },
+    "user": {
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera",
+      "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+      "email": "jrivera@example.com"
+    },
+    "project": {
+      "id": 987,
+      "name": "example-project",
+      "description": "Example project used by SuperPlane workflows.",
+      "web_url": "https://gitlab.com/group/example-project",
+      "avatar_url": null,
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "namespace": "group",
+      "visibility_level": 20,
+      "path_with_namespace": "group/example-project",
+      "default_branch": "main",
+      "ci_config_path": ".gitlab-ci.yml"
+    },
+    "commit": {
+      "id": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "message": "Cache dependencies between CI jobs\n",
+      "title": "Cache dependencies between CI jobs",
+      "timestamp": "2026-02-13T17:55:42+00:00",
+      "url": "https://gitlab.com/group/example-project/-/commit/f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "author": {
+        "name": "Jamie Rivera",
+        "email": "jrivera@example.com"
+      }
+    },
+    "source_pipeline": {
+      "project": {
+        "id": 41,
+        "web_url": "https://gitlab.com/group/upstream-project",
+        "path_with_namespace": "group/upstream-project"
+      },
+      "pipeline_id": 12300,
+      "job_id": 3401
+    },
+    "builds": [
+      {
+        "id": 998877,
+        "stage": "external",
+        "name": "security-scan",
+        "status": "success",
+        "created_at": "2026-02-13 17:59:40 UTC",
+        "started_at": "2026-02-13 17:59:41 UTC",
+        "finished_at": "2026-02-13 18:00:00 UTC",
+        "duration": 19.0,
+        "queued_duration": 1.0,
+        "failure_reason": null,
+        "when": "on_success",
+        "manual": false,
+        "allow_failure": false,
+        "user": {
+          "id": 22,
+          "name": "Jamie Rivera",
+          "username": "jrivera",
+          "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+          "email": "jrivera@example.com"
+        },
+        "runner": null,
+        "artifacts_file": {
+          "filename": null,
+          "size": null
+        },
+        "environment": null
+      },
+      {
+        "id": 998876,
+        "stage": "test",
+        "name": "unit-tests",
+        "status": "success",
+        "created_at": "2026-02-13 17:56:00 UTC",
+        "started_at": "2026-02-13 17:57:30 UTC",
+        "finished_at": "2026-02-13 17:59:30 UTC",
+        "duration": 120.0,
+        "queued_duration": 3.0,
+        "failure_reason": null,
+        "when": "on_success",
+        "manual": false,
+        "allow_failure": false,
+        "user": {
+          "id": 22,
+          "name": "Jamie Rivera",
+          "username": "jrivera",
+          "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+          "email": "jrivera@example.com"
+        },
+        "runner": {
+          "id": 380987,
+          "description": "shared-runners-manager-6.gitlab.com",
+          "runner_type": "instance_type",
+          "active": true,
+          "is_shared": true,
+          "tags": ["linux", "docker", "shared-runner"]
+        },
+        "artifacts_file": {
+          "filename": "artifacts.zip",
+          "size": 10240
+        },
+        "environment": null
+      },
+      {
+        "id": 998875,
+        "stage": "build",
+        "name": "build-image",
+        "status": "success",
+        "created_at": "2026-02-13 17:56:00 UTC",
+        "started_at": "2026-02-13 17:56:04 UTC",
+        "finished_at": "2026-02-13 17:57:20 UTC",
+        "duration": 76.0,
+        "queued_duration": 4.0,
+        "failure_reason": null,
+        "when": "on_success",
+        "manual": false,
+        "allow_failure": false,
+        "user": {
+          "id": 22,
+          "name": "Jamie Rivera",
+          "username": "jrivera",
+          "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+          "email": "jrivera@example.com"
+        },
+        "runner": {
+          "id": 380987,
+          "description": "shared-runners-manager-6.gitlab.com",
+          "runner_type": "instance_type",
+          "active": true,
+          "is_shared": true,
+          "tags": ["linux", "docker", "shared-runner"]
+        },
+        "artifacts_file": {
+          "filename": null,
+          "size": null
+        },
+        "environment": null
+      }
+    ]
+  },
+  "timestamp": "2026-02-13T18:00:00.000000000Z",
+  "type": "gitlab.commitStatusChanged"
+}
