@@ -37,6 +37,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 		if auth == "" {
 			panic("broker: AuthToken is required — use mandatory AUTH_TOKEN from main")
 		}
+		s.AuthToken = auth
 
 		r.Route("/tasks/{id}/live-logs", func(r chi.Router) {
 			r.Use(liveLogsCORS(opt.LiveLogsCORSOrigins))
@@ -47,6 +48,13 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			})
 		})
 
+		r.Post("/runners/register", s.registerRunner)
+		r.With(s.runnerAuth).Post("/tasks/claim", s.claimTask)
+		r.With(s.runnerAuth).Get("/runners/stream", s.runnerStream)
+		r.With(s.runnerAuth).Post("/tasks/{id}/complete", s.completeTask)
+		r.With(s.runnerAuth).Delete("/runners/self", s.revokeRunner)
+		r.With(s.controlOrRunnerAuth(auth)).Get("/tasks/{id}", s.getTask)
+
 		r.Group(func(r chi.Router) {
 			r.Use(bearerAuth(auth))
 			r.Get("/fleets", s.listFleets)
@@ -55,12 +63,8 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/fleets/{id}/task-counts", s.getFleetTaskCounts)
 			r.Get("/tasks", s.listTasks)
 			r.Post("/tasks", s.createTask)
-			r.Post("/tasks/claim", s.claimTask)
-			r.Get("/tasks/{id}", s.getTask)
 			r.Post("/tasks/{id}/cancel", s.cancelTask)
-			r.Post("/tasks/{id}/complete", s.completeTask)
 			r.Post("/runners/drain", s.drainRunners)
-			r.Get("/runners/stream", s.runnerStream)
 		})
 	})
 

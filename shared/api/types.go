@@ -111,6 +111,17 @@ type CompleteTaskRequest struct {
 	Canceled bool `json:"canceled,omitempty"`
 }
 
+// RegisterRunnerRequest exchanges a registration JWT for a runner access token.
+type RegisterRunnerRequest struct {
+	RunnerID string `json:"runner_id"`
+	FleetID  string `json:"fleet_id"`
+}
+
+// RegisterRunnerResponse returns the runner-scoped bearer exactly once.
+type RegisterRunnerResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
 const (
 	FailureKindRunnerInfra = "runner_infra"
 )

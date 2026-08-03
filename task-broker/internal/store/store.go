@@ -87,4 +87,8 @@ type Store interface {
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
+
+	RegisterRunnerWithJTI(ctx context.Context, jti, runnerID, fleetID, accessTokenHash string, now time.Time) error
+	GetRunnerByAccessTokenHash(ctx context.Context, accessTokenHash string) (*brokermodels.RunnerCredential, error)
+	DeleteRunnerCredentials(ctx context.Context, fleetID string, runnerIDs []string) error
 }

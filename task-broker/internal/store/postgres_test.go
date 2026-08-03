@@ -8,10 +8,87 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/opaquetoken"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
+
+func TestRegisterRunnerWithJTIIsSingleUse(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	accessToken := "runner-access-secret"
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-1",
+		"i-012345",
+		"fleet-a",
+		opaquetoken.Hash(accessToken),
+		now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	credential, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash(accessToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if credential == nil || credential.RunnerID != "i-012345" || credential.FleetID != "fleet-a" {
+		t.Fatalf("credential = %#v", credential)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-1",
+		"i-other",
+		"fleet-a",
+		opaquetoken.Hash("other-access"),
+		now.Add(time.Second),
+	); err != taskstore.ErrInvalidRunnerRegistration {
+		t.Fatalf("second register error = %v, want invalid registration", err)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-2",
+		"i-other",
+		"fleet-a",
+		opaquetoken.Hash("other-access"),
+		now.Add(time.Second),
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegisterRunnerWithJTIReplacesExistingCredential(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-old", "i-012345", "fleet-a", opaquetoken.Hash("old-access"), now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-new", "i-012345", "fleet-a", opaquetoken.Hash("new-access"), now.Add(time.Second),
+	); err != nil {
+		t.Fatal(err)
+	}
+	old, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("old-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old != nil {
+		t.Fatalf("old credential still valid: %#v", old)
+	}
+	got, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("new-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.RunnerID != "i-012345" {
+		t.Fatalf("new credential = %#v", got)
+	}
+}
 
 func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)

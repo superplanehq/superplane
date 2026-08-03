@@ -32,6 +32,9 @@ type Server struct {
 	RunnerCancel *RunnerCancelHub
 	RunnerDrain  *RunnerDrainHub
 
+	// AuthToken is the control-plane bearer and HMAC secret for registration JWTs.
+	AuthToken string
+
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
 	TaskCloudWatchRegion          string
@@ -177,6 +180,17 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "could not drain unhealthy runner tasks")
 			return
 		}
+	}
+	drainedRunnerIDs := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		if status.State == api.DrainRunnerStateDrained {
+			drainedRunnerIDs = append(drainedRunnerIDs, status.RunnerID)
+		}
+	}
+	if err := s.Store.DeleteRunnerCredentials(r.Context(), req.FleetID, drainedRunnerIDs); err != nil {
+		s.logErr("revoke drained runner credentials", err)
+		writeError(w, http.StatusInternalServerError, "could not revoke drained runners")
+		return
 	}
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
@@ -505,6 +519,12 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
 	}
+	identity, ok := runnerIdentityFromContext(r.Context())
+	if !ok || identity.RunnerID != strings.TrimSpace(req.RunnerID) ||
+		identity.FleetID != strings.TrimSpace(req.FleetID) {
+		writeError(w, http.StatusForbidden, "runner identity mismatch")
+		return
+	}
 	lease := time.Duration(req.LeaseSeconds) * time.Second
 	if lease <= 0 {
 		lease = 5 * time.Minute
@@ -594,6 +614,11 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "task not found")
 		return
 	}
+	if identity, runnerRequest := runnerIdentityFromContext(r.Context()); runnerRequest &&
+		task.RunnerID != identity.RunnerID {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	writeJSON(w, http.StatusOK, taskStatusResponse(task, s))
 }
 
@@ -656,6 +681,11 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	identity, ok := runnerIdentityFromContext(r.Context())
+	if !ok || identity.RunnerID != runnerID {
+		writeError(w, http.StatusForbidden, "runner identity mismatch")
+		return
+	}
 	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") ||

@@ -74,7 +74,7 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 				RunnerCloudWatchLogGroup:        "/superplane/tasks",
 				RunnerCloudWatchLogStreamPrefix: "tasks",
 				RunnerProcessLogGroup:           "/superplane/runners",
-			}, 1700000000)
+			}, 1700000000, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -98,12 +98,50 @@ func TestUserDataScriptIncludesLaunchRequestedAt(t *testing.T) {
 		RunnerInstallAWSRegion: "us-east-1",
 		TaskBrokerURL:          "http://broker:8081",
 		RunnerFleetID:          "fleet-a",
-	}, 1700000000)
+	}, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(script, "RUNNER_LAUNCH_REQUESTED_AT=1700000000") {
 		t.Fatalf("user-data missing launch timestamp: %s", script)
+	}
+}
+
+func TestUserDataContainsRunnerRegistrationTokenNotControlSecret(t *testing.T) {
+	script, err := userDataScript(Config{
+		RunnerS3URI:            "s3://bucket/runner",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}, 1700000000, "registration-jwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="registration-jwt"`) {
+		t.Fatal("user-data missing registration token")
+	}
+	if !strings.Contains(script, `RUNNER_ACCESS_TOKEN_PATH=/var/lib/superplane-runner/access_token`) {
+		t.Fatal("user-data missing access token path for restart persistence")
+	}
+	if strings.Contains(script, "\nAUTH_TOKEN=") {
+		t.Fatal("user-data must not contain broker control token")
+	}
+	if strings.Contains(script, "control-secret") || strings.Contains(script, "AUTH_TOKEN=") {
+		t.Fatal("user-data must not leak broker control credentials")
+	}
+}
+
+func TestConfigFromEnvAcceptsLegacyRegistrationSecretAlias(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envRegistrationSecret, "")
+	t.Setenv(envRegistrationSecretLegacy, "legacy-control-secret")
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RunnerRegistrationSecret != "legacy-control-secret" {
+		t.Fatalf("RunnerRegistrationSecret = %q", cfg.RunnerRegistrationSecret)
 	}
 }
 
@@ -196,7 +234,7 @@ func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
 	}
 	oneShot := base
 	oneShot.RunnerTerminateAfterEachTask = true
-	script, err := userDataScript(oneShot, 1700000000)
+	script, err := userDataScript(oneShot, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +243,7 @@ func TestUserDataScriptSelfTerminateDropIn(t *testing.T) {
 			t.Fatalf("one-shot user-data missing %q", want)
 		}
 	}
-	script, err = userDataScript(base, 1700000000)
+	script, err = userDataScript(base, 1700000000, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,18 +356,20 @@ func TestIsInsufficientInstanceCapacity(t *testing.T) {
 func TestLaunch_RetriesNextSubnetOnInsufficientCapacity(t *testing.T) {
 	var tried []string
 	l := &Launcher{
+		BrokerClient: &fakeBrokerClient{},
 		Config: Config{
-			AMI:                    "ami-test",
-			InstanceType:           "t3.micro",
-			SubnetIDs:              []string{"subnet-a", "subnet-b"},
-			SecurityGroupIDs:       []string{"sg-test"},
-			RunnerS3URI:            "s3://bucket/runner-linux-amd64",
-			RunnerInstallAWSRegion: "us-east-1",
-			TaskBrokerURL:          "http://broker:8081",
-			RunnerFleetID:          "fleet-a",
-			FleetID:                "fleet-a",
-			RunnersIAMProfName:     "profile",
-			VolumeSizeGB:           30,
+			AMI:                      "ami-test",
+			InstanceType:             "t3.micro",
+			SubnetIDs:                []string{"subnet-a", "subnet-b"},
+			SecurityGroupIDs:         []string{"sg-test"},
+			RunnerS3URI:              "s3://bucket/runner-linux-amd64",
+			RunnerInstallAWSRegion:   "us-east-1",
+			TaskBrokerURL:            "http://broker:8081",
+			RunnerFleetID:            "fleet-a",
+			FleetID:                  "fleet-a",
+			RunnersIAMProfName:       "profile",
+			VolumeSizeGB:             30,
+			RunnerRegistrationSecret: "control-secret",
 		},
 		pending: make(map[string]time.Time),
 		runInstancesHook: func(_ context.Context, in *ec2.RunInstancesInput) (*ec2.RunInstancesOutput, error) {

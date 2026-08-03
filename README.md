@@ -112,7 +112,7 @@ Use **separate terminals**: **`make task-broker`**, then **`make register-local-
 | -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `LISTEN_ADDR`        | `:8081`       | HTTP listen address                                                                                                      |
 | `DATABASE_URL`       | —             | **Required.** PostgreSQL connection string (fleets + task queue)                                                       |
-| `AUTH_TOKEN`         | —             | **Required.** `Authorization: Bearer …` for all **`/v1/*`** routes (including runner claim/complete and live-logs JWT issuance) |
+| `AUTH_TOKEN`         | —             | **Required control-plane bearer.** Used by callers and fleet-manager; never placed on runner VMs. |
 | `REAP_INTERVAL_SEC`  | `15`          | How often to requeue expired leases or finalize canceled tasks                                                           |
 | `TASK_CLOUDWATCH_LOG_GROUP` | (empty) | When set, `GET /v1/tasks/{id}` and completion webhooks include **`task_log`** (and legacy `cloudwatch_log_*` fields) pointing at the stream the runner writes to |
 | `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` | (empty) | Optional; stream name is `{prefix}/{task_id}` (see `shared/cwstream`). Must match **`RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`** on runners. |
@@ -163,9 +163,9 @@ Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_D
 
 Optional: **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP`**, **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`** — written into **`/etc/default/superplane-runner`** as **`RUNNER_CLOUDWATCH_*`** (requires the runner instance profile to allow **`logs:CreateLogGroup`**, **`logs:CreateLogStream`**, **`logs:PutLogEvents`**, **`logs:DescribeLogStreams`** on that log group).
 
-Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_ARCH`** (`amd64` default, or `arm64`), **`EC2_PROVISION_FLEET_ID`** (stable name for this deployment; defaults to the host's OS hostname — **set this explicitly** when running multiple fleet-managers in the same AWS account to prevent cross-fleet reconcile interference), **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**.
+Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_ARCH`** (`amd64` default, or `arm64`), **`EC2_PROVISION_FLEET_ID`** (stable name for this deployment; defaults to the host's OS hostname — **set this explicitly** when running multiple fleet-managers in the same AWS account to prevent cross-fleet reconcile interference), **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_REGISTRATION_SECRET`** (broker control token / HMAC secret used only by fleet-manager to mint registration JWTs; legacy alias **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**), **`EC2_PROVISION_KEY_NAME`**.
 
-**Dynamic scaling (optional)** — set **`EC2_PROVISION_RUNNER_HEADROOM=N`** to make fleet-manager target **`want = queued + claimed + N`** for its **`EC2_PROVISION_RUNNER_FLEET_ID`** each reconcile tick (counts pulled from task-broker via **`GET /v1/fleets/{id}/task-counts`** using **`EC2_PROVISION_TASK_BROKER_URL`** + **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**). Counting **queued** tasks (not only **claimed**) pre-warms capacity for a burst — when several tasks arrive at once, fleet-manager launches VMs in parallel instead of waiting for each one to be claimed first. Scale-down is automatic — when claimed/queued drops, want drops, and fleet-manager removes the oldest excess VMs that are safe to terminate. Before terminating, fleet-manager asks task-broker to drain the selected runner IDs; drained runners cannot claim new tasks, and busy runners are left running for a later reconcile. Instances that already own claimed tasks are also preserved. When the broker call fails, the tick falls back to **`EC2_PROVISION_HOT_INSTANCE_COUNT`** and skips scale-down until runner state is available again. Leave **`EC2_PROVISION_RUNNER_HEADROOM`** unset for the previous static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
+**Dynamic scaling (optional)** — set **`EC2_PROVISION_RUNNER_HEADROOM=N`** to make fleet-manager target **`want = queued + claimed + N`** for its **`EC2_PROVISION_RUNNER_FLEET_ID`** each reconcile tick (counts pulled from task-broker via **`GET /v1/fleets/{id}/task-counts`** using **`EC2_PROVISION_TASK_BROKER_URL`** + the broker control token from the JSON config / env). Counting **queued** tasks (not only **claimed**) pre-warms capacity for a burst — when several tasks arrive at once, fleet-manager launches VMs in parallel instead of waiting for each one to be claimed first. Scale-down is automatic — when claimed/queued drops, want drops, and fleet-manager removes the oldest excess VMs that are safe to terminate. Before terminating, fleet-manager asks task-broker to drain the selected runner IDs; drained runners cannot claim new tasks, and busy runners are left running for a later reconcile. Instances that already own claimed tasks are also preserved. When the broker call fails, the tick falls back to **`EC2_PROVISION_HOT_INSTANCE_COUNT`** and skips scale-down until runner state is available again. Leave **`EC2_PROVISION_RUNNER_HEADROOM`** unset for the previous static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
 
 Packer AMIs bake **Docker**, **Node.js 22**, **Python 3**, **git**, **gh**, **jq**, **yq**, **ripgrep**, **fd**, **make**, **zip**, **rsync**, **wget**, **Claude Code**, **OpenCode**, **Codex CLI**, AWS CLI, and the CloudWatch agent. Provisioner **user-data** only installs **`/usr/local/bin/runner`** from S3 and starts **`superplane-runner.service`** as the **`ubuntu`** user (host tasks start in **`/home/ubuntu`**; **`ubuntu`** is in the **`docker`** group).
 
@@ -194,7 +194,9 @@ Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, *
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `TASK_BROKER_URL`      | **Required.** Base URL of **task-broker**                                                              |
 | `RUNNER_FLEET_ID`      | **Required.** Fleet id registered on the broker (`POST /v1/fleets`)                                    |
-| `AUTH_TOKEN`           | **Required.** Same bearer token as task-broker **`AUTH_TOKEN`**                                          |
+| `RUNNER_REGISTRATION_TOKEN` | One-time token exchanged at startup for a runner-scoped bearer. EC2 user-data sets this. |
+| `RUNNER_ACCESS_TOKEN`  | Optional pre-issued runner access token (local/testing only). |
+| `RUNNER_ACCESS_TOKEN_PATH` | Optional path to persist the exchanged access token across process restarts (EC2 user-data sets `/var/lib/superplane-runner/access_token`). |
 | `RUNNER_TRANSPORT`     | Default **WebSocket** (`GET /v1/runners/stream`). Set **`http`**, **`polling`**, or **`legacy`** for **`POST /v1/tasks/claim`** / **`complete`**. |
 | `RUNNER_ID`            | Optional; defaults to host name or a random id (EC2 user-data sets instance id from IMDS)              |
 | `POLL_EMPTY_MS`        | Sleep when no work (default ~1000 ms)                                                                  |
@@ -207,7 +209,10 @@ Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, *
 ```bash
 export TASK_BROKER_URL=http://127.0.0.1:8081
 export RUNNER_FLEET_ID=local
-export AUTH_TOKEN=dev-local-token
+# Single-use registration JWT (HMAC with broker AUTH_TOKEN). Fleet-manager mints these
+# locally when launching VMs; for a local runner:
+export RUNNER_REGISTRATION_TOKEN="$(go run ./scripts/mint-runner-registration \
+  -fleet local -secret dev-local-token)"
 ./bin/runner
 ```
 
