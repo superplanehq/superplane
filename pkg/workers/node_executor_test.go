@@ -6,10 +6,14 @@ import (
 	"log"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -416,4 +420,87 @@ func TestClassifyAttemptFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+type baseAction struct{}
+
+func (a *baseAction) Name() string                    { return "" }
+func (a *baseAction) Label() string                   { return "" }
+func (a *baseAction) Description() string             { return "" }
+func (a *baseAction) Documentation() string           { return "" }
+func (a *baseAction) Icon() string                    { return "" }
+func (a *baseAction) Color() string                   { return "" }
+func (a *baseAction) ExampleOutput() map[string]any   { return nil }
+func (a *baseAction) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+func (a *baseAction) Configuration() []configuration.Field { return nil }
+func (a *baseAction) Setup(ctx core.SetupContext) error    { return nil }
+func (a *baseAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return nil, nil
+}
+func (a *baseAction) Cancel(ctx core.ExecutionContext) error    { return nil }
+func (a *baseAction) Cleanup(ctx core.SetupContext) error       { return nil }
+func (a *baseAction) Hooks() []core.Hook                        { return nil }
+func (a *baseAction) HandleHook(ctx core.ActionHookContext) error { return nil }
+func (a *baseAction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+
+type failingAction struct {
+	baseAction
+}
+
+func (a *failingAction) Name() string  { return "failing" }
+func (a *failingAction) Label() string { return "Failing Action" }
+
+func (a *failingAction) Execute(ctx core.ExecutionContext) error {
+	return errors.New("action failed: simulated error")
+}
+
+func init() {
+	registry.RegisterAction("failing", &failingAction{})
+}
+
+func Test__NodeExecutor_FailedActionRecordsFailure(t *testing.T) {
+	r := support.Setup(t)
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "failing"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	executor := newTestNodeExecutor(t, r)
+	err := executor.LockAndProcessNodeExecution(execution.ID)
+	require.NoError(t, err)
+
+	updatedExecution, fetchErr := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, fetchErr)
+
+	assert.NotEqual(t, models.CanvasNodeExecutionStatePending, updatedExecution.State,
+		"execution must not remain pending — this causes an infinite retry loop (issue #6292)")
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, updatedExecution.ResultReason)
 }
