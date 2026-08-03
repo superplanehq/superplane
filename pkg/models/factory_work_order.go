@@ -80,15 +80,15 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID)
 }
 
 func (o *FactoryWorkOrder) Close(tx *gorm.DB, result string) (*FactoryWorkOrder, error) {
+	if o.State == FactoryWorkOrderStateClosed {
+		return o, nil
+	}
+
 	now := time.Now()
 	o.State = FactoryWorkOrderStateClosed
 	o.Result = result
 	o.UpdatedAt = now
-	err := tx.Model(o).
-		Where("organization_id = ? AND factory_id = ? AND id = ?", o.OrganizationID, o.FactoryID, o.ID).
-		Where("state = ?", FactoryWorkOrderStateOpen).
-		Updates(o).Error
-
+	err := tx.Model(o).Updates(o).Error
 	if err != nil {
 		return nil, err
 	}

@@ -174,3 +174,25 @@ export function filterWorkOrdersByStatus(
   }
   return orders.filter((order) => getWorkOrderDisplayStatus(order) === statusFilter);
 }
+
+export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined) {
+  if (!order) {
+    return {
+      displayStatus: null,
+      statusMeta: null,
+      assigneeIds: [] as string[],
+      assigneeNames: [] as string[],
+      isOpen: false,
+    };
+  }
+
+  const displayStatus = getWorkOrderDisplayStatus(order);
+
+  return {
+    displayStatus,
+    statusMeta: getWorkOrderDisplayStatusMeta(displayStatus),
+    assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
+    assigneeNames: (order.assignees ?? []).map((assignee) => assignee.name ?? "Unknown"),
+    isOpen: order.state === "STATE_OPEN",
+  };
+}

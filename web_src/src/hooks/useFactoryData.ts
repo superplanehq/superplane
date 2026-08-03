@@ -127,7 +127,7 @@ export function useCreateFactory(organizationId: string) {
       const response = await factoriesCreateFactory(
         withOrganizationHeader({
           organizationId,
-          query: {
+          body: {
             name: input.name,
             description: input.description,
           },
