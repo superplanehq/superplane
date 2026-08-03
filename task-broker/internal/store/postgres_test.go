@@ -59,6 +59,37 @@ func TestRegisterRunnerWithJTIIsSingleUse(t *testing.T) {
 	}
 }
 
+func TestRegisterRunnerWithJTIReplacesExistingCredential(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-old", "i-012345", "fleet-a", opaquetoken.Hash("old-access"), now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-new", "i-012345", "fleet-a", opaquetoken.Hash("new-access"), now.Add(time.Second),
+	); err != nil {
+		t.Fatal(err)
+	}
+	old, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("old-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old != nil {
+		t.Fatalf("old credential still valid: %#v", old)
+	}
+	got, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("new-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.RunnerID != "i-012345" {
+		t.Fatalf("new credential = %#v", got)
+	}
+}
+
 func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()

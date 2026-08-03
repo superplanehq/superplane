@@ -238,7 +238,7 @@ func (l *Launcher) launchOne(ctx context.Context, requestedAt time.Time) (string
 	registrationToken, err := runnerregistrationtoken.Mint(
 		l.Config.RunnerFleetID,
 		l.Config.RunnerRegistrationSecret,
-		requestedAt.Add(runnerRegistrationTTL),
+		time.Now().UTC().Add(runnerRegistrationTTL),
 	)
 	if err != nil {
 		return "", fmt.Errorf("mint runner registration: %w", err)
@@ -379,31 +379,33 @@ func normalizeArch(raw string) (string, error) {
 
 // Env var constants and defaults used by ConfigFromEnv.
 const (
-	envAMI                 = "EC2_PROVISION_AMI_ID"
-	envInstanceType        = "EC2_PROVISION_INSTANCE_TYPE"
-	envArch                = "EC2_PROVISION_ARCH"
-	envFleetID             = "EC2_PROVISION_FLEET_ID"
-	envSubnet              = "EC2_PROVISION_SUBNET_ID"
-	envSubnets             = "EC2_PROVISION_SUBNET_IDS"
-	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
-	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
-	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
-	envRunnerFleetID       = "EC2_PROVISION_RUNNER_FLEET_ID"
-	envRegistrationSecret  = "EC2_PROVISION_RUNNER_REGISTRATION_SECRET"
-	envKeyName             = "EC2_PROVISION_KEY_NAME"
-	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
-	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
-	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
-	envRunnerCWGroup       = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
-	envRunnerCWPrefix      = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
-	envRunnerProcCWGroup   = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
-	envRunnerProcCWRegion  = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
-	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
-	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
-	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
-	envRunnerHealthTimeout = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
-	envRunnerHealthFails   = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
-	envRunnerHeadroom      = "EC2_PROVISION_RUNNER_HEADROOM"
+	envAMI                = "EC2_PROVISION_AMI_ID"
+	envInstanceType       = "EC2_PROVISION_INSTANCE_TYPE"
+	envArch               = "EC2_PROVISION_ARCH"
+	envFleetID            = "EC2_PROVISION_FLEET_ID"
+	envSubnet             = "EC2_PROVISION_SUBNET_ID"
+	envSubnets            = "EC2_PROVISION_SUBNET_IDS"
+	envSecurityGroups     = "EC2_PROVISION_SECURITY_GROUP_IDS"
+	envRunnerS3URI        = "EC2_PROVISION_RUNNER_S3_URI"
+	envTaskBrokerURL      = "EC2_PROVISION_TASK_BROKER_URL"
+	envRunnerFleetID      = "EC2_PROVISION_RUNNER_FLEET_ID"
+	envRegistrationSecret = "EC2_PROVISION_RUNNER_REGISTRATION_SECRET"
+	// Legacy alias kept so older env-based deploys keep working.
+	envRegistrationSecretLegacy = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
+	envKeyName                  = "EC2_PROVISION_KEY_NAME"
+	envRunnerIAMProf            = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
+	envRunnerTerminateTask      = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
+	envHotCount                 = "EC2_PROVISION_HOT_INSTANCE_COUNT"
+	envRunnerCWGroup            = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
+	envRunnerCWPrefix           = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
+	envRunnerProcCWGroup        = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
+	envRunnerProcCWRegion       = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
+	envVolumeSizeGB             = "EC2_PROVISION_VOLUME_SIZE_GB"
+	envBootGraceSec             = "EC2_PROVISION_BOOT_GRACE_SEC"
+	envRunnerHealthPort         = "EC2_PROVISION_RUNNER_HEALTH_PORT"
+	envRunnerHealthTimeout      = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
+	envRunnerHealthFails        = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
+	envRunnerHeadroom           = "EC2_PROVISION_RUNNER_HEADROOM"
 
 	defaultInstanceType                 = "t3.micro"
 	defaultArch                         = "amd64"
@@ -416,6 +418,13 @@ const (
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
 var ErrDisabled = errors.New("ec2 provisioning disabled: EC2_PROVISION_HOT_INSTANCE_COUNT is not set")
+
+func registrationSecretFromEnv() string {
+	if secret := strings.TrimSpace(os.Getenv(envRegistrationSecret)); secret != "" {
+		return secret
+	}
+	return strings.TrimSpace(os.Getenv(envRegistrationSecretLegacy))
+}
 
 // ConfigFromEnv builds a Config from EC2_PROVISION_* environment variables.
 // Retained for local/testing use; production uses the JSON config file.
@@ -549,7 +558,7 @@ func ConfigFromEnv() (Config, error) {
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
 		TaskBrokerURL:                   url,
-		RunnerRegistrationSecret:        strings.TrimSpace(os.Getenv(envRegistrationSecret)),
+		RunnerRegistrationSecret:        registrationSecretFromEnv(),
 		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName:              prof,
 		HotInstanceCount:                hot,

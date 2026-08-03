@@ -45,7 +45,10 @@ func (s *PostgresStore) RegisterRunnerWithJTI(
 			AccessTokenHash: accessTokenHash,
 			CreatedAt:       now,
 		}
-		return tx.Create(&credential).Error
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "runner_id"}, {Name: "fleet_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"access_token_hash", "created_at"}),
+		}).Create(&credential).Error
 	})
 }
 

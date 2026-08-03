@@ -185,18 +185,16 @@ func getLaunchRequestedAt() int64 {
 }
 
 func getAuthToken(baseURL, runnerID, fleetID string) string {
-	token := strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN"))
-	if token != "" {
-		return token
-	}
-	registrationToken := strings.TrimSpace(os.Getenv("RUNNER_REGISTRATION_TOKEN"))
-	if registrationToken == "" {
-		log.Error("RUNNER_ACCESS_TOKEN or RUNNER_REGISTRATION_TOKEN is required")
-		os.Exit(1)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	token, err := agent.RegisterRunner(ctx, http.DefaultClient, baseURL, registrationToken, runnerID, fleetID)
+	token, err := agent.ResolveAccessToken(ctx, http.DefaultClient, agent.ResolveAccessTokenOptions{
+		BaseURL:           baseURL,
+		AccessToken:       os.Getenv("RUNNER_ACCESS_TOKEN"),
+		RegistrationToken: os.Getenv("RUNNER_REGISTRATION_TOKEN"),
+		RunnerID:          runnerID,
+		FleetID:           fleetID,
+		AccessTokenPath:   strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN_PATH")),
+	})
 	if err != nil {
 		log.Error("runner registration failed", slog.Any("err", err))
 		os.Exit(1)

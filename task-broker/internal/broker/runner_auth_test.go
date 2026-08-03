@@ -122,6 +122,80 @@ func TestRunnerRegistrationJWTClaimAndComplete(t *testing.T) {
 	}
 }
 
+// Regression: broker control token and raw registration JWTs must not claim work
+// after the registration cutover (control secret stays off runner VMs).
+func TestControlPlaneCredentialsCannotClaimTasks(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID: "fleet-a", Provisioner: "aws", CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateTask(ctx, &models.Task{
+		ID: "task-a", FleetID: "fleet-a", Status: models.StatusQueued,
+		CreatedAt: time.Now().UTC(), Command: []string{"true"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	const control = "control-plane-secret"
+	ts := httptest.NewServer(NewRouter(&Server{Store: st}, RouterOptions{AuthToken: control}))
+	defer ts.Close()
+
+	claimBody, _ := json.Marshal(api.ClaimTaskRequest{
+		RunnerID: "i-runner", FleetID: "fleet-a", LeaseSeconds: 60,
+	})
+	postClaim := func(bearer string) int {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/tasks/claim", bytes.NewReader(claimBody))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+bearer)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if status := postClaim(control); status != http.StatusUnauthorized {
+		t.Fatalf("control token claim status = %d, want 401", status)
+	}
+
+	registration := createTestRegistration(t, control, "fleet-a")
+	if status := postClaim(registration); status != http.StatusUnauthorized {
+		t.Fatalf("registration JWT claim status = %d, want 401", status)
+	}
+
+	accessToken := registerTestRunner(t, ts.URL, registration, "i-runner", "fleet-a")
+	if status := postClaim(accessToken); status != http.StatusOK {
+		t.Fatalf("runner access token claim status = %d, want 200", status)
+	}
+
+	spoofBody, _ := json.Marshal(api.ClaimTaskRequest{
+		RunnerID: "i-other", FleetID: "fleet-a", LeaseSeconds: 60,
+	})
+	spoofReq, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/tasks/claim", bytes.NewReader(spoofBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spoofReq.Header.Set("Authorization", "Bearer "+accessToken)
+	spoofReq.Header.Set("Content-Type", "application/json")
+	spoofResp, err := http.DefaultClient.Do(spoofReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer spoofResp.Body.Close()
+	if spoofResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("identity mismatch claim status = %d, want 403", spoofResp.StatusCode)
+	}
+}
+
 func createTestRegistration(t *testing.T, secret, fleetID string) string {
 	t.Helper()
 	token, err := runnerregistrationtoken.Mint(fleetID, secret, time.Now().UTC().Add(time.Minute))

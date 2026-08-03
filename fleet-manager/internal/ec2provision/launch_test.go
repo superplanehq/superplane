@@ -120,8 +120,28 @@ func TestUserDataContainsRunnerRegistrationTokenNotControlSecret(t *testing.T) {
 	if !strings.Contains(script, `RUNNER_REGISTRATION_TOKEN="registration-jwt"`) {
 		t.Fatal("user-data missing registration token")
 	}
+	if !strings.Contains(script, `RUNNER_ACCESS_TOKEN_PATH=/var/lib/superplane-runner/access_token`) {
+		t.Fatal("user-data missing access token path for restart persistence")
+	}
 	if strings.Contains(script, "\nAUTH_TOKEN=") {
 		t.Fatal("user-data must not contain broker control token")
+	}
+	if strings.Contains(script, "control-secret") || strings.Contains(script, "AUTH_TOKEN=") {
+		t.Fatal("user-data must not leak broker control credentials")
+	}
+}
+
+func TestConfigFromEnvAcceptsLegacyRegistrationSecretAlias(t *testing.T) {
+	setRequiredProvisionEnv(t)
+	t.Setenv(envRegistrationSecret, "")
+	t.Setenv(envRegistrationSecretLegacy, "legacy-control-secret")
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RunnerRegistrationSecret != "legacy-control-secret" {
+		t.Fatalf("RunnerRegistrationSecret = %q", cfg.RunnerRegistrationSecret)
 	}
 }
 
