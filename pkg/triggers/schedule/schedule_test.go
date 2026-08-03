@@ -145,7 +145,7 @@ func TestGetNextTrigger(t *testing.T) {
 				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
+			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday of the same week
 		},
 		{
 			name: "months configuration",
@@ -387,7 +387,7 @@ func TestTimezoneHandling(t *testing.T) {
 				Timezone:      stringPtr("-8"), // GMT-8 (PST)
 			},
 			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
-			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+			expectNext: mustParseTime("2025-01-06T17:00:00Z"), // Monday 9 AM PST (5 PM UTC), later the same day
 		},
 		{
 			name: "month schedule in GMT+9 timezone (JST)",
@@ -648,5 +648,86 @@ func TestHandleHookRun(t *testing.T) {
 
 	if eventCtx.Payloads[0].Type != "scheduler.tick" {
 		t.Errorf("expected payload type to be scheduler.tick, got %q", eventCtx.Payloads[0].Type)
+	}
+}
+
+// A weekly schedule configured with several weekdays must fire on every one of
+// them, not just the first. Walking a full week (Mon -> Wed -> Fri -> next Mon)
+// with weekDays=[monday, wednesday, friday] should visit each selected day in
+// turn. See https://github.com/superplanehq/superplane/issues/6514
+func TestNextWeeksTriggerFiresOnAllSelectedWeekdays(t *testing.T) {
+	weekDays := []string{"monday", "wednesday", "friday"}
+
+	tests := []struct {
+		name       string
+		now        time.Time
+		expectNext time.Time
+	}{
+		{
+			name:       "after Monday's run, next is Wednesday of the same week",
+			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday, after the 09:00 run
+			expectNext: mustParseTime("2025-01-08T09:00:00Z"), // Wednesday
+		},
+		{
+			name:       "after Wednesday's run, next is Friday of the same week",
+			now:        mustParseTime("2025-01-08T10:00:00Z"), // Wednesday, after the 09:00 run
+			expectNext: mustParseTime("2025-01-10T09:00:00Z"), // Friday
+		},
+		{
+			name:       "after Friday's run, next is Monday of the following week",
+			now:        mustParseTime("2025-01-10T10:00:00Z"), // Friday, after the 09:00 run
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"), // next Monday
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := nextWeeksTrigger(1, weekDays, 9, 0, tt.now)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !result.Equal(tt.expectNext) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, result.UTC())
+			}
+		})
+	}
+}
+
+// With an interval greater than 1 the schedule still fires on each selected
+// weekday within an active week, then skips the inactive weeks. Here, every two
+// weeks on [monday, wednesday]: both days of the active week fire, then it jumps
+// straight to the next active week two weeks later.
+func TestNextWeeksTriggerRespectsInterval(t *testing.T) {
+	weekDays := []string{"monday", "wednesday"}
+
+	tests := []struct {
+		name       string
+		now        time.Time
+		expectNext time.Time
+	}{
+		{
+			name:       "Monday's run is followed by Wednesday of the same active week",
+			now:        mustParseTime("2025-01-06T09:00:00Z"), // Monday, right at the run
+			expectNext: mustParseTime("2025-01-08T09:00:00Z"), // Wednesday, same week
+		},
+		{
+			name:       "after the active week, it jumps two weeks ahead",
+			now:        mustParseTime("2025-01-08T09:00:00Z"), // Wednesday, right at the run
+			expectNext: mustParseTime("2025-01-20T09:00:00Z"), // Monday, two weeks later (week skipped)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := nextWeeksTrigger(2, weekDays, 9, 0, tt.now)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !result.Equal(tt.expectNext) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, result.UTC())
+			}
+		})
 	}
 }
