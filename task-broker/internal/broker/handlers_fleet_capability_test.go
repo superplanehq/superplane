@@ -24,7 +24,7 @@ func TestCreateTaskRejectsDockerOnFleetWithoutDockerSupport(t *testing.T) {
 	noDocker := false
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID: "fleet-no-docker", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), LambdaFunctionName: "fn", SupportsDocker: &noDocker,
+		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", SupportsDocker: &noDocker,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestCreateTaskRejectsExecutionTimeoutAboveFleetCap(t *testing.T) {
 	capSeconds := 900
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID: "fleet-capped", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), LambdaFunctionName: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
+		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestCreateTaskClampsOmittedTimeoutToFleetCap(t *testing.T) {
 	capSeconds := 900
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID: "fleet-capped-2", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), LambdaFunctionName: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
+		CreatedAt: time.Now().UTC(), DispatchTarget: "fn", MaxExecutionTimeoutSeconds: &capSeconds,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestCreateTaskDispatchesToLambdaFleet(t *testing.T) {
 	defer cleanup()
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID: "fleet-lambda-dispatch", Provisioner: "aws-lambda", Arch: "amd64", Size: "small",
-		CreatedAt: time.Now().UTC(), LambdaFunctionName: "runner-lambda-fn",
+		CreatedAt: time.Now().UTC(), DispatchTarget: "runner-lambda-fn",
 	}); err != nil {
 		t.Fatal(err)
 	}

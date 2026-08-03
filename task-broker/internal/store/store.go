@@ -62,10 +62,10 @@ type CompleteTaskResult struct {
 }
 
 type DispatchCandidate struct {
-	TaskID             string
-	FleetID            string
-	Provisioner        string
-	LambdaFunctionName string
+	TaskID         string
+	FleetID        string
+	Provisioner    string
+	DispatchTarget string
 }
 
 // Store persists fleets and the task queue.

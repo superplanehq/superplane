@@ -63,9 +63,9 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provisioner := strings.TrimSpace(req.Provisioner)
-	lambdaFunctionName := strings.TrimSpace(req.LambdaFunctionName)
-	if provisioner == dispatch.ProvisionerAWSLambda && lambdaFunctionName == "" {
-		writeError(w, http.StatusBadRequest, "lambda_function_name required for provisioner "+dispatch.ProvisionerAWSLambda)
+	dispatchTarget := strings.TrimSpace(req.DispatchTarget)
+	if provisioner == dispatch.ProvisionerAWSLambda && dispatchTarget == "" {
+		writeError(w, http.StatusBadRequest, "dispatch_target required for provisioner "+dispatch.ProvisionerAWSLambda)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		Arch:                       strings.TrimSpace(req.Arch),
 		Size:                       strings.TrimSpace(req.Size),
 		CreatedAt:                  time.Now().UTC(),
-		LambdaFunctionName:         lambdaFunctionName,
+		DispatchTarget:             dispatchTarget,
 		MaxExecutionTimeoutSeconds: req.MaxExecutionTimeoutSeconds,
 		SupportsDocker:             req.SupportsDocker,
 	}
@@ -406,7 +406,7 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 		Arch:                       f.Arch,
 		Size:                       f.Size,
 		CreatedAt:                  f.CreatedAt.Unix(),
-		LambdaFunctionName:         f.LambdaFunctionName,
+		DispatchTarget:             f.DispatchTarget,
 		MaxExecutionTimeoutSeconds: f.MaxExecutionTimeoutSeconds,
 		SupportsDocker:             f.SupportsDocker,
 	}
@@ -556,7 +556,7 @@ func (s *Server) resolveDispatcher(fleet *brokermodels.Fleet) (dispatch.Dispatch
 	if s.Dispatch == nil || fleet == nil {
 		return nil, false
 	}
-	return s.Dispatch.For(fleet.Provisioner, fleet.LambdaFunctionName)
+	return s.Dispatch.For(fleet.Provisioner, fleet.DispatchTarget)
 }
 
 func (s *Server) invokeDispatch(d dispatch.Dispatcher, fleetID, taskID string) {

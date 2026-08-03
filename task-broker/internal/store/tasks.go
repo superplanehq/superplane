@@ -202,7 +202,7 @@ func (s *PostgresStore) ClaimDispatchCandidates(ctx context.Context, provisioner
 	var rows []DispatchCandidate
 	err := s.db.WithContext(ctx).Raw(`
 WITH candidates AS (
-	SELECT t.id, t.fleet_id, f.provisioner, f.lambda_function_name
+	SELECT t.id, t.fleet_id, f.provisioner, f.dispatch_target
 	FROM tasks t
 	JOIN fleets f ON f.id = t.fleet_id
 	WHERE t.status = ?
@@ -216,9 +216,9 @@ updated AS (
 	UPDATE tasks t SET dispatch_requested_at = ?
 	FROM candidates c
 	WHERE t.id = c.id
-	RETURNING t.id AS task_id, c.fleet_id, c.provisioner, c.lambda_function_name
+	RETURNING t.id AS task_id, c.fleet_id, c.provisioner, c.dispatch_target
 )
-SELECT task_id, fleet_id, provisioner, lambda_function_name FROM updated ORDER BY task_id ASC`,
+SELECT task_id, fleet_id, provisioner, dispatch_target FROM updated ORDER BY task_id ASC`,
 		string(models.StatusQueued), provisioner, staleBefore, limit, now,
 	).Scan(&rows).Error
 	if err != nil {

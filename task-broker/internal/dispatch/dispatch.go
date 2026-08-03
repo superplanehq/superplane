@@ -19,15 +19,19 @@ type Resolver struct {
 	LambdaClient LambdaInvoker
 }
 
-func (r *Resolver) For(provisioner, lambdaFunctionName string) (Dispatcher, bool) {
+func (r *Resolver) For(provisioner, dispatchTarget string) (Dispatcher, bool) {
 	switch strings.TrimSpace(provisioner) {
 	case ProvisionerAWSLambda:
 		var client LambdaInvoker
 		if r != nil {
 			client = r.LambdaClient
 		}
-		return &Lambda{Client: client, FunctionName: strings.TrimSpace(lambdaFunctionName)}, true
+		return &Lambda{Client: client, FunctionName: strings.TrimSpace(dispatchTarget)}, true
 	default:
 		return NoOp{}, false
 	}
+}
+
+func (r *Resolver) Provisioners() []string {
+	return []string{ProvisionerAWSLambda}
 }

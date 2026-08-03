@@ -912,12 +912,12 @@ func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
 	now := time.Now().UTC()
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:                 "fleet-lambda",
-		Provisioner:        "aws-lambda",
-		Arch:               "amd64",
-		Size:               "small",
-		CreatedAt:          now,
-		LambdaFunctionName: "runner-lambda-small",
+		ID:             "fleet-lambda",
+		Provisioner:    "aws-lambda",
+		Arch:           "amd64",
+		Size:           "small",
+		CreatedAt:      now,
+		DispatchTarget: "runner-lambda-small",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -962,7 +962,7 @@ func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
 		t.Fatalf("candidates: %#v", candidates)
 	}
 	c := candidates[0]
-	if c.TaskID != lambdaTaskID || c.FleetID != "fleet-lambda" || c.Provisioner != "aws-lambda" || c.LambdaFunctionName != "runner-lambda-small" {
+	if c.TaskID != lambdaTaskID || c.FleetID != "fleet-lambda" || c.Provisioner != "aws-lambda" || c.DispatchTarget != "runner-lambda-small" {
 		t.Fatalf("candidate: %#v", c)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/superplane/runner/task-broker/internal/dispatch"
+	taskstore "github.com/superplane/runner/task-broker/internal/store"
 )
 
 const (
@@ -31,17 +31,21 @@ func RunDispatchSweepLoop(ctx context.Context, log *slog.Logger, srv *Server, in
 }
 
 func sweepDispatchOnce(ctx context.Context, log *slog.Logger, srv *Server, staleAfter time.Duration) {
-	candidates, err := srv.Store.ClaimDispatchCandidates(ctx, dispatch.ProvisionerAWSLambda, staleAfter, dispatchSweepLimit)
-	if err != nil {
-		if log != nil {
-			log.Warn("dispatch sweep: claim candidates", slog.Any("err", err))
+	var candidates []taskstore.DispatchCandidate
+	for _, provisioner := range srv.Dispatch.Provisioners() {
+		found, err := srv.Store.ClaimDispatchCandidates(ctx, provisioner, staleAfter, dispatchSweepLimit)
+		if err != nil {
+			if log != nil {
+				log.Warn("dispatch sweep: claim candidates", slog.String("provisioner", provisioner), slog.Any("err", err))
+			}
+			continue
 		}
-		return
+		candidates = append(candidates, found...)
 	}
 	sem := make(chan struct{}, dispatchSweepConcurrency)
 	var wg sync.WaitGroup
 	for _, c := range candidates {
-		d, needsDispatch := srv.Dispatch.For(c.Provisioner, c.LambdaFunctionName)
+		d, needsDispatch := srv.Dispatch.For(c.Provisioner, c.DispatchTarget)
 		if !needsDispatch {
 			continue
 		}

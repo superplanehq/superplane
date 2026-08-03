@@ -10,7 +10,7 @@ type Fleet struct {
 	Size        string    `gorm:"not null"`
 	CreatedAt   time.Time `gorm:"not null"`
 
-	LambdaFunctionName         string `gorm:"not null;default:''"`
+	DispatchTarget             string `gorm:"not null;default:''"`
 	MaxExecutionTimeoutSeconds *int   `gorm:""`
 	SupportsDocker             *bool  `gorm:""`
 }
