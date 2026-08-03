@@ -49,7 +49,7 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	order, err := factory.CreateWorkOrder(db, title, req.GetDescription(), createdByID, assigneeIDs)
+	order, err := factory.CreateWorkOrder(db, title, req.GetDescription(), &createdByID, assigneeIDs)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}

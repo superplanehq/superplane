@@ -101,7 +101,7 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
 	now := time.Now()
 	order := &FactoryWorkOrder{
 		ID:             uuid.New(),
@@ -111,7 +111,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		Description:    description,
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
-		CreatedByID:    &createdBy,
+		CreatedByID:    createdBy,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
