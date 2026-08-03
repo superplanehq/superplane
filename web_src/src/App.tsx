@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { appPath, appSettingsPath } from "./lib/appPaths";
+import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { Toaster } from "sonner";
 import "./App.css";
@@ -10,6 +11,7 @@ import "./App.css";
 // Import pages
 import AuthGuard from "./components/AuthGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
+import { RequireExperimentalFeature } from "./components/RequireExperimentalFeature";
 import { AccountProvider } from "./contexts/AccountProvider";
 import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
@@ -21,6 +23,13 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
+import {
+  FactoryDetailPage,
+  FactoryListPage,
+  CreateWorkOrderPage,
+  FactoryLineEditPage,
+  WorkOrderDetailPage,
+} from "./pages/factories";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -57,6 +66,16 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
   <AuthGuard>
     <RequirePermission resource={resource} action={action}>
       <Component />
+    </RequirePermission>
+  </AuthGuard>
+);
+
+const withAuthPermissionAndFactoriesFeature = (Component: React.ComponentType, resource: string, action: string) => (
+  <AuthGuard>
+    <RequirePermission resource={resource} action={action}>
+      <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+        <Component />
+      </RequireExperimentalFeature>
     </RequirePermission>
   </AuthGuard>
 );
@@ -124,6 +143,29 @@ function AppRouter() {
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
+                <Route path="factories">
+                  <Route index element={withAuthPermissionAndFactoriesFeature(FactoryListPage, "factories", "read")} />
+                  <Route
+                    path=":factoryId"
+                    element={withAuthPermissionAndFactoriesFeature(FactoryDetailPage, "factories", "read")}
+                  />
+                  <Route
+                    path=":factoryId/orders/new"
+                    element={withAuthPermissionAndFactoriesFeature(CreateWorkOrderPage, "factories", "create")}
+                  />
+                  <Route
+                    path=":factoryId/orders/:orderId"
+                    element={withAuthPermissionAndFactoriesFeature(WorkOrderDetailPage, "factories", "read")}
+                  />
+                  <Route
+                    path=":factoryId/lines/new"
+                    element={withAuthPermissionAndFactoriesFeature(FactoryLineEditPage, "factories", "update")}
+                  />
+                  <Route
+                    path=":factoryId/lines/:lineId/edit"
+                    element={withAuthPermissionAndFactoriesFeature(FactoryLineEditPage, "factories", "update")}
+                  />
+                </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
