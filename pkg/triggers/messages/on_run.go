@@ -28,7 +28,7 @@ func (c *OnRun) Label() string {
 }
 
 func (c *OnRun) Description() string {
-	return "Handle runs started from another app or from a factory work order"
+	return "Handle runs started from another app"
 }
 
 func (c *OnRun) Color() string {

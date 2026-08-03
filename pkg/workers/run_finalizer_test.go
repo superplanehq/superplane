@@ -550,7 +550,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", uuid.New(), nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", r.User, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)

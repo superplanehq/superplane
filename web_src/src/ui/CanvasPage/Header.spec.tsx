@@ -10,6 +10,13 @@ vi.mock("@/components/OrganizationMenuButton", () => ({
   OrganizationMenuButton: () => null,
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => featureId === "factories",
+    enabledExperimentalFeatures: ["factories"],
+  }),
+}));
+
 vi.mock("./components/CanvasProjectSwitcher", () => ({
   CanvasProjectSwitcher: () => null,
 }));

@@ -176,22 +176,6 @@ func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) 
 	return &line, nil
 }
 
-func FindFactoryLineByID(tx *gorm.DB, organizationID, lineID uuid.UUID) (*FactoryLine, error) {
-	var line FactoryLine
-	err := tx.
-		Where("organization_id = ? AND id = ?", organizationID, lineID).
-		First(&line).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryLineNotFound
-		}
-		return nil, err
-	}
-
-	return &line, nil
-}
-
 func (f *Factory) FindLineByName(tx *gorm.DB, name string) (*FactoryLine, error) {
 	var line FactoryLine
 	err := tx.
