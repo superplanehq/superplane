@@ -35,6 +35,14 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.NotEmpty(t, workOrder.ID)
 	})
 
+	t.Run("rejects blank title", func(t *testing.T) {
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, models.ErrFactoryWorkOrderTitleRequired)
+	})
+
 	t.Run("rejects non-factory app", func(t *testing.T) {
 		regularCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		ctx := NewFactoryContext(database.Conn(), regularCanvas, nodeExecution)
