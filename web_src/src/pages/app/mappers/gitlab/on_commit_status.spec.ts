@@ -163,6 +163,7 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
         configuration: {
           statuses: ["success", "failed"],
           names: [{ type: "equals", value: "security-scan" }],
+          refs: [{ type: "equals", value: "main" }],
         },
       }),
       definition: buildDefinition(),
@@ -172,6 +173,7 @@ describe("onCommitStatusTriggerRenderer.getTriggerProps", () => {
     expect(props.metadata?.find((m) => String(m.label).includes("group/example-project"))).toBeDefined();
     expect(props.metadata?.find((m) => String(m.label).includes("success, failed"))).toBeDefined();
     expect(props.metadata?.find((m) => String(m.label).includes("security-scan"))).toBeDefined();
+    expect(props.metadata?.find((m) => m.icon === "git-branch" && String(m.label).includes("main"))).toBeDefined();
   });
 
   it("omits metadata when project and filters are not configured", () => {

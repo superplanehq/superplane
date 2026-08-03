@@ -90,6 +90,13 @@ function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnCom
     });
   }
 
+  if (configuration?.refs?.length) {
+    metadataItems.push({
+      icon: "git-branch",
+      label: configuration.refs.map((ref) => formatPredicate(ref)).join(", "),
+    });
+  }
+
   return metadataItems;
 }
 
