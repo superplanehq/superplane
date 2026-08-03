@@ -16,10 +16,21 @@ const (
 	pingPeriod = 10 * time.Second // Ping every 10s
 )
 
+type websocketConn interface {
+	Close() error
+	SetWriteDeadline(time.Time) error
+	NextWriter(int) (io.WriteCloser, error)
+	WriteMessage(int, []byte) error
+	SetReadLimit(int64)
+	SetReadDeadline(time.Time) error
+	SetPongHandler(func(string) error)
+	ReadMessage() (int, []byte, error)
+}
+
 // Client represents a connected websocket client
 type Client struct {
 	hub        *Hub
-	conn       *websocket.Conn
+	conn       websocketConn
 	send       chan []byte
 	Done       chan struct{}
 	workflowID string // Which workflow this client is watching
@@ -163,7 +174,7 @@ func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
 }
 
 // NewClient creates a new websocket client
-func (h *Hub) NewClient(conn *websocket.Conn, workflowID string) *Client {
+func (h *Hub) NewClient(conn websocketConn, workflowID string) *Client {
 	client := &Client{
 		hub:        h,
 		conn:       conn,

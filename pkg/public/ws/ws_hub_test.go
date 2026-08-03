@@ -1,12 +1,11 @@
 package ws
 
 import (
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 // MockConn is a mock websocket connection for testing
@@ -46,7 +45,7 @@ func (m *MockConn) Close() error {
 	return nil
 }
 
-func (m *MockConn) NextWriter(messageType int) (interface{}, error) {
+func (m *MockConn) NextWriter(messageType int) (io.WriteCloser, error) {
 	return &mockWriter{}, nil
 }
 
