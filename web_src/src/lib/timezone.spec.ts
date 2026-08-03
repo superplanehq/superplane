@@ -12,10 +12,19 @@ describe("timezone", () => {
   });
 
   it("formats timestamps in the requested timezone", () => {
-    const toLocaleDateStringSpy = vi.spyOn(Date.prototype, "toLocaleDateString").mockReturnValue("Mar 29, 2026, 14:30");
-
     expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "UTC")).toBe("Mar 29, 2026, 14:30 UTC");
-    expect(toLocaleDateStringSpy).toHaveBeenCalledWith("en-US", {
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "America/New_York")).toBe(
+      "Mar 29, 2026, 10:30 America/New_York",
+    );
+  });
+
+  it("formats timestamps for GMT offset labels", () => {
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "GMT+2")).toBe("Mar 29, 2026, 16:30 GMT+2");
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "GMT-5:30")).toBe("Mar 29, 2026, 09:00 GMT-5:30");
+  });
+
+  it("falls back to the browser timezone for unknown timezones", () => {
+    const inBrowserTimezone = new Date("2026-03-29T14:30:00.000Z").toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -23,6 +32,10 @@ describe("timezone", () => {
       minute: "2-digit",
       hour12: false,
     });
+
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "Not/AZone")).toBe(
+      `${inBrowserTimezone} Not/AZone`,
+    );
   });
 
   it("formats relative time in abbreviated and long forms", () => {
