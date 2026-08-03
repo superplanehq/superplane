@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
@@ -540,4 +541,141 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	assert.Equal(t, childCanvas.ID, receivedCallback.Run.AppID)
 	assert.Equal(t, models.CanvasRunResultPassed, receivedCallback.Run.Result)
 	assert.Equal(t, "runApp", parentExecution.NodeID)
+}
+
+func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", uuid.New(), nil)
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := createFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Name:       "step-one",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Name:       "step-two",
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: secondEntry,
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		firstResult, startErr = line.StartStep(tx, order, 0)
+		return startErr
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending *factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		return advanceErr
+	}))
+
+	require.NotNil(t, pending)
+	assert.Equal(t, secondApp.ID, pending.workflowID)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
+
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, secondExecution.StepIndex)
+	assert.Equal(t, "step-two", secondExecution.StepName)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
+}
+
+func createFactoryAppWithOnRunTrigger(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	name, entrypoint string,
+) (*models.Canvas, string) {
+	t.Helper()
+
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           support.RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     entrypoint,
+			Name:       name,
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "onRun"},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{
+				{
+					ID:   entrypoint,
+					Name: name,
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "onRun"},
+					},
+				},
+			}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas, entrypoint
 }

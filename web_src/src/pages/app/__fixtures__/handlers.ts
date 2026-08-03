@@ -417,6 +417,11 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
               description: "Canvas agent chat",
               released: true,
             },
+            {
+              id: "factories",
+              label: "Factories",
+              description: "Software factories for work orders",
+            },
           ],
         },
       }),

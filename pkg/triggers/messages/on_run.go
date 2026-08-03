@@ -28,7 +28,7 @@ func (c *OnRun) Label() string {
 }
 
 func (c *OnRun) Description() string {
-	return "Handle runs started from another app"
+	return "Handle runs started from another app or from a factory work order"
 }
 
 func (c *OnRun) Color() string {
@@ -174,15 +174,27 @@ func (c *OnRun) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) 
 }
 
 func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, error) {
+	workOrder, hasWorkOrder := ctx.Parameters["work_order"].(map[string]any)
+	sourceApp, hasApp := ctx.Parameters["app"].(map[string]any)
+	if !hasWorkOrder && !hasApp {
+		return nil, fmt.Errorf("on run: app or work_order is required")
+	}
+
+	if hasWorkOrder {
+		err := ctx.Events.Emit("factory.work_order", map[string]any{
+			"work_order": workOrder,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("on run: emit event: %w", err)
+		}
+
+		return nil, nil
+	}
+
 	config := OnRunConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return nil, fmt.Errorf("on run: decode configuration: %w", err)
-	}
-
-	sourceApp, ok := ctx.Parameters["app"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("on run: source app not found")
 	}
 
 	parameters, err := c.validateParameters(config, ctx.Parameters)

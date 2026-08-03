@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -393,6 +394,28 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		}
 	}
 
+	//
+	// If the run is part of a factory work order execution, we advance the factory line.
+	//
+	var nextFactoryLineRun *factoryLinePendingRun
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		nextFactoryLineRun, advanceErr = w.executeNextFactoryLineStep(tx, runID)
+		return advanceErr
+	})
+
+	if err != nil {
+		logger.WithError(err).Errorf("Error advancing factory line after run finished: %v", err)
+		return err
+	}
+
+	if nextFactoryLineRun != nil {
+		if err := messages.NewCanvasRunMessage(nextFactoryLineRun.workflowID.String(), nextFactoryLineRun.runID.String()).PublishPending(); err != nil {
+			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", nextFactoryLineRun.runID)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -456,4 +479,72 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	}
 
 	return true, "", nil
+}
+
+type factoryLinePendingRun struct {
+	workflowID uuid.UUID
+	runID      uuid.UUID
+}
+
+func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) (*factoryLinePendingRun, error) {
+	//
+	// Finish current factory work order execution.
+	//
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	run, err := models.LockCanvasRunInTransaction(tx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
+		return nil, nil
+	}
+
+	if err := execution.MarkFinished(tx, run.Result); err != nil {
+		return nil, err
+	}
+
+	if run.Result != models.CanvasRunResultPassed {
+		return nil, nil
+	}
+
+	//
+	// Start next step in the factory line.
+	//
+	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	line, err := factory.FindLine(tx, execution.LineID)
+	if err != nil {
+		return nil, err
+	}
+
+	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	nextIndex := execution.StepIndex + 1
+	if nextIndex >= len(line.Steps) {
+		return nil, nil
+	}
+
+	result, err := line.StartStep(tx, workOrder, nextIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	return &factoryLinePendingRun{
+		workflowID: result.Run.WorkflowID,
+		runID:      result.Run.ID,
+	}, nil
 }
