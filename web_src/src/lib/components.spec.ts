@@ -141,6 +141,40 @@ describe("components value parsing and validation", () => {
     ).toEqual(["Value must not exceed 4"]);
   });
 
+  it("accepts day and month names in either case", () => {
+    // Cron names are case-insensitive for the backend validator
+    // (pkg/configuration/validation.go allows a-z as well as A-Z) and for the
+    // next-run preview in lib/cron.ts, which upper-cases before lookup. The
+    // submission validator has to agree, or a lowercase schedule the server
+    // would happily accept is blocked in the form.
+    const cronField = buildField({ type: "cron" });
+
+    for (const expression of [
+      "0 0 * * mon",
+      "0 0 * * MON",
+      "0 0 * * mon-fri",
+      "0 0 * * sun,sat",
+      "0 0 * jan *",
+      "0 0 * Feb *",
+    ]) {
+      expect(validateFieldForSubmission(cronField, expression)).toEqual([]);
+    }
+  });
+
+  it("still rejects characters that are not valid in a cron expression", () => {
+    const cronField = buildField({ type: "cron" });
+
+    expect(validateFieldForSubmission(cronField, "0 0 * * mon;fri")).toEqual([
+      "Invalid characters. Use only: numbers, *, ,, -, / and day names",
+    ]);
+    expect(validateFieldForSubmission(cronField, "0 0 * * @mon")).toEqual([
+      "Invalid characters. Use only: numbers, *, ,, -, / and day names",
+    ]);
+    expect(validateFieldForSubmission(cronField, "0 0 * * mon_fri")).toEqual([
+      "Invalid characters. Use only: numbers, *, ,, -, / and day names",
+    ]);
+  });
+
   it("parses default values according to field type", () => {
     expect(
       parseDefaultValues([
