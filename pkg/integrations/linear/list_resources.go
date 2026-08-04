@@ -2,6 +2,7 @@ package linear
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -13,6 +14,7 @@ const (
 	ResourceTypeMember        = "member"
 	ResourceTypeLabel         = "label"
 	ResourceTypeProject       = "project"
+	ResourceTypeAttachment    = "attachment"
 )
 
 func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -27,6 +29,8 @@ func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContex
 		return ListLabels(ctx)
 	case ResourceTypeProject:
 		return ListProjects(ctx)
+	case ResourceTypeAttachment:
+		return ListAttachments(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -162,6 +166,45 @@ func ListProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 	}
 
 	return resources, nil
+}
+
+// ListAttachments returns the attachments on the issue selected in the sibling
+// field. It stays empty until an issue is chosen, and an issue set from an
+// expression cannot be resolved here, so the picker offers nothing in that case.
+func ListAttachments(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	issueID := ctx.Parameters["issue"]
+	if issueID == "" || strings.Contains(issueID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	attachments, err := client.ListIssueAttachments(issueID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list attachments: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(attachments))
+	for _, attachment := range attachments {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeAttachment,
+			Name: attachmentLabel(attachment),
+			ID:   attachment.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func attachmentLabel(attachment Attachment) string {
+	if attachment.Subtitle != "" {
+		return fmt.Sprintf("%s (%s)", attachment.Title, attachment.Subtitle)
+	}
+
+	return attachment.Title
 }
 
 func memberLabel(member User) string {
