@@ -1,5 +1,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar } from "@/components/Avatar/avatar";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { buildOrgUserDisplayMap, getUserInitials, resolveOrgUserDisplay } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 
@@ -20,17 +22,27 @@ export function WorkOrderAssigneePicker({
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
 
-  const userOptions = useMemo(
-    () =>
-      users
-        .filter((user) => user.metadata?.id)
-        .map((user) => ({
-          id: user.metadata!.id!,
-          label: user.metadata?.email || user.spec?.displayName || user.metadata!.id!,
-        }))
-        .sort((left, right) => left.label.localeCompare(right.label)),
-    [users],
-  );
+  const userOptions = useMemo(() => {
+    const usersById = buildOrgUserDisplayMap(users);
+
+    return users
+      .filter((user) => user.metadata?.id)
+      .map((user) => {
+        const id = user.metadata!.id!;
+        const display = resolveOrgUserDisplay(usersById, id) ?? {
+          id,
+          name: user.metadata?.email || id,
+          initials: getUserInitials(user.metadata?.email || id),
+        };
+
+        return {
+          id,
+          label: display.name,
+          display,
+        };
+      })
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [users]);
 
   const toggleUser = (userId: string, checked: boolean) => {
     if (disabled) {
@@ -78,6 +90,12 @@ export function WorkOrderAssigneePicker({
                 checked={checked}
                 disabled={disabled}
                 onChange={(event) => toggleUser(user.id, event.target.checked)}
+              />
+              <Avatar
+                src={user.display.avatarUrl}
+                initials={user.display.initials}
+                alt={user.display.name}
+                className="size-6"
               />
               <span className="text-sm text-gray-900 dark:text-gray-100">{user.label}</span>
             </label>

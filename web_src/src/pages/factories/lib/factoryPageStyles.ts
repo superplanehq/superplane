@@ -35,8 +35,3 @@ export const factorySidebarActionClassName =
 export const factoryFormCardClassName = cn(
   "rounded-lg border border-gray-200 bg-white px-6 py-8 dark:border-gray-700/70 dark:bg-gray-900 sm:px-8",
 );
-
-/** @deprecated Use factoryWorkOrderRowClassName — kept for detail pages until migrated. */
-export const factoryCardClassName = cn(
-  "rounded-lg border border-gray-200 bg-white dark:border-gray-700/70 dark:bg-gray-900",
-);

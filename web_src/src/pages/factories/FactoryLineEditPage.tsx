@@ -3,7 +3,7 @@ import { Text } from "@/components/Text/text";
 import { ArrowLeft } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { FactoryLineForm } from "./FactoryLineForm";
-import { factoryFormCardClassName, factoryPageContentClassName } from "./factoryPageStyles";
+import { factoryFormCardClassName, factoryPageContentClassName } from "./lib/factoryPageStyles";
 import { FactoryPageShell } from "./FactoryPageShell";
 import { useFactoryLineEditPage } from "./useFactoryLineEditPage";
 

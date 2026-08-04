@@ -2,7 +2,7 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { CornerDownRight, MoveRight } from "lucide-react";
-import { factoryCountBadgeClassName } from "./factoryPageStyles";
+import { factoryCountBadgeClassName } from "./lib/factoryPageStyles";
 
 interface FactoryLinesSidebarProps {
   factoryHref: string;

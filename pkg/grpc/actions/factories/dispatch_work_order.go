@@ -35,13 +35,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
-	tx := database.DB(ctx)
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
-
 	var logger *log.Entry
 
-	err = tx.Transaction(func(tx *gorm.DB) error {
+	db := database.DB(ctx)
+	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err

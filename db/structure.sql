@@ -380,6 +380,19 @@ CREATE TABLE public.factory_work_order_assignees (
 
 
 --
+-- Name: factory_work_order_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    work_order_id uuid NOT NULL,
+    type text NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_executions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1061,6 +1074,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_events factory_work_order_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_events
+    ADD CONSTRAINT factory_work_order_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_order_executions factory_work_order_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1566,6 +1587,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 
 
 --
+-- Name: idx_factory_work_order_events_work_order_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC);
+
+
+--
 -- Name: idx_factory_work_order_executions_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2052,6 +2080,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_events factory_work_order_events_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_events
+    ADD CONSTRAINT factory_work_order_events_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
 
 
 --
@@ -2550,7 +2586,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260730024822	f
+20260804134504	f
 \.
 
 

@@ -2,14 +2,16 @@ import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Forward, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import { factoryWorkOrderRowClassName } from "./factoryPageStyles";
+import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
+import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
-import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
+import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
 interface WorkOrderCardProps {
   order: FactoriesWorkOrder;
@@ -30,12 +32,16 @@ export function WorkOrderCard({
   isDispatching = false,
   onDispatch,
 }: WorkOrderCardProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
   const displayStatus = getWorkOrderDisplayStatus(order);
   const statusMeta = getWorkOrderDisplayStatusMeta(displayStatus);
   const updatedAt = order.updatedAt ?? order.createdAt;
   const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
   const href = order.id ? `${factoryHref}/orders/${order.id}` : factoryHref;
-  const authorLabel = order.createdBy?.name?.trim() || "Unknown";
+  const creatorDisplay = resolveUser(order.createdBy?.id, order.createdBy?.name);
+  const assigneeDisplays = (order.assignees ?? [])
+    .filter((assignee) => assignee.id)
+    .map((assignee) => resolveUser(assignee.id, assignee.name));
   const showDispatch = order.state === "STATE_OPEN" && onDispatch && order.id;
 
   return (
@@ -60,8 +66,9 @@ export function WorkOrderCard({
               ) : null}
               {statusMeta.label}
             </Badge>
-            <div className="flex min-w-0 flex-wrap items-center gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <h3 className="min-w-0 text-base font-semibold text-gray-900 dark:text-gray-100">{order.title}</h3>
+              <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">Updated {timeLabel}</span>
               {showDispatch ? (
                 <div className="pointer-events-auto">
                   <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
@@ -90,8 +97,26 @@ export function WorkOrderCard({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-            <span>Created by {authorLabel}</span>
-            <span>Updated {timeLabel}</span>
+            <span className="inline-flex items-center gap-1.5">
+              Creator:
+              <OrgUserReference display={creatorDisplay} size="md" showName={false} />
+            </span>
+            {assigneeDisplays.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                Assignees:
+                <span className="inline-flex items-center -space-x-1">
+                  {assigneeDisplays.map((display, index) => (
+                    <OrgUserReference
+                      key={display?.id ?? index}
+                      display={display}
+                      size="md"
+                      showName={false}
+                      className="rounded-full ring-2 ring-white dark:ring-gray-900"
+                    />
+                  ))}
+                </span>
+              </span>
+            ) : null}
           </div>
         </div>
 

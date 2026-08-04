@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import { REFUND_FACTORY_LINES } from "./__fixtures__/factoryPageResponses";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
-import { getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
+import { getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
 /**
  * Header for the work order detail page: status badge, title, and (when open)

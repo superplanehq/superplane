@@ -3,7 +3,7 @@ import { useFactory, useFactoryApps } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useMemo } from "react";
-import { factoryDetailPath } from "./factoryPagePaths";
+import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { isFactoryLineEditPageFailed, resolveFactoryLineEditRedirect } from "./factoryPageRedirects";
 import { useFactoryLineEditActions } from "./useFactoryLineEditActions";
 
