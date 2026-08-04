@@ -16,10 +16,21 @@ const (
 	pingPeriod = 10 * time.Second // Ping every 10s
 )
 
+type websocketConn interface {
+	Close() error
+	SetWriteDeadline(time.Time) error
+	NextWriter(int) (io.WriteCloser, error)
+	WriteMessage(int, []byte) error
+	SetReadLimit(int64)
+	SetReadDeadline(time.Time) error
+	SetPongHandler(func(string) error)
+	ReadMessage() (int, []byte, error)
+}
+
 // Client represents a connected websocket client
 type Client struct {
 	hub        *Hub
-	conn       *websocket.Conn
+	conn       websocketConn
 	send       chan []byte
 	Done       chan struct{}
 	workflowID string // Which workflow this client is watching
@@ -105,39 +116,54 @@ func (h *Hub) unregisterClient(client *Client) {
 				}
 			}
 		}
-		log.Debugf("Client unregistered, remaining clients: %d", len(h.clients))
+		log.Warnf("Client unregistered (likely due to full send buffer), remaining clients: %d", len(h.clients))
 	}
 }
 
 // BroadcastAll sends a message to all connected clients
 func (h *Hub) BroadcastAll(message []byte) {
 	h.mutex.RLock()
-	defer h.mutex.RUnlock()
-
+	// Collect stalled clients while holding read lock
+	var stalledClients []*Client
 	for client := range h.clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			// If the client's buffer is full, mark it for eviction
+			stalledClients = append(stalledClients, client)
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing read lock
+	// to prevent deadlock with write lock in unregisterClient
+	for _, client := range stalledClients {
+		h.unregisterClient(client)
 	}
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	h.mutex.RLock()
-	defer h.mutex.RUnlock()
-
+	// Collect stalled clients while holding read lock
+	var stalledClients []*Client
+	
 	// Get clients subscribed to this workflow
 	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
 		for client := range clients {
 			select {
 			case client.send <- message:
 			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
+				// If the client's buffer is full, mark it for eviction
+				stalledClients = append(stalledClients, client)
 			}
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing read lock
+	// to prevent deadlock with write lock in unregisterClient
+	for _, client := range stalledClients {
+		h.unregisterClient(client)
 	}
 }
 
@@ -148,7 +174,7 @@ func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
 }
 
 // NewClient creates a new websocket client
-func (h *Hub) NewClient(conn *websocket.Conn, workflowID string) *Client {
+func (h *Hub) NewClient(conn websocketConn, workflowID string) *Client {
 	client := &Client{
 		hub:        h,
 		conn:       conn,
@@ -247,7 +273,7 @@ func (c *Client) readPump() {
 
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(message []byte) {
-	// Handle client messages
-	log.Infof("Received message: %s", string(message))
+	// Handle client messages - note: only log at debug level to avoid log floods
+	log.Debugf("Received message from client: %d bytes", len(message))
 	return
 }
