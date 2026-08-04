@@ -1,0 +1,433 @@
+syntax = "proto3";
+
+package Superplane.Factories;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Factories API";
+    version: "1.0";
+    description: "API for Superplane Factories";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Factories {
+  rpc ListFactories(ListFactoriesRequest) returns (ListFactoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factories";
+      description: "Returns a list of factories";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactory(CreateFactoryRequest) returns (CreateFactoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory";
+      description: "Creates a new factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactory(DescribeFactoryRequest) returns (DescribeFactoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory";
+      description: "Returns a factory by its ID";
+      tags: "Factory";
+    };
+  }
+
+  //
+  // Factory line APIs
+  //
+
+  rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/lines"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory line";
+      description: "Creates a new line for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryLine(UpdateFactoryLineRequest) returns (UpdateFactoryLineResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/lines/{line_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory line";
+      description: "Updates a factory line";
+      tags: "Factory";
+    };
+  }
+
+  //
+  // Factory app APIs
+  //
+
+  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/apps"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory apps";
+      description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  //
+  // Work orders APIs
+  //
+
+  rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work orders";
+      description: "Returns a list of work orders for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateWorkOrder(CreateWorkOrderRequest) returns (CreateWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory work order";
+      description: "Creates a new work order for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeWorkOrder(DescribeWorkOrderRequest) returns (DescribeWorkOrderResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory work order";
+      description: "Returns a work order by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderEvents(ListWorkOrderEventsRequest) returns (ListWorkOrderEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work order events";
+      description: "Returns a list of events for a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateWorkOrderAssignees(UpdateWorkOrderAssigneesRequest) returns (UpdateWorkOrderAssigneesResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/assignees"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a work order's assignees";
+      description: "Updates the assignees of a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc DispatchWorkOrder(DispatchWorkOrderRequest) returns (DispatchWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Dispatch a work order";
+      description: "Dispatches a work order to a factory line";
+      tags: "Factory";
+    };
+  }
+
+  rpc CloseWorkOrder(CloseWorkOrderRequest) returns (CloseWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/close"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Close factory work order";
+      description: "Closes a work order";
+      tags: "Factory";
+    };
+  }
+}
+
+//
+// Factories
+//
+
+message ListFactoriesRequest {}
+
+message ListFactoriesResponse {
+  repeated Factory factories = 1;
+}
+
+message CreateFactoryRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message CreateFactoryResponse {
+  Factory factory = 1;
+}
+
+message DescribeFactoryRequest {
+  string id = 1;
+}
+
+message DescribeFactoryResponse {
+  Factory factory = 1;
+}
+
+message Factory {
+  message App {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated FactoryLine lines = 4;
+}
+
+message FactoryLine {
+  message Step {
+    string name = 1;
+    string type = 2;
+    optional AppStep app = 3;
+  }
+
+  message AppStep {
+    string app = 1;
+    string entrypoint = 2;
+  }
+
+  string id = 1;
+  string name = 2;
+  repeated Step steps = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message CreateFactoryLineRequest {
+  string factory_id = 1;
+  string name = 2;
+  repeated FactoryLine.Step steps = 3;
+}
+
+message CreateFactoryLineResponse {
+  FactoryLine line = 1;
+}
+
+message UpdateFactoryLineRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  optional string name = 3;
+  repeated FactoryLine.Step steps = 4;
+}
+
+message UpdateFactoryLineResponse {
+  FactoryLine line = 1;
+}
+
+message ListFactoryAppsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryAppsResponse {
+  repeated Factory.App apps = 1;
+}
+
+//
+// Work orders
+//
+
+message ListWorkOrdersRequest {
+  string factory_id = 1;
+  repeated string assignee_ids = 2;
+  repeated WorkOrder.State states = 3;
+  repeated WorkOrder.Result results = 4;
+  optional bool unassigned = 5;
+}
+
+message ListWorkOrdersResponse {
+  repeated WorkOrder orders = 1;
+}
+
+message CreateWorkOrderRequest {
+  string factory_id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string assignee_ids = 4;
+}
+
+message CreateWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message CloseWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrder.Result result = 3;
+}
+
+message CloseWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message WorkOrder {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_OPEN = 1;
+    STATE_CLOSED = 2;
+  }
+
+  enum Result {
+    RESULT_UNSPECIFIED = 0;
+    RESULT_COMPLETED = 1;
+    RESULT_REJECTED = 2;
+  }
+
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  State state = 4;
+  Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  repeated UserRef assignees = 8;
+  repeated WorkOrderExecution executions = 9;
+  UserRef created_by = 10;
+}
+
+message UserRef {
+  string id = 1;
+  string name = 2;
+}
+
+message WorkOrderExecution {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_CANCELLING = 3;
+    STATE_FINISHED = 4;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  message LineRef {
+    string id = 1;
+    string name = 2;
+  }
+
+  message RunRef {
+    string id = 1;
+    string app_id = 2;
+    string app_name = 3;
+  }
+
+  string id = 1;
+  LineRef line = 2;
+  string step = 3;
+  State state = 4;
+  Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  RunRef run = 8;
+}
+
+message DescribeWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message DescribeWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message UpdateWorkOrderAssigneesRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string assignee_ids = 3;
+}
+
+message UpdateWorkOrderAssigneesResponse {
+  WorkOrder order = 1;
+}
+
+message DispatchWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string line_name = 3;
+}
+
+message DispatchWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message ListWorkOrderEventsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListWorkOrderEventsResponse {
+  repeated WorkOrderEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message WorkOrderEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  string type = 2;
+  google.protobuf.Struct event = 3;
+}

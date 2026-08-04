@@ -44,6 +44,7 @@ import (
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -56,6 +57,7 @@ import (
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -356,6 +358,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbFactories.RegisterFactoriesHandlerServer(ctx, grpcGatewayMux, services.Factories)
+	if err != nil {
+		return err
+	}
+
 	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
@@ -416,6 +423,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/factories").Handler(protectedGRPCHandler)
 
 	return nil
 }
@@ -525,8 +533,9 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-func (s *Server) RegisterWebRoutes(webBasePath string) {
-	log.Infof("Registering web routes with base path: %s", webBasePath)
+// RegisterWebSocketRoutes registers canvas and agent-session WebSocket endpoints.
+func (s *Server) RegisterWebSocketRoutes() {
+	log.Info("Registering websocket routes")
 
 	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
@@ -543,6 +552,10 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
 	)
+}
+
+func (s *Server) RegisterWebRoutes(webBasePath string) {
+	log.Infof("Registering web routes with base path: %s", webBasePath)
 
 	//
 	// In development mode, we proxy to the Vite dev server.
@@ -1378,6 +1391,11 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	user, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -1387,18 +1405,33 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	parsedWorkflowID, err := uuid.Parse(workflowID)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "workflow not found", http.StatusNotFound)
 		return
 	}
 
 	_, err = models.FindCanvas(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "canvas not found", http.StatusNotFound)
 		return
 	}
 
-	ws, err := s.upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeUpgradeError,
+		)
 		if _, ok := err.(websocket.HandshakeError); !ok {
 			log.Println(err)
 		}
@@ -1406,7 +1439,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := s.wsHub.NewClient(ws, workflowID)
+	client := s.wsHub.NewClient(conn, workflowID)
 
 	<-client.Done
 }
