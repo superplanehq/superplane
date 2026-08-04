@@ -1,5 +1,5 @@
 import { useCreateCanvas } from "@/hooks/useCanvasData";
-import { factoryAppsKey, useDispatchWorkOrder, useUpdateFactory } from "@/hooks/useFactoryData";
+import { factoryAppsKey, useDeleteFactory, useDispatchWorkOrder, useUpdateFactory } from "@/hooks/useFactoryData";
 import { appPath } from "@/lib/appPaths";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -16,6 +16,7 @@ export function useFactoryDetailActions(
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const createCanvas = useCreateCanvas(organizationId);
   const updateFactory = useUpdateFactory(organizationId, factoryId);
+  const deleteFactory = useDeleteFactory(organizationId);
 
   const handleCreateApp = async (input: { name: string; description: string }) => {
     try {
@@ -48,12 +49,25 @@ export function useFactoryDetailActions(
     showSuccessToast("Factory updated");
   };
 
+  const handleDeleteFactory = async () => {
+    try {
+      await deleteFactory.mutateAsync(factoryId);
+      showSuccessToast("Factory deleted");
+      navigate(`/${organizationId}/factories`);
+    } catch {
+      showErrorToast("Failed to delete factory");
+      throw new Error("Failed to delete factory");
+    }
+  };
+
   return {
     handleCreateApp,
     handleDispatch,
     handleUpdateFactory,
+    handleDeleteFactory,
     isCreateAppSaving: createCanvas.isPending,
     isDispatching: dispatchWorkOrder.isPending,
     isUpdatingFactory: updateFactory.isPending,
+    isDeletingFactory: deleteFactory.isPending,
   };
 }

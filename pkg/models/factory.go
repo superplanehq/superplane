@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ type Factory struct {
 	Description    string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
 func MapFactoryNameUniqueConstraintError(err error) error {
@@ -87,6 +89,25 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	}
 
 	return factories, nil
+}
+
+func (f *Factory) SoftDelete(tx *gorm.DB) error {
+	now := time.Now()
+	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
+
+	err := tx.Model(f).Updates(map[string]any{
+		"name":       newName,
+		"deleted_at": now,
+		"updated_at": now,
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	f.Name = newName
+	f.DeletedAt = gorm.DeletedAt{Time: now, Valid: true}
+	f.UpdatedAt = now
+	return nil
 }
 
 func (f *Factory) Update(tx *gorm.DB, name, description *string) error {

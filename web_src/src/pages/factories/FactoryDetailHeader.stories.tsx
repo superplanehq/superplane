@@ -5,7 +5,7 @@ import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, REFUND_FACTORY } from ".
 import { FactoryDetailHeader } from "./FactoryDetailHeader";
 
 /**
- * Factory detail header: factory name, description, edit action,
+ * Factory detail header: factory name, description, actions menu (edit/delete),
  * and the "New Work Order" CTA (gated by permissions). Doesn't include filters —
  * those live in the work orders panel.
  */
@@ -33,13 +33,16 @@ const baseArgs = {
   workOrdersCount: 3,
   canCreate: true,
   canUpdate: true,
+  canDelete: true,
   permissionsLoading: false,
   createHref,
   isUpdating: false,
+  isDeleting: false,
   onUpdate: async () => undefined,
+  onDelete: async () => undefined,
 };
 
-/** Populated header with a CTA and edit action. */
+/** Populated header with a CTA and manage actions. */
 export const Default: Story = {
   args: baseArgs,
 };
@@ -52,5 +55,6 @@ export const WithoutManagePermission: Story = {
     workOrdersCount: 0,
     canCreate: false,
     canUpdate: false,
+    canDelete: false,
   },
 };
