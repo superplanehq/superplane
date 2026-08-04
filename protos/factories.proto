@@ -72,6 +72,17 @@ service Factories {
     };
   }
 
+  rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory";
+      description: "Soft-deletes an existing factory";
+      tags: "Factory";
+    };
+  }
+
   //
   // Factory line APIs
   //
@@ -237,6 +248,12 @@ message UpdateFactoryRequest {
 message UpdateFactoryResponse {
   Factory factory = 1;
 }
+
+message DeleteFactoryRequest {
+  string id = 1;
+}
+
+message DeleteFactoryResponse {}
 
 message Factory {
   message App {
