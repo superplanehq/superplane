@@ -281,15 +281,22 @@ export function factoriesOrganizationUsersResponse(): FixtureResult {
   };
 }
 
-/** Convenience for tests that want to exercise the matcher directly. */
-export async function fetchFactoryPageFixture(path: string, options?: RequestInit): Promise<Response> {
+/**
+ * Convenience for tests that want to exercise the matcher directly. Deep-clones
+ * `defaultFactoriesFixture` so mutating calls do not leak between tests.
+ */
+export async function fetchFactoryPageFixture(
+  path: string,
+  options?: RequestInit,
+  fixture: FactoriesFixture = structuredClone(defaultFactoriesFixture),
+): Promise<Response> {
   const url = new URL(path, "http://localhost");
   const method = (options?.method ?? "GET").toUpperCase();
   const body =
     typeof options?.body === "string" && options.body.trim()
       ? (JSON.parse(options.body) as Record<string, unknown>)
       : null;
-  const result = matchFactoryPageFixture(url, method, body);
+  const result = matchFactoryPageFixture(url, method, body, fixture);
   if (!result) {
     return new Response(null, { status: 404 });
   }

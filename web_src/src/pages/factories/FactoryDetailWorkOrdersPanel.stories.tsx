@@ -7,9 +7,15 @@ import {
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_ID,
   REFUND_FACTORY_LINES,
+  STORYBOOK_ME_USER_ID,
 } from "./__fixtures__/factoryPageResponses";
 import { FactoryDetailWorkOrdersPanel } from "./FactoryDetailWorkOrdersPanel";
-import { filterWorkOrdersByStatus, type WorkOrderOwnerFilter, type WorkOrderStatusFilter } from "./workOrderProgress";
+import {
+  filterWorkOrdersByOwner,
+  filterWorkOrdersByStatus,
+  type WorkOrderOwnerFilter,
+  type WorkOrderStatusFilter,
+} from "./workOrderProgress";
 
 /**
  * The Work Orders section on the factory detail page: header + filters + list.
@@ -35,19 +41,24 @@ type Story = StoryObj<typeof meta>;
 const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`;
 
 function InteractivePanel({
+  initialOwner = "all",
   initialStatus = "all",
   workOrders = DEFAULT_WORK_ORDERS,
   isLoading = false,
   ordersError = null,
 }: {
+  initialOwner?: WorkOrderOwnerFilter;
   initialStatus?: WorkOrderStatusFilter;
   workOrders?: typeof DEFAULT_WORK_ORDERS;
   isLoading?: boolean;
   ordersError?: Error | null;
 }) {
-  const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("all");
+  const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>(initialOwner);
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>(initialStatus);
-  const filtered = filterWorkOrdersByStatus(workOrders, statusFilter);
+  const filtered = filterWorkOrdersByStatus(
+    filterWorkOrdersByOwner(workOrders, ownerFilter, STORYBOOK_ME_USER_ID),
+    statusFilter,
+  );
   return (
     <FactoryDetailWorkOrdersPanel
       openWorkOrderCount={workOrders.filter((order) => order.state === "STATE_OPEN").length}
@@ -71,9 +82,15 @@ function InteractivePanel({
   );
 }
 
-/** Populated: all statuses visible. */
+/** Populated: all owners, all statuses. */
 export const Populated: Story = {
   render: () => <InteractivePanel />,
+};
+
+/** Page default filters — `mine + open` — showing only orders assigned to me. */
+export const MyOpen: Story = {
+  name: "My Open",
+  render: () => <InteractivePanel initialOwner="mine" initialStatus="open" />,
 };
 
 /** Only failed orders — status filter set to `failed`. */

@@ -152,6 +152,26 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   executions: [],
 };
 
+/**
+ * Second open work order assigned to the storybook user so the FactoryDetailPage
+ * "Populated" story shows a real list under the default `mine + open` filters.
+ */
+export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
+  id: "wo-open-refunds-schema",
+  title: "Add refund reason enum to schema",
+  description: "Extend the refund ledger schema with a nullable reason enum so audit can categorize.",
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: TWO_HOURS_AGO,
+  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [],
+};
+
+// Assignees include the storybook user so the running/failed variants surface
+// under the "mine + running" and "mine + failed" filters. Reviewer/operator
+// remain listed to demonstrate multi-assignee cards.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   title: "Add refund reconciliation test",
@@ -161,7 +181,10 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  assignees: [{ id: REVIEWER_USER.id, name: REVIEWER_USER.name }],
+  assignees: [
+    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+  ],
   executions: [
     planLineExecution("plan", { id: "1", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
     planLineExecution("implement", {
@@ -174,6 +197,8 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   ],
 };
 
+// Failed order stays authored by operator; storybook user co-assigned so the
+// "mine + failed" filter is meaningfully populated.
 export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-failed-refunds",
   title: "Ship idempotent refund retries",
@@ -183,7 +208,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
-  assignees: [],
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [
     planLineExecution("plan", { id: "3", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
     planLineExecution("implement", {
@@ -227,6 +252,7 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   CLOSED_WORK_ORDER,

@@ -52,7 +52,11 @@ export function createOrgWorkspaceFixtureFetch(
 ): typeof fetch {
   const homeFixture = options?.homeFixture ?? defaultHomePageFixture;
   const appFixture = options?.appFixture;
-  const factoriesFixture = options?.factoriesFixture;
+  // Factories handlers mutate the fixture in place (create/dispatch/close/assign),
+  // so each fetch impl owns a private deep-clone. Otherwise interactive stories
+  // would permanently alter the module-level `defaultFactoriesFixture` (and every
+  // fixture that shares nested arrays with it).
+  const factoriesFixture = options?.factoriesFixture ? structuredClone(options.factoriesFixture) : undefined;
   const orgIntegrations: StorybookOrgIntegration[] = [];
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
 

@@ -27,14 +27,19 @@ type Story = StoryObj<typeof meta>;
 
 const detailPath = `factories/${PRIMARY_FACTORY_ID}`;
 
-/** Populated detail view: 3 open orders (open, running, failed) + closed history. */
+/**
+ * Populated detail view. Lands on the page's default `mine + open` filters,
+ * so the list shows the two open orders assigned to `storybook-user`. Flip
+ * status filters to reveal running / failed / closed variants, and the
+ * owner filter to see orders belonging to teammates.
+ */
 export const Populated: Story = {
   render: () => (
     <FactoriesHarness pathSuffix={detailPath} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
-/** Only closed history remains — active filters land on the "no matches" state. */
+/** Only closed history remains — the default `mine + open` filters land on the "no matches" state. */
 export const EmptyWorkOrders: Story = {
   name: "Empty Work Orders",
   render: () => (
