@@ -3,14 +3,24 @@ import { useEffect, useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
+import {
+  CreateWorkOrderPage,
+  FactoryDetailPage,
+  FactoryLineEditPage,
+  FactoryListPage,
+  WorkOrderDetailPage,
+} from "@/pages/factories";
+import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
@@ -47,7 +57,7 @@ function fixtureFetchState(): FixtureFetchState {
 export interface OrgWorkspaceHarnessProps {
   /** Where to land when the story mounts. */
   startAt?: "home" | "app";
-  /** Path under the org when `startAt` is `home`, e.g. `apps/new`. */
+  /** Path under the org when `startAt` is `home`, e.g. `apps/new` or `factories/...`. */
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
   appQuery?: string;
@@ -58,17 +68,23 @@ export interface OrgWorkspaceHarnessProps {
   openAgentSidebar?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
+  /** Backing fixture for factory pages (list, detail, orders, lines, apps). */
+  factoriesFixture?: FactoriesFixture;
   /** Storybook-only: seed post-install Agent improvement suggestions for the canvas. */
   agentSuggestions?: AgentSuggestion[];
 }
 
-function useOrgWorkspaceFixtureFetch(
-  canvasId: string,
-  openAgentSidebar: boolean,
-  homeFixture?: HomePageFixture,
-  appFixture?: CanvasAppFixture,
-  agentSuggestions?: AgentSuggestion[],
-) {
+interface FixtureFetchOptions {
+  canvasId: string;
+  openAgentSidebar: boolean;
+  homeFixture?: HomePageFixture;
+  appFixture?: CanvasAppFixture;
+  factoriesFixture?: FactoriesFixture;
+  agentSuggestions?: AgentSuggestion[];
+}
+
+function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
+  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions } = options;
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -76,7 +92,7 @@ function useOrgWorkspaceFixtureFetch(
       setAgentSuggestions(canvasId, agentSuggestions);
     }
     const state = fixtureFetchState();
-    const impl = createOrgWorkspaceFixtureFetch(state.original, { homeFixture, appFixture });
+    const impl = createOrgWorkspaceFixtureFetch(state.original, { homeFixture, appFixture, factoriesFixture });
     state.delegate = impl;
     return impl;
   });
@@ -97,6 +113,28 @@ function useOrgWorkspaceFixtureFetch(
   return fixtureFetch;
 }
 
+/**
+ * Resolve org and canvas IDs from whichever fixture the story provided. Kept
+ * as a plain helper so the harness component stays under the complexity budget.
+ */
+function resolveWorkspaceIds(
+  homeFixture: HomePageFixture | undefined,
+  appFixture: CanvasAppFixture | undefined,
+  factoriesFixture: FactoriesFixture | undefined,
+) {
+  const orgId =
+    homeFixture?.organizationId ??
+    appFixture?.organizationId ??
+    factoriesFixture?.organizationId ??
+    homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+  return { orgId, canvasId };
+}
+
+function factoryRoute(element: React.ReactNode) {
+  return <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>{element}</RequireExperimentalFeature>;
+}
+
 function OrgWorkspaceRoutes() {
   return (
     <Routes>
@@ -111,6 +149,14 @@ function OrgWorkspaceRoutes() {
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={<AppPage />} />
+        <Route path="factories">
+          <Route index element={factoryRoute(<FactoryListPage />)} />
+          <Route path=":factoryId" element={factoryRoute(<FactoryDetailPage />)} />
+          <Route path=":factoryId/orders/new" element={factoryRoute(<CreateWorkOrderPage />)} />
+          <Route path=":factoryId/orders/:orderId" element={factoryRoute(<WorkOrderDetailPage />)} />
+          <Route path=":factoryId/lines/new" element={factoryRoute(<FactoryLineEditPage />)} />
+          <Route path=":factoryId/lines/:lineId/edit" element={factoryRoute(<FactoryLineEditPage />)} />
+        </Route>
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
@@ -131,11 +177,18 @@ export function OrgWorkspaceHarness({
   openAgentSidebar = false,
   homeFixture,
   appFixture,
+  factoriesFixture,
   agentSuggestions,
 }: OrgWorkspaceHarnessProps) {
-  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
-  useOrgWorkspaceFixtureFetch(canvasId, openAgentSidebar, homeFixture, appFixture, agentSuggestions);
+  const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
+  useOrgWorkspaceFixtureFetch({
+    canvasId,
+    openAgentSidebar,
+    homeFixture,
+    appFixture,
+    factoriesFixture,
+    agentSuggestions,
+  });
 
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
