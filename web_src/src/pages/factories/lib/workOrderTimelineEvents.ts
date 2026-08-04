@@ -5,10 +5,18 @@ import type {
   SuperplaneUsersUser,
 } from "@/api-client";
 import { formatDuration } from "@/lib/duration";
+import {
+  buildOrgUserDisplayMap,
+  createOrgUserDisplayLookup,
+  resolveOrgUserDisplay,
+  type OrgUserDisplay,
+  type OrgUserDisplayLookup,
+} from "@/lib/orgUserDisplay";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
-export type WorkOrderTimelineEventKind = "created" | "dispatched" | "assigned";
+export type WorkOrderTimelineEventKind = "created" | "dispatched" | "assigned" | "closed";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
+export type { OrgUserDisplayLookup };
 
 export interface WorkOrderTimelineStep {
   id: string;
@@ -20,11 +28,18 @@ export interface WorkOrderTimelineStep {
   execution: FactoriesWorkOrderExecution;
 }
 
+export interface WorkOrderTimelineAssigneeChange {
+  assignedUserIds: string[];
+  unassignedUserIds: string[];
+}
+
 export interface WorkOrderTimelineEvent {
   id: string;
   kind: WorkOrderTimelineEventKind;
   at: string;
+  actorUserId?: string;
   actorName?: string;
+  assigneeChange?: WorkOrderTimelineAssigneeChange;
   title: string;
   lineName?: string;
   steps?: WorkOrderTimelineStep[];
@@ -32,14 +47,20 @@ export interface WorkOrderTimelineEvent {
 
 export interface WorkOrderTimelineViewModel {
   events: WorkOrderTimelineEvent[];
-  closedLabel: string | null;
-  closedAt: string | null;
 }
 
 export function buildWorkOrderUserNameLookup(users: SuperplaneUsersUser[], order: FactoriesWorkOrder): UserNameLookup {
-  const namesById = collectOrgUserNames(users);
-  addOrderFallbackNames(namesById, order);
-  return createUserNameResolver(namesById);
+  const resolveUserDisplay = buildWorkOrderUserDisplayLookup(users, order);
+  return (userId) => resolveUserDisplay(userId)?.name;
+}
+
+export function buildWorkOrderUserDisplayLookup(
+  users: SuperplaneUsersUser[],
+  order: FactoriesWorkOrder,
+): OrgUserDisplayLookup {
+  const usersById = buildOrgUserDisplayMap(users);
+  addOrderFallbackNames(usersById, order);
+  return createOrgUserDisplayLookup(usersById);
 }
 
 export function buildWorkOrderTimelineView(
@@ -63,36 +84,22 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
   return formatted || null;
 }
 
-function collectOrgUserNames(users: SuperplaneUsersUser[]): Map<string, string> {
-  const namesById = new Map<string, string>();
-
-  for (const user of users) {
-    registerUserName(namesById, user.metadata?.id, user.spec?.displayName?.trim() || user.metadata?.email?.trim());
-  }
-
-  return namesById;
-}
-
-function addOrderFallbackNames(namesById: Map<string, string>, order: FactoriesWorkOrder): void {
-  registerUserName(namesById, order.createdBy?.id, order.createdBy?.name);
+function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {
+  registerOrderUserFallback(usersById, order.createdBy?.id, order.createdBy?.name);
 
   for (const assignee of order.assignees ?? []) {
-    registerUserName(namesById, assignee.id, assignee.name);
+    registerOrderUserFallback(usersById, assignee.id, assignee.name);
   }
 }
 
-function registerUserName(namesById: Map<string, string>, id: string | undefined, name: string | undefined): void {
-  if (id && name?.trim()) {
-    namesById.set(id, name.trim());
+function registerOrderUserFallback(
+  usersById: Map<string, OrgUserDisplay>,
+  id: string | undefined,
+  name: string | undefined,
+): void {
+  if (!id || usersById.has(id) || !name?.trim()) {
+    return;
   }
-}
 
-function createUserNameResolver(namesById: Map<string, string>): UserNameLookup {
-  return (userId) => {
-    if (!userId) {
-      return undefined;
-    }
-
-    return namesById.get(userId);
-  };
+  usersById.set(id, resolveOrgUserDisplay(new Map(), id, name)!);
 }

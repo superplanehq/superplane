@@ -2,9 +2,10 @@ import { Text } from "@/components/Text/text";
 import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
+import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import {
   Check,
   CircleDashed,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   buildWorkOrderTimelineView,
+  buildWorkOrderUserDisplayLookup,
   buildWorkOrderUserNameLookup,
   formatStepExecutionDuration,
   type WorkOrderTimelineEvent,
@@ -25,6 +27,7 @@ import {
   type WorkOrderTimelineStep,
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
+import { OrgUserReference } from "./OrgUserReference";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
@@ -51,6 +54,7 @@ export function WorkOrderActivityTimeline({
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
+  const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
 
   if (pendingView) {
@@ -59,7 +63,7 @@ export function WorkOrderActivityTimeline({
 
   const timeline = buildWorkOrderTimelineView(events, resolveUserName);
 
-  if (timeline.events.length === 0 && !timeline.closedLabel) {
+  if (timeline.events.length === 0) {
     return <TimelineActivityEmpty />;
   }
 
@@ -67,6 +71,7 @@ export function WorkOrderActivityTimeline({
     <WorkOrderTimelineList
       timeline={timeline}
       organizationId={organizationId}
+      resolveUserDisplay={resolveUserDisplay}
       hasMoreEvents={hasMoreEvents}
       isLoadingMoreEvents={isLoadingMoreEvents}
       onLoadMoreEvents={onLoadMoreEvents}
@@ -124,12 +129,14 @@ function TimelineActivityEmpty() {
 function WorkOrderTimelineList({
   timeline,
   organizationId,
+  resolveUserDisplay,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
 }: {
   timeline: ReturnType<typeof buildWorkOrderTimelineView>;
   organizationId: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -154,21 +161,10 @@ function WorkOrderTimelineList({
           key={event.id}
           event={event}
           organizationId={organizationId}
-          isLast={index === timeline.events.length - 1 && !timeline.closedLabel}
+          resolveUserDisplay={resolveUserDisplay}
+          isLast={index === timeline.events.length - 1}
         />
       ))}
-
-      {timeline.closedLabel && timeline.closedAt ? (
-        <li className="relative flex gap-4 pb-2 pl-8">
-          <TimelineMarker icon={CircleDot} className="text-gray-400" />
-          <div className="min-w-0 flex-1 pb-8">
-            <p className="text-sm text-gray-900 dark:text-gray-100">{timeline.closedLabel}</p>
-            <time className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {formatTimeAgo(new Date(timeline.closedAt))}
-            </time>
-          </div>
-        </li>
-      ) : null}
     </ol>
   );
 }
@@ -176,35 +172,42 @@ function WorkOrderTimelineList({
 function TimelineItem({
   event,
   organizationId,
+  resolveUserDisplay,
   isLast,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
   isLast: boolean;
 }) {
-  const { icon: Icon, markerClassName } = getTimelineEventPresentation(event.kind);
-  const isUserActionEvent = event.kind === "created" || event.kind === "assigned";
-  const isCreatedEvent = event.kind === "created";
+  const { icon: Icon } = getTimelineEventPresentation(event.kind);
+  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
+  const showSomeoneFallback = (event.kind === "created" || event.kind === "closed") && !actorDisplay;
 
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
         <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
-      <TimelineMarker icon={Icon} className={markerClassName} />
+      <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
         {isUserActionEvent ? (
-          <p className="text-sm text-gray-900 dark:text-gray-100">
-            {event.actorName ? (
-              <>
-                <span className="font-semibold">{event.actorName}</span>{" "}
-              </>
-            ) : isCreatedEvent ? (
-              <>
-                <span className="font-semibold">Someone</span>{" "}
-              </>
+          <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
+            {actorDisplay ? (
+              <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+            ) : showSomeoneFallback ? (
+              <span className="font-semibold">Someone</span>
             ) : null}
-            {event.title}
+            {event.kind === "assigned" && event.assigneeChange ? (
+              <AssigneeChangeDescription
+                actorUserId={event.actorUserId}
+                assigneeChange={event.assigneeChange}
+                resolveUserDisplay={resolveUserDisplay}
+              />
+            ) : (
+              <span>{event.title}</span>
+            )}
           </p>
         ) : (
           <>
@@ -225,6 +228,117 @@ function TimelineItem({
         ) : null}
       </div>
     </li>
+  );
+}
+
+function AssigneeChangeDescription({
+  actorUserId,
+  assigneeChange,
+  resolveUserDisplay,
+}: {
+  actorUserId?: string;
+  assigneeChange: NonNullable<WorkOrderTimelineEvent["assigneeChange"]>;
+  resolveUserDisplay: OrgUserDisplayLookup;
+}) {
+  const { assignedUserIds, unassignedUserIds } = assigneeChange;
+  const parts: ReactNode[] = [];
+
+  const assignedDescription = buildAssignedChangeDescription(actorUserId, assignedUserIds, resolveUserDisplay);
+  if (assignedDescription) {
+    parts.push(<span key="assigned">{assignedDescription}</span>);
+  }
+
+  if (unassignedUserIds.length > 0) {
+    parts.push(
+      <span key="unassigned" className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
+        unassigned <InlineUserList userIds={unassignedUserIds} resolveUserDisplay={resolveUserDisplay} />
+      </span>,
+    );
+  }
+
+  if (parts.length === 0) {
+    return <span>updated assignees</span>;
+  }
+
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? <span> and </span> : null}
+          {part}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+function buildAssignedChangeDescription(
+  actorUserId: string | undefined,
+  assignedUserIds: string[],
+  resolveUserDisplay: OrgUserDisplayLookup,
+): ReactNode | null {
+  if (assignedUserIds.length === 0) {
+    return null;
+  }
+
+  const assignedOthers = actorUserId ? assignedUserIds.filter((userId) => userId !== actorUserId) : assignedUserIds;
+  const selfAssigned = Boolean(actorUserId && assignedUserIds.includes(actorUserId));
+
+  if (selfAssigned && assignedOthers.length === 0) {
+    return <span>self-assigned</span>;
+  }
+
+  if (selfAssigned && assignedOthers.length > 0) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
+        self-assigned and assigned <InlineUserList userIds={assignedOthers} resolveUserDisplay={resolveUserDisplay} />
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
+      assigned <InlineUserList userIds={assignedUserIds} resolveUserDisplay={resolveUserDisplay} />
+    </span>
+  );
+}
+
+function InlineUserList({
+  userIds,
+  resolveUserDisplay,
+}: {
+  userIds: string[];
+  resolveUserDisplay: OrgUserDisplayLookup;
+}) {
+  if (userIds.length === 0) {
+    return null;
+  }
+
+  if (userIds.length === 1) {
+    return <OrgUserReference display={resolveUserDisplay(userIds[0])} size="sm" emphasizeName />;
+  }
+
+  if (userIds.length === 2) {
+    return (
+      <>
+        <OrgUserReference display={resolveUserDisplay(userIds[0])} size="sm" emphasizeName />
+        <span> and </span>
+        <OrgUserReference display={resolveUserDisplay(userIds[1])} size="sm" emphasizeName />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {userIds.slice(0, -1).map((userId, index) => (
+        <Fragment key={userId}>
+          {index > 0 ? <span>, </span> : null}
+          <OrgUserReference display={resolveUserDisplay(userId)} size="sm" emphasizeName />
+        </Fragment>
+      ))}
+      <span>, and </span>
+      <OrgUserReference display={resolveUserDisplay(userIds[userIds.length - 1])} size="sm" emphasizeName />
+    </>
   );
 }
 
@@ -289,15 +403,10 @@ function StepStatusIcon({ execution }: { execution: FactoriesWorkOrderExecution 
   return <CircleDashed className={cn(iconClassName, "text-gray-400")} aria-label={meta.label} />;
 }
 
-function TimelineMarker({ icon: Icon, className }: { icon: typeof UserRound; className?: string }) {
+function TimelineMarker({ icon: Icon }: { icon: typeof UserRound }) {
   return (
-    <span
-      className={cn(
-        "absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700/70 dark:bg-gray-900",
-        className,
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
+    <span className="absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700/70 dark:bg-gray-900">
+      <Icon className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" aria-hidden />
     </span>
   );
 }
@@ -306,14 +415,15 @@ type TimelineMarkerIcon = typeof UserRound;
 
 function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
   icon: TimelineMarkerIcon;
-  markerClassName: string;
 } {
   switch (kind) {
     case "created":
-      return { icon: UserRound, markerClassName: "text-gray-500" };
+      return { icon: UserRound };
     case "assigned":
-      return { icon: UsersRound, markerClassName: "text-sky-500" };
+      return { icon: UsersRound };
     case "dispatched":
-      return { icon: GitBranch, markerClassName: "text-violet-500" };
+      return { icon: GitBranch };
+    case "closed":
+      return { icon: CircleDot };
   }
 }
