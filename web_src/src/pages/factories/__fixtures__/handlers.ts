@@ -79,8 +79,21 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
       pattern: re("/api/v1/factories/([^/]+)"),
-      resolve: (match) => {
+      resolve: (match, method, body) => {
         const factory = fixture.factories.find((entry) => entry.id === match[1]);
+
+        if (method === "PUT") {
+          if (!factory) return { json: {} };
+          const request = (body ?? {}) as RequestBody;
+          if (typeof request.name === "string" && request.name.trim()) {
+            factory.name = request.name.trim();
+          }
+          if (typeof request.description === "string") {
+            factory.description = request.description;
+          }
+          return { json: { factory } };
+        }
+
         return factory ? { json: { factory } } : { json: {} };
       },
     },

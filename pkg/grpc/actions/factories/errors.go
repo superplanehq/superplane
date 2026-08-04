@@ -12,6 +12,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	switch {
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
+	case errors.Is(err, models.ErrFactoryNameRequired):
+		return grpcerrors.InvalidArgument(err, "factory name is required")
 	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.NotFound(err, "factory not found")
 	case errors.Is(err, models.ErrFactoryWorkOrderNotFound):
