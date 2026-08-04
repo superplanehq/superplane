@@ -13,6 +13,9 @@ var exampleDataOnIssueBytes []byte
 //go:embed example_data_on_issue_comment.json
 var exampleDataOnIssueCommentBytes []byte
 
+//go:embed example_data_on_job.json
+var exampleDataOnJobBytes []byte
+
 //go:embed example_data_on_merge_comment.json
 var exampleDataOnMergeCommentBytes []byte
 
@@ -48,6 +51,9 @@ var exampleDataOnIssue map[string]any
 
 var exampleDataOnIssueCommentOnce sync.Once
 var exampleDataOnIssueComment map[string]any
+
+var exampleDataOnJobOnce sync.Once
+var exampleDataOnJob map[string]any
 
 var exampleDataOnMergeCommentOnce sync.Once
 var exampleDataOnMergeComment map[string]any
@@ -85,6 +91,10 @@ func (i *OnIssue) ExampleData() map[string]any {
 
 func (m *OnIssueComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
+func (t *OnJob) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnJobOnce, exampleDataOnJobBytes, &exampleDataOnJob)
 }
 
 func (m *OnMergeComment) ExampleData() map[string]any {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ const factoryNameUniqueConstraint = "factories_organization_id_name_key"
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
 var ErrFactoryNotFound = errors.New("factory not found")
+var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 
 type Factory struct {
 	ID             uuid.UUID
@@ -101,7 +103,12 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+
 	now := time.Now()
 	order := &FactoryWorkOrder{
 		ID:             uuid.New(),
@@ -111,7 +118,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		Description:    description,
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
-		CreatedByID:    &createdBy,
+		CreatedByID:    createdBy,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
