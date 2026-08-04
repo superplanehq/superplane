@@ -17,11 +17,19 @@ export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
 
-/** Timestamps expressed relative to a fixed "now" so `formatTimeAgo` renders stable labels in stories. */
-const HOUR_AGO = new Date("2026-05-10T11:00:00Z").toISOString();
-const TWO_HOURS_AGO = new Date("2026-05-10T10:00:00Z").toISOString();
-const YESTERDAY = new Date("2026-05-09T09:00:00Z").toISOString();
-const LAST_WEEK = new Date("2026-05-03T09:00:00Z").toISOString();
+// Anchored to Date.now() at module load so `formatTimeAgo` renders the intended
+// "1 hour ago" / "yesterday" / "last week" labels regardless of when a story is
+// opened. (Absolute dates cause labels to drift over time.)
+const NOW_MS = Date.now();
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const relativeIso = (offsetMs: number) => new Date(NOW_MS - offsetMs).toISOString();
+
+const HOUR_AGO = relativeIso(HOUR_MS);
+const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
+const YESTERDAY = relativeIso(DAY_MS);
+const LAST_WEEK = relativeIso(7 * DAY_MS);
 
 export const REVIEWER_USER = {
   id: "user-reviewer-alex",

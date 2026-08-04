@@ -10,9 +10,12 @@ import {
 import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
 
 /**
- * Sidebar assignees panel: heading + edit affordance + list. The popover is
- * gated to view-only in these stories to avoid the picker's live fetch;
- * the harnessed full-page stories cover the interactive path.
+ * Sidebar assignees panel: heading + edit affordance + list. These stories
+ * showcase the panel's *rendered* states (populated / empty / read-only);
+ * the assignees popover fetches from `/api/v1/users` when opened, so the
+ * interactive edit path is covered by the harnessed page stories under
+ * `Pages/Factories/WorkOrderDetail`. Edit is disabled here to keep every
+ * story self-contained.
  */
 const meta = {
   title: "Factories/WorkOrderAssigneesField",
@@ -31,18 +34,16 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Multiple assignees, editable. */
+/** Multiple assignees rendered as chips. */
 export const WithAssignees: Story = {
   name: "With Assignees",
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     assigneeIds: [STORYBOOK_ME_USER_ID, REVIEWER_USER.id],
     assigneeNames: [STORYBOOK_ME_USER_NAME, REVIEWER_USER.name],
-    canEdit: true,
+    canEdit: false,
     isSaving: false,
-    onSave: async (ids) => {
-      console.log("save assignees", ids);
-    },
+    onSave: async () => undefined,
   },
 };
 
@@ -52,7 +53,7 @@ export const Empty: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     assigneeIds: [],
     assigneeNames: [],
-    canEdit: true,
+    canEdit: false,
     isSaving: false,
     onSave: async () => undefined,
   },
