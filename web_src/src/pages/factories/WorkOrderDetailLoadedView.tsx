@@ -24,6 +24,12 @@ interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
+  eventsError?: Error | null;
+  isEventsLoading?: boolean;
+  hasMoreEvents?: boolean;
+  isLoadingMoreEvents?: boolean;
+  onLoadMoreEvents?: () => void;
+  onRetryEvents?: () => void;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -50,6 +56,12 @@ export function WorkOrderDetailLoadedView({
   organizationId,
   order,
   events,
+  eventsError,
+  isEventsLoading,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+  onRetryEvents,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -110,7 +122,17 @@ export function WorkOrderDetailLoadedView({
             <section>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
               <div className="mt-5">
-                <WorkOrderActivityTimeline organizationId={organizationId} order={order} events={events} />
+                <WorkOrderActivityTimeline
+                  organizationId={organizationId}
+                  order={order}
+                  events={events}
+                  eventsError={eventsError}
+                  isLoading={isEventsLoading}
+                  hasMoreEvents={hasMoreEvents}
+                  isLoadingMoreEvents={isLoadingMoreEvents}
+                  onLoadMoreEvents={onLoadMoreEvents}
+                  onRetryEvents={onRetryEvents}
+                />
               </div>
             </section>
           </div>

@@ -1,3 +1,4 @@
+import { Text } from "@/components/Text/text";
 import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -20,6 +21,7 @@ import {
   buildWorkOrderUserNameLookup,
   formatStepExecutionDuration,
   type WorkOrderTimelineEvent,
+  type WorkOrderTimelineEventKind,
   type WorkOrderTimelineStep,
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
@@ -28,19 +30,125 @@ interface WorkOrderTimelineProps {
   organizationId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
+  eventsError?: Error | null;
+  isLoading?: boolean;
+  hasMoreEvents?: boolean;
+  isLoadingMoreEvents?: boolean;
+  onLoadMoreEvents?: () => void;
+  onRetryEvents?: () => void;
 }
 
-export function WorkOrderActivityTimeline({ organizationId, order, events }: WorkOrderTimelineProps) {
+export function WorkOrderActivityTimeline({
+  organizationId,
+  order,
+  events,
+  eventsError = null,
+  isLoading = false,
+  hasMoreEvents = false,
+  isLoadingMoreEvents = false,
+  onLoadMoreEvents,
+  onRetryEvents,
+}: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
+  const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
+
+  if (pendingView) {
+    return pendingView;
+  }
+
   const timeline = buildWorkOrderTimelineView(events, resolveUserName);
 
   if (timeline.events.length === 0 && !timeline.closedLabel) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>;
+    return <TimelineActivityEmpty />;
   }
 
   return (
+    <WorkOrderTimelineList
+      timeline={timeline}
+      organizationId={organizationId}
+      hasMoreEvents={hasMoreEvents}
+      isLoadingMoreEvents={isLoadingMoreEvents}
+      onLoadMoreEvents={onLoadMoreEvents}
+    />
+  );
+}
+
+function renderTimelinePendingView({
+  events,
+  eventsError,
+  isLoading,
+  onRetryEvents,
+}: {
+  events?: FactoriesWorkOrderEvent[];
+  eventsError: Error | null;
+  isLoading: boolean;
+  onRetryEvents?: () => void;
+}) {
+  if (eventsError && !events?.length) {
+    return <TimelineActivityError onRetryEvents={onRetryEvents} />;
+  }
+
+  if (isLoading && !events?.length) {
+    return <TimelineActivityLoading />;
+  }
+
+  return null;
+}
+
+function TimelineActivityError({ onRetryEvents }: { onRetryEvents?: () => void }) {
+  return (
+    <div role="alert" className="rounded-lg border border-red-300 px-4 py-3 dark:border-red-800">
+      <Text className="text-red-500 dark:text-red-400">Failed to load activity.</Text>
+      {onRetryEvents ? (
+        <button
+          type="button"
+          onClick={onRetryEvents}
+          className="mt-2 text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+        >
+          Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function TimelineActivityLoading() {
+  return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading activity…</Text>;
+}
+
+function TimelineActivityEmpty() {
+  return <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>;
+}
+
+function WorkOrderTimelineList({
+  timeline,
+  organizationId,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+}: {
+  timeline: ReturnType<typeof buildWorkOrderTimelineView>;
+  organizationId: string;
+  hasMoreEvents: boolean;
+  isLoadingMoreEvents: boolean;
+  onLoadMoreEvents?: () => void;
+}) {
+  return (
     <ol className="relative space-y-0">
+      {hasMoreEvents ? (
+        <li className="relative pb-4 pl-8">
+          <button
+            type="button"
+            onClick={onLoadMoreEvents}
+            disabled={isLoadingMoreEvents || !onLoadMoreEvents}
+            className="text-sm font-medium text-violet-600 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-violet-400 dark:hover:text-violet-300"
+          >
+            {isLoadingMoreEvents ? "Loading…" : "Load more events"}
+          </button>
+        </li>
+      ) : null}
+
       {timeline.events.map((event, index) => (
         <TimelineItem
           key={event.id}
@@ -74,27 +182,24 @@ function TimelineItem({
   organizationId: string;
   isLast: boolean;
 }) {
-  const Icon = event.kind === "created" ? UserRound : event.kind === "assigned" ? UsersRound : GitBranch;
+  const { icon: Icon, markerClassName } = getTimelineEventPresentation(event.kind);
+  const isUserActionEvent = event.kind === "created" || event.kind === "assigned";
+  const isCreatedEvent = event.kind === "created";
 
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
         <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
-      <TimelineMarker
-        icon={Icon}
-        className={
-          event.kind === "created" ? "text-gray-500" : event.kind === "assigned" ? "text-sky-500" : "text-violet-500"
-        }
-      />
+      <TimelineMarker icon={Icon} className={markerClassName} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        {event.kind === "created" || event.kind === "assigned" ? (
+        {isUserActionEvent ? (
           <p className="text-sm text-gray-900 dark:text-gray-100">
             {event.actorName ? (
               <>
                 <span className="font-semibold">{event.actorName}</span>{" "}
               </>
-            ) : event.kind === "created" ? (
+            ) : isCreatedEvent ? (
               <>
                 <span className="font-semibold">Someone</span>{" "}
               </>
@@ -113,7 +218,7 @@ function TimelineItem({
             ) : null}
           </>
         )}
-        {event.kind === "created" || event.kind === "assigned" ? (
+        {isUserActionEvent ? (
           <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
             {formatTimeAgo(new Date(event.at))}
           </time>
@@ -195,4 +300,20 @@ function TimelineMarker({ icon: Icon, className }: { icon: typeof UserRound; cla
       <Icon className="h-3.5 w-3.5" aria-hidden />
     </span>
   );
+}
+
+type TimelineMarkerIcon = typeof UserRound;
+
+function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
+  icon: TimelineMarkerIcon;
+  markerClassName: string;
+} {
+  switch (kind) {
+    case "created":
+      return { icon: UserRound, markerClassName: "text-gray-500" };
+    case "assigned":
+      return { icon: UsersRound, markerClassName: "text-sky-500" };
+    case "dispatched":
+      return { icon: GitBranch, markerClassName: "text-violet-500" };
+  }
 }

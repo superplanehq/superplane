@@ -40,22 +40,8 @@ interface LineStepExecutionPayload {
   run?: EventRunRef;
 }
 
-/** @deprecated Legacy event shape; kept for older stored events. */
-interface EventExecutionRef {
-  id?: string;
-  stepName?: string;
-  step_name?: string;
-  run?: EventRunRef;
-  run_id?: string;
-  app_id?: string;
-  app_name?: string;
-  result?: string;
-  state?: string;
-}
-
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
-  execution?: EventExecutionRef;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
   order?: {
@@ -93,24 +79,36 @@ interface StepFromExecutionEventInput {
   batch: WorkOrderTimelineEvent;
 }
 
-interface StepFromLegacyEventInput {
-  executionPayload: EventExecutionRef;
-  line: EventLineRef | undefined;
-  at: string;
-  index: number;
-  eventType: string;
-  batch: WorkOrderTimelineEvent;
-}
-
 type StepExecutionEventType = "step.execution.created" | "step.execution.finished";
+
+const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
+  "order.opened": 10,
+  "order.assignees.updated": 20,
+  "step.execution.created": 30,
+  "step.execution.finished": 40,
+  "order.closed": 50,
+};
+
+function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
+  const timeDiff = Date.parse(left.timestamp ?? "") - Date.parse(right.timestamp ?? "");
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  const leftOrder = WORK_ORDER_EVENT_TYPE_ORDER[left.type ?? ""] ?? 0;
+  const rightOrder = WORK_ORDER_EVENT_TYPE_ORDER[right.type ?? ""] ?? 0;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  return (left.type ?? "").localeCompare(right.type ?? "");
+}
 
 export function buildWorkOrderTimelineViewFromEvents(
   apiEvents: FactoriesWorkOrderEvent[],
   resolveUserName?: UserNameLookup,
 ): WorkOrderTimelineViewModel {
-  const eventsAsc = [...apiEvents].sort(
-    (left, right) => Date.parse(left.timestamp ?? "") - Date.parse(right.timestamp ?? ""),
-  );
+  const eventsAsc = apiEvents.toSorted(compareWorkOrderEventsChronologically);
 
   const state = createTimelineBuildState();
 
@@ -151,13 +149,6 @@ function applyApiEventToTimeline(
       return;
     case "step.execution.finished":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
-      return;
-    case "order.dispatched":
-      registerExplicitDispatchBatch(state, index, payload, at);
-      return;
-    case "line.step.started":
-    case "line.step.finished":
-      appendLegacyStepEvent(toDispatchBatchContext(state), { payload, at, index, eventType: apiEvent.type ?? "" });
       return;
     case "order.closed":
       applyOrderClosedState(state, payload, at);
@@ -201,21 +192,6 @@ function appendAssigneesUpdatedEvent(
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
     title: describeAssigneesUpdated(payload, resolveUserName),
   });
-}
-
-function registerExplicitDispatchBatch(
-  state: TimelineBuildState,
-  index: number,
-  payload: EventPayload,
-  at: string,
-): void {
-  const line = payload.line;
-  const lineId = line?.id ?? `line-${index}`;
-  const lineName = line?.name?.trim() || "Unnamed line";
-  const batch = createDispatchBatchEvent(lineId, lineName, at);
-
-  state.events.push(batch);
-  state.dispatchBatchByLine.set(lineId, batch);
 }
 
 function applyOrderClosedState(state: TimelineBuildState, payload: EventPayload, at: string): void {
@@ -316,6 +292,11 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
   const { payload, runId, stepName, at, eventType, batch } = input;
   const stepId = `run-${runId}`;
   const existingStep = batch.steps?.find((item) => item.id === stepId);
+
+  if (eventType === "step.execution.created" && existingStep?.finishedAt) {
+    return existingStep;
+  }
+
   const { startedAt, finishedAt } = resolveStepTiming(existingStep, at, eventType === "step.execution.finished");
 
   return {
@@ -326,64 +307,6 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
     finishedAt,
     execution: executionFromStepPayload(payload, startedAt, at, eventType),
   };
-}
-
-function appendLegacyStepEvent(
-  ctx: DispatchBatchContext,
-  input: { payload: EventPayload; at: string; index: number; eventType: string },
-): void {
-  const { payload, at, index, eventType } = input;
-  const line = payload.line;
-  const executionPayload = payload.execution;
-  if (!executionPayload) {
-    return;
-  }
-
-  const lineId = line?.id ?? "unknown-line";
-  const lineName = line?.name?.trim() || "Unnamed line";
-  const batch = findOrCreateDispatchBatch(ctx, {
-    lineId,
-    lineName,
-    stepName: legacyStepName(executionPayload),
-    at,
-    isCreatedEvent: eventType === "line.step.started",
-  });
-
-  const step = buildStepFromLegacyEvent({
-    executionPayload,
-    line,
-    at,
-    index,
-    eventType,
-    batch,
-  });
-  upsertTimelineStep(batch, step);
-}
-
-function buildStepFromLegacyEvent(input: StepFromLegacyEventInput): WorkOrderTimelineStep {
-  const { executionPayload, line, at, index, eventType, batch } = input;
-  const execution = executionFromLegacyPayload(executionPayload, line, at, eventType);
-  const stepId = execution.id ?? `step-${index}`;
-  const existingStep = batch.steps?.find((item) => item.id === stepId);
-  const isFinished = eventType === "line.step.finished";
-  const { startedAt, finishedAt } = resolveStepTiming(existingStep, at, isFinished);
-
-  return {
-    id: stepId,
-    stepName: legacyStepName(executionPayload),
-    at: finishedAt ?? startedAt,
-    startedAt,
-    finishedAt,
-    execution: {
-      ...execution,
-      createdAt: startedAt,
-      updatedAt: finishedAt ?? startedAt,
-    },
-  };
-}
-
-function legacyStepName(executionPayload: EventExecutionRef): string {
-  return executionPayload.stepName?.trim() || executionPayload.step_name?.trim() || "Unnamed step";
 }
 
 function resolveStepTiming(
@@ -473,40 +396,10 @@ function executionFromStepPayload(
   };
 }
 
-function executionFromLegacyPayload(
-  executionPayload: EventExecutionRef,
-  line: EventLineRef | undefined,
-  at: string,
-  eventType: string,
-): FactoriesWorkOrderExecution {
-  const state = mapExecutionState(executionPayload.state ?? executionPayload.run?.state, eventType);
-  const result = mapExecutionResult(executionPayload.result ?? executionPayload.run?.result);
-
-  return {
-    id: executionPayload.id,
-    step: executionPayload.stepName ?? executionPayload.step_name,
-    state,
-    result,
-    createdAt: at,
-    updatedAt: at,
-    line: line?.id
-      ? {
-          id: line.id,
-          name: line.name,
-        }
-      : undefined,
-    run:
-      (executionPayload.run_id ?? executionPayload.run?.id) && executionPayload.app_id
-        ? {
-            id: executionPayload.run_id ?? executionPayload.run?.id,
-            appId: executionPayload.app_id,
-            appName: executionPayload.app_name,
-          }
-        : undefined,
-  };
-}
-
-function mapExecutionState(state: string | undefined, eventType: string): FactoriesWorkOrderExecutionState {
+function mapExecutionState(
+  state: string | undefined,
+  eventType: StepExecutionEventType,
+): FactoriesWorkOrderExecutionState {
   switch (state) {
     case "running":
     case "started":
@@ -518,10 +411,7 @@ function mapExecutionState(state: string | undefined, eventType: string): Factor
     case "finished":
       return "STATE_FINISHED";
     default:
-      if (eventType === "line.step.finished" || eventType === "step.execution.finished") {
-        return "STATE_FINISHED";
-      }
-      return "STATE_PENDING";
+      return eventType === "step.execution.finished" ? "STATE_FINISHED" : "STATE_PENDING";
   }
 }
 

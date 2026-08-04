@@ -37,7 +37,6 @@ type Story = StoryObj<typeof meta>;
 
 /** Freshly opened order — only a `created` marker. */
 export const JustCreated: Story = {
-  name: "Just Created",
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: OPEN_WORK_ORDER,
@@ -69,5 +68,33 @@ export const Closed: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: CLOSED_WORK_ORDER,
     events: CLOSED_WORK_ORDER_EVENTS,
+  },
+};
+
+/** Older events are available but not loaded yet. */
+export const WithLoadMore: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: RUNNING_WORK_ORDER,
+    events: RUNNING_WORK_ORDER_EVENTS,
+    hasMoreEvents: true,
+    onLoadMoreEvents: () => undefined,
+  },
+};
+
+export const Loading: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    isLoading: true,
+  },
+};
+
+export const ErrorState: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    eventsError: new Error("Failed to load activity"),
+    onRetryEvents: () => undefined,
   },
 };

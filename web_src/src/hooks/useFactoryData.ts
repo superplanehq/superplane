@@ -17,14 +17,17 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
-  FactoriesWorkOrderEvent,
   FactoriesWorkOrderResult,
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { hasActiveWorkOrderExecution } from "@/pages/factories/lib/workOrderExecutions";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getWorkOrderEventsNextPageParam,
+  WORK_ORDER_EVENTS_PAGE_LIMIT,
+} from "@/pages/factories/lib/workOrderEventsPagination";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const WORK_ORDER_POLL_INTERVAL_MS = 5_000;
 
@@ -126,17 +129,23 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
 }
 
 export function useWorkOrderEvents(organizationId: string, factoryId: string, orderId: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: workOrderEventsKey(organizationId, factoryId, orderId),
-    queryFn: async (): Promise<FactoriesWorkOrderEvent[]> => {
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
       const response = await factoriesListWorkOrderEvents(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId },
+          query: {
+            limit: WORK_ORDER_EVENTS_PAGE_LIMIT,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
         }),
       );
-      return response.data?.events ?? [];
+      return response.data;
     },
+    getNextPageParam: getWorkOrderEventsNextPageParam,
+    initialPageParam: undefined as string | undefined,
     enabled: Boolean(organizationId && factoryId && orderId),
     refetchInterval: WORK_ORDER_POLL_INTERVAL_MS,
   });

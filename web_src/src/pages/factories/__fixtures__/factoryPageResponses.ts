@@ -296,7 +296,9 @@ function stepExecutionCreatedEvent(input: StepExecutionEventFixture): FactoriesW
   };
 }
 
-function stepExecutionFinishedEvent(input: StepExecutionEventFixture & { result: "passed" | "failed" }): FactoriesWorkOrderEvent {
+function stepExecutionFinishedEvent(
+  input: StepExecutionEventFixture & { result: "passed" | "failed" },
+): FactoriesWorkOrderEvent {
   const { order, stepName, at, runId, appId, result } = input;
   return {
     type: "step.execution.finished",
