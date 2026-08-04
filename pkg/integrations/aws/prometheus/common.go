@@ -248,6 +248,7 @@ type ruleGroupsNamespaceConfiguration struct {
 	Region      string `json:"region" mapstructure:"region"`
 	WorkspaceID string `json:"workspace" mapstructure:"workspace"`
 	Name        string `json:"namespace" mapstructure:"namespace"`
+	ClientToken string `json:"clientToken" mapstructure:"clientToken"`
 }
 
 func decodeRuleGroupsNamespaceConfiguration(rawConfiguration any) (ruleGroupsNamespaceConfiguration, error) {
@@ -259,6 +260,7 @@ func decodeRuleGroupsNamespaceConfiguration(rawConfiguration any) (ruleGroupsNam
 	config.Region = strings.TrimSpace(config.Region)
 	config.WorkspaceID = strings.TrimSpace(config.WorkspaceID)
 	config.Name = strings.TrimSpace(config.Name)
+	config.ClientToken = strings.TrimSpace(config.ClientToken)
 
 	if config.Region == "" {
 		return ruleGroupsNamespaceConfiguration{}, fmt.Errorf("region is required")
