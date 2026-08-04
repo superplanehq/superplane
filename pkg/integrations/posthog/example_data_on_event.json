@@ -1,0 +1,38 @@
+{
+  "type": "posthog.event",
+  "data": {
+    "event": {
+      "uuid": "01912f3a-4b5c-7d8e-9f01-23456789abcd",
+      "event": "subscription upgraded",
+      "distinct_id": "user_84f21c",
+      "timestamp": "2024-08-14T09:31:12.482000Z",
+      "url": "https://us.posthog.com/project/12345/events/01912f3a-4b5c-7d8e-9f01-23456789abcd",
+      "properties": {
+        "plan": "enterprise",
+        "previous_plan": "team",
+        "seats": 45,
+        "mrr": 2250,
+        "$browser": "Chrome",
+        "$os": "Mac OS X",
+        "$current_url": "https://example.com/settings/billing",
+        "$lib": "web"
+      }
+    },
+    "person": {
+      "id": "01912f39-8a2b-7c4d-8e5f-0123456789ab",
+      "url": "https://us.posthog.com/project/12345/person/user_84f21c",
+      "properties": {
+        "email": "dana@example.com",
+        "name": "Dana Whitfield",
+        "company": "Example Inc",
+        "$initial_referring_domain": "google.com"
+      }
+    },
+    "project": {
+      "id": "12345",
+      "name": "Example Production",
+      "url": "https://us.posthog.com/project/12345"
+    }
+  },
+  "timestamp": "2024-08-14T09:31:12Z"
+}
