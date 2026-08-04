@@ -2,14 +2,14 @@ import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { Check, CircleDashed, CornerDownRight, Loader2, MinusCircle, XCircle } from "lucide-react";
+import { Check, CircleDashed, Loader2, MinusCircle, XCircle } from "lucide-react";
 import {
   getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
   getWorkOrderExecutionRunHref,
   groupWorkOrderExecutionsByLine,
   type WorkOrderExecutionLineGroup,
-} from "./workOrderExecutions";
+} from "./lib/workOrderExecutions";
 
 interface WorkOrderExecutionsListProps {
   organizationId: string;
@@ -110,7 +110,6 @@ function CompactExecutionRow({
 
   return (
     <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
       <ExecutionStepMeta execution={execution} stepLabel={stepLabel} meta={meta} runHref={runHref} showTimestamp />
     </li>
   );

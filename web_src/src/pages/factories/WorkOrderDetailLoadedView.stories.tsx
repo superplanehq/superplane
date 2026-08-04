@@ -14,7 +14,7 @@ import {
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
-import { getWorkOrderDetailDerived } from "./workOrderProgress";
+import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 /**
  * Direct-props stories for `WorkOrderDetailLoadedView` — the pure composed
