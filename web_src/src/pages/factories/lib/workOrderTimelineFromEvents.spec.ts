@@ -37,4 +37,38 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(step?.execution?.state).toBe("STATE_FINISHED");
     expect(step?.execution?.result).toBe("RESULT_PASSED");
   });
+
+  it("describes self-assignment when the actor assigns only themselves", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.assignees.updated",
+        event: {
+          user: { id: "user-1" },
+          assigned: [{ id: "user-1" }],
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.title).toBe("self-assigned");
+  });
+
+  it("includes the closing user on closed events", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.closed",
+        event: {
+          user: { id: "user-1" },
+          result: "completed",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "closed",
+      actorUserId: "user-1",
+      title: "closed as completed",
+    });
+  });
 });
