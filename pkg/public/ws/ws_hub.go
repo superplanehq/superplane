@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 const (
@@ -82,6 +84,7 @@ func (h *Hub) registerClient(client *Client) {
 	log.Debugf("Client subscribed to workflow: %s", client.workflowID)
 
 	log.Debugf("New client registered %v, total clients: %d", client, len(h.clients))
+	telemetry.RecordWebSocketConnectionOpened(context.Background(), KindFromTopic(client.workflowID))
 }
 
 // unregisterClient removes a client from the hub
@@ -106,6 +109,7 @@ func (h *Hub) unregisterClient(client *Client) {
 			}
 		}
 		log.Debugf("Client unregistered, remaining clients: %d", len(h.clients))
+		telemetry.RecordWebSocketConnectionClosed(context.Background(), KindFromTopic(client.workflowID))
 	}
 }
 
@@ -125,20 +129,37 @@ func (h *Hub) BroadcastAll(message []byte) {
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	kind := KindFromTopic(workflowID)
 
-	// Get clients subscribed to this workflow
-	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
-		for client := range clients {
+	h.mutex.RLock()
+	subscribers := h.workflowSubscriptions[workflowID]
+	clients := make([]*Client, 0, len(subscribers))
+	for client := range subscribers {
+		clients = append(clients, client)
+	}
+	h.mutex.RUnlock()
+
+	if len(clients) == 0 {
+		telemetry.RecordWebSocketBroadcast(context.Background(), kind, 0)
+		return
+	}
+
+	recipients := 0
+	for _, client := range clients {
+		select {
+		case client.send <- message:
+			recipients++
+		default:
+			// Buffer full — queue unregister on the hub loop (never call
+			// unregisterClient under the read lock; that deadlocks).
 			select {
-			case client.send <- message:
+			case h.unregister <- client:
 			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
 			}
 		}
 	}
+
+	telemetry.RecordWebSocketBroadcast(context.Background(), kind, recipients)
 }
 
 func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
