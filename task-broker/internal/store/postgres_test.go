@@ -1144,3 +1144,82 @@ func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.Postgres
 func ptrTime(t time.Time) *time.Time {
 	return &t
 }
+
+func TestClaimDispatchCandidatesReturnsQueuedLambdaTasksOnce(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID:             "fleet-lambda",
+		Provisioner:    "aws-lambda",
+		Arch:           "amd64",
+		Size:           "small",
+		CreatedAt:      now,
+		DispatchTarget: "runner-lambda-small",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID:          "fleet-ec2",
+		Provisioner: "aws",
+		Arch:        "amd64",
+		Size:        "t3.micro",
+		CreatedAt:   now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	lambdaTaskID := uuid.NewString()
+	if err := st.CreateTask(ctx, &models.Task{
+		ID:         lambdaTaskID,
+		FleetID:    "fleet-lambda",
+		Command:    []string{"echo", "hi"},
+		WebhookURL: "https://example.com/hook",
+		Status:     models.StatusQueued,
+		CreatedAt:  now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ec2TaskID := uuid.NewString()
+	if err := st.CreateTask(ctx, &models.Task{
+		ID:         ec2TaskID,
+		FleetID:    "fleet-ec2",
+		Command:    []string{"echo", "hi"},
+		WebhookURL: "https://example.com/hook",
+		Status:     models.StatusQueued,
+		CreatedAt:  now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	candidates, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Minute, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 1 {
+		t.Fatalf("candidates: %#v", candidates)
+	}
+	c := candidates[0]
+	if c.TaskID != lambdaTaskID || c.FleetID != "fleet-lambda" || c.Provisioner != "aws-lambda" || c.DispatchTarget != "runner-lambda-small" {
+		t.Fatalf("candidate: %#v", c)
+	}
+
+	again, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Minute, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("expected no candidates immediately after claim: %#v", again)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	retried, err := st.ClaimDispatchCandidates(ctx, "aws-lambda", time.Millisecond, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(retried) != 1 || retried[0].TaskID != lambdaTaskID {
+		t.Fatalf("expected stale task reclaimed: %#v", retried)
+	}
+}

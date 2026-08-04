@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
+	"github.com/superplane/runner/task-broker/internal/dispatch"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
@@ -31,6 +33,8 @@ type Server struct {
 	TaskNotify   *WaitHub
 	RunnerCancel *RunnerCancelHub
 	RunnerDrain  *RunnerDrainHub
+
+	Dispatch *dispatch.Resolver
 
 	// AuthToken is the control-plane bearer and HMAC secret for registration JWTs.
 	AuthToken string
@@ -56,12 +60,27 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
+	if req.MaxExecutionTimeoutSeconds != nil && *req.MaxExecutionTimeoutSeconds <= 0 {
+		writeError(w, http.StatusBadRequest, "max_execution_timeout_seconds must be positive")
+		return
+	}
+
+	provisioner := strings.TrimSpace(req.Provisioner)
+	dispatchTarget := strings.TrimSpace(req.DispatchTarget)
+	if provisioner == dispatch.ProvisionerAWSLambda && dispatchTarget == "" {
+		writeError(w, http.StatusBadRequest, "dispatch_target required for provisioner "+dispatch.ProvisionerAWSLambda)
+		return
+	}
+
 	f := &brokermodels.Fleet{
-		ID:          req.ID,
-		Provisioner: strings.TrimSpace(req.Provisioner),
-		Arch:        strings.TrimSpace(req.Arch),
-		Size:        strings.TrimSpace(req.Size),
-		CreatedAt:   time.Now().UTC(),
+		ID:                         req.ID,
+		Provisioner:                provisioner,
+		Arch:                       strings.TrimSpace(req.Arch),
+		Size:                       strings.TrimSpace(req.Size),
+		CreatedAt:                  time.Now().UTC(),
+		DispatchTarget:             dispatchTarget,
+		MaxExecutionTimeoutSeconds: req.MaxExecutionTimeoutSeconds,
+		SupportsDocker:             req.SupportsDocker,
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -396,11 +415,14 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 		return nil
 	}
 	return &api.FleetResponse{
-		ID:          f.ID,
-		Provisioner: f.Provisioner,
-		Arch:        f.Arch,
-		Size:        f.Size,
-		CreatedAt:   f.CreatedAt.Unix(),
+		ID:                         f.ID,
+		Provisioner:                f.Provisioner,
+		Arch:                       f.Arch,
+		Size:                       f.Size,
+		CreatedAt:                  f.CreatedAt.Unix(),
+		DispatchTarget:             f.DispatchTarget,
+		MaxExecutionTimeoutSeconds: f.MaxExecutionTimeoutSeconds,
+		SupportsDocker:             f.SupportsDocker,
 	}
 }
 
@@ -451,6 +473,18 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid execution_mode")
 		return
 	}
+	if mode == models.ExecutionDocker && fleet.SupportsDocker != nil && !*fleet.SupportsDocker {
+		writeError(w, http.StatusBadRequest, "fleet "+fleet.ID+" does not support docker execution_mode")
+		return
+	}
+
+	execTimeoutSeconds, msg := resolveExecutionTimeoutSeconds(fleet, req.ExecutionTimeoutSeconds)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+
+	dispatcher, needsDispatch := s.resolveDispatcher(fleet)
 
 	task := &models.Task{
 		ID:            uuid.NewString(),
@@ -464,6 +498,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		Environment:   api.CloneEnvironment(req.Environment),
 		Labels:        models.NormalizeOriginLabels(req.Labels),
 		Files:         api.NormalizeFiles(req.Files),
+	}
+	if needsDispatch {
+		dispatchedAt := time.Now().UTC()
+		task.DispatchRequestedAt = &dispatchedAt
 	}
 	switch kind {
 	case models.RunModeJavaScript, models.RunModePython, models.RunModeBash:
@@ -486,10 +524,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid run_mode")
 		return
 	}
-	if req.ExecutionTimeoutSeconds != nil {
-		v := *req.ExecutionTimeoutSeconds
-		task.ExecutionTimeoutSeconds = &v
-	}
+	task.ExecutionTimeoutSeconds = execTimeoutSeconds
 	if req.WebhookPayloadSizeLimit > 0 {
 		task.WebhookPayloadSizeLimit = req.WebhookPayloadSizeLimit
 	}
@@ -502,7 +537,55 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
+	if needsDispatch {
+		go s.invokeDispatch(dispatcher, fleet.ID, task.ID)
+	}
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
+}
+
+func resolveExecutionTimeoutSeconds(fleet *brokermodels.Fleet, requested *int) (*int, string) {
+	if fleet == nil || fleet.MaxExecutionTimeoutSeconds == nil {
+		if requested == nil {
+			return nil, ""
+		}
+		v := *requested
+		return &v, ""
+	}
+	capSeconds := *fleet.MaxExecutionTimeoutSeconds
+	if requested != nil {
+		if *requested > capSeconds {
+			return nil, fmt.Sprintf("execution_timeout_seconds exceeds fleet %s limit of %d seconds", fleet.ID, capSeconds)
+		}
+		v := *requested
+		return &v, ""
+	}
+	v := api.DefaultExecutionTimeoutSeconds
+	if v > capSeconds {
+		v = capSeconds
+	}
+	return &v, ""
+}
+
+func (s *Server) resolveDispatcher(fleet *brokermodels.Fleet) (dispatch.Dispatcher, bool) {
+	if s.Dispatch == nil || fleet == nil {
+		return nil, false
+	}
+	return s.Dispatch.For(fleet.Provisioner, fleet.DispatchTarget)
+}
+
+func (s *Server) invokeDispatch(d dispatch.Dispatcher, fleetID, taskID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.warn("dispatch invoke panicked, sweeper will retry",
+				slog.String("task_id", taskID), slog.String("fleet_id", fleetID), slog.Any("recover", r))
+		}
+	}()
+	dispatchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := d.Dispatch(dispatchCtx, fleetID, taskID); err != nil {
+		s.warn("dispatch task failed, sweeper will retry",
+			slog.String("task_id", taskID), slog.String("fleet_id", fleetID), slog.Any("err", err))
+	}
 }
 
 func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {

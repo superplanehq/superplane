@@ -199,6 +199,45 @@ RETURNING id`,
 	return s.GetTask(ctx, id)
 }
 
+func (s *PostgresStore) ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error) {
+	provisioner = strings.TrimSpace(provisioner)
+	if provisioner == "" {
+		return nil, fmt.Errorf("provisioner required for dispatch candidates")
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	now := time.Now().UTC()
+	staleBefore := now.Add(-staleAfter)
+
+	var rows []DispatchCandidate
+	err := s.db.WithContext(ctx).Raw(`
+WITH candidates AS (
+	SELECT t.id, t.fleet_id, f.provisioner, f.dispatch_target
+	FROM tasks t
+	JOIN fleets f ON f.id = t.fleet_id
+	WHERE t.status = ?
+	  AND f.provisioner = ?
+	  AND (t.dispatch_requested_at IS NULL OR t.dispatch_requested_at < ?)
+	ORDER BY t.created_at ASC
+	LIMIT ?
+	FOR UPDATE OF t SKIP LOCKED
+),
+updated AS (
+	UPDATE tasks t SET dispatch_requested_at = ?
+	FROM candidates c
+	WHERE t.id = c.id
+	RETURNING t.id AS task_id, c.fleet_id, c.provisioner, c.dispatch_target
+)
+SELECT task_id, fleet_id, provisioner, dispatch_target FROM updated ORDER BY task_id ASC`,
+		string(models.StatusQueued), provisioner, staleBefore, limit, now,
+	).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 func compactRunnerIDs(ids []string) []string {
 	out := make([]string, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))

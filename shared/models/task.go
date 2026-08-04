@@ -70,6 +70,7 @@ type Task struct {
 	// RunnerTerminationRequestedAt is set internally when fleet-manager is terminating
 	// the runner before the task can be finalized safely.
 	RunnerTerminationRequestedAt *time.Time
+	DispatchRequestedAt          *time.Time
 }
 
 // EnvironmentVariable is one task-scoped environment variable.

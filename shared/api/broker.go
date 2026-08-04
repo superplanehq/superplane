@@ -13,19 +13,25 @@ type BrokerCreateTaskResponse struct {
 
 // RegisterFleetRequest is POST task-broker /v1/fleets.
 type RegisterFleetRequest struct {
-	ID          string `json:"id"`
-	Provisioner string `json:"provisioner,omitempty"`
-	Arch        string `json:"arch,omitempty"`
-	Size        string `json:"size,omitempty"`
+	ID                         string `json:"id"`
+	Provisioner                string `json:"provisioner,omitempty"`
+	Arch                       string `json:"arch,omitempty"`
+	Size                       string `json:"size,omitempty"`
+	DispatchTarget             string `json:"dispatch_target,omitempty"`
+	MaxExecutionTimeoutSeconds *int   `json:"max_execution_timeout_seconds,omitempty"`
+	SupportsDocker             *bool  `json:"supports_docker,omitempty"`
 }
 
 // FleetResponse describes a registered runner pool.
 type FleetResponse struct {
-	ID          string `json:"id"`
-	Provisioner string `json:"provisioner,omitempty"`
-	Arch        string `json:"arch,omitempty"`
-	Size        string `json:"size,omitempty"`
-	CreatedAt   int64  `json:"created_at_unix,omitempty"`
+	ID                         string `json:"id"`
+	Provisioner                string `json:"provisioner,omitempty"`
+	Arch                       string `json:"arch,omitempty"`
+	Size                       string `json:"size,omitempty"`
+	CreatedAt                  int64  `json:"created_at_unix,omitempty"`
+	DispatchTarget             string `json:"dispatch_target,omitempty"`
+	MaxExecutionTimeoutSeconds *int   `json:"max_execution_timeout_seconds,omitempty"`
+	SupportsDocker             *bool  `json:"supports_docker,omitempty"`
 }
 
 type FleetTaskCountsResponse struct {

@@ -61,6 +61,13 @@ type CompleteTaskResult struct {
 	Outcome CompleteTaskOutcome
 }
 
+type DispatchCandidate struct {
+	TaskID         string
+	FleetID        string
+	Provisioner    string
+	DispatchTarget string
+}
+
 // Store persists fleets and the task queue.
 type Store interface {
 	CreateFleet(ctx context.Context, f *brokermodels.Fleet) error
@@ -87,6 +94,8 @@ type Store interface {
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error)
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
+
+	ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error)
 
 	RegisterRunnerWithJTI(ctx context.Context, jti, runnerID, fleetID, accessTokenHash string, now time.Time) error
 	GetRunnerByAccessTokenHash(ctx context.Context, accessTokenHash string) (*brokermodels.RunnerCredential, error)
