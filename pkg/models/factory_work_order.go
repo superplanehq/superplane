@@ -1,0 +1,146 @@
+package models
+
+import (
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+const (
+	FactoryWorkOrderStateOpen   = "open"
+	FactoryWorkOrderStateClosed = "closed"
+
+	FactoryWorkOrderResultCompleted = "completed"
+	FactoryWorkOrderResultRejected  = "rejected"
+)
+
+var ErrFactoryWorkOrderNotFound = errors.New("factory work order not found")
+
+type FactoryWorkOrder struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Title          string
+	Description    string
+	State          string
+	Result         string
+	CreatedByID    *uuid.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+
+	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
+	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
+}
+
+func (FactoryWorkOrder) TableName() string {
+	return "factory_work_orders"
+}
+
+func (o *FactoryWorkOrder) IsOpen() bool {
+	return o.State == FactoryWorkOrderStateOpen
+}
+
+type FactoryWorkOrderAssignee struct {
+	WorkOrderID uuid.UUID `gorm:"primaryKey"`
+	UserID      uuid.UUID `gorm:"primaryKey"`
+	CreatedAt   time.Time
+
+	User *User `gorm:"foreignKey:UserID"`
+}
+
+func (FactoryWorkOrderAssignee) TableName() string {
+	return "factory_work_order_assignees"
+}
+
+// NOTE: this is only OK to be used in the workers.
+// For APIs, always use the factory.FindWorkOrder method.
+func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := db.Where("id = ?", id).First(&order).Error
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (o *FactoryWorkOrder) UpdateAssignees(db *gorm.DB, assigneeIDs []uuid.UUID) (*FactoryWorkOrder, error) {
+	now := time.Now()
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
+			return err
+		}
+
+		o.UpdatedAt = now
+		return tx.Model(o).Update("updated_at", now).Error
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
+func (o *FactoryWorkOrder) Close(tx *gorm.DB, result string) (*FactoryWorkOrder, error) {
+	if o.State == FactoryWorkOrderStateClosed {
+		return o, nil
+	}
+
+	now := time.Now()
+	o.State = FactoryWorkOrderStateClosed
+	o.Result = result
+	o.UpdatedAt = now
+	err := tx.Model(o).Updates(map[string]any{
+		"state":      o.State,
+		"result":     o.Result,
+		"updated_at": o.UpdatedAt,
+	}).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
+func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderExecution, error) {
+	var execution FactoryWorkOrderExecution
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Where("status IN ?", []string{
+			FactoryWorkOrderExecutionStatusPending,
+			FactoryWorkOrderExecutionStatusRunning,
+		}).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
+func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
+	if err := tx.Where("work_order_id = ?", o.ID).Delete(&FactoryWorkOrderAssignee{}).Error; err != nil {
+		return err
+	}
+
+	if len(assigneeIDs) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	assignees := make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		assignees = append(assignees, FactoryWorkOrderAssignee{
+			WorkOrderID: o.ID,
+			UserID:      assigneeID,
+			CreatedAt:   now,
+		})
+	}
+
+	return tx.Create(&assignees).Error
+}

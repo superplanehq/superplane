@@ -31,6 +31,11 @@ func SerializeCanvas(
 		liveVersionID = canvas.LiveVersionID.String()
 	}
 
+	factoryID := ""
+	if canvas.FactoryID != nil {
+		factoryID = canvas.FactoryID.String()
+	}
+
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
 			Id:                          canvas.ID.String(),
@@ -42,6 +47,7 @@ func SerializeCanvas(
 			CreatedBy:                   createdBy,
 			FolderId:                    canvasFolderID,
 			LiveVersionId:               liveVersionID,
+			FactoryId:                   factoryID,
 			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
 		},
 		Spec: &pb.Canvas_Spec{

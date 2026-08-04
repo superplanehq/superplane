@@ -15,9 +15,17 @@ function buildMeUser(orgId: string) {
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
-      (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
-    ),
+    permissions: [
+      "canvases",
+      "integrations",
+      "secrets",
+      "groups",
+      "users",
+      "roles",
+      "organization",
+      "agents",
+      "factories",
+    ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
 
@@ -109,11 +117,30 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           organization: {
             metadata: { id: orgId, name: fixture.organizationName },
-            spec: {},
+            spec: {
+              enabledExperimentalFeatures: fixture.enabledExperimentalFeatures ?? [],
+            },
             status: {},
           },
         },
       }),
+    },
+    {
+      pattern: re("/api/v1/factories"),
+      resolve: (_m, _url, method) => {
+        if (method === "POST") {
+          return {
+            json: {
+              factory: {
+                id: "storybook-new-factory",
+                name: "New Factory",
+                description: "",
+              },
+            },
+          };
+        }
+        return { json: { factories: fixture.factories ?? [] } };
+      },
     },
     {
       pattern: re("/account/experimental-features"),
@@ -125,6 +152,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Managed agents",
               description: "Canvas agent chat",
               released: true,
+            },
+            {
+              id: "factories",
+              label: "Factories",
+              description: "Software factories for work orders",
             },
           ],
         },
