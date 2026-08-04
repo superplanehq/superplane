@@ -1,8 +1,4 @@
-import {
-  defaultFactoriesFixture,
-  ORGANIZATION_USERS,
-  type FactoriesFixture,
-} from "./factoryPageResponses";
+import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
 import type { FactoriesWorkOrder } from "@/api-client";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
@@ -16,11 +12,7 @@ const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 interface FactoriesRoute {
   pattern: RegExp;
-  resolve: (
-    match: RegExpExecArray,
-    method: string,
-    body: Record<string, unknown> | null,
-  ) => FixtureResult;
+  resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null) => FixtureResult;
 }
 
 interface RequestBody {
@@ -157,9 +149,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             createdBy: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name },
-            assignees: findUsersByIds(
-              stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids),
-            ),
+            assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
             executions: [],
           };
           orders.unshift(created);
@@ -191,9 +181,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         if (!order) {
           return { json: {} };
         }
-        order.assignees = findUsersByIds(
-          stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids),
-        );
+        order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids));
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
       },

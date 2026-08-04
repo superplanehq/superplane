@@ -25,7 +25,5 @@ const newOrderPath = `factories/${PRIMARY_FACTORY_ID}/orders/new`;
 
 /** Default: blank form ready for input; Create disabled until title is filled. */
 export const Default: Story = {
-  render: () => (
-    <FactoriesHarness pathSuffix={newOrderPath} factoriesFixture={defaultFactoriesFixture} />
-  ),
+  render: () => <FactoriesHarness pathSuffix={newOrderPath} factoriesFixture={defaultFactoriesFixture} />,
 };

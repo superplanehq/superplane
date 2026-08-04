@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
-import {
-  FACTORIES_ORGANIZATION_ID,
-  PRIMARY_FACTORY_ID,
-  REFUND_FACTORY,
-} from "./__fixtures__/factoryPageResponses";
+import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, REFUND_FACTORY } from "./__fixtures__/factoryPageResponses";
 import { FactoryDetailHeader } from "./FactoryDetailHeader";
 
 /**

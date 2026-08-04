@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoryLineEditPage } from "./FactoryLineEditPage";
 import { FactoriesHarness } from "./__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  PRIMARY_FACTORY_ID,
-  REFUND_FACTORY_LINES,
-} from "./__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, REFUND_FACTORY_LINES } from "./__fixtures__/factoryPageResponses";
 
 /**
  * Line editor page: name field + steps editor (app + trigger per step).

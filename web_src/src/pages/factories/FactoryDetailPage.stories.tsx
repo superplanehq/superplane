@@ -34,15 +34,11 @@ const detailPath = `factories/${PRIMARY_FACTORY_ID}`;
  * owner filter to see orders belonging to teammates.
  */
 export const Populated: Story = {
-  render: () => (
-    <FactoriesHarness pathSuffix={detailPath} factoriesFixture={defaultFactoriesFixture} />
-  ),
+  render: () => <FactoriesHarness pathSuffix={detailPath} factoriesFixture={defaultFactoriesFixture} />,
 };
 
 /** Only closed history remains — the default `mine + open` filters land on the "no matches" state. */
 export const EmptyWorkOrders: Story = {
   name: "Empty Work Orders",
-  render: () => (
-    <FactoriesHarness pathSuffix={detailPath} factoriesFixture={emptyWorkOrdersFactoriesFixture} />
-  ),
+  render: () => <FactoriesHarness pathSuffix={detailPath} factoriesFixture={emptyWorkOrdersFactoriesFixture} />,
 };

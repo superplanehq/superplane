@@ -23,10 +23,7 @@ export function FactoriesHarness({
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
     organizationId: factoriesFixture.organizationId ?? FACTORIES_ORGANIZATION_ID,
-    enabledExperimentalFeatures: [
-      ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
-      "factories",
-    ],
+    enabledExperimentalFeatures: [...(defaultHomePageFixture.enabledExperimentalFeatures ?? []), "factories"],
     factories: factoriesFixture.factories.map((factory) => ({
       id: factory.id ?? "",
       name: factory.name ?? "",

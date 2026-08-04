@@ -2,10 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoryListPage } from "./FactoryListPage";
 import { FactoriesHarness } from "./__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  emptyFactoriesFixture,
-} from "./__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, emptyFactoriesFixture } from "./__fixtures__/factoryPageResponses";
 
 /**
  * Mounts the real Factories list route against an in-process fixture backend.

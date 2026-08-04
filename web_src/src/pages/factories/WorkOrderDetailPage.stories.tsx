@@ -40,10 +40,7 @@ export const Open: Story = {
 /** Currently running on a line — activity timeline shows in-flight steps. */
 export const Running: Story = {
   render: () => (
-    <FactoriesHarness
-      pathSuffix={orderPath(RUNNING_WORK_ORDER.id ?? "")}
-      factoriesFixture={defaultFactoriesFixture}
-    />
+    <FactoriesHarness pathSuffix={orderPath(RUNNING_WORK_ORDER.id ?? "")} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
