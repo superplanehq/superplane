@@ -20,7 +20,7 @@ All e2e tests live under the `test/e2e` directory.
 
 ## How to run e2e tests
 
-Before running the tests, use the same Docker setup as CI (`make dev.up` and `make dev.setup` with both databases). The dev image already includes the Playwright browser binary, so no extra install step is needed:
+Before running the tests, use the same Docker setup as CI (`make dev.up` and `make dev.setup` with both databases). The dev image already includes the Playwright driver and Chromium, so no extra Playwright install step is needed:
 
 ```
 make dev.up
