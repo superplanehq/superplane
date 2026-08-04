@@ -33,7 +33,7 @@ interface WorkOrderTimelineProps {
 export function WorkOrderActivityTimeline({ organizationId, order, events }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
-  const timeline = buildWorkOrderTimelineView(order, events, resolveUserName);
+  const timeline = buildWorkOrderTimelineView(events, resolveUserName);
 
   if (timeline.events.length === 0 && !timeline.closedLabel) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>;
