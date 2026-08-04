@@ -1,10 +1,13 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -65,39 +68,51 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 	return &order, nil
 }
 
-func (o *FactoryWorkOrder) UpdateAssignees(db *gorm.DB, assigneeIDs []uuid.UUID) (*FactoryWorkOrder, error) {
-	now := time.Now()
+func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
+	previousAssignees := o.AssigneeIDs()
 
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
-			return err
-		}
-
-		o.UpdatedAt = now
-		return tx.Model(o).Update("updated_at", now).Error
-	})
-
-	if err != nil {
-		return nil, err
+	if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
+		return err
 	}
 
-	return o, nil
+	now := time.Now()
+	o.UpdatedAt = now
+	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+		return err
+	}
+
+	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
+	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
 }
 
-func (o *FactoryWorkOrder) Close(tx *gorm.DB, result string) (*FactoryWorkOrder, error) {
+func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID) (*FactoryWorkOrder, error) {
 	if o.State == FactoryWorkOrderStateClosed {
 		return o, nil
 	}
 
 	now := time.Now()
-	o.State = FactoryWorkOrderStateClosed
-	o.Result = result
-	o.UpdatedAt = now
-	err := tx.Model(o).Updates(map[string]any{
-		"state":      o.State,
-		"result":     o.Result,
-		"updated_at": o.UpdatedAt,
-	}).Error
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		o.State = FactoryWorkOrderStateClosed
+		o.Result = result
+		o.UpdatedAt = now
+
+		updateErr := tx.
+			Model(o).
+			Updates(map[string]any{
+				"state":      o.State,
+				"result":     o.Result,
+				"updated_at": o.UpdatedAt,
+			}).
+			Error
+
+		if updateErr != nil {
+			return updateErr
+		}
+
+		return o.RecordClosed(tx, closedBy, result)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -143,4 +158,165 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 	}
 
 	return tx.Create(&assignees).Error
+}
+
+func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time) ([]FactoryWorkOrderEvent, error) {
+	query := tx.Where("work_order_id = ?", o.ID)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if before != nil {
+		query = query.Where("created_at < ?", before)
+	}
+
+	var events []FactoryWorkOrderEvent
+	err := query.
+		Order("created_at DESC").
+		Order("id DESC").
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
+	var count int64
+
+	err := tx.
+		Model(&FactoryWorkOrderEvent{}).
+		Where("work_order_id = ?", o.ID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
+	return &factory.WorkOrderRef{
+		ID:    o.ID,
+		Title: o.Title,
+	}
+}
+
+func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error {
+	data := factory.WorkOrderOpened{
+		Order: o.Ref(),
+	}
+	if createdBy != nil {
+		data.User = &factory.UserRef{ID: *createdBy}
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderOpened,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, result string) error {
+	data := factory.WorkOrderClosed{
+		Order:  o.Ref(),
+		User:   &factory.UserRef{ID: *closedBy},
+		Result: &result,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderClosed,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+func (o *FactoryWorkOrder) RecordAssigneesUpdated(
+	tx *gorm.DB,
+	updatedBy uuid.UUID,
+	assigned []factory.UserRef,
+	unassigned []factory.UserRef,
+) error {
+	if len(assigned) == 0 && len(unassigned) == 0 {
+		return nil
+	}
+
+	data := factory.WorkOrderAssigneesUpdated{
+		Order:      o.Ref(),
+		User:       &factory.UserRef{ID: updatedBy},
+		Assigned:   assigned,
+		Unassigned: unassigned,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderAssigneesUpdated,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(o.Assignees))
+	for _, assignee := range o.Assignees {
+		ids = append(ids, assignee.UserID)
+	}
+
+	return ids
+}
+
+func assigneeDiff(previousIDs, nextIDs []uuid.UUID) (assigned, unassigned []factory.UserRef) {
+	previous := make(map[uuid.UUID]struct{}, len(previousIDs))
+	for _, id := range previousIDs {
+		previous[id] = struct{}{}
+	}
+
+	next := make(map[uuid.UUID]struct{}, len(nextIDs))
+	for _, id := range nextIDs {
+		next[id] = struct{}{}
+	}
+
+	for id := range next {
+		if _, ok := previous[id]; !ok {
+			assigned = append(assigned, factory.UserRef{ID: id})
+		}
+	}
+
+	for id := range previous {
+		if _, ok := next[id]; !ok {
+			unassigned = append(unassigned, factory.UserRef{ID: id})
+		}
+	}
+
+	return assigned, unassigned
 }

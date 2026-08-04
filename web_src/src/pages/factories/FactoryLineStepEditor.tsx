@@ -5,8 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCanvas } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { listTriggerNodes } from "./factoryCanvasTriggers";
-import type { DraftStep } from "./factoryLineFormShared";
+import { listTriggerNodes } from "./lib/factoryCanvasTriggers";
+import type { DraftStep } from "./lib/factoryLineFormShared";
 import { LineStepEditorShell } from "./FactoryLineStepFlow";
 
 const stepFieldClassName = "w-full min-w-0";

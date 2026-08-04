@@ -4,8 +4,8 @@ import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useMemo, useState } from "react";
-import { getFactoryDetailLoadingState } from "./factoryDetailLoading";
-import { createWorkOrderPath, factoryDetailPath } from "./factoryPagePaths";
+import { getFactoryDetailLoadingState } from "./lib/factoryDetailLoading";
+import { createWorkOrderPath, factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveFactoryLoadRedirect } from "./factoryPageRedirects";
 import { useFactoryDetailActions } from "./useFactoryDetailActions";
 import {
@@ -14,7 +14,7 @@ import {
   filterWorkOrdersByStatus,
   type WorkOrderOwnerFilter,
   type WorkOrderStatusFilter,
-} from "./workOrderProgress";
+} from "./lib/workOrderProgress";
 
 export function useFactoryDetailPage(organizationId: string, factoryId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();

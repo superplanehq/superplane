@@ -1,17 +1,21 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactory, useWorkOrder } from "@/hooks/useFactoryData";
+import { useFactory, useWorkOrder, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { factoryDetailPath } from "./factoryPagePaths";
+import { useMemo } from "react";
+import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveWorkOrderDetailRedirect } from "./factoryPageRedirects";
 import { useWorkOrderDetailActions } from "./useWorkOrderDetailActions";
-import { getWorkOrderDetailDerived } from "./workOrderProgress";
+import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
+import { flattenWorkOrderEventsPages } from "./lib/workOrderEventsPagination";
 
 export function useWorkOrderDetailPage(organizationId: string, factoryId: string, orderId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
+  const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
+  const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   const derived = getWorkOrderDetailDerived(order);
@@ -41,6 +45,17 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     kind: "ready" as const,
     factory,
     order,
+    events,
+    eventsError: eventsQuery.error ?? null,
+    isEventsLoading: eventsQuery.isLoading,
+    hasMoreEvents: eventsQuery.hasNextPage ?? false,
+    isLoadingMoreEvents: eventsQuery.isFetchingNextPage,
+    onLoadMoreEvents: () => {
+      void eventsQuery.fetchNextPage();
+    },
+    onRetryEvents: () => {
+      void eventsQuery.refetch();
+    },
     factoryHref: factoryDetailPath(organizationId, factoryId),
     organizationId,
     factoryLines: factory?.lines ?? [],
