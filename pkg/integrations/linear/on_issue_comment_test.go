@@ -7,7 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -39,8 +38,8 @@ func commentConfig() map[string]any {
 	return map[string]any{"team": "t1", "actions": []string{"create"}}
 }
 
-func commentConfigWithFilter(predicates []configuration.Predicate) map[string]any {
-	return map[string]any{"team": "t1", "actions": []string{"create"}, "contentFilter": predicates}
+func commentConfigWithFilter(filter string) map[string]any {
+	return map[string]any{"team": "t1", "actions": []string{"create"}, "contentFilter": filter}
 }
 
 // signedCommentRequest signs the body and sets the Comment event header, since
@@ -100,7 +99,7 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationWithTeam(),
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: commentConfigWithFilter([]configuration.Predicate{{Type: configuration.PredicateTypeMatches, Value: "["}}),
+			Configuration: commentConfigWithFilter("[invalid(regex"),
 		})
 
 		require.ErrorContains(t, err, "invalid content filter pattern")
@@ -110,7 +109,7 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationWithTeam(),
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: commentConfigWithFilter([]configuration.Predicate{{Type: configuration.PredicateTypeMatches, Value: "^/deploy"}}),
+			Configuration: commentConfigWithFilter("^/deploy"),
 		})
 
 		require.NoError(t, err)
@@ -243,12 +242,11 @@ func Test__OnIssueComment__HandleWebhook__FiltersActions(t *testing.T) {
 
 func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
 	trigger := &OnIssueComment{}
-	deployFilter := []configuration.Predicate{{Type: configuration.PredicateTypeMatches, Value: "^/deploy"}}
 
 	t.Run("matching body is emitted", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		body := commentEventWithBody("create", "/deploy staging")
-		ctx := signedCommentRequest(t, body, commentConfigWithFilter(deployFilter), events)
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("^/deploy"), events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)
@@ -258,7 +256,7 @@ func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
 
 	t.Run("non-matching body is ignored", func(t *testing.T) {
 		events := &contexts.EventContext{}
-		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter(deployFilter), events)
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter("^/deploy"), events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)
@@ -266,11 +264,20 @@ func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
 		assert.Zero(t, events.Count())
 	})
 
-	t.Run("equals predicate matches the exact body", func(t *testing.T) {
+	t.Run("pattern matches anywhere in the body", func(t *testing.T) {
 		events := &contexts.EventContext{}
-		filter := []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "/deploy"}}
-		body := commentEventWithBody("create", "/deploy")
-		ctx := signedCommentRequest(t, body, commentConfigWithFilter(filter), events)
+		body := commentEventWithBody("create", "please /deploy staging now")
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("/deploy"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("empty filter emits every comment", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter(""), events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)
@@ -282,7 +289,7 @@ func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
 		events := &contexts.EventContext{}
 		body := commentEvent("remove")
 		delete(body["data"].(map[string]any), "body")
-		config := map[string]any{"team": "t1", "actions": []string{"remove"}, "contentFilter": deployFilter}
+		config := map[string]any{"team": "t1", "actions": []string{"remove"}, "contentFilter": "^/deploy"}
 		ctx := signedCommentRequest(t, body, config, events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
@@ -291,10 +298,20 @@ func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
 		assert.Zero(t, events.Count())
 	})
 
+	t.Run("invalid pattern -> bad request", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter("[invalid(regex"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusBadRequest, code)
+		require.ErrorContains(t, err, "invalid content filter pattern")
+		assert.Zero(t, events.Count())
+	})
+
 	t.Run("filter is not reached for unselected actions", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		body := commentEventWithBody("update", "/deploy staging")
-		ctx := signedCommentRequest(t, body, commentConfigWithFilter(deployFilter), events)
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("^/deploy"), events)
 
 		code, _, err := trigger.HandleWebhook(ctx)
 		assert.Equal(t, http.StatusOK, code)

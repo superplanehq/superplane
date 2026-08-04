@@ -16,9 +16,9 @@ import (
 type OnIssueComment struct{}
 
 type OnIssueCommentConfiguration struct {
-	Team          string                    `json:"team" mapstructure:"team"`
-	Actions       []string                  `json:"actions" mapstructure:"actions"`
-	ContentFilter []configuration.Predicate `json:"contentFilter" mapstructure:"contentFilter"`
+	Team          string   `json:"team" mapstructure:"team"`
+	Actions       []string `json:"actions" mapstructure:"actions"`
+	ContentFilter string   `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 func (i *OnIssueComment) Name() string {
@@ -47,8 +47,8 @@ updated or deleted on an issue in a Linear team.
 
 - **Team** (required): Linear team to monitor
 - **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
-- **Content Filter** (optional): Only trigger for comments whose body matches one of these predicates.
-  A comment delivered without a body never matches.
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. ` + "`/deploy`" + ` to
+  only trigger on comments containing "/deploy". A comment delivered without a body never matches.
 
 ## Outputs
 
@@ -104,14 +104,10 @@ func (i *OnIssueComment) Configuration() []configuration.Field {
 		{
 			Name:        "contentFilter",
 			Label:       "Content Filter",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Only trigger for comments whose body matches one of these predicates",
-			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
-				},
-			},
+			Placeholder: "e.g., /deploy",
+			Description: "Optional regex pattern to filter comments by content",
 		},
 	}
 }
@@ -134,17 +130,9 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("at least one action is required")
 	}
 
-	//
-	// Predicate evaluation swallows regex errors and never matches, so reject an
-	// uncompilable pattern here instead of saving a silently dead trigger.
-	//
-	for _, predicate := range config.ContentFilter {
-		if predicate.Type != configuration.PredicateTypeMatches {
-			continue
-		}
-
-		if _, err := regexp.Compile(predicate.Value); err != nil {
-			return fmt.Errorf("invalid content filter pattern %q: %w", predicate.Value, err)
+	if config.ContentFilter != "" {
+		if _, err := regexp.Compile(config.ContentFilter); err != nil {
+			return fmt.Errorf("invalid content filter pattern: %w", err)
 		}
 	}
 
@@ -204,7 +192,13 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	if len(config.ContentFilter) > 0 && !i.matchesContentFilter(ctx.Logger, data, config.ContentFilter) {
+	matched, err := i.matchesContentFilter(config.ContentFilter, data)
+	if err != nil {
+		return http.StatusBadRequest, nil, err
+	}
+
+	if !matched {
+		ctx.Logger.Info("Comment does not match the content filter - ignoring")
 		return http.StatusOK, nil, nil
 	}
 
@@ -233,21 +227,27 @@ func (i *OnIssueComment) whitelistedAction(logger *log.Entry, data map[string]an
 	return true
 }
 
-func (i *OnIssueComment) matchesContentFilter(logger *log.Entry, data map[string]any, predicates []configuration.Predicate) bool {
+// matchesContentFilter checks the comment body against the regex filter. An empty
+// filter always matches, and a comment delivered without a body never does.
+func (i *OnIssueComment) matchesContentFilter(filter string, data map[string]any) (bool, error) {
+	if filter == "" {
+		return true, nil
+	}
+
 	comment, ok := data["data"].(map[string]any)
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	body, ok := comment["body"].(string)
 	if !ok {
-		return false
+		return false, nil
 	}
 
-	if !configuration.MatchesAnyPredicate(predicates, body) {
-		logger.Infof("Comment body does not match the content filter: %v", predicates)
-		return false
+	matched, err := regexp.MatchString(filter, body)
+	if err != nil {
+		return false, fmt.Errorf("invalid content filter pattern: %w", err)
 	}
 
-	return true
+	return matched, nil
 }

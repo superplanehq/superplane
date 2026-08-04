@@ -145,8 +145,8 @@ updated or deleted on an issue in a Linear team.
 
 - **Team** (required): Linear team to monitor
 - **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
-- **Content Filter** (optional): Only trigger for comments whose body matches one of these predicates.
-  A comment delivered without a body never matches.
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `/deploy` to
+  only trigger on comments containing "/deploy". A comment delivered without a body never matches.
 
 ### Outputs
 
