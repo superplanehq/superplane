@@ -111,33 +111,47 @@ func (h *Hub) unregisterClient(client *Client) {
 
 // BroadcastAll sends a message to all connected clients
 func (h *Hub) BroadcastAll(message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	var stalledClients []*Client
 
+	h.mutex.RLock()
 	for client := range h.clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			// If the client's buffer is full, mark it for removal
+			stalledClients = append(stalledClients, client)
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing the read lock
+	for _, client := range stalledClients {
+		log.Warnf("Client send buffer full, evicting client from broadcast")
+		h.unregisterClient(client)
 	}
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	var stalledClients []*Client
 
+	h.mutex.RLock()
 	// Get clients subscribed to this workflow
 	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
 		for client := range clients {
 			select {
 			case client.send <- message:
 			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
+				// If the client's buffer is full, mark it for removal
+				stalledClients = append(stalledClients, client)
 			}
 		}
+	}
+	h.mutex.RUnlock()
+
+	// Unregister stalled clients after releasing the read lock
+	for _, client := range stalledClients {
+		log.Warnf("Client send buffer full, evicting client from workflow %s", workflowID)
+		h.unregisterClient(client)
 	}
 }
 
@@ -248,6 +262,6 @@ func (c *Client) readPump() {
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(message []byte) {
 	// Handle client messages
-	log.Infof("Received message: %s", string(message))
+	log.Debugf("Received message: %s", string(message))
 	return
 }
