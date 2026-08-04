@@ -6,7 +6,9 @@ type ScreenPoint = {
 type DropdownPositionInput = {
   cursor: ScreenPoint;
   viewportWidth: number;
+  viewportHeight: number;
   dropdownWidth: number;
+  dropdownHeight: number;
   valuePreviewWidth: number;
   showValuePreview: boolean;
   edgePadding?: number;
@@ -16,7 +18,9 @@ type DropdownPositionInput = {
 export function calculateDropdownPosition({
   cursor,
   viewportWidth,
+  viewportHeight,
   dropdownWidth,
+  dropdownHeight,
   valuePreviewWidth,
   showValuePreview,
   edgePadding = 16,
@@ -24,18 +28,39 @@ export function calculateDropdownPosition({
 }: DropdownPositionInput) {
   const spaceOnRight = viewportWidth - cursor.x - edgePadding;
   const spaceOnLeft = cursor.x - edgePadding;
-  const shouldFlipLeft = spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth;
+
+  const shouldFlipLeft =
+    spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth;
 
   let left: number;
+
   if (shouldFlipLeft) {
-    left = showValuePreview ? cursor.x - dropdownWidth - valuePreviewWidth : cursor.x - dropdownWidth;
+    left = showValuePreview
+      ? cursor.x - dropdownWidth - valuePreviewWidth
+      : cursor.x - dropdownWidth;
   } else {
     left = showValuePreview ? cursor.x - valuePreviewWidth : cursor.x;
   }
 
-  const totalWidth = showValuePreview ? dropdownWidth + valuePreviewWidth : dropdownWidth;
+  const totalWidth = showValuePreview
+    ? dropdownWidth + valuePreviewWidth
+    : dropdownWidth;
+
+  const spaceBelow = viewportHeight - cursor.y - edgePadding;
+  const spaceAbove = cursor.y - edgePadding;
+
+  const shouldFlipUp =
+    spaceBelow < dropdownHeight && spaceAbove >= dropdownHeight;
+
+  const top = shouldFlipUp
+    ? cursor.y - dropdownHeight - gap
+    : cursor.y + gap;
+
   return {
-    top: cursor.y + gap,
-    left: Math.max(edgePadding, Math.min(left, viewportWidth - totalWidth - edgePadding)),
+    top,
+    left: Math.max(
+      edgePadding,
+      Math.min(left, viewportWidth - totalWidth - edgePadding),
+    ),
   };
 }
