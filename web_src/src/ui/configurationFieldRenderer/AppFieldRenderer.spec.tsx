@@ -62,7 +62,7 @@ beforeEach(() => {
     data: [],
     isLoading: false,
     error: null,
-  } as ReturnType<typeof useFactoryApps>);
+  } as unknown as ReturnType<typeof useFactoryApps>);
 
   mockUseCanvases.mockReturnValue({
     data: [
@@ -102,15 +102,6 @@ describe("AppFieldRenderer", () => {
     expect(screen.getByText("Current App")).toBeInTheDocument();
   });
 
-  it("stores the selected app id", async () => {
-    render(<ControlledRenderer />);
-
-    await userEvent.click(screen.getByRole("combobox"));
-    await userEvent.click(screen.getByText("Billing Alerts"));
-
-    expect(screen.getByTestId("current-value")).toHaveTextContent("canvas_billing");
-  });
-
   it("lists factory apps when configuring on a factory-owned canvas", async () => {
     mockUseCanvas.mockReturnValue({
       data: {
@@ -129,7 +120,7 @@ describe("AppFieldRenderer", () => {
       ],
       isLoading: false,
       error: null,
-    } as ReturnType<typeof useFactoryApps>);
+    } as unknown as ReturnType<typeof useFactoryApps>);
 
     render(
       <ControlledRenderer
@@ -146,6 +137,41 @@ describe("AppFieldRenderer", () => {
     await userEvent.click(screen.getByRole("combobox"));
     expect(screen.getByText("Current Factory App")).toBeInTheDocument();
     expect(screen.getByText("Refund Planner")).toBeInTheDocument();
+    expect(screen.queryByText("Billing Alerts")).not.toBeInTheDocument();
+  });
+
+  it("stores the selected app id", async () => {
+    render(<ControlledRenderer />);
+
+    await userEvent.click(screen.getByRole("combobox"));
+    await userEvent.click(screen.getByText("Billing Alerts"));
+
+    expect(screen.getByTestId("current-value")).toHaveTextContent("canvas_billing");
+  });
+
+  it("waits for the current canvas before showing org apps", () => {
+    mockUseCanvas.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as ReturnType<typeof useCanvas>);
+
+    render(<ControlledRenderer />);
+
+    expect(screen.getByText("Loading apps...")).toBeInTheDocument();
+    expect(screen.queryByText("Billing Alerts")).not.toBeInTheDocument();
+  });
+
+  it("shows an error when the current canvas fails to load", () => {
+    mockUseCanvas.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error("Canvas unavailable"),
+    } as ReturnType<typeof useCanvas>);
+
+    render(<ControlledRenderer />);
+
+    expect(screen.getByText("Failed to load apps: Canvas unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Billing Alerts")).not.toBeInTheDocument();
   });
 });

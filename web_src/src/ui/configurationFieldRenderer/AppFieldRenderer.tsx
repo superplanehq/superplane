@@ -77,15 +77,36 @@ function getEmptyStateMessage(isFactoryContext: boolean, allowSelf: boolean): st
 }
 
 function useAppFieldSources(organizationId: string, currentAppId: string | undefined): AppFieldSources {
-  const { data: currentCanvas } = useCanvas(organizationId, currentAppId ?? "", {
-    enabled: Boolean(currentAppId),
+  const needsCanvasContext = Boolean(currentAppId);
+  const canvasQuery = useCanvas(organizationId, currentAppId ?? "", {
+    enabled: needsCanvasContext,
     staleTime: Infinity,
   });
-  const factoryId = currentCanvas?.metadata?.factoryId;
+
+  const factoryId = canvasQuery.data?.metadata?.factoryId;
   const isFactoryContext = Boolean(factoryId);
 
   const orgCanvasesQuery = useCanvases(organizationId);
   const factoryAppsQuery = useFactoryApps(organizationId, factoryId ?? "");
+
+  if (needsCanvasContext && canvasQuery.isLoading) {
+    return {
+      apps: undefined,
+      isLoading: true,
+      error: null,
+      isFactoryContext: false,
+    };
+  }
+
+  if (needsCanvasContext && canvasQuery.error) {
+    return {
+      apps: undefined,
+      isLoading: false,
+      error: canvasQuery.error,
+      isFactoryContext: false,
+    };
+  }
+
   const activeQuery = isFactoryContext ? factoryAppsQuery : orgCanvasesQuery;
 
   return {
