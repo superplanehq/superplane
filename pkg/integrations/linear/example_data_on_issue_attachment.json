@@ -1,0 +1,38 @@
+{
+  "data": {
+    "action": "create",
+    "type": "Attachment",
+    "actor": {
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "type": "user",
+      "name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "url": "https://linear.app/acme/profiles/ada"
+    },
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "data": {
+      "id": "a7c41e88-1b2d-4f6a-9c3e-5d8f0a1b2c3d",
+      "createdAt": "2026-03-27T16:42:11.123Z",
+      "updatedAt": "2026-03-27T16:42:11.123Z",
+      "title": "Deploy - staging",
+      "subtitle": "Succeeded in 4m 12s",
+      "url": "https://app.superplane.com/runs/8f21c4d0",
+      "creatorId": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "metadata": {},
+      "sourceType": "unknown",
+      "groupBySource": false,
+      "issueId": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "issue": {
+        "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+        "identifier": "ENG-142",
+        "title": "Deploy pipeline fails on retry",
+        "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+      }
+    },
+    "organizationId": "dc844923-1f0a-4b6e-9d7c-2a3b4c5d6e7f",
+    "webhookTimestamp": 1774629731123,
+    "webhookId": "000042e3-5c6d-4e8f-9a0b-1c2d3e4f5a6b"
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.attachment"
+}

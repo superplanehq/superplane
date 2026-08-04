@@ -117,6 +117,24 @@ export interface OnIssueCommentConfiguration {
   actions?: string[];
 }
 
+export interface OnIssueAttachmentConfiguration {
+  team?: string;
+  actions?: string[];
+}
+
+export interface CreateAttachmentConfiguration {
+  issue?: string;
+  title?: string;
+  url?: string;
+  subtitle?: string;
+  iconUrl?: string;
+}
+
+export interface DeleteAttachmentConfiguration {
+  issue?: string;
+  attachment?: string;
+}
+
 export interface GetIssueConfiguration {
   issue?: string;
 }
@@ -142,6 +160,42 @@ export interface LinearComment {
   updatedAt?: string;
   user?: LinearUser;
   issue?: { id?: string; identifier?: string; title?: string; url?: string };
+}
+
+/** Attachment as returned by the `attachmentCreate` mutation. */
+export interface LinearAttachment {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  url?: string;
+  iconUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  creator?: LinearUser;
+  issue?: { id?: string; identifier?: string; title?: string; url?: string };
+}
+
+/** Result of the `deleteAttachment` action, which Linear answers with only a success flag. */
+export interface LinearAttachmentDeletion {
+  id?: string;
+  deleted?: boolean;
+}
+
+/**
+ * Envelope Linear POSTs for an attachment event. `data` is the attachment; Linear
+ * sends only `issueId`, and the trigger adds `issue` by looking it up.
+ */
+export interface LinearAttachmentWebhookEvent {
+  action?: string;
+  type?: string;
+  createdAt?: string;
+  actor?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    type?: string;
+  };
+  data?: LinearAttachment & { issueId?: string };
 }
 
 /** Envelope Linear POSTs for a comment event. `data` is the comment. */
