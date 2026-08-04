@@ -11,7 +11,7 @@ import {
   factoryDetailPanelClassName,
   factoryDetailSidebarClassName,
   factoryPageContentClassName,
-} from "./factoryPageStyles";
+} from "./lib/factoryPageStyles";
 import { useFactoryDetailPage } from "./useFactoryDetailPage";
 
 export function FactoryDetailPage() {

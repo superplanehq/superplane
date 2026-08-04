@@ -7,9 +7,9 @@ import { formatTimeAgo } from "@/lib/date";
 import { Forward, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import { factoryWorkOrderRowClassName } from "./factoryPageStyles";
+import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
-import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
+import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
 interface WorkOrderCardProps {
   order: FactoriesWorkOrder;

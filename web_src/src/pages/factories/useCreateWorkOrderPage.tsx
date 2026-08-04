@@ -6,7 +6,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { factoryDetailPath } from "./factoryPagePaths";
+import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveFactoryLoadRedirect } from "./factoryPageRedirects";
 
 export function useCreateWorkOrderPage(organizationId: string, factoryId: string) {

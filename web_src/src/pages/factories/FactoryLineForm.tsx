@@ -7,7 +7,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useMemo, useState } from "react";
 import { FactoryLineStepsEditor } from "./FactoryLineStepsEditor";
-import { draftStepsFromLine, draftStepsToProto, emptyStep, type DraftStep } from "./factoryLineFormShared";
+import { draftStepsFromLine, draftStepsToProto, emptyStep, type DraftStep } from "./lib/factoryLineFormShared";
 
 const stepFieldClassName = "w-full min-w-0";
 

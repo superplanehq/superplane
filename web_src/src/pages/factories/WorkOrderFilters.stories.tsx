@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { WorkOrderFilters } from "./WorkOrderFilters";
-import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./workOrderProgress";
+import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 
 /**
  * Row of interactive pills: "My Work / Unassigned / All" on the left and

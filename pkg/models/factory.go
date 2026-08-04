@@ -133,6 +133,10 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		}
 	}
 
+	if err := order.RecordOpened(tx, createdBy); err != nil {
+		return nil, err
+	}
+
 	return f.FindWorkOrder(tx, order.ID)
 }
 
