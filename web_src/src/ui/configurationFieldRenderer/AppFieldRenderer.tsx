@@ -20,6 +20,13 @@ type AppOptionSource = {
   name?: string;
 };
 
+type AppFieldSources = {
+  apps: AppOptionSource[] | undefined;
+  isLoading: boolean;
+  error: unknown;
+  isFactoryContext: boolean;
+};
+
 function buildAppOptions(
   apps: AppOptionSource[] | undefined,
   allowSelf: boolean,
@@ -48,74 +55,101 @@ function buildAppOptions(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function AppFieldRenderer({ field, value, onChange, organizationId, readOnly = false }: AppFieldRendererProps) {
-  const { appId: currentAppId } = useParams<{ appId?: string }>();
+function resolveSelectedAppValue(apps: AppOptionSource[] | undefined, value: string | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const matchedApp = apps?.find((app) => app.id === value || app.name === value);
+  return matchedApp?.id ?? value;
+}
+
+function getEmptyStateMessage(isFactoryContext: boolean, allowSelf: boolean): string {
+  if (isFactoryContext) {
+    return allowSelf
+      ? "Select another app in this factory to invoke."
+      : "Create another app in this factory to subscribe to its events.";
+  }
+
+  return allowSelf
+    ? "Select an app in this organization to invoke."
+    : "Create another app in this organization to subscribe to its events.";
+}
+
+function useAppFieldSources(organizationId: string, currentAppId: string | undefined): AppFieldSources {
   const { data: currentCanvas } = useCanvas(organizationId, currentAppId ?? "", {
     enabled: Boolean(currentAppId),
     staleTime: Infinity,
   });
   const factoryId = currentCanvas?.metadata?.factoryId;
-  const allowSelf = field.typeOptions?.app?.allowSelf ?? false;
+  const isFactoryContext = Boolean(factoryId);
 
   const orgCanvasesQuery = useCanvases(organizationId);
   const factoryAppsQuery = useFactoryApps(organizationId, factoryId ?? "");
+  const activeQuery = isFactoryContext ? factoryAppsQuery : orgCanvasesQuery;
 
-  const isFactoryContext = Boolean(factoryId);
-  const { data: apps, isLoading, error } = isFactoryContext ? factoryAppsQuery : orgCanvasesQuery;
+  return {
+    apps: activeQuery.data,
+    isLoading: activeQuery.isLoading,
+    error: activeQuery.error,
+    isFactoryContext,
+  };
+}
 
-  const options = useMemo(
-    () => buildAppOptions(apps, allowSelf, currentAppId),
-    [allowSelf, apps, currentAppId],
+function AppFieldLoadError({ error }: { error: unknown }) {
+  const message = error instanceof Error ? error.message : "Unknown error";
+
+  return <div className="text-sm text-red-500 dark:text-red-400">Failed to load apps: {message}</div>;
+}
+
+function AppFieldLoading({ fieldName }: { fieldName: string | undefined }) {
+  return (
+    <div data-testid={toTestId(`app-field-${fieldName}`)}>
+      <Select value="" disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Loading apps..." />
+        </SelectTrigger>
+      </Select>
+    </div>
+  );
+}
+
+function AppFieldEmpty({ fieldName, message }: { fieldName: string | undefined; message: string }) {
+  return (
+    <div data-testid={toTestId(`app-field-${fieldName}`)} className="space-y-2">
+      <Select value="" disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No apps available" />
+        </SelectTrigger>
+      </Select>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{message}</p>
+    </div>
+  );
+}
+
+export function AppFieldRenderer({ field, value, onChange, organizationId, readOnly = false }: AppFieldRendererProps) {
+  const { appId: currentAppId } = useParams<{ appId?: string }>();
+  const allowSelf = field.typeOptions?.app?.allowSelf ?? false;
+  const { apps, isLoading, error, isFactoryContext } = useAppFieldSources(organizationId, currentAppId);
+
+  const options = useMemo(() => buildAppOptions(apps, allowSelf, currentAppId), [allowSelf, apps, currentAppId]);
+
+  const selectedValue = useMemo(() => resolveSelectedAppValue(apps, value), [apps, value]);
+  const emptyStateMessage = useMemo(
+    () => getEmptyStateMessage(isFactoryContext, allowSelf),
+    [allowSelf, isFactoryContext],
   );
 
-  const selectedValue = useMemo(() => {
-    if (!value) {
-      return "";
-    }
-
-    const matchedApp = apps?.find((app) => app.id === value || app.name === value);
-    return matchedApp?.id ?? value;
-  }, [apps, value]);
-
   if (error) {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">
-        Failed to load apps: {error instanceof Error ? error.message : "Unknown error"}
-      </div>
-    );
+    return <AppFieldLoadError error={error} />;
   }
 
   if (isLoading) {
-    return (
-      <div data-testid={toTestId(`app-field-${field.name}`)}>
-        <Select value="" disabled>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Loading apps..." />
-          </SelectTrigger>
-        </Select>
-      </div>
-    );
+    return <AppFieldLoading fieldName={field.name} />;
   }
 
   if (options.length === 0) {
-    return (
-      <div data-testid={toTestId(`app-field-${field.name}`)} className="space-y-2">
-        <Select value="" disabled>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="No apps available" />
-          </SelectTrigger>
-        </Select>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {isFactoryContext
-            ? allowSelf
-              ? "Select another app in this factory to invoke."
-              : "Create another app in this factory to subscribe to its events."
-            : allowSelf
-              ? "Select an app in this organization to invoke."
-              : "Create another app in this organization to subscribe to its events."}
-        </p>
-      </div>
-    );
+    return <AppFieldEmpty fieldName={field.name} message={emptyStateMessage} />;
   }
 
   return (
