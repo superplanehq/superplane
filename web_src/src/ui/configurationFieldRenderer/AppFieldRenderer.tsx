@@ -3,7 +3,8 @@ import { useParams } from "react-router-dom";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ConfigurationField } from "@/api-client";
-import { useCanvases } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvases } from "@/hooks/useCanvasData";
+import { useFactoryApps } from "@/hooks/useFactoryData";
 import { toTestId } from "@/lib/testID";
 
 interface AppFieldRendererProps {
@@ -14,43 +15,67 @@ interface AppFieldRendererProps {
   readOnly?: boolean;
 }
 
+type AppOptionSource = {
+  id?: string;
+  name?: string;
+};
+
+function buildAppOptions(
+  apps: AppOptionSource[] | undefined,
+  allowSelf: boolean,
+  currentAppId: string | undefined,
+): AutoCompleteOption[] {
+  if (!apps?.length) {
+    return [];
+  }
+
+  return apps
+    .filter((app) => {
+      if (!app.id || !app.name) {
+        return false;
+      }
+
+      if (!allowSelf && app.id === currentAppId) {
+        return false;
+      }
+
+      return true;
+    })
+    .map((app) => ({
+      value: app.id!,
+      label: app.name!,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
 export function AppFieldRenderer({ field, value, onChange, organizationId, readOnly = false }: AppFieldRendererProps) {
   const { appId: currentAppId } = useParams<{ appId?: string }>();
-  const { data: canvases, isLoading, error } = useCanvases(organizationId);
+  const { data: currentCanvas } = useCanvas(organizationId, currentAppId ?? "", {
+    enabled: Boolean(currentAppId),
+    staleTime: Infinity,
+  });
+  const factoryId = currentCanvas?.metadata?.factoryId;
   const allowSelf = field.typeOptions?.app?.allowSelf ?? false;
 
-  const options: AutoCompleteOption[] = useMemo(() => {
-    if (!canvases?.length) {
-      return [];
-    }
+  const orgCanvasesQuery = useCanvases(organizationId);
+  const factoryAppsQuery = useFactoryApps(organizationId, factoryId ?? "");
 
-    return canvases
-      .filter((canvas) => {
-        if (!canvas.id || !canvas.name) {
-          return false;
-        }
+  const isFactoryContext = Boolean(factoryId);
+  const { data: apps, isLoading, error } = isFactoryContext ? factoryAppsQuery : orgCanvasesQuery;
 
-        if (!allowSelf && canvas.id === currentAppId) {
-          return false;
-        }
-
-        return true;
-      })
-      .map((canvas) => ({
-        value: canvas.id!,
-        label: canvas.name!,
-      }))
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [allowSelf, canvases, currentAppId]);
+  const options = useMemo(
+    () => buildAppOptions(apps, allowSelf, currentAppId),
+    [allowSelf, apps, currentAppId],
+  );
 
   const selectedValue = useMemo(() => {
     if (!value) {
       return "";
     }
 
-    const matchedCanvas = canvases?.find((canvas) => canvas.id === value || canvas.name === value);
-    return matchedCanvas?.id ?? value;
-  }, [canvases, value]);
+    const matchedApp = apps?.find((app) => app.id === value || app.name === value);
+    return matchedApp?.id ?? value;
+  }, [apps, value]);
 
   if (error) {
     return (
@@ -81,9 +106,13 @@ export function AppFieldRenderer({ field, value, onChange, organizationId, readO
           </SelectTrigger>
         </Select>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {allowSelf
-            ? "Select an app in this organization to invoke."
-            : "Create another app in this organization to subscribe to its events."}
+          {isFactoryContext
+            ? allowSelf
+              ? "Select another app in this factory to invoke."
+              : "Create another app in this factory to subscribe to its events."
+            : allowSelf
+              ? "Select an app in this organization to invoke."
+              : "Create another app in this organization to subscribe to its events."}
         </p>
       </div>
     );

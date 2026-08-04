@@ -4,7 +4,8 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigurationField } from "@/api-client";
-import { useCanvases } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvases } from "@/hooks/useCanvasData";
+import { useFactoryApps } from "@/hooks/useFactoryData";
 
 import { AppFieldRenderer } from "./AppFieldRenderer";
 
@@ -14,9 +15,16 @@ vi.mock("react-router-dom", () => ({
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases: vi.fn(),
+  useCanvas: vi.fn(),
+}));
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactoryApps: vi.fn(),
 }));
 
 const mockUseCanvases = vi.mocked(useCanvases);
+const mockUseCanvas = vi.mocked(useCanvas);
+const mockUseFactoryApps = vi.mocked(useFactoryApps);
 
 function appField(overrides: Partial<ConfigurationField> = {}): ConfigurationField {
   return {
@@ -44,6 +52,18 @@ function ControlledRenderer({
 }
 
 beforeEach(() => {
+  mockUseCanvas.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  } as ReturnType<typeof useCanvas>);
+
+  mockUseFactoryApps.mockReturnValue({
+    data: [],
+    isLoading: false,
+    error: null,
+  } as ReturnType<typeof useFactoryApps>);
+
   mockUseCanvases.mockReturnValue({
     data: [
       { id: "canvas_current", name: "Current App" },
@@ -89,5 +109,43 @@ describe("AppFieldRenderer", () => {
     await userEvent.click(screen.getByText("Billing Alerts"));
 
     expect(screen.getByTestId("current-value")).toHaveTextContent("canvas_billing");
+  });
+
+  it("lists factory apps when configuring on a factory-owned canvas", async () => {
+    mockUseCanvas.mockReturnValue({
+      data: {
+        metadata: {
+          factoryId: "factory_refunds",
+        },
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useCanvas>);
+
+    mockUseFactoryApps.mockReturnValue({
+      data: [
+        { id: "canvas_current", name: "Current Factory App" },
+        { id: "canvas_planner", name: "Refund Planner" },
+      ],
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useFactoryApps>);
+
+    render(
+      <ControlledRenderer
+        field={appField({
+          typeOptions: {
+            app: {
+              allowSelf: true,
+            },
+          },
+        })}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+    expect(screen.getByText("Current Factory App")).toBeInTheDocument();
+    expect(screen.getByText("Refund Planner")).toBeInTheDocument();
+    expect(screen.queryByText("Billing Alerts")).not.toBeInTheDocument();
   });
 });
