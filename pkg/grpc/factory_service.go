@@ -61,6 +61,11 @@ func (s *FactoryService) DescribeWorkOrder(ctx context.Context, req *pb.Describe
 	return actions.DescribeWorkOrder(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListWorkOrderEvents(ctx context.Context, req *pb.ListWorkOrderEventsRequest) (*pb.ListWorkOrderEventsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListWorkOrderEvents(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateWorkOrderAssignees(
 	ctx context.Context,
 	req *pb.UpdateWorkOrderAssigneesRequest,

@@ -15,7 +15,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { homeListCardClassName, homePageSubtitleClassName, homePageTitleClassName } from "../home/homePageStyles";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { FactoryPageShell } from "./FactoryPageShell";
-import { factoryPageContentClassName } from "./factoryPageStyles";
+import { factoryPageContentClassName } from "./lib/factoryPageStyles";
 
 export function FactoryListPage() {
   const { organizationId } = useParams<{ organizationId: string }>();

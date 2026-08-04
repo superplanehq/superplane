@@ -1,24 +1,25 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactory, useWorkOrder } from "@/hooks/useFactoryData";
+import { useFactory, useWorkOrder, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { factoryDetailPath } from "./factoryPagePaths";
+import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveWorkOrderDetailRedirect } from "./factoryPageRedirects";
 import { useWorkOrderDetailActions } from "./useWorkOrderDetailActions";
-import { getWorkOrderDetailDerived } from "./workOrderProgress";
+import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 export function useWorkOrderDetailPage(organizationId: string, factoryId: string, orderId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
+  const { data: events, isLoading: eventsLoading } = useWorkOrderEvents(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   const derived = getWorkOrderDetailDerived(order);
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Factory"]);
 
-  const isLoading = factoryLoading || orderLoading;
+  const isLoading = factoryLoading || orderLoading || eventsLoading;
   const canManageWorkOrders = canAct("factories", "update");
 
   useReportPageReady(!isLoading && Boolean(factory && order), {
@@ -41,6 +42,7 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     kind: "ready" as const,
     factory,
     order,
+    events,
     factoryHref: factoryDetailPath(organizationId, factoryId),
     organizationId,
     factoryLines: factory?.lines ?? [],

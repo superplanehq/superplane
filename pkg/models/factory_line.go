@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -154,10 +156,41 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 		return nil, err
 	}
 
+	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run); err != nil {
+		return nil, err
+	}
+
 	return &FactoryLineStepResult{
 		Run:       run,
 		Execution: execution,
 	}, nil
+}
+
+func (l *FactoryLine) RecordStepExecutionCreated(tx *gorm.DB, order *FactoryWorkOrder, execution *FactoryWorkOrderExecution, step *FactoryLineStep, run *CanvasRun) error {
+	data := factory.LineStepExecutionCreated{
+		StepName: step.Name,
+		Order:    order.Ref(),
+		Line:     &factory.LineRef{ID: l.ID, Name: l.Name},
+		App:      &factory.AppRef{ID: run.WorkflowID},
+		Run:      &factory.RunRef{ID: run.ID, State: run.State},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
+		WorkOrderID:    order.ID,
+		Type:           factory.EventTypeLineStepExecutionCreated,
+		Data:           datatypes.JSON(jsonData),
+		CreatedAt:      time.Now(),
+	}
+
+	return tx.Create(event).Error
 }
 
 func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {

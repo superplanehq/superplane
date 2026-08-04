@@ -2,8 +2,8 @@ import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Text } from "@/components/Text/text";
 import { WorkOrderCard } from "./WorkOrderCard";
 import { WorkOrderFilters } from "./WorkOrderFilters";
-import { factoryCountBadgeClassName, factoryDetailMainClassName } from "./factoryPageStyles";
-import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./workOrderProgress";
+import { factoryCountBadgeClassName, factoryDetailMainClassName } from "./lib/factoryPageStyles";
+import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 
 interface FactoryDetailWorkOrdersPanelProps {
   openWorkOrderCount: number;

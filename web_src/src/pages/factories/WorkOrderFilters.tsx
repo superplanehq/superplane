@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { factoryFilterPillActiveClassName, factoryFilterPillInactiveClassName } from "./factoryPageStyles";
-import type { WorkOrderDisplayStatus, WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./workOrderProgress";
-import { getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
+import { factoryFilterPillActiveClassName, factoryFilterPillInactiveClassName } from "./lib/factoryPageStyles";
+import type { WorkOrderDisplayStatus, WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
+import { getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
 const STATUS_FILTERS: Array<{ id: WorkOrderStatusFilter; label: string }> = [
   { id: "all", label: "All statuses" },

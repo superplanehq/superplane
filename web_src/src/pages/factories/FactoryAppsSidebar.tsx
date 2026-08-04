@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
-import { factoryCountBadgeClassName, factorySidebarActionClassName } from "./factoryPageStyles";
+import { factoryCountBadgeClassName, factorySidebarActionClassName } from "./lib/factoryPageStyles";
 
 interface FactoryAppsSidebarProps {
   organizationId: string;
