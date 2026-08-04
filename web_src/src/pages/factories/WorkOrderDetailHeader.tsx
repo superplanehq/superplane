@@ -6,7 +6,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
 import { Forward, Loader2 } from "lucide-react";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import type { WorkOrderDisplayStatus } from "./workOrderProgress";
+import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;

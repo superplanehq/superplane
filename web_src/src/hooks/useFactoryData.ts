@@ -8,6 +8,7 @@ import {
   factoriesDispatchWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
+  factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrderAssignees,
@@ -21,8 +22,12 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { hasActiveWorkOrderExecution } from "@/pages/factories/workOrderExecutions";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { hasActiveWorkOrderExecution } from "@/pages/factories/lib/workOrderExecutions";
+import {
+  getWorkOrderEventsNextPageParam,
+  WORK_ORDER_EVENTS_PAGE_LIMIT,
+} from "@/pages/factories/lib/workOrderEventsPagination";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const WORK_ORDER_POLL_INTERVAL_MS = 5_000;
 
@@ -40,6 +45,10 @@ function workOrdersKey(organizationId: string, factoryId: string) {
 
 function workOrderDetailKey(organizationId: string, factoryId: string, orderId: string) {
   return ["factories", organizationId, factoryId, "work-orders", orderId] as const;
+}
+
+function workOrderEventsKey(organizationId: string, factoryId: string, orderId: string) {
+  return ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const;
 }
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
@@ -119,6 +128,29 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
   });
 }
 
+export function useWorkOrderEvents(organizationId: string, factoryId: string, orderId: string) {
+  return useInfiniteQuery({
+    queryKey: workOrderEventsKey(organizationId, factoryId, orderId),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await factoriesListWorkOrderEvents(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+          query: {
+            limit: WORK_ORDER_EVENTS_PAGE_LIMIT,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: getWorkOrderEventsNextPageParam,
+    initialPageParam: undefined as string | undefined,
+    enabled: Boolean(organizationId && factoryId && orderId),
+    refetchInterval: WORK_ORDER_POLL_INTERVAL_MS,
+  });
+}
+
 export function useCreateFactory(organizationId: string) {
   const queryClient = useQueryClient();
 
@@ -165,8 +197,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       }
       return response.data.order;
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      if (order.id) {
+        void queryClient.invalidateQueries({
+          queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
+        });
+      }
     },
   });
 }
@@ -194,6 +231,9 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
     },
   });
@@ -223,6 +263,9 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
     },
   });
 }
@@ -250,6 +293,9 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
     },
   });
