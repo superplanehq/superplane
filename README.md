@@ -30,7 +30,7 @@ SuperPlane orchestrates your existing stack into git-backed **apps** with durabl
 ## How it works
 
 - **Canvases**: A graph of steps and their dependencies; a single canvas can express multiple workflows and run them concurrently.
-- **Components**: Each node is a trigger or action, built-in or integration-backed that performs a specific task (for example: deploy a service, open an incident, post a notification, wait for a condition, require approval, etc.).
+- **Components**: Each node is a trigger or action, built-in or integration-backed, that performs a specific task (for example: deploy a service, open an incident, post a notification, wait for a condition, require approval, etc.).
 - **Events & triggers**: Incoming events match triggers and start runs with the event payload as input.
 - **Runs & durable execution**: Runs, run items, and payloads are tracked across restarts; failed steps can resume without custom retry logic.
 - **Memory**: App-scoped JSON storage that persists across runs.
