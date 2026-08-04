@@ -5,7 +5,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import { stringOrDash } from "../utils";
+import { formatPredicate, stringOrDash } from "../utils";
 import { addTeamMetadata, getIssueLabel, getUserLabel } from "./utils";
 import type { LinearCommentWebhookEvent, LinearNodeMetadata, OnIssueCommentConfiguration } from "./types";
 
@@ -58,6 +58,13 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "funnel",
         label: configuration.actions.map((action) => actionLabel(action)).join(", "),
+      });
+    }
+
+    if (configuration?.contentFilter && configuration.contentFilter.length > 0) {
+      metadataItems.push({
+        icon: "funnel",
+        label: `Filter: ${configuration.contentFilter.map((predicate) => formatPredicate(predicate)).join(", ")}`,
       });
     }
 

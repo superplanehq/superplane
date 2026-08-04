@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,9 @@ import (
 type OnIssueComment struct{}
 
 type OnIssueCommentConfiguration struct {
-	Team    string   `json:"team" mapstructure:"team"`
-	Actions []string `json:"actions" mapstructure:"actions"`
+	Team          string                    `json:"team" mapstructure:"team"`
+	Actions       []string                  `json:"actions" mapstructure:"actions"`
+	ContentFilter []configuration.Predicate `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 func (i *OnIssueComment) Name() string {
@@ -37,7 +39,7 @@ updated or deleted on an issue in a Linear team.
 
 ## Use Cases
 
-- **Run a command** when someone comments a keyword on an issue
+- **Run a command** when someone comments a keyword like ` + "`/deploy`" + ` on an issue
 - **Sync discussion** to another tool when a comment is added
 - **Notify a channel** when an issue gets new activity
 
@@ -45,6 +47,8 @@ updated or deleted on an issue in a Linear team.
 
 - **Team** (required): Linear team to monitor
 - **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
+- **Content Filter** (optional): Only trigger for comments whose body matches one of these predicates.
+  A comment delivered without a body never matches.
 
 ## Outputs
 
@@ -97,6 +101,18 @@ func (i *OnIssueComment) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "contentFilter",
+			Label:       "Content Filter",
+			Type:        configuration.FieldTypeAnyPredicateList,
+			Required:    false,
+			Description: "Only trigger for comments whose body matches one of these predicates",
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
+		},
 	}
 }
 
@@ -116,6 +132,20 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	//
 	if len(config.Actions) == 0 {
 		return fmt.Errorf("at least one action is required")
+	}
+
+	//
+	// Predicate evaluation swallows regex errors and never matches, so reject an
+	// uncompilable pattern here instead of saving a silently dead trigger.
+	//
+	for _, predicate := range config.ContentFilter {
+		if predicate.Type != configuration.PredicateTypeMatches {
+			continue
+		}
+
+		if _, err := regexp.Compile(predicate.Value); err != nil {
+			return fmt.Errorf("invalid content filter pattern %q: %w", predicate.Value, err)
+		}
 	}
 
 	team, err := requireTeam(ctx.Integration, config.Team)
@@ -174,6 +204,10 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
+	if len(config.ContentFilter) > 0 && !i.matchesContentFilter(ctx.Logger, data, config.ContentFilter) {
+		return http.StatusOK, nil, nil
+	}
+
 	if err := ctx.Events.Emit(CommentPayloadType, data); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -193,6 +227,25 @@ func (i *OnIssueComment) whitelistedAction(logger *log.Entry, data map[string]an
 
 	if !slices.Contains(allowedActions, action) {
 		logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
+		return false
+	}
+
+	return true
+}
+
+func (i *OnIssueComment) matchesContentFilter(logger *log.Entry, data map[string]any, predicates []configuration.Predicate) bool {
+	comment, ok := data["data"].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	body, ok := comment["body"].(string)
+	if !ok {
+		return false
+	}
+
+	if !configuration.MatchesAnyPredicate(predicates, body) {
+		logger.Infof("Comment body does not match the content filter: %v", predicates)
 		return false
 	}
 
