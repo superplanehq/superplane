@@ -15,9 +15,17 @@ function buildMeUser(orgId: string) {
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
-      (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
-    ),
+    permissions: [
+      "canvases",
+      "integrations",
+      "secrets",
+      "groups",
+      "users",
+      "roles",
+      "organization",
+      "agents",
+      "factories",
+    ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
 
