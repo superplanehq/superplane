@@ -77,7 +77,7 @@ func (c *CreateWorkspace) Configuration() []configuration.Field {
 			},
 		},
 		clientTokenField(),
-		tagsField(),
+		tagsField("Tags to associate with the workspace"),
 	}
 }
 
