@@ -181,13 +181,11 @@ func (l *FactoryLine) RecordStepExecutionCreated(tx *gorm.DB, order *FactoryWork
 	}
 
 	event := &FactoryWorkOrderEvent{
-		ID:             uuid.New(),
-		OrganizationID: l.OrganizationID,
-		FactoryID:      l.FactoryID,
-		WorkOrderID:    order.ID,
-		Type:           factory.EventTypeLineStepExecutionCreated,
-		Data:           datatypes.JSON(jsonData),
-		CreatedAt:      time.Now(),
+		ID:          uuid.New(),
+		WorkOrderID: order.ID,
+		Type:        factory.EventTypeLineStepExecutionCreated,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
 	}
 
 	return tx.Create(event).Error

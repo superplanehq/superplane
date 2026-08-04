@@ -125,13 +125,11 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 	}
 
 	event := &FactoryWorkOrderEvent{
-		ID:             uuid.New(),
-		OrganizationID: e.OrganizationID,
-		FactoryID:      e.FactoryID,
-		WorkOrderID:    e.WorkOrderID,
-		Type:           factory.EventTypeLineStepExecutionFinished,
-		Data:           datatypes.JSON(jsonData),
-		CreatedAt:      time.Now(),
+		ID:          uuid.New(),
+		WorkOrderID: e.WorkOrderID,
+		Type:        factory.EventTypeLineStepExecutionFinished,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
 	}
 
 	return tx.Create(event).Error

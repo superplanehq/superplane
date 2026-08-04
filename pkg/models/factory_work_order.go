@@ -161,8 +161,7 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 }
 
 func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time) ([]FactoryWorkOrderEvent, error) {
-	query := tx.
-		Where("organization_id = ? AND factory_id = ? AND work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID)
+	query := tx.Where("work_order_id = ?", o.ID)
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -190,7 +189,7 @@ func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 
 	err := tx.
 		Model(&FactoryWorkOrderEvent{}).
-		Where("organization_id = ? AND factory_id = ? AND work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID).
+		Where("work_order_id = ?", o.ID).
 		Count(&count).
 		Error
 	if err != nil {
@@ -221,13 +220,11 @@ func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error
 	}
 
 	event := &FactoryWorkOrderEvent{
-		ID:             uuid.New(),
-		OrganizationID: o.OrganizationID,
-		FactoryID:      o.FactoryID,
-		WorkOrderID:    o.ID,
-		Type:           factory.EventTypeOrderOpened,
-		Data:           datatypes.JSON(jsonData),
-		CreatedAt:      time.Now(),
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderOpened,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
 	}
 
 	return tx.Create(event).Error
@@ -246,13 +243,11 @@ func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, result
 	}
 
 	event := &FactoryWorkOrderEvent{
-		ID:             uuid.New(),
-		OrganizationID: o.OrganizationID,
-		FactoryID:      o.FactoryID,
-		WorkOrderID:    o.ID,
-		Type:           factory.EventTypeOrderClosed,
-		Data:           datatypes.JSON(jsonData),
-		CreatedAt:      time.Now(),
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderClosed,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
 	}
 
 	return tx.Create(event).Error
@@ -281,13 +276,11 @@ func (o *FactoryWorkOrder) RecordAssigneesUpdated(
 	}
 
 	event := &FactoryWorkOrderEvent{
-		ID:             uuid.New(),
-		OrganizationID: o.OrganizationID,
-		FactoryID:      o.FactoryID,
-		WorkOrderID:    o.ID,
-		Type:           factory.EventTypeOrderAssigneesUpdated,
-		Data:           datatypes.JSON(jsonData),
-		CreatedAt:      time.Now(),
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        factory.EventTypeOrderAssigneesUpdated,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
 	}
 
 	return tx.Create(event).Error

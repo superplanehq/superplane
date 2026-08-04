@@ -8,11 +8,9 @@ import (
 )
 
 type FactoryWorkOrderEvent struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	WorkOrderID    uuid.UUID
-	Type           string
-	Data           datatypes.JSON
-	CreatedAt      time.Time
+	ID          uuid.UUID
+	WorkOrderID uuid.UUID
+	Type        string
+	Data        datatypes.JSON
+	CreatedAt   time.Time
 }

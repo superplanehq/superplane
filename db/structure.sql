@@ -385,8 +385,6 @@ CREATE TABLE public.factory_work_order_assignees (
 
 CREATE TABLE public.factory_work_order_events (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
     work_order_id uuid NOT NULL,
     type text NOT NULL,
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -2082,14 +2080,6 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_events factory_work_order_events_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_events
-    ADD CONSTRAINT factory_work_order_events_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
