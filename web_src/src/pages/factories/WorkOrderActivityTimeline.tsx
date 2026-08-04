@@ -1,57 +1,62 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import {
   Check,
   CircleDashed,
   CircleDot,
-  CornerDownRight,
   GitBranch,
   Loader2,
   MinusCircle,
   UserRound,
+  UsersRound,
   XCircle,
 } from "lucide-react";
 import {
-  buildWorkOrderTimelineEvents,
-  describeWorkOrderClosed,
+  buildWorkOrderTimelineView,
+  buildWorkOrderUserNameLookup,
+  formatStepExecutionDuration,
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineStep,
-} from "./workOrderTimelineEvents";
-import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./workOrderExecutions";
+} from "./lib/workOrderTimelineEvents";
+import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
   order: FactoriesWorkOrder;
+  events?: FactoriesWorkOrderEvent[];
 }
 
-export function WorkOrderActivityTimeline({ organizationId, order }: WorkOrderTimelineProps) {
-  const events = buildWorkOrderTimelineEvents(order);
-  const closedLabel = describeWorkOrderClosed(order);
+export function WorkOrderActivityTimeline({ organizationId, order, events }: WorkOrderTimelineProps) {
+  const { data: users = [] } = useOrganizationUsers(organizationId);
+  const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
+  const timeline = buildWorkOrderTimelineView(order, events, resolveUserName);
 
-  if (events.length === 0 && !closedLabel) {
+  if (timeline.events.length === 0 && !timeline.closedLabel) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>;
   }
 
   return (
     <ol className="relative space-y-0">
-      {events.map((event, index) => (
+      {timeline.events.map((event, index) => (
         <TimelineItem
           key={event.id}
           event={event}
           organizationId={organizationId}
-          isLast={index === events.length - 1 && !closedLabel}
+          isLast={index === timeline.events.length - 1 && !timeline.closedLabel}
         />
       ))}
 
-      {closedLabel && order.updatedAt ? (
+      {timeline.closedLabel && timeline.closedAt ? (
         <li className="relative flex gap-4 pb-2 pl-8">
           <TimelineMarker icon={CircleDot} className="text-gray-400" />
           <div className="min-w-0 flex-1 pb-8">
-            <p className="text-sm text-gray-900 dark:text-gray-100">{closedLabel}</p>
+            <p className="text-sm text-gray-900 dark:text-gray-100">{timeline.closedLabel}</p>
             <time className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {formatTimeAgo(new Date(order.updatedAt))}
+              {formatTimeAgo(new Date(timeline.closedAt))}
             </time>
           </div>
         </li>
@@ -69,20 +74,29 @@ function TimelineItem({
   organizationId: string;
   isLast: boolean;
 }) {
-  const Icon = event.kind === "created" ? UserRound : GitBranch;
+  const Icon = event.kind === "created" ? UserRound : event.kind === "assigned" ? UsersRound : GitBranch;
 
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
         <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
-      <TimelineMarker icon={Icon} className={event.kind === "created" ? "text-gray-500" : "text-violet-500"} />
+      <TimelineMarker
+        icon={Icon}
+        className={
+          event.kind === "created" ? "text-gray-500" : event.kind === "assigned" ? "text-sky-500" : "text-violet-500"
+        }
+      />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        {event.kind === "created" ? (
+        {event.kind === "created" || event.kind === "assigned" ? (
           <p className="text-sm text-gray-900 dark:text-gray-100">
             {event.actorName ? (
               <>
                 <span className="font-semibold">{event.actorName}</span>{" "}
+              </>
+            ) : event.kind === "created" ? (
+              <>
+                <span className="font-semibold">Someone</span>{" "}
               </>
             ) : null}
             {event.title}
@@ -99,7 +113,7 @@ function TimelineItem({
             ) : null}
           </>
         )}
-        {event.kind === "created" ? (
+        {event.kind === "created" || event.kind === "assigned" ? (
           <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
             {formatTimeAgo(new Date(event.at))}
           </time>
@@ -111,6 +125,7 @@ function TimelineItem({
 
 function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
   const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
+  const durationLabel = formatStepExecutionDuration(step);
   const linkClassName =
     "pointer-events-auto inline-flex w-fit max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-sm text-gray-700 no-underline transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/40 dark:hover:text-gray-100";
   const stepContent = (
@@ -124,13 +139,13 @@ function DispatchStepRow({ organizationId, step }: { organizationId: string; ste
             <time className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(step.at))}</time>
           </>
         ) : null}
+        {durationLabel ? <span className="text-xs text-gray-500 dark:text-gray-400"> · {durationLabel}</span> : null}
       </span>
     </>
   );
 
   return (
     <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
       {runHref ? (
         <Link href={runHref} className={linkClassName}>
           {stepContent}

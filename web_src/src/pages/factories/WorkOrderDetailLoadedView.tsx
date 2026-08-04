@@ -2,6 +2,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderEvent,
   FactoriesWorkOrderResult,
 } from "@/api-client";
 import { Link } from "@/components/Link/link";
@@ -11,17 +12,18 @@ import {
   factoryDetailPanelClassName,
   factoryDetailSidebarClassName,
   factoryPageContentClassName,
-} from "./factoryPageStyles";
+} from "./lib/factoryPageStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
-import type { WorkOrderDisplayStatus } from "./workOrderProgress";
+import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
   factory: FactoriesFactory;
   factoryHref: string;
   organizationId: string;
   order: FactoriesWorkOrder;
+  events?: FactoriesWorkOrderEvent[];
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -47,6 +49,7 @@ export function WorkOrderDetailLoadedView({
   factoryHref,
   organizationId,
   order,
+  events,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -107,7 +110,7 @@ export function WorkOrderDetailLoadedView({
             <section>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
               <div className="mt-5">
-                <WorkOrderActivityTimeline organizationId={organizationId} order={order} />
+                <WorkOrderActivityTimeline organizationId={organizationId} order={order} events={events} />
               </div>
             </section>
           </div>

@@ -1,10 +1,13 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -75,12 +78,63 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 	e.UpdatedAt = now
 	e.FinishedAt = &now
 
-	return tx.Model(e).Updates(map[string]any{
+	if err := tx.Model(e).Updates(map[string]any{
 		"status":      FactoryWorkOrderExecutionStatusFinished,
 		"result":      result,
 		"updated_at":  now,
 		"finished_at": &now,
-	}).Error
+	}).Error; err != nil {
+		return err
+	}
+
+	return e.RecordFinished(tx, result)
+}
+
+func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {
+	f, err := FindFactory(tx, e.OrganizationID, e.FactoryID)
+	if err != nil {
+		return err
+	}
+
+	line, err := f.FindLine(tx, e.LineID)
+	if err != nil {
+		return err
+	}
+
+	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
+	if err != nil {
+		return err
+	}
+
+	run, err := LockCanvasRunInTransaction(tx, e.RunID)
+	if err != nil {
+		return err
+	}
+
+	data := factory.LineStepExecutionFinished{
+		StepName: e.StepName,
+		Order:    order.Ref(),
+		Line:     &factory.LineRef{ID: line.ID, Name: line.Name},
+		App:      &factory.AppRef{ID: run.WorkflowID},
+		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:             uuid.New(),
+		OrganizationID: e.OrganizationID,
+		FactoryID:      e.FactoryID,
+		WorkOrderID:    e.WorkOrderID,
+		Type:           factory.EventTypeLineStepExecutionFinished,
+		Data:           datatypes.JSON(jsonData),
+		CreatedAt:      time.Now(),
+	}
+
+	return tx.Create(event).Error
 }
 
 type FactoryWorkOrderExecutionRecord struct {
