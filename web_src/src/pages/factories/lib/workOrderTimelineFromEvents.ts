@@ -108,7 +108,7 @@ export function buildWorkOrderTimelineViewFromEvents(
   apiEvents: FactoriesWorkOrderEvent[],
   resolveUserName?: UserNameLookup,
 ): WorkOrderTimelineViewModel {
-  const eventsAsc = apiEvents.toSorted(compareWorkOrderEventsChronologically);
+  const eventsAsc = [...apiEvents].sort(compareWorkOrderEventsChronologically);
 
   const state = createTimelineBuildState();
 
