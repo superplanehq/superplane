@@ -25,6 +25,7 @@ import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
+import { onJobTriggerRenderer } from "./on_job";
 import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
 import { onMergeRequestTriggerRenderer } from "./on_merge_request";
 import { onMilestoneTriggerRenderer } from "./on_milestone";
@@ -105,6 +106,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onBranchCreated: onBranchCreatedTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onIssueComment: onIssueCommentTriggerRenderer,
+  onJob: onJobTriggerRenderer,
   onMergeComment: onMergeCommentTriggerRenderer,
   onMergeRequest: onMergeRequestTriggerRenderer,
   onMilestone: onMilestoneTriggerRenderer,
