@@ -14,6 +14,7 @@ import (
 const factoryNameUniqueConstraint = "factories_organization_id_name_key"
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
+var ErrFactoryNameRequired = errors.New("factory name is required")
 var ErrFactoryNotFound = errors.New("factory not found")
 var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 
@@ -86,6 +87,50 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	}
 
 	return factories, nil
+}
+
+func (f *Factory) Update(tx *gorm.DB, name, description *string) error {
+	updates := map[string]any{}
+
+	if name != nil {
+		nextName := strings.TrimSpace(*name)
+		if nextName == "" {
+			return ErrFactoryNameRequired
+		}
+		if f.Name != nextName {
+			updates["name"] = nextName
+		}
+	}
+
+	if description != nil && f.Description != *description {
+		updates["description"] = *description
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	updates["updated_at"] = now
+
+	err := MapFactoryNameUniqueConstraintError(
+		tx.Model(f).
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			Updates(updates).
+			Error,
+	)
+	if err != nil {
+		return err
+	}
+
+	if nextName, ok := updates["name"].(string); ok {
+		f.Name = nextName
+	}
+	if nextDescription, ok := updates["description"].(string); ok {
+		f.Description = nextDescription
+	}
+	f.UpdatedAt = now
+	return nil
 }
 
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
