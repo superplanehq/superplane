@@ -161,6 +161,8 @@ export interface HomePageFixture {
   organizationName: string;
   canvases: CanvasesCanvasSummary[];
   folders: CanvasFoldersCanvasFolder[];
+  enabledExperimentalFeatures?: string[];
+  factories?: Array<{ id: string; name: string; description?: string }>;
 }
 
 export const defaultHomePageFixture: HomePageFixture = {

@@ -68,6 +68,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"gitlab.onBranchCreated": "{{ root().data.ref }}",
 	"gitlab.onIssue":         "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onIssueComment":  "#{{ root().data.issue.iid }} - {{ root().data.issue.title }}",
+	"gitlab.onJob":           "{{ root().data.build_name }} {{ root().data.build_status }} - {{ root().data.sha[:7] }}",
 	"gitlab.onMergeComment":  "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",
 	"gitlab.onMergeRequest":  "!{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}",
 	"gitlab.onMRDiffNote":    "!{{ root().data.merge_request.iid }} - {{ root().data.merge_request.title }}",

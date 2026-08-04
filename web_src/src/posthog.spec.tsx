@@ -25,6 +25,14 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));
