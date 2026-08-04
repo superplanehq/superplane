@@ -115,6 +115,7 @@ export interface OnIssueLabelConfiguration {
 export interface OnIssueCommentConfiguration {
   team?: string;
   actions?: string[];
+  contentFilter?: string;
 }
 
 export interface GetIssueConfiguration {
