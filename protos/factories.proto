@@ -3,6 +3,7 @@ syntax = "proto3";
 package Superplane.Factories;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -136,6 +137,17 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory work order";
       description: "Returns a work order by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderEvents(ListWorkOrderEventsRequest) returns (ListWorkOrderEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work order events";
+      description: "Returns a list of events for a work order";
       tags: "Factory";
     };
   }
@@ -398,4 +410,24 @@ message DispatchWorkOrderRequest {
 
 message DispatchWorkOrderResponse {
   WorkOrder order = 1;
+}
+
+message ListWorkOrderEventsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListWorkOrderEventsResponse {
+  repeated WorkOrderEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message WorkOrderEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  string type = 2;
+  google.protobuf.Struct event = 3;
 }

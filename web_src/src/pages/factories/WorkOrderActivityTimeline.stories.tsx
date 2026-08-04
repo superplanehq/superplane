@@ -3,10 +3,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
   CLOSED_WORK_ORDER,
+  CLOSED_WORK_ORDER_EVENTS,
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
+  FAILED_WORK_ORDER_EVENTS,
   OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_EVENTS,
   RUNNING_WORK_ORDER,
+  RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageResponses";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 
@@ -33,10 +37,10 @@ type Story = StoryObj<typeof meta>;
 
 /** Freshly opened order — only a `created` marker. */
 export const JustCreated: Story = {
-  name: "Just Created",
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: OPEN_WORK_ORDER,
+    events: OPEN_WORK_ORDER_EVENTS,
   },
 };
 
@@ -45,6 +49,7 @@ export const Running: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: RUNNING_WORK_ORDER,
+    events: RUNNING_WORK_ORDER_EVENTS,
   },
 };
 
@@ -53,6 +58,7 @@ export const Failed: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: FAILED_WORK_ORDER,
+    events: FAILED_WORK_ORDER_EVENTS,
   },
 };
 
@@ -61,5 +67,34 @@ export const Closed: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: CLOSED_WORK_ORDER,
+    events: CLOSED_WORK_ORDER_EVENTS,
+  },
+};
+
+/** Older events are available but not loaded yet. */
+export const WithLoadMore: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: RUNNING_WORK_ORDER,
+    events: RUNNING_WORK_ORDER_EVENTS,
+    hasMoreEvents: true,
+    onLoadMoreEvents: () => undefined,
+  },
+};
+
+export const Loading: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    isLoading: true,
+  },
+};
+
+export const ErrorState: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    eventsError: new Error("Failed to load activity"),
+    onRetryEvents: () => undefined,
   },
 };

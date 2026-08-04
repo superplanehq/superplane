@@ -15,7 +15,7 @@ import {
   filterWorkOrdersByStatus,
   type WorkOrderOwnerFilter,
   type WorkOrderStatusFilter,
-} from "./workOrderProgress";
+} from "./lib/workOrderProgress";
 
 /**
  * The Work Orders section on the factory detail page: header + filters + list.

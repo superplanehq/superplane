@@ -45,6 +45,13 @@ function WorkOrderDetailPageContent({
           factoryHref={page.factoryHref}
           organizationId={page.organizationId}
           order={page.order}
+          events={page.events}
+          eventsError={page.eventsError}
+          isEventsLoading={page.isEventsLoading}
+          hasMoreEvents={page.hasMoreEvents}
+          isLoadingMoreEvents={page.isLoadingMoreEvents}
+          onLoadMoreEvents={page.onLoadMoreEvents}
+          onRetryEvents={page.onRetryEvents}
           displayStatus={page.displayStatus}
           statusMeta={page.statusMeta}
           assigneeIds={page.assigneeIds}

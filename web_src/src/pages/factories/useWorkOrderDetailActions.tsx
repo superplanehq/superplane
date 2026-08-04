@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderResult } from "@/api-client";
 import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { formatWorkOrderResult } from "./workOrderPresentation";
+import { formatWorkOrderResult } from "./lib/workOrderPresentation";
 
 export function useWorkOrderDetailActions(organizationId: string, factoryId: string, orderId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);

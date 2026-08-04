@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft } from "lucide-react";
-import { factoryFormCardClassName, factoryPageContentClassName } from "./factoryPageStyles";
+import { factoryFormCardClassName, factoryPageContentClassName } from "./lib/factoryPageStyles";
 import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
 
 const MAX_TITLE_LENGTH = 256;

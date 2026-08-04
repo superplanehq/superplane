@@ -1,7 +1,7 @@
 import type { FactoriesFactory } from "@/api-client";
 import type { ReactElement } from "react";
 import { Navigate } from "react-router-dom";
-import { factoryDetailPath, factoryListPath } from "./factoryPagePaths";
+import { factoryDetailPath, factoryListPath } from "./lib/factoryPagePaths";
 
 export function factoryListRedirect(organizationId: string) {
   return <Navigate to={factoryListPath(organizationId)} replace />;
