@@ -109,6 +109,8 @@ func (l *Linear) Actions() []core.Action {
 		&UpdateIssue{},
 		&AddIssueLabel{},
 		&AddIssueComment{},
+		&CreateAttachment{},
+		&DeleteAttachment{},
 	}
 }
 
@@ -117,6 +119,7 @@ func (l *Linear) Triggers() []core.Trigger {
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnIssueLabel{},
+		&OnIssueAttachment{},
 	}
 }
 
