@@ -80,7 +80,9 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)"),
       resolve: (match, method, body) => {
-        const factory = fixture.factories.find((entry) => entry.id === match[1]);
+        const factoryId = match[1];
+        const factoryIndex = fixture.factories.findIndex((entry) => entry.id === factoryId);
+        const factory = factoryIndex >= 0 ? fixture.factories[factoryIndex] : undefined;
 
         if (method === "PUT") {
           if (!factory) return { json: {} };
@@ -92,6 +94,14 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             factory.description = request.description;
           }
           return { json: { factory } };
+        }
+
+        if (method === "DELETE") {
+          if (factoryIndex < 0) return { json: {} };
+          fixture.factories.splice(factoryIndex, 1);
+          delete fixture.workOrdersByFactoryId[factoryId];
+          delete fixture.appsByFactoryId[factoryId];
+          return { json: {} };
         }
 
         return factory ? { json: { factory } } : { json: {} };
