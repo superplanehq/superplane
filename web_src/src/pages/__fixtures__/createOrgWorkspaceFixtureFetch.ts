@@ -108,6 +108,26 @@ async function readRequestJson(input: RequestInfo | URL, init?: RequestInit): Pr
   return undefined;
 }
 
+function resolveFactoryFixtures(
+  url: URL,
+  method: string,
+  body: unknown,
+  factoriesFixture: FactoriesFixture | undefined,
+) {
+  if (!factoriesFixture) {
+    return { factoryPagesResolved: null, factoryUsersResolved: null };
+  }
+  const factoryPagesResolved = matchFactoryPageFixture(
+    url,
+    method,
+    (body ?? null) as Record<string, unknown> | null,
+    factoriesFixture,
+  );
+  const factoryUsersResolved =
+    url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse() : null;
+  return { factoryPagesResolved, factoryUsersResolved };
+}
+
 async function resolveOrgWorkspaceFixture(args: {
   url: URL;
   method: string;
@@ -124,16 +144,7 @@ async function resolveOrgWorkspaceFixture(args: {
   const homeResolved = matchHomePageFixture(url, method, homeFixture);
   const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
   const factorySetupResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
-  // Factory pages need a richer detail/orders/apps/lines backend than the
-  // home stub. When a factories fixture is provided by the harness, it wins.
-  const factoryPagesResolved = factoriesFixture
-    ? matchFactoryPageFixture(url, method, (body ?? null) as Record<string, unknown> | null, factoriesFixture)
-    : null;
-  // Assignee picker and create form call /api/v1/users; return the seeded org roster.
-  const factoryUsersResolved =
-    factoriesFixture && url.pathname === "/api/v1/users" && method === "GET"
-      ? factoriesOrganizationUsersResponse()
-      : null;
+  const { factoryPagesResolved, factoryUsersResolved } = resolveFactoryFixtures(url, method, body, factoriesFixture);
   // AppPageHarness always supplies `appFixture`, so canvas integrations win there.
   // HomePageHarness omits it, so factory GitHub/Claude stubs stay available for setup.
   if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture !== undefined) {

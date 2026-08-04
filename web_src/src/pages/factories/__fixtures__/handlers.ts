@@ -53,56 +53,53 @@ function ensureFactoryWorkOrders(fixture: FactoriesFixture, factoryId: string): 
   return created;
 }
 
-/** Builds a resolvable factories route table for a fixture snapshot. */
-function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
-  return [
-    {
-      pattern: re("/api/v1/factories"),
-      resolve: (_match, method, body) => {
-        if (method === "POST") {
-          const request = (body ?? {}) as RequestBody;
-          const created = {
-            id: `storybook-factory-${fixture.factories.length + 1}`,
-            name: stringOrEmpty(request.name) || "New Factory",
-            description: stringOrEmpty(request.description),
-            lines: [],
-          };
-          fixture.factories.push(created);
-          fixture.workOrdersByFactoryId[created.id] = [];
-          fixture.appsByFactoryId[created.id] = [];
-          return { json: { factory: created } };
-        }
+function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories"),
+    resolve: (_match, method, body) => {
+      if (method !== "POST") {
         return { json: { factories: fixture.factories } };
-      },
+      }
+      const request = (body ?? {}) as RequestBody;
+      const created = {
+        id: `storybook-factory-${fixture.factories.length + 1}`,
+        name: stringOrEmpty(request.name) || "New Factory",
+        description: stringOrEmpty(request.description),
+        lines: [],
+      };
+      fixture.factories.push(created);
+      fixture.workOrdersByFactoryId[created.id] = [];
+      fixture.appsByFactoryId[created.id] = [];
+      return { json: { factory: created } };
     },
+  };
+}
+
+function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
     {
       pattern: re("/api/v1/factories/([^/]+)"),
       resolve: (match) => {
         const factory = fixture.factories.find((entry) => entry.id === match[1]);
-        if (!factory) {
-          return { json: {} };
-        }
-        return { json: { factory } };
+        return factory ? { json: { factory } } : { json: {} };
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
-      resolve: (match) => {
-        const apps = fixture.appsByFactoryId[match[1]] ?? [];
-        return { json: { apps } };
-      },
+      resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
+  ];
+}
+
+function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
     {
       pattern: re("/api/v1/factories/([^/]+)/lines"),
       resolve: (match, method, body) => {
-        if (method !== "POST") {
-          return null;
-        }
+        if (method !== "POST") return null;
         const request = (body ?? {}) as RequestBody;
         const factory = fixture.factories.find((entry) => entry.id === match[1]);
-        if (!factory) {
-          return { json: {} };
-        }
+        if (!factory) return { json: {} };
         const line = {
           id: `storybook-line-${(factory.lines?.length ?? 0) + 1}`,
           name: stringOrEmpty(request.name) || "new-line",
@@ -115,18 +112,11 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)/lines/([^/]+)"),
       resolve: (match, method, body) => {
-        if (method !== "PATCH") {
-          return null;
-        }
+        if (method !== "PATCH") return null;
         const request = (body ?? {}) as RequestBody;
         const factory = fixture.factories.find((entry) => entry.id === match[1]);
-        if (!factory) {
-          return { json: {} };
-        }
-        const existing = factory.lines?.find((entry) => entry.id === match[2]);
-        if (!existing) {
-          return { json: {} };
-        }
+        const existing = factory?.lines?.find((entry) => entry.id === match[2]);
+        if (!existing) return { json: {} };
         existing.name = stringOrEmpty(request.name) || existing.name;
         if (Array.isArray(request.steps)) {
           existing.steps = request.steps as typeof existing.steps;
@@ -134,53 +124,78 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         return { json: { line: existing } };
       },
     },
+  ];
+}
+
+function createWorkOrderFromRequest(request: RequestBody, orderCount: number): FactoriesWorkOrder {
+  const nowIso = new Date().toISOString();
+  return {
+    id: `storybook-work-order-${orderCount + 1}`,
+    title: stringOrEmpty(request.title) || "New work order",
+    description: stringOrEmpty(request.description),
+    state: "STATE_OPEN",
+    result: "RESULT_UNSPECIFIED",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    createdBy: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name },
+    assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
+    executions: [],
+  };
+}
+
+function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
+  const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
+  return orders.find((entry) => entry.id === orderId);
+}
+
+function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
+  const order = findOrder(fixture, factoryId, orderId);
+  if (!order) return { json: {} };
+  const factory = fixture.factories.find((entry) => entry.id === factoryId);
+  const lineName = stringOrEmpty(request.lineName ?? request.line_name);
+  const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
+  order.updatedAt = new Date().toISOString();
+  order.executions = [
+    ...(order.executions ?? []),
+    {
+      id: `dispatch-${Date.now()}`,
+      line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
+      step: line?.steps?.[0]?.name ?? "start",
+      state: "STATE_STARTED",
+      result: "RESULT_UNKNOWN",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ];
+  return { json: { order } };
+}
+
+function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
     {
       pattern: re("/api/v1/factories/([^/]+)/orders"),
       resolve: (match, method, body) => {
         const orders = ensureFactoryWorkOrders(fixture, match[1]);
-        if (method === "POST") {
-          const request = (body ?? {}) as RequestBody;
-          const created: FactoriesWorkOrder = {
-            id: `storybook-work-order-${orders.length + 1}`,
-            title: stringOrEmpty(request.title) || "New work order",
-            description: stringOrEmpty(request.description),
-            state: "STATE_OPEN",
-            result: "RESULT_UNSPECIFIED",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            createdBy: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name },
-            assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
-            executions: [],
-          };
-          orders.unshift(created);
-          return { json: { order: created } };
-        }
-        return { json: { orders } };
+        if (method !== "POST") return { json: { orders } };
+        const created = createWorkOrderFromRequest((body ?? {}) as RequestBody, orders.length);
+        orders.unshift(created);
+        return { json: { order: created } };
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)"),
       resolve: (match) => {
-        const orders = fixture.workOrdersByFactoryId[match[1]] ?? [];
-        const order = orders.find((entry) => entry.id === match[2]);
-        if (!order) {
-          return { json: {} };
-        }
-        return { json: { order } };
+        const order = findOrder(fixture, match[1], match[2]);
+        return order ? { json: { order } } : { json: {} };
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/assignees"),
       resolve: (match, method, body) => {
-        if (method !== "PATCH") {
-          return null;
-        }
+        if (method !== "PATCH") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
         const request = (body ?? {}) as RequestBody;
-        const orders = fixture.workOrdersByFactoryId[match[1]] ?? [];
-        const order = orders.find((entry) => entry.id === match[2]);
-        if (!order) {
-          return { json: {} };
-        }
         order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids));
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
@@ -189,52 +204,33 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/dispatch"),
       resolve: (match, method, body) => {
-        if (method !== "PATCH") {
-          return null;
-        }
-        const request = (body ?? {}) as RequestBody;
-        const orders = fixture.workOrdersByFactoryId[match[1]] ?? [];
-        const order = orders.find((entry) => entry.id === match[2]);
-        if (!order) {
-          return { json: {} };
-        }
-        const factory = fixture.factories.find((entry) => entry.id === match[1]);
-        const lineName = stringOrEmpty(request.lineName ?? request.line_name);
-        const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
-        order.updatedAt = new Date().toISOString();
-        order.executions = [
-          ...(order.executions ?? []),
-          {
-            id: `dispatch-${Date.now()}`,
-            line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
-            step: line?.steps?.[0]?.name ?? "start",
-            state: "STATE_STARTED",
-            result: "RESULT_UNKNOWN",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        ];
-        return { json: { order } };
+        if (method !== "PATCH") return null;
+        return dispatchOrder(fixture, match[1], match[2], (body ?? {}) as RequestBody);
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/close"),
       resolve: (match, method, body) => {
-        if (method !== "PATCH") {
-          return null;
-        }
+        if (method !== "PATCH") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
         const request = (body ?? {}) as RequestBody;
-        const orders = fixture.workOrdersByFactoryId[match[1]] ?? [];
-        const order = orders.find((entry) => entry.id === match[2]);
-        if (!order) {
-          return { json: {} };
-        }
         order.state = "STATE_CLOSED";
         order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
       },
     },
+  ];
+}
+
+/** Builds a resolvable factories route table for a fixture snapshot. */
+function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    factoriesCollectionRoute(fixture),
+    ...factoryDetailRoutes(fixture),
+    ...factoryLinesRoutes(fixture),
+    ...workOrderRoutes(fixture),
   ];
 }
 

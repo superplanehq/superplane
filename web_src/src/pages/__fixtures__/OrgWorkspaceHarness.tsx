@@ -74,14 +74,17 @@ export interface OrgWorkspaceHarnessProps {
   agentSuggestions?: AgentSuggestion[];
 }
 
-function useOrgWorkspaceFixtureFetch(
-  canvasId: string,
-  openAgentSidebar: boolean,
-  homeFixture?: HomePageFixture,
-  appFixture?: CanvasAppFixture,
-  factoriesFixture?: FactoriesFixture,
-  agentSuggestions?: AgentSuggestion[],
-) {
+interface FixtureFetchOptions {
+  canvasId: string;
+  openAgentSidebar: boolean;
+  homeFixture?: HomePageFixture;
+  appFixture?: CanvasAppFixture;
+  factoriesFixture?: FactoriesFixture;
+  agentSuggestions?: AgentSuggestion[];
+}
+
+function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
+  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions } = options;
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -108,6 +111,24 @@ function useOrgWorkspaceFixtureFetch(
   }, [canvasId, fixtureFetch, openAgentSidebar]);
 
   return fixtureFetch;
+}
+
+/**
+ * Resolve org and canvas IDs from whichever fixture the story provided. Kept
+ * as a plain helper so the harness component stays under the complexity budget.
+ */
+function resolveWorkspaceIds(
+  homeFixture: HomePageFixture | undefined,
+  appFixture: CanvasAppFixture | undefined,
+  factoriesFixture: FactoriesFixture | undefined,
+) {
+  const orgId =
+    homeFixture?.organizationId ??
+    appFixture?.organizationId ??
+    factoriesFixture?.organizationId ??
+    homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+  return { orgId, canvasId };
 }
 
 function factoryRoute(element: React.ReactNode) {
@@ -159,13 +180,15 @@ export function OrgWorkspaceHarness({
   factoriesFixture,
   agentSuggestions,
 }: OrgWorkspaceHarnessProps) {
-  const orgId =
-    homeFixture?.organizationId ??
-    appFixture?.organizationId ??
-    factoriesFixture?.organizationId ??
-    homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
-  useOrgWorkspaceFixtureFetch(canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions);
+  const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
+  useOrgWorkspaceFixtureFetch({
+    canvasId,
+    openAgentSidebar,
+    homeFixture,
+    appFixture,
+    factoriesFixture,
+    agentSuggestions,
+  });
 
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
