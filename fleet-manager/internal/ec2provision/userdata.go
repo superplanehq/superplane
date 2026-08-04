@@ -23,7 +23,7 @@ type userDataVars struct {
 	RunnerFleetID                   string
 	AWSCLIArch                      string
 	CloudWatchAgentArch             string
-	RunnersAuthToken                string
+	RunnerRegistrationToken         string
 	RunnerTerminateAfterEachTask    bool
 	RunnerCloudWatchLogGroup        string
 	RunnerCloudWatchLogStreamPrefix string
@@ -32,7 +32,7 @@ type userDataVars struct {
 	LaunchRequestedAt               int64
 }
 
-func userDataVarsFromConfig(c Config, launchRequestedAt int64) userDataVars {
+func userDataVarsFromConfig(c Config, launchRequestedAt int64, registrationToken string) userDataVars {
 	restartPolicy := "always"
 	if c.RunnerTerminateAfterEachTask {
 		restartPolicy = "no"
@@ -54,7 +54,7 @@ func userDataVarsFromConfig(c Config, launchRequestedAt int64) userDataVars {
 		RunnerFleetID:                   c.RunnerFleetID,
 		AWSCLIArch:                      awsCLIArch,
 		CloudWatchAgentArch:             cloudWatchArch,
-		RunnersAuthToken:                strings.TrimSpace(c.RunnersAuthToken),
+		RunnerRegistrationToken:         strings.TrimSpace(registrationToken),
 		RunnerTerminateAfterEachTask:    c.RunnerTerminateAfterEachTask,
 		RunnerCloudWatchLogGroup:        strings.TrimSpace(c.RunnerCloudWatchLogGroup),
 		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(c.RunnerCloudWatchLogStreamPrefix),
@@ -106,9 +106,9 @@ func mustCloudWatchAgentJSON(logGroup, region string) string {
 	return string(b)
 }
 
-func userDataScript(c Config, launchRequestedAt int64) (string, error) {
+func userDataScript(c Config, launchRequestedAt int64, registrationToken string) (string, error) {
 	var buf bytes.Buffer
-	if err := userDataTemplate.Execute(&buf, userDataVarsFromConfig(c, launchRequestedAt)); err != nil {
+	if err := userDataTemplate.Execute(&buf, userDataVarsFromConfig(c, launchRequestedAt, registrationToken)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

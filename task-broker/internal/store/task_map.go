@@ -46,6 +46,7 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		DispatchRequestedAt:          t.DispatchRequestedAt,
 		ClaimedAt:                    t.ClaimedAt,
 		LeaseUntil:                   t.LeaseUntil,
+		FinishedAt:                   t.FinishedAt,
 		ExecutionTimeoutSeconds:      t.ExecutionTimeoutSeconds,
 		ExitCode:                     t.ExitCode,
 	}
@@ -159,6 +160,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		DispatchRequestedAt:          row.DispatchRequestedAt,
 		ClaimedAt:                    row.ClaimedAt,
 		LeaseUntil:                   row.LeaseUntil,
+		FinishedAt:                   row.FinishedAt,
 		ExecutionTimeoutSeconds:      row.ExecutionTimeoutSeconds,
 		ExitCode:                     row.ExitCode,
 	}
@@ -173,6 +175,10 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		lt := t.LeaseUntil.UTC()
 		t.LeaseUntil = &lt
 	}
+	if t.FinishedAt != nil {
+		ft := t.FinishedAt.UTC()
+		t.FinishedAt = &ft
+	}
 	if t.RunnerTerminationRequestedAt != nil {
 		rt := t.RunnerTerminationRequestedAt.UTC()
 		t.RunnerTerminationRequestedAt = &rt
@@ -182,4 +188,16 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		t.DispatchRequestedAt = &dt
 	}
 	return t, nil
+}
+
+func tasksFromRows(rows []brokermodels.Task) ([]*models.Task, error) {
+	out := make([]*models.Task, 0, len(rows))
+	for i := range rows {
+		t, err := taskModelFromRow(&rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
 }

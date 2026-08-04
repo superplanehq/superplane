@@ -45,8 +45,9 @@ type CreateTaskRequest struct {
 	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
 	Environment []EnvironmentVariable `json:"environment,omitempty"`
-	// Labels are optional origin attributes (canvas_name, node_name) for metrics/alerting.
-	// Other keys are ignored. Not sent to runners or status/webhook payloads.
+	// Labels are optional origin attributes (canvas_id, organization_id, canvas_name, node_name)
+	// for metrics/alerting. Other keys are ignored. Not sent to runners or completion webhooks;
+	// returned on status/list.
 	Labels map[string]string `json:"labels,omitempty"`
 	// Files are materialized under SUPERPLANE_TASK_DIR before execution (all run modes).
 	Files         []TaskFile `json:"files,omitempty"`
@@ -108,6 +109,17 @@ type CompleteTaskRequest struct {
 	Result json.RawMessage `json:"result,omitempty"`
 	// Canceled when true means the runner stopped the task due to caller cancel (terminal status canceled).
 	Canceled bool `json:"canceled,omitempty"`
+}
+
+// RegisterRunnerRequest exchanges a registration JWT for a runner access token.
+type RegisterRunnerRequest struct {
+	RunnerID string `json:"runner_id"`
+	FleetID  string `json:"fleet_id"`
+}
+
+// RegisterRunnerResponse returns the runner-scoped bearer exactly once.
+type RegisterRunnerResponse struct {
+	AccessToken string `json:"access_token"`
 }
 
 const (
@@ -185,6 +197,11 @@ type WebhookPayload struct {
 	Status   string `json:"status"`
 	ExitCode int    `json:"exit_code"`
 	Error    string `json:"error,omitempty"`
+	// ClaimedAt/FinishedAt let callers compute execution duration (e.g. usage
+	// metering). ClaimedAt is nil when the task never ran (canceled while queued)
+	// or when the runner was lost (infra failure, not billed).
+	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
 	// CloudWatch fields mirror TaskStatusResponse when task-broker advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
@@ -195,18 +212,20 @@ type WebhookPayload struct {
 
 // TaskStatusResponse is GET task-broker /v1/tasks/{id}.
 type TaskStatusResponse struct {
-	ID              string     `json:"id"`
-	Status          string     `json:"status"`
-	FleetID         string     `json:"fleet_id"`
-	CreatedAt       time.Time  `json:"created_at"`
-	ClaimedAt       *time.Time `json:"claimed_at,omitempty"`
-	LeaseUntil      *time.Time `json:"lease_until,omitempty"`
-	RunnerID        string     `json:"runner_id,omitempty"` // set after claim (EC2: instance id from IMDS)
-	ExecutionMode   string     `json:"execution_mode,omitempty"`
-	DockerImage     string     `json:"docker_image,omitempty"`
-	ExitCode        *int       `json:"exit_code,omitempty"`
-	Error           string     `json:"error,omitempty"`
-	CancelRequested bool       `json:"cancel_requested,omitempty"`
+	ID              string            `json:"id"`
+	Status          string            `json:"status"`
+	FleetID         string            `json:"fleet_id"`
+	CreatedAt       time.Time         `json:"created_at"`
+	ClaimedAt       *time.Time        `json:"claimed_at,omitempty"`
+	LeaseUntil      *time.Time        `json:"lease_until,omitempty"`
+	FinishedAt      *time.Time        `json:"finished_at,omitempty"` // set when the task reached a terminal status
+	RunnerID        string            `json:"runner_id,omitempty"`   // set after claim (EC2: instance id from IMDS)
+	ExecutionMode   string            `json:"execution_mode,omitempty"`
+	DockerImage     string            `json:"docker_image,omitempty"`
+	ExitCode        *int              `json:"exit_code,omitempty"`
+	Error           string            `json:"error,omitempty"`
+	CancelRequested bool              `json:"cancel_requested,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when task-broker is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
 	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
@@ -223,7 +242,8 @@ type CancelTaskResponse struct {
 	Status string `json:"status"` // task status after the operation
 }
 
-// ListTasksResponse is GET task-broker /v1/tasks (non-terminal tasks only).
+// ListTasksResponse is GET task-broker /v1/tasks.
+// Without query params: non-terminal tasks only. With runner_id: recent tasks for that runner (any status).
 type ListTasksResponse struct {
 	Tasks []TaskStatusResponse `json:"tasks"`
 }

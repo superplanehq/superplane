@@ -28,6 +28,7 @@ import (
 
 	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/runnerregistrationtoken"
 )
 
 type TaskCountsClient interface {
@@ -95,8 +96,9 @@ type Config struct {
 	TaskBrokerURL string
 	// RunnerFleetID is this pool's broker fleet id; also the partition value in the superplane_fleet_id EC2 tag.
 	RunnerFleetID string
-	// RunnersAuthToken is the bearer token runner VMs (and this Launcher's broker client) use against task-broker.
-	RunnersAuthToken string
+	// RunnerRegistrationSecret is the broker AUTH_TOKEN / task_broker_auth_token HMAC secret
+	// used to mint single-use registration JWTs. Never placed on runner VMs.
+	RunnerRegistrationSecret string
 	// KeyName is an optional EC2 key pair name attached to runner VMs.
 	KeyName string
 	// RunnersIAMProfName is the IAM instance profile attached to runner VMs (lets them read S3, ship logs).
@@ -212,37 +214,61 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count > maxLaunch {
 		return nil, fmt.Errorf("count exceeds maximum of %d", maxLaunch)
 	}
-	subnets := l.Config.SubnetIDs
-	if len(subnets) == 0 {
+	if len(l.Config.SubnetIDs) == 0 {
 		return nil, fmt.Errorf("no subnet ids configured")
 	}
-
-	n := int32(count)
+	if strings.TrimSpace(l.Config.RunnerRegistrationSecret) == "" {
+		return nil, fmt.Errorf("runner registration secret required")
+	}
 	requestedAt := time.Now().UTC()
-	userdata, err := userDataScript(l.Config, requestedAt.Unix())
+	ids := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		id, err := l.launchOne(ctx, requestedAt)
+		if err != nil {
+			return ids, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+const runnerRegistrationTTL = 10 * time.Minute
+
+func (l *Launcher) launchOne(ctx context.Context, requestedAt time.Time) (string, error) {
+	registrationToken, err := runnerregistrationtoken.Mint(
+		l.Config.RunnerFleetID,
+		l.Config.RunnerRegistrationSecret,
+		time.Now().UTC().Add(runnerRegistrationTTL),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("user-data script: %w", err)
+		return "", fmt.Errorf("mint runner registration: %w", err)
+	}
+	userdata, err := userDataScript(l.Config, requestedAt.Unix(), registrationToken)
+	if err != nil {
+		return "", fmt.Errorf("user-data script: %w", err)
 	}
 	encodedUserData := base64.StdEncoding.EncodeToString([]byte(userdata))
-
 	var lastErr error
-	for _, subnetID := range subnets {
-		ids, err := l.launchInSubnet(ctx, n, encodedUserData, subnetID, requestedAt)
+	for _, subnetID := range l.Config.SubnetIDs {
+		ids, err := l.launchInSubnet(ctx, 1, encodedUserData, subnetID, requestedAt)
 		if err == nil {
-			return ids, nil
+			if len(ids) != 1 {
+				return "", fmt.Errorf("RunInstances returned %d instance ids, want 1", len(ids))
+			}
+			return ids[0], nil
 		}
 		lastErr = err
 		if !isInsufficientInstanceCapacity(err) {
-			return nil, err
+			return "", err
 		}
 		if l.Log != nil {
 			l.Log.Info("ec2 RunInstances capacity exhausted, trying next subnet",
 				slog.String("subnet_id", subnetID),
-				slog.Int("count", count),
+				slog.Int("count", 1),
 				slog.Any("err", err))
 		}
 	}
-	return nil, lastErr
+	return "", lastErr
 }
 
 func (l *Launcher) launchInSubnet(ctx context.Context, count int32, encodedUserData, subnetID string, requestedAt time.Time) ([]string, error) {
@@ -353,31 +379,33 @@ func normalizeArch(raw string) (string, error) {
 
 // Env var constants and defaults used by ConfigFromEnv.
 const (
-	envAMI                 = "EC2_PROVISION_AMI_ID"
-	envInstanceType        = "EC2_PROVISION_INSTANCE_TYPE"
-	envArch                = "EC2_PROVISION_ARCH"
-	envFleetID             = "EC2_PROVISION_FLEET_ID"
-	envSubnet              = "EC2_PROVISION_SUBNET_ID"
-	envSubnets             = "EC2_PROVISION_SUBNET_IDS"
-	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
-	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
-	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
-	envRunnerFleetID       = "EC2_PROVISION_RUNNER_FLEET_ID"
-	envRunnersAuth         = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
-	envKeyName             = "EC2_PROVISION_KEY_NAME"
-	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
-	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
-	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
-	envRunnerCWGroup       = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
-	envRunnerCWPrefix      = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
-	envRunnerProcCWGroup   = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
-	envRunnerProcCWRegion  = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
-	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
-	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
-	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
-	envRunnerHealthTimeout = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
-	envRunnerHealthFails   = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
-	envRunnerHeadroom      = "EC2_PROVISION_RUNNER_HEADROOM"
+	envAMI                = "EC2_PROVISION_AMI_ID"
+	envInstanceType       = "EC2_PROVISION_INSTANCE_TYPE"
+	envArch               = "EC2_PROVISION_ARCH"
+	envFleetID            = "EC2_PROVISION_FLEET_ID"
+	envSubnet             = "EC2_PROVISION_SUBNET_ID"
+	envSubnets            = "EC2_PROVISION_SUBNET_IDS"
+	envSecurityGroups     = "EC2_PROVISION_SECURITY_GROUP_IDS"
+	envRunnerS3URI        = "EC2_PROVISION_RUNNER_S3_URI"
+	envTaskBrokerURL      = "EC2_PROVISION_TASK_BROKER_URL"
+	envRunnerFleetID      = "EC2_PROVISION_RUNNER_FLEET_ID"
+	envRegistrationSecret = "EC2_PROVISION_RUNNER_REGISTRATION_SECRET"
+	// Legacy alias kept so older env-based deploys keep working.
+	envRegistrationSecretLegacy = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
+	envKeyName                  = "EC2_PROVISION_KEY_NAME"
+	envRunnerIAMProf            = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
+	envRunnerTerminateTask      = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
+	envHotCount                 = "EC2_PROVISION_HOT_INSTANCE_COUNT"
+	envRunnerCWGroup            = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
+	envRunnerCWPrefix           = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
+	envRunnerProcCWGroup        = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
+	envRunnerProcCWRegion       = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
+	envVolumeSizeGB             = "EC2_PROVISION_VOLUME_SIZE_GB"
+	envBootGraceSec             = "EC2_PROVISION_BOOT_GRACE_SEC"
+	envRunnerHealthPort         = "EC2_PROVISION_RUNNER_HEALTH_PORT"
+	envRunnerHealthTimeout      = "EC2_PROVISION_RUNNER_HEALTH_TIMEOUT_SEC"
+	envRunnerHealthFails        = "EC2_PROVISION_RUNNER_HEALTH_FAILURE_THRESHOLD"
+	envRunnerHeadroom           = "EC2_PROVISION_RUNNER_HEADROOM"
 
 	defaultInstanceType                 = "t3.micro"
 	defaultArch                         = "amd64"
@@ -390,6 +418,13 @@ const (
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
 var ErrDisabled = errors.New("ec2 provisioning disabled: EC2_PROVISION_HOT_INSTANCE_COUNT is not set")
+
+func registrationSecretFromEnv() string {
+	if secret := strings.TrimSpace(os.Getenv(envRegistrationSecret)); secret != "" {
+		return secret
+	}
+	return strings.TrimSpace(os.Getenv(envRegistrationSecretLegacy))
+}
 
 // ConfigFromEnv builds a Config from EC2_PROVISION_* environment variables.
 // Retained for local/testing use; production uses the JSON config file.
@@ -523,7 +558,7 @@ func ConfigFromEnv() (Config, error) {
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
 		TaskBrokerURL:                   url,
-		RunnersAuthToken:                strings.TrimSpace(os.Getenv(envRunnersAuth)),
+		RunnerRegistrationSecret:        registrationSecretFromEnv(),
 		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName:              prof,
 		HotInstanceCount:                hot,

@@ -25,7 +25,7 @@ type Client struct {
 }
 
 // New returns a Client. baseURL is the task-broker URL (e.g. http://broker:8081),
-// authToken is the broker's bearer token (same value as runner AUTH_TOKEN).
+// authToken is the broker's control-plane bearer token.
 func New(baseURL, authToken string) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 5 * time.Second},

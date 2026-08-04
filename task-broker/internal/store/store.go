@@ -78,6 +78,8 @@ type Store interface {
 	CreateTask(ctx context.Context, t *models.Task) error
 	GetTask(ctx context.Context, id string) (*models.Task, error)
 	ListActiveTasks(ctx context.Context) ([]*models.Task, error)
+	// TasksByRunnerID returns the newest tasks for runnerID across all statuses (capped).
+	TasksByRunnerID(ctx context.Context, runnerID string) ([]*models.Task, error)
 	CountTasksByFleet(ctx context.Context, fleetID string) (queued, claimed int, err error)
 	OldestQueuedTaskCreatedAt(ctx context.Context, fleetID string) (*time.Time, error)
 	ClaimedRunnerIDsByFleet(ctx context.Context, fleetID string) ([]string, error)
@@ -94,4 +96,8 @@ type Store interface {
 	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
 
 	ClaimDispatchCandidates(ctx context.Context, provisioner string, staleAfter time.Duration, limit int) ([]DispatchCandidate, error)
+
+	RegisterRunnerWithJTI(ctx context.Context, jti, runnerID, fleetID, accessTokenHash string, now time.Time) error
+	GetRunnerByAccessTokenHash(ctx context.Context, accessTokenHash string) (*brokermodels.RunnerCredential, error)
+	DeleteRunnerCredentials(ctx context.Context, fleetID string, runnerIDs []string) error
 }

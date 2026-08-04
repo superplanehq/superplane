@@ -8,10 +8,87 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/opaquetoken"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
+
+func TestRegisterRunnerWithJTIIsSingleUse(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	accessToken := "runner-access-secret"
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-1",
+		"i-012345",
+		"fleet-a",
+		opaquetoken.Hash(accessToken),
+		now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	credential, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash(accessToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if credential == nil || credential.RunnerID != "i-012345" || credential.FleetID != "fleet-a" {
+		t.Fatalf("credential = %#v", credential)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-1",
+		"i-other",
+		"fleet-a",
+		opaquetoken.Hash("other-access"),
+		now.Add(time.Second),
+	); err != taskstore.ErrInvalidRunnerRegistration {
+		t.Fatalf("second register error = %v, want invalid registration", err)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx,
+		"jti-2",
+		"i-other",
+		"fleet-a",
+		opaquetoken.Hash("other-access"),
+		now.Add(time.Second),
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegisterRunnerWithJTIReplacesExistingCredential(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-old", "i-012345", "fleet-a", opaquetoken.Hash("old-access"), now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegisterRunnerWithJTI(
+		ctx, "jti-new", "i-012345", "fleet-a", opaquetoken.Hash("new-access"), now.Add(time.Second),
+	); err != nil {
+		t.Fatal(err)
+	}
+	old, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("old-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old != nil {
+		t.Fatalf("old credential still valid: %#v", old)
+	}
+	got, err := st.GetRunnerByAccessTokenHash(ctx, opaquetoken.Hash("new-access"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.RunnerID != "i-012345" {
+		t.Fatalf("new credential = %#v", got)
+	}
+}
 
 func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)
@@ -356,6 +433,57 @@ func TestPostgresStoreListActiveTasks(t *testing.T) {
 	}
 	if active[0].ID != "queued-1" || active[1].ID != "claimed-1" {
 		t.Fatalf("order/ids: %#v", active)
+	}
+}
+
+func TestPostgresStoreTasksByRunnerID(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	create := func(id string, status models.TaskStatus, runnerID string, createdAt time.Time) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    "fleet-a",
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  createdAt,
+			RunnerID:   runnerID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("older-claimed", models.StatusClaimed, "i-aaa", now)
+	create("newer-done", models.StatusSucceeded, "i-aaa", now.Add(time.Second))
+	create("other-runner", models.StatusSucceeded, "i-bbb", now.Add(2*time.Second))
+	create("cleared-runner", models.StatusFailed, "", now.Add(3*time.Second))
+
+	got, err := st.TasksByRunnerID(ctx, "i-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("tasks: got %d want 2: %#v", len(got), got)
+	}
+	if got[0].ID != "newer-done" || got[1].ID != "older-claimed" {
+		t.Fatalf("order/ids: %#v", got)
+	}
+
+	empty, err := st.TasksByRunnerID(ctx, "i-missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("missing runner: %#v", empty)
+	}
+
+	if _, err := st.TasksByRunnerID(ctx, "   "); err == nil {
+		t.Fatal("expected error for empty runner_id")
 	}
 }
 
@@ -873,6 +1001,118 @@ func TestFinalizeTerminatedRunnerTasksIsIdempotent(t *testing.T) {
 	if got.Status != models.StatusFailed || got.ErrorMessage != "runner lost before completion" {
 		t.Fatalf("task after second finalize: %#v", got)
 	}
+}
+
+func TestTerminalTransitionsSetFinishedAt(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	t.Run("complete keeps claimed_at and sets finished_at", func(t *testing.T) {
+		taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+		result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+			ID:       taskID,
+			RunnerID: "runner-1",
+			ExitCode: 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Task.FinishedAt == nil {
+			t.Fatal("finished_at should be set on completion")
+		}
+		if result.Task.ClaimedAt == nil {
+			t.Fatal("claimed_at should be preserved on completion")
+		}
+		if result.Task.FinishedAt.Before(*result.Task.ClaimedAt) {
+			t.Fatalf("finished_at %v before claimed_at %v", result.Task.FinishedAt, result.Task.ClaimedAt)
+		}
+	})
+
+	t.Run("cancel while queued sets finished_at without claimed_at", func(t *testing.T) {
+		taskID := uuid.NewString()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         taskID,
+			FleetID:    "fleet-finished-at",
+			Status:     models.StatusQueued,
+			CreatedAt:  time.Now().UTC(),
+			WebhookURL: "https://example.com/hook",
+			Commands:   models.CommandList{{Command: "echo hi"}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		task, outcome, err := st.RequestCancelTask(ctx, taskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome != taskstore.CancelOutcomeCanceledQueued {
+			t.Fatalf("cancel outcome: got %s want %s", outcome, taskstore.CancelOutcomeCanceledQueued)
+		}
+		if task.FinishedAt == nil {
+			t.Fatal("finished_at should be set on queued cancel")
+		}
+		if task.ClaimedAt != nil {
+			t.Fatalf("claimed_at should stay nil for never-claimed task: %v", task.ClaimedAt)
+		}
+	})
+
+	t.Run("finalize lost runner sets finished_at", func(t *testing.T) {
+		taskID := createClaimedTask(t, ctx, st, "runner-2", 1)
+		if _, err := st.MarkLostRunnerTasksTerminating(ctx, "fleet-retry", []string{"runner-2"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.FinalizeTerminatedRunnerTasks(ctx, "fleet-retry", []string{"runner-2"}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.GetTask(ctx, taskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != models.StatusFailed {
+			t.Fatalf("status: got %s want failed", got.Status)
+		}
+		if got.FinishedAt == nil {
+			t.Fatal("finished_at should be set when a lost runner task is finalized")
+		}
+	})
+
+	t.Run("lease reap cancel sets finished_at", func(t *testing.T) {
+		now := time.Now().UTC()
+		taskID := uuid.NewString()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:              taskID,
+			FleetID:         "fleet-finished-at",
+			Status:          models.StatusClaimed,
+			CreatedAt:       now,
+			ClaimedAt:       &now,
+			LeaseUntil:      ptrTime(now.Add(-time.Minute)),
+			RunnerID:        "runner-3",
+			WebhookURL:      "https://example.com/hook",
+			Commands:        models.CommandList{{Command: "echo hi"}},
+			CancelRequested: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, canceled, err := st.ReapExpiredLeases(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reaped *models.Task
+		for _, c := range canceled {
+			if c.ID == taskID {
+				reaped = c
+			}
+		}
+		if reaped == nil {
+			t.Fatalf("task %s should be canceled by the lease reaper: %#v", taskID, canceled)
+		}
+		if reaped.Status != models.StatusCanceled {
+			t.Fatalf("status: got %s want canceled", reaped.Status)
+		}
+		if reaped.FinishedAt == nil {
+			t.Fatal("finished_at should be set when the lease reaper cancels a task")
+		}
+	})
 }
 
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {

@@ -83,6 +83,11 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 		_ = writeWSError(writeMu, conn, http.StatusBadRequest, "fleet_id required")
 		return
 	}
+	identity, ok := runnerIdentityFromContext(r.Context())
+	if !ok || identity.RunnerID != runnerID || identity.FleetID != fleetID {
+		_ = writeWSError(writeMu, conn, http.StatusForbidden, "runner identity mismatch")
+		return
+	}
 	lease := time.Duration(hello.LeaseSeconds) * time.Second
 	if lease <= 0 {
 		lease = 5 * time.Minute
@@ -245,6 +250,10 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		compRunnerID := strings.TrimSpace(comp.RunnerID)
 		if compRunnerID == "" {
 			_ = writeWSError(writeMu, conn, http.StatusBadRequest, "runner_id required")
+			continue
+		}
+		if compRunnerID != rid {
+			_ = writeWSError(writeMu, conn, http.StatusForbidden, "runner identity mismatch")
 			continue
 		}
 

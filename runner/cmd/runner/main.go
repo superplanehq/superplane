@@ -25,7 +25,7 @@ func main() {
 	cfg.FleetID = getRunnerFleetID()
 	cfg.RunnerID = getRunnerID()
 	cfg.LaunchRequestedAt = getLaunchRequestedAt()
-	cfg.Token = getAuthToken()
+	cfg.Token = getAuthToken(cfg.BaseURL, cfg.RunnerID, cfg.FleetID)
 	cfg.Transport = getTransport()
 
 	if v := os.Getenv("POLL_EMPTY_MS"); v != "" {
@@ -184,10 +184,19 @@ func getLaunchRequestedAt() int64 {
 	return sec
 }
 
-func getAuthToken() string {
-	token := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
-	if token == "" {
-		log.Error("AUTH_TOKEN is required")
+func getAuthToken(baseURL, runnerID, fleetID string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	token, err := agent.ResolveAccessToken(ctx, http.DefaultClient, agent.ResolveAccessTokenOptions{
+		BaseURL:           baseURL,
+		AccessToken:       os.Getenv("RUNNER_ACCESS_TOKEN"),
+		RegistrationToken: os.Getenv("RUNNER_REGISTRATION_TOKEN"),
+		RunnerID:          runnerID,
+		FleetID:           fleetID,
+		AccessTokenPath:   strings.TrimSpace(os.Getenv("RUNNER_ACCESS_TOKEN_PATH")),
+	})
+	if err != nil {
+		log.Error("runner registration failed", slog.Any("err", err))
 		os.Exit(1)
 	}
 	return token

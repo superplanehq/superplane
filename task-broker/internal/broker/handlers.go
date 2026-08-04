@@ -36,6 +36,9 @@ type Server struct {
 
 	Dispatch *dispatch.Resolver
 
+	// AuthToken is the control-plane bearer and HMAC secret for registration JWTs.
+	AuthToken string
+
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
 	TaskCloudWatchRegion          string
@@ -196,6 +199,17 @@ func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "could not drain unhealthy runner tasks")
 			return
 		}
+	}
+	drainedRunnerIDs := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		if status.State == api.DrainRunnerStateDrained {
+			drainedRunnerIDs = append(drainedRunnerIDs, status.RunnerID)
+		}
+	}
+	if err := s.Store.DeleteRunnerCredentials(r.Context(), req.FleetID, drainedRunnerIDs); err != nil {
+		s.logErr("revoke drained runner credentials", err)
+		writeError(w, http.StatusInternalServerError, "could not revoke drained runners")
+		return
 	}
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
@@ -588,6 +602,12 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
 	}
+	identity, ok := runnerIdentityFromContext(r.Context())
+	if !ok || identity.RunnerID != strings.TrimSpace(req.RunnerID) ||
+		identity.FleetID != strings.TrimSpace(req.FleetID) {
+		writeError(w, http.StatusForbidden, "runner identity mismatch")
+		return
+	}
 	lease := time.Duration(req.LeaseSeconds) * time.Second
 	if lease <= 0 {
 		lease = 5 * time.Minute
@@ -632,11 +652,27 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
-	tasks, err := s.Store.ListActiveTasks(r.Context())
-	if err != nil {
-		s.logErr("list active tasks", err)
-		writeError(w, http.StatusInternalServerError, "could not list tasks")
-		return
+	var tasks []*models.Task
+	var err error
+	if _, ok := r.URL.Query()["runner_id"]; ok {
+		runnerID := strings.TrimSpace(r.URL.Query().Get("runner_id"))
+		if runnerID == "" {
+			writeError(w, http.StatusBadRequest, "runner_id required")
+			return
+		}
+		tasks, err = s.Store.TasksByRunnerID(r.Context(), runnerID)
+		if err != nil {
+			s.logErr("list tasks by runner", err)
+			writeError(w, http.StatusInternalServerError, "could not list tasks")
+			return
+		}
+	} else {
+		tasks, err = s.Store.ListActiveTasks(r.Context())
+		if err != nil {
+			s.logErr("list active tasks", err)
+			writeError(w, http.StatusInternalServerError, "could not list tasks")
+			return
+		}
 	}
 	out := make([]api.TaskStatusResponse, 0, len(tasks))
 	for _, task := range tasks {
@@ -661,6 +697,11 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "task not found")
 		return
 	}
+	if identity, runnerRequest := runnerIdentityFromContext(r.Context()); runnerRequest &&
+		task.RunnerID != identity.RunnerID {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	writeJSON(w, http.StatusOK, taskStatusResponse(task, s))
 }
 
@@ -676,11 +717,13 @@ func taskStatusResponse(task *models.Task, s *Server) api.TaskStatusResponse {
 		CreatedAt:       task.CreatedAt.UTC(),
 		ClaimedAt:       task.ClaimedAt,
 		LeaseUntil:      task.LeaseUntil,
+		FinishedAt:      task.FinishedAt,
 		RunnerID:        strings.TrimSpace(task.RunnerID),
 		ExecutionMode:   mode,
 		DockerImage:     strings.TrimSpace(task.DockerImage),
 		Error:           task.ErrorMessage,
 		CancelRequested: task.CancelRequested,
+		Labels:          task.Labels,
 	}
 	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
 		resp.CloudWatchLogGroup = g
@@ -721,6 +764,11 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	identity, ok := runnerIdentityFromContext(r.Context())
+	if !ok || identity.RunnerID != runnerID {
+		writeError(w, http.StatusForbidden, "runner identity mismatch")
+		return
+	}
 	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") ||
@@ -856,10 +904,12 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 		exit = *task.ExitCode
 	}
 	payload := api.WebhookPayload{
-		TaskID:   task.ID,
-		Status:   string(task.Status),
-		ExitCode: exit,
-		Error:    task.ErrorMessage,
+		TaskID:     task.ID,
+		Status:     string(task.Status),
+		ExitCode:   exit,
+		Error:      task.ErrorMessage,
+		ClaimedAt:  task.ClaimedAt,
+		FinishedAt: task.FinishedAt,
 	}
 	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
 		payload.CloudWatchLogGroup = g

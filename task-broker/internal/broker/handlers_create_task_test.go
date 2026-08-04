@@ -75,6 +75,8 @@ func TestCreateTaskPersistsOriginLabels(t *testing.T) {
 		"webhook_url": "https://example.com/hook",
 		"commands": [{"command": "echo hi"}],
 		"labels": {
+			"canvas_id": "11111111-1111-1111-1111-111111111111",
+			"organization_id": "22222222-2222-2222-2222-222222222222",
 			"canvas_name": "release-train",
 			"node_name": "Run tests",
 			"ignored": "nope"
@@ -104,10 +106,34 @@ func TestCreateTaskPersistsOriginLabels(t *testing.T) {
 	if err != nil || task == nil {
 		t.Fatalf("get task: %v %#v", err, task)
 	}
-	if task.Labels[models.LabelCanvasName] != "release-train" || task.Labels[models.LabelNodeName] != "Run tests" {
+	if task.Labels[models.LabelCanvasID] != "11111111-1111-1111-1111-111111111111" ||
+		task.Labels[models.LabelOrganizationID] != "22222222-2222-2222-2222-222222222222" ||
+		task.Labels[models.LabelCanvasName] != "release-train" ||
+		task.Labels[models.LabelNodeName] != "Run tests" {
 		t.Fatalf("labels=%#v", task.Labels)
 	}
 	if _, ok := task.Labels["ignored"]; ok {
 		t.Fatalf("ignored key should be dropped: %#v", task.Labels)
+	}
+
+	getReq, err := http.NewRequest(http.MethodGet, ts.URL+"/v1/tasks/"+created.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	getReq.Header.Set("Authorization", "Bearer token")
+	getResp, err := ts.Client().Do(getReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer getResp.Body.Close()
+	if getResp.StatusCode != http.StatusOK {
+		t.Fatalf("get status=%d", getResp.StatusCode)
+	}
+	var status api.TaskStatusResponse
+	if err := json.NewDecoder(getResp.Body).Decode(&status); err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Labels) != 4 || status.Labels[models.LabelCanvasID] != task.Labels[models.LabelCanvasID] {
+		t.Fatalf("status labels=%#v", status.Labels)
 	}
 }

@@ -15,14 +15,16 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/runnerregistrationtoken"
 )
 
 const e2eBrokerAuthToken = E2EAuthToken
 
 type brokerStack struct {
-	BrokerURL string
-	FleetID   string
-	AuthToken string
+	BrokerURL               string
+	FleetID                 string
+	AuthToken               string
+	RunnerRegistrationToken string
 }
 
 func startBrokerStack(t *testing.T, root string, binDir string) brokerStack {
@@ -88,11 +90,18 @@ func startBrokerStack(t *testing.T, root string, binDir string) brokerStack {
 	if regResp.StatusCode != http.StatusCreated {
 		t.Fatalf("register fleet: %s", string(regRespBody))
 	}
+	registrationToken, err := runnerregistrationtoken.Mint(
+		fleetID, e2eBrokerAuthToken, time.Now().UTC().Add(10*time.Minute),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return brokerStack{
-		BrokerURL: brokerURL,
-		FleetID:   fleetID,
-		AuthToken: e2eBrokerAuthToken,
+		BrokerURL:               brokerURL,
+		FleetID:                 fleetID,
+		AuthToken:               e2eBrokerAuthToken,
+		RunnerRegistrationToken: registrationToken,
 	}
 }
 

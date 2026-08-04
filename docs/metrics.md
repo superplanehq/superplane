@@ -98,7 +98,9 @@ Attributes: `fleet_id`
 **Tasks queued**
 Current number of tasks waiting for a runner to claim them (`status = queued`).
 Sampled periodically. Split by SuperPlane origin when callers send `labels`
-(`canvas_name`, `node_name`); empty strings when omitted.
+(`canvas_name`, `node_name`); empty strings when omitted. Create also accepts
+`canvas_id` / `organization_id` for status/alert lookup; backlog metrics still
+key only on the name attributes to limit cardinality.
 Attributes: `fleet_id`, `canvas_name`, `node_name`
 
 **Tasks claimed**

@@ -43,15 +43,26 @@ func (s *PostgresStore) ListActiveTasks(ctx context.Context) ([]*models.Task, er
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*models.Task, 0, len(rows))
-	for i := range rows {
-		t, err := taskModelFromRow(&rows[i])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+	return tasksFromRows(rows)
+}
+
+const tasksByRunnerIDLimit = 5
+
+func (s *PostgresStore) TasksByRunnerID(ctx context.Context, runnerID string) ([]*models.Task, error) {
+	runnerID = strings.TrimSpace(runnerID)
+	if runnerID == "" {
+		return nil, fmt.Errorf("runner_id required")
 	}
-	return out, nil
+	var rows []brokermodels.Task
+	err := s.db.WithContext(ctx).
+		Where("runner_id = ?", runnerID).
+		Order("created_at DESC, id DESC").
+		Limit(tasksByRunnerIDLimit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return tasksFromRows(rows)
 }
 
 func (s *PostgresStore) CountTasksByFleet(ctx context.Context, fleetID string) (int, int, error) {
@@ -281,6 +292,7 @@ const (
 )
 
 func (s *PostgresStore) RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error) {
+	now := time.Now().UTC()
 	res := s.db.WithContext(ctx).Exec(`
 UPDATE tasks SET
 	status = ?,
@@ -290,9 +302,10 @@ UPDATE tasks SET
 	claimed_at = NULL,
 	lease_until = NULL,
 	runner_id = NULL,
-	cancel_requested = false
+	cancel_requested = false,
+	finished_at = ?
 WHERE id = ? AND status = ?`,
-		string(models.StatusCanceled), exitCanceled, msgCanceledQueued, id, string(models.StatusQueued),
+		string(models.StatusCanceled), exitCanceled, msgCanceledQueued, now, id, string(models.StatusQueued),
 	)
 	if res.Error != nil {
 		return nil, "", res.Error
@@ -359,9 +372,10 @@ UPDATE tasks SET
 	error_message = ?,
 	cancel_requested = false,
 	environment_json = NULL,
-	runner_termination_requested_at = NULL
+	runner_termination_requested_at = NULL,
+	finished_at = ?
 WHERE id = ? AND runner_id = ? AND status = ?`,
-		string(final), req.ExitCode, nullIfEmpty(req.ResultJSON), nullIfEmpty(req.ErrorMessage),
+		string(final), req.ExitCode, nullIfEmpty(req.ResultJSON), nullIfEmpty(req.ErrorMessage), time.Now().UTC(),
 		req.ID, req.RunnerID, string(models.StatusClaimed),
 	)
 	if res.Error != nil {
@@ -486,6 +500,7 @@ func (s *PostgresStore) FinalizeTerminatedRunnerTasks(ctx context.Context, fleet
 		return []LostRunnerTaskRecovery{}, nil
 	}
 
+	now := time.Now().UTC()
 	var recoveries []LostRunnerTaskRecovery
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		canceled, err := recoverLostRunnerTasks(tx, `
@@ -507,14 +522,15 @@ updated AS (
 		output = ?,
 		result_json = NULL,
 		error_message = NULL,
-		environment_json = ''
+		environment_json = '',
+		finished_at = ?
 	FROM candidates c
 	WHERE t.id = c.id
 	RETURNING t.id, t.fleet_id, c.runner_id, t.status
 )
 SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
 			fleetID, string(models.StatusClaimed), runnerIDs,
-			string(models.StatusCanceled), exitCanceled, msgCanceledRunnerLost,
+			string(models.StatusCanceled), exitCanceled, msgCanceledRunnerLost, now,
 		)
 		if err != nil {
 			return err
@@ -540,14 +556,15 @@ updated AS (
 		result_json = NULL,
 		error_message = ?,
 		cancel_requested = false,
-		environment_json = ''
+		environment_json = '',
+		finished_at = ?
 	FROM candidates c
 	WHERE t.id = c.id
 	RETURNING t.id, t.fleet_id, c.runner_id, t.status
 )
 	SELECT id, fleet_id, runner_id, status FROM updated ORDER BY runner_id ASC, id ASC`,
 			fleetID, string(models.StatusClaimed), runnerIDs,
-			string(models.StatusFailed), msgRunnerLost,
+			string(models.StatusFailed), msgRunnerLost, now,
 		)
 		if err != nil {
 			return err
@@ -606,10 +623,11 @@ UPDATE tasks SET
 	exit_code = ?,
 	output = ?,
 	result_json = NULL,
-	error_message = NULL
+	error_message = NULL,
+	finished_at = ?
 WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = true AND runner_termination_requested_at IS NULL
 RETURNING id`,
-		string(models.StatusCanceled), exitCanceled, msgCanceledLeaseReap,
+		string(models.StatusCanceled), exitCanceled, msgCanceledLeaseReap, now,
 		string(models.StatusClaimed), now,
 	).Scan(&canceledIDs).Error
 	if err != nil {

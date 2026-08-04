@@ -124,6 +124,9 @@ func (a *Agent) Run(ctx context.Context) error {
 					slog.String("task_id", task.ID),
 					slog.Any("complete_err", completeErr))
 			}
+			if completeErr == nil {
+				a.revokeCredential(ctx, base)
+			}
 			return completeErr
 		}
 		if completeErr != nil {
@@ -272,6 +275,26 @@ func (a *Agent) complete(ctx context.Context, base, id string, execution taskExe
 func (a *Agent) auth(req *http.Request) {
 	if t := strings.TrimSpace(a.Config.Token); t != "" {
 		req.Header.Set("Authorization", "Bearer "+t)
+	}
+}
+
+func (a *Agent) revokeCredential(ctx context.Context, base string) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, base+"/v1/runners/self", nil)
+	if err == nil {
+		a.auth(req)
+		resp, doErr := a.HTTP.Do(req)
+		if doErr == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusNoContent {
+				return
+			}
+			err = fmt.Errorf("status %d", resp.StatusCode)
+		} else {
+			err = doErr
+		}
+	}
+	if a.Config.Log != nil {
+		a.Config.Log.Warn("task_broker_http", slog.String("op", "revoke_runner"), slog.Any("err", err))
 	}
 }
 

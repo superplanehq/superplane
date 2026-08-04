@@ -44,7 +44,12 @@ func OpenPostgres(dsn string) (*PostgresStore, error) {
 func (s *PostgresStore) migrate() error {
 	migrateMu.Lock()
 	defer migrateMu.Unlock()
-	if err := s.db.AutoMigrate(&brokermodels.Fleet{}, &brokermodels.Task{}); err != nil {
+	if err := s.db.AutoMigrate(
+		&brokermodels.Fleet{},
+		&brokermodels.Task{},
+		&brokermodels.UsedRegistrationJTI{},
+		&brokermodels.RunnerCredential{},
+	); err != nil {
 		return err
 	}
 	// Drop legacy proxy columns from earlier broker versions.
@@ -54,6 +59,7 @@ func (s *PostgresStore) migrate() error {
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS labels`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS type`,
 		`DROP TABLE IF EXISTS broker_tasks`,
+		`DROP TABLE IF EXISTS runner_registrations`,
 	} {
 		if err := s.db.Exec(stmt).Error; err != nil {
 			return err
@@ -72,7 +78,9 @@ func (s *PostgresStore) Close() error {
 
 // Truncate removes all rows (for tests).
 func (s *PostgresStore) Truncate(ctx context.Context) error {
-	return s.db.WithContext(ctx).Exec("TRUNCATE TABLE fleets, tasks RESTART IDENTITY CASCADE").Error
+	return s.db.WithContext(ctx).Exec(
+		"TRUNCATE TABLE fleets, tasks, used_registration_jtis, runner_credentials RESTART IDENTITY CASCADE",
+	).Error
 }
 
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {

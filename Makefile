@@ -9,7 +9,7 @@ LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslm
 .PHONY: test-integration
 test-integration:
 	docker compose up -d db
-	TEST_DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) go test ./task-broker/... ./runner/... ./shared/... -count=1
+	TEST_DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
 	docker compose stop db
 
 LOCAL_BROKER_LISTEN ?= :8081
@@ -64,13 +64,15 @@ register-local-fleet:
 runner: build
 	@set -e; n="$(N)"; i=1; \
 	while [ "$$i" -le "$$n" ]; do \
+	  reg=$$(go run ./scripts/mint-runner-registration \
+	    -fleet "$(LOCAL_FLEET_ID)" -secret "$(LOCAL_STACK_AUTH_TOKEN)"); \
 	  ( cd "$(CURDIR)" && \
 	    TASK_BROKER_URL="$(LOCAL_BROKER_URL)" \
 	    RUNNER_FLEET_ID="$(LOCAL_FLEET_ID)" \
 	    RUNNER_TRANSPORT="$(LOCAL_RUNNER_TRANSPORT)" \
 	    RUNNER_SHELL_USE_PIPE="$(LOCAL_RUNNER_SHELL_USE_PIPE)" \
 	    RUNNER_ID="runner-$$i" \
-	    AUTH_TOKEN="$(LOCAL_STACK_AUTH_TOKEN)" \
+	    RUNNER_REGISTRATION_TOKEN="$$reg" \
 	    exec ./bin/runner ) & \
 	  i=$$((i+1)); \
 	done; \
