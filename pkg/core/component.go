@@ -48,6 +48,7 @@ type ExecutionContext struct {
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
 	Runs           RunExecutionContext
+	Factory        FactoryContext
 }
 
 type AppExecutionContext interface {

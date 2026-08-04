@@ -210,6 +210,13 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			return fmt.Errorf("start run: %w", err)
 		}
 
+		//
+		// If this run is part of a factory work order execution, we mark the execution as running.
+		//
+		if err := w.markFactoryWorkOrderExecutionRunning(tx, runID); err != nil {
+			return fmt.Errorf("mark factory work order execution running: %w", err)
+		}
+
 		stateUpdated = true
 		return nil
 	})
@@ -266,8 +273,36 @@ func (w *RunInitializer) failRun(
 		return err
 	}
 
+	if err := w.finishFactoryWorkOrderExecutionForRun(tx, run.ID, models.CanvasRunResultFailed); err != nil {
+		return err
+	}
+
 	return NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
 		DispatchFinished()
+}
+
+func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.MarkRunning(tx)
+}
+
+func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) error {
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.MarkFinished(tx, result)
 }

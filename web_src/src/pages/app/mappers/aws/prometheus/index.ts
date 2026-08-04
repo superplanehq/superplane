@@ -1,5 +1,7 @@
+export { createRuleGroupNamespaceMapper } from "./create_rule_group_namespace";
 export { createWorkspaceMapper } from "./create_workspace";
 export { deleteWorkspaceMapper } from "./delete_workspace";
+export { getRuleGroupNamespaceMapper } from "./get_rule_group_namespace";
 export { getWorkspaceMapper } from "./get_workspace";
 export { queryMapper } from "./query";
 export { queryRangeMapper } from "./query_range";

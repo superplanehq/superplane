@@ -137,7 +137,7 @@ updated or deleted on an issue in a Linear team.
 
 ### Use Cases
 
-- **Run a command** when someone comments a keyword on an issue
+- **Run a command** when someone comments a keyword like `/deploy` on an issue
 - **Sync discussion** to another tool when a comment is added
 - **Notify a channel** when an issue gets new activity
 
@@ -145,6 +145,8 @@ updated or deleted on an issue in a Linear team.
 
 - **Team** (required): Linear team to monitor
 - **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `/deploy` to
+  only trigger on comments containing "/deploy". A comment delivered without a body never matches.
 
 ### Outputs
 
