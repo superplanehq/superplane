@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderExecutionState,
 } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
+import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
   WorkOrderTimelineEvent,
@@ -12,7 +13,7 @@ import type {
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
 
-const UNKNOWN_MEMBER_LABEL = "Unknown member";
+const UNKNOWN_MEMBER_LABEL = UNKNOWN_ORG_USER_NAME;
 
 interface EventUserRef {
   id?: string;
@@ -53,8 +54,6 @@ interface EventPayload extends LineStepExecutionPayload {
 interface TimelineBuildState {
   events: WorkOrderTimelineEvent[];
   dispatchBatchByLine: Map<string, WorkOrderTimelineEvent>;
-  closedLabel: string | null;
-  closedAt: string | null;
 }
 
 interface DispatchBatchContext {
@@ -116,15 +115,13 @@ export function buildWorkOrderTimelineViewFromEvents(
     applyApiEventToTimeline(state, index, apiEvent, resolveUserName);
   }
 
-  return { events: state.events, closedLabel: state.closedLabel, closedAt: state.closedAt };
+  return { events: state.events };
 }
 
 function createTimelineBuildState(): TimelineBuildState {
   return {
     events: [],
     dispatchBatchByLine: new Map(),
-    closedLabel: null,
-    closedAt: null,
   };
 }
 
@@ -151,7 +148,7 @@ function applyApiEventToTimeline(
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
       return;
     case "order.closed":
-      applyOrderClosedState(state, payload, at);
+      appendClosedEvent(state.events, index, payload, at, resolveUserName);
   }
 }
 
@@ -173,6 +170,7 @@ function appendOpenedEvent(
     id: `opened-${index}`,
     kind: "created",
     at,
+    actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
     title: "opened this work order",
   });
@@ -189,18 +187,36 @@ function appendAssigneesUpdatedEvent(
     id: `assignees-updated-${index}`,
     kind: "assigned",
     at,
+    actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    assigneeChange: {
+      assignedUserIds: (payload.assigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id)),
+      unassignedUserIds: (payload.unassigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id)),
+    },
     title: describeAssigneesUpdated(payload, resolveUserName),
   });
 }
 
-function applyOrderClosedState(state: TimelineBuildState, payload: EventPayload, at: string): void {
+function appendClosedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
   const closedResult = payload.result ?? payload.order?.result;
   const result = formatWorkOrderResult(
     closedResult === "completed" ? "RESULT_COMPLETED" : closedResult === "rejected" ? "RESULT_REJECTED" : undefined,
   );
-  state.closedLabel = result ? `Closed as ${result.toLowerCase()}` : "Closed";
-  state.closedAt = at;
+
+  events.push({
+    id: `closed-${index}`,
+    kind: "closed",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    title: result ? `closed as ${result.toLowerCase()}` : "closed this work order",
+  });
 }
 
 function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
@@ -212,12 +228,26 @@ function resolveUserDisplayName(userId: string | undefined, resolveUserName?: Us
 }
 
 function describeAssigneesUpdated(payload: EventPayload, resolveUserName?: UserNameLookup): string {
-  const assignedNames = formatEventUserNames(payload.assigned, resolveUserName);
+  const actorId = payload.user?.id;
+  const assignedIds = (payload.assigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id));
+  const assignedOthers = actorId ? assignedIds.filter((userId) => userId !== actorId) : assignedIds;
+  const selfAssigned = Boolean(actorId && assignedIds.includes(actorId));
   const unassignedNames = formatEventUserNames(payload.unassigned, resolveUserName);
   const parts: string[] = [];
 
-  if (assignedNames) {
-    parts.push(`assigned ${assignedNames}`);
+  if (selfAssigned && assignedOthers.length === 0) {
+    parts.push("self-assigned");
+  } else if (selfAssigned && assignedOthers.length > 0) {
+    const otherNames = formatEventUserNames(
+      assignedOthers.map((id) => ({ id })),
+      resolveUserName,
+    );
+    parts.push(otherNames ? `self-assigned and assigned ${otherNames}` : "self-assigned");
+  } else {
+    const assignedNames = formatEventUserNames(payload.assigned, resolveUserName);
+    if (assignedNames) {
+      parts.push(`assigned ${assignedNames}`);
+    }
   }
 
   if (unassignedNames) {

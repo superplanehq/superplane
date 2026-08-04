@@ -13,8 +13,8 @@ import {
 import { WorkOrderCard } from "./WorkOrderCard";
 
 /**
- * Single work order row: status badge, title, author/updated meta, and a
- * compact execution list beneath. Open orders also expose a dispatch popover.
+ * Single work order row: status badge, title, creator/assignee avatars, updated meta,
+ * and a compact execution list beneath. Open orders also expose a dispatch popover.
  */
 const meta = {
   title: "Factories/WorkOrderCard",
