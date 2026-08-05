@@ -62,6 +62,42 @@ func Test__ListDeletedFactories__IncludesFactoriesInDeletedOrg(t *testing.T) {
 	assert.WithinDuration(t, deletedAt.UTC(), found.DeletedAt.Time.UTC(), time.Second)
 }
 
+func Test__ListDeletedFactories__UsesEarliestDeletedAt(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+	require.NoError(t, factory.SoftDelete(db))
+
+	factoryDeletedAt := time.Now().AddDate(0, 0, -40)
+	require.NoError(t, db.Unscoped().Model(&models.Factory{}).
+		Where("id = ?", factory.ID).
+		Update("deleted_at", factoryDeletedAt).
+		Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+	orgDeletedAt := time.Now().AddDate(0, 0, -10)
+	require.NoError(t, db.Unscoped().Model(&models.Organization{}).
+		Where("id = ?", r.Organization.ID).
+		Update("deleted_at", orgDeletedAt).
+		Error)
+
+	deleted, err := models.ListDeletedFactories(db)
+	require.NoError(t, err)
+
+	var found *models.Factory
+	for i := range deleted {
+		if deleted[i].ID == factory.ID {
+			found = &deleted[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.True(t, found.DeletedAt.Valid)
+	assert.WithinDuration(t, factoryDeletedAt.UTC(), found.DeletedAt.Time.UTC(), time.Second)
+}
+
 func Test__LockDeletedFactory__SkipLocked(t *testing.T) {
 	r := support.Setup(t)
 

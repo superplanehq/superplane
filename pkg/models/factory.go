@@ -182,8 +182,8 @@ func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
 			"factories.description",
 			"factories.created_at",
 			"factories.updated_at",
-			// Prefer organization.deleted_at so org cleanup does not reset factory grace.
-			"COALESCE(organizations.deleted_at, factories.deleted_at) AS deleted_at",
+			// Earliest deletion wins so neither factory nor org soft-delete resets grace.
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
 		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		Find(&factories).
@@ -208,7 +208,7 @@ func LockDeletedFactory(tx *gorm.DB, id uuid.UUID) (*Factory, error) {
 			"factories.description",
 			"factories.created_at",
 			"factories.updated_at",
-			"COALESCE(organizations.deleted_at, factories.deleted_at) AS deleted_at",
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
 		Clauses(clause.Locking{
 			Strength: "UPDATE",
