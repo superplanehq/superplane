@@ -49,9 +49,9 @@ func (d *DataForSEO) Configuration() []configuration.Field {
 }
 
 func (d *DataForSEO) Actions() []core.Action {
-	// Task 2 adds &RunSiteAudit{} here once that type exists — an empty
-	// slice keeps this package compiling and registered on its own.
-	return []core.Action{}
+	return []core.Action{
+		&RunSiteAudit{},
+	}
 }
 
 func (d *DataForSEO) Triggers() []core.Trigger {

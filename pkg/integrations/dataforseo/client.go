@@ -1,6 +1,7 @@
 package dataforseo
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -82,4 +83,38 @@ func (c *Client) Verify() error {
 	}
 
 	return nil
+}
+
+type taskPostResponse struct {
+	StatusCode int `json:"status_code"`
+	Tasks      []struct {
+		ID         string `json:"id"`
+		StatusCode int    `json:"status_code"`
+	} `json:"tasks"`
+}
+
+func (c *Client) PostAudit(target string, maxCrawlPages int) (string, error) {
+	payload := []map[string]any{
+		{"target": target, "max_crawl_pages": maxCrawlPages},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal task_post request: %v", err)
+	}
+
+	respBody, err := c.execRequest(http.MethodPost, baseURL+"/on_page/task_post", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+
+	var response taskPostResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return "", fmt.Errorf("failed to unmarshal task_post response: %v", err)
+	}
+
+	if len(response.Tasks) == 0 || response.Tasks[0].ID == "" {
+		return "", fmt.Errorf("task_post response missing task id")
+	}
+
+	return response.Tasks[0].ID, nil
 }
