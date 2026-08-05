@@ -62,9 +62,6 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 type userDataResponse struct {
 	StatusCode int `json:"status_code"`
-	Tasks      []struct {
-		ID string `json:"id"`
-	} `json:"tasks"`
 }
 
 func (c *Client) Verify() error {
@@ -86,10 +83,12 @@ func (c *Client) Verify() error {
 }
 
 type taskPostResponse struct {
-	StatusCode int `json:"status_code"`
-	Tasks      []struct {
-		ID         string `json:"id"`
-		StatusCode int    `json:"status_code"`
+	StatusCode    int    `json:"status_code"`
+	StatusMessage string `json:"status_message"`
+	Tasks         []struct {
+		ID            string `json:"id"`
+		StatusCode    int    `json:"status_code"`
+		StatusMessage string `json:"status_message"`
 	} `json:"tasks"`
 }
 
@@ -112,11 +111,24 @@ func (c *Client) PostAudit(target string, maxCrawlPages int) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal task_post response: %v", err)
 	}
 
-	if len(response.Tasks) == 0 || response.Tasks[0].ID == "" {
+	if response.StatusCode != 20000 {
+		return "", fmt.Errorf("DataForSEO returned status_code %d: %s", response.StatusCode, response.StatusMessage)
+	}
+
+	if len(response.Tasks) == 0 {
 		return "", fmt.Errorf("task_post response missing task id")
 	}
 
-	return response.Tasks[0].ID, nil
+	task := response.Tasks[0]
+	if task.StatusCode != 20000 && task.StatusCode != 20100 {
+		return "", fmt.Errorf("DataForSEO rejected task_post request: status_code %d: %s", task.StatusCode, task.StatusMessage)
+	}
+
+	if task.ID == "" {
+		return "", fmt.Errorf("task_post response missing task id")
+	}
+
+	return task.ID, nil
 }
 
 type summaryResponse struct {

@@ -56,6 +56,68 @@ func Test__Client__Verify(t *testing.T) {
 	})
 }
 
+func Test__Client__PostAudit(t *testing.T) {
+	t.Run("task created", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mockResponse(http.StatusOK, `{
+					"status_code": 20000,
+					"tasks": [{"id": "task-1", "status_code": 20100, "status_message": "Task Created."}]
+				}`),
+			},
+		}
+		client, err := NewClient(httpCtx, &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "dXNlcjpwYXNz"},
+		})
+		require.NoError(t, err)
+
+		taskID, err := client.PostAudit("freehire.me", 100)
+		require.NoError(t, err)
+		assert.Equal(t, "task-1", taskID)
+	})
+
+	t.Run("rejected by DataForSEO - bad domain", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mockResponse(http.StatusOK, `{
+					"status_code": 20000,
+					"tasks": [{"id": "task-1", "status_code": 40501, "status_message": "Invalid Field: 'target'."}]
+				}`),
+			},
+		}
+		client, err := NewClient(httpCtx, &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "dXNlcjpwYXNz"},
+		})
+		require.NoError(t, err)
+
+		taskID, err := client.PostAudit("not a domain", 100)
+		require.Error(t, err)
+		assert.Empty(t, taskID)
+		assert.Contains(t, err.Error(), "Invalid Field")
+	})
+
+	t.Run("rejected by DataForSEO - top level status_code", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mockResponse(http.StatusOK, `{
+					"status_code": 40200,
+					"status_message": "Access denied.",
+					"tasks": []
+				}`),
+			},
+		}
+		client, err := NewClient(httpCtx, &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "dXNlcjpwYXNz"},
+		})
+		require.NoError(t, err)
+
+		taskID, err := client.PostAudit("freehire.me", 100)
+		require.Error(t, err)
+		assert.Empty(t, taskID)
+		assert.Contains(t, err.Error(), "Access denied")
+	})
+}
+
 func Test__DataForSEO__Sync(t *testing.T) {
 	d := &DataForSEO{}
 

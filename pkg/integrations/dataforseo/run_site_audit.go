@@ -2,6 +2,7 @@ package dataforseo
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,7 +19,20 @@ const (
 	RunSiteAuditPollAction      = "poll"
 	RunSiteAuditMaxPollAttempts = 72
 	RunSiteAuditKVTaskID        = "task_id"
+
+	// runSiteAuditPagesLimit is the max number of pages fetched per GetPages
+	// call. If the number of pages returned equals this limit, there may be
+	// more pages on the site that DataForSEO didn't return (no pagination is
+	// implemented), so the result is marked as truncated.
+	runSiteAuditPagesLimit = 1000
 )
+
+// runSiteAuditIssuePagesEmitCap bounds how many issue pages are included in
+// the emitted payload, so a large site with many issues doesn't blow past
+// the execution engine's per-event payload size limit. It's a var (not a
+// const) so tests can override it to exercise the capping logic without
+// needing a 100+ item fixture.
+var runSiteAuditIssuePagesEmitCap = 100
 
 type RunSiteAudit struct{}
 
@@ -50,7 +64,33 @@ func (r *RunSiteAudit) Documentation() string {
 ## Use Cases
 
 - **SEO guardrail**: Gate a deploy or release step on the site staying free of on-page SEO regressions
-- **Scheduled monitoring**: Run on a schedule and branch into issue-handling automation when problems appear`
+- **Scheduled monitoring**: Run on a schedule and branch into issue-handling automation when problems appear
+
+## Output Channels
+
+- **Issues found**: at least one crawled page failed one of the four checks below
+- **Clean**: every crawled page passed all four checks
+
+## Polling
+
+After starting the audit, the component polls DataForSEO every 5 minutes for up to 72 attempts (~6 hours). If the
+audit hasn't finished within that window, the execution fails with an "audit_timeout" error.
+
+## What counts as an "issue"
+
+A page is considered to have an issue if any of the following on-page checks fail:
+
+- **Broken links**: the page contains one or more broken outgoing links
+- **Duplicate title**: the page's title tag duplicates another page's title
+- **Duplicate meta description**: the page's meta description duplicates another page's
+- **Broken page response**: the page itself returned a broken (non-2xx) HTTP response
+
+## Coverage limits
+
+Only the first 1000 crawled pages are fetched per audit. If the site has more pages than that, the emitted payload
+includes a "truncated" flag so downstream automation can distinguish a genuinely clean site from one where coverage
+was only partial. The "pages" list in the payload is also capped to the first 100 issue pages; the true total is
+always available in "issuePageCount".`
 }
 
 func (r *RunSiteAudit) Icon() string {
@@ -96,6 +136,19 @@ func (r *RunSiteAudit) Configuration() []configuration.Field {
 }
 
 func (r *RunSiteAudit) Setup(ctx core.SetupContext) error {
+	spec := RunSiteAuditSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if strings.TrimSpace(spec.Domain) == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	if spec.MaxCrawlPages < 1 {
+		return fmt.Errorf("maxCrawlPages must be at least 1")
+	}
+
 	return nil
 }
 
@@ -187,7 +240,12 @@ func (r *RunSiteAudit) poll(ctx core.ActionHookContext) error {
 
 	crawlProgress, err := client.GetSummary(metadata.TaskID)
 	if err != nil {
-		return err
+		ctx.Logger.Warnf("failed to get DataForSEO audit summary for task %s: %v", metadata.TaskID, err)
+		metadata.PollAttempt++
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+		return ctx.Requests.ScheduleActionCall(RunSiteAuditPollAction, map[string]any{}, RunSiteAuditPollInterval)
 	}
 
 	if crawlProgress != "finished" {
@@ -200,8 +258,6 @@ func (r *RunSiteAudit) poll(ctx core.ActionHookContext) error {
 
 	return r.resolve(ctx, client, metadata)
 }
-
-const runSiteAuditPagesLimit = 1000
 
 func (r *RunSiteAudit) resolve(ctx core.ActionHookContext, client *Client, metadata RunSiteAuditExecutionMetadata) error {
 	allPages, err := client.GetPages(metadata.TaskID, runSiteAuditPagesLimit)
@@ -216,13 +272,29 @@ func (r *RunSiteAudit) resolve(ctx core.ActionHookContext, client *Client, metad
 		}
 	}
 
-	if len(issuePages) == 0 {
-		return ctx.ExecutionState.Emit(RunSiteAuditCleanChannel, "dataforseo.audit.finished", []any{
-			map[string]any{"taskId": metadata.TaskID, "pages": issuePages},
-		})
+	// The "issues found" vs "clean" decision is based on the true issue
+	// count, not the (possibly capped) list of pages emitted below.
+	channel := RunSiteAuditCleanChannel
+	if len(issuePages) > 0 {
+		channel = RunSiteAuditIssuesChannel
 	}
 
-	return ctx.ExecutionState.Emit(RunSiteAuditIssuesChannel, "dataforseo.audit.finished", []any{
-		map[string]any{"taskId": metadata.TaskID, "pages": issuePages},
+	emittedPages := issuePages
+	if len(emittedPages) > runSiteAuditIssuePagesEmitCap {
+		emittedPages = emittedPages[:runSiteAuditIssuePagesEmitCap]
+	}
+
+	// If DataForSEO returned exactly as many pages as we asked for, there may
+	// be more pages on the site that we never fetched (no pagination is
+	// implemented), so this can't be treated as a fully-covered crawl.
+	truncated := len(allPages) >= runSiteAuditPagesLimit
+
+	return ctx.ExecutionState.Emit(channel, "dataforseo.audit.finished", []any{
+		map[string]any{
+			"taskId":         metadata.TaskID,
+			"pages":          emittedPages,
+			"truncated":      truncated,
+			"issuePageCount": len(issuePages),
+		},
 	})
 }
