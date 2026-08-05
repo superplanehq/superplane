@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactory, useWorkOrder, useWorkOrderEvents } from "@/hooks/useFactoryData";
+import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useMemo } from "react";
@@ -16,9 +16,12 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
+  const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   const derived = getWorkOrderDetailDerived(order);
+  const isDraft = order?.state === "STATE_DRAFT";
+  const isReady = order?.state === "STATE_READY";
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Factory"]);
 
@@ -63,7 +66,13 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     canDispatch: canManageWorkOrders,
     canClose: canManageWorkOrders,
     canAssign: canManageWorkOrders,
+    canManage: canManageWorkOrders,
     permissionsLoading,
+    artifacts: artifactsQuery.data ?? [],
+    isArtifactsLoading: artifactsQuery.isLoading,
+    artifactsError: artifactsQuery.error ?? null,
+    isDraft,
+    isReady,
     ...derived,
     ...actions,
   };

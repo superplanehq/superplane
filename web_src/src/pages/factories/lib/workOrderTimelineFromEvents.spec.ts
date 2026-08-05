@@ -71,4 +71,145 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       title: "closed as completed",
     });
   });
+
+  it("labels a close-as-failed result", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.closed",
+        event: { result: "failed" },
+      },
+    ]);
+
+    expect(view.events[0]?.title).toBe("closed as failed");
+  });
+
+  it("skips status transitions already covered by opened/closed events", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: { fromState: "ready", toState: "open" },
+      },
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: { fromState: "open", toState: "closed", toResult: "completed" },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(0);
+  });
+
+  it("renders the initial creation (empty fromState → draft) as a created entry", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: {
+          user: { id: "user-1" },
+          fromState: "",
+          toState: "draft",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "created",
+      actorUserId: "user-1",
+      title: "created this work order",
+    });
+  });
+
+  it("renders a draft→ready transition as a status change", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: {
+          user: { id: "user-1" },
+          fromState: "draft",
+          toState: "ready",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "statusChanged",
+      actorUserId: "user-1",
+      statusChange: { fromState: "draft", toState: "ready" },
+      title: "moved Draft → Ready",
+    });
+  });
+
+  it("renders a reopen (closed→open) as a reopen, not a fresh open", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: {
+          user: { id: "user-1" },
+          fromState: "closed",
+          toState: "open",
+          fromResult: "completed",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "statusChanged",
+      actorUserId: "user-1",
+      statusChange: { fromState: "closed", toState: "open", fromResult: "completed" },
+      title: "reopened as Open",
+    });
+  });
+
+  it("carries a comment body into the timeline", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Please double-check the payload shape.",
+          author: { kind: "llm", label: "Claude" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "commented",
+      comment: {
+        body: "Please double-check the payload shape.",
+        authorKind: "llm",
+        authorLabel: "Claude",
+      },
+    });
+  });
+
+  it("captures PR artifact metadata", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          artifact: {
+            id: "art-1",
+            type: "pr",
+            url: "https://github.com/example/repo/pull/1",
+            title: "Add checkout",
+          },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "artifactAdded",
+      artifact: {
+        id: "art-1",
+        type: "pr",
+        url: "https://github.com/example/repo/pull/1",
+        title: "Add checkout",
+      },
+    });
+  });
 });

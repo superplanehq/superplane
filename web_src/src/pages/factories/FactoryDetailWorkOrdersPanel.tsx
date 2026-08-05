@@ -6,7 +6,12 @@ import { factoryCountBadgeClassName, factoryDetailMainClassName } from "./lib/fa
 import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 
 interface FactoryDetailWorkOrdersPanelProps {
-  openWorkOrderCount: number;
+  //
+  // Number of work orders in an active state (draft / ready / open /
+  // running / failed). Matches the default status filter and the header
+  // badge count.
+  //
+  activeWorkOrderCount: number;
   ownerFilter: WorkOrderOwnerFilter;
   statusFilter: WorkOrderStatusFilter;
   onOwnerFilterChange: (filter: WorkOrderOwnerFilter) => void;
@@ -24,7 +29,7 @@ interface FactoryDetailWorkOrdersPanelProps {
 }
 
 export function FactoryDetailWorkOrdersPanel({
-  openWorkOrderCount,
+  activeWorkOrderCount,
   ownerFilter,
   statusFilter,
   onOwnerFilterChange,
@@ -45,7 +50,7 @@ export function FactoryDetailWorkOrdersPanel({
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Work Orders</h2>
-          <span className={factoryCountBadgeClassName}>{openWorkOrderCount}</span>
+          <span className={factoryCountBadgeClassName}>{activeWorkOrderCount}</span>
         </div>
       </div>
 

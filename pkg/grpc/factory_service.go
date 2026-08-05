@@ -93,3 +93,23 @@ func (s *FactoryService) CloseWorkOrder(ctx context.Context, req *pb.CloseWorkOr
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CloseWorkOrder(ctx, organizationID, req)
 }
+
+func (s *FactoryService) UpdateWorkOrderStatus(ctx context.Context, req *pb.UpdateWorkOrderStatusRequest) (*pb.UpdateWorkOrderStatusResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateWorkOrderStatus(ctx, organizationID, req)
+}
+
+func (s *FactoryService) AddWorkOrderComment(ctx context.Context, req *pb.AddWorkOrderCommentRequest) (*pb.AddWorkOrderCommentResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AddWorkOrderComment(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListWorkOrderArtifacts(ctx context.Context, req *pb.ListWorkOrderArtifactsRequest) (*pb.ListWorkOrderArtifactsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListWorkOrderArtifacts(ctx, organizationID, req)
+}
+
+func (s *FactoryService) AddWorkOrderArtifact(ctx context.Context, req *pb.AddWorkOrderArtifactRequest) (*pb.AddWorkOrderArtifactResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AddWorkOrderArtifact(ctx, organizationID, req)
+}

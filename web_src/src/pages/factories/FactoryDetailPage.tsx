@@ -43,7 +43,7 @@ function FactoryDetailPageContent({ organizationId, factoryId }: { organizationI
         <div className={cn(factoryPageContentClassName, "pb-10")}>
           <FactoryDetailHeader
             factory={page.factory}
-            workOrdersCount={page.openWorkOrderCount}
+            workOrdersCount={page.activeWorkOrderCount}
             canCreate={page.canCreateWork}
             canUpdate={page.canUpdateFactory}
             canDelete={page.canDeleteFactory}
@@ -57,7 +57,7 @@ function FactoryDetailPageContent({ organizationId, factoryId }: { organizationI
 
           <div className={cn(factoryDetailPanelClassName, "mt-8 grid w-full lg:grid-cols-[minmax(0,1fr)_320px]")}>
             <FactoryDetailWorkOrdersPanel
-              openWorkOrderCount={page.openWorkOrderCount}
+              activeWorkOrderCount={page.activeWorkOrderCount}
               ownerFilter={page.ownerFilter}
               statusFilter={page.statusFilter}
               onOwnerFilterChange={page.setOwnerFilter}

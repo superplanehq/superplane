@@ -210,6 +210,53 @@ service Factories {
       tags: "Factory";
     };
   }
+
+  rpc UpdateWorkOrderStatus(UpdateWorkOrderStatusRequest) returns (UpdateWorkOrderStatusResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/status"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update work order status";
+      description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderComment(AddWorkOrderCommentRequest) returns (AddWorkOrderCommentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order comment";
+      description: "Appends a comment to the work order timeline";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderArtifacts(ListWorkOrderArtifactsRequest) returns (ListWorkOrderArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List work order artifacts";
+      description: "Returns artifacts attached to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderArtifact(AddWorkOrderArtifactRequest) returns (AddWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order artifact";
+      description: "Attaches an artifact (PR, markdown) to a work order";
+      tags: "Factory";
+    };
+  }
 }
 
 //
@@ -358,14 +405,24 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
+    //
+    // Enum numbers are ordered so the pre-existing OPEN / CLOSED values
+    // keep the numbers they've always had; the new DRAFT / READY states
+    // are appended. Even though our protos are only used for JSON
+    // conversion (see AGENTS.md), stable numbers keep any snapshot or
+    // stored numeric enum consistent across versions.
+    //
     STATE_OPEN = 1;
     STATE_CLOSED = 2;
+    STATE_DRAFT = 3;
+    STATE_READY = 4;
   }
 
   enum Result {
     RESULT_UNSPECIFIED = 0;
     RESULT_COMPLETED = 1;
     RESULT_REJECTED = 2;
+    RESULT_FAILED = 3;
   }
 
   string id = 1;
@@ -378,6 +435,13 @@ message WorkOrder {
   repeated UserRef assignees = 8;
   repeated WorkOrderExecution executions = 9;
   UserRef created_by = 10;
+  //
+  // Bumped only on lifecycle transitions (draft → ready → open, reopen,
+  // close). Distinct from `updated_at`, which also bumps on assignee
+  // updates. The UI uses this as the fence for "current attempt" so a
+  // reassign after a failure doesn't hide the failed pill.
+  //
+  google.protobuf.Timestamp state_updated_at = 11;
 }
 
 message UserRef {
@@ -469,4 +533,91 @@ message WorkOrderEvent {
   google.protobuf.Timestamp timestamp = 1;
   string type = 2;
   google.protobuf.Struct event = 3;
+}
+
+//
+// Status / comments / artifacts
+//
+
+message UpdateWorkOrderStatusRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrder.State state = 3;
+  WorkOrder.Result result = 4;
+}
+
+message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message AddWorkOrderCommentRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string body = 3;
+  WorkOrderCommentAuthor.Kind author_kind = 4;
+  string author_label = 5;
+}
+
+message AddWorkOrderCommentResponse {
+  WorkOrderComment comment = 1;
+}
+
+message WorkOrderComment {
+  string id = 1;
+  string body = 2;
+  WorkOrderCommentAuthor author = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message WorkOrderCommentAuthor {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_LLM = 2;
+    KIND_SYSTEM = 3;
+  }
+
+  Kind kind = 1;
+  string user_id = 2;
+  string label = 3;
+}
+
+message ListWorkOrderArtifactsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message ListWorkOrderArtifactsResponse {
+  repeated WorkOrderArtifact artifacts = 1;
+}
+
+message AddWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrderArtifact.Type type = 3;
+  string url = 4;
+  string title = 5;
+  string body = 6;
+  google.protobuf.Struct data = 7;
+}
+
+message AddWorkOrderArtifactResponse {
+  WorkOrderArtifact artifact = 1;
+}
+
+message WorkOrderArtifact {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_PR = 1;
+    TYPE_MARKDOWN = 2;
+  }
+
+  string id = 1;
+  Type type = 2;
+  string url = 3;
+  string title = 4;
+  string body = 5;
+  google.protobuf.Struct data = 6;
+  UserRef created_by = 7;
+  google.protobuf.Timestamp created_at = 8;
 }

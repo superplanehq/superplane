@@ -1,20 +1,27 @@
 import type {
+  FactoriesAddWorkOrderArtifactBody,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderResult,
+  FactoriesWorkOrderState,
 } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import {
   factoryDetailPanelClassName,
   factoryDetailSidebarClassName,
   factoryPageContentClassName,
 } from "./lib/factoryPageStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
 import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
+import { WorkOrderAttachArtifactDialog } from "./WorkOrderAttachArtifactDialog";
+import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
@@ -30,24 +37,38 @@ interface WorkOrderDetailLoadedViewProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
+  artifacts: FactoriesWorkOrderArtifact[];
+  isArtifactsLoading: boolean;
+  artifactsError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
   isOpen: boolean;
+  isDispatchable: boolean;
+  isClosed: boolean;
+  isDraft: boolean;
+  isReady: boolean;
   canDispatch: boolean;
   canClose: boolean;
   canAssign: boolean;
+  canManage: boolean;
   permissionsLoading: boolean;
   isDispatching: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
   isAssigneesSaving: boolean;
+  isUpdatingStatus: boolean;
+  isAddingComment: boolean;
+  isAddingArtifact: boolean;
   onDispatch: (lineName: string) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
+  onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onAddComment: (body: string) => Promise<void>;
+  onAddArtifact: (artifact: FactoriesAddWorkOrderArtifactBody) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView({
@@ -62,25 +83,41 @@ export function WorkOrderDetailLoadedView({
   isLoadingMoreEvents,
   onLoadMoreEvents,
   onRetryEvents,
+  artifacts,
+  isArtifactsLoading,
+  artifactsError,
   displayStatus,
   statusMeta,
   assigneeIds,
   assigneeNames,
   factoryLines,
   isOpen,
+  isDispatchable,
+  isClosed,
+  isDraft,
+  isReady,
   canDispatch,
   canClose,
   canAssign,
+  canManage,
   permissionsLoading,
   isDispatching,
   isCompleting,
   isRejecting,
   isClosing,
   isAssigneesSaving,
+  isUpdatingStatus,
+  isAddingComment,
+  isAddingArtifact,
   onDispatch,
   onClose,
   onAssigneesSave,
+  onStatusChange,
+  onAddComment,
+  onAddArtifact,
 }: WorkOrderDetailLoadedViewProps) {
+  const [isAttachOpen, setIsAttachOpen] = useState(false);
+
   return (
     <div className={factoryPageContentClassName}>
       <Link
@@ -96,16 +133,23 @@ export function WorkOrderDetailLoadedView({
         statusMeta={statusMeta}
         displayStatus={displayStatus}
         isOpen={isOpen}
+        isDispatchable={isDispatchable}
+        isDraft={isDraft}
+        isReady={isReady}
+        isClosed={isClosed}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
         canClose={canClose}
+        canManage={canManage}
         permissionsLoading={permissionsLoading}
         isDispatching={isDispatching}
         isCompleting={isCompleting}
         isRejecting={isRejecting}
         isClosing={isClosing}
+        isUpdatingStatus={isUpdatingStatus}
         onDispatch={onDispatch}
         onClose={onClose}
+        onStatusChange={onStatusChange}
       />
 
       <div className={factoryDetailPanelClassName}>
@@ -118,6 +162,10 @@ export function WorkOrderDetailLoadedView({
                 </p>
               </section>
             ) : null}
+
+            <section className="mb-8">
+              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
+            </section>
 
             <section>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
@@ -146,9 +194,26 @@ export function WorkOrderDetailLoadedView({
               isSaving={isAssigneesSaving}
               onSave={onAssigneesSave}
             />
+
+            <div className="mt-6">
+              <WorkOrderArtifactsPanel
+                artifacts={artifacts}
+                isLoading={isArtifactsLoading}
+                error={artifactsError}
+                canAttach={canManage}
+                onOpenAttach={() => setIsAttachOpen(true)}
+              />
+            </div>
           </aside>
         </div>
       </div>
+
+      <WorkOrderAttachArtifactDialog
+        open={isAttachOpen}
+        onOpenChange={setIsAttachOpen}
+        isSubmitting={isAddingArtifact}
+        onSubmit={onAddArtifact}
+      />
     </div>
   );
 }
