@@ -1,5 +1,5 @@
 import { useCreateCanvas } from "@/hooks/useCanvasData";
-import { factoryAppsKey, useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import { factoryAppsKey, useDispatchWorkOrder, useUpdateFactory } from "@/hooks/useFactoryData";
 import { appPath } from "@/lib/appPaths";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -15,6 +15,7 @@ export function useFactoryDetailActions(
   const queryClient = useQueryClient();
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const createCanvas = useCreateCanvas(organizationId);
+  const updateFactory = useUpdateFactory(organizationId, factoryId);
 
   const handleCreateApp = async (input: { name: string; description: string }) => {
     try {
@@ -42,10 +43,17 @@ export function useFactoryDetailActions(
     showSuccessToast(`Dispatched to ${lineName}.`);
   };
 
+  const handleUpdateFactory = async (input: { name: string; description: string }) => {
+    await updateFactory.mutateAsync(input);
+    showSuccessToast("Factory updated");
+  };
+
   return {
     handleCreateApp,
     handleDispatch,
+    handleUpdateFactory,
     isCreateAppSaving: createCanvas.isPending,
     isDispatching: dispatchWorkOrder.isPending,
+    isUpdatingFactory: updateFactory.isPending,
   };
 }

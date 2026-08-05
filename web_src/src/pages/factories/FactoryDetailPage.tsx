@@ -45,8 +45,11 @@ function FactoryDetailPageContent({ organizationId, factoryId }: { organizationI
             factory={page.factory}
             workOrdersCount={page.openWorkOrderCount}
             canCreate={page.canCreateWork}
+            canUpdate={page.canUpdateFactory}
             permissionsLoading={page.permissionsLoading}
             createHref={page.createWorkOrderHref}
+            isUpdating={page.isUpdatingFactory}
+            onUpdate={page.handleUpdateFactory}
           />
 
           <div className={cn(factoryDetailPanelClassName, "mt-8 grid w-full lg:grid-cols-[minmax(0,1fr)_320px]")}>
