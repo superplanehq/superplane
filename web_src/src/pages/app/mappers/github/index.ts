@@ -96,6 +96,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   addIssueAssignee: baseIssueMapper,
   removeIssueAssignee: baseIssueMapper,
   addReaction: addReactionMapper,
+  addIssueReaction: addReactionMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
