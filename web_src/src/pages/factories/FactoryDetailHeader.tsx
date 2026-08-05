@@ -1,16 +1,14 @@
 import type { FactoriesFactory } from "@/api-client";
-import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Icon } from "@/components/Icon";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { EditFactoryDialog } from "./EditFactoryDialog";
+import { FactoryActionsMenu } from "./FactoryActionsMenu";
+import { FactoryDeleteDialog } from "./FactoryDeleteDialog";
 
 interface FactoryDetailHeaderProps {
   factory: FactoriesFactory;
@@ -41,7 +39,6 @@ export function FactoryDetailHeader({
 }: FactoryDetailHeaderProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const canManage = canUpdate || canDelete;
 
   return (
     <>
@@ -51,64 +48,12 @@ export function FactoryDetailHeader({
             <h1 className="min-w-0 text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
               {factory.name}
             </h1>
-            {!canManage ? (
-              <PermissionTooltip
-                allowed={permissionsLoading}
-                message="You don't have permission to manage this factory."
-              >
-                <button
-                  type="button"
-                  className="shrink-0 rounded p-1.5 text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
-                  aria-label="Factory actions"
-                  disabled
-                  data-testid="factory-actions-menu"
-                >
-                  <MoreVertical size={24} />
-                </button>
-              </PermissionTooltip>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-                    aria-label="Factory actions"
-                    disabled={isDeleting}
-                    data-testid="factory-actions-menu"
-                  >
-                    <MoreVertical size={24} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <PermissionTooltip allowed={canUpdate} message="You don't have permission to update factories.">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (!canUpdate) return;
-                        setEditOpen(true);
-                      }}
-                      disabled={!canUpdate}
-                      data-testid="factory-edit-action"
-                    >
-                      <Pencil size={16} />
-                      Edit
-                    </DropdownMenuItem>
-                  </PermissionTooltip>
-                  <PermissionTooltip allowed={canDelete} message="You don't have permission to delete factories.">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (!canDelete) return;
-                        setDeleteOpen(true);
-                      }}
-                      disabled={!canDelete}
-                      data-testid="factory-delete-action"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </DropdownMenuItem>
-                  </PermissionTooltip>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <FactoryActionsMenu
+              permissions={{ canUpdate, canDelete, loading: permissionsLoading }}
+              isDeleting={isDeleting}
+              onEdit={() => setEditOpen(true)}
+              onDelete={() => setDeleteOpen(true)}
+            />
           </div>
           {factory.description?.trim() ? (
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-500 dark:text-gray-400">
@@ -148,38 +93,14 @@ export function FactoryDetailHeader({
         }}
       />
 
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} size="lg" className="text-left">
-        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{factory.name}"?</DialogTitle>
-        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
-          This cannot be undone. Are you sure you want to continue?
-        </DialogDescription>
-        <DialogActions>
-          <LoadingButton
-            variant="destructive"
-            onClick={() => {
-              void (async () => {
-                try {
-                  await onDelete();
-                  setDeleteOpen(false);
-                } catch {
-                  // Toast handled by caller; keep dialog open for retry.
-                }
-              })();
-            }}
-            disabled={!canDelete}
-            loading={isDeleting}
-            loadingText="Deleting..."
-            className="flex items-center gap-2"
-            data-testid="factory-delete-confirm-button"
-          >
-            <Trash2 size={16} />
-            Delete
-          </LoadingButton>
-          <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <FactoryDeleteDialog
+        open={deleteOpen}
+        factoryName={factory.name ?? ""}
+        canDelete={canDelete}
+        isDeleting={isDeleting}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={onDelete}
+      />
     </>
   );
 }
