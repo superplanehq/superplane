@@ -51,11 +51,12 @@ linked source run (`source_run_id` on the work order record).
 States (persisted on `factory_work_orders.state`; `result` is set only on `closed`):
 
 ```
-[*] → draft → open → closed
-        ↑     ↓        ↓
-        └── back  ← reopen
-            to
-           draft
+[*] → draft ─────→ open ─────→ closed
+        │  ↑        ↓             ↓
+        │  └── back ┘        ← reopen
+        │      to
+        │     draft
+        └────────── abandon (rejected) ──────────→ closed
 ```
 
 | Transition | How | Notes |
@@ -63,19 +64,17 @@ States (persisted on `factory_work_orders.state`; `result` is set only on `close
 | `→ draft` | `POST …/orders` | Every new work order starts as `draft`. |
 | `draft → open` | `PATCH …/orders/{id}/dispatch` **or** `PATCH …/status` (`STATE_OPEN`) | Dispatch auto-promotes `draft` → `open` and records a status event. Explicit `PATCH …/status` also works ("open it without a dispatch yet"). |
 | `open → closed` | `PATCH …/orders/{id}/close` (legacy) **or** `PATCH …/status` (`STATE_CLOSED` + result) | Close **requires** a result: `completed`, `rejected`, or `failed`. |
+| `draft → closed` | `PATCH …/status` (`STATE_CLOSED`, `RESULT_REJECTED`) | Abandon-before-dispatch. Only `rejected` is valid — `completed` / `failed` imply the order actually ran. |
 | `closed → open` | `PATCH …/status` (`STATE_OPEN`) | Reopens the order and clears its `result`. |
 | `open → draft` | `PATCH …/status` (`STATE_DRAFT`) | "Back to draft" affordance when a run needs re-scoping. |
 
 Guardrails:
 
 - `dispatch` only works from `draft` or `open`, and still requires no active execution.
-- `close` only works from `open`; the API rejects invalid transitions (e.g. `draft → closed`).
+- Valid close results depend on the source state (per `factoryWorkOrderCloseResultsByFromState`): `open → closed` accepts `completed`, `rejected`, `failed`; `draft → closed` accepts `rejected` only.
 - `UpdateStatus` is the single writer for the lifecycle; `Close(...)` is kept as a thin wrapper for the existing REST endpoint and canvas components.
 
-Every transition writes an `order.status.updated` event (`fromState`, `toState`, `fromResult`, `toResult`). Two coarse legacy events fire alongside it so older timeline logic keeps working:
-
-- `order.opened` fires only on the initial `draft → open` promotion (mirroring a dispatch). Reopens from `closed` do **not** re-emit `order.opened`; the `order.status.updated` event is authoritative and the timeline renders it as "reopened as Open".
-- `order.closed` fires on any transition into `closed`.
+Every transition writes exactly one `order.status.updated` event (`fromState`, `toState`, `fromResult`, `toResult`) — the sole authoritative lifecycle event. When the transition is caused by a canvas run, the event also carries `automation` (line + step + node) and `run` + `app` refs so the timeline can attribute it back to the caller. On the first `draft → open`, the originating run/app snapshot from `SourceRunID` is included even when no automation is present.
 
 **Display status** in the UI derives both from `state` and from executions:
 
@@ -91,7 +90,7 @@ Every transition writes an `order.status.updated` event (`fromState`, `toState`,
 
 ## Comments and artifacts
 
-- **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is one of `user`, `automation`, or `system`. `user` comments carry the authenticated caller's id; `automation` and `system` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation / system comments show a small badge.
+- **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is `user` or `automation`. `user` comments carry the authenticated caller's id; `automation` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation comments show a small badge.
 - **Artifacts** are first-class rows in `factory_work_order_artifacts`. Each artifact has a required `type` (`pr` or `markdown`) plus optional `title`, `url`, and a free-form JSONB `data` map. `pr` requires `url`; markdown notes conventionally place their inline content under `data.body`. Any provided `url` must be an absolute `http(s)` URL with a host — the model rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs so a user with `factories:update` cannot smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts and offers an **Attach** dialog.
 
 ## API

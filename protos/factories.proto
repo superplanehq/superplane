@@ -384,10 +384,9 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
-    // OPEN / CLOSED keep their original numbers; DRAFT appends.
-    STATE_OPEN = 1;
-    STATE_CLOSED = 2;
-    STATE_DRAFT = 3;
+    STATE_DRAFT = 1;
+    STATE_OPEN = 2;
+    STATE_CLOSED = 3;
   }
 
   enum Result {
@@ -535,12 +534,11 @@ message WorkOrderCommentAuthor {
     KIND_UNSPECIFIED = 0;
     KIND_USER = 1;
     KIND_AUTOMATION = 2;
-    KIND_SYSTEM = 3;
   }
 
   Kind kind = 1;
   string user_id = 2;
-  // Populated for `automation` / `system`: identifies the canvas node
+  // Populated for `automation` comments: identifies the canvas node
   // (and app) that wrote the comment.
   AutomationRef automation = 3;
 }

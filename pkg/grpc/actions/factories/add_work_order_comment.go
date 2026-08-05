@@ -104,8 +104,6 @@ func commentAuthorKindToProto(kind string) pb.WorkOrderCommentAuthor_Kind {
 	switch kind {
 	case factory.CommentAuthorKindAutomation:
 		return pb.WorkOrderCommentAuthor_KIND_AUTOMATION
-	case factory.CommentAuthorKindSystem:
-		return pb.WorkOrderCommentAuthor_KIND_SYSTEM
 	case factory.CommentAuthorKindUser:
 		return pb.WorkOrderCommentAuthor_KIND_USER
 	default:

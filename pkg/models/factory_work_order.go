@@ -511,8 +511,7 @@ func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload an
 func IsValidWorkOrderCommentAuthorKind(kind string) bool {
 	switch kind {
 	case factory.CommentAuthorKindUser,
-		factory.CommentAuthorKindAutomation,
-		factory.CommentAuthorKindSystem:
+		factory.CommentAuthorKindAutomation:
 		return true
 	}
 	return false

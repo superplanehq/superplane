@@ -17,15 +17,11 @@ export function CommentTimelineBody({
     return null;
   }
 
-  const kind = (comment.authorKind ?? "").toLowerCase();
-  const isAutomation = kind === "automation";
-  const isSystem = kind === "system";
-  const showAutomationBadge = isAutomation || isSystem;
-  const shouldRenderActor = actorDisplay && !showAutomationBadge;
-  const shouldRenderAutomationActor = showAutomationBadge && Boolean(event.actorAutomation ?? comment.automation);
+  const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
+  const shouldRenderActor = actorDisplay && !isAutomation;
+  const shouldRenderAutomationActor = isAutomation && Boolean(event.actorAutomation ?? comment.automation);
   const fallbackAuthorLabel = resolveCommentAuthorLabel({
     isAutomation,
-    isSystem,
     automation: comment.automation,
     actorName: actorDisplay?.name,
   });
@@ -36,17 +32,14 @@ export function CommentTimelineBody({
         {shouldRenderActor ? (
           <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
         ) : shouldRenderAutomationActor ? (
-          <TimelineAutomationActor
-            actor={event.actorAutomation ?? comment.automation!}
-            fallbackLabel={isSystem ? "System" : "Automation"}
-          />
+          <TimelineAutomationActor actor={event.actorAutomation ?? comment.automation!} fallbackLabel="Automation" />
         ) : (
           <span className="font-semibold">{fallbackAuthorLabel}</span>
         )}
         <span>commented</span>
-        {showAutomationBadge ? (
+        {isAutomation ? (
           <span className="ml-1 inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
-            {isSystem ? "System" : "Automation"}
+            Automation
           </span>
         ) : null}
       </p>

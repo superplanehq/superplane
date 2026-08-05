@@ -2,28 +2,19 @@ import type { WorkOrderTimelineCommentAutomation } from "../lib/workOrderTimelin
 
 export interface CommentAuthorLabelInput {
   isAutomation: boolean;
-  isSystem: boolean;
   automation: WorkOrderTimelineCommentAutomation | null | undefined;
   actorName: string | null | undefined;
 }
 
-// Automation/system comments show the executing node's identity;
+// Automation comments show the executing node's identity;
 // human comments fall back to the resolved actor name.
-export function resolveCommentAuthorLabel({
-  isAutomation,
-  isSystem,
-  automation,
-  actorName,
-}: CommentAuthorLabelInput): string {
+export function resolveCommentAuthorLabel({ isAutomation, automation, actorName }: CommentAuthorLabelInput): string {
   const nodeName = automation?.nodeName?.trim();
   const appName = automation?.appName?.trim();
   const automationLabel = formatAutomationLabel(nodeName, appName);
 
   if (isAutomation) {
     return automationLabel || "Automation";
-  }
-  if (isSystem) {
-    return automationLabel || "System";
   }
   return actorName || "Someone";
 }

@@ -23,7 +23,6 @@ const (
 const (
 	CommentAuthorKindUser       = "user"
 	CommentAuthorKindAutomation = "automation"
-	CommentAuthorKindSystem     = "system"
 )
 
 // Artifact types

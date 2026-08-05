@@ -28,7 +28,7 @@ interface StepExecutionEventFixture {
 }
 
 interface CommentAuthorFixture {
-  kind: "user" | "automation" | "system";
+  kind: "user" | "automation";
   userId?: string;
   automation?: {
     nodeId?: string;
