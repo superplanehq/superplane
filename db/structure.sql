@@ -2166,7 +2166,7 @@ ALTER TABLE ONLY public.factory_work_orders
 --
 
 ALTER TABLE ONLY public.factory_work_orders
-    ADD CONSTRAINT factory_work_orders_source_run_id_fkey FOREIGN KEY (source_run_id) REFERENCES public.workflow_runs(id) ON DELETE RESTRICT;
+    ADD CONSTRAINT factory_work_orders_source_run_id_fkey FOREIGN KEY (source_run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
 
 
 --

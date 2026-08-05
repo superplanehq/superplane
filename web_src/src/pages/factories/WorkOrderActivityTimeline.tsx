@@ -190,11 +190,7 @@ function TimelineItem({
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        <TimelineItemContent
-          event={event}
-          organizationId={organizationId}
-          resolveUserDisplay={resolveUserDisplay}
-        />
+        <TimelineItemContent event={event} organizationId={organizationId} resolveUserDisplay={resolveUserDisplay} />
       </div>
     </li>
   );
@@ -233,9 +229,7 @@ function TimelineItemContent({
         organizationId={organizationId}
         resolveUserDisplay={resolveUserDisplay}
       />
-      <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
-        {formatTimeAgo(new Date(event.at))}
-      </time>
+      <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
     </>
   );
 }

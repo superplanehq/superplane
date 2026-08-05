@@ -342,3 +342,42 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
 	assert.Equal(t, int64(0), runCount)
 }
+
+func Test__CanvasRun__DeleteChain__ClearsWorkOrderSourceRunID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+		},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, &run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, order.SourceRunID)
+	assert.Equal(t, run.ID, *order.SourceRunID)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.DeleteChain(tx)
+		return err
+	}))
+
+	persisted, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Nil(t, persisted.SourceRunID)
+
+	var runCount int64
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	assert.Equal(t, int64(0), runCount)
+}
