@@ -301,7 +301,6 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		CreatedByID:    createdBy,
 		CreatedAt:      now,
 		UpdatedAt:      now,
-		StateUpdatedAt: now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {

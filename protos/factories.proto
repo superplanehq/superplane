@@ -434,14 +434,6 @@ message WorkOrder {
   repeated UserRef assignees = 8;
   repeated WorkOrderExecution executions = 9;
   UserRef created_by = 10;
-  //
-  // Bumped only on lifecycle transitions (draft → open on dispatch,
-  // close, reopen, back to draft). Distinct from `updated_at`, which
-  // also bumps on assignee updates. The UI uses this as the fence for
-  // "current attempt" so a reassign after a failure doesn't hide the
-  // failed pill.
-  //
-  google.protobuf.Timestamp state_updated_at = 11;
 }
 
 message UserRef {

@@ -447,8 +447,7 @@ CREATE TABLE public.factory_work_orders (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    state_updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 

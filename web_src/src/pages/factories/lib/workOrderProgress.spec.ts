@@ -78,7 +78,6 @@ describe("getWorkOrderDisplayStatus", () => {
       result: "RESULT_UNSPECIFIED",
       createdAt: created,
       updatedAt: created,
-      stateUpdatedAt: created,
       executions: [
         {
           id: "e1",
@@ -92,7 +91,7 @@ describe("getWorkOrderDisplayStatus", () => {
     expect(getWorkOrderDisplayStatus(failedOpen)).toBe("failed");
   });
 
-  it("resets to `open` after a reopen (stateUpdatedAt bumped past the last failure)", () => {
+  it("resets to `open` after a reopen (updatedAt bumped past the last failure)", () => {
     const failedAt = "2026-08-04T12:00:00.000Z";
     const reopenAt = "2026-08-04T13:00:00.000Z";
     const reopened: FactoriesWorkOrder = {
@@ -102,7 +101,6 @@ describe("getWorkOrderDisplayStatus", () => {
       result: "RESULT_UNSPECIFIED",
       createdAt: "2026-08-04T10:00:00.000Z",
       updatedAt: reopenAt,
-      stateUpdatedAt: reopenAt,
       executions: [
         {
           id: "e1",
@@ -118,9 +116,8 @@ describe("getWorkOrderDisplayStatus", () => {
 
   it("clears the failed pill when a subsequent retry finishes successfully", () => {
     //
-    // Re-dispatch after a failure doesn't bump `stateUpdatedAt` (no
-    // lifecycle transition), so the fence stays where it was. The newer
-    // passing execution supersedes the older failure and the display
+    // The latest finished execution passed, so it supersedes the older
+    // failure regardless of the `updatedAt` fence, and the display
     // returns to "open".
     //
     const orderCreated = "2026-08-04T10:00:00.000Z";
@@ -133,7 +130,6 @@ describe("getWorkOrderDisplayStatus", () => {
       result: "RESULT_UNSPECIFIED",
       createdAt: orderCreated,
       updatedAt: orderCreated,
-      stateUpdatedAt: orderCreated,
       executions: [
         {
           id: "e1",
@@ -152,36 +148,5 @@ describe("getWorkOrderDisplayStatus", () => {
       ],
     };
     expect(getWorkOrderDisplayStatus(passedAfterFail)).toBe("open");
-  });
-
-  it("does not hide the failed pill when only the assignees change (updatedAt bumps but stateUpdatedAt does not)", () => {
-    //
-    // `UpdateAssignees` bumps `updatedAt` for cache invalidation, but
-    // not `stateUpdatedAt`. The failure fence must use `stateUpdatedAt`
-    // so a reassign doesn't wipe out a genuine failure the user still
-    // needs to act on.
-    //
-    const orderCreated = "2026-08-04T10:00:00.000Z";
-    const failedAt = "2026-08-04T11:00:00.000Z";
-    const reassignedAt = "2026-08-04T12:00:00.000Z";
-    const reassignedFailure: FactoriesWorkOrder = {
-      id: "wo-reassigned-failure",
-      title: "failure with new assignee",
-      state: "STATE_OPEN",
-      result: "RESULT_UNSPECIFIED",
-      createdAt: orderCreated,
-      updatedAt: reassignedAt,
-      stateUpdatedAt: orderCreated,
-      executions: [
-        {
-          id: "e1",
-          step: "s",
-          state: "STATE_FINISHED",
-          result: "RESULT_FAILED",
-          updatedAt: failedAt,
-        },
-      ],
-    };
-    expect(getWorkOrderDisplayStatus(reassignedFailure)).toBe("failed");
   });
 });

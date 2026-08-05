@@ -135,19 +135,18 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
   // Only surface the "failed" display status when the latest finished
   // execution failed. A subsequent passing retry supersedes the earlier
   // failure (its finish timestamp is newer), so the pill clears without
-  // needing a state transition. On top of that we fence the failure
-  // against `order.stateUpdatedAt`, which only bumps on lifecycle
-  // transitions (draft → open on dispatch, close, reopen, back to
-  // draft). Failures older than the last transition belong to a
-  // previous attempt and shouldn't stick to a reopened order; assignee
-  // / comment / artifact writes don't bump the fence, so re-assigning
-  // a failed order doesn't hide the failure.
+  // needing a state transition. We fence the failure against
+  // `order.updatedAt` so failures older than the most recent write to
+  // the order (lifecycle transition, assignee change, comment, artifact)
+  // are treated as belonging to a previous attempt — a reopened or
+  // re-triaged order clears the failed pill until a new dispatch
+  // actually fails.
   //
   const latestFinished = latestFinishedWorkOrderExecution(executions);
   if (latestFinished?.result === "RESULT_FAILED") {
     const finishedAt = Date.parse(latestFinished.updatedAt ?? latestFinished.createdAt ?? "");
-    const stateUpdatedAt = Date.parse(order.stateUpdatedAt ?? order.updatedAt ?? "");
-    if (Number.isNaN(finishedAt) || Number.isNaN(stateUpdatedAt) || finishedAt >= stateUpdatedAt) {
+    const orderUpdatedAt = Date.parse(order.updatedAt ?? "");
+    if (Number.isNaN(finishedAt) || Number.isNaN(orderUpdatedAt) || finishedAt >= orderUpdatedAt) {
       return "failed";
     }
   }

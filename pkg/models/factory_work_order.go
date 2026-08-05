@@ -68,15 +68,6 @@ type FactoryWorkOrder struct {
 	CreatedByID    *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-	//
-	// StateUpdatedAt is bumped only when `UpdateStatus` moves the order
-	// through a lifecycle transition. It stays put on assignee changes,
-	// comments, and artifact writes. The display-status logic uses it as
-	// the fence for "current attempt" so a reopened order isn't tagged
-	// `failed` by executions from the previous attempt, and re-assigning
-	// a failed order doesn't hide the failure.
-	//
-	StateUpdatedAt time.Time
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -190,15 +181,13 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		o.State = toState
 		o.Result = nextResult
 		o.UpdatedAt = now
-		o.StateUpdatedAt = now
 
 		err := tx.
 			Model(o).
 			Updates(map[string]any{
-				"state":            o.State,
-				"result":           o.Result,
-				"updated_at":       o.UpdatedAt,
-				"state_updated_at": o.StateUpdatedAt,
+				"state":      o.State,
+				"result":     o.Result,
+				"updated_at": o.UpdatedAt,
 			}).
 			Error
 		if err != nil {

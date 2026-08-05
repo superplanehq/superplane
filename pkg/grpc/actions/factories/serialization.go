@@ -85,17 +85,16 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 
 func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
 	return &pb.WorkOrder{
-		Id:             order.ID.String(),
-		Title:          order.Title,
-		Description:    order.Description,
-		State:          serializeWorkOrderState(order.State),
-		Result:         serializeWorkOrderResult(order.Result),
-		CreatedAt:      timestamppb.New(order.CreatedAt),
-		UpdatedAt:      timestamppb.New(order.UpdatedAt),
-		StateUpdatedAt: timestamppb.New(order.StateUpdatedAt),
-		Assignees:      serializeWorkOrderAssignees(order.Assignees),
-		Executions:     serializeWorkOrderExecutions(executions),
-		CreatedBy:      serializeWorkOrderCreator(order),
+		Id:          order.ID.String(),
+		Title:       order.Title,
+		Description: order.Description,
+		State:       serializeWorkOrderState(order.State),
+		Result:      serializeWorkOrderResult(order.Result),
+		CreatedAt:   timestamppb.New(order.CreatedAt),
+		UpdatedAt:   timestamppb.New(order.UpdatedAt),
+		Assignees:   serializeWorkOrderAssignees(order.Assignees),
+		Executions:  serializeWorkOrderExecutions(executions),
+		CreatedBy:   serializeWorkOrderCreator(order),
 	}
 }
 

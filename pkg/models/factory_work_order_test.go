@@ -22,7 +22,6 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
 	assert.Equal(t, "", order.Result)
-	assert.False(t, order.StateUpdatedAt.IsZero(), "state_updated_at must be set on create so the failure fence has a baseline")
 
 	events, err := order.ListEvents(database.Conn(), 10, nil)
 	require.NoError(t, err)
@@ -33,42 +32,6 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, json.Unmarshal(events[0].Data, &payload))
 	assert.Equal(t, "", payload.FromState)
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
-}
-
-func TestFactoryWorkOrder_StateUpdatedAtOnlyBumpsOnLifecycleTransitions(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-
-	_, userID, factoryModel := setupFactoryWithUser(t, "state-updated-at")
-
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Fenced", "", &userID, nil)
-	require.NoError(t, err)
-	createdFence := order.StateUpdatedAt
-
-	//
-	// Reload after an assignee update — updated_at should bump but the
-	// lifecycle fence must stay put so a reassign never hides a
-	// pre-existing failure in the UI.
-	//
-	time.Sleep(5 * time.Millisecond)
-	require.NoError(t, order.UpdateAssignees(database.Conn(), []uuid.UUID{userID}, userID))
-
-	reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, createdFence.UnixNano(), reloaded.StateUpdatedAt.UnixNano(),
-		"UpdateAssignees must not bump state_updated_at")
-	assert.True(t, reloaded.UpdatedAt.After(createdFence) || reloaded.UpdatedAt.Equal(createdFence),
-		"UpdateAssignees is still expected to bump updated_at for cache invalidation")
-
-	//
-	// A real lifecycle transition must bump the fence.
-	//
-	time.Sleep(5 * time.Millisecond)
-	require.NoError(t, reloaded.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
-		ToState: FactoryWorkOrderStateOpen,
-		Actor:   &userID,
-	}))
-	assert.True(t, reloaded.StateUpdatedAt.After(createdFence),
-		"UpdateStatus must bump state_updated_at")
 }
 
 func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
