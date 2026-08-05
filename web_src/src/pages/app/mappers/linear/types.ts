@@ -163,13 +163,15 @@ export interface LinearComment {
   issue?: { id?: string; identifier?: string; title?: string; url?: string };
 }
 
-/** Attachment as returned by the `attachmentCreate` mutation. */
+/**
+ * Attachment as returned by the `attachmentCreate` mutation. No `iconUrl`:
+ * Linear accepts one on create but never exposes it on the attachment.
+ */
 export interface LinearAttachment {
   id?: string;
   title?: string;
   subtitle?: string;
   url?: string;
-  iconUrl?: string;
   createdAt?: string;
   updatedAt?: string;
   creator?: LinearUser;

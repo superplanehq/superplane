@@ -581,7 +581,10 @@ Attachments render as cards on the issue instead of messages in the comment thre
 - **Title** (required): The attachment's headline. Supports expressions.
 - **URL** (required): The link the attachment points to. Supports expressions.
 - **Subtitle** (optional): Secondary line shown under the title. Supports expressions.
-- **Icon URL** (optional): Icon shown on the attachment card.
+- **Icon URL** (optional): Icon shown on the attachment card. Linear downloads the image when the
+  attachment is created, so the URL must be publicly reachable — an unreachable one fails the whole
+  step, not just the icon. Linear does not expose the icon on the attachment afterwards, so it is not
+  part of this component's output.
 
 ### Deduplication
 

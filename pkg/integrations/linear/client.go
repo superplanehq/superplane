@@ -228,12 +228,13 @@ type CommentIssue struct {
 
 // Attachment is a link card on an issue. Linear deduplicates attachments by url
 // within an issue, so creating one with an existing url updates it in place.
+// iconUrl is deliberately absent: Linear accepts it on AttachmentCreateInput but
+// does not expose it on the Attachment type, so it can never be read back.
 type Attachment struct {
 	ID        string        `json:"id"`
 	Title     string        `json:"title"`
 	Subtitle  string        `json:"subtitle,omitempty"`
 	URL       string        `json:"url"`
-	IconURL   string        `json:"iconUrl,omitempty"`
 	CreatedAt string        `json:"createdAt,omitempty"`
 	UpdatedAt string        `json:"updatedAt,omitempty"`
 	Creator   *User         `json:"creator,omitempty"`

@@ -186,6 +186,38 @@ func Test__CreateAttachment__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "Entity not found")
 	})
 
+	//
+	// Linear takes iconUrl on AttachmentCreateInput but does not expose it on the
+	// Attachment type, so selecting it fails the whole mutation with
+	// `Cannot query field "iconUrl" on type "Attachment"`.
+	//
+	t.Run("iconUrl is sent but never selected back", func(t *testing.T) {
+		assert.NotContains(t, attachmentFields, "iconUrl")
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"attachmentCreate":{"success":true,"attachment":{"id":"a1","title":"Deploy - staging","url":"https://app.superplane.com/runs/8f21c4d0"}}}}`),
+			},
+		}
+
+		config := attachmentConfig()
+		config["iconUrl"] = "https://example.com/icon.png"
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration:  config,
+		})
+
+		require.NoError(t, err)
+
+		request := variablesFromRequest(t, httpContext, 0)
+		input, ok := request["input"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "https://example.com/icon.png", input["iconUrl"])
+	})
+
 	t.Run("unsuccessful response is surfaced", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
