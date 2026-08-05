@@ -52,7 +52,8 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, err
 	}
 
-	workOrder, err := factory.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{})
+	sourceRunID := c.execution.RunID
+	workOrder, err := factory.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
 	if err != nil {
 		return nil, err
 	}
