@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/buildinfo"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-// Version is set at build time via -ldflags.
-// Defaults to "dev" for development builds.
-var Version = "dev"
+// Version is the CLI's release version. It shares buildinfo.Version's
+// -ldflags stamp with the server, so the CLI and server binaries cannot
+// carry drifted version strings from two independently-stamped vars.
+var Version = buildinfo.Version
 
 var updateCheckResult <-chan *updateInfo
 
@@ -146,26 +149,5 @@ func buildUpdateNotice(currentVersion string, release *releaseInfo, goos, goarch
 // isNewerVersion returns true if latest is a newer semver than current.
 // Both may optionally have a "v" prefix.
 func isNewerVersion(current, latest string) bool {
-	current = strings.TrimPrefix(current, "v")
-	latest = strings.TrimPrefix(latest, "v")
-
-	if current == latest {
-		return false
-	}
-
-	var cMajor, cMinor, cPatch int
-	var lMajor, lMinor, lPatch int
-
-	fmt.Sscanf(current, "%d.%d.%d", &cMajor, &cMinor, &cPatch)
-	fmt.Sscanf(latest, "%d.%d.%d", &lMajor, &lMinor, &lPatch)
-
-	if lMajor != cMajor {
-		return lMajor > cMajor
-	}
-
-	if lMinor != cMinor {
-		return lMinor > cMinor
-	}
-
-	return lPatch > cPatch
+	return core.IsNewerVersion(current, latest)
 }

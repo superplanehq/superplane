@@ -48,6 +48,7 @@ docker buildx build \
   --push \
   --target runner \
   --cache-from "${DEV_BASE_IMAGE_REPO}:app-latest-${ARCH}" \
+  --build-arg VERSION="${VERSION}" \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
   -f Dockerfile \
   .

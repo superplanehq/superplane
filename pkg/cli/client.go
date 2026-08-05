@@ -3,8 +3,11 @@ package cli
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/buildinfo"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -32,14 +35,61 @@ func methodSafeRedirectPolicy() func(*http.Request, []*http.Request) error {
 	}
 }
 
+// serverVersionTransport wraps an http.RoundTripper and remembers the
+// buildinfo.VersionHeader value from the most recent response, so the CLI
+// can detect version skew without a dedicated second request. Transports are
+// safe to share across http.Client instances, so a single package-level
+// instance backs every client the CLI builds.
+type serverVersionTransport struct {
+	next http.RoundTripper
+
+	mu      sync.RWMutex
+	version string
+}
+
+func (t *serverVersionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.next.RoundTrip(req)
+	if err == nil {
+		t.mu.Lock()
+		t.version = resp.Header.Get(buildinfo.VersionHeader)
+		t.mu.Unlock()
+	}
+	return resp, err
+}
+
+var sharedServerVersionTransport = &serverVersionTransport{next: http.DefaultTransport}
+
+// ServerVersion returns the server version reported by the most recent API
+// response, if any response has been received yet. Servers that predate
+// version reporting answer without the header, which is reported as
+// core.ErrServerVersionUnavailable.
+func ServerVersion() (string, error) {
+	sharedServerVersionTransport.mu.RLock()
+	version := sharedServerVersionTransport.version
+	sharedServerVersionTransport.mu.RUnlock()
+
+	if version == "" {
+		return "", core.ErrServerVersionUnavailable
+	}
+	return version, nil
+}
+
+// defaultHTTPClient is used by every API client the CLI builds unless a
+// caller explicitly overrides ClientConfig.HTTPClient, so all of them route
+// through sharedServerVersionTransport and ServerVersion stays accurate.
+func defaultHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout:       time.Second * 30,
+		CheckRedirect: methodSafeRedirectPolicy(),
+		Transport:     sharedServerVersionTransport,
+	}
+}
+
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
-		BaseURL:  GetAPIURL(),
-		APIToken: GetAPIToken(),
-		HTTPClient: &http.Client{
-			Timeout:       time.Second * 30,
-			CheckRedirect: methodSafeRedirectPolicy(),
-		},
+		BaseURL:    GetAPIURL(),
+		APIToken:   GetAPIToken(),
+		HTTPClient: defaultHTTPClient(),
 	}
 }
 
@@ -56,8 +106,9 @@ func NewAPIClient(config *ClientConfig) *openapi_client.APIClient {
 		apiConfig.DefaultHeader["Authorization"] = "Bearer " + config.APIToken
 	}
 
-	if config.HTTPClient != nil {
-		apiConfig.HTTPClient = config.HTTPClient
+	apiConfig.HTTPClient = config.HTTPClient
+	if apiConfig.HTTPClient == nil {
+		apiConfig.HTTPClient = defaultHTTPClient()
 	}
 
 	return openapi_client.NewAPIClient(apiConfig)
