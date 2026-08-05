@@ -118,3 +118,30 @@ func (c *Client) PostAudit(target string, maxCrawlPages int) (string, error) {
 
 	return response.Tasks[0].ID, nil
 }
+
+type summaryResponse struct {
+	StatusCode int `json:"status_code"`
+	Tasks      []struct {
+		Result []struct {
+			CrawlProgress string `json:"crawl_progress"`
+		} `json:"result"`
+	} `json:"tasks"`
+}
+
+func (c *Client) GetSummary(taskID string) (string, error) {
+	respBody, err := c.execRequest(http.MethodGet, baseURL+"/on_page/summary/"+taskID, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var response summaryResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return "", fmt.Errorf("failed to unmarshal summary response: %v", err)
+	}
+
+	if len(response.Tasks) == 0 || len(response.Tasks[0].Result) == 0 {
+		return "", fmt.Errorf("summary response missing result for task %s", taskID)
+	}
+
+	return response.Tasks[0].Result[0].CrawlProgress, nil
+}

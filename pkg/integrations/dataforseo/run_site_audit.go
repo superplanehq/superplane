@@ -137,17 +137,70 @@ func (r *RunSiteAudit) Cleanup(ctx core.SetupContext) error {
 }
 
 func (r *RunSiteAudit) Hooks() []core.Hook {
-	return nil
+	return []core.Hook{
+		{Name: RunSiteAuditPollAction, Type: core.HookTypeInternal},
+	}
 }
 
 func (r *RunSiteAudit) HandleHook(ctx core.ActionHookContext) error {
-	return nil
+	switch ctx.Name {
+	case RunSiteAuditPollAction:
+		return r.poll(ctx)
+	}
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (r *RunSiteAudit) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return 200, nil, nil
+	return 200, nil, nil // DataForSEO OnPage has no webhook path in v1; polling only.
 }
 
 func (r *RunSiteAudit) Cancel(ctx core.ExecutionContext) error {
+	ctx.Logger.Info("DataForSEO OnPage tasks cannot be cancelled server-side; nothing to do")
 	return nil
+}
+
+func (r *RunSiteAudit) poll(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	metadata := RunSiteAuditExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.TaskID == "" {
+		return fmt.Errorf("task id is missing from execution metadata")
+	}
+
+	if metadata.PollAttempt >= RunSiteAuditMaxPollAttempts {
+		return ctx.ExecutionState.Fail(
+			"audit_timeout",
+			fmt.Sprintf("DataForSEO audit did not finish within %d poll attempts", RunSiteAuditMaxPollAttempts),
+		)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	crawlProgress, err := client.GetSummary(metadata.TaskID)
+	if err != nil {
+		return err
+	}
+
+	if crawlProgress != "finished" {
+		metadata.PollAttempt++
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+		return ctx.Requests.ScheduleActionCall(RunSiteAuditPollAction, map[string]any{}, RunSiteAuditPollInterval)
+	}
+
+	return r.resolve(ctx, client, metadata)
+}
+
+func (r *RunSiteAudit) resolve(ctx core.ActionHookContext, client *Client, metadata RunSiteAuditExecutionMetadata) error {
+	return ctx.ExecutionState.Pass()
 }
