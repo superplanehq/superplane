@@ -52,34 +52,58 @@ func (c *AppContext) GetNode(app, node string) (*core.CanvasNode, error) {
 
 func (c *AppContext) getAppByID(id uuid.UUID) (*core.App, error) {
 	otherApp, err := models.FindCanvasInTransaction(c.tx, c.canvas.OrganizationID, id)
-	if err == nil {
-		return &core.App{
-			ID:   otherApp.ID.String(),
-			Name: otherApp.Name,
-		}, nil
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, core.ErrNotFound
+		}
+
+		return nil, err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, core.ErrNotFound
+	if err := c.validateFactoryOwnedAppReference(c.canvas, otherApp); err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	return &core.App{
+		ID:   otherApp.ID.String(),
+		Name: otherApp.Name,
+	}, nil
 }
 
 func (c *AppContext) getAppByName(name string) (*core.App, error) {
 	otherApp, err := models.FindCanvasByNameInTransaction(c.tx, name, c.canvas.OrganizationID)
-	if err == nil {
-		return &core.App{
-			ID:   otherApp.ID.String(),
-			Name: otherApp.Name,
-		}, nil
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, core.ErrNotFound
+		}
+
+		return nil, err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, core.ErrNotFound
+	if err := c.validateFactoryOwnedAppReference(c.canvas, otherApp); err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	return &core.App{
+		ID:   otherApp.ID.String(),
+		Name: otherApp.Name,
+	}, nil
+}
+
+func (c *AppContext) validateFactoryOwnedAppReference(caller, target *models.Canvas) error {
+	if caller.FactoryID == nil {
+		if target.FactoryID != nil {
+			return fmt.Errorf("app %q is owned by a factory", target.Name)
+		}
+
+		return nil
+	}
+
+	if target.FactoryID == nil || *target.FactoryID != *caller.FactoryID {
+		return fmt.Errorf("app %q is not owned by this factory", target.Name)
+	}
+
+	return nil
 }
 
 func (c *AppContext) Subscribe(id string) error {

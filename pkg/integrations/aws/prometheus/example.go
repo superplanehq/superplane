@@ -31,6 +31,18 @@ var exampleOutputDeleteWorkspaceBytes []byte
 var exampleOutputDeleteWorkspaceOnce sync.Once
 var exampleOutputDeleteWorkspace map[string]any
 
+//go:embed example_output_create_rule_group_namespace.json
+var exampleOutputCreateRuleGroupNamespaceBytes []byte
+
+var exampleOutputCreateRuleGroupNamespaceOnce sync.Once
+var exampleOutputCreateRuleGroupNamespace map[string]any
+
+//go:embed example_output_get_rule_group_namespace.json
+var exampleOutputGetRuleGroupNamespaceBytes []byte
+
+var exampleOutputGetRuleGroupNamespaceOnce sync.Once
+var exampleOutputGetRuleGroupNamespace map[string]any
+
 //go:embed example_output_query.json
 var exampleOutputQueryBytes []byte
 
@@ -72,6 +84,22 @@ func (c *DeleteWorkspace) ExampleOutput() map[string]any {
 		&exampleOutputDeleteWorkspaceOnce,
 		exampleOutputDeleteWorkspaceBytes,
 		&exampleOutputDeleteWorkspace,
+	)
+}
+
+func (c *CreateRuleGroupNamespace) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateRuleGroupNamespaceOnce,
+		exampleOutputCreateRuleGroupNamespaceBytes,
+		&exampleOutputCreateRuleGroupNamespace,
+	)
+}
+
+func (c *GetRuleGroupNamespace) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetRuleGroupNamespaceOnce,
+		exampleOutputGetRuleGroupNamespaceBytes,
+		&exampleOutputGetRuleGroupNamespace,
 	)
 }
 

@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ func CreateCanvas(
 	organizationID uuid.UUID,
 	name string,
 	description string,
+	factoryID *uuid.UUID,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
 	name = strings.TrimSpace(name)
@@ -52,6 +54,7 @@ func CreateCanvas(
 		organizationID,
 		name,
 		description,
+		factoryID,
 		[]models.Node{},
 		[]models.Edge{},
 		usageService,
@@ -73,6 +76,7 @@ func CreateCanvasWithSeedFiles(
 	organizationID uuid.UUID,
 	name string,
 	description string,
+	factoryID *uuid.UUID,
 	nodes []models.Node,
 	edges []models.Edge,
 	usageService usage.Service,
@@ -108,6 +112,7 @@ func CreateCanvasWithSeedFiles(
 	canvas := models.Canvas{
 		ID:             canvasID,
 		OrganizationID: organizationID,
+		FactoryID:      factoryID,
 		LiveVersionID:  &versionID,
 		Name:           name,
 		Description:    description,
@@ -117,6 +122,10 @@ func CreateCanvasWithSeedFiles(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := validateCanvasFactoryID(tx, organizationID, factoryID); err != nil {
+			return err
+		}
+
 		//
 		// Create the workflow record
 		//
@@ -231,4 +240,17 @@ func CreateCanvasWithSeedFiles(
 	return &pb.CreateCanvasResponse{
 		Canvas: proto,
 	}, nil
+}
+
+func validateCanvasFactoryID(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) error {
+	if factoryID == nil {
+		return nil
+	}
+
+	_, err := models.FindFactory(tx, organizationID, *factoryID)
+	if errors.Is(err, models.ErrFactoryNotFound) {
+		return grpcerrors.NotFound(err, "factory not found")
+	}
+
+	return err
 }
