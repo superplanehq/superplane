@@ -446,7 +446,8 @@ CREATE TABLE public.factory_work_orders (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_run_id uuid
 );
 
 
@@ -1670,6 +1671,13 @@ CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders
 
 
 --
+-- Name: idx_factory_work_orders_source_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_source_run_id ON public.factory_work_orders USING btree (source_run_id) WHERE (source_run_id IS NOT NULL);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2218,6 +2226,14 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
+-- Name: factory_work_orders factory_work_orders_source_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_source_run_id_fkey FOREIGN KEY (source_run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2665,7 +2681,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260805132155	f
+20260805201543	f
 \.
 
 

@@ -53,6 +53,28 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(view.events[0]?.title).toBe("self-assigned");
   });
 
+  it("links automation-created work orders to the source run", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.opened",
+        event: {
+          run: { id: "run-1", state: "started" },
+          app: { id: "app-1" },
+          order: { id: "order-1", title: "Fix bug" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "created",
+      sourceRunId: "run-1",
+      sourceAppId: "app-1",
+      title: "Work order created from",
+    });
+    expect(view.events[0]?.actorUserId).toBeUndefined();
+  });
+
   it("includes the closing user on closed events", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {

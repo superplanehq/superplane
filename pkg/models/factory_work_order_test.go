@@ -18,7 +18,7 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "create-draft")
 
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "New order", "", &userID, nil)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "New order", "", &userID, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
 	assert.Equal(t, "", order.Result)
@@ -39,7 +39,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "transitions")
 
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Lifecycle", "", &userID, nil)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Lifecycle", "", &userID, nil, nil)
 	require.NoError(t, err)
 
 	t.Run("draft to open is allowed and emits opened event", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("invalid transition draft to closed is rejected", func(t *testing.T) {
-		other, err := factoryModel.CreateWorkOrder(database.Conn(), "Direct close", "", &userID, nil)
+		other, err := factoryModel.CreateWorkOrder(database.Conn(), "Direct close", "", &userID, nil, nil)
 		require.NoError(t, err)
 
 		err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
@@ -91,7 +91,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("reopen from closed does not re-emit order.opened", func(t *testing.T) {
-		reopened, err := factoryModel.CreateWorkOrder(database.Conn(), "Reopen", "", &userID, nil)
+		reopened, err := factoryModel.CreateWorkOrder(database.Conn(), "Reopen", "", &userID, nil, nil)
 		require.NoError(t, err)
 
 		for _, step := range []FactoryWorkOrderStatusUpdate{
@@ -125,7 +125,7 @@ func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "automation-forward")
 
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation", "", &userID, nil)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation", "", &userID, nil, nil)
 	require.NoError(t, err)
 
 	automation := &factory.AutomationRef{
@@ -174,7 +174,7 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "comment")
 
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Comment target", "", &userID, nil)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Comment target", "", &userID, nil, nil)
 	require.NoError(t, err)
 
 	userIDStr := userID.String()
@@ -203,7 +203,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "artifact")
 
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Artifact target", "", &userID, nil)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Artifact target", "", &userID, nil, nil)
 	require.NoError(t, err)
 
 	t.Run("pr requires a url", func(t *testing.T) {

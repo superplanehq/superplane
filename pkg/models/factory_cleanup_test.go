@@ -126,7 +126,7 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, []uuid.UUID{r.User})
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(db, "line", nil)
@@ -189,7 +189,7 @@ func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		_, err := factory.CreateWorkOrder(db, support.RandomName("order"), "", &r.User, nil)
+		_, err := factory.CreateWorkOrder(db, support.RandomName("order"), "", &r.User, nil, nil)
 		require.NoError(t, err)
 	}
 	require.NoError(t, factory.SoftDelete(db))
@@ -296,7 +296,7 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
-	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line, err := factory.CreateLine(db, "line", nil)
 	require.NoError(t, err)
@@ -343,6 +343,45 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	assert.Equal(t, int64(0), runCount)
 }
 
+func Test__CanvasRun__DeleteChain__ClearsWorkOrderSourceRunID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+		},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, &run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, order.SourceRunID)
+	assert.Equal(t, run.ID, *order.SourceRunID)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.DeleteChain(tx)
+		return err
+	}))
+
+	persisted, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Nil(t, persisted.SourceRunID)
+
+	var runCount int64
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	assert.Equal(t, int64(0), runCount)
+}
+
 // Reverting an open work order back to draft while a step is still running
 // would leave the executor and FSM out of sync; UpdateStatus must reject it
 // with the same guard DispatchWorkOrder uses.
@@ -353,7 +392,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateOpen,

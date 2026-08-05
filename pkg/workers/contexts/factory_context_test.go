@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -34,6 +35,43 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, "From GitHub issue", workOrder.Title)
 		assert.Equal(t, "Automated intake", workOrder.Description)
 		assert.NotEmpty(t, workOrder.ID)
+
+		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(workOrder.ID))
+		require.NoError(t, err)
+		require.NotNil(t, persisted.SourceRunID)
+		assert.Equal(t, run.ID, *persisted.SourceRunID)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, persisted.State,
+			"work orders now start as draft and are promoted to open on first dispatch")
+
+		// At creation the lifecycle emits `order.status.updated` ("" → "draft"),
+		// not the coarse `order.opened` (which fires on the first draft → open
+		// transition). The Source Run + App reference lives on the row and is
+		// enriched into `order.opened` when it eventually fires.
+		events, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		assert.Equal(t, factoryevents.EventTypeOrderStatusUpdated, events[0].Type)
+
+		var initialStatus factoryevents.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(events[0].Data, &initialStatus))
+		assert.Equal(t, "", initialStatus.FromState)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, initialStatus.ToState)
+
+		// Promote to open and confirm the source run/app enrichment lands on
+		// the resulting `order.opened` event.
+		require.NoError(t, persisted.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+		}))
+
+		openedEvent := findWorkOrderEvent(t, persisted, factoryevents.EventTypeOrderOpened)
+
+		var opened factoryevents.WorkOrderOpened
+		require.NoError(t, json.Unmarshal(openedEvent.Data, &opened))
+		require.NotNil(t, opened.Run)
+		assert.Equal(t, run.ID, opened.Run.ID)
+		require.NotNil(t, opened.App)
+		assert.Equal(t, canvas.ID, opened.App.ID)
+		assert.Nil(t, opened.User)
 	})
 
 	t.Run("rejects blank title", func(t *testing.T) {
@@ -57,7 +95,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		line, err := factory.CreateLine(database.Conn(), "ship", nil)
 		require.NoError(t, err)
 
-		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil)
+		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil, nil)
 		require.NoError(t, err)
 
 		now := time.Now()
@@ -91,7 +129,7 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
-	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
@@ -124,7 +162,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
-	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
@@ -175,7 +213,7 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
-	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
@@ -214,7 +252,7 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
-	order, err := factory.CreateWorkOrder(database.Conn(), "Artifact target", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Artifact target", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 

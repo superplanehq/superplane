@@ -35,9 +35,16 @@ const (
 // Events
 
 type WorkOrderOpened struct {
-	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Order *WorkOrderRef `json:"order,omitempty"`
+	// One of the three attribution fields below is set depending on
+	// how the order transitioned into `open`:
+	//   - User:       manual open via the REST API
+	//   - Automation: opened by a factory-line node
+	//   - App + Run:  opened as a side-effect of an originating canvas run
 	User       *UserRef       `json:"user,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
+	App        *AppRef        `json:"app,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
 }
 
 type WorkOrderClosed struct {

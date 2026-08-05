@@ -34,10 +34,17 @@ Run input shape (for app triggers):
     "id": "...",
     "title": "...",
     "description": "...",
-    "factory_id": "..."
+    "factory_id": "...",
+    "source": {
+      "issue": { "number": 42, "title": "..." }
+    }
   }
 }
 ```
+
+`source` is present when the work order was created by a factory-app component
+run. Manual work orders omit it. `source` is the root trigger event from the
+linked source run (`source_run_id` on the work order record).
 
 ## Work order lifecycle
 

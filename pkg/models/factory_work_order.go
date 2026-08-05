@@ -59,6 +59,7 @@ type FactoryWorkOrder struct {
 	State          string
 	Result         string
 	CreatedByID    *uuid.UUID
+	SourceRunID    *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -358,8 +359,26 @@ func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID, autom
 		Order:      o.Ref(),
 		Automation: automation,
 	}
+
 	if createdBy != nil {
 		data.User = &factory.UserRef{ID: *createdBy}
+	}
+
+	// When the order was spawned from a canvas run, attach the run/app
+	// reference so consumers can trace back to the originating trigger.
+	if o.SourceRunID != nil {
+		run, err := FindUnscopedCanvasRun(tx, *o.SourceRunID)
+		if err != nil {
+			return err
+		}
+
+		runRef := &factory.RunRef{ID: run.ID, State: run.State}
+		if run.Result != "" {
+			result := run.Result
+			runRef.Result = &result
+		}
+		data.Run = runRef
+		data.App = &factory.AppRef{ID: run.WorkflowID}
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderOpened, data)

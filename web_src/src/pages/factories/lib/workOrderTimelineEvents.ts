@@ -82,6 +82,8 @@ export interface WorkOrderTimelineEvent {
   actorUserId?: string;
   actorName?: string;
   actorAutomation?: WorkOrderTimelineAutomationActor;
+  sourceRunId?: string;
+  sourceAppId?: string;
   assigneeChange?: WorkOrderTimelineAssigneeChange;
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
