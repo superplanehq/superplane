@@ -30,9 +30,33 @@ interface WorkOrderDetailHeaderProps {
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
 
-export function WorkOrderDetailHeader({
-  orderTitle,
-  statusMeta,
+export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
+  const { orderTitle, statusMeta, displayStatus } = props;
+  return (
+    <header className="border-b border-gray-200 pb-6 dark:border-gray-700/70">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          <Badge
+            variant="outline"
+            className={cn("inline-flex shrink-0 px-2.5 py-1 text-xs font-medium", statusMeta.className)}
+          >
+            {displayStatus === "running" ? <Loader2 className="mr-1 inline h-3 w-3 animate-spin" aria-hidden /> : null}
+            {statusMeta.label}
+          </Badge>
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">
+            {orderTitle}
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <HeaderActions {...props} />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function HeaderActions({
   displayStatus,
   isOpen,
   isDispatchable,
@@ -52,112 +76,91 @@ export function WorkOrderDetailHeader({
   onStatusChange,
 }: WorkOrderDetailHeaderProps) {
   return (
-    <header className="border-b border-gray-200 pb-6 dark:border-gray-700/70">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <Badge
-            variant="outline"
-            className={cn("inline-flex shrink-0 px-2.5 py-1 text-xs font-medium", statusMeta.className)}
+    <>
+      {isDispatchable ? (
+        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <DispatchWorkOrderPopover
+            lines={factoryLines}
+            isSaving={isDispatching}
+            canDispatch={canDispatch || permissionsLoading}
+            onDispatch={onDispatch}
           >
-            {displayStatus === "running" ? <Loader2 className="mr-1 inline h-3 w-3 animate-spin" aria-hidden /> : null}
-            {statusMeta.label}
-          </Badge>
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">
-            {orderTitle}
-          </h1>
-        </div>
+            <Button
+              type="button"
+              disabled={!canDispatch || factoryLines.length === 0}
+              data-testid="work-order-dispatch-button"
+            >
+              Dispatch
+              <Forward className="ml-1.5 h-4 w-4" aria-hidden />
+            </Button>
+          </DispatchWorkOrderPopover>
+        </PermissionTooltip>
+      ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {isDispatchable ? (
-            <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-              <DispatchWorkOrderPopover
-                lines={factoryLines}
-                isSaving={isDispatching}
-                canDispatch={canDispatch || permissionsLoading}
-                onDispatch={onDispatch}
-              >
-                <Button
-                  type="button"
-                  disabled={!canDispatch || factoryLines.length === 0}
-                  data-testid="work-order-dispatch-button"
-                >
-                  Dispatch
-                  <Forward className="ml-1.5 h-4 w-4" aria-hidden />
-                </Button>
-              </DispatchWorkOrderPopover>
-            </PermissionTooltip>
-          ) : null}
-
-          {isOpen ? (
-            <>
-              {/*
-               * Back-to-draft hits the `open → draft` FSM guard, which rejects
-               * while a line execution is pending/running. Only render the
-               * control when the order is at rest.
-               */}
-              {displayStatus !== "running" ? (
-                <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-                  <LoadingButton
-                    type="button"
-                    variant="ghost"
-                    disabled={!canManage || isUpdatingStatus}
-                    loading={isUpdatingStatus}
-                    loadingText="Moving to draft..."
-                    onClick={() => void onStatusChange("STATE_DRAFT")}
-                    data-testid="work-order-back-to-draft-button"
-                  >
-                    Back to draft
-                  </LoadingButton>
-                </PermissionTooltip>
-              ) : null}
-
-              <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  disabled={!canClose || isClosing}
-                  loading={isCompleting}
-                  loadingText="Completing..."
-                  onClick={() => void onClose("RESULT_COMPLETED")}
-                  data-testid="work-order-complete-button"
-                >
-                  Complete
-                </LoadingButton>
-              </PermissionTooltip>
-
-              <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  disabled={!canClose || isClosing}
-                  loading={isRejecting}
-                  loadingText="Rejecting..."
-                  onClick={() => void onClose("RESULT_REJECTED")}
-                  data-testid="work-order-reject-button"
-                >
-                  Reject
-                </LoadingButton>
-              </PermissionTooltip>
-            </>
-          ) : null}
-
-          {isClosed ? (
-            <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
+      {isOpen ? (
+        <>
+          {/* Back-to-draft hits the `open → draft` FSM guard, which rejects while a line execution is pending/running. */}
+          {displayStatus !== "running" ? (
+            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
               <LoadingButton
                 type="button"
                 variant="ghost"
                 disabled={!canManage || isUpdatingStatus}
                 loading={isUpdatingStatus}
-                loadingText="Reopening..."
-                onClick={() => void onStatusChange("STATE_OPEN")}
-                data-testid="work-order-reopen-open-button"
+                loadingText="Moving to draft..."
+                onClick={() => void onStatusChange("STATE_DRAFT")}
+                data-testid="work-order-back-to-draft-button"
               >
-                Reopen
+                Back to draft
               </LoadingButton>
             </PermissionTooltip>
           ) : null}
-        </div>
-      </div>
-    </header>
+
+          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+            <LoadingButton
+              type="button"
+              variant="ghost"
+              disabled={!canClose || isClosing}
+              loading={isCompleting}
+              loadingText="Completing..."
+              onClick={() => void onClose("RESULT_COMPLETED")}
+              data-testid="work-order-complete-button"
+            >
+              Complete
+            </LoadingButton>
+          </PermissionTooltip>
+
+          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+            <LoadingButton
+              type="button"
+              variant="ghost"
+              disabled={!canClose || isClosing}
+              loading={isRejecting}
+              loadingText="Rejecting..."
+              onClick={() => void onClose("RESULT_REJECTED")}
+              data-testid="work-order-reject-button"
+            >
+              Reject
+            </LoadingButton>
+          </PermissionTooltip>
+        </>
+      ) : null}
+
+      {isClosed ? (
+        <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
+          <LoadingButton
+            type="button"
+            variant="ghost"
+            disabled={!canManage || isUpdatingStatus}
+            loading={isUpdatingStatus}
+            loadingText="Reopening..."
+            onClick={() => void onStatusChange("STATE_OPEN")}
+            data-testid="work-order-reopen-open-button"
+          >
+            Reopen
+          </LoadingButton>
+        </PermissionTooltip>
+      ) : null}
+    </>
   );
 }

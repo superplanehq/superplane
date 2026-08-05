@@ -3,20 +3,22 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
   CLOSED_FAILED_WORK_ORDER,
-  CLOSED_FAILED_WORK_ORDER_EVENTS,
   CLOSED_WORK_ORDER,
-  CLOSED_WORK_ORDER_EVENTS,
   DRAFT_WORK_ORDER,
-  DRAFT_WORK_ORDER_EVENTS,
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
-  FAILED_WORK_ORDER_EVENTS,
   OPEN_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+} from "./__fixtures__/factoryPageResponses";
+import {
+  CLOSED_FAILED_WORK_ORDER_EVENTS,
+  CLOSED_WORK_ORDER_EVENTS,
+  DRAFT_WORK_ORDER_EVENTS,
+  FAILED_WORK_ORDER_EVENTS,
   OPEN_WORK_ORDER_EVENTS,
   RICH_OPEN_WORK_ORDER_EVENTS,
-  RUNNING_WORK_ORDER,
   RUNNING_WORK_ORDER_EVENTS,
-} from "./__fixtures__/factoryPageResponses";
+} from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 
 /**

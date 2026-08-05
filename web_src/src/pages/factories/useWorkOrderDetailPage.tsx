@@ -42,6 +42,53 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     return { kind: "redirect" as const, element: redirect };
   }
 
+  return buildReadyState({
+    organizationId,
+    factoryId,
+    factory,
+    order,
+    events,
+    eventsQuery,
+    artifactsQuery,
+    actions,
+    derived,
+    isLoading,
+    canManageWorkOrders,
+    permissionsLoading,
+  });
+}
+
+type EventsQuery = ReturnType<typeof useWorkOrderEvents>;
+type ArtifactsQuery = ReturnType<typeof useWorkOrderArtifacts>;
+
+function buildReadyState(input: {
+  organizationId: string;
+  factoryId: string;
+  factory: ReturnType<typeof useFactory>["data"];
+  order: ReturnType<typeof useWorkOrder>["data"];
+  events: ReturnType<typeof flattenWorkOrderEventsPages>;
+  eventsQuery: EventsQuery;
+  artifactsQuery: ArtifactsQuery;
+  actions: ReturnType<typeof useWorkOrderDetailActions>;
+  derived: ReturnType<typeof getWorkOrderDetailDerived>;
+  isLoading: boolean;
+  canManageWorkOrders: boolean;
+  permissionsLoading: boolean;
+}) {
+  const {
+    organizationId,
+    factoryId,
+    factory,
+    order,
+    events,
+    eventsQuery,
+    artifactsQuery,
+    actions,
+    derived,
+    isLoading,
+    canManageWorkOrders,
+    permissionsLoading,
+  } = input;
   return {
     kind: "ready" as const,
     factory,

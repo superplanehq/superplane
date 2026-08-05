@@ -42,7 +42,9 @@ export function WorkOrderCard({
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)
     .map((assignee) => resolveUser(assignee.id, assignee.name));
-  const showDispatch = (order.state === "STATE_OPEN" || order.state === "STATE_DRAFT") && onDispatch && order.id;
+  const canShowDispatchButton = Boolean(
+    (order.state === "STATE_OPEN" || order.state === "STATE_DRAFT") && onDispatch && order.id,
+  );
 
   return (
     <article
@@ -69,59 +71,92 @@ export function WorkOrderCard({
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <h3 className="min-w-0 text-base font-semibold text-gray-900 dark:text-gray-100">{order.title}</h3>
               <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">Updated {timeLabel}</span>
-              {showDispatch ? (
-                <div className="pointer-events-auto">
-                  <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-                    <DispatchWorkOrderPopover
-                      lines={lines}
-                      isSaving={isDispatching}
-                      canDispatch={canDispatch}
-                      onDispatch={onDispatch!}
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                        disabled={!canDispatch || lines.length === 0}
-                        aria-label="Dispatch to line"
-                        data-testid="work-order-dispatch-button"
-                      >
-                        <Forward className="h-4 w-4" aria-hidden />
-                      </Button>
-                    </DispatchWorkOrderPopover>
-                  </PermissionTooltip>
-                </div>
+              {canShowDispatchButton && onDispatch ? (
+                <WorkOrderCardDispatchButton
+                  lines={lines}
+                  canDispatch={canDispatch}
+                  isDispatching={isDispatching}
+                  onDispatch={onDispatch}
+                />
               ) : null}
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-            <span className="inline-flex items-center gap-1.5">
-              Creator:
-              <OrgUserReference display={creatorDisplay} size="md" showName={false} />
-            </span>
-            {assigneeDisplays.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5">
-                Assignees:
-                <span className="inline-flex items-center -space-x-1">
-                  {assigneeDisplays.map((display, index) => (
-                    <OrgUserReference
-                      key={display?.id ?? index}
-                      display={display}
-                      size="md"
-                      showName={false}
-                      className="rounded-full ring-2 ring-white dark:ring-gray-900"
-                    />
-                  ))}
-                </span>
-              </span>
-            ) : null}
-          </div>
+          <WorkOrderCardActors creatorDisplay={creatorDisplay} assigneeDisplays={assigneeDisplays} />
         </div>
 
         <WorkOrderExecutionsList organizationId={organizationId} executions={order.executions} variant="compact" />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardDispatchButton({
+  lines,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+}: {
+  lines: FactoriesFactoryLine[];
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (lineName: string) => Promise<void>;
+}) {
+  return (
+    <div className="pointer-events-auto">
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+        <DispatchWorkOrderPopover
+          lines={lines}
+          isSaving={isDispatching}
+          canDispatch={canDispatch}
+          onDispatch={onDispatch}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            disabled={!canDispatch || lines.length === 0}
+            aria-label="Dispatch to line"
+            data-testid="work-order-dispatch-button"
+          >
+            <Forward className="h-4 w-4" aria-hidden />
+          </Button>
+        </DispatchWorkOrderPopover>
+      </PermissionTooltip>
+    </div>
+  );
+}
+
+function WorkOrderCardActors({
+  creatorDisplay,
+  assigneeDisplays,
+}: {
+  creatorDisplay: ReturnType<ReturnType<typeof useOrgUserLookup>["resolveUser"]>;
+  assigneeDisplays: Array<ReturnType<ReturnType<typeof useOrgUserLookup>["resolveUser"]>>;
+}) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+      <span className="inline-flex items-center gap-1.5">
+        Creator:
+        <OrgUserReference display={creatorDisplay} size="md" showName={false} />
+      </span>
+      {assigneeDisplays.length > 0 ? (
+        <span className="inline-flex items-center gap-1.5">
+          Assignees:
+          <span className="inline-flex items-center -space-x-1">
+            {assigneeDisplays.map((display, index) => (
+              <OrgUserReference
+                key={display?.id ?? index}
+                display={display}
+                size="md"
+                showName={false}
+                className="rounded-full ring-2 ring-white dark:ring-gray-900"
+              />
+            ))}
+          </span>
+        </span>
+      ) : null}
+    </div>
   );
 }
