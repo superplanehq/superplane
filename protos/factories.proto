@@ -470,3 +470,11 @@ message WorkOrderEvent {
   string type = 2;
   google.protobuf.Struct event = 3;
 }
+
+// Internal AMQP message for factory work-order websocket fan-out.
+message FactoryWorkOrderUpdatedMessage {
+  string factory_id = 1;
+  string order_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
