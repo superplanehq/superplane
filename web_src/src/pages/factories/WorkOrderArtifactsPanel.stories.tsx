@@ -5,8 +5,10 @@ import { OPEN_WORK_ORDER_ARTIFACTS } from "./__fixtures__/factoryPageResponses";
 import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
 
 /**
- * Work-order detail sidebar section: lists attached PRs / markdown notes and
- * exposes the "Attach" trigger that opens the artifact dialog.
+ * Work-order detail sidebar section: lists PRs and markdown notes attached
+ * by automation nodes. This panel is read-only from the UI; manual attach
+ * was removed and artifacts are added exclusively through
+ * `addWorkOrderArtifact` canvas components.
  */
 const meta = {
   title: "Factories/WorkOrderArtifactsPanel",
@@ -14,7 +16,7 @@ const meta = {
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="min-h-[280px] max-w-sm bg-white p-4 dark:bg-gray-900">
+      <ComponentStoryShell className="min-h-70 max-w-sm bg-white p-4 dark:bg-gray-900">
         <Story />
       </ComponentStoryShell>
     ),
@@ -25,25 +27,19 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const noop = () => undefined;
-
 /** Populated — PR + markdown note, both clickable if a URL is present. */
 export const Populated: Story = {
   args: {
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
     isLoading: false,
-    canAttach: true,
-    onOpenAttach: noop,
   },
 };
 
-/** Empty state — encourages attaching the first artifact. */
+/** Empty state — text prompt while no automation has attached artifacts yet. */
 export const Empty: Story = {
   args: {
     artifacts: [],
     isLoading: false,
-    canAttach: true,
-    onOpenAttach: noop,
   },
 };
 
@@ -52,8 +48,6 @@ export const Loading: Story = {
   args: {
     artifacts: [],
     isLoading: true,
-    canAttach: true,
-    onOpenAttach: noop,
   },
 };
 
@@ -64,18 +58,5 @@ export const ErrorState: Story = {
     artifacts: [],
     isLoading: false,
     error: new Error("Failed to load artifacts"),
-    canAttach: true,
-    onOpenAttach: noop,
-  },
-};
-
-/** Read-only viewer — Attach button disabled. */
-export const ReadOnly: Story = {
-  name: "Read Only",
-  args: {
-    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
-    isLoading: false,
-    canAttach: false,
-    onOpenAttach: noop,
   },
 };

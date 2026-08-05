@@ -3,24 +3,31 @@ import { describe, expect, it } from "vitest";
 import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
-  it("returns #<number> when data.prNumber is a numeric value", () => {
-    expect(formatPrArtifactLabel({ prNumber: 1234 })).toBe("#1234");
+  it("returns #<number> when data.number is set (backend convention)", () => {
+    expect(formatPrArtifactLabel({ number: 1234 })).toBe("#1234");
+    expect(formatPrArtifactLabel({ number: "1234" })).toBe("#1234");
   });
 
-  it("returns #<number> when data.prNumber is a numeric string", () => {
-    expect(formatPrArtifactLabel({ prNumber: "1234" })).toBe("#1234");
+  it("falls back to data.prNumber when data.number is absent", () => {
+    expect(formatPrArtifactLabel({ prNumber: 42 })).toBe("#42");
+  });
+
+  it("prefers data.number over data.prNumber when both are set", () => {
+    expect(formatPrArtifactLabel({ number: 1, prNumber: 2 })).toBe("#1");
   });
 
   it("normalizes a leading '#' so callers don't render '##'", () => {
-    expect(formatPrArtifactLabel({ prNumber: "#42" })).toBe("#42");
+    expect(formatPrArtifactLabel({ number: "#42" })).toBe("#42");
+    expect(formatPrArtifactLabel({ prNumber: "#7" })).toBe("#7");
   });
 
-  it("returns undefined when data.prNumber is missing or empty", () => {
+  it("returns undefined when no known key carries a usable value", () => {
     expect(formatPrArtifactLabel(undefined)).toBeUndefined();
     expect(formatPrArtifactLabel({})).toBeUndefined();
+    expect(formatPrArtifactLabel({ number: "" })).toBeUndefined();
+    expect(formatPrArtifactLabel({ number: "   " })).toBeUndefined();
+    expect(formatPrArtifactLabel({ number: null })).toBeUndefined();
     expect(formatPrArtifactLabel({ prNumber: "" })).toBeUndefined();
-    expect(formatPrArtifactLabel({ prNumber: "   " })).toBeUndefined();
-    expect(formatPrArtifactLabel({ prNumber: null })).toBeUndefined();
   });
 });
 

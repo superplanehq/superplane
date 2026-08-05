@@ -1,19 +1,29 @@
 export type ArtifactData = Record<string, unknown> | undefined;
 
+// Keys we accept for the PR number in the free-form artifact data map.
+// The Add Work Order Artifact component's example uses `number`; some
+// authors reach for `prNumber`. Tolerate both so links render as `#1234`
+// regardless of which convention was used.
+const PR_NUMBER_KEYS = ["number", "prNumber"] as const;
+
 /**
- * Prefer `data.prNumber` for PR artifact labels so links read as `#1234`,
- * matching how git hosts render them. Returns undefined when the field is
- * missing or empty, letting callers fall back to title / URL / a generic
- * label.
+ * Returns `#<n>` when the free-form artifact data carries a PR number,
+ * otherwise undefined so callers can fall back to title / URL / a generic
+ * label. Any leading `#` is stripped to avoid rendering `##`.
  */
 export function formatPrArtifactLabel(data: ArtifactData): string | undefined {
-  const raw = extractArtifactField(data, "prNumber");
-  if (raw === undefined) {
-    return undefined;
-  }
+  for (const key of PR_NUMBER_KEYS) {
+    const raw = extractArtifactField(data, key);
+    if (raw === undefined) {
+      continue;
+    }
 
-  const digits = raw.replace(/^#/, "").trim();
-  return digits ? `#${digits}` : undefined;
+    const digits = raw.replace(/^#/, "").trim();
+    if (digits) {
+      return `#${digits}`;
+    }
+  }
+  return undefined;
 }
 
 export function extractArtifactMarkdownBody(data: ArtifactData): string | undefined {
