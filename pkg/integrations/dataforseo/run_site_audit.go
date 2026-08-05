@@ -201,6 +201,28 @@ func (r *RunSiteAudit) poll(ctx core.ActionHookContext) error {
 	return r.resolve(ctx, client, metadata)
 }
 
+const runSiteAuditPagesLimit = 1000
+
 func (r *RunSiteAudit) resolve(ctx core.ActionHookContext, client *Client, metadata RunSiteAuditExecutionMetadata) error {
-	return ctx.ExecutionState.Pass()
+	allPages, err := client.GetPages(metadata.TaskID, runSiteAuditPagesLimit)
+	if err != nil {
+		return fmt.Errorf("failed to fetch audit pages: %w", err)
+	}
+
+	issuePages := make([]PageResult, 0, len(allPages))
+	for _, page := range allPages {
+		if page.Checks.HasIssue() {
+			issuePages = append(issuePages, page)
+		}
+	}
+
+	if len(issuePages) == 0 {
+		return ctx.ExecutionState.Emit(RunSiteAuditCleanChannel, "dataforseo.audit.finished", []any{
+			map[string]any{"taskId": metadata.TaskID, "pages": issuePages},
+		})
+	}
+
+	return ctx.ExecutionState.Emit(RunSiteAuditIssuesChannel, "dataforseo.audit.finished", []any{
+		map[string]any{"taskId": metadata.TaskID, "pages": issuePages},
+	})
 }

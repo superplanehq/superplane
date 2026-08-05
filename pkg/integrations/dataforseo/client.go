@@ -145,3 +145,54 @@ func (c *Client) GetSummary(taskID string) (string, error) {
 
 	return response.Tasks[0].Result[0].CrawlProgress, nil
 }
+
+type PageChecks struct {
+	BrokenLinks          bool `json:"broken_links"`
+	DuplicateTitle       bool `json:"duplicate_title"`
+	DuplicateDescription bool `json:"duplicate_description"`
+	IsBroken             bool `json:"is_broken"`
+}
+
+func (c PageChecks) HasIssue() bool {
+	return c.BrokenLinks || c.DuplicateTitle || c.DuplicateDescription || c.IsBroken
+}
+
+type PageResult struct {
+	URL    string     `json:"url"`
+	Checks PageChecks `json:"checks"`
+}
+
+type pagesResponse struct {
+	StatusCode int `json:"status_code"`
+	Tasks      []struct {
+		Result []struct {
+			Items []PageResult `json:"items"`
+		} `json:"result"`
+	} `json:"tasks"`
+}
+
+func (c *Client) GetPages(taskID string, limit int) ([]PageResult, error) {
+	payload := []map[string]any{
+		{"id": taskID, "limit": limit},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal pages request: %v", err)
+	}
+
+	respBody, err := c.execRequest(http.MethodPost, baseURL+"/on_page/pages", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response pagesResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal pages response: %v", err)
+	}
+
+	if len(response.Tasks) == 0 || len(response.Tasks[0].Result) == 0 {
+		return nil, fmt.Errorf("pages response missing result for task %s", taskID)
+	}
+
+	return response.Tasks[0].Result[0].Items, nil
+}
