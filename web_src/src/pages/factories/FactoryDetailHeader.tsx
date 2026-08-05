@@ -47,7 +47,7 @@ export function FactoryDetailHeader({
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
+          <div className="flex items-center gap-2">
             <h1 className="min-w-0 text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
               {factory.name}
             </h1>
@@ -58,12 +58,12 @@ export function FactoryDetailHeader({
               >
                 <button
                   type="button"
-                  className="mt-1 rounded p-1 text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
+                  className="shrink-0 rounded p-1.5 text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
                   aria-label="Factory actions"
                   disabled
                   data-testid="factory-actions-menu"
                 >
-                  <MoreVertical size={16} />
+                  <MoreVertical size={24} />
                 </button>
               </PermissionTooltip>
             ) : (
@@ -71,12 +71,12 @@ export function FactoryDetailHeader({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="mt-1 rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    className="shrink-0 rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
                     aria-label="Factory actions"
                     disabled={isDeleting}
                     data-testid="factory-actions-menu"
                   >
-                    <MoreVertical size={16} />
+                    <MoreVertical size={24} />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
