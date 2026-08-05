@@ -349,7 +349,8 @@ CREATE TABLE public.factories (
     name text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone
 );
 
 
@@ -1567,6 +1568,13 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_factories_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factories_deleted_at ON public.factories USING btree (deleted_at);
+
+
+--
 -- Name: idx_factories_organization_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1592,6 +1600,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_executions_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_factory_id ON public.factory_work_order_executions USING btree (factory_id);
 
 
 --

@@ -5,9 +5,9 @@ import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, REFUND_FACTORY } from ".
 import { FactoryDetailHeader } from "./FactoryDetailHeader";
 
 /**
- * Factory detail header: factory name, description, and the "New Work Order"
- * CTA (gated by permissions). Doesn't include filters — those live in the
- * work orders panel.
+ * Factory detail header: factory name, description, actions menu (edit/delete),
+ * and the "New Work Order" CTA (gated by permissions). Doesn't include filters —
+ * those live in the work orders panel.
  */
 const meta = {
   title: "Factories/FactoryDetailHeader",
@@ -28,25 +28,33 @@ type Story = StoryObj<typeof meta>;
 
 const createHref = `/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}/orders/new`;
 
-/** Populated header with a CTA. */
-export const Default: Story = {
-  args: {
-    factory: REFUND_FACTORY,
-    workOrdersCount: 3,
-    canCreate: true,
-    permissionsLoading: false,
-    createHref,
-  },
+const baseArgs = {
+  factory: REFUND_FACTORY,
+  workOrdersCount: 3,
+  canCreate: true,
+  canUpdate: true,
+  canDelete: true,
+  permissionsLoading: false,
+  createHref,
+  isUpdating: false,
+  isDeleting: false,
+  onUpdate: async () => undefined,
+  onDelete: async () => undefined,
 };
 
-/** Read-only viewer — CTA disabled with a tooltip. */
-export const WithoutCreatePermission: Story = {
-  name: "Without Create Permission",
+/** Populated header with a CTA and manage actions. */
+export const Default: Story = {
+  args: baseArgs,
+};
+
+/** Read-only viewer — CTA and actions disabled with tooltips. */
+export const WithoutManagePermission: Story = {
+  name: "Without Manage Permission",
   args: {
-    factory: REFUND_FACTORY,
+    ...baseArgs,
     workOrdersCount: 0,
     canCreate: false,
-    permissionsLoading: false,
-    createHref,
+    canUpdate: false,
+    canDelete: false,
   },
 };

@@ -13,6 +13,7 @@ p,/roles/org_admin,/org/*,canvases,update
 p,/roles/org_admin,/org/*,canvases,delete
 p,/roles/org_admin,/org/*,factories,create
 p,/roles/org_admin,/org/*,factories,update
+p,/roles/org_admin,/org/*,factories,delete
 p,/roles/org_admin,/org/*,members,create
 p,/roles/org_admin,/org/*,members,update
 p,/roles/org_admin,/org/*,members,delete
