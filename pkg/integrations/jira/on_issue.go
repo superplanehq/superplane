@@ -115,13 +115,19 @@ func (t *OnIssue) ExampleData() map[string]any {
 }
 
 func (t *OnIssue) Configuration() []configuration.Field {
+	return projectAndEventsFields("The Jira project to listen for issue events in", "Which issue events to listen for")
+}
+
+// projectAndEventsFields is the Project + Events configuration shared by every project-scoped,
+// created/updated/deleted event trigger (jira.onIssue, jira.onIssueComment).
+func projectAndEventsFields(projectDescription, eventsDescription string) []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "project",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Jira project to listen for issue events in",
+			Description: projectDescription,
 			Placeholder: "Select a project",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -135,7 +141,7 @@ func (t *OnIssue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    true,
 			Default:     []string{"created"},
-			Description: "Which issue events to listen for",
+			Description: eventsDescription,
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
