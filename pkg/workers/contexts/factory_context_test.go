@@ -43,10 +43,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, persisted.State,
 			"work orders now start as draft and are promoted to open on first dispatch")
 
-		// At creation the lifecycle emits `order.status.updated` ("" → "draft"),
-		// not the coarse `order.opened` (which fires on the first draft → open
-		// transition). The Source Run + App reference lives on the row and is
-		// enriched into `order.opened` when it eventually fires.
+		// Creation emits a single `order.status.updated` ("" → draft).
 		events, err := persisted.ListEvents(database.Conn(), 0, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
@@ -57,16 +54,19 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, "", initialStatus.FromState)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, initialStatus.ToState)
 
-		// Promote to open and confirm the source run/app enrichment lands on
-		// the resulting `order.opened` event.
+		// On the first `draft → open` promotion the source-run snapshot from
+		// `o.SourceRunID` is enriched into the status.updated event so the
+		// timeline can link back to the originating canvas run.
 		require.NoError(t, persisted.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
 			ToState: models.FactoryWorkOrderStateOpen,
 		}))
 
-		openedEvent := findWorkOrderEvent(t, persisted, factoryevents.EventTypeOrderOpened)
-
-		var opened factoryevents.WorkOrderOpened
-		require.NoError(t, json.Unmarshal(openedEvent.Data, &opened))
+		statusEvents := listWorkOrderEvents(t, persisted, factoryevents.EventTypeOrderStatusUpdated)
+		require.Len(t, statusEvents, 2)
+		var opened factoryevents.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(statusEvents[0].Data, &opened))
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, opened.FromState)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, opened.ToState)
 		require.NotNil(t, opened.Run)
 		assert.Equal(t, run.ID, opened.Run.ID)
 		require.NotNil(t, opened.App)
@@ -141,17 +141,13 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
 
+	// `order.status.updated` is now the sole authoritative event. The
+	// draft → open transition carries the automation ref (node/line/step).
 	statusEvent := findWorkOrderEvent(t, order, "order.status.updated")
-	openedEvent := findWorkOrderEvent(t, order, "order.opened")
-
 	statusAutomation := extractAutomationPayload(t, statusEvent)
 	assert.Equal(t, nodeExecution.NodeID, statusAutomation.NodeID)
 	assert.Equal(t, line.Name, statusAutomation.LineName)
 	assert.Equal(t, "component-under-test", statusAutomation.StepName)
-
-	openedAutomation := extractAutomationPayload(t, openedEvent)
-	assert.Equal(t, line.Name, openedAutomation.LineName)
-	assert.Equal(t, "component-under-test", openedAutomation.StepName)
 }
 
 func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
@@ -179,7 +175,8 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, updated.State)
 
-	closed := findWorkOrderEvent(t, order, "order.closed")
+	// The most recent status.updated (open → closed) is the close event.
+	closed := findWorkOrderEvent(t, order, "order.status.updated")
 	closedAutomation := extractAutomationPayload(t, closed)
 	assert.Equal(t, line.Name, closedAutomation.LineName)
 	assert.Equal(t, "component-under-test", closedAutomation.StepName)
@@ -305,6 +302,7 @@ func findWorkOrderEvent(t *testing.T, order *models.FactoryWorkOrder, eventType 
 	events, err := order.ListEvents(database.Conn(), 50, nil)
 	require.NoError(t, err)
 
+	// ListEvents sorts DESC by created_at, so the first match is the latest.
 	for i := range events {
 		if events[i].Type == eventType {
 			return &events[i]
@@ -313,6 +311,22 @@ func findWorkOrderEvent(t *testing.T, order *models.FactoryWorkOrder, eventType 
 
 	t.Fatalf("expected %s event on work order %s", eventType, order.ID)
 	return nil
+}
+
+// listWorkOrderEvents returns every event of the given type, newest first.
+func listWorkOrderEvents(t *testing.T, order *models.FactoryWorkOrder, eventType string) []models.FactoryWorkOrderEvent {
+	t.Helper()
+
+	events, err := order.ListEvents(database.Conn(), 100, nil)
+	require.NoError(t, err)
+
+	matches := make([]models.FactoryWorkOrderEvent, 0)
+	for _, event := range events {
+		if event.Type == eventType {
+			matches = append(matches, event)
+		}
+	}
+	return matches
 }
 
 // linkRunToWorkOrder creates the `factory_work_order_executions` row

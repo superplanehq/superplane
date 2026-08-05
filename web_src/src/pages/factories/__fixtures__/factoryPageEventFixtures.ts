@@ -49,15 +49,15 @@ interface AutomationRefFixture {
   stepName?: string;
 }
 
+// The lifecycle emits `order.status.updated` for every transition (creation,
+// open, close). This helper wraps the common `draft → open` promotion — the
+// closest analogue to the old `order.opened` event — for readable fixtures.
 function openedWorkOrderEvent(order: FactoriesWorkOrder, at: string): FactoriesWorkOrderEvent {
-  return {
-    type: "order.opened",
-    timestamp: at,
-    event: {
-      user: { id: order.createdBy?.id },
-      order: { id: order.id, title: order.title },
-    },
-  };
+  return statusUpdatedEvent(order, at, {
+    fromState: "draft",
+    toState: "open",
+    actor: { id: order.createdBy?.id ?? STORYBOOK_ME_USER_ID },
+  });
 }
 
 function stepExecutionCreatedEvent(input: StepExecutionEventFixture): FactoriesWorkOrderEvent {
@@ -95,14 +95,25 @@ function stepExecutionFinishedEvent(
 function statusUpdatedEvent(
   order: FactoriesWorkOrder,
   at: string,
-  transition: { fromState: string; toState: string; toResult?: string; actor?: { id: string } },
+  transition: {
+    fromState: string;
+    toState: string;
+    toResult?: string;
+    actor?: { id: string };
+    automation?: AutomationRefFixture;
+    run?: { id: string };
+    app?: { id: string };
+  },
 ): FactoriesWorkOrderEvent {
-  const { fromState, toState, toResult, actor = { id: STORYBOOK_ME_USER_ID } } = transition;
+  const { fromState, toState, toResult, actor = { id: STORYBOOK_ME_USER_ID }, automation, run, app } = transition;
   return {
     type: "order.status.updated",
     timestamp: at,
     event: {
       user: { id: actor.id },
+      ...(automation ? { automation } : {}),
+      ...(run ? { run } : {}),
+      ...(app ? { app } : {}),
       order: { id: order.id, title: order.title },
       fromState,
       toState,
@@ -153,21 +164,21 @@ function artifactAddedEvent(
   };
 }
 
+// Emit a canvas-attributed close as an `order.status.updated` (open → closed)
+// carrying the automation ref, matching how FactoryContext records it in
+// production.
 function automationClosedEvent(
   order: FactoriesWorkOrder,
   at: string,
   result: "completed" | "failed" | "rejected",
   automation: AutomationRefFixture,
 ): FactoriesWorkOrderEvent {
-  return {
-    type: "order.closed",
-    timestamp: at,
-    event: {
-      automation,
-      order: { id: order.id, title: order.title },
-      result,
-    },
-  };
+  return statusUpdatedEvent(order, at, {
+    fromState: "open",
+    toState: "closed",
+    toResult: result,
+    automation,
+  });
 }
 
 export const OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [openedWorkOrderEvent(OPEN_WORK_ORDER, HOUR_AGO)];
@@ -310,15 +321,11 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     appId: "app-refund-verifier",
     result: "passed",
   }),
-  {
-    type: "order.closed",
-    timestamp: YESTERDAY,
-    event: {
-      user: { id: STORYBOOK_ME_USER_ID },
-      order: { id: CLOSED_WORK_ORDER.id, title: CLOSED_WORK_ORDER.title },
-      result: "completed",
-    },
-  },
+  statusUpdatedEvent(CLOSED_WORK_ORDER, YESTERDAY, {
+    fromState: "open",
+    toState: "closed",
+    toResult: "completed",
+  }),
 ];
 
 export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [

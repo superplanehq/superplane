@@ -53,15 +53,16 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(view.events[0]?.title).toBe("self-assigned");
   });
 
-  it("renders order.opened (draft→open) as a status change and links it to the source run", () => {
-    // Under the new FSM `order.opened` fires on the first `draft → open`
-    // transition, not at creation. It must not duplicate the `created` entry
-    // produced by the initial `status.updated ("" → draft)`.
+  it("renders a draft→open transition as an open with source-run enrichment", () => {
+    // `order.status.updated` is the sole lifecycle event; the reader derives
+    // the visual kind + title from the transition.
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.opened",
+        type: "order.status.updated",
         event: {
+          fromState: "draft",
+          toState: "open",
           run: { id: "run-1", state: "started" },
           app: { id: "app-1" },
           order: { id: "order-1", title: "Fix bug" },
@@ -75,19 +76,21 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       sourceRunId: "run-1",
       sourceAppId: "app-1",
       title: "opened this work order",
-      statusChange: { fromState: "draft", toState: "open", fromResult: "", toResult: "" },
+      statusChange: { fromState: "draft", toState: "open" },
     });
     expect(view.events[0]?.actorUserId).toBeUndefined();
   });
 
-  it("includes the closing user on closed events", () => {
+  it("includes the closing user on close transitions", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.closed",
+        type: "order.status.updated",
         event: {
           user: { id: "user-1" },
-          result: "completed",
+          fromState: "open",
+          toState: "closed",
+          toResult: "completed",
         },
       },
     ]);
@@ -96,6 +99,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       kind: "closed",
       actorUserId: "user-1",
       title: "closed as completed",
+      statusChange: { fromState: "open", toState: "closed", toResult: "completed" },
     });
   });
 
@@ -103,29 +107,36 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.closed",
-        event: { result: "failed" },
+        type: "order.status.updated",
+        event: { fromState: "open", toState: "closed", toResult: "failed" },
       },
     ]);
 
     expect(view.events[0]?.title).toBe("closed as failed");
   });
 
-  it("skips status transitions already covered by opened/closed events", () => {
+  it("labels an abandon (draft→closed as rejected) with the same close styling", () => {
+    // `draft → closed` (allowed only with `rejected`) surfaces the same
+    // `closed` kind as a normal open→closed, so the timeline shows a single
+    // consistent entry per termination.
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
         type: "order.status.updated",
-        event: { fromState: "draft", toState: "open" },
-      },
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.status.updated",
-        event: { fromState: "open", toState: "closed", toResult: "completed" },
+        event: {
+          user: { id: "user-1" },
+          fromState: "draft",
+          toState: "closed",
+          toResult: "rejected",
+        },
       },
     ]);
 
-    expect(view.events).toHaveLength(0);
+    expect(view.events[0]).toMatchObject({
+      kind: "closed",
+      title: "closed as rejected",
+      statusChange: { fromState: "draft", toState: "closed", toResult: "rejected" },
+    });
   });
 
   it("renders the initial creation (empty fromState → draft) as a created entry", () => {
@@ -165,7 +176,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       kind: "statusChanged",
       actorUserId: "user-1",
       statusChange: { fromState: "open", toState: "draft" },
-      title: "moved Open → Draft",
+      title: "moved this work order back to Draft",
     });
   });
 
@@ -187,7 +198,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       kind: "statusChanged",
       actorUserId: "user-1",
       statusChange: { fromState: "closed", toState: "open", fromResult: "completed" },
-      title: "reopened as Open",
+      title: "reopened this work order",
     });
   });
 
@@ -275,7 +286,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.closed",
+        type: "order.status.updated",
         event: {
           automation: {
             nodeName: "node-comment",
@@ -283,7 +294,9 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
             lineName: "Plan",
             stepName: "step-01",
           },
-          result: "completed",
+          fromState: "open",
+          toState: "closed",
+          toResult: "completed",
         },
       },
     ]);

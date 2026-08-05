@@ -76,6 +76,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		Result:     params.Result,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
+		App:        c.appRef(),
 		SkipSame:   true,
 	})
 	if err != nil {
@@ -163,6 +164,17 @@ func (c *FactoryContext) runRef() *factory.RunRef {
 	return &factory.RunRef{
 		ID: c.execution.RunID,
 	}
+}
+
+// appRef attributes emitted events back to the canvas ("app") the current
+// run belongs to. Paired with runRef, this lets the timeline link straight
+// to the originating run.
+func (c *FactoryContext) appRef() *factory.AppRef {
+	if c.canvas == nil {
+		return nil
+	}
+
+	return &factory.AppRef{ID: c.canvas.ID}
 }
 
 // automationRef captures node/app/line/step identity for timeline

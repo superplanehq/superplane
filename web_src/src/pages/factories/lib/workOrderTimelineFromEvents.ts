@@ -5,6 +5,7 @@ import type {
   UserNameLookup,
   WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
+  WorkOrderTimelineEventKind,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
 import {
@@ -60,6 +61,9 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  // LineStepExecutionPayload already exposes `run` + `app`; they are
+  // populated on `order.status.updated` when the transition is attributed
+  // to a canvas run (source-run enrichment or automation caller).
 }
 
 interface TimelineBuildState {
@@ -68,14 +72,12 @@ interface TimelineBuildState {
 }
 
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
-  "order.opened": 10,
   "order.status.updated": 15,
   "order.assignees.updated": 20,
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
   "order.artifact.added": 47,
-  "order.closed": 50,
 };
 
 function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
@@ -125,9 +127,6 @@ function applyApiEventToTimeline(
   const at = apiEvent.timestamp ?? "";
 
   switch (apiEvent.type) {
-    case "order.opened":
-      appendOpenedEvent(state.events, index, payload, at, resolveUserName);
-      return;
     case "order.status.updated":
       appendStatusUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
@@ -145,9 +144,6 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state.events, index, payload, at, resolveUserName);
-      return;
-    case "order.closed":
-      appendClosedEvent(state.events, index, payload, at, resolveUserName);
   }
 }
 
@@ -156,31 +152,6 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
     timelineEvents: state.events,
     dispatchBatchByLine: state.dispatchBatchByLine,
   };
-}
-
-function appendOpenedEvent(
-  events: WorkOrderTimelineEvent[],
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
-  // `order.opened` now fires on the first `draft → open` transition, not at
-  // creation. Emit it as a status change so we don't duplicate the "created"
-  // entry that `order.status.updated ("" → draft)` already produced. The
-  // originating run / app are attached for attribution when present.
-  events.push({
-    id: `opened-${index}`,
-    kind: "statusChanged",
-    at,
-    actorUserId: payload.user?.id,
-    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    sourceRunId: payload.run?.id,
-    sourceAppId: payload.app?.id,
-    statusChange: { fromState: "draft", toState: "open", fromResult: "", toResult: "" },
-    title: "opened this work order",
-  });
 }
 
 function appendAssigneesUpdatedEvent(
@@ -204,6 +175,10 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
+// `order.status.updated` is the sole authoritative lifecycle event. The
+// visual kind (`created` / `closed` / `statusChanged`) is derived from
+// `fromState` + `toState` so downstream renderers keep their per-kind
+// styling (badges, colors, action verbs) without needing coarse events.
 function appendStatusUpdatedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -220,47 +195,47 @@ function appendStatusUpdatedEvent(
   const toResult = payload.toResult ?? "";
   const fromResult = payload.fromResult ?? "";
 
-  // Creation is emitted as `status.updated` with empty `fromState`.
-  if (!fromState) {
-    events.push({
-      id: `created-${index}`,
-      kind: "created",
-      at,
-      actorUserId: payload.user?.id,
-      actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-      actorAutomation: toAutomationActor(payload.automation),
-      title: "created this work order",
-    });
-    return;
-  }
-
-  // Skip status.updated when a coarse `order.opened` / `order.closed`
-  // event already covers the same change (one entry per transition).
-  if (toState === "open" && fromState === "draft") {
-    return;
-  }
-  if (toState === "closed") {
-    return;
-  }
-
+  const kind = deriveStatusEventKind(fromState, toState);
   events.push({
-    id: `status-updated-${index}`,
-    kind: "statusChanged",
+    id: `${kind}-${index}`,
+    kind,
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
     actorAutomation: toAutomationActor(payload.automation),
+    sourceRunId: payload.run?.id,
+    sourceAppId: payload.app?.id,
     statusChange: { fromState, toState, fromResult, toResult },
-    title: describeStatusTransition(fromState, toState),
+    title: describeStatusTransition(fromState, toState, toResult),
   });
 }
 
-function describeStatusTransition(fromState: string, toState: string): string {
+function deriveStatusEventKind(fromState: string, toState: string): WorkOrderTimelineEventKind {
   if (!fromState) {
-    return `set status to ${humanizeState(toState)}`;
+    return "created";
+  }
+  if (toState === "closed") {
+    return "closed";
+  }
+  return "statusChanged";
+}
+
+function describeStatusTransition(fromState: string, toState: string, toResult: string): string {
+  if (!fromState) {
+    return "created this work order";
+  }
+  if (toState === "closed") {
+    const result = formatWorkOrderResult(CLOSED_RESULT_TO_PROTO[toResult] ?? undefined);
+    return result ? `closed as ${result.toLowerCase()}` : "closed this work order";
+  }
+  if (fromState === "draft" && toState === "open") {
+    return "opened this work order";
+  }
+  if (fromState === "open" && toState === "draft") {
+    return "moved this work order back to Draft";
   }
   if (fromState === "closed" && toState === "open") {
-    return `reopened as ${humanizeState(toState)}`;
+    return "reopened this work order";
   }
   return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
 }
@@ -358,33 +333,14 @@ function describeArtifactAdded(artifact: EventArtifactPayload): string {
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
 
-// Event payload result → proto enum the presentation helpers expect.
+// Close-result string (from `status.updated.toResult`) → proto enum the
+// presentation helpers expect. Kept centralized so `describeStatusTransition`
+// stays a pure formatter.
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
   failed: "RESULT_FAILED",
 };
-
-function appendClosedEvent(
-  events: WorkOrderTimelineEvent[],
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
-  const closedResult = payload.result ?? payload.order?.result;
-  const result = formatWorkOrderResult(closedResult ? CLOSED_RESULT_TO_PROTO[closedResult] : undefined);
-
-  events.push({
-    id: `closed-${index}`,
-    kind: "closed",
-    at,
-    actorUserId: payload.user?.id,
-    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    title: result ? `closed as ${result.toLowerCase()}` : "closed this work order",
-  });
-}
 
 function toAutomationActor(
   payload: EventAutomationRefPayload | undefined,

@@ -110,7 +110,10 @@ export const Closed: Story = {
   },
 };
 
-/** Draft — Dispatch is available so scoping can flip straight into a run. */
+/**
+ * Draft — Dispatch flips straight into a run; Reject abandons the order
+ * before any work runs (only `RESULT_REJECTED` is allowed from draft).
+ */
 export const Draft: Story = {
   args: {
     orderTitle: "Draft: rework refund telemetry",
@@ -120,7 +123,7 @@ export const Draft: Story = {
     isDispatchable: true,
     isClosed: false,
     canDispatch: true,
-    canClose: false,
+    canClose: true,
     canManage: true,
     ...commonFlags,
     ...commonHandlers,

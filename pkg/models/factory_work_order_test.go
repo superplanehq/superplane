@@ -42,7 +42,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Lifecycle", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	t.Run("draft to open is allowed and emits opened event", func(t *testing.T) {
+	t.Run("draft to open emits status.updated", func(t *testing.T) {
 		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
@@ -51,10 +51,14 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 		events, err := order.ListEvents(database.Conn(), 10, nil)
 		require.NoError(t, err)
-		assert.Contains(t, eventTypes(events), factory.EventTypeOrderOpened)
+		latest := findEventOfType(t, events, factory.EventTypeOrderStatusUpdated)
+		var payload factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(latest.Data, &payload))
+		assert.Equal(t, FactoryWorkOrderStateDraft, payload.FromState)
+		assert.Equal(t, FactoryWorkOrderStateOpen, payload.ToState)
 	})
 
-	t.Run("open to closed requires a result", func(t *testing.T) {
+	t.Run("open to closed requires a valid close result", func(t *testing.T) {
 		err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Actor:   &userID,
@@ -63,7 +67,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
 	})
 
-	t.Run("open to closed with failed result works", func(t *testing.T) {
+	t.Run("open to closed with failed result emits status.updated", func(t *testing.T) {
 		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultFailed,
@@ -74,23 +78,52 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 		events, err := order.ListEvents(database.Conn(), 10, nil)
 		require.NoError(t, err)
-		assert.Contains(t, eventTypes(events), factory.EventTypeOrderClosed)
+		latest := findEventOfType(t, events, factory.EventTypeOrderStatusUpdated)
+		var payload factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(latest.Data, &payload))
+		assert.Equal(t, FactoryWorkOrderStateOpen, payload.FromState)
+		assert.Equal(t, FactoryWorkOrderStateClosed, payload.ToState)
+		assert.Equal(t, FactoryWorkOrderResultFailed, payload.ToResult)
 	})
 
-	t.Run("invalid transition draft to closed is rejected", func(t *testing.T) {
+	t.Run("draft to closed is allowed only with rejected", func(t *testing.T) {
 		other, err := factoryModel.CreateWorkOrder(database.Conn(), "Direct close", "", &userID, nil, nil)
 		require.NoError(t, err)
 
-		err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		// `completed` and `failed` imply the order actually ran; only `rejected`
+		// (abandon-before-dispatch) makes sense for a never-opened draft.
+		for _, invalid := range []string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed} {
+			err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+				ToState: FactoryWorkOrderStateClosed,
+				Result:  invalid,
+				Actor:   &userID,
+			})
+			require.Error(t, err, "expected draft→closed with result=%q to be rejected", invalid)
+			assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		}
+
+		require.NoError(t, other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
-			Result:  FactoryWorkOrderResultCompleted,
+			Result:  FactoryWorkOrderResultRejected,
 			Actor:   &userID,
-		})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+		}))
+		assert.Equal(t, FactoryWorkOrderStateClosed, other.State)
+		assert.Equal(t, FactoryWorkOrderResultRejected, other.Result)
+
+		events, err := other.ListEvents(database.Conn(), 10, nil)
+		require.NoError(t, err)
+		// Should have exactly two status.updated events: creation ("" → draft)
+		// and abandonment (draft → closed). No coarse order.opened/closed.
+		statusEvents := filterEventsOfType(events, factory.EventTypeOrderStatusUpdated)
+		require.Len(t, statusEvents, 2)
+		var latest factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(statusEvents[0].Data, &latest))
+		assert.Equal(t, FactoryWorkOrderStateDraft, latest.FromState)
+		assert.Equal(t, FactoryWorkOrderStateClosed, latest.ToState)
+		assert.Equal(t, FactoryWorkOrderResultRejected, latest.ToResult)
 	})
 
-	t.Run("reopen from closed does not re-emit order.opened", func(t *testing.T) {
+	t.Run("reopen from closed emits a fresh status.updated", func(t *testing.T) {
 		reopened, err := factoryModel.CreateWorkOrder(database.Conn(), "Reopen", "", &userID, nil, nil)
 		require.NoError(t, err)
 
@@ -103,7 +136,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 		before, err := reopened.ListEvents(database.Conn(), 50, nil)
 		require.NoError(t, err)
-		openedBefore := countEventsOfType(before, factory.EventTypeOrderOpened)
+		statusBefore := countEventsOfType(before, factory.EventTypeOrderStatusUpdated)
 
 		require.NoError(t, reopened.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
@@ -112,11 +145,14 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 		after, err := reopened.ListEvents(database.Conn(), 50, nil)
 		require.NoError(t, err)
-		assert.Equal(t, openedBefore, countEventsOfType(after, factory.EventTypeOrderOpened),
-			"reopen should not emit another order.opened event; the paired order.status.updated is authoritative")
+		assert.Equal(t, statusBefore+1, countEventsOfType(after, factory.EventTypeOrderStatusUpdated),
+			"reopen must record exactly one new order.status.updated event")
 
-		assert.Contains(t, eventTypes(after), factory.EventTypeOrderStatusUpdated,
-			"reopen must still record an order.status.updated event")
+		latest := findEventOfType(t, after, factory.EventTypeOrderStatusUpdated)
+		var payload factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(latest.Data, &payload))
+		assert.Equal(t, FactoryWorkOrderStateClosed, payload.FromState)
+		assert.Equal(t, FactoryWorkOrderStateOpen, payload.ToState)
 	})
 }
 
@@ -150,22 +186,17 @@ func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	events, err := order.ListEvents(database.Conn(), 50, nil)
 	require.NoError(t, err)
 
-	for _, eventType := range []string{
-		factory.EventTypeOrderStatusUpdated,
-		factory.EventTypeOrderOpened,
-		factory.EventTypeOrderClosed,
-	} {
-		matches := filterEventsOfType(events, eventType)
-		require.NotEmpty(t, matches, "no %s events emitted", eventType)
-		latest := matches[0]
-		var wrapper struct {
-			Automation *factory.AutomationRef `json:"automation"`
-		}
-		require.NoError(t, json.Unmarshal(latest.Data, &wrapper), "unmarshal %s", eventType)
-		require.NotNil(t, wrapper.Automation, "%s missing automation payload", eventType)
-		assert.Equal(t, "Plan", wrapper.Automation.LineName, "%s line", eventType)
-		assert.Equal(t, "step-01", wrapper.Automation.StepName, "%s step", eventType)
-		assert.Equal(t, "node-comment", wrapper.Automation.NodeName, "%s node", eventType)
+	// Every transition (creation, open, close) is a status.updated event
+	// carrying the automation ref. Assert on the two non-creation ones.
+	statusEvents := filterEventsOfType(events, factory.EventTypeOrderStatusUpdated)
+	require.GreaterOrEqual(t, len(statusEvents), 2)
+	for _, ev := range statusEvents[:2] {
+		var payload factory.WorkOrderStatusUpdated
+		require.NoError(t, json.Unmarshal(ev.Data, &payload))
+		require.NotNil(t, payload.Automation, "%s → %s missing automation", payload.FromState, payload.ToState)
+		assert.Equal(t, "Plan", payload.Automation.LineName)
+		assert.Equal(t, "step-01", payload.Automation.StepName)
+		assert.Equal(t, "node-comment", payload.Automation.NodeName)
 	}
 }
 

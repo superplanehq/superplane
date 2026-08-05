@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	// Work order events
-	EventTypeOrderOpened           = "order.opened"
-	EventTypeOrderClosed           = "order.closed"
+	// Work order events. `order.status.updated` is the sole authoritative
+	// lifecycle event: every FSM transition emits one, enriched with the
+	// actor / automation / originating run / app when applicable.
 	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
 	EventTypeOrderStatusUpdated    = "order.status.updated"
 	EventTypeOrderCommentAdded     = "order.comment.added"
@@ -34,26 +34,6 @@ const (
 
 // Events
 
-type WorkOrderOpened struct {
-	Order *WorkOrderRef `json:"order,omitempty"`
-	// One of the three attribution fields below is set depending on
-	// how the order transitioned into `open`:
-	//   - User:       manual open via the REST API
-	//   - Automation: opened by a factory-line node
-	//   - App + Run:  opened as a side-effect of an originating canvas run
-	User       *UserRef       `json:"user,omitempty"`
-	Automation *AutomationRef `json:"automation,omitempty"`
-	App        *AppRef        `json:"app,omitempty"`
-	Run        *RunRef        `json:"run,omitempty"`
-}
-
-type WorkOrderClosed struct {
-	Order      *WorkOrderRef  `json:"order,omitempty"`
-	User       *UserRef       `json:"user,omitempty"`
-	Automation *AutomationRef `json:"automation,omitempty"`
-	Result     *string        `json:"result,omitempty"`
-}
-
 type WorkOrderAssigneesUpdated struct {
 	Order      *WorkOrderRef `json:"order,omitempty"`
 	User       *UserRef      `json:"user,omitempty"`
@@ -61,10 +41,15 @@ type WorkOrderAssigneesUpdated struct {
 	Unassigned []UserRef     `json:"unassigned,omitempty"`
 }
 
+// WorkOrderStatusUpdated is the authoritative lifecycle event: emitted for
+// every FSM transition, including the initial `"" → draft` on creation and
+// the `→ closed` termination. `User`, `Automation`, and `Run` + `App` are
+// attribution channels — populate whichever caused the transition.
 type WorkOrderStatusUpdated struct {
 	Order      *WorkOrderRef  `json:"order,omitempty"`
 	User       *UserRef       `json:"user,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
+	App        *AppRef        `json:"app,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
 	FromState  string         `json:"fromState"`
 	ToState    string         `json:"toState"`

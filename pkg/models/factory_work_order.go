@@ -35,16 +35,23 @@ var (
 		FactoryWorkOrderStateClosed,
 	}
 
-	factoryWorkOrderCloseResults = []string{
-		FactoryWorkOrderResultCompleted,
-		FactoryWorkOrderResultRejected,
-		FactoryWorkOrderResultFailed,
+	// Allowed close results per source state. A draft was never dispatched,
+	// so it can only be `rejected` (abandoned). Open orders may terminate
+	// with any of the three results depending on outcome.
+	factoryWorkOrderCloseResultsByFromState = map[string][]string{
+		FactoryWorkOrderStateDraft: {FactoryWorkOrderResultRejected},
+		FactoryWorkOrderStateOpen: {
+			FactoryWorkOrderResultCompleted,
+			FactoryWorkOrderResultRejected,
+			FactoryWorkOrderResultFailed,
+		},
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
-	// open` is reopen. See TransitionOnDispatch for the draft → open promotion.
+	// open` is reopen; `draft → closed` is "abandon before dispatch"
+	// (rejected only). See TransitionOnDispatch for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
-		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
 		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
 		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
 	}
@@ -98,14 +105,15 @@ func (FactoryWorkOrderAssignee) TableName() string {
 }
 
 // FactoryWorkOrderStatusUpdate captures a requested transition through the
-// shared status FSM. Actor / Automation / Run are optional and populate
-// the emitted event.
+// shared status FSM. Actor / Automation / Run + App are optional attribution
+// fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
 	ToState    string
 	Result     string
 	Actor      *uuid.UUID
 	Automation *factory.AutomationRef
 	Run        *factory.RunRef
+	App        *factory.AppRef
 	SkipSame   bool // when true, no-op transitions to the current state succeed silently
 }
 
@@ -138,9 +146,11 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 }
 
 // UpdateStatus is the single writer for the work order lifecycle: it
-// validates the transition, updates the row, and records the events
-// (always `order.status.updated`; plus the coarse `order.opened` on
-// the first draft → open and `order.closed` on any close).
+// validates the transition, updates the row, and records an
+// `order.status.updated` event enriched with the caller's attribution
+// (actor / automation / run + app). On the initial `draft → open` we also
+// snapshot the originating run/app from `o.SourceRunID`, so the timeline
+// can always trace an order back to the run that created it.
 func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
 	toState := update.ToState
 	if !slices.Contains(factoryWorkOrderStates, toState) {
@@ -155,19 +165,23 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		return fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
-	if !slices.Contains(factoryWorkOrderAllowedTransitions[o.State], toState) {
-		return fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, o.State, toState)
+	fromState := o.State
+	if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
+		return fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
 	}
 
 	nextResult := ""
 	if toState == FactoryWorkOrderStateClosed {
-		if !slices.Contains(factoryWorkOrderCloseResults, update.Result) {
-			return fmt.Errorf("%w: closing requires a valid result (completed, rejected, failed)", ErrFactoryWorkOrderInvalidState)
+		allowed := factoryWorkOrderCloseResultsByFromState[fromState]
+		if !slices.Contains(allowed, update.Result) {
+			return fmt.Errorf(
+				"%w: closing from %s requires result in %v (got %q)",
+				ErrFactoryWorkOrderInvalidState, fromState, allowed, update.Result,
+			)
 		}
 		nextResult = update.Result
 	}
 
-	fromState := o.State
 	fromResult := o.Result
 	now := time.Now()
 
@@ -196,26 +210,50 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			return err
 		}
 
-		if err := o.RecordStatusUpdated(tx, update.Actor, update.Automation, update.Run, fromState, toState, fromResult, nextResult); err != nil {
-			return err
-		}
-
-		// `order.opened` marks the initial draft → open only, so the
-		// timeline can distinguish opens from reopens.
-		if toState == FactoryWorkOrderStateOpen && fromState == FactoryWorkOrderStateDraft {
-			if err := o.RecordOpened(tx, update.Actor, update.Automation); err != nil {
+		run, app := update.Run, update.App
+		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && o.SourceRunID != nil {
+			// Snapshot the originating canvas run so downstream consumers can
+			// trace back to the trigger without needing to load the order.
+			sourceRun, sourceApp, err := o.loadSourceRunRefs(tx)
+			if err != nil {
 				return err
+			}
+			// Explicit caller-provided refs win, otherwise use the snapshot.
+			if run == nil {
+				run = sourceRun
+			}
+			if app == nil {
+				app = sourceApp
 			}
 		}
 
-		if toState == FactoryWorkOrderStateClosed {
-			if err := o.RecordClosed(tx, update.Actor, update.Automation, nextResult); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return o.RecordStatusUpdated(tx, statusUpdatedRecord{
+			Actor:      update.Actor,
+			Automation: update.Automation,
+			Run:        run,
+			App:        app,
+			FromState:  fromState,
+			ToState:    toState,
+			FromResult: fromResult,
+			ToResult:   nextResult,
+		})
 	})
+}
+
+// loadSourceRunRefs resolves the originating canvas run + app for an order
+// created from a canvas run. Only called when o.SourceRunID is non-nil.
+func (o *FactoryWorkOrder) loadSourceRunRefs(tx *gorm.DB) (*factory.RunRef, *factory.AppRef, error) {
+	run, err := FindUnscopedCanvasRun(tx, *o.SourceRunID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	runRef := &factory.RunRef{ID: run.ID, State: run.State}
+	if run.Result != "" {
+		result := run.Result
+		runRef.Result = &result
+	}
+	return runRef, &factory.AppRef{ID: run.WorkflowID}, nil
 }
 
 // Close is kept for backwards compatibility with existing handlers. New code
@@ -354,67 +392,33 @@ func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
 	}
 }
 
-func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID, automation *factory.AutomationRef) error {
-	data := factory.WorkOrderOpened{
-		Order:      o.Ref(),
-		Automation: automation,
-	}
-
-	if createdBy != nil {
-		data.User = &factory.UserRef{ID: *createdBy}
-	}
-
-	// When the order was spawned from a canvas run, attach the run/app
-	// reference so consumers can trace back to the originating trigger.
-	if o.SourceRunID != nil {
-		run, err := FindUnscopedCanvasRun(tx, *o.SourceRunID)
-		if err != nil {
-			return err
-		}
-
-		runRef := &factory.RunRef{ID: run.ID, State: run.State}
-		if run.Result != "" {
-			result := run.Result
-			runRef.Result = &result
-		}
-		data.Run = runRef
-		data.App = &factory.AppRef{ID: run.WorkflowID}
-	}
-
-	return o.recordEvent(tx, factory.EventTypeOrderOpened, data)
+// statusUpdatedRecord bundles the attribution + transition fields for
+// `order.status.updated`. Keeps RecordStatusUpdated's signature small so
+// callers (UpdateStatus, CreateWorkOrder) read cleanly at the call site.
+type statusUpdatedRecord struct {
+	Actor      *uuid.UUID
+	Automation *factory.AutomationRef
+	Run        *factory.RunRef
+	App        *factory.AppRef
+	FromState  string
+	ToState    string
+	FromResult string
+	ToResult   string
 }
 
-func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, automation *factory.AutomationRef, result string) error {
-	data := factory.WorkOrderClosed{
-		Order:      o.Ref(),
-		Automation: automation,
-		Result:     &result,
-	}
-	if closedBy != nil {
-		data.User = &factory.UserRef{ID: *closedBy}
-	}
-
-	return o.recordEvent(tx, factory.EventTypeOrderClosed, data)
-}
-
-func (o *FactoryWorkOrder) RecordStatusUpdated(
-	tx *gorm.DB,
-	actor *uuid.UUID,
-	automation *factory.AutomationRef,
-	run *factory.RunRef,
-	fromState, toState, fromResult, toResult string,
-) error {
+func (o *FactoryWorkOrder) RecordStatusUpdated(tx *gorm.DB, r statusUpdatedRecord) error {
 	data := factory.WorkOrderStatusUpdated{
 		Order:      o.Ref(),
-		Automation: automation,
-		Run:        run,
-		FromState:  fromState,
-		ToState:    toState,
-		FromResult: fromResult,
-		ToResult:   toResult,
+		Automation: r.Automation,
+		Run:        r.Run,
+		App:        r.App,
+		FromState:  r.FromState,
+		ToState:    r.ToState,
+		FromResult: r.FromResult,
+		ToResult:   r.ToResult,
 	}
-	if actor != nil {
-		data.User = &factory.UserRef{ID: *actor}
+	if r.Actor != nil {
+		data.User = &factory.UserRef{ID: *r.Actor}
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)

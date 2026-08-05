@@ -275,15 +275,15 @@ function UserActionEventDescription({
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  // Attribution via an originating canvas run + app (main's "created from run"
-  // surface). Applies to any user-action kind that may carry a source run
-  // reference — currently `created` (initial status.updated) and
-  // `statusChanged` (the `draft → open` marker).
-  const hasSourceRun = Boolean(event.sourceRunId);
+  // Attribution preference: user → factory-line automation → originating
+  // canvas run + app → "Someone" fallback. Automation wins over the source
+  // run because the line/step tells the operator far more than a raw run
+  // link (e.g. "closed by Plan / step-01" vs. "closed via run"). Only fall
+  // back to sourceRunId when no automation ref is attached (typical for
+  // user-issued transitions triggered by a run — the initial creation).
   const automationActor =
-    !actorDisplay && !hasSourceRun && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind)
-      ? event.actorAutomation
-      : undefined;
+    !actorDisplay && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind) ? event.actorAutomation : undefined;
+  const hasSourceRun = Boolean(event.sourceRunId) && !automationActor;
   const showSomeoneFallback =
     !actorDisplay && !hasSourceRun && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
 

@@ -75,6 +75,10 @@ function HeaderActions({
   onClose,
   onStatusChange,
 }: WorkOrderDetailHeaderProps) {
+  // Draft is "dispatchable, not yet open, not closed" — the only lifecycle
+  // stage where an operator can abandon the order before any work runs.
+  const isDraft = isDispatchable && !isOpen && !isClosed;
+
   return (
     <>
       {isDispatchable ? (
@@ -94,6 +98,22 @@ function HeaderActions({
               <Forward className="ml-1.5 h-4 w-4" aria-hidden />
             </Button>
           </DispatchWorkOrderPopover>
+        </PermissionTooltip>
+      ) : null}
+
+      {isDraft ? (
+        <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+          <LoadingButton
+            type="button"
+            variant="ghost"
+            disabled={!canClose || isClosing}
+            loading={isRejecting}
+            loadingText="Rejecting..."
+            onClick={() => void onClose("RESULT_REJECTED")}
+            data-testid="work-order-reject-draft-button"
+          >
+            Reject
+          </LoadingButton>
         </PermissionTooltip>
       ) : null}
 
