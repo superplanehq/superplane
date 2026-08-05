@@ -4,6 +4,7 @@ import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { formatTimeAgo } from "@/lib/date";
+import { appRunPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { Fragment, useMemo, type ReactNode } from "react";
 import {
@@ -181,9 +182,6 @@ function TimelineItem({
   isLast: boolean;
 }) {
   const { icon: Icon } = getTimelineEventPresentation(event.kind);
-  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
-  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  const showSomeoneFallback = (event.kind === "created" || event.kind === "closed") && !actorDisplay;
 
   return (
     <li className="relative flex gap-4 pl-8">
@@ -192,44 +190,119 @@ function TimelineItem({
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        {isUserActionEvent ? (
-          <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
-            {actorDisplay ? (
-              <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
-            ) : showSomeoneFallback ? (
-              <span className="font-semibold">Someone</span>
-            ) : null}
-            {event.kind === "assigned" && event.assigneeChange ? (
-              <AssigneeChangeDescription
-                actorUserId={event.actorUserId}
-                assigneeChange={event.assigneeChange}
-                resolveUserDisplay={resolveUserDisplay}
-              />
-            ) : (
-              <span>{event.title}</span>
-            )}
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
-            {event.steps?.length ? (
-              <ul className="mt-2 space-y-1">
-                {event.steps.map((step) => (
-                  <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
-                ))}
-              </ul>
-            ) : null}
-          </>
-        )}
-        {isUserActionEvent ? (
-          <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
-            {formatTimeAgo(new Date(event.at))}
-          </time>
-        ) : null}
+        <TimelineItemContent
+          event={event}
+          organizationId={organizationId}
+          resolveUserDisplay={resolveUserDisplay}
+        />
       </div>
     </li>
   );
 }
+
+function TimelineItemContent({
+  event,
+  organizationId,
+  resolveUserDisplay,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
+}) {
+  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
+
+  if (!isUserActionEvent) {
+    return (
+      <>
+        <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
+        {event.steps?.length ? (
+          <ul className="mt-2 space-y-1">
+            {event.steps.map((step) => (
+              <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
+            ))}
+          </ul>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <UserActionEventDescription
+        event={event}
+        organizationId={organizationId}
+        resolveUserDisplay={resolveUserDisplay}
+      />
+      <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
+        {formatTimeAgo(new Date(event.at))}
+      </time>
+    </>
+  );
+}
+
+function UserActionEventDescription({
+  event,
+  organizationId,
+  resolveUserDisplay,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
+}) {
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
+  const isAutomationCreated = event.kind === "created" && Boolean(event.sourceRunId);
+  const showSomeoneFallback =
+    (event.kind === "created" || event.kind === "closed") && !actorDisplay && !isAutomationCreated;
+
+  return (
+    <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
+      {actorDisplay ? (
+        <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+      ) : showSomeoneFallback ? (
+        <span className="font-semibold">Someone</span>
+      ) : null}
+      {event.kind === "assigned" && event.assigneeChange ? (
+        <AssigneeChangeDescription
+          actorUserId={event.actorUserId}
+          assigneeChange={event.assigneeChange}
+          resolveUserDisplay={resolveUserDisplay}
+        />
+      ) : isAutomationCreated ? (
+        <AutomationCreatedDescription event={event} organizationId={organizationId} />
+      ) : (
+        <span>{event.title}</span>
+      )}
+    </p>
+  );
+}
+
+function AutomationCreatedDescription({
+  event,
+  organizationId,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+}) {
+  const runHref =
+    event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
+      <span>{event.title}</span>
+      {runHref ? (
+        <Link href={runHref} className={timelineRunLinkClassName}>
+          <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          run
+        </Link>
+      ) : (
+        <span>run</span>
+      )}
+    </span>
+  );
+}
+
+const timelineRunLinkClassName =
+  "pointer-events-auto inline-flex w-fit max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-sm text-gray-700 underline decoration-gray-300 underline-offset-2 transition-colors hover:bg-gray-50 hover:text-gray-900 hover:decoration-gray-500 dark:text-gray-300 dark:decoration-gray-600 dark:hover:bg-gray-800/40 dark:hover:text-gray-100 dark:hover:decoration-gray-400";
 
 function AssigneeChangeDescription({
   actorUserId,
@@ -345,8 +418,7 @@ function InlineUserList({
 function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
   const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
   const durationLabel = formatStepExecutionDuration(step);
-  const linkClassName =
-    "pointer-events-auto inline-flex w-fit max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-sm text-gray-700 no-underline transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/40 dark:hover:text-gray-100";
+  const linkClassName = timelineRunLinkClassName;
   const stepContent = (
     <>
       <StepStatusIcon execution={step.execution} />
