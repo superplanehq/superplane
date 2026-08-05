@@ -11,9 +11,12 @@ import {
   Check,
   CircleDashed,
   CircleDot,
+  FileText,
   GitBranch,
   Loader2,
+  MessageSquareText,
   MinusCircle,
+  ShieldCheck,
   UserRound,
   UsersRound,
   XCircle,
@@ -29,6 +32,7 @@ import {
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
 import { OrgUserReference } from "./OrgUserReference";
+import { ArtifactTimelineBody, CommentTimelineBody, TimelineAutomationActor } from "./timeline";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
@@ -186,7 +190,7 @@ function TimelineItem({
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
-        <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
+        <span className="absolute left-2.75 top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
@@ -195,6 +199,8 @@ function TimelineItem({
     </li>
   );
 }
+
+const USER_ACTION_EVENT_KINDS: WorkOrderTimelineEventKind[] = ["created", "assigned", "statusChanged", "closed"];
 
 function TimelineItemContent({
   event,
@@ -205,34 +211,59 @@ function TimelineItemContent({
   organizationId: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
-  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
 
-  if (!isUserActionEvent) {
+  if (event.kind === "commented") {
     return (
       <>
-        <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
-        {event.steps?.length ? (
-          <ul className="mt-2 space-y-1">
-            {event.steps.map((step) => (
-              <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
-            ))}
-          </ul>
-        ) : null}
+        <CommentTimelineBody event={event} actorDisplay={actorDisplay} />
+        <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
+      </>
+    );
+  }
+
+  if (event.kind === "artifactAdded") {
+    return (
+      <>
+        <ArtifactTimelineBody event={event} actorDisplay={actorDisplay} />
+        <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
+      </>
+    );
+  }
+
+  if (USER_ACTION_EVENT_KINDS.includes(event.kind)) {
+    return (
+      <>
+        <UserActionEventDescription
+          event={event}
+          organizationId={organizationId}
+          resolveUserDisplay={resolveUserDisplay}
+        />
+        <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
       </>
     );
   }
 
   return (
     <>
-      <UserActionEventDescription
-        event={event}
-        organizationId={organizationId}
-        resolveUserDisplay={resolveUserDisplay}
-      />
-      <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
+      <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
+      {event.steps?.length ? (
+        <ul className="mt-2 space-y-1">
+          {event.steps.map((step) => (
+            <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
+          ))}
+        </ul>
+      ) : null}
     </>
   );
 }
+
+// Attribution kinds we may show for an event. Order matters (highest priority
+// first): a matched org user always wins; otherwise we look for an app-run
+// source (main), then a factory-line automation actor (ours), and finally
+// fall back to a generic "Someone" label.
+const AUTOMATION_ATTRIBUTABLE_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
+const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
 
 function UserActionEventDescription({
   event,
@@ -244,14 +275,24 @@ function UserActionEventDescription({
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  const isAutomationCreated = event.kind === "created" && Boolean(event.sourceRunId);
+  // Attribution via an originating canvas run + app (main's "created from run"
+  // surface). Applies to any user-action kind that may carry a source run
+  // reference — currently `created` (initial status.updated) and
+  // `statusChanged` (the `draft → open` marker).
+  const hasSourceRun = Boolean(event.sourceRunId);
+  const automationActor =
+    !actorDisplay && !hasSourceRun && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind)
+      ? event.actorAutomation
+      : undefined;
   const showSomeoneFallback =
-    (event.kind === "created" || event.kind === "closed") && !actorDisplay && !isAutomationCreated;
+    !actorDisplay && !hasSourceRun && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
 
   return (
     <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
       {actorDisplay ? (
         <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+      ) : automationActor ? (
+        <TimelineAutomationActor actor={automationActor} />
       ) : showSomeoneFallback ? (
         <span className="font-semibold">Someone</span>
       ) : null}
@@ -261,28 +302,36 @@ function UserActionEventDescription({
           assigneeChange={event.assigneeChange}
           resolveUserDisplay={resolveUserDisplay}
         />
-      ) : isAutomationCreated ? (
-        <AutomationCreatedDescription event={event} organizationId={organizationId} />
+      ) : hasSourceRun ? (
+        <SourceRunAttribution event={event} organizationId={organizationId} />
       ) : (
         <span>{event.title}</span>
       )}
+      {automationActor ? (
+        <span className="ml-1 inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+          Automation
+        </span>
+      ) : null}
     </p>
   );
 }
 
-function AutomationCreatedDescription({
-  event,
-  organizationId,
-}: {
-  event: WorkOrderTimelineEvent;
-  organizationId: string;
-}) {
+// Renders an event title followed by "run" (linked to the originating canvas
+// run when the app+run ids are known). Used for events attributed to a run
+// rather than to a user or a factory-line automation.
+function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimelineEvent; organizationId: string }) {
   const runHref =
     event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+
+  // `created` events read "Work order created from run"; other kinds (e.g.
+  // `statusChanged` for the `draft → open` marker) read "opened this work
+  // order via run". We choose the connector accordingly.
+  const connector = event.kind === "created" ? "from" : "via";
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
       <span>{event.title}</span>
+      <span>{connector}</span>
       {runHref ? (
         <Link href={runHref} className={timelineRunLinkClassName}>
           <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -489,6 +538,12 @@ function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
       return { icon: UsersRound };
     case "dispatched":
       return { icon: GitBranch };
+    case "statusChanged":
+      return { icon: ShieldCheck };
+    case "commented":
+      return { icon: MessageSquareText };
+    case "artifactAdded":
+      return { icon: FileText };
     case "closed":
       return { icon: CircleDot };
   }
