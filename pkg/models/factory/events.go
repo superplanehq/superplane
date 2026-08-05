@@ -26,6 +26,8 @@ const (
 type WorkOrderOpened struct {
 	Order *WorkOrderRef `json:"order,omitempty"`
 	User  *UserRef      `json:"user,omitempty"`
+	App   *AppRef       `json:"app,omitempty"`
+	Run   *RunRef       `json:"run,omitempty"`
 }
 
 type WorkOrderClosed struct {
