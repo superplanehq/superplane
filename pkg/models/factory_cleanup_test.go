@@ -126,7 +126,7 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, []uuid.UUID{r.User})
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(db, "line", nil)
@@ -189,7 +189,7 @@ func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		_, err := factory.CreateWorkOrder(db, support.RandomName("order"), "", &r.User, nil)
+		_, err := factory.CreateWorkOrder(db, support.RandomName("order"), "", &r.User, nil, nil)
 		require.NoError(t, err)
 	}
 	require.NoError(t, factory.SoftDelete(db))
@@ -296,7 +296,7 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
-	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	line, err := factory.CreateLine(db, "line", nil)
 	require.NoError(t, err)
