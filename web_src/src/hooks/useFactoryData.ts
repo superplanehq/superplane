@@ -24,37 +24,46 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { hasActiveWorkOrderExecution } from "@/pages/factories/lib/workOrderExecutions";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
 } from "@/pages/factories/lib/workOrderEventsPagination";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const WORK_ORDER_POLL_INTERVAL_MS = 5_000;
+export const factoryQueryKeys = {
+  list: (organizationId: string) => ["factories", organizationId] as const,
+  detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
+  workOrders: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "work-orders"] as const,
+  workOrderDetail: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId] as const,
+  workOrderEvents: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
+  apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
+};
 
 function factoryListKey(organizationId: string) {
-  return ["factories", organizationId] as const;
+  return factoryQueryKeys.list(organizationId);
 }
 
 function factoryDetailKey(organizationId: string, factoryId: string) {
-  return ["factories", organizationId, factoryId] as const;
+  return factoryQueryKeys.detail(organizationId, factoryId);
 }
 
 function workOrdersKey(organizationId: string, factoryId: string) {
-  return ["factories", organizationId, factoryId, "work-orders"] as const;
+  return factoryQueryKeys.workOrders(organizationId, factoryId);
 }
 
 function workOrderDetailKey(organizationId: string, factoryId: string, orderId: string) {
-  return ["factories", organizationId, factoryId, "work-orders", orderId] as const;
+  return factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId);
 }
 
 function workOrderEventsKey(organizationId: string, factoryId: string, orderId: string) {
-  return ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const;
+  return factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId);
 }
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
-  return ["factories", organizationId, factoryId, "apps"] as const;
+  return factoryQueryKeys.apps(organizationId, factoryId);
 }
 
 export function useFactories(organizationId: string, enabled = true) {
@@ -100,10 +109,6 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
       return response.data?.orders ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
-    refetchInterval: (query) =>
-      query.state.data?.some((order) => hasActiveWorkOrderExecution(order.executions))
-        ? WORK_ORDER_POLL_INTERVAL_MS
-        : false,
   });
 }
 
@@ -123,10 +128,6 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
       return response.data.order;
     },
     enabled: Boolean(organizationId && factoryId && orderId),
-    refetchInterval: (query) =>
-      query.state.data && hasActiveWorkOrderExecution(query.state.data.executions)
-        ? WORK_ORDER_POLL_INTERVAL_MS
-        : false,
   });
 }
 
@@ -149,7 +150,6 @@ export function useWorkOrderEvents(organizationId: string, factoryId: string, or
     getNextPageParam: getWorkOrderEventsNextPageParam,
     initialPageParam: undefined as string | undefined,
     enabled: Boolean(organizationId && factoryId && orderId),
-    refetchInterval: WORK_ORDER_POLL_INTERVAL_MS,
   });
 }
 

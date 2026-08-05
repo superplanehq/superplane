@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -91,6 +92,14 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
 			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
 		}
+	}
+
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeLineStepExecutionCreated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, order)
