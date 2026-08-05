@@ -115,11 +115,7 @@ describe("getWorkOrderDisplayStatus", () => {
   });
 
   it("clears the failed pill when a subsequent retry finishes successfully", () => {
-    //
-    // The latest finished execution passed, so it supersedes the older
-    // failure regardless of the `updatedAt` fence, and the display
-    // returns to "open".
-    //
+    // Latest passing execution supersedes an older failure.
     const orderCreated = "2026-08-04T10:00:00.000Z";
     const failedAt = "2026-08-04T11:00:00.000Z";
     const passedAt = "2026-08-04T12:00:00.000Z";

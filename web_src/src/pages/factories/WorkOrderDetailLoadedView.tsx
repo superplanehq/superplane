@@ -1,5 +1,4 @@
 import type {
-  FactoriesAddWorkOrderArtifactBody,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -11,7 +10,6 @@ import type {
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
 import {
   factoryDetailPanelClassName,
   factoryDetailSidebarClassName,
@@ -20,7 +18,6 @@ import {
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
 import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
-import { WorkOrderAttachArtifactDialog } from "./WorkOrderAttachArtifactDialog";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
@@ -60,13 +57,11 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
-  isAddingArtifact: boolean;
   onDispatch: (lineName: string) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string) => Promise<void>;
-  onAddArtifact: (artifact: FactoriesAddWorkOrderArtifactBody) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView({
@@ -104,16 +99,12 @@ export function WorkOrderDetailLoadedView({
   isAssigneesSaving,
   isUpdatingStatus,
   isAddingComment,
-  isAddingArtifact,
   onDispatch,
   onClose,
   onAssigneesSave,
   onStatusChange,
   onAddComment,
-  onAddArtifact,
 }: WorkOrderDetailLoadedViewProps) {
-  const [isAttachOpen, setIsAttachOpen] = useState(false);
-
   return (
     <div className={factoryPageContentClassName}>
       <Link
@@ -190,24 +181,11 @@ export function WorkOrderDetailLoadedView({
             />
 
             <div className="mt-6">
-              <WorkOrderArtifactsPanel
-                artifacts={artifacts}
-                isLoading={isArtifactsLoading}
-                error={artifactsError}
-                canAttach={canManage}
-                onOpenAttach={() => setIsAttachOpen(true)}
-              />
+              <WorkOrderArtifactsPanel artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
             </div>
           </aside>
         </div>
       </div>
-
-      <WorkOrderAttachArtifactDialog
-        open={isAttachOpen}
-        onOpenChange={setIsAttachOpen}
-        isSubmitting={isAddingArtifact}
-        onSubmit={onAddArtifact}
-      />
     </div>
   );
 }

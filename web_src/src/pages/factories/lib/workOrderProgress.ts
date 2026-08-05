@@ -131,17 +131,9 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "running";
   }
 
-  //
-  // Only surface the "failed" display status when the latest finished
-  // execution failed. A subsequent passing retry supersedes the earlier
-  // failure (its finish timestamp is newer), so the pill clears without
-  // needing a state transition. We fence the failure against
-  // `order.updatedAt` so failures older than the most recent write to
-  // the order (lifecycle transition, assignee change, comment, artifact)
-  // are treated as belonging to a previous attempt — a reopened or
-  // re-triaged order clears the failed pill until a new dispatch
-  // actually fails.
-  //
+  // "failed" only if the newest execution failed AND finished after
+  // the last write to the order (reopen / reassign / comment / artifact),
+  // so a fresh attempt or triage clears the pill until a new failure.
   const latestFinished = latestFinishedWorkOrderExecution(executions);
   if (latestFinished?.result === "RESULT_FAILED") {
     const finishedAt = Date.parse(latestFinished.updatedAt ?? latestFinished.createdAt ?? "");
@@ -195,13 +187,8 @@ export function groupWorkOrdersBySection(
     .filter((entry) => entry.orders.length > 0);
 }
 
-//
-// countActiveWorkOrders is what the "Work Orders" badge and the factory
-// detail header render — the count of orders that need attention, which
-// matches the default `active` status filter (draft + open + running +
-// failed). Closed orders (completed / rejected / closed-failed) are not
-// counted.
-//
+// countActiveWorkOrders backs the "Work Orders" badge; it matches the
+// default `active` filter (draft + open + running + failed).
 export function countActiveWorkOrders(orders: FactoriesWorkOrder[]): number {
   return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order))).length;
 }
@@ -210,19 +197,11 @@ export type WorkOrderOwnerFilter = "all" | "mine" | "unassigned";
 
 export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
 
-//
-// Display statuses that are considered "active" — anything not yet closed.
-// The `Active` pill is the default view so newly-created `draft` orders
-// don't get hidden behind the old `Open` pill, which only matched
-// STATE_OPEN.
-//
+// "Active" pill covers everything not yet closed (draft included, so
+// new orders aren't hidden behind the STATE_OPEN-only `Open` pill).
 const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
 
-//
-// Display statuses that count as "failed" for the Failed pill. Both open
-// orders with a failed line step (`failed`) and orders closed as failed
-// (`closedFailed`) are surfaced together so the pill matches user intent.
-//
+// "Failed" pill unions in-flight failures with closed-as-failed orders.
 const FAILED_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["failed", "closedFailed"];
 
 export function filterWorkOrdersByOwner(

@@ -16,6 +16,17 @@ type FactoryContext struct {
 	tx        *gorm.DB
 	canvas    *models.Canvas
 	execution *models.CanvasNodeExecution
+
+	lineStepOnce   bool
+	lineStepLoaded bool
+	lineStepCache  lineStepInfo
+}
+
+type lineStepInfo struct {
+	LineID    uuid.UUID
+	LineName  string
+	StepIndex int
+	StepName  string
 }
 
 func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.CanvasNodeExecution) *FactoryContext {
@@ -27,10 +38,7 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
-	//
-	// Sanity check: do not allow work order to be created
-	// when it is already part of a work order execution
-	//
+	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
 		return nil, errors.New("cannot create work order while executing another work order")
@@ -63,10 +71,11 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	}
 
 	err = order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
-		ToState:  params.State,
-		Result:   params.Result,
-		Run:      c.runRef(),
-		SkipSame: true,
+		ToState:    params.State,
+		Result:     params.Result,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+		SkipSame:   true,
 	})
 	if err != nil {
 		return nil, err
@@ -86,13 +95,8 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		return errors.New("comment body is required")
 	}
 
-	//
-	// Canvas comments are always attributed to `automation` — the tool that
-	// wrote the note is exposed through the `Automation` payload (node +
-	// app), not a free-form `llm` / `system` enum. Human attribution is
-	// only available through the interactive API, which reads the
-	// authenticated caller's id and writes `kind = user`.
-	//
+	// Canvas comments always attribute to `automation`; user comments
+	// only come from the interactive API path.
 	author := factory.WorkOrderCommentAuthor{
 		Kind:       factory.CommentAuthorKindAutomation,
 		Automation: c.automationRef(),
@@ -108,12 +112,12 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	}
 
 	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
-		Type:  params.Type,
-		URL:   params.URL,
-		Title: params.Title,
-		Body:  params.Body,
-		Data:  params.Data,
-		Run:   c.runRef(),
+		Type:       params.Type,
+		URL:        params.URL,
+		Title:      params.Title,
+		Data:       params.Data,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
 	})
 	if err != nil {
 		return nil, err
@@ -122,17 +126,9 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	return artifactToCore(artifact)
 }
 
-// currentWorkOrder resolves the work order that owns the currently
-// executing canvas run. Factory work-order components (update status,
-// add comment, add artifact) only make sense in the context of a
-// running work order — we look up that link through the run rather
-// than asking the component author to supply the ID by hand.
-//
-// The link is the `factory_work_order_executions` row that
-// `DispatchWorkOrder` created for this run. Canvas runs that were not
-// started as part of a work-order dispatch have no such row; in that
-// case we return a clear error so the component fails fast instead of
-// silently writing to nothing.
+// currentWorkOrder resolves the work order that owns the current run
+// via its `factory_work_order_executions` row (created by
+// `DispatchWorkOrder`). Runs not attached to a work order fail fast.
 func (c *FactoryContext) currentWorkOrder() (*models.FactoryWorkOrder, error) {
 	if c.canvas.FactoryID == nil {
 		return nil, errors.New("app is not owned by a factory")
@@ -157,8 +153,7 @@ func (c *FactoryContext) currentWorkOrder() (*models.FactoryWorkOrder, error) {
 	return f.FindWorkOrder(c.tx, execution.WorkOrderID)
 }
 
-// runRef returns a lightweight reference to the current run so events written
-// from a canvas can be attributed back to the emitting execution.
+// runRef attributes emitted events back to the currently executing run.
 func (c *FactoryContext) runRef() *factory.RunRef {
 	if c.execution == nil {
 		return nil
@@ -169,11 +164,8 @@ func (c *FactoryContext) runRef() *factory.RunRef {
 	}
 }
 
-// automationRef captures the identity of the executing canvas node (and
-// its owning app) so timeline consumers can render "commented via
-// <node> in <app>" without inferring the source from a free-form
-// author label. Failure to resolve the node is soft: we still emit the
-// comment with whatever we know rather than dropping the whole event.
+// automationRef captures node/app/line/step identity for timeline
+// attribution. Missing fields are tolerated so the event still lands.
 func (c *FactoryContext) automationRef() *factory.AutomationRef {
 	if c.execution == nil || c.canvas == nil {
 		return nil
@@ -190,7 +182,53 @@ func (c *FactoryContext) automationRef() *factory.AutomationRef {
 		ref.NodeName = node.Name
 	}
 
+	if info, ok := c.lineStep(); ok {
+		ref.LineID = info.LineID
+		ref.LineName = info.LineName
+		ref.StepIndex = info.StepIndex
+		ref.StepName = info.StepName
+	}
+
 	return ref
+}
+
+// lineStep resolves the factory line + step that owns the current run
+// so events can be attributed back to the pipeline the user configured.
+// Runs not attached to a work order (e.g. `CreateWorkOrder`) return
+// ok=false and callers omit the fields.
+func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
+	if c.lineStepOnce {
+		return c.lineStepCache, c.lineStepLoaded
+	}
+	c.lineStepOnce = true
+
+	if c.execution == nil || c.canvas == nil || c.canvas.FactoryID == nil {
+		return lineStepInfo{}, false
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
+	if err != nil {
+		return lineStepInfo{}, false
+	}
+
+	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	if err != nil {
+		return lineStepInfo{}, false
+	}
+
+	line, err := f.FindLine(c.tx, execution.LineID)
+	if err != nil {
+		return lineStepInfo{}, false
+	}
+
+	c.lineStepCache = lineStepInfo{
+		LineID:    line.ID,
+		LineName:  line.Name,
+		StepIndex: execution.StepIndex,
+		StepName:  execution.StepName,
+	}
+	c.lineStepLoaded = true
+	return c.lineStepCache, true
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
@@ -217,7 +255,6 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 		Type:        artifact.Type,
 		URL:         artifact.URL,
 		Title:       artifact.Title,
-		Body:        artifact.Body,
 		Data:        data,
 	}, nil
 }

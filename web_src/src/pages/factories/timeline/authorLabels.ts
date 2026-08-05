@@ -7,13 +7,8 @@ export interface CommentAuthorLabelInput {
   actorName: string | null | undefined;
 }
 
-//
-// Resolve the display name shown next to "commented" in the timeline.
-// Automation / system comments prefer the executing node's identity
-// (node name + app) so reviewers can trace the comment back to the
-// canvas node that wrote it, instead of showing a free-form author
-// label. Human comments fall back to the resolved actor name.
-//
+// Automation/system comments show the executing node's identity;
+// human comments fall back to the resolved actor name.
 export function resolveCommentAuthorLabel({
   isAutomation,
   isSystem,
@@ -33,17 +28,14 @@ export function resolveCommentAuthorLabel({
   return actorName || "Someone";
 }
 
-function formatAutomationLabel(nodeName: string | undefined, appName: string | undefined): string | undefined {
+export function formatAutomationLabel(nodeName: string | undefined, appName: string | undefined): string | undefined {
   if (nodeName && appName) {
     return `${nodeName} · ${appName}`;
   }
   return nodeName || appName;
 }
 
-//
-// Long-form label for an artifact kind, used inside the sentence
-// "<actor> attached a <kind>" in the activity timeline body.
-//
+// Long-form label used in "<actor> attached a <kind>".
 const ARTIFACT_KIND_LONG_LABEL: Record<string, string> = {
   pr: "pull request",
   markdown: "note",

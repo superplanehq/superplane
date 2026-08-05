@@ -381,7 +381,6 @@ CREATE TABLE public.factory_work_order_artifacts (
     type character varying(32) NOT NULL,
     url text,
     title text,
-    body text,
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL

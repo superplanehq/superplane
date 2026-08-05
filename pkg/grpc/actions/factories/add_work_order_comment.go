@@ -48,15 +48,8 @@ func AddWorkOrderComment(
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to add work order comment")
 	}
 
-	//
-	// The REST/gRPC comment endpoint is the interactive path: the human
-	// hitting it is always the author. Automation-authored comments go
-	// through the `addWorkOrderComment` canvas component, which fills in
-	// `Automation` from the executing node instead of taking an author
-	// from the request. Keeping only `user` here removes the previous
-	// spoofing surface where any caller could stamp a comment as `llm`
-	// or `system`.
-	//
+	// Interactive endpoint: author is always the caller. Automation
+	// comments arrive through the canvas component with its own kind.
 	author := factory.WorkOrderCommentAuthor{
 		Kind:   factory.CommentAuthorKindUser,
 		UserID: &userIDStr,

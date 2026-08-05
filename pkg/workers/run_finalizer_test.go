@@ -615,11 +615,8 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
 }
 
-// dispatchWorkOrderForTest promotes a freshly created work order to
-// `open`, mirroring what the dispatch API does before starting the
-// first step. Work orders now default to `draft` and only `open`
-// orders advance in the run finalizer, so tests that manually poke
-// `StartStep` need this helper.
+// dispatchWorkOrderForTest promotes a draft order to open, mirroring
+// the dispatch API — needed by tests that poke `StartStep` directly.
 func dispatchWorkOrderForTest(t *testing.T, order *models.FactoryWorkOrder) {
 	t.Helper()
 	require.NoError(t, order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{

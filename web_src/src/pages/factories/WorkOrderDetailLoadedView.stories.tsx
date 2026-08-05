@@ -92,7 +92,6 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     isAssigneesSaving: false,
     isUpdatingStatus: false,
     isAddingComment: false,
-    isAddingArtifact: false,
     onDispatch: async (lineName: string) => {
       console.log("dispatch", lineName);
     },
@@ -107,9 +106,6 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     },
     onAddComment: async (body: string) => {
       console.log("comment", body);
-    },
-    onAddArtifact: async (artifact: unknown) => {
-      console.log("artifact", artifact);
     },
   };
 }

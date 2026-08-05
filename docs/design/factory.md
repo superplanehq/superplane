@@ -12,7 +12,7 @@ Behind the experimental feature flag `factories` (`pkg/features/features.go`). E
 | **Line** | Named sequence of steps. Each step runs one factory app entrypoint. |
 | **Step** | Type `runApp` today. References a factory-owned canvas by ID and an `onRun` trigger node as entrypoint. |
 | **Work order** | Unit of work: title, description, assignees, `created_by`. States: `draft` → `open` → `closed` (with reopen). Close result: `completed`, `rejected`, or `failed`. |
-| **Work-order artifact** | Typed output attached to a work order (`pr` with a required URL, or `markdown` with an inline body). Optional structured `data` for richer PR metadata. |
+| **Work-order artifact** | Typed output attached to a work order (`pr` with a required URL, or `markdown` note). All extra content lives in a free-form JSONB `data` map — markdown notes typically use `data.body` for the inline content. |
 | **Execution** | One line step run for a work order. Links to a canvas run; tracks pending / running / finished and pass / fail / cancel. |
 | **Factory app** | Canvas with `factory_id` set. Listed under the factory; steps must point at these apps. |
 
@@ -85,7 +85,7 @@ Every transition writes an `order.status.updated` event (`fromState`, `toState`,
 ## Comments and artifacts
 
 - **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is one of `user`, `automation`, or `system`. `user` comments carry the authenticated caller's id; `automation` and `system` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation / system comments show a small badge.
-- **Artifacts** are first-class rows in `factory_work_order_artifacts`. Each artifact has a required `type` (`pr` or `markdown`) plus optional `title`, `url`, `body`, and JSONB `data`. `pr` requires `url`; `markdown` requires `body`. Any provided `url` must be an absolute `http(s)` URL with a host — the model rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs so a user with `factories:update` cannot smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event. The Work Order detail sidebar lists artifacts and offers an **Attach** dialog.
+- **Artifacts** are first-class rows in `factory_work_order_artifacts`. Each artifact has a required `type` (`pr` or `markdown`) plus optional `title`, `url`, and a free-form JSONB `data` map. `pr` requires `url`; markdown notes conventionally place their inline content under `data.body`. Any provided `url` must be an absolute `http(s)` URL with a host — the model rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs so a user with `factories:update` cannot smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts and offers an **Attach** dialog.
 
 ## API
 
@@ -116,7 +116,7 @@ Built-in factory components in `pkg/components/factory/`, registered on the stan
 | `createWorkOrder` | `title`, `description`, `assignees[]` | Creates a work order in `draft`. |
 | `updateWorkOrderStatus` | `workOrderId`, `status` (`draft`/`open`/`closed`), conditional `result` (`completed`/`rejected`/`failed`, required for `closed`) | Runs the FSM and records `order.status.updated`. |
 | `addWorkOrderComment` | `body` | Appends an `order.comment.added` event. Authorship is derived from the executing canvas node (`kind = automation`, `automation = { nodeName, appName }`). |
-| `addWorkOrderArtifact` | `artifactType` (`pr`/`markdown`), conditional `url`/`title`/`body`, optional free-form `data` (`{name, value}` list) | Creates the artifact row + `order.artifact.added` event. |
+| `addWorkOrderArtifact` | `artifactType` (`pr`/`markdown`), conditional `url`, optional `title`, free-form `data` (`{name, value}` list — use `body` for markdown notes) | Creates the artifact row + `order.artifact.added` event. |
 
 Components target the work order that owns the current canvas run — the link is the `factory_work_order_executions` row created when the run was dispatched, so component authors don't have to (and can't) supply the work order ID by hand. Canvas invocations record the current `run` reference on the emitted events (comments also carry the executing node / app on the author payload); no acting user is attributed.
 

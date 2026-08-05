@@ -6,11 +6,7 @@ import { factoryCountBadgeClassName, factoryDetailMainClassName } from "./lib/fa
 import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 
 interface FactoryDetailWorkOrdersPanelProps {
-  //
-  // Number of work orders in an active state (draft / ready / open /
-  // running / failed). Matches the default status filter and the header
-  // badge count.
-  //
+  // Work orders in an active state (matches the default status filter).
   activeWorkOrderCount: number;
   ownerFilter: WorkOrderOwnerFilter;
   statusFilter: WorkOrderStatusFilter;

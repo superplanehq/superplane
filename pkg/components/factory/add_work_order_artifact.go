@@ -18,11 +18,8 @@ func init() {
 
 type AddWorkOrderArtifact struct{}
 
-// Data is a free-form list of `{name, value}` entries the component
-// author fills in per invocation. We turn it into a `map[string]any`
-// before handing it to the context so callers downstream still see
-// familiar structured metadata; keeping the config as a list avoids
-// baking a fixed PR schema into the component (see PR #6569 review).
+// ArtifactDataEntry is one {name, value} row in the free-form data
+// list; flattened into `map[string]any` at Execute time.
 type ArtifactDataEntry struct {
 	Name  string `json:"name" mapstructure:"name"`
 	Value string `json:"value" mapstructure:"value"`
@@ -32,7 +29,6 @@ type AddWorkOrderArtifactConfiguration struct {
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
 	Title        string              `json:"title" mapstructure:"title"`
-	Body         string              `json:"body" mapstructure:"body"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -49,7 +45,7 @@ func (c *AddWorkOrderArtifact) Description() string {
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required) and markdown notes (an inline body is required). Free-form metadata can be attached as name/value pairs. This component can only be used in factory-owned apps.`
+	return `The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required) and markdown notes. Free-form metadata can be attached as name/value pairs — markdown notes typically use a ` + "`body`" + ` entry for the inline content. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -85,7 +81,6 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prVisibility := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
-	markdownVisibility := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 
 	return []configuration.Field{
 		{
@@ -124,25 +119,9 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}},
 		},
 		{
-			Name:                 "body",
-			Label:                "Body",
-			Description:          "Markdown body stored inline with the artifact",
-			Type:                 configuration.FieldTypeText,
-			Required:             false,
-			VisibilityConditions: markdownVisibility,
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "artifactType", Values: []string{"markdown"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Text: &configuration.TextTypeOptions{
-					Language: "markdown",
-				},
-			},
-		},
-		{
 			Name:        "data",
 			Label:       "Metadata",
-			Description: "Free-form name/value pairs stored alongside the artifact (e.g. PR number, provider, refs)",
+			Description: "Free-form name/value pairs stored alongside the artifact (e.g. PR number, provider, refs; use `body` for markdown notes)",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
 			TypeOptions: &configuration.TypeOptions{
@@ -173,7 +152,6 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		Type:  config.ArtifactType,
 		URL:   config.URL,
 		Title: config.Title,
-		Body:  config.Body,
 		Data:  data,
 	})
 	if err != nil {
@@ -217,10 +195,8 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-// artifactDataToMap flattens the free-form `{name, value}` entries the
-// component author configured into the `map[string]any` shape the model
-// layer expects. Duplicate names take the last value written, matching
-// how the UI would render them in-order.
+// artifactDataToMap flattens the list into a map; blank names are
+// skipped and duplicate names take the last value written.
 func artifactDataToMap(entries []ArtifactDataEntry) map[string]any {
 	if len(entries) == 0 {
 		return nil

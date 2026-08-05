@@ -1,3 +1,4 @@
 export { ArtifactTimelineBody } from "./ArtifactTimelineBody";
 export { CommentTimelineBody } from "./CommentTimelineBody";
-export { formatArtifactKindLong, resolveCommentAuthorLabel } from "./authorLabels";
+export { TimelineAutomationActor } from "./TimelineAutomationActor";
+export { formatArtifactKindLong, formatAutomationLabel, resolveCommentAuthorLabel } from "./authorLabels";

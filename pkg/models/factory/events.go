@@ -5,9 +5,7 @@ import (
 )
 
 const (
-	//
 	// Work order events
-	//
 	EventTypeOrderOpened           = "order.opened"
 	EventTypeOrderClosed           = "order.closed"
 	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
@@ -15,20 +13,13 @@ const (
 	EventTypeOrderCommentAdded     = "order.comment.added"
 	EventTypeOrderArtifactAdded    = "order.artifact.added"
 
-	//
 	// Factory line events
-	//
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
 	EventTypeLineStepExecutionFinished = "step.execution.finished"
 )
 
-// Comment author kinds.
-//
-// `automation` covers any comment written by a canvas run (LLM node,
-// system node, custom automation) — the specific tool is exposed
-// through the `Automation` payload rather than a separate `llm` /
-// `system` kind, so downstream consumers can render "commented via
-// <node> in <app>" without inspecting a fixed enum.
+// Comment author kinds. `automation` covers any canvas-run comment;
+// the specific tool is exposed via the `Automation` payload.
 const (
 	CommentAuthorKindUser       = "user"
 	CommentAuthorKindAutomation = "automation"
@@ -41,19 +32,19 @@ const (
 	ArtifactTypeMarkdown = "markdown"
 )
 
-//
 // Events
-//
 
 type WorkOrderOpened struct {
-	Order *WorkOrderRef `json:"order,omitempty"`
-	User  *UserRef      `json:"user,omitempty"`
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	User       *UserRef       `json:"user,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
 }
 
 type WorkOrderClosed struct {
-	Order  *WorkOrderRef `json:"order,omitempty"`
-	User   *UserRef      `json:"user,omitempty"`
-	Result *string       `json:"result,omitempty"`
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	User       *UserRef       `json:"user,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Result     *string        `json:"result,omitempty"`
 }
 
 type WorkOrderAssigneesUpdated struct {
@@ -64,24 +55,28 @@ type WorkOrderAssigneesUpdated struct {
 }
 
 type WorkOrderStatusUpdated struct {
-	Order      *WorkOrderRef `json:"order,omitempty"`
-	User       *UserRef      `json:"user,omitempty"`
-	Run        *RunRef       `json:"run,omitempty"`
-	FromState  string        `json:"fromState"`
-	ToState    string        `json:"toState"`
-	FromResult string        `json:"fromResult,omitempty"`
-	ToResult   string        `json:"toResult,omitempty"`
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	User       *UserRef       `json:"user,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
+	FromState  string         `json:"fromState"`
+	ToState    string         `json:"toState"`
+	FromResult string         `json:"fromResult,omitempty"`
+	ToResult   string         `json:"toResult,omitempty"`
 }
 
-// AutomationRef identifies the canvas node + app that produced an
-// automated comment (kind `automation` / `system`). The values are
-// captured at write time so the timeline stays stable even if the node
-// or app is later renamed or removed.
+// AutomationRef snapshots the canvas node + app + factory line/step
+// behind an automated event. Captured at write time so later renames
+// don't retro-edit history.
 type AutomationRef struct {
-	NodeID   string    `json:"nodeId,omitempty"`
-	NodeName string    `json:"nodeName,omitempty"`
-	AppID    uuid.UUID `json:"appId,omitempty"`
-	AppName  string    `json:"appName,omitempty"`
+	NodeID    string    `json:"nodeId,omitempty"`
+	NodeName  string    `json:"nodeName,omitempty"`
+	AppID     uuid.UUID `json:"appId,omitempty"`
+	AppName   string    `json:"appName,omitempty"`
+	LineID    uuid.UUID `json:"lineId,omitempty"`
+	LineName  string    `json:"lineName,omitempty"`
+	StepIndex int       `json:"stepIndex,omitempty"`
+	StepName  string    `json:"stepName,omitempty"`
 }
 
 type WorkOrderCommentAuthor struct {
@@ -98,10 +93,11 @@ type WorkOrderCommentAdded struct {
 }
 
 type WorkOrderArtifactAdded struct {
-	Order    *WorkOrderRef `json:"order,omitempty"`
-	Artifact *ArtifactRef  `json:"artifact,omitempty"`
-	User     *UserRef      `json:"user,omitempty"`
-	Run      *RunRef       `json:"run,omitempty"`
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Artifact   *ArtifactRef   `json:"artifact,omitempty"`
+	User       *UserRef       `json:"user,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
 }
 
 type LineStepExecutionCreated struct {
@@ -120,9 +116,7 @@ type LineStepExecutionFinished struct {
 	Run      *RunRef       `json:"run,omitempty"`
 }
 
-//
 // Refs
-//
 
 type WorkOrderRef struct {
 	ID     uuid.UUID `json:"id"`
@@ -150,12 +144,9 @@ type RunRef struct {
 }
 
 type ArtifactRef struct {
-	ID    uuid.UUID `json:"id"`
-	Type  string    `json:"type"`
-	URL   string    `json:"url,omitempty"`
-	Title string    `json:"title,omitempty"`
-	// Body carries the inline markdown for `markdown` artifacts so the
-	// activity timeline can render it without a separate artifact fetch.
-	// Omitted for `pr` artifacts.
-	Body string `json:"body,omitempty"`
+	ID    uuid.UUID      `json:"id"`
+	Type  string         `json:"type"`
+	URL   string         `json:"url,omitempty"`
+	Title string         `json:"title,omitempty"`
+	Data  map[string]any `json:"data,omitempty"`
 }

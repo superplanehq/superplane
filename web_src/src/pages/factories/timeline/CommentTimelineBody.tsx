@@ -3,6 +3,7 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { OrgUserReference } from "../OrgUserReference";
 import type { WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
 import { resolveCommentAuthorLabel } from "./authorLabels";
+import { TimelineAutomationActor } from "./TimelineAutomationActor";
 
 export function CommentTimelineBody({
   event,
@@ -20,26 +21,27 @@ export function CommentTimelineBody({
   const isAutomation = kind === "automation";
   const isSystem = kind === "system";
   const showAutomationBadge = isAutomation || isSystem;
-  //
-  // For automation / system comments we deliberately ignore actorDisplay
-  // and render the automation identity instead — the OrgUserReference
-  // avatar would misrepresent an automated note as a human comment.
-  //
-  const authorLabel = resolveCommentAuthorLabel({
+  const shouldRenderActor = actorDisplay && !showAutomationBadge;
+  const shouldRenderAutomationActor = showAutomationBadge && Boolean(event.actorAutomation ?? comment.automation);
+  const fallbackAuthorLabel = resolveCommentAuthorLabel({
     isAutomation,
     isSystem,
     automation: comment.automation,
     actorName: actorDisplay?.name,
   });
-  const shouldRenderActor = actorDisplay && !showAutomationBadge;
 
   return (
     <div>
       <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
         {shouldRenderActor ? (
           <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+        ) : shouldRenderAutomationActor ? (
+          <TimelineAutomationActor
+            actor={event.actorAutomation ?? comment.automation!}
+            fallbackLabel={isSystem ? "System" : "Automation"}
+          />
         ) : (
-          <span className="font-semibold">{authorLabel}</span>
+          <span className="font-semibold">{fallbackAuthorLabel}</span>
         )}
         <span>commented</span>
         {showAutomationBadge ? (

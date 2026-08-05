@@ -1,5 +1,4 @@
 import {
-  factoriesAddWorkOrderArtifact,
   factoriesAddWorkOrderComment,
   factoriesCloseWorkOrder,
   factoriesCreateFactory,
@@ -20,7 +19,6 @@ import {
   factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
 import type {
-  FactoriesAddWorkOrderArtifactBody,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -407,34 +405,6 @@ export function useWorkOrderArtifacts(organizationId: string, factoryId: string,
       return response.data?.artifacts ?? [];
     },
     enabled: Boolean(organizationId && factoryId && orderId),
-  });
-}
-
-export function useAddWorkOrderArtifact(organizationId: string, factoryId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: { orderId: string; artifact: FactoriesAddWorkOrderArtifactBody }) => {
-      const response = await factoriesAddWorkOrderArtifact(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, orderId: input.orderId },
-          body: input.artifact,
-        }),
-      );
-      if (!response.data?.artifact) {
-        throw new Error("Failed to add artifact");
-      }
-      return response.data.artifact;
-    },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: workOrderArtifactsKey(organizationId, factoryId, variables.orderId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
-      });
-    },
   });
 }
 

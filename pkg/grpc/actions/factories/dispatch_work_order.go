@@ -84,10 +84,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		//
-		// Promote ready → open before we start the first step. Idempotent for
-		// orders already in `open` state.
-		//
+		// Promote draft → open before the first step; no-op if already open.
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}

@@ -313,12 +313,8 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		}
 	}
 
-	//
-	// Record the creation as a status transition into `draft`. Callers can
-	// look at `order.status.updated` with `fromState == ""` to detect the
-	// initial creation event without a separate event type.
-	//
-	if err := order.RecordStatusUpdated(tx, createdBy, nil, "", FactoryWorkOrderStateDraft, "", ""); err != nil {
+	// Creation is a status transition into `draft` (fromState == "").
+	if err := order.RecordStatusUpdated(tx, createdBy, nil, nil, "", FactoryWorkOrderStateDraft, "", ""); err != nil {
 		return nil, err
 	}
 

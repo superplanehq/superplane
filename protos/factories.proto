@@ -83,9 +83,7 @@ service Factories {
     };
   }
 
-  //
   // Factory line APIs
-  //
 
   rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
     option (google.api.http) = {
@@ -111,9 +109,7 @@ service Factories {
     };
   }
 
-  //
   // Factory app APIs
-  //
 
   rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
     option (google.api.http) = {
@@ -126,9 +122,7 @@ service Factories {
     };
   }
 
-  //
   // Work orders APIs
-  //
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
     option (google.api.http) = {
@@ -246,22 +240,9 @@ service Factories {
     };
   }
 
-  rpc AddWorkOrderArtifact(AddWorkOrderArtifactRequest) returns (AddWorkOrderArtifactResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Add work order artifact";
-      description: "Attaches an artifact (PR, markdown) to a work order";
-      tags: "Factory";
-    };
-  }
 }
 
-//
 // Factories
-//
 
 message ListFactoriesRequest {}
 
@@ -365,9 +346,7 @@ message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
 }
 
-//
 // Work orders
-//
 
 message ListWorkOrdersRequest {
   string factory_id = 1;
@@ -405,13 +384,7 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
-    //
-    // Enum numbers are ordered so the pre-existing OPEN / CLOSED values
-    // keep the numbers they've always had; DRAFT is appended. Even
-    // though our protos are only used for JSON conversion (see
-    // AGENTS.md), stable numbers keep any snapshot or stored numeric
-    // enum consistent across versions.
-    //
+    // OPEN / CLOSED keep their original numbers; DRAFT appends.
     STATE_OPEN = 1;
     STATE_CLOSED = 2;
     STATE_DRAFT = 3;
@@ -527,9 +500,7 @@ message WorkOrderEvent {
   google.protobuf.Struct event = 3;
 }
 
-//
 // Status / comments / artifacts
-//
 
 message UpdateWorkOrderStatusRequest {
   string factory_id = 1;
@@ -569,12 +540,8 @@ message WorkOrderCommentAuthor {
 
   Kind kind = 1;
   string user_id = 2;
-  //
-  // Populated when kind is `automation` or `system` — identifies the
-  // canvas node (and its owning app) that wrote the comment so the
-  // timeline can render "commented via <node> in <app>" without any
-  // free-form author label.
-  //
+  // Populated for `automation` / `system`: identifies the canvas node
+  // (and app) that wrote the comment.
   AutomationRef automation = 3;
 }
 
@@ -594,20 +561,6 @@ message ListWorkOrderArtifactsResponse {
   repeated WorkOrderArtifact artifacts = 1;
 }
 
-message AddWorkOrderArtifactRequest {
-  string factory_id = 1;
-  string order_id = 2;
-  WorkOrderArtifact.Type type = 3;
-  string url = 4;
-  string title = 5;
-  string body = 6;
-  google.protobuf.Struct data = 7;
-}
-
-message AddWorkOrderArtifactResponse {
-  WorkOrderArtifact artifact = 1;
-}
-
 message WorkOrderArtifact {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -619,8 +572,7 @@ message WorkOrderArtifact {
   Type type = 2;
   string url = 3;
   string title = 4;
-  string body = 5;
-  google.protobuf.Struct data = 6;
-  UserRef created_by = 7;
-  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Struct data = 5;
+  UserRef created_by = 6;
+  google.protobuf.Timestamp created_at = 7;
 }

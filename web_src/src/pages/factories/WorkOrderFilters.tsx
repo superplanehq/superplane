@@ -3,11 +3,8 @@ import { factoryFilterPillActiveClassName, factoryFilterPillInactiveClassName } 
 import type { WorkOrderDisplayStatus, WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 import { getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
-//
-// `id` uses the filter key, `label` is a static fallback used for non-display
-// statuses (`all`, `active`); every other pill picks its label from
-// `getWorkOrderDisplayStatusMeta`.
-//
+// `label` is a fallback for non-display filters (`all`, `active`);
+// other pills resolve their label via `getWorkOrderDisplayStatusMeta`.
 const STATUS_FILTERS: Array<{ id: WorkOrderStatusFilter; label: string }> = [
   { id: "all", label: "All statuses" },
   { id: "active", label: "Active" },

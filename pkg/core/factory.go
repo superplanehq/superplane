@@ -25,7 +25,6 @@ type AddWorkOrderArtifactParams struct {
 	Type  string
 	URL   string
 	Title string
-	Body  string
 	Data  map[string]any
 }
 
@@ -43,6 +42,5 @@ type WorkOrderArtifact struct {
 	Type        string         `json:"type"`
 	URL         string         `json:"url,omitempty"`
 	Title       string         `json:"title,omitempty"`
-	Body        string         `json:"body,omitempty"`
 	Data        map[string]any `json:"data,omitempty"`
 }

@@ -1,10 +1,5 @@
-import type {
-  FactoriesAddWorkOrderArtifactBody,
-  FactoriesWorkOrderResult,
-  FactoriesWorkOrderState,
-} from "@/api-client";
+import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import {
-  useAddWorkOrderArtifact,
   useAddWorkOrderComment,
   useCloseWorkOrder,
   useDispatchWorkOrder,
@@ -21,7 +16,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   const addComment = useAddWorkOrderComment(organizationId, factoryId);
-  const addArtifact = useAddWorkOrderArtifact(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -67,16 +61,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleAddArtifact = async (artifact: FactoriesAddWorkOrderArtifactBody) => {
-    try {
-      await addArtifact.mutateAsync({ orderId, artifact });
-      showSuccessToast("Artifact attached.");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to attach artifact"));
-      throw error;
-    }
-  };
-
   const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
   const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
 
@@ -86,7 +70,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleClose,
     handleStatusChange,
     handleAddComment,
-    handleAddArtifact,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,
@@ -94,6 +77,5 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     isAssigneesSaving: updateAssignees.isPending,
     isUpdatingStatus: updateStatus.isPending,
     isAddingComment: addComment.isPending,
-    isAddingArtifact: addArtifact.isPending,
   };
 }

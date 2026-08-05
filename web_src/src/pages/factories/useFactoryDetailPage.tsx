@@ -21,11 +21,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
   const { data: me } = useMe(false);
   const [createAppOpen, setCreateAppOpen] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("mine");
-  //
-  // Default to "active" (draft/ready/open/running/failed) rather than "open"
-  // so newly-created work orders (which start as `draft`) show up under the
-  // default view.
-  //
+  // "active" covers draft/open/running/failed so new drafts show up by default.
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("active");
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);

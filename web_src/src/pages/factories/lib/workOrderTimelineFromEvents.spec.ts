@@ -215,4 +215,124 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       },
     });
   });
+
+  it("attributes automation-driven status changes with the factory line", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.status.updated",
+        event: {
+          automation: {
+            nodeName: "node-comment",
+            appName: "Factory-App",
+            lineName: "Plan",
+            stepName: "step-01",
+          },
+          fromState: "open",
+          toState: "draft",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "statusChanged",
+      actorAutomation: {
+        lineName: "Plan",
+        stepName: "step-01",
+        nodeName: "node-comment",
+      },
+    });
+  });
+
+  it("attributes automation-driven closes with the factory line", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.closed",
+        event: {
+          automation: {
+            nodeName: "node-comment",
+            appName: "Factory-App",
+            lineName: "Plan",
+            stepName: "step-01",
+          },
+          result: "completed",
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "closed",
+      actorAutomation: {
+        lineName: "Plan",
+        stepName: "step-01",
+        nodeName: "node-comment",
+      },
+      title: "closed as completed",
+    });
+  });
+
+  it("attributes automation-driven artifacts with the factory line", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: {
+            nodeName: "attach-artifact",
+            appName: "Factory-App",
+            lineName: "Plan",
+            stepName: "step-01",
+          },
+          artifact: { id: "art-1", type: "pr", url: "https://example.com/pull/1", title: "PR" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "artifactAdded",
+      actorAutomation: {
+        lineName: "Plan",
+        stepName: "step-01",
+        nodeName: "attach-artifact",
+      },
+    });
+  });
+
+  it("propagates comment automation into actorAutomation for the timeline", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              nodeName: "node-comment",
+              appName: "Factory-App",
+              lineName: "Plan",
+              stepName: "step-01",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "commented",
+      actorAutomation: {
+        lineName: "Plan",
+        stepName: "step-01",
+        nodeName: "node-comment",
+      },
+      comment: {
+        automation: {
+          lineName: "Plan",
+          stepName: "step-01",
+          nodeName: "node-comment",
+        },
+      },
+    });
+  });
 });

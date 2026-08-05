@@ -19,9 +19,7 @@ export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
 
-// Anchored to Date.now() at module load so `formatTimeAgo` renders the intended
-// "1 hour ago" / "yesterday" / "last week" labels regardless of when a story is
-// opened. (Absolute dates cause labels to drift over time.)
+// Relative timestamps so `formatTimeAgo` stays stable across story loads.
 const NOW_MS = Date.now();
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -179,9 +177,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   executions: [],
 };
 
-// Assignees include the storybook user so the running/failed variants surface
-// under the "mine + running" and "mine + failed" filters. Reviewer/operator
-// remain listed to demonstrate multi-assignee cards.
+// Storybook user is co-assigned so "mine + running" surfaces this order.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   title: "Add refund reconciliation test",
@@ -207,8 +203,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   ],
 };
 
-// Failed order stays authored by operator; storybook user co-assigned so the
-// "mine + failed" filter is meaningfully populated.
+// Storybook user is co-assigned so "mine + failed" surfaces this order.
 export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-failed-refunds",
   title: "Ship idempotent refund retries",
@@ -372,6 +367,17 @@ interface CommentAuthorFixture {
   };
 }
 
+interface AutomationRefFixture {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
+}
+
 function commentAddedEvent(
   order: FactoriesWorkOrder,
   at: string,
@@ -392,16 +398,41 @@ function commentAddedEvent(
 function artifactAddedEvent(
   order: FactoriesWorkOrder,
   at: string,
-  artifact: { id: string; type: "pr" | "markdown"; url?: string; title?: string; body?: string },
-  actor: { id: string } = { id: STORYBOOK_ME_USER_ID },
+  artifact: {
+    id: string;
+    type: "pr" | "markdown";
+    url?: string;
+    title?: string;
+    data?: Record<string, unknown>;
+  },
+  actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },
+  automation?: AutomationRefFixture,
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.artifact.added",
     timestamp: at,
     event: {
-      user: { id: actor.id },
+      ...(actor ? { user: { id: actor.id } } : {}),
+      ...(automation ? { automation } : {}),
       order: { id: order.id, title: order.title },
       artifact,
+    },
+  };
+}
+
+function automationClosedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  result: "completed" | "failed" | "rejected",
+  automation: AutomationRefFixture,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.closed",
+    timestamp: at,
+    event: {
+      automation,
+      order: { id: order.id, title: order.title },
+      result,
     },
   };
 }
@@ -427,19 +458,16 @@ export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       id: "art-audit-report",
       type: "markdown",
       title: "Reconciliation report",
-      body: "Ledger totals mismatched by $412.66 — see attached JIRA for follow-up.",
+      data: { body: "Ledger totals mismatched by $412.66 — see attached JIRA for follow-up." },
     },
     { id: OPERATOR_USER.id },
   ),
-  {
-    type: "order.closed",
-    timestamp: YESTERDAY,
-    event: {
-      user: { id: OPERATOR_USER.id },
-      order: { id: CLOSED_FAILED_WORK_ORDER.id, title: CLOSED_FAILED_WORK_ORDER.title },
-      result: "failed",
-    },
-  },
+  automationClosedEvent(CLOSED_FAILED_WORK_ORDER, YESTERDAY, "failed", {
+    nodeName: "node-close",
+    appName: "Refund Diagnostics",
+    lineName: "Plan",
+    stepName: "step-01",
+  }),
 ];
 
 export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
@@ -595,9 +623,23 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       id: "art-md-1",
       type: "markdown",
       title: "Investigation notes",
-      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+      data: {
+        body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+      },
     },
     { id: REVIEWER_USER.id },
+  ),
+  artifactAddedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    {
+      id: "art-auto-1",
+      type: "pr",
+      url: "https://github.com/example/ledger/pull/483",
+      title: "Automated retry fix",
+    },
+    null,
+    { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },
   ),
 ];
 
@@ -614,7 +656,9 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
     id: "art-md-1",
     type: "TYPE_MARKDOWN",
     title: "Investigation notes",
-    body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+    data: {
+      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+    },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,
   },

@@ -165,13 +165,8 @@ function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
   return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
 }
 
-//
-// latestFinishedWorkOrderExecution returns the most recent finished
-// execution (by `updatedAt`, falling back to `createdAt`). Used by the
-// display-status logic so a passing retry supersedes an earlier failure,
-// and callers can fence the result against `order.updatedAt` to handle
-// reopens that don't dispatch again.
-//
+// Most recent finished execution (by `updatedAt`, fallback `createdAt`).
+// Callers fence against `order.updatedAt` to handle reopens.
 export function latestFinishedWorkOrderExecution(
   executions: FactoriesWorkOrderExecution[] | undefined,
 ): FactoriesWorkOrderExecution | null {

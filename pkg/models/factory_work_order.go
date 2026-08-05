@@ -41,15 +41,8 @@ var (
 		FactoryWorkOrderResultFailed,
 	}
 
-	//
-	// Allowed transitions between states. The updater always emits an
-	// `order.status.updated` event; explicit lifecycle events (`order.opened`,
-	// `order.closed`) remain for backwards compatibility with the timeline.
-	//
-	// Dispatching a `draft` order promotes it to `open` (see
-	// TransitionOnDispatch). `open → draft` supports "back to draft" edits.
-	// `closed → open` is the reopen path.
-	//
+	// Allowed transitions. `open → draft` is "back to draft"; `closed →
+	// open` is reopen. See TransitionOnDispatch for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen},
 		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
@@ -85,10 +78,8 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 	return o.State == FactoryWorkOrderStateClosed
 }
 
-// IsDispatchable reports whether the work order can be dispatched to a line.
-// Both `draft` and `open` work orders accept new dispatches; the first
-// dispatch from `draft` also transitions the order into `open` (see
-// TransitionOnDispatch).
+// IsDispatchable reports whether the work order can be dispatched;
+// the first dispatch from `draft` also promotes it to `open`.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
 }
@@ -106,13 +97,15 @@ func (FactoryWorkOrderAssignee) TableName() string {
 }
 
 // FactoryWorkOrderStatusUpdate captures a requested transition through the
-// shared status FSM. Actor / run are optional and populate the emitted event.
+// shared status FSM. Actor / Automation / Run are optional and populate
+// the emitted event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState  string
-	Result   string
-	Actor    *uuid.UUID
-	Run      *factory.RunRef
-	SkipSame bool // when true, no-op transitions to the current state succeed silently
+	ToState    string
+	Result     string
+	Actor      *uuid.UUID
+	Automation *factory.AutomationRef
+	Run        *factory.RunRef
+	SkipSame   bool // when true, no-op transitions to the current state succeed silently
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -143,10 +136,10 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
 }
 
-// UpdateStatus is the single writer for the work order lifecycle. It validates
-// the requested transition, updates the row, and records the corresponding
-// events (always `order.status.updated`; plus `order.opened` when the order
-// first enters `open`, and `order.closed` when it enters `closed`).
+// UpdateStatus is the single writer for the work order lifecycle: it
+// validates the transition, updates the row, and records the events
+// (always `order.status.updated`; plus the coarse `order.opened` on
+// the first draft → open and `order.closed` on any close).
 func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
 	toState := update.ToState
 	if !slices.Contains(factoryWorkOrderStates, toState) {
@@ -194,29 +187,20 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			return err
 		}
 
-		if err := o.RecordStatusUpdated(tx, update.Actor, update.Run, fromState, toState, fromResult, nextResult); err != nil {
+		if err := o.RecordStatusUpdated(tx, update.Actor, update.Automation, update.Run, fromState, toState, fromResult, nextResult); err != nil {
 			return err
 		}
 
-		//
-		// Preserve the pre-existing coarse events so old UI/timeline logic
-		// keeps working:
-		//
-		//   * `order.opened` fires only on the initial promotion from
-		//     `draft` (the "first opened" event, mirroring a dispatch).
-		//     Reopens from `closed` are covered by the
-		//     `order.status.updated` event alone so the timeline can
-		//     distinguish "opened" from "reopened".
-		//   * `order.closed` fires whenever the order becomes `closed`.
-		//
+		// `order.opened` marks the initial draft → open only, so the
+		// timeline can distinguish opens from reopens.
 		if toState == FactoryWorkOrderStateOpen && fromState == FactoryWorkOrderStateDraft {
-			if err := o.RecordOpened(tx, update.Actor); err != nil {
+			if err := o.RecordOpened(tx, update.Actor, update.Automation); err != nil {
 				return err
 			}
 		}
 
 		if toState == FactoryWorkOrderStateClosed {
-			if err := o.RecordClosed(tx, update.Actor, nextResult); err != nil {
+			if err := o.RecordClosed(tx, update.Actor, update.Automation, nextResult); err != nil {
 				return err
 			}
 		}
@@ -245,9 +229,8 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	return o, nil
 }
 
-// TransitionOnDispatch is called when the work order is being dispatched to a
-// factory line. Draft work orders promote to open at that moment; open ones
-// stay put. Any other state means the work order is not dispatchable.
+// TransitionOnDispatch promotes a draft order to open; open is a no-op.
+// Any other state rejects the dispatch.
 func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
 	if o.State == FactoryWorkOrderStateOpen {
 		return nil
@@ -349,9 +332,10 @@ func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
 	}
 }
 
-func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error {
+func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID, automation *factory.AutomationRef) error {
 	data := factory.WorkOrderOpened{
-		Order: o.Ref(),
+		Order:      o.Ref(),
+		Automation: automation,
 	}
 	if createdBy != nil {
 		data.User = &factory.UserRef{ID: *createdBy}
@@ -360,10 +344,11 @@ func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error
 	return o.recordEvent(tx, factory.EventTypeOrderOpened, data)
 }
 
-func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, result string) error {
+func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, automation *factory.AutomationRef, result string) error {
 	data := factory.WorkOrderClosed{
-		Order:  o.Ref(),
-		Result: &result,
+		Order:      o.Ref(),
+		Automation: automation,
+		Result:     &result,
 	}
 	if closedBy != nil {
 		data.User = &factory.UserRef{ID: *closedBy}
@@ -375,11 +360,13 @@ func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, result
 func (o *FactoryWorkOrder) RecordStatusUpdated(
 	tx *gorm.DB,
 	actor *uuid.UUID,
+	automation *factory.AutomationRef,
 	run *factory.RunRef,
 	fromState, toState, fromResult, toResult string,
 ) error {
 	data := factory.WorkOrderStatusUpdated{
 		Order:      o.Ref(),
+		Automation: automation,
 		Run:        run,
 		FromState:  fromState,
 		ToState:    toState,
@@ -413,12 +400,14 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	tx *gorm.DB,
 	artifact *factory.ArtifactRef,
 	actor *uuid.UUID,
+	automation *factory.AutomationRef,
 	run *factory.RunRef,
 ) error {
 	data := factory.WorkOrderArtifactAdded{
-		Order:    o.Ref(),
-		Artifact: artifact,
-		Run:      run,
+		Order:      o.Ref(),
+		Artifact:   artifact,
+		Automation: automation,
+		Run:        run,
 	}
 	if actor != nil {
 		data.User = &factory.UserRef{ID: *actor}

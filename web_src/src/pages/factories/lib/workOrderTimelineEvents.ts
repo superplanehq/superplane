@@ -47,17 +47,24 @@ export interface WorkOrderTimelineStatusChange {
   toResult?: string;
 }
 
-export interface WorkOrderTimelineCommentAutomation {
+export interface WorkOrderTimelineAutomationActor {
   nodeId?: string;
   nodeName?: string;
   appId?: string;
   appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
 }
+
+/** @deprecated use WorkOrderTimelineAutomationActor */
+export type WorkOrderTimelineCommentAutomation = WorkOrderTimelineAutomationActor;
 
 export interface WorkOrderTimelineComment {
   body: string;
   authorKind?: string;
-  automation?: WorkOrderTimelineCommentAutomation;
+  automation?: WorkOrderTimelineAutomationActor;
 }
 
 export interface WorkOrderTimelineArtifact {
@@ -65,7 +72,7 @@ export interface WorkOrderTimelineArtifact {
   type: string;
   url?: string;
   title?: string;
-  body?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface WorkOrderTimelineEvent {
@@ -74,6 +81,7 @@ export interface WorkOrderTimelineEvent {
   at: string;
   actorUserId?: string;
   actorName?: string;
+  actorAutomation?: WorkOrderTimelineAutomationActor;
   assigneeChange?: WorkOrderTimelineAssigneeChange;
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;

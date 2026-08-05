@@ -68,11 +68,6 @@ func TestAddWorkOrderComment_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	//
-	// `authorKind` and `authorLabel` were removed from the config —
-	// automation identity is derived from the executing canvas node.
-	// The only knob left is the comment body itself.
-	//
 	t.Run("accepts body-only configuration", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"body": "hello",
@@ -96,15 +91,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("requires body for markdown", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"artifactType": "markdown",
-		})
-		if err == nil {
-			t.Fatal("expected error for markdown without body")
-		}
-	})
-
 	t.Run("accepts valid pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "pr",
@@ -116,10 +102,12 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts valid markdown", func(t *testing.T) {
+	t.Run("accepts markdown with data-only body", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "markdown",
-			"body":         "notes",
+			"data": []any{
+				map[string]any{"name": "body", "value": "notes"},
+			},
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -127,11 +115,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	})
 
 	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
-		//
-		// Free-form data replaces the old PR-specific schema. Entries are
-		// name/value pairs the author fills in per invocation; the exec
-		// path flattens them to `map[string]any` before persisting.
-		//
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",

@@ -61,13 +61,8 @@ func (c *AddWorkOrderComment) OutputChannels(configuration any) []core.OutputCha
 }
 
 func (c *AddWorkOrderComment) Configuration() []configuration.Field {
-	//
-	// Author identity is derived from the executing canvas node (node
-	// name + app name) instead of being configured on the component.
-	// This keeps the timeline honest — you can always trace an automation
-	// comment back to the exact node that wrote it — and removes an
-	// author-spoofing footgun in canvas configs.
-	//
+	// Author identity is derived from the canvas node — no spoofable
+	// label lives in the component config.
 	return []configuration.Field{
 		{
 			Name:        "body",

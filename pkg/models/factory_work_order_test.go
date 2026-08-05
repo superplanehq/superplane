@@ -120,6 +120,55 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "automation-forward")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation", "", &userID, nil)
+	require.NoError(t, err)
+
+	automation := &factory.AutomationRef{
+		NodeID:    "node-comment",
+		NodeName:  "node-comment",
+		AppName:   "Factory-App",
+		LineName:  "Plan",
+		StepIndex: 0,
+		StepName:  "step-01",
+	}
+
+	require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		ToState:    FactoryWorkOrderStateOpen,
+		Automation: automation,
+	}))
+	require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		ToState:    FactoryWorkOrderStateClosed,
+		Result:     FactoryWorkOrderResultCompleted,
+		Automation: automation,
+	}))
+
+	events, err := order.ListEvents(database.Conn(), 50, nil)
+	require.NoError(t, err)
+
+	for _, eventType := range []string{
+		factory.EventTypeOrderStatusUpdated,
+		factory.EventTypeOrderOpened,
+		factory.EventTypeOrderClosed,
+	} {
+		matches := filterEventsOfType(events, eventType)
+		require.NotEmpty(t, matches, "no %s events emitted", eventType)
+		latest := matches[0]
+		var wrapper struct {
+			Automation *factory.AutomationRef `json:"automation"`
+		}
+		require.NoError(t, json.Unmarshal(latest.Data, &wrapper), "unmarshal %s", eventType)
+		require.NotNil(t, wrapper.Automation, "%s missing automation payload", eventType)
+		assert.Equal(t, "Plan", wrapper.Automation.LineName, "%s line", eventType)
+		assert.Equal(t, "step-01", wrapper.Automation.StepName, "%s step", eventType)
+		assert.Equal(t, "node-comment", wrapper.Automation.NodeName, "%s node", eventType)
+	}
+}
+
 func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -165,14 +214,6 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
 
-	t.Run("markdown requires a body", func(t *testing.T) {
-		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypeMarkdown,
-		})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
-	})
-
 	t.Run("pr rejects non-http(s) urls", func(t *testing.T) {
 		cases := []string{
 			"javascript:alert(1)",
@@ -198,7 +239,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 			Type: FactoryWorkOrderArtifactTypeMarkdown,
 			URL:  "javascript:alert(1)",
-			Body: "note body",
+			Data: map[string]any{"body": "note body"},
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
@@ -226,11 +267,11 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.Contains(t, eventTypes(events), factory.EventTypeOrderArtifactAdded)
 	})
 
-	t.Run("markdown event payload carries the inline body", func(t *testing.T) {
+	t.Run("markdown persists free-form data", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 			Type:      FactoryWorkOrderArtifactTypeMarkdown,
 			Title:     "Design notes",
-			Body:      "Investigation notes: retry policy exceeded idempotency window.",
+			Data:      map[string]any{"body": "Investigation notes: retry policy exceeded idempotency window."},
 			CreatedBy: &userID,
 		})
 		require.NoError(t, err)
@@ -244,8 +285,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
 		require.NotNil(t, payload.Artifact)
 		assert.Equal(t, FactoryWorkOrderArtifactTypeMarkdown, payload.Artifact.Type)
-		assert.Equal(t, "Investigation notes: retry policy exceeded idempotency window.", payload.Artifact.Body,
-			"markdown artifacts must include the body so the timeline can render it without a separate fetch")
+		assert.Equal(t, "Design notes", payload.Artifact.Title)
 	})
 }
 
@@ -294,6 +334,16 @@ func countEventsOfType(events []FactoryWorkOrderEvent, eventType string) int {
 		}
 	}
 	return count
+}
+
+func filterEventsOfType(events []FactoryWorkOrderEvent, eventType string) []FactoryWorkOrderEvent {
+	result := make([]FactoryWorkOrderEvent, 0)
+	for _, e := range events {
+		if e.Type == eventType {
+			result = append(result, e)
+		}
+	}
+	return result
 }
 
 func findEventOfType(t *testing.T, events []FactoryWorkOrderEvent, eventType string) FactoryWorkOrderEvent {

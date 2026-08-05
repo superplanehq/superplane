@@ -9,6 +9,7 @@ import { formatWorkOrderResult } from "./workOrderPresentation";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
+  WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineStep,
   WorkOrderTimelineViewModel,
@@ -47,6 +48,10 @@ interface EventAutomationRefPayload {
   nodeName?: string;
   appId?: string;
   appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
 }
 
 interface EventCommentAuthorPayload {
@@ -60,11 +65,12 @@ interface EventArtifactPayload {
   type?: string;
   url?: string;
   title?: string;
-  body?: string;
+  data?: Record<string, unknown>;
 }
 
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
+  automation?: EventAutomationRefPayload;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
   order?: {
@@ -213,6 +219,7 @@ function appendOpenedEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     title: "opened this work order",
   });
 }
@@ -254,12 +261,7 @@ function appendStatusUpdatedEvent(
   const toResult = payload.toResult ?? "";
   const fromResult = payload.fromResult ?? "";
 
-  //
-  // Initial creation: work orders are created directly in `draft` via a
-  // single `order.status.updated` with an empty `fromState` (see
-  // `CreateWorkOrder`). Render it as the timeline's `created` entry so it
-  // matches how the pre-draft world represented `order.opened`.
-  //
+  // Creation is emitted as `status.updated` with empty `fromState`.
   if (!fromState) {
     events.push({
       id: `created-${index}`,
@@ -267,24 +269,14 @@ function appendStatusUpdatedEvent(
       at,
       actorUserId: payload.user?.id,
       actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+      actorAutomation: toAutomationActor(payload.automation),
       title: "created this work order",
     });
     return;
   }
 
-  //
-  // The backend still emits paired coarse events for the transitions the old
-  // UI relies on; skip the duplicate `order.status.updated` when a paired
-  // event covers the same change so the timeline shows one visible entry per
-  // lifecycle change:
-  //
-  //   * `order.opened` fires only on the initial `draft → open` promotion
-  //     (mirroring a dispatch).
-  //   * `order.closed` fires on any transition into `closed`.
-  //
-  // Reopens (`closed → open`) are represented by this status-updated event
-  // alone.
-  //
+  // Skip status.updated when a coarse `order.opened` / `order.closed`
+  // event already covers the same change (one entry per transition).
   if (toState === "open" && fromState === "draft") {
     return;
   }
@@ -298,6 +290,7 @@ function appendStatusUpdatedEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     statusChange: { fromState, toState, fromResult, toResult },
     title: describeStatusTransition(fromState, toState),
   });
@@ -339,24 +332,18 @@ function appendCommentEvent(
   }
 
   const author = payload.author ?? {};
-  const automation = author.automation;
+  const automationActor = toAutomationActor(author.automation);
   events.push({
     id: `comment-${index}`,
     kind: "commented",
     at,
     actorUserId: author.userId ?? payload.user?.id,
     actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
+    actorAutomation: automationActor,
     comment: {
       body,
       authorKind: author.kind,
-      automation: automation
-        ? {
-            nodeId: automation.nodeId,
-            nodeName: automation.nodeName,
-            appId: automation.appId,
-            appName: automation.appName,
-          }
-        : undefined,
+      automation: automationActor,
     },
     title: "commented",
   });
@@ -380,23 +367,20 @@ function appendArtifactEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     artifact: {
       id: artifact.id,
       type: artifact.type,
       url: artifact.url,
       title: artifact.title,
-      body: artifact.body,
+      data: artifact.data,
     },
     title: describeArtifactAdded(artifact),
   });
 }
 
-//
-// Short-form artifact-kind label used in event descriptions like
-// "attached PR: <label>". Kept separate from the timeline body's
-// long-form label ("pull request") so callers can pick the phrasing
-// that reads best in context.
-//
+// Short-form artifact label ("PR", "note") for event descriptions.
+// See timeline/authorLabels.ts for the long form used in bodies.
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
   pr: "PR",
   markdown: "note",
@@ -415,11 +399,7 @@ function describeArtifactAdded(artifact: EventArtifactPayload): string {
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
 
-//
-// Map from the lowercase result stored in the event payload back to
-// the proto enum the presentation helpers expect. Kept as a map so we
-// don't grow a chained ternary every time a new result is added.
-//
+// Event payload result → proto enum the presentation helpers expect.
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
@@ -442,8 +422,34 @@ function appendClosedEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     title: result ? `closed as ${result.toLowerCase()}` : "closed this work order",
   });
+}
+
+function toAutomationActor(
+  payload: EventAutomationRefPayload | undefined,
+): WorkOrderTimelineAutomationActor | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const anySet =
+    payload.nodeId || payload.nodeName || payload.appId || payload.appName || payload.lineId || payload.lineName;
+  if (!anySet) {
+    return undefined;
+  }
+
+  return {
+    nodeId: payload.nodeId,
+    nodeName: payload.nodeName,
+    appId: payload.appId,
+    appName: payload.appName,
+    lineId: payload.lineId,
+    lineName: payload.lineName,
+    stepIndex: payload.stepIndex,
+    stepName: payload.stepName,
+  };
 }
 
 function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
