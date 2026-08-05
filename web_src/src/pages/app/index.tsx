@@ -1279,8 +1279,11 @@ export function AppPage() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
-    [triggers, components, availableIntegrations],
+    () =>
+      buildBuildingBlockCategories(triggers, components, availableIntegrations, {
+        isFactoryApp: Boolean(canvas?.metadata?.factoryId),
+      }),
+    [triggers, components, availableIntegrations, canvas?.metadata?.factoryId],
   );
   const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasNodesById = useMemo(() => {
@@ -4146,6 +4149,7 @@ export function AppPage() {
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
+          factoryId={canvas?.metadata?.factoryId}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           showCanvasSettingsMenu={canUpdateCanvas}

@@ -152,6 +152,18 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 		return nil, nil, nil
 	}
 
+	if err := models.SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {
+		return nil, nil, fmt.Errorf("soft delete organization factories: %w", err)
+	}
+
+	remainingFactories, err := models.CountFactoriesByOrganization(tx, organization.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("count remaining factories: %w", err)
+	}
+	if remainingFactories > 0 {
+		return nil, nil, nil
+	}
+
 	organizationSessions, err := models.ListAgentSessionsForOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list organization agent sessions: %w", err)
