@@ -3,6 +3,8 @@ import { formatTimeAgo } from "@/lib/date";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
 
+import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "./lib/workOrderArtifact";
+
 interface WorkOrderArtifactsPanelProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isLoading: boolean;
@@ -38,9 +40,9 @@ export function WorkOrderArtifactsPanel({ artifacts, isLoading, error }: WorkOrd
 function WorkOrderArtifactRow({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
   const isPr = artifact.type === "TYPE_PR";
   const safeUrl = safeExternalUrl(artifact.url);
-  const label = artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
-  // Markdown content lives under `data.body`.
-  const markdownBody = !isPr ? extractStringField(artifact.data, "body") : undefined;
+  const prLabel = isPr ? formatPrArtifactLabel(toDataRecord(artifact.data)) : undefined;
+  const label = prLabel || artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
+  const markdownBody = !isPr ? extractArtifactMarkdownBody(toDataRecord(artifact.data)) : undefined;
 
   return (
     <li className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700/70 dark:bg-gray-900/40">
@@ -79,10 +81,6 @@ function WorkOrderArtifactRow({ artifact }: { artifact: FactoriesWorkOrderArtifa
   );
 }
 
-function extractStringField(data: unknown, key: string): string | undefined {
-  if (!data || typeof data !== "object") {
-    return undefined;
-  }
-  const value = (data as Record<string, unknown>)[key];
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+function toDataRecord(data: unknown): Record<string, unknown> | undefined {
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
 }

@@ -4,6 +4,7 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import { OrgUserReference } from "../OrgUserReference";
+import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "../lib/workOrderArtifact";
 import type { WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
 import { formatArtifactKindLong } from "./authorLabels";
 import { TimelineAutomationActor } from "./TimelineAutomationActor";
@@ -23,8 +24,9 @@ export function ArtifactTimelineBody({
   const isPr = artifact.type === "pr";
   const isMarkdown = artifact.type === "markdown";
   const safeUrl = safeExternalUrl(artifact.url);
-  const label = artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
-  const markdownBody = isMarkdown ? extractStringField(artifact.data, "body") : undefined;
+  const prLabel = isPr ? formatPrArtifactLabel(artifact.data) : undefined;
+  const label = prLabel || artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
+  const markdownBody = isMarkdown ? extractArtifactMarkdownBody(artifact.data) : undefined;
   const automationActor = event.actorAutomation;
 
   return (
@@ -73,11 +75,3 @@ export function ArtifactTimelineBody({
   );
 }
 
-// Markdown content lives under `data.body`; missing/non-string returns undefined.
-function extractStringField(data: Record<string, unknown> | undefined, key: string): string | undefined {
-  if (!data) {
-    return undefined;
-  }
-  const value = data[key];
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
-}
