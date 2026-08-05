@@ -342,3 +342,70 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
 	assert.Equal(t, int64(0), runCount)
 }
+
+// Reverting an open work order back to draft while a step is still running
+// would leave the executor and FSM out of sync; UpdateStatus must reject it
+// with the same guard DispatchWorkOrder uses.
+func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActive(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil)
+	require.NoError(t, err)
+	require.NoError(t, order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	}))
+
+	line, err := factory.CreateLine(db, "line", nil)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	now := time.Now()
+	execution := models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		StepIndex:      0,
+		StepName:       "step",
+		RunID:          run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, db.Create(&execution).Error)
+
+	err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateDraft,
+		Actor:   &r.User,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionActive)
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State,
+		"failed back-to-draft must not mutate the row")
+
+	require.NoError(t, execution.MarkFinished(db, models.FactoryWorkOrderResultCompleted))
+
+	require.NoError(t, order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateDraft,
+		Actor:   &r.User,
+	}))
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+}

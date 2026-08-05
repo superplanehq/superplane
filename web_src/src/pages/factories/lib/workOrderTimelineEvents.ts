@@ -14,7 +14,14 @@ import {
 } from "@/lib/orgUserDisplay";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
-export type WorkOrderTimelineEventKind = "created" | "dispatched" | "assigned" | "closed";
+export type WorkOrderTimelineEventKind =
+  | "created"
+  | "dispatched"
+  | "assigned"
+  | "statusChanged"
+  | "commented"
+  | "artifactAdded"
+  | "closed";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
 export type { OrgUserDisplayLookup };
 
@@ -33,13 +40,52 @@ export interface WorkOrderTimelineAssigneeChange {
   unassignedUserIds: string[];
 }
 
+export interface WorkOrderTimelineStatusChange {
+  fromState?: string;
+  toState: string;
+  fromResult?: string;
+  toResult?: string;
+}
+
+export interface WorkOrderTimelineAutomationActor {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
+}
+
+/** @deprecated use WorkOrderTimelineAutomationActor */
+export type WorkOrderTimelineCommentAutomation = WorkOrderTimelineAutomationActor;
+
+export interface WorkOrderTimelineComment {
+  body: string;
+  authorKind?: string;
+  automation?: WorkOrderTimelineAutomationActor;
+}
+
+export interface WorkOrderTimelineArtifact {
+  id?: string;
+  type: string;
+  url?: string;
+  title?: string;
+  data?: Record<string, unknown>;
+}
+
 export interface WorkOrderTimelineEvent {
   id: string;
   kind: WorkOrderTimelineEventKind;
   at: string;
   actorUserId?: string;
   actorName?: string;
+  actorAutomation?: WorkOrderTimelineAutomationActor;
   assigneeChange?: WorkOrderTimelineAssigneeChange;
+  statusChange?: WorkOrderTimelineStatusChange;
+  comment?: WorkOrderTimelineComment;
+  artifact?: WorkOrderTimelineArtifact;
   title: string;
   lineName?: string;
   steps?: WorkOrderTimelineStep[];

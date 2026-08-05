@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,14 +14,41 @@ import (
 )
 
 const (
+	FactoryWorkOrderStateDraft  = "draft"
 	FactoryWorkOrderStateOpen   = "open"
 	FactoryWorkOrderStateClosed = "closed"
 
 	FactoryWorkOrderResultCompleted = "completed"
 	FactoryWorkOrderResultRejected  = "rejected"
+	FactoryWorkOrderResultFailed    = "failed"
 )
 
-var ErrFactoryWorkOrderNotFound = errors.New("factory work order not found")
+var (
+	ErrFactoryWorkOrderNotFound     = errors.New("factory work order not found")
+	ErrFactoryWorkOrderInvalidState = errors.New("invalid work order state transition")
+)
+
+var (
+	factoryWorkOrderStates = []string{
+		FactoryWorkOrderStateDraft,
+		FactoryWorkOrderStateOpen,
+		FactoryWorkOrderStateClosed,
+	}
+
+	factoryWorkOrderCloseResults = []string{
+		FactoryWorkOrderResultCompleted,
+		FactoryWorkOrderResultRejected,
+		FactoryWorkOrderResultFailed,
+	}
+
+	// Allowed transitions. `open → draft` is "back to draft"; `closed →
+	// open` is reopen. See TransitionOnDispatch for the draft → open promotion.
+	factoryWorkOrderAllowedTransitions = map[string][]string{
+		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
+		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
+	}
+)
 
 type FactoryWorkOrder struct {
 	ID             uuid.UUID
@@ -45,6 +74,16 @@ func (o *FactoryWorkOrder) IsOpen() bool {
 	return o.State == FactoryWorkOrderStateOpen
 }
 
+func (o *FactoryWorkOrder) IsClosed() bool {
+	return o.State == FactoryWorkOrderStateClosed
+}
+
+// IsDispatchable reports whether the work order can be dispatched;
+// the first dispatch from `draft` also promotes it to `open`.
+func (o *FactoryWorkOrder) IsDispatchable() bool {
+	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+}
+
 type FactoryWorkOrderAssignee struct {
 	WorkOrderID uuid.UUID `gorm:"primaryKey"`
 	UserID      uuid.UUID `gorm:"primaryKey"`
@@ -55,6 +94,18 @@ type FactoryWorkOrderAssignee struct {
 
 func (FactoryWorkOrderAssignee) TableName() string {
 	return "factory_work_order_assignees"
+}
+
+// FactoryWorkOrderStatusUpdate captures a requested transition through the
+// shared status FSM. Actor / Automation / Run are optional and populate
+// the emitted event.
+type FactoryWorkOrderStatusUpdate struct {
+	ToState    string
+	Result     string
+	Actor      *uuid.UUID
+	Automation *factory.AutomationRef
+	Run        *factory.RunRef
+	SkipSame   bool // when true, no-op transitions to the current state succeed silently
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -85,19 +136,54 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
 }
 
-func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID) (*FactoryWorkOrder, error) {
-	if o.State == FactoryWorkOrderStateClosed {
-		return o, nil
+// UpdateStatus is the single writer for the work order lifecycle: it
+// validates the transition, updates the row, and records the events
+// (always `order.status.updated`; plus the coarse `order.opened` on
+// the first draft → open and `order.closed` on any close).
+func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
+	toState := update.ToState
+	if !slices.Contains(factoryWorkOrderStates, toState) {
+		return fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
+	if o.State == toState {
+		if update.SkipSame {
+			return nil
+		}
+
+		return fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
+	}
+
+	if !slices.Contains(factoryWorkOrderAllowedTransitions[o.State], toState) {
+		return fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, o.State, toState)
+	}
+
+	nextResult := ""
+	if toState == FactoryWorkOrderStateClosed {
+		if !slices.Contains(factoryWorkOrderCloseResults, update.Result) {
+			return fmt.Errorf("%w: closing requires a valid result (completed, rejected, failed)", ErrFactoryWorkOrderInvalidState)
+		}
+		nextResult = update.Result
+	}
+
+	fromState := o.State
+	fromResult := o.Result
 	now := time.Now()
 
-	err := db.Transaction(func(tx *gorm.DB) error {
-		o.State = FactoryWorkOrderStateClosed
-		o.Result = result
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Reverting `open → draft` while a step is still pending/running would
+		// desync the FSM from the executor. Mirror the dispatch guard here.
+		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
+			if err := o.ensureNoActiveExecution(tx); err != nil {
+				return err
+			}
+		}
+
+		o.State = toState
+		o.Result = nextResult
 		o.UpdatedAt = now
 
-		updateErr := tx.
+		err := tx.
 			Model(o).
 			Updates(map[string]any{
 				"state":      o.State,
@@ -105,19 +191,80 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 				"updated_at": o.UpdatedAt,
 			}).
 			Error
-
-		if updateErr != nil {
-			return updateErr
+		if err != nil {
+			return err
 		}
 
-		return o.RecordClosed(tx, closedBy, result)
-	})
+		if err := o.RecordStatusUpdated(tx, update.Actor, update.Automation, update.Run, fromState, toState, fromResult, nextResult); err != nil {
+			return err
+		}
 
+		// `order.opened` marks the initial draft → open only, so the
+		// timeline can distinguish opens from reopens.
+		if toState == FactoryWorkOrderStateOpen && fromState == FactoryWorkOrderStateDraft {
+			if err := o.RecordOpened(tx, update.Actor, update.Automation); err != nil {
+				return err
+			}
+		}
+
+		if toState == FactoryWorkOrderStateClosed {
+			if err := o.RecordClosed(tx, update.Actor, update.Automation, nextResult); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// Close is kept for backwards compatibility with existing handlers. New code
+// should call UpdateStatus directly.
+func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID) (*FactoryWorkOrder, error) {
+	if o.IsClosed() {
+		return o, nil
+	}
+
+	err := o.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState:  FactoryWorkOrderStateClosed,
+		Result:   result,
+		Actor:    closedBy,
+		SkipSame: true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	return o, nil
+}
+
+// TransitionOnDispatch promotes a draft order to open; open is a no-op.
+// Any other state rejects the dispatch.
+func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
+	if o.State == FactoryWorkOrderStateOpen {
+		return nil
+	}
+
+	if o.State != FactoryWorkOrderStateDraft {
+		return fmt.Errorf("%w: work order must be draft or open to dispatch", ErrFactoryWorkOrderInvalidState)
+	}
+
+	return o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   actor,
+	})
+}
+
+// ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if a
+// pending/running execution exists, nil otherwise.
+func (o *FactoryWorkOrder) ensureNoActiveExecution(tx *gorm.DB) error {
+	_, err := o.FindActiveExecution(tx)
+	if err == nil {
+		return ErrFactoryWorkOrderExecutionActive
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	return err
 }
 
 func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderExecution, error) {
@@ -206,51 +353,88 @@ func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
 	}
 }
 
-func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error {
+func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID, automation *factory.AutomationRef) error {
 	data := factory.WorkOrderOpened{
-		Order: o.Ref(),
+		Order:      o.Ref(),
+		Automation: automation,
 	}
 	if createdBy != nil {
 		data.User = &factory.UserRef{ID: *createdBy}
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	event := &FactoryWorkOrderEvent{
-		ID:          uuid.New(),
-		WorkOrderID: o.ID,
-		Type:        factory.EventTypeOrderOpened,
-		Data:        datatypes.JSON(jsonData),
-		CreatedAt:   time.Now(),
-	}
-
-	return tx.Create(event).Error
+	return o.recordEvent(tx, factory.EventTypeOrderOpened, data)
 }
 
-func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, result string) error {
+func (o *FactoryWorkOrder) RecordClosed(tx *gorm.DB, closedBy *uuid.UUID, automation *factory.AutomationRef, result string) error {
 	data := factory.WorkOrderClosed{
+		Order:      o.Ref(),
+		Automation: automation,
+		Result:     &result,
+	}
+	if closedBy != nil {
+		data.User = &factory.UserRef{ID: *closedBy}
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderClosed, data)
+}
+
+func (o *FactoryWorkOrder) RecordStatusUpdated(
+	tx *gorm.DB,
+	actor *uuid.UUID,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+	fromState, toState, fromResult, toResult string,
+) error {
+	data := factory.WorkOrderStatusUpdated{
+		Order:      o.Ref(),
+		Automation: automation,
+		Run:        run,
+		FromState:  fromState,
+		ToState:    toState,
+		FromResult: fromResult,
+		ToResult:   toResult,
+	}
+	if actor != nil {
+		data.User = &factory.UserRef{ID: *actor}
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)
+}
+
+func (o *FactoryWorkOrder) RecordCommentAdded(
+	tx *gorm.DB,
+	body string,
+	author factory.WorkOrderCommentAuthor,
+	run *factory.RunRef,
+) error {
+	data := factory.WorkOrderCommentAdded{
 		Order:  o.Ref(),
-		User:   &factory.UserRef{ID: *closedBy},
-		Result: &result,
+		Body:   body,
+		Author: &author,
+		Run:    run,
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
+	return o.recordEvent(tx, factory.EventTypeOrderCommentAdded, data)
+}
+
+func (o *FactoryWorkOrder) RecordArtifactAdded(
+	tx *gorm.DB,
+	artifact *factory.ArtifactRef,
+	actor *uuid.UUID,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+) error {
+	data := factory.WorkOrderArtifactAdded{
+		Order:      o.Ref(),
+		Artifact:   artifact,
+		Automation: automation,
+		Run:        run,
+	}
+	if actor != nil {
+		data.User = &factory.UserRef{ID: *actor}
 	}
 
-	event := &FactoryWorkOrderEvent{
-		ID:          uuid.New(),
-		WorkOrderID: o.ID,
-		Type:        factory.EventTypeOrderClosed,
-		Data:        datatypes.JSON(jsonData),
-		CreatedAt:   time.Now(),
-	}
-
-	return tx.Create(event).Error
+	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
 }
 
 func (o *FactoryWorkOrder) RecordAssigneesUpdated(
@@ -270,20 +454,7 @@ func (o *FactoryWorkOrder) RecordAssigneesUpdated(
 		Unassigned: unassigned,
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	event := &FactoryWorkOrderEvent{
-		ID:          uuid.New(),
-		WorkOrderID: o.ID,
-		Type:        factory.EventTypeOrderAssigneesUpdated,
-		Data:        datatypes.JSON(jsonData),
-		CreatedAt:   time.Now(),
-	}
-
-	return tx.Create(event).Error
+	return o.recordEvent(tx, factory.EventTypeOrderAssigneesUpdated, data)
 }
 
 func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
@@ -293,6 +464,35 @@ func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
 	}
 
 	return ids
+}
+
+func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload any) error {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: o.ID,
+		Type:        eventType,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+// IsValidWorkOrderCommentAuthorKind reports whether the given author kind is
+// accepted by RecordCommentAdded / API handlers.
+func IsValidWorkOrderCommentAuthorKind(kind string) bool {
+	switch kind {
+	case factory.CommentAuthorKindUser,
+		factory.CommentAuthorKindAutomation,
+		factory.CommentAuthorKindSystem:
+		return true
+	}
+	return false
 }
 
 func assigneeDiff(previousIDs, nextIDs []uuid.UUID) (assigned, unassigned []factory.UserRef) {

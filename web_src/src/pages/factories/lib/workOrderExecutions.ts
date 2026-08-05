@@ -161,6 +161,33 @@ export function hasFailedWorkOrderExecution(executions: FactoriesWorkOrderExecut
   return (executions ?? []).some((execution) => execution.result === "RESULT_FAILED");
 }
 
+function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
+  return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
+}
+
+// Most recent finished execution (by `updatedAt`, fallback `createdAt`).
+// Callers fence against `order.updatedAt` to handle reopens.
+export function latestFinishedWorkOrderExecution(
+  executions: FactoriesWorkOrderExecution[] | undefined,
+): FactoriesWorkOrderExecution | null {
+  let latest: FactoriesWorkOrderExecution | null = null;
+  let latestAt = -Infinity;
+  for (const execution of executions ?? []) {
+    if (execution.state !== "STATE_FINISHED") {
+      continue;
+    }
+    if (!execution.result || execution.result === "RESULT_UNKNOWN") {
+      continue;
+    }
+    const at = executionTimestamp(execution);
+    if (at >= latestAt) {
+      latest = execution;
+      latestAt = at;
+    }
+  }
+  return latest;
+}
+
 export function hasActiveWorkOrderExecution(executions: FactoriesWorkOrderExecution[] | undefined): boolean {
   return (executions ?? []).some(isActiveWorkOrderExecution);
 }

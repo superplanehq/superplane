@@ -42,7 +42,7 @@ export function WorkOrderCard({
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)
     .map((assignee) => resolveUser(assignee.id, assignee.name));
-  const showDispatch = order.state === "STATE_OPEN" && onDispatch && order.id;
+  const showDispatch = (order.state === "STATE_OPEN" || order.state === "STATE_DRAFT") && onDispatch && order.id;
 
   return (
     <article

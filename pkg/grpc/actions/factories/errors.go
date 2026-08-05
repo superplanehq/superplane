@@ -22,14 +22,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory line not found")
 	case errors.Is(err, models.ErrFactoryLineNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory line with the same name already exists")
-	case errors.Is(err, models.ErrFactoryWorkOrderNotOpen):
-		return grpcerrors.FailedPrecondition(err, "work order is not open")
+	case errors.Is(err, models.ErrFactoryWorkOrderNotDispatchable):
+		return grpcerrors.FailedPrecondition(err, "work order cannot be dispatched in its current state")
+	case errors.Is(err, models.ErrFactoryWorkOrderInvalidState):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrFactoryWorkOrderExecutionActive):
 		return grpcerrors.FailedPrecondition(err, "work order already has an active execution")
 	case errors.Is(err, models.ErrFactoryLineHasNoSteps):
 		return grpcerrors.FailedPrecondition(err, "factory line has no steps")
 	case errors.Is(err, models.ErrFactoryLineStepNotOnRun):
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
+	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

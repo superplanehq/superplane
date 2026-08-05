@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -80,6 +81,233 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.Error(t, err)
 		assert.EqualError(t, err, "cannot create work order while executing another work order")
 	})
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
+	require.NoError(t, err)
+	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+
+	statusEvent := findWorkOrderEvent(t, order, "order.status.updated")
+	openedEvent := findWorkOrderEvent(t, order, "order.opened")
+
+	statusAutomation := extractAutomationPayload(t, statusEvent)
+	assert.Equal(t, nodeExecution.NodeID, statusAutomation.NodeID)
+	assert.Equal(t, line.Name, statusAutomation.LineName)
+	assert.Equal(t, "component-under-test", statusAutomation.StepName)
+
+	openedAutomation := extractAutomationPayload(t, openedEvent)
+	assert.Equal(t, line.Name, openedAutomation.LineName)
+	assert.Equal(t, "component-under-test", openedAutomation.StepName)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
+	require.NoError(t, err)
+	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	require.NoError(t, order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	}))
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State:  models.FactoryWorkOrderStateClosed,
+		Result: models.FactoryWorkOrderResultCompleted,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, updated.State)
+
+	closed := findWorkOrderEvent(t, order, "order.closed")
+	closedAutomation := extractAutomationPayload(t, closed)
+	assert.Equal(t, line.Name, closedAutomation.LineName)
+	assert.Equal(t, "component-under-test", closedAutomation.StepName)
+	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
+	// A run with no work-order execution link must fail loudly rather
+	// than silently target some default order.
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State: models.FactoryWorkOrderStateOpen,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not attached to a work order")
+}
+
+func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil)
+	require.NoError(t, err)
+	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		Body: "Ready for review",
+	}))
+
+	commentEvent := findWorkOrderEvent(t, order, "order.comment.added")
+
+	var payload struct {
+		Author struct {
+			Kind       string `json:"kind"`
+			Automation struct {
+				NodeID   string `json:"nodeId"`
+				AppName  string `json:"appName"`
+				LineName string `json:"lineName"`
+				StepName string `json:"stepName"`
+			} `json:"automation"`
+		} `json:"author"`
+	}
+	require.NoError(t, json.Unmarshal(commentEvent.Data, &payload))
+	assert.Equal(t, "automation", payload.Author.Kind)
+	assert.Equal(t, nodeExecution.NodeID, payload.Author.Automation.NodeID)
+	assert.NotEmpty(t, payload.Author.Automation.AppName)
+	assert.Equal(t, line.Name, payload.Author.Automation.LineName)
+	assert.Equal(t, "component-under-test", payload.Author.Automation.StepName)
+}
+
+func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Artifact target", "", &r.User, nil)
+	require.NoError(t, err)
+	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		Type:  "pr",
+		URL:   "https://github.com/example/repo/pull/1",
+		Title: "Draft",
+		Data:  map[string]any{"number": "1"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, artifact)
+	assert.Equal(t, "pr", artifact.Type)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, "https://github.com/example/repo/pull/1", artifacts[0].URL)
+
+	artifactEvent := findWorkOrderEvent(t, order, "order.artifact.added")
+	artifactAutomation := extractAutomationPayload(t, artifactEvent)
+	assert.Equal(t, nodeExecution.NodeID, artifactAutomation.NodeID)
+	assert.Equal(t, line.Name, artifactAutomation.LineName)
+	assert.Equal(t, "component-under-test", artifactAutomation.StepName)
+}
+
+type automationPayload struct {
+	NodeID   string `json:"nodeId"`
+	NodeName string `json:"nodeName"`
+	AppName  string `json:"appName"`
+	LineName string `json:"lineName"`
+	StepName string `json:"stepName"`
+}
+
+func extractAutomationPayload(t *testing.T, event *models.FactoryWorkOrderEvent) automationPayload {
+	t.Helper()
+
+	var wrapper struct {
+		Automation *automationPayload `json:"automation"`
+	}
+	require.NoError(t, json.Unmarshal(event.Data, &wrapper))
+	require.NotNil(t, wrapper.Automation, "event %s missing automation payload", event.Type)
+	return *wrapper.Automation
+}
+
+func findWorkOrderEvent(t *testing.T, order *models.FactoryWorkOrder, eventType string) *models.FactoryWorkOrderEvent {
+	t.Helper()
+
+	events, err := order.ListEvents(database.Conn(), 50, nil)
+	require.NoError(t, err)
+
+	for i := range events {
+		if events[i].Type == eventType {
+			return &events[i]
+		}
+	}
+
+	t.Fatalf("expected %s event on work order %s", eventType, order.ID)
+	return nil
+}
+
+// linkRunToWorkOrder creates the `factory_work_order_executions` row
+// FactoryContext looks up from `execution.RunID`; the returned line is
+// used by tests that assert line-based automation attribution.
+func linkRunToWorkOrder(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factory *models.Factory,
+	workOrderID uuid.UUID,
+	runID uuid.UUID,
+) *models.FactoryLine {
+	t.Helper()
+
+	line, err := factory.CreateLine(database.Conn(), support.RandomName("line"), nil)
+	require.NoError(t, err)
+
+	now := time.Now()
+	execution := models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		WorkOrderID:    workOrderID,
+		LineID:         line.ID,
+		StepIndex:      0,
+		StepName:       "component-under-test",
+		RunID:          runID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, database.Conn().Create(&execution).Error)
+	return line
 }
 
 func setupFactoryAppExecution(
