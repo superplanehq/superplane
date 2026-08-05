@@ -4,15 +4,21 @@ import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { formatTimeAgo } from "@/lib/date";
+import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { Fragment, useMemo, type ReactNode } from "react";
 import {
   Check,
   CircleDashed,
   CircleDot,
+  ExternalLink,
+  FileText,
   GitBranch,
+  GitPullRequest,
   Loader2,
+  MessageSquareText,
   MinusCircle,
+  ShieldCheck,
   UserRound,
   UsersRound,
   XCircle,
@@ -181,14 +187,16 @@ function TimelineItem({
   isLast: boolean;
 }) {
   const { icon: Icon } = getTimelineEventPresentation(event.kind);
-  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
+  const isUserActionEvent =
+    event.kind === "created" || event.kind === "assigned" || event.kind === "statusChanged" || event.kind === "closed";
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  const showSomeoneFallback = (event.kind === "created" || event.kind === "closed") && !actorDisplay;
+  const showSomeoneFallback =
+    (event.kind === "created" || event.kind === "closed" || event.kind === "statusChanged") && !actorDisplay;
 
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
-        <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
+        <span className="absolute left-2.75 top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
@@ -209,6 +217,10 @@ function TimelineItem({
               <span>{event.title}</span>
             )}
           </p>
+        ) : event.kind === "commented" ? (
+          <CommentTimelineBody event={event} actorDisplay={actorDisplay} />
+        ) : event.kind === "artifactAdded" ? (
+          <ArtifactTimelineBody event={event} actorDisplay={actorDisplay} />
         ) : (
           <>
             <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
@@ -221,13 +233,112 @@ function TimelineItem({
             ) : null}
           </>
         )}
-        {isUserActionEvent ? (
+        {isUserActionEvent || event.kind === "commented" || event.kind === "artifactAdded" ? (
           <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
             {formatTimeAgo(new Date(event.at))}
           </time>
         ) : null}
       </div>
     </li>
+  );
+}
+
+function CommentTimelineBody({
+  event,
+  actorDisplay,
+}: {
+  event: WorkOrderTimelineEvent;
+  actorDisplay: ReturnType<OrgUserDisplayLookup>;
+}) {
+  const comment = event.comment;
+  if (!comment) {
+    return null;
+  }
+
+  const kind = (comment.authorKind ?? "").toLowerCase();
+  const isLLM = kind === "llm";
+  const isSystem = kind === "system";
+  const authorLabel = isLLM
+    ? comment.authorLabel || "Assistant"
+    : isSystem
+      ? comment.authorLabel || "System"
+      : (actorDisplay?.name ?? comment.authorLabel ?? "Someone");
+
+  return (
+    <div>
+      <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
+        {actorDisplay ? (
+          <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+        ) : (
+          <span className="font-semibold">{authorLabel}</span>
+        )}
+        <span>commented</span>
+        {isLLM ? (
+          <span className="ml-1 inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+            LLM
+          </span>
+        ) : null}
+      </p>
+      <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-700/70 dark:bg-gray-900/40 dark:text-gray-200">
+        <p className="whitespace-pre-wrap leading-relaxed">{comment.body}</p>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactTimelineBody({
+  event,
+  actorDisplay,
+}: {
+  event: WorkOrderTimelineEvent;
+  actorDisplay: ReturnType<OrgUserDisplayLookup>;
+}) {
+  const artifact = event.artifact;
+  if (!artifact) {
+    return null;
+  }
+
+  const isPr = artifact.type === "pr";
+  const isMarkdown = artifact.type === "markdown";
+  const safeUrl = safeExternalUrl(artifact.url);
+  const label = artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
+
+  return (
+    <div>
+      <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
+        {actorDisplay ? (
+          <OrgUserReference display={actorDisplay} size="sm" emphasizeName />
+        ) : (
+          <span className="font-semibold">Someone</span>
+        )}
+        <span>attached a</span>
+        <span className="font-medium">{isPr ? "pull request" : isMarkdown ? "note" : "artifact"}</span>
+      </p>
+      <div className="mt-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700/70 dark:bg-gray-900/40 dark:text-gray-200">
+        {safeUrl ? (
+          <a
+            href={safeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex max-w-full items-center gap-2 font-medium text-violet-700 hover:underline dark:text-violet-300"
+          >
+            {isPr ? (
+              <GitPullRequest className="h-4 w-4" aria-hidden />
+            ) : (
+              <ExternalLink className="h-4 w-4" aria-hidden />
+            )}
+            <span className="truncate">{label}</span>
+          </a>
+        ) : (
+          <p className="font-medium">{label}</p>
+        )}
+        {isMarkdown && artifact.body ? (
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+            {artifact.body}
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -423,6 +534,12 @@ function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
       return { icon: UsersRound };
     case "dispatched":
       return { icon: GitBranch };
+    case "statusChanged":
+      return { icon: ShieldCheck };
+    case "commented":
+      return { icon: MessageSquareText };
+    case "artifactAdded":
+      return { icon: FileText };
     case "closed":
       return { icon: CircleDot };
   }

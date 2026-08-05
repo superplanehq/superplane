@@ -41,6 +41,20 @@ interface LineStepExecutionPayload {
   run?: EventRunRef;
 }
 
+interface EventCommentAuthorPayload {
+  kind?: string;
+  userId?: string;
+  label?: string;
+}
+
+interface EventArtifactPayload {
+  id?: string;
+  type?: string;
+  url?: string;
+  title?: string;
+  body?: string;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   assigned?: EventUserRef[];
@@ -49,6 +63,13 @@ interface EventPayload extends LineStepExecutionPayload {
     result?: string;
   };
   result?: string;
+  fromState?: string;
+  toState?: string;
+  fromResult?: string;
+  toResult?: string;
+  body?: string;
+  author?: EventCommentAuthorPayload;
+  artifact?: EventArtifactPayload;
 }
 
 interface TimelineBuildState {
@@ -82,9 +103,12 @@ type StepExecutionEventType = "step.execution.created" | "step.execution.finishe
 
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.opened": 10,
+  "order.status.updated": 15,
   "order.assignees.updated": 20,
   "step.execution.created": 30,
   "step.execution.finished": 40,
+  "order.comment.added": 45,
+  "order.artifact.added": 47,
   "order.closed": 50,
 };
 
@@ -138,6 +162,9 @@ function applyApiEventToTimeline(
     case "order.opened":
       appendOpenedEvent(state.events, index, payload, at, resolveUserName);
       return;
+    case "order.status.updated":
+      appendStatusUpdatedEvent(state.events, index, payload, at, resolveUserName);
+      return;
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
@@ -146,6 +173,12 @@ function applyApiEventToTimeline(
       return;
     case "step.execution.finished":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
+      return;
+    case "order.comment.added":
+      appendCommentEvent(state.events, index, payload, at, resolveUserName);
+      return;
+    case "order.artifact.added":
+      appendArtifactEvent(state.events, index, payload, at, resolveUserName);
       return;
     case "order.closed":
       appendClosedEvent(state.events, index, payload, at, resolveUserName);
@@ -197,6 +230,158 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
+function appendStatusUpdatedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const toState = payload.toState ?? "";
+  if (!toState) {
+    return;
+  }
+
+  const fromState = payload.fromState ?? "";
+  const toResult = payload.toResult ?? "";
+  const fromResult = payload.fromResult ?? "";
+
+  //
+  // Initial creation: work orders are created directly in `draft` via a
+  // single `order.status.updated` with an empty `fromState` (see
+  // `CreateWorkOrder`). Render it as the timeline's `created` entry so it
+  // matches how the pre-draft world represented `order.opened`.
+  //
+  if (!fromState) {
+    events.push({
+      id: `created-${index}`,
+      kind: "created",
+      at,
+      actorUserId: payload.user?.id,
+      actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+      title: "created this work order",
+    });
+    return;
+  }
+
+  //
+  // The backend still emits paired coarse events for the transitions the old
+  // UI relies on; skip the duplicate `order.status.updated` when a paired
+  // event covers the same change so the timeline shows one visible entry per
+  // lifecycle change:
+  //
+  //   * `order.opened` fires only on the initial `ready → open` promotion.
+  //   * `order.closed` fires on any transition into `closed`.
+  //
+  // Reopens (`closed → open`, `closed → ready`) are represented by this
+  // status-updated event alone.
+  //
+  if (toState === "open" && fromState === "ready") {
+    return;
+  }
+  if (toState === "closed") {
+    return;
+  }
+
+  events.push({
+    id: `status-updated-${index}`,
+    kind: "statusChanged",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    statusChange: { fromState, toState, fromResult, toResult },
+    title: describeStatusTransition(fromState, toState),
+  });
+}
+
+function describeStatusTransition(fromState: string, toState: string): string {
+  if (!fromState) {
+    return `set status to ${humanizeState(toState)}`;
+  }
+  if (fromState === "closed" && (toState === "open" || toState === "ready")) {
+    return `reopened as ${humanizeState(toState)}`;
+  }
+  return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
+}
+
+function humanizeState(state: string): string {
+  switch (state) {
+    case "draft":
+      return "Draft";
+    case "ready":
+      return "Ready";
+    case "open":
+      return "Open";
+    case "closed":
+      return "Closed";
+    default:
+      return state || "Unknown";
+  }
+}
+
+function appendCommentEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const body = (payload.body ?? "").trim();
+  if (!body) {
+    return;
+  }
+
+  const author = payload.author ?? {};
+  events.push({
+    id: `comment-${index}`,
+    kind: "commented",
+    at,
+    actorUserId: author.userId ?? payload.user?.id,
+    actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
+    comment: {
+      body,
+      authorKind: author.kind,
+      authorLabel: author.label,
+    },
+    title: "commented",
+  });
+}
+
+function appendArtifactEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const artifact = payload.artifact;
+  if (!artifact?.type) {
+    return;
+  }
+
+  events.push({
+    id: `artifact-${index}`,
+    kind: "artifactAdded",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    artifact: {
+      id: artifact.id,
+      type: artifact.type,
+      url: artifact.url,
+      title: artifact.title,
+      body: artifact.body,
+    },
+    title: describeArtifactAdded(artifact),
+  });
+}
+
+function describeArtifactAdded(artifact: EventArtifactPayload): string {
+  const label = artifact.title?.trim() || artifact.url?.trim();
+  const type = artifact.type === "pr" ? "PR" : artifact.type === "markdown" ? "note" : "artifact";
+  return label ? `attached ${type}: ${label}` : `attached ${type}`;
+}
+
 function appendClosedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -206,7 +391,13 @@ function appendClosedEvent(
 ): void {
   const closedResult = payload.result ?? payload.order?.result;
   const result = formatWorkOrderResult(
-    closedResult === "completed" ? "RESULT_COMPLETED" : closedResult === "rejected" ? "RESULT_REJECTED" : undefined,
+    closedResult === "completed"
+      ? "RESULT_COMPLETED"
+      : closedResult === "rejected"
+        ? "RESULT_REJECTED"
+        : closedResult === "failed"
+          ? "RESULT_FAILED"
+          : undefined,
   );
 
   events.push({

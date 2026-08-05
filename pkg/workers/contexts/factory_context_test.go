@@ -82,6 +82,98 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		WorkOrderID: order.ID.String(),
+		State:       models.FactoryWorkOrderStateReady,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateReady, updated.State)
+}
+
+func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		WorkOrderID: order.ID.String(),
+		Body:        "Ready for review",
+		AuthorKind:  "llm",
+		AuthorLabel: "Claude",
+	}))
+
+	events, err := order.ListEvents(database.Conn(), 10, nil)
+	require.NoError(t, err)
+	types := make([]string, 0, len(events))
+	for _, e := range events {
+		types = append(types, e.Type)
+	}
+	assert.Contains(t, types, "order.comment.added")
+
+	//
+	// Canvas comments never have an acting human, so an explicit `user`
+	// kind must be rejected up front rather than silently written with an
+	// empty `userId` that later renders as "Someone" in the timeline.
+	//
+	err = ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		WorkOrderID: order.ID.String(),
+		Body:        "should be rejected",
+		AuthorKind:  "user",
+	})
+	require.Error(t, err)
+}
+
+func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Artifact target", "", &r.User, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		WorkOrderID: order.ID.String(),
+		Type:        "pr",
+		URL:         "https://github.com/example/repo/pull/1",
+		Title:       "Draft",
+		Data:        map[string]any{"number": "1"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, artifact)
+	assert.Equal(t, "pr", artifact.Type)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, "https://github.com/example/repo/pull/1", artifacts[0].URL)
+}
+
 func setupFactoryAppExecution(
 	t *testing.T,
 	r *support.ResourceRegistry,

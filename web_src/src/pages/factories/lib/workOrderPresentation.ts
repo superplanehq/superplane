@@ -2,6 +2,10 @@ import type { FactoriesWorkOrder } from "@/api-client";
 
 export function formatWorkOrderState(state?: FactoriesWorkOrder["state"]) {
   switch (state) {
+    case "STATE_DRAFT":
+      return "Draft";
+    case "STATE_READY":
+      return "Ready";
     case "STATE_OPEN":
       return "Open";
     case "STATE_CLOSED":
@@ -17,6 +21,8 @@ export function formatWorkOrderResult(result?: FactoriesWorkOrder["result"]) {
       return "Completed";
     case "RESULT_REJECTED":
       return "Rejected";
+    case "RESULT_FAILED":
+      return "Failed";
     default:
       return "";
   }
