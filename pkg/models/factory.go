@@ -296,11 +296,12 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		FactoryID:      f.ID,
 		Title:          title,
 		Description:    description,
-		State:          FactoryWorkOrderStateOpen,
+		State:          FactoryWorkOrderStateDraft,
 		Result:         "",
 		CreatedByID:    createdBy,
 		CreatedAt:      now,
 		UpdatedAt:      now,
+		StateUpdatedAt: now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
@@ -313,7 +314,12 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		}
 	}
 
-	if err := order.RecordOpened(tx, createdBy); err != nil {
+	//
+	// Record the creation as a status transition into `draft`. Callers can
+	// look at `order.status.updated` with `fromState == ""` to detect the
+	// initial creation event without a separate event type.
+	//
+	if err := order.RecordStatusUpdated(tx, createdBy, nil, "", FactoryWorkOrderStateDraft, "", ""); err != nil {
 		return nil, err
 	}
 

@@ -14,7 +14,14 @@ import {
 } from "@/lib/orgUserDisplay";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
-export type WorkOrderTimelineEventKind = "created" | "dispatched" | "assigned" | "closed";
+export type WorkOrderTimelineEventKind =
+  | "created"
+  | "dispatched"
+  | "assigned"
+  | "statusChanged"
+  | "commented"
+  | "artifactAdded"
+  | "closed";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
 export type { OrgUserDisplayLookup };
 
@@ -33,6 +40,34 @@ export interface WorkOrderTimelineAssigneeChange {
   unassignedUserIds: string[];
 }
 
+export interface WorkOrderTimelineStatusChange {
+  fromState?: string;
+  toState: string;
+  fromResult?: string;
+  toResult?: string;
+}
+
+export interface WorkOrderTimelineCommentAutomation {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+}
+
+export interface WorkOrderTimelineComment {
+  body: string;
+  authorKind?: string;
+  automation?: WorkOrderTimelineCommentAutomation;
+}
+
+export interface WorkOrderTimelineArtifact {
+  id?: string;
+  type: string;
+  url?: string;
+  title?: string;
+  body?: string;
+}
+
 export interface WorkOrderTimelineEvent {
   id: string;
   kind: WorkOrderTimelineEventKind;
@@ -40,6 +75,9 @@ export interface WorkOrderTimelineEvent {
   actorUserId?: string;
   actorName?: string;
   assigneeChange?: WorkOrderTimelineAssigneeChange;
+  statusChange?: WorkOrderTimelineStatusChange;
+  comment?: WorkOrderTimelineComment;
+  artifact?: WorkOrderTimelineArtifact;
   title: string;
   lineName?: string;
   steps?: WorkOrderTimelineStep[];

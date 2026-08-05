@@ -85,16 +85,17 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 
 func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
 	return &pb.WorkOrder{
-		Id:          order.ID.String(),
-		Title:       order.Title,
-		Description: order.Description,
-		State:       serializeWorkOrderState(order.State),
-		Result:      serializeWorkOrderResult(order.Result),
-		CreatedAt:   timestamppb.New(order.CreatedAt),
-		UpdatedAt:   timestamppb.New(order.UpdatedAt),
-		Assignees:   serializeWorkOrderAssignees(order.Assignees),
-		Executions:  serializeWorkOrderExecutions(executions),
-		CreatedBy:   serializeWorkOrderCreator(order),
+		Id:             order.ID.String(),
+		Title:          order.Title,
+		Description:    order.Description,
+		State:          serializeWorkOrderState(order.State),
+		Result:         serializeWorkOrderResult(order.Result),
+		CreatedAt:      timestamppb.New(order.CreatedAt),
+		UpdatedAt:      timestamppb.New(order.UpdatedAt),
+		StateUpdatedAt: timestamppb.New(order.StateUpdatedAt),
+		Assignees:      serializeWorkOrderAssignees(order.Assignees),
+		Executions:     serializeWorkOrderExecutions(executions),
+		CreatedBy:      serializeWorkOrderCreator(order),
 	}
 }
 
@@ -180,6 +181,8 @@ func serializeWorkOrderExecutionResult(executionResult, runResult string) pb.Wor
 
 func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	switch state {
+	case models.FactoryWorkOrderStateDraft:
+		return pb.WorkOrder_STATE_DRAFT
 	case models.FactoryWorkOrderStateOpen:
 		return pb.WorkOrder_STATE_OPEN
 	case models.FactoryWorkOrderStateClosed:
@@ -195,6 +198,8 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 		return pb.WorkOrder_RESULT_COMPLETED
 	case models.FactoryWorkOrderResultRejected:
 		return pb.WorkOrder_RESULT_REJECTED
+	case models.FactoryWorkOrderResultFailed:
+		return pb.WorkOrder_RESULT_FAILED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
 	}

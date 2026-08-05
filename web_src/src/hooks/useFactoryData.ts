@@ -1,4 +1,6 @@
 import {
+  factoriesAddWorkOrderArtifact,
+  factoriesAddWorkOrderComment,
   factoriesCloseWorkOrder,
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
@@ -9,17 +11,22 @@ import {
   factoriesDispatchWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
+  factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrderAssignees,
+  factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
 import type {
+  FactoriesAddWorkOrderArtifactBody,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
+  FactoriesWorkOrderState,
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
@@ -51,6 +58,10 @@ function workOrderDetailKey(organizationId: string, factoryId: string, orderId: 
 
 function workOrderEventsKey(organizationId: string, factoryId: string, orderId: string) {
   return ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const;
+}
+
+function workOrderArtifactsKey(organizationId: string, factoryId: string, orderId: string) {
+  return ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const;
 }
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
@@ -312,6 +323,113 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useUpdateWorkOrderStatus(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      orderId: string;
+      state: FactoriesWorkOrderState;
+      result?: FactoriesWorkOrderResult;
+    }) => {
+      const response = await factoriesUpdateWorkOrderStatus(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            state: input.state,
+            result: input.result,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to update work order status");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useAddWorkOrderComment(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; body: string }) => {
+      const response = await factoriesAddWorkOrderComment(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            body: input.body,
+          },
+        }),
+      );
+      if (!response.data?.comment) {
+        throw new Error("Failed to add comment");
+      }
+      return response.data.comment;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useWorkOrderArtifacts(organizationId: string, factoryId: string, orderId: string) {
+  return useQuery({
+    queryKey: workOrderArtifactsKey(organizationId, factoryId, orderId),
+    queryFn: async (): Promise<FactoriesWorkOrderArtifact[]> => {
+      const response = await factoriesListWorkOrderArtifacts(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+        }),
+      );
+      return response.data?.artifacts ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && orderId),
+  });
+}
+
+export function useAddWorkOrderArtifact(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; artifact: FactoriesAddWorkOrderArtifactBody }) => {
+      const response = await factoriesAddWorkOrderArtifact(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: input.artifact,
+        }),
+      );
+      if (!response.data?.artifact) {
+        throw new Error("Failed to add artifact");
+      }
+      return response.data.artifact;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrderArtifactsKey(organizationId, factoryId, variables.orderId),
       });
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),

@@ -9,7 +9,7 @@ import { createWorkOrderPath, factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveFactoryLoadRedirect } from "./factoryPageRedirects";
 import { useFactoryDetailActions } from "./useFactoryDetailActions";
 import {
-  countOpenWorkOrders,
+  countActiveWorkOrders,
   filterWorkOrdersByOwner,
   filterWorkOrdersByStatus,
   type WorkOrderOwnerFilter,
@@ -21,7 +21,12 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
   const { data: me } = useMe(false);
   const [createAppOpen, setCreateAppOpen] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("mine");
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("open");
+  //
+  // Default to "active" (draft/ready/open/running/failed) rather than "open"
+  // so newly-created work orders (which start as `draft`) show up under the
+  // default view.
+  //
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("active");
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
   const {
@@ -77,7 +82,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
     createWorkOrderHref: createWorkOrderPath(organizationId, factoryId),
     factoryApps,
     filteredWorkOrders,
-    openWorkOrderCount: countOpenWorkOrders(workOrders),
+    activeWorkOrderCount: countActiveWorkOrders(workOrders),
     ownerFilter,
     statusFilter,
     setOwnerFilter,

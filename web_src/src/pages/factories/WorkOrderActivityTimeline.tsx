@@ -10,9 +10,12 @@ import {
   Check,
   CircleDashed,
   CircleDot,
+  FileText,
   GitBranch,
   Loader2,
+  MessageSquareText,
   MinusCircle,
+  ShieldCheck,
   UserRound,
   UsersRound,
   XCircle,
@@ -28,6 +31,7 @@ import {
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
 import { OrgUserReference } from "./OrgUserReference";
+import { ArtifactTimelineBody, CommentTimelineBody } from "./timeline";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
@@ -181,14 +185,16 @@ function TimelineItem({
   isLast: boolean;
 }) {
   const { icon: Icon } = getTimelineEventPresentation(event.kind);
-  const isUserActionEvent = event.kind === "created" || event.kind === "assigned" || event.kind === "closed";
+  const isUserActionEvent =
+    event.kind === "created" || event.kind === "assigned" || event.kind === "statusChanged" || event.kind === "closed";
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  const showSomeoneFallback = (event.kind === "created" || event.kind === "closed") && !actorDisplay;
+  const showSomeoneFallback =
+    (event.kind === "created" || event.kind === "closed" || event.kind === "statusChanged") && !actorDisplay;
 
   return (
     <li className="relative flex gap-4 pl-8">
       {!isLast ? (
-        <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
+        <span className="absolute left-2.75 top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
@@ -209,6 +215,10 @@ function TimelineItem({
               <span>{event.title}</span>
             )}
           </p>
+        ) : event.kind === "commented" ? (
+          <CommentTimelineBody event={event} actorDisplay={actorDisplay} />
+        ) : event.kind === "artifactAdded" ? (
+          <ArtifactTimelineBody event={event} actorDisplay={actorDisplay} />
         ) : (
           <>
             <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
@@ -221,7 +231,7 @@ function TimelineItem({
             ) : null}
           </>
         )}
-        {isUserActionEvent ? (
+        {isUserActionEvent || event.kind === "commented" || event.kind === "artifactAdded" ? (
           <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
             {formatTimeAgo(new Date(event.at))}
           </time>
@@ -423,6 +433,12 @@ function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
       return { icon: UsersRound };
     case "dispatched":
       return { icon: GitBranch };
+    case "statusChanged":
+      return { icon: ShieldCheck };
+    case "commented":
+      return { icon: MessageSquareText };
+    case "artifactAdded":
+      return { icon: FileText };
     case "closed":
       return { icon: CircleDot };
   }

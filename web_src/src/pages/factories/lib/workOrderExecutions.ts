@@ -161,6 +161,38 @@ export function hasFailedWorkOrderExecution(executions: FactoriesWorkOrderExecut
   return (executions ?? []).some((execution) => execution.result === "RESULT_FAILED");
 }
 
+function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
+  return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
+}
+
+//
+// latestFinishedWorkOrderExecution returns the most recent finished
+// execution (by `updatedAt`, falling back to `createdAt`). Used by the
+// display-status logic so a passing retry supersedes an earlier failure,
+// and callers can fence the result against `order.updatedAt` to handle
+// reopens that don't dispatch again.
+//
+export function latestFinishedWorkOrderExecution(
+  executions: FactoriesWorkOrderExecution[] | undefined,
+): FactoriesWorkOrderExecution | null {
+  let latest: FactoriesWorkOrderExecution | null = null;
+  let latestAt = -Infinity;
+  for (const execution of executions ?? []) {
+    if (execution.state !== "STATE_FINISHED") {
+      continue;
+    }
+    if (!execution.result || execution.result === "RESULT_UNKNOWN") {
+      continue;
+    }
+    const at = executionTimestamp(execution);
+    if (at >= latestAt) {
+      latest = execution;
+      latestAt = at;
+    }
+  }
+  return latest;
+}
+
 export function hasActiveWorkOrderExecution(executions: FactoriesWorkOrderExecution[] | undefined): boolean {
   return (executions ?? []).some(isActiveWorkOrderExecution);
 }

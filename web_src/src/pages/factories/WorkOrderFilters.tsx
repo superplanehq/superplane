@@ -3,8 +3,15 @@ import { factoryFilterPillActiveClassName, factoryFilterPillInactiveClassName } 
 import type { WorkOrderDisplayStatus, WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 import { getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
+//
+// `id` uses the filter key, `label` is a static fallback used for non-display
+// statuses (`all`, `active`); every other pill picks its label from
+// `getWorkOrderDisplayStatusMeta`.
+//
 const STATUS_FILTERS: Array<{ id: WorkOrderStatusFilter; label: string }> = [
   { id: "all", label: "All statuses" },
+  { id: "active", label: "Active" },
+  { id: "draft", label: "Draft" },
   { id: "open", label: "Open" },
   { id: "running", label: "Running" },
   { id: "failed", label: "Failed" },
@@ -46,7 +53,7 @@ export function WorkOrderFilters({
             active={statusFilter === filter.id}
             onClick={() => onStatusFilterChange(filter.id)}
           >
-            {filter.id === "all"
+            {filter.id === "all" || filter.id === "active"
               ? filter.label
               : getWorkOrderDisplayStatusMeta(filter.id as WorkOrderDisplayStatus).filterLabel}
           </FilterPill>

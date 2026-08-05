@@ -52,24 +52,36 @@ function WorkOrderDetailPageContent({
           isLoadingMoreEvents={page.isLoadingMoreEvents}
           onLoadMoreEvents={page.onLoadMoreEvents}
           onRetryEvents={page.onRetryEvents}
+          artifacts={page.artifacts}
+          isArtifactsLoading={page.isArtifactsLoading}
+          artifactsError={page.artifactsError}
           displayStatus={page.displayStatus}
           statusMeta={page.statusMeta}
           assigneeIds={page.assigneeIds}
           assigneeNames={page.assigneeNames}
           factoryLines={page.factoryLines}
           isOpen={page.isOpen}
+          isDispatchable={page.isDispatchable}
+          isClosed={page.isClosed}
           canDispatch={page.canDispatch}
           canClose={page.canClose}
           canAssign={page.canAssign}
+          canManage={page.canManage}
           permissionsLoading={page.permissionsLoading}
           isDispatching={page.isDispatching}
           isCompleting={page.isCompleting}
           isRejecting={page.isRejecting}
           isClosing={page.isClosing}
           isAssigneesSaving={page.isAssigneesSaving}
+          isUpdatingStatus={page.isUpdatingStatus}
+          isAddingComment={page.isAddingComment}
+          isAddingArtifact={page.isAddingArtifact}
           onDispatch={page.handleDispatch}
           onClose={page.handleClose}
           onAssigneesSave={page.handleAssigneesSave}
+          onStatusChange={page.handleStatusChange}
+          onAddComment={page.handleAddComment}
+          onAddArtifact={page.handleAddArtifact}
         />
       ) : null}
     </FactoryPageShell>
