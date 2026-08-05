@@ -2,8 +2,10 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderResult,
+  FactoriesWorkOrderState,
 } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
@@ -14,7 +16,9 @@ import {
   factoryPageContentClassName,
 } from "./lib/factoryPageStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
 import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
+import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
@@ -30,24 +34,34 @@ interface WorkOrderDetailLoadedViewProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
+  artifacts: FactoriesWorkOrderArtifact[];
+  isArtifactsLoading: boolean;
+  artifactsError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
   isOpen: boolean;
+  isDispatchable: boolean;
+  isClosed: boolean;
   canDispatch: boolean;
   canClose: boolean;
   canAssign: boolean;
+  canManage: boolean;
   permissionsLoading: boolean;
   isDispatching: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
   isAssigneesSaving: boolean;
+  isUpdatingStatus: boolean;
+  isAddingComment: boolean;
   onDispatch: (lineName: string) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
+  onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  onAddComment: (body: string) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView({
@@ -62,24 +76,34 @@ export function WorkOrderDetailLoadedView({
   isLoadingMoreEvents,
   onLoadMoreEvents,
   onRetryEvents,
+  artifacts,
+  isArtifactsLoading,
+  artifactsError,
   displayStatus,
   statusMeta,
   assigneeIds,
   assigneeNames,
   factoryLines,
   isOpen,
+  isDispatchable,
+  isClosed,
   canDispatch,
   canClose,
   canAssign,
+  canManage,
   permissionsLoading,
   isDispatching,
   isCompleting,
   isRejecting,
   isClosing,
   isAssigneesSaving,
+  isUpdatingStatus,
+  isAddingComment,
   onDispatch,
   onClose,
   onAssigneesSave,
+  onStatusChange,
+  onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
   return (
     <div className={factoryPageContentClassName}>
@@ -96,16 +120,21 @@ export function WorkOrderDetailLoadedView({
         statusMeta={statusMeta}
         displayStatus={displayStatus}
         isOpen={isOpen}
+        isDispatchable={isDispatchable}
+        isClosed={isClosed}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
         canClose={canClose}
+        canManage={canManage}
         permissionsLoading={permissionsLoading}
         isDispatching={isDispatching}
         isCompleting={isCompleting}
         isRejecting={isRejecting}
         isClosing={isClosing}
+        isUpdatingStatus={isUpdatingStatus}
         onDispatch={onDispatch}
         onClose={onClose}
+        onStatusChange={onStatusChange}
       />
 
       <div className={factoryDetailPanelClassName}>
@@ -118,6 +147,10 @@ export function WorkOrderDetailLoadedView({
                 </p>
               </section>
             ) : null}
+
+            <section className="mb-8">
+              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
+            </section>
 
             <section>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
@@ -146,6 +179,10 @@ export function WorkOrderDetailLoadedView({
               isSaving={isAssigneesSaving}
               onSave={onAssigneesSave}
             />
+
+            <div className="mt-6">
+              <WorkOrderArtifactsPanel artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+            </div>
           </aside>
         </div>
       </div>

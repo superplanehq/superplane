@@ -2,6 +2,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
   FactoryApp,
@@ -18,9 +19,7 @@ export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
 
-// Anchored to Date.now() at module load so `formatTimeAgo` renders the intended
-// "1 hour ago" / "yesterday" / "last week" labels regardless of when a story is
-// opened. (Absolute dates cause labels to drift over time.)
+// Relative timestamps so `formatTimeAgo` stays stable across story loads.
 const NOW_MS = Date.now();
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -178,9 +177,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   executions: [],
 };
 
-// Assignees include the storybook user so the running/failed variants surface
-// under the "mine + running" and "mine + failed" filters. Reviewer/operator
-// remain listed to demonstrate multi-assignee cards.
+// Storybook user is co-assigned so "mine + running" surfaces this order.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   title: "Add refund reconciliation test",
@@ -206,8 +203,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   ],
 };
 
-// Failed order stays authored by operator; storybook user co-assigned so the
-// "mine + failed" filter is meaningfully populated.
+// Storybook user is co-assigned so "mine + failed" surfaces this order.
 export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-failed-refunds",
   title: "Ship idempotent refund retries",
@@ -228,6 +224,32 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
       updatedAt: HOUR_AGO,
     }),
   ],
+};
+
+export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-draft-refunds",
+  title: "Draft: rework refund telemetry",
+  description: "Still scoping the metric shape and dashboards before we mark this ready.",
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: HOUR_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [],
+};
+
+export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-closed-failed-refunds",
+  title: "Failed: reconcile refund ledger for Q1 audit",
+  description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
+  state: "STATE_CLOSED",
+  result: "RESULT_FAILED",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  createdBy: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [],
 };
 
 export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
@@ -313,7 +335,140 @@ function stepExecutionFinishedEvent(
   };
 }
 
+function statusUpdatedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  fromState: string,
+  toState: string,
+  actor: { id: string } = { id: STORYBOOK_ME_USER_ID },
+  toResult?: string,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.status.updated",
+    timestamp: at,
+    event: {
+      user: { id: actor.id },
+      order: { id: order.id, title: order.title },
+      fromState,
+      toState,
+      ...(toResult ? { toResult } : {}),
+    },
+  };
+}
+
+interface CommentAuthorFixture {
+  kind: "user" | "automation" | "system";
+  userId?: string;
+  automation?: {
+    nodeId?: string;
+    nodeName?: string;
+    appId?: string;
+    appName?: string;
+  };
+}
+
+interface AutomationRefFixture {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
+}
+
+function commentAddedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  body: string,
+  author: CommentAuthorFixture,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.comment.added",
+    timestamp: at,
+    event: {
+      order: { id: order.id, title: order.title },
+      body,
+      author,
+    },
+  };
+}
+
+function artifactAddedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  artifact: {
+    id: string;
+    type: "pr" | "markdown";
+    url?: string;
+    title?: string;
+    data?: Record<string, unknown>;
+  },
+  actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },
+  automation?: AutomationRefFixture,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.artifact.added",
+    timestamp: at,
+    event: {
+      ...(actor ? { user: { id: actor.id } } : {}),
+      ...(automation ? { automation } : {}),
+      order: { id: order.id, title: order.title },
+      artifact,
+    },
+  };
+}
+
+function automationClosedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  result: "completed" | "failed" | "rejected",
+  automation: AutomationRefFixture,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.closed",
+    timestamp: at,
+    event: {
+      automation,
+      order: { id: order.id, title: order.title },
+      result,
+    },
+  };
+}
+
 export const OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [openedWorkOrderEvent(OPEN_WORK_ORDER, HOUR_AGO)];
+
+export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(DRAFT_WORK_ORDER, TWO_HOURS_AGO, "", "draft"),
+  commentAddedEvent(
+    DRAFT_WORK_ORDER,
+    HOUR_AGO,
+    "Scoping notes: need product sign-off on metric names before moving to ready.",
+    { kind: "user", userId: STORYBOOK_ME_USER_ID },
+  ),
+];
+
+export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  openedWorkOrderEvent(CLOSED_FAILED_WORK_ORDER, LAST_WEEK),
+  artifactAddedEvent(
+    CLOSED_FAILED_WORK_ORDER,
+    YESTERDAY,
+    {
+      id: "art-audit-report",
+      type: "markdown",
+      title: "Reconciliation report",
+      data: { body: "Ledger totals mismatched by $412.66 — see attached JIRA for follow-up." },
+    },
+    { id: OPERATOR_USER.id },
+  ),
+  automationClosedEvent(CLOSED_FAILED_WORK_ORDER, YESTERDAY, "failed", {
+    nodeName: "node-close",
+    appName: "Refund Diagnostics",
+    lineName: "Plan",
+    stepName: "step-01",
+  }),
+];
 
 export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(RUNNING_WORK_ORDER, YESTERDAY),
@@ -433,12 +588,93 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   },
 ];
 
+export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  openedWorkOrderEvent(OPEN_WORK_ORDER, YESTERDAY),
+  commentAddedEvent(
+    OPEN_WORK_ORDER,
+    TWO_HOURS_AGO,
+    "Kicked off — starting with the ledger diff, will attach a repro PR shortly.",
+    { kind: "user", userId: REVIEWER_USER.id },
+  ),
+  commentAddedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    "I re-ran the failing test locally and confirmed the duplicate entry appears only on retry #3.",
+    {
+      kind: "automation",
+      automation: { nodeName: "reproduce-failure", appName: "Refund Diagnostics" },
+    },
+  ),
+  artifactAddedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    {
+      id: "art-pr-1",
+      type: "pr",
+      url: "https://github.com/example/ledger/pull/482",
+      title: "Fix duplicate refund on retry",
+      data: { number: 482 },
+    },
+    { id: REVIEWER_USER.id },
+  ),
+  artifactAddedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    {
+      id: "art-md-1",
+      type: "markdown",
+      title: "Investigation notes",
+      data: {
+        body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+      },
+    },
+    { id: REVIEWER_USER.id },
+  ),
+  artifactAddedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    {
+      id: "art-auto-1",
+      type: "pr",
+      url: "https://github.com/example/ledger/pull/483",
+      title: "Automated retry fix",
+      data: { number: 483 },
+    },
+    null,
+    { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },
+  ),
+];
+
+export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
+  {
+    id: "art-pr-1",
+    type: "TYPE_PR",
+    url: "https://github.com/example/ledger/pull/482",
+    title: "Fix duplicate refund on retry",
+    data: { number: 482 },
+    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+    createdAt: HOUR_AGO,
+  },
+  {
+    id: "art-md-1",
+    type: "TYPE_MARKDOWN",
+    title: "Investigation notes",
+    data: {
+      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+    },
+    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+    createdAt: HOUR_AGO,
+  },
+];
+
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
+  DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  CLOSED_FAILED_WORK_ORDER,
 ];
 
 export interface FactoriesFixture {

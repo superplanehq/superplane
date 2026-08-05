@@ -3,11 +3,13 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
+  FactoriesWorkOrderResult,
 } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
+  WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineStep,
   WorkOrderTimelineViewModel,
@@ -41,15 +43,47 @@ interface LineStepExecutionPayload {
   run?: EventRunRef;
 }
 
+interface EventAutomationRefPayload {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
+  stepName?: string;
+}
+
+interface EventCommentAuthorPayload {
+  kind?: string;
+  userId?: string;
+  automation?: EventAutomationRefPayload;
+}
+
+interface EventArtifactPayload {
+  id?: string;
+  type?: string;
+  url?: string;
+  title?: string;
+  data?: Record<string, unknown>;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
-  run?: EventRunRef;
+  automation?: EventAutomationRefPayload;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
   order?: {
     result?: string;
   };
   result?: string;
+  fromState?: string;
+  toState?: string;
+  fromResult?: string;
+  toResult?: string;
+  body?: string;
+  author?: EventCommentAuthorPayload;
+  artifact?: EventArtifactPayload;
 }
 
 interface TimelineBuildState {
@@ -83,9 +117,12 @@ type StepExecutionEventType = "step.execution.created" | "step.execution.finishe
 
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.opened": 10,
+  "order.status.updated": 15,
   "order.assignees.updated": 20,
   "step.execution.created": 30,
   "step.execution.finished": 40,
+  "order.comment.added": 45,
+  "order.artifact.added": 47,
   "order.closed": 50,
 };
 
@@ -139,6 +176,9 @@ function applyApiEventToTimeline(
     case "order.opened":
       appendOpenedEvent(state.events, index, payload, at, resolveUserName);
       return;
+    case "order.status.updated":
+      appendStatusUpdatedEvent(state.events, index, payload, at, resolveUserName);
+      return;
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
@@ -147,6 +187,12 @@ function applyApiEventToTimeline(
       return;
     case "step.execution.finished":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
+      return;
+    case "order.comment.added":
+      appendCommentEvent(state.events, index, payload, at, resolveUserName);
+      return;
+    case "order.artifact.added":
+      appendArtifactEvent(state.events, index, payload, at, resolveUserName);
       return;
     case "order.closed":
       appendClosedEvent(state.events, index, payload, at, resolveUserName);
@@ -185,6 +231,7 @@ function appendOpenedEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     title: "opened this work order",
   });
 }
@@ -210,6 +257,167 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
+function appendStatusUpdatedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const toState = payload.toState ?? "";
+  if (!toState) {
+    return;
+  }
+
+  const fromState = payload.fromState ?? "";
+  const toResult = payload.toResult ?? "";
+  const fromResult = payload.fromResult ?? "";
+
+  // Creation is emitted as `status.updated` with empty `fromState`.
+  if (!fromState) {
+    events.push({
+      id: `created-${index}`,
+      kind: "created",
+      at,
+      actorUserId: payload.user?.id,
+      actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+      actorAutomation: toAutomationActor(payload.automation),
+      title: "created this work order",
+    });
+    return;
+  }
+
+  // Skip status.updated when a coarse `order.opened` / `order.closed`
+  // event already covers the same change (one entry per transition).
+  if (toState === "open" && fromState === "draft") {
+    return;
+  }
+  if (toState === "closed") {
+    return;
+  }
+
+  events.push({
+    id: `status-updated-${index}`,
+    kind: "statusChanged",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
+    statusChange: { fromState, toState, fromResult, toResult },
+    title: describeStatusTransition(fromState, toState),
+  });
+}
+
+function describeStatusTransition(fromState: string, toState: string): string {
+  if (!fromState) {
+    return `set status to ${humanizeState(toState)}`;
+  }
+  if (fromState === "closed" && toState === "open") {
+    return `reopened as ${humanizeState(toState)}`;
+  }
+  return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
+}
+
+function humanizeState(state: string): string {
+  switch (state) {
+    case "draft":
+      return "Draft";
+    case "open":
+      return "Open";
+    case "closed":
+      return "Closed";
+    default:
+      return state || "Unknown";
+  }
+}
+
+function appendCommentEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const body = (payload.body ?? "").trim();
+  if (!body) {
+    return;
+  }
+
+  const author = payload.author ?? {};
+  const automationActor = toAutomationActor(author.automation);
+  events.push({
+    id: `comment-${index}`,
+    kind: "commented",
+    at,
+    actorUserId: author.userId ?? payload.user?.id,
+    actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
+    actorAutomation: automationActor,
+    comment: {
+      body,
+      authorKind: author.kind,
+      automation: automationActor,
+    },
+    title: "commented",
+  });
+}
+
+function appendArtifactEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const artifact = payload.artifact;
+  if (!artifact?.type) {
+    return;
+  }
+
+  events.push({
+    id: `artifact-${index}`,
+    kind: "artifactAdded",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
+    artifact: {
+      id: artifact.id,
+      type: artifact.type,
+      url: artifact.url,
+      title: artifact.title,
+      data: artifact.data,
+    },
+    title: describeArtifactAdded(artifact),
+  });
+}
+
+// Short-form artifact label ("PR", "note") for event descriptions.
+// See timeline/authorLabels.ts for the long form used in bodies.
+const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
+  pr: "PR",
+  markdown: "note",
+};
+
+function formatArtifactKindShort(type: string | undefined): string {
+  if (!type) {
+    return "artifact";
+  }
+  return ARTIFACT_KIND_SHORT_LABEL[type] ?? "artifact";
+}
+
+function describeArtifactAdded(artifact: EventArtifactPayload): string {
+  const label = artifact.title?.trim() || artifact.url?.trim();
+  const type = formatArtifactKindShort(artifact.type);
+  return label ? `attached ${type}: ${label}` : `attached ${type}`;
+}
+
+// Event payload result → proto enum the presentation helpers expect.
+const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
+  completed: "RESULT_COMPLETED",
+  rejected: "RESULT_REJECTED",
+  failed: "RESULT_FAILED",
+};
+
 function appendClosedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -218,9 +426,7 @@ function appendClosedEvent(
   resolveUserName?: UserNameLookup,
 ): void {
   const closedResult = payload.result ?? payload.order?.result;
-  const result = formatWorkOrderResult(
-    closedResult === "completed" ? "RESULT_COMPLETED" : closedResult === "rejected" ? "RESULT_REJECTED" : undefined,
-  );
+  const result = formatWorkOrderResult(closedResult ? CLOSED_RESULT_TO_PROTO[closedResult] : undefined);
 
   events.push({
     id: `closed-${index}`,
@@ -228,8 +434,34 @@ function appendClosedEvent(
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
     title: result ? `closed as ${result.toLowerCase()}` : "closed this work order",
   });
+}
+
+function toAutomationActor(
+  payload: EventAutomationRefPayload | undefined,
+): WorkOrderTimelineAutomationActor | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const anySet =
+    payload.nodeId || payload.nodeName || payload.appId || payload.appName || payload.lineId || payload.lineName;
+  if (!anySet) {
+    return undefined;
+  }
+
+  return {
+    nodeId: payload.nodeId,
+    nodeName: payload.nodeName,
+    appId: payload.appId,
+    appName: payload.appName,
+    lineId: payload.lineId,
+    lineName: payload.lineName,
+    stepIndex: payload.stepIndex,
+    stepName: payload.stepName,
+  };
 }
 
 function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
