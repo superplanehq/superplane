@@ -370,25 +370,6 @@ CREATE TABLE public.factory_lines (
 
 
 --
--- Name: factory_work_order_artifacts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.factory_work_order_artifacts (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
-    work_order_id uuid NOT NULL,
-    type character varying(32) NOT NULL,
-    url text,
-    title text,
-    body text,
-    data jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_by_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: factory_work_order_assignees; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -443,12 +424,11 @@ CREATE TABLE public.factory_work_orders (
     factory_id uuid NOT NULL,
     title text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
-    state character varying(32) DEFAULT 'draft'::character varying NOT NULL,
+    state character varying(32) DEFAULT 'open'::character varying NOT NULL,
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    state_updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1087,14 +1067,6 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
--- Name: factory_work_order_artifacts factory_work_order_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_artifacts
-    ADD CONSTRAINT factory_work_order_artifacts_pkey PRIMARY KEY (id);
-
-
---
 -- Name: factory_work_order_assignees factory_work_order_assignees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1616,20 +1588,6 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
--- Name: idx_factory_work_order_artifacts_factory_created; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_artifacts_factory_created ON public.factory_work_order_artifacts USING btree (factory_id, created_at DESC);
-
-
---
--- Name: idx_factory_work_order_artifacts_work_order_created; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_artifacts_work_order_created ON public.factory_work_order_artifacts USING btree (work_order_id, created_at DESC);
-
-
---
 -- Name: idx_factory_work_order_assignees_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1641,6 +1599,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_events_work_order_created ON public.factory_work_order_events USING btree (work_order_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_executions_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_factory_id ON public.factory_work_order_executions USING btree (factory_id);
 
 
 --
@@ -2114,30 +2079,6 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.factory_lines
     ADD CONSTRAINT factory_lines_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_artifacts factory_work_order_artifacts_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_artifacts
-    ADD CONSTRAINT factory_work_order_artifacts_created_by_id_fkey FOREIGN KEY (created_by_id) REFERENCES public.users(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_artifacts factory_work_order_artifacts_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_artifacts
-    ADD CONSTRAINT factory_work_order_artifacts_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_artifacts factory_work_order_artifacts_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_artifacts
-    ADD CONSTRAINT factory_work_order_artifacts_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
 
 
 --
@@ -2660,7 +2601,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260805004843	f
+20260805132155	f
 \.
 
 
