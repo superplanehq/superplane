@@ -533,7 +533,7 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas and agent-session WebSocket endpoints.
+// RegisterWebSocketRoutes registers canvas, agent-session, and factory WebSocket endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
 
@@ -551,6 +551,13 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/agents/sessions/{sessionId}",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
+	)
+
+	// Factory WebSocket: org-scoped work-order updates for a single factory.
+	s.Router.Handle(
+		"/ws/factories/{factoryId}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
 	)
 }
 

@@ -235,6 +235,20 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		})
 	}
 
+	type pendingFactoryWorkOrderUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	pendingFactoryWorkOrderUpdates := []pendingFactoryWorkOrderUpdate{}
+	onFactoryWorkOrderUpdated := func(factoryID, orderID, reason string) {
+		pendingFactoryWorkOrderUpdates = append(pendingFactoryWorkOrderUpdates, pendingFactoryWorkOrderUpdate{
+			factoryID: factoryID,
+			orderID:   orderID,
+			reason:    reason,
+		})
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -271,7 +285,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -306,6 +320,12 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 	}
 
+	for _, update := range pendingFactoryWorkOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(update.factoryID, update.orderID, update.reason); err != nil {
+			w.logger.Errorf("failed to publish factory work order updated RabbitMQ message: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -316,6 +336,7 @@ func (w *NodeExecutor) executeActionNode(
 	onNewEvents func([]models.CanvasEvent),
 	onMemoryChanged func(uuid.UUID),
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 ) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
@@ -384,7 +405,8 @@ func (w *NodeExecutor) executeActionNode(
 		OIDC:        w.oidcProvider,
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
-		Factory:     contexts.NewFactoryContext(tx, workflow, execution),
+		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated),
 	}
 
 	if node.AppInstallationID != nil {
