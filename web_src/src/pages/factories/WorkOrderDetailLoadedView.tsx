@@ -48,8 +48,6 @@ interface WorkOrderDetailLoadedViewProps {
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
-  isDraft: boolean;
-  isReady: boolean;
   canDispatch: boolean;
   canClose: boolean;
   canAssign: boolean;
@@ -94,8 +92,6 @@ export function WorkOrderDetailLoadedView({
   isOpen,
   isDispatchable,
   isClosed,
-  isDraft,
-  isReady,
   canDispatch,
   canClose,
   canAssign,
@@ -134,8 +130,6 @@ export function WorkOrderDetailLoadedView({
         displayStatus={displayStatus}
         isOpen={isOpen}
         isDispatchable={isDispatchable}
-        isDraft={isDraft}
-        isReady={isReady}
         isClosed={isClosed}
         factoryLines={factoryLines}
         canDispatch={canDispatch}

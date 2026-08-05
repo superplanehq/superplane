@@ -244,22 +244,6 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   executions: [],
 };
 
-export const READY_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-ready-refunds",
-  title: "Ready: patch retry logic for duplicate refunds",
-  description: "Scoped and approved — waiting on a line dispatch.",
-  state: "STATE_READY",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: TWO_HOURS_AGO,
-  updatedAt: HOUR_AGO,
-  createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
-  executions: [],
-};
-
 export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-closed-failed-refunds",
   title: "Failed: reconcile refund ledger for Q1 audit",
@@ -377,11 +361,22 @@ function statusUpdatedEvent(
   };
 }
 
+interface CommentAuthorFixture {
+  kind: "user" | "automation" | "system";
+  userId?: string;
+  automation?: {
+    nodeId?: string;
+    nodeName?: string;
+    appId?: string;
+    appName?: string;
+  };
+}
+
 function commentAddedEvent(
   order: FactoriesWorkOrder,
   at: string,
   body: string,
-  author: { kind: "user" | "llm" | "system"; userId?: string; label?: string },
+  author: CommentAuthorFixture,
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.comment.added",
@@ -421,17 +416,6 @@ export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     "Scoping notes: need product sign-off on metric names before moving to ready.",
     { kind: "user", userId: STORYBOOK_ME_USER_ID },
   ),
-];
-
-export const READY_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
-  statusUpdatedEvent(READY_WORK_ORDER, TWO_HOURS_AGO, "", "draft", { id: REVIEWER_USER.id }),
-  commentAddedEvent(
-    READY_WORK_ORDER,
-    TWO_HOURS_AGO,
-    "PR draft looks good — I'll approve once the design doc is attached.",
-    { kind: "llm", label: "Claude" },
-  ),
-  statusUpdatedEvent(READY_WORK_ORDER, HOUR_AGO, "draft", "ready", { id: REVIEWER_USER.id }),
 ];
 
 export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
@@ -588,7 +572,10 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     OPEN_WORK_ORDER,
     HOUR_AGO,
     "I re-ran the failing test locally and confirmed the duplicate entry appears only on retry #3.",
-    { kind: "llm", label: "Claude" },
+    {
+      kind: "automation",
+      automation: { nodeName: "reproduce-failure", appName: "Refund Diagnostics" },
+    },
   ),
   artifactAddedEvent(
     OPEN_WORK_ORDER,
@@ -639,7 +626,6 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,
-  READY_WORK_ORDER,
   CLOSED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,
 ];

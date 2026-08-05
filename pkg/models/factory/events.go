@@ -22,11 +22,17 @@ const (
 	EventTypeLineStepExecutionFinished = "step.execution.finished"
 )
 
-// Comment author kinds
+// Comment author kinds.
+//
+// `automation` covers any comment written by a canvas run (LLM node,
+// system node, custom automation) — the specific tool is exposed
+// through the `Automation` payload rather than a separate `llm` /
+// `system` kind, so downstream consumers can render "commented via
+// <node> in <app>" without inspecting a fixed enum.
 const (
-	CommentAuthorKindUser   = "user"
-	CommentAuthorKindLLM    = "llm"
-	CommentAuthorKindSystem = "system"
+	CommentAuthorKindUser       = "user"
+	CommentAuthorKindAutomation = "automation"
+	CommentAuthorKindSystem     = "system"
 )
 
 // Artifact types
@@ -67,10 +73,21 @@ type WorkOrderStatusUpdated struct {
 	ToResult   string        `json:"toResult,omitempty"`
 }
 
+// AutomationRef identifies the canvas node + app that produced an
+// automated comment (kind `automation` / `system`). The values are
+// captured at write time so the timeline stays stable even if the node
+// or app is later renamed or removed.
+type AutomationRef struct {
+	NodeID   string    `json:"nodeId,omitempty"`
+	NodeName string    `json:"nodeName,omitempty"`
+	AppID    uuid.UUID `json:"appId,omitempty"`
+	AppName  string    `json:"appName,omitempty"`
+}
+
 type WorkOrderCommentAuthor struct {
-	Kind   string  `json:"kind"`
-	UserID *string `json:"userId,omitempty"`
-	Label  string  `json:"label,omitempty"`
+	Kind       string         `json:"kind"`
+	UserID     *string        `json:"userId,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
 }
 
 type WorkOrderCommentAdded struct {

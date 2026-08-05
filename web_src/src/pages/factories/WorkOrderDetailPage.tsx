@@ -63,8 +63,6 @@ function WorkOrderDetailPageContent({
           isOpen={page.isOpen}
           isDispatchable={page.isDispatchable}
           isClosed={page.isClosed}
-          isDraft={page.isDraft}
-          isReady={page.isReady}
           canDispatch={page.canDispatch}
           canClose={page.canClose}
           canAssign={page.canAssign}
@@ -82,7 +80,7 @@ function WorkOrderDetailPageContent({
           onClose={page.handleClose}
           onAssigneesSave={page.handleAssigneesSave}
           onStatusChange={page.handleStatusChange}
-          onAddComment={(body) => page.handleAddComment({ body, authorKind: "KIND_USER" })}
+          onAddComment={page.handleAddComment}
           onAddArtifact={page.handleAddArtifact}
         />
       ) : null}

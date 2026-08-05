@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -89,18 +90,41 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
 	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil)
 	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		WorkOrderID: order.ID.String(),
-		State:       models.FactoryWorkOrderStateReady,
+		State: models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateReady, updated.State)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
+	//
+	// When the run has no `factory_work_order_executions` row we have
+	// no way to know which order the component is meant to update.
+	// Rather than silently succeed on some default target, the context
+	// must fail loudly so the component author sees the wiring is off.
+	//
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State: models.FactoryWorkOrderStateOpen,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not attached to a work order")
 }
 
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
@@ -110,38 +134,48 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
 	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil)
 	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		WorkOrderID: order.ID.String(),
-		Body:        "Ready for review",
-		AuthorKind:  "llm",
-		AuthorLabel: "Claude",
+		Body: "Ready for review",
 	}))
 
 	events, err := order.ListEvents(database.Conn(), 10, nil)
 	require.NoError(t, err)
-	types := make([]string, 0, len(events))
-	for _, e := range events {
-		types = append(types, e.Type)
-	}
-	assert.Contains(t, types, "order.comment.added")
 
 	//
-	// Canvas comments never have an acting human, so an explicit `user`
-	// kind must be rejected up front rather than silently written with an
-	// empty `userId` that later renders as "Someone" in the timeline.
+	// The comment must be attributed to the executing canvas node (kind
+	// = automation, automation.nodeId matches the exec) so the timeline
+	// can render "commented via <node> in <app>" instead of a free-form
+	// author label.
 	//
-	err = ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		WorkOrderID: order.ID.String(),
-		Body:        "should be rejected",
-		AuthorKind:  "user",
-	})
-	require.Error(t, err)
+	var commentEvent *models.FactoryWorkOrderEvent
+	for i := range events {
+		if events[i].Type == "order.comment.added" {
+			commentEvent = &events[i]
+			break
+		}
+	}
+	require.NotNil(t, commentEvent, "expected order.comment.added event")
+
+	var payload struct {
+		Author struct {
+			Kind       string `json:"kind"`
+			Automation struct {
+				NodeID  string `json:"nodeId"`
+				AppName string `json:"appName"`
+			} `json:"automation"`
+		} `json:"author"`
+	}
+	require.NoError(t, json.Unmarshal(commentEvent.Data, &payload))
+	assert.Equal(t, "automation", payload.Author.Kind)
+	assert.Equal(t, nodeExecution.NodeID, payload.Author.Automation.NodeID)
+	assert.NotEmpty(t, payload.Author.Automation.AppName)
 }
 
 func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
@@ -151,18 +185,18 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
 	order, err := factory.CreateWorkOrder(database.Conn(), "Artifact target", "", &r.User, nil)
 	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		WorkOrderID: order.ID.String(),
-		Type:        "pr",
-		URL:         "https://github.com/example/repo/pull/1",
-		Title:       "Draft",
-		Data:        map[string]any{"number": "1"},
+		Type:  "pr",
+		URL:   "https://github.com/example/repo/pull/1",
+		Title: "Draft",
+		Data:  map[string]any{"number": "1"},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, artifact)
@@ -172,6 +206,42 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, "https://github.com/example/repo/pull/1", artifacts[0].URL)
+}
+
+// linkRunToWorkOrder creates the `factory_work_order_executions` row
+// that the FactoryContext resolves from `execution.RunID` to find the
+// "current" work order. Every factory work-order component now derives
+// the target order from this link instead of taking it as config.
+//
+// A real (empty) factory line is created so the FK on `line_id`
+// resolves; the test doesn't otherwise care about the line's shape.
+func linkRunToWorkOrder(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factory *models.Factory,
+	workOrderID uuid.UUID,
+	runID uuid.UUID,
+) {
+	t.Helper()
+
+	line, err := factory.CreateLine(database.Conn(), support.RandomName("line"), nil)
+	require.NoError(t, err)
+
+	now := time.Now()
+	execution := models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		WorkOrderID:    workOrderID,
+		LineID:         line.ID,
+		StepIndex:      0,
+		StepName:       "component-under-test",
+		RunID:          runID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, database.Conn().Create(&execution).Error)
 }
 
 func setupFactoryAppExecution(

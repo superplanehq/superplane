@@ -26,7 +26,6 @@ function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStat
 
 describe("filterWorkOrdersByStatus", () => {
   const draft = order({ state: "STATE_DRAFT" });
-  const ready = order({ state: "STATE_READY" });
   const open = order({ state: "STATE_OPEN" });
   const running = order({
     state: "STATE_OPEN",
@@ -42,10 +41,10 @@ describe("filterWorkOrdersByStatus", () => {
   const closedRejected = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-rejected" });
   const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-closed-failed" });
 
-  const all = [draft, ready, open, running, failed, closedCompleted, closedRejected, closedFailed];
+  const all = [draft, open, running, failed, closedCompleted, closedRejected, closedFailed];
 
-  it("`active` returns every non-closed order (draft/ready/open/running/failed)", () => {
-    expect(idsFilteredBy(all, "active")).toEqual([draft.id, ready.id, open.id, running.id, failed.id]);
+  it("`active` returns every non-closed order (draft/open/running/failed)", () => {
+    expect(idsFilteredBy(all, "active")).toEqual([draft.id, open.id, running.id, failed.id]);
   });
 
   it("`failed` includes both in-flight failed and closed-as-failed orders", () => {
@@ -56,16 +55,15 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "all")).toEqual(all.map((o) => o.id));
   });
 
-  it("specific display statuses (draft/ready/completed/rejected) match by that status only", () => {
+  it("specific display statuses (draft/completed/rejected) match by that status only", () => {
     expect(idsFilteredBy(all, "draft")).toEqual([draft.id]);
-    expect(idsFilteredBy(all, "ready")).toEqual([ready.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
   });
 
   it("countActiveWorkOrders matches the size of the default `active` filter", () => {
     expect(countActiveWorkOrders(all)).toBe(filterWorkOrdersByStatus(all, "active").length);
-    expect(countActiveWorkOrders(all)).toBe(5);
+    expect(countActiveWorkOrders(all)).toBe(4);
   });
 });
 

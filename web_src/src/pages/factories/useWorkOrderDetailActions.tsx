@@ -2,7 +2,6 @@ import type {
   FactoriesAddWorkOrderArtifactBody,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
-  WorkOrderCommentAuthorKind,
 } from "@/api-client";
 import {
   useAddWorkOrderArtifact,
@@ -58,13 +57,9 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleAddComment = async (input: {
-    body: string;
-    authorKind?: WorkOrderCommentAuthorKind;
-    authorLabel?: string;
-  }) => {
+  const handleAddComment = async (body: string) => {
     try {
-      await addComment.mutateAsync({ orderId, ...input });
+      await addComment.mutateAsync({ orderId, body });
       showSuccessToast("Comment added.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to add comment"));

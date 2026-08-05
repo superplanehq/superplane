@@ -20,8 +20,6 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   const derived = getWorkOrderDetailDerived(order);
-  const isDraft = order?.state === "STATE_DRAFT";
-  const isReady = order?.state === "STATE_READY";
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Factory"]);
 
@@ -71,8 +69,6 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     artifacts: artifactsQuery.data ?? [],
     isArtifactsLoading: artifactsQuery.isLoading,
     artifactsError: artifactsQuery.error ?? null,
-    isDraft,
-    isReady,
     ...derived,
     ...actions,
   };

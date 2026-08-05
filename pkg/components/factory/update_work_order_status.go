@@ -19,9 +19,8 @@ func init() {
 type UpdateWorkOrderStatus struct{}
 
 type UpdateWorkOrderStatusConfiguration struct {
-	WorkOrderID string `json:"workOrderId" mapstructure:"workOrderId"`
-	Status      string `json:"status" mapstructure:"status"`
-	Result      string `json:"result" mapstructure:"result"`
+	Status string `json:"status" mapstructure:"status"`
+	Result string `json:"result" mapstructure:"result"`
 }
 
 func (c *UpdateWorkOrderStatus) Name() string {
@@ -37,7 +36,7 @@ func (c *UpdateWorkOrderStatus) Description() string {
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Work Order Status component transitions a work order across the lifecycle draft → ready → open → closed. When closing, a result (completed, rejected, or failed) must be provided. This component can only be used in factory-owned apps.`
+	return `The Update Work Order Status component transitions a work order across the lifecycle draft → open → closed (with reopen from closed back to open). When closing, a result (completed, rejected, or failed) must be provided. This component can only be used in factory-owned apps.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
@@ -70,13 +69,6 @@ func (c *UpdateWorkOrderStatus) OutputChannels(configuration any) []core.OutputC
 func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "workOrderId",
-			Label:       "Work Order ID",
-			Description: "The ID of the work order to update",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-		},
-		{
 			Name:        "status",
 			Label:       "Status",
 			Description: "The new lifecycle state for the work order",
@@ -86,7 +78,6 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Draft", Value: "draft"},
-						{Label: "Ready", Value: "ready"},
 						{Label: "Open", Value: "open"},
 						{Label: "Closed", Value: "closed"},
 					},
@@ -125,9 +116,8 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	workOrder, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		WorkOrderID: config.WorkOrderID,
-		State:       config.Status,
-		Result:      config.Result,
+		State:  config.Status,
+		Result: config.Result,
 	})
 	if err != nil {
 		return err

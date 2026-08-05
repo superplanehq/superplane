@@ -3,6 +3,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
+  FactoriesWorkOrderResult,
 } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
@@ -41,10 +42,17 @@ interface LineStepExecutionPayload {
   run?: EventRunRef;
 }
 
+interface EventAutomationRefPayload {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+}
+
 interface EventCommentAuthorPayload {
   kind?: string;
   userId?: string;
-  label?: string;
+  automation?: EventAutomationRefPayload;
 }
 
 interface EventArtifactPayload {
@@ -270,13 +278,14 @@ function appendStatusUpdatedEvent(
   // event covers the same change so the timeline shows one visible entry per
   // lifecycle change:
   //
-  //   * `order.opened` fires only on the initial `ready → open` promotion.
+  //   * `order.opened` fires only on the initial `draft → open` promotion
+  //     (mirroring a dispatch).
   //   * `order.closed` fires on any transition into `closed`.
   //
-  // Reopens (`closed → open`, `closed → ready`) are represented by this
-  // status-updated event alone.
+  // Reopens (`closed → open`) are represented by this status-updated event
+  // alone.
   //
-  if (toState === "open" && fromState === "ready") {
+  if (toState === "open" && fromState === "draft") {
     return;
   }
   if (toState === "closed") {
@@ -298,7 +307,7 @@ function describeStatusTransition(fromState: string, toState: string): string {
   if (!fromState) {
     return `set status to ${humanizeState(toState)}`;
   }
-  if (fromState === "closed" && (toState === "open" || toState === "ready")) {
+  if (fromState === "closed" && toState === "open") {
     return `reopened as ${humanizeState(toState)}`;
   }
   return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
@@ -308,8 +317,6 @@ function humanizeState(state: string): string {
   switch (state) {
     case "draft":
       return "Draft";
-    case "ready":
-      return "Ready";
     case "open":
       return "Open";
     case "closed":
@@ -332,6 +339,7 @@ function appendCommentEvent(
   }
 
   const author = payload.author ?? {};
+  const automation = author.automation;
   events.push({
     id: `comment-${index}`,
     kind: "commented",
@@ -341,7 +349,14 @@ function appendCommentEvent(
     comment: {
       body,
       authorKind: author.kind,
-      authorLabel: author.label,
+      automation: automation
+        ? {
+            nodeId: automation.nodeId,
+            nodeName: automation.nodeName,
+            appId: automation.appId,
+            appName: automation.appName,
+          }
+        : undefined,
     },
     title: "commented",
   });
@@ -376,11 +391,40 @@ function appendArtifactEvent(
   });
 }
 
+//
+// Short-form artifact-kind label used in event descriptions like
+// "attached PR: <label>". Kept separate from the timeline body's
+// long-form label ("pull request") so callers can pick the phrasing
+// that reads best in context.
+//
+const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
+  pr: "PR",
+  markdown: "note",
+};
+
+function formatArtifactKindShort(type: string | undefined): string {
+  if (!type) {
+    return "artifact";
+  }
+  return ARTIFACT_KIND_SHORT_LABEL[type] ?? "artifact";
+}
+
 function describeArtifactAdded(artifact: EventArtifactPayload): string {
   const label = artifact.title?.trim() || artifact.url?.trim();
-  const type = artifact.type === "pr" ? "PR" : artifact.type === "markdown" ? "note" : "artifact";
+  const type = formatArtifactKindShort(artifact.type);
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
+
+//
+// Map from the lowercase result stored in the event payload back to
+// the proto enum the presentation helpers expect. Kept as a map so we
+// don't grow a chained ternary every time a new result is added.
+//
+const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
+  completed: "RESULT_COMPLETED",
+  rejected: "RESULT_REJECTED",
+  failed: "RESULT_FAILED",
+};
 
 function appendClosedEvent(
   events: WorkOrderTimelineEvent[],
@@ -390,15 +434,7 @@ function appendClosedEvent(
   resolveUserName?: UserNameLookup,
 ): void {
   const closedResult = payload.result ?? payload.order?.result;
-  const result = formatWorkOrderResult(
-    closedResult === "completed"
-      ? "RESULT_COMPLETED"
-      : closedResult === "rejected"
-        ? "RESULT_REJECTED"
-        : closedResult === "failed"
-          ? "RESULT_FAILED"
-          : undefined,
-  );
+  const result = formatWorkOrderResult(closedResult ? CLOSED_RESULT_TO_PROTO[closedResult] : undefined);
 
   events.push({
     id: `closed-${index}`,

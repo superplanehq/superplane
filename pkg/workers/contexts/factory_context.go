@@ -3,7 +3,6 @@ package contexts
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -58,7 +57,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, error) {
-	order, err := c.findWorkOrder(params.WorkOrderID)
+	order, err := c.currentWorkOrder()
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 }
 
 func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {
-	order, err := c.findWorkOrder(params.WorkOrderID)
+	order, err := c.currentWorkOrder()
 	if err != nil {
 		return err
 	}
@@ -87,34 +86,23 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		return errors.New("comment body is required")
 	}
 
-	kind := params.AuthorKind
-	if kind == "" {
-		kind = factory.CommentAuthorKindLLM
-	}
-	if !models.IsValidWorkOrderCommentAuthorKind(kind) {
-		return fmt.Errorf("invalid comment author kind %q", kind)
-	}
 	//
-	// The canvas has no acting human, so it must never attribute a comment
-	// to `user` — the timeline would render "Someone" and downstream LLM
-	// context would attribute the note to a phantom person. Human
-	// attribution is only available via the interactive API path, which
-	// pulls the id from the authenticated caller.
+	// Canvas comments are always attributed to `automation` — the tool that
+	// wrote the note is exposed through the `Automation` payload (node +
+	// app), not a free-form `llm` / `system` enum. Human attribution is
+	// only available through the interactive API, which reads the
+	// authenticated caller's id and writes `kind = user`.
 	//
-	if kind == factory.CommentAuthorKindUser {
-		return fmt.Errorf("canvas comments cannot be attributed to a human user; use `llm` or `system`")
-	}
-
 	author := factory.WorkOrderCommentAuthor{
-		Kind:  kind,
-		Label: strings.TrimSpace(params.AuthorLabel),
+		Kind:       factory.CommentAuthorKindAutomation,
+		Automation: c.automationRef(),
 	}
 
 	return order.RecordCommentAdded(c.tx, body, author, c.runRef())
 }
 
 func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	order, err := c.findWorkOrder(params.WorkOrderID)
+	order, err := c.currentWorkOrder()
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +122,31 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	return artifactToCore(artifact)
 }
 
-func (c *FactoryContext) findWorkOrder(workOrderID string) (*models.FactoryWorkOrder, error) {
+// currentWorkOrder resolves the work order that owns the currently
+// executing canvas run. Factory work-order components (update status,
+// add comment, add artifact) only make sense in the context of a
+// running work order — we look up that link through the run rather
+// than asking the component author to supply the ID by hand.
+//
+// The link is the `factory_work_order_executions` row that
+// `DispatchWorkOrder` created for this run. Canvas runs that were not
+// started as part of a work-order dispatch have no such row; in that
+// case we return a clear error so the component fails fast instead of
+// silently writing to nothing.
+func (c *FactoryContext) currentWorkOrder() (*models.FactoryWorkOrder, error) {
 	if c.canvas.FactoryID == nil {
 		return nil, errors.New("app is not owned by a factory")
 	}
+	if c.execution == nil {
+		return nil, errors.New("factory context has no current execution")
+	}
 
-	id, err := uuid.Parse(strings.TrimSpace(workOrderID))
+	execution, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid work order id: %w", err)
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, errors.New("this canvas run is not attached to a work order; dispatch a work order to it first")
+		}
+		return nil, err
 	}
 
 	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
@@ -149,7 +154,7 @@ func (c *FactoryContext) findWorkOrder(workOrderID string) (*models.FactoryWorkO
 		return nil, err
 	}
 
-	return f.FindWorkOrder(c.tx, id)
+	return f.FindWorkOrder(c.tx, execution.WorkOrderID)
 }
 
 // runRef returns a lightweight reference to the current run so events written
@@ -162,6 +167,30 @@ func (c *FactoryContext) runRef() *factory.RunRef {
 	return &factory.RunRef{
 		ID: c.execution.RunID,
 	}
+}
+
+// automationRef captures the identity of the executing canvas node (and
+// its owning app) so timeline consumers can render "commented via
+// <node> in <app>" without inferring the source from a free-form
+// author label. Failure to resolve the node is soft: we still emit the
+// comment with whatever we know rather than dropping the whole event.
+func (c *FactoryContext) automationRef() *factory.AutomationRef {
+	if c.execution == nil || c.canvas == nil {
+		return nil
+	}
+
+	ref := &factory.AutomationRef{
+		NodeID:  c.execution.NodeID,
+		AppID:   c.canvas.ID,
+		AppName: c.canvas.Name,
+	}
+
+	node, err := c.canvas.FindNode(c.execution.NodeID)
+	if err == nil && node != nil {
+		ref.NodeName = node.Name
+	}
+
+	return ref
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {

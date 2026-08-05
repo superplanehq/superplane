@@ -407,15 +407,14 @@ message WorkOrder {
     STATE_UNSPECIFIED = 0;
     //
     // Enum numbers are ordered so the pre-existing OPEN / CLOSED values
-    // keep the numbers they've always had; the new DRAFT / READY states
-    // are appended. Even though our protos are only used for JSON
-    // conversion (see AGENTS.md), stable numbers keep any snapshot or
-    // stored numeric enum consistent across versions.
+    // keep the numbers they've always had; DRAFT is appended. Even
+    // though our protos are only used for JSON conversion (see
+    // AGENTS.md), stable numbers keep any snapshot or stored numeric
+    // enum consistent across versions.
     //
     STATE_OPEN = 1;
     STATE_CLOSED = 2;
     STATE_DRAFT = 3;
-    STATE_READY = 4;
   }
 
   enum Result {
@@ -436,10 +435,11 @@ message WorkOrder {
   repeated WorkOrderExecution executions = 9;
   UserRef created_by = 10;
   //
-  // Bumped only on lifecycle transitions (draft → ready → open, reopen,
-  // close). Distinct from `updated_at`, which also bumps on assignee
-  // updates. The UI uses this as the fence for "current attempt" so a
-  // reassign after a failure doesn't hide the failed pill.
+  // Bumped only on lifecycle transitions (draft → open on dispatch,
+  // close, reopen, back to draft). Distinct from `updated_at`, which
+  // also bumps on assignee updates. The UI uses this as the fence for
+  // "current attempt" so a reassign after a failure doesn't hide the
+  // failed pill.
   //
   google.protobuf.Timestamp state_updated_at = 11;
 }
@@ -554,8 +554,6 @@ message AddWorkOrderCommentRequest {
   string factory_id = 1;
   string order_id = 2;
   string body = 3;
-  WorkOrderCommentAuthor.Kind author_kind = 4;
-  string author_label = 5;
 }
 
 message AddWorkOrderCommentResponse {
@@ -573,13 +571,26 @@ message WorkOrderCommentAuthor {
   enum Kind {
     KIND_UNSPECIFIED = 0;
     KIND_USER = 1;
-    KIND_LLM = 2;
+    KIND_AUTOMATION = 2;
     KIND_SYSTEM = 3;
   }
 
   Kind kind = 1;
   string user_id = 2;
-  string label = 3;
+  //
+  // Populated when kind is `automation` or `system` — identifies the
+  // canvas node (and its owning app) that wrote the comment so the
+  // timeline can render "commented via <node> in <app>" without any
+  // free-form author label.
+  //
+  AutomationRef automation = 3;
+}
+
+message AutomationRef {
+  string node_id = 1;
+  string node_name = 2;
+  string app_id = 3;
+  string app_name = 4;
 }
 
 message ListWorkOrderArtifactsRequest {

@@ -183,8 +183,6 @@ func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	switch state {
 	case models.FactoryWorkOrderStateDraft:
 		return pb.WorkOrder_STATE_DRAFT
-	case models.FactoryWorkOrderStateReady:
-		return pb.WorkOrder_STATE_READY
 	case models.FactoryWorkOrderStateOpen:
 		return pb.WorkOrder_STATE_OPEN
 	case models.FactoryWorkOrderStateClosed:

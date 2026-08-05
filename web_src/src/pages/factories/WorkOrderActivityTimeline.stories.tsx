@@ -13,8 +13,6 @@ import {
   FAILED_WORK_ORDER_EVENTS,
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_EVENTS,
-  READY_WORK_ORDER,
-  READY_WORK_ORDER_EVENTS,
   RICH_OPEN_WORK_ORDER_EVENTS,
   RUNNING_WORK_ORDER,
   RUNNING_WORK_ORDER_EVENTS,
@@ -84,15 +82,6 @@ export const Draft: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: DRAFT_WORK_ORDER,
     events: DRAFT_WORK_ORDER_EVENTS,
-  },
-};
-
-/** Ready — draft→ready status change plus an LLM-authored comment. */
-export const Ready: Story = {
-  args: {
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    order: READY_WORK_ORDER,
-    events: READY_WORK_ORDER_EVENTS,
   },
 };
 

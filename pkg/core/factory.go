@@ -13,25 +13,20 @@ type WorkOrderParams struct {
 }
 
 type UpdateWorkOrderStatusParams struct {
-	WorkOrderID string
-	State       string
-	Result      string
+	State  string
+	Result string
 }
 
 type AddWorkOrderCommentParams struct {
-	WorkOrderID string
-	Body        string
-	AuthorKind  string
-	AuthorLabel string
+	Body string
 }
 
 type AddWorkOrderArtifactParams struct {
-	WorkOrderID string
-	Type        string
-	URL         string
-	Title       string
-	Body        string
-	Data        map[string]any
+	Type  string
+	URL   string
+	Title string
+	Body  string
+	Data  map[string]any
 }
 
 type WorkOrder struct {

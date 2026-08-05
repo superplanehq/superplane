@@ -89,7 +89,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       {
         timestamp: "2026-08-04T12:00:00.000Z",
         type: "order.status.updated",
-        event: { fromState: "ready", toState: "open" },
+        event: { fromState: "draft", toState: "open" },
       },
       {
         timestamp: "2026-08-04T12:00:00.000Z",
@@ -121,15 +121,15 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     });
   });
 
-  it("renders a draft→ready transition as a status change", () => {
+  it("renders an open→draft transition as a status change", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
         type: "order.status.updated",
         event: {
           user: { id: "user-1" },
-          fromState: "draft",
-          toState: "ready",
+          fromState: "open",
+          toState: "draft",
         },
       },
     ]);
@@ -137,8 +137,8 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(view.events[0]).toMatchObject({
       kind: "statusChanged",
       actorUserId: "user-1",
-      statusChange: { fromState: "draft", toState: "ready" },
-      title: "moved Draft → Ready",
+      statusChange: { fromState: "open", toState: "draft" },
+      title: "moved Open → Draft",
     });
   });
 
@@ -164,14 +164,17 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     });
   });
 
-  it("carries a comment body into the timeline", () => {
+  it("carries a comment body and automation ref into the timeline", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
         type: "order.comment.added",
         event: {
           body: "Please double-check the payload shape.",
-          author: { kind: "llm", label: "Claude" },
+          author: {
+            kind: "automation",
+            automation: { nodeName: "review-payload", appName: "Refund Diagnostics" },
+          },
         },
       },
     ]);
@@ -180,8 +183,8 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       kind: "commented",
       comment: {
         body: "Please double-check the payload shape.",
-        authorKind: "llm",
-        authorLabel: "Claude",
+        authorKind: "automation",
+        automation: { nodeName: "review-payload", appName: "Refund Diagnostics" },
       },
     });
   });

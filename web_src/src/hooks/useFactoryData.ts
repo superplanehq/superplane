@@ -29,7 +29,6 @@ import type {
   FactoriesWorkOrderState,
   FactoryApp,
   FactoryLineStep,
-  WorkOrderCommentAuthorKind,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { hasActiveWorkOrderExecution } from "@/pages/factories/lib/workOrderExecutions";
@@ -372,20 +371,13 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      orderId: string;
-      body: string;
-      authorKind?: WorkOrderCommentAuthorKind;
-      authorLabel?: string;
-    }) => {
+    mutationFn: async (input: { orderId: string; body: string }) => {
       const response = await factoriesAddWorkOrderComment(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             body: input.body,
-            authorKind: input.authorKind,
-            authorLabel: input.authorLabel,
           },
         }),
       );

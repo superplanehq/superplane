@@ -30,7 +30,6 @@ const openMeta = getWorkOrderDisplayStatusMeta("open");
 const runningMeta = getWorkOrderDisplayStatusMeta("running");
 const completedMeta = getWorkOrderDisplayStatusMeta("completed");
 const draftMeta = getWorkOrderDisplayStatusMeta("draft");
-const readyMeta = getWorkOrderDisplayStatusMeta("ready");
 const closedFailedMeta = getWorkOrderDisplayStatusMeta("closedFailed");
 
 const commonHandlers = {
@@ -55,7 +54,7 @@ const commonFlags = {
   isUpdatingStatus: false,
 };
 
-/** Open — Dispatch, Complete, Reject all available. */
+/** Open — Dispatch, Back to draft, Complete, Reject all available. */
 export const Open: Story = {
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
@@ -63,8 +62,6 @@ export const Open: Story = {
     displayStatus: "open",
     isOpen: true,
     isDispatchable: true,
-    isDraft: false,
-    isReady: false,
     isClosed: false,
     canDispatch: true,
     canClose: true,
@@ -82,8 +79,6 @@ export const Running: Story = {
     displayStatus: "running",
     isOpen: true,
     isDispatchable: true,
-    isDraft: false,
-    isReady: false,
     isClosed: false,
     canDispatch: true,
     canClose: true,
@@ -94,7 +89,7 @@ export const Running: Story = {
   },
 };
 
-/** Closed — reopen actions surface (as open or as ready). */
+/** Closed — single "Reopen" action surfaces. */
 export const Closed: Story = {
   args: {
     orderTitle: "Backfill refund audit trail",
@@ -102,8 +97,6 @@ export const Closed: Story = {
     displayStatus: "completed",
     isOpen: false,
     isDispatchable: false,
-    isDraft: false,
-    isReady: false,
     isClosed: true,
     canDispatch: false,
     canClose: false,
@@ -113,35 +106,14 @@ export const Closed: Story = {
   },
 };
 
-/** Draft — only "Mark ready" appears in the action bar. */
+/** Draft — Dispatch is available so scoping can flip straight into a run. */
 export const Draft: Story = {
   args: {
     orderTitle: "Draft: rework refund telemetry",
     statusMeta: draftMeta,
     displayStatus: "draft",
     isOpen: false,
-    isDispatchable: false,
-    isDraft: true,
-    isReady: false,
-    isClosed: false,
-    canDispatch: false,
-    canClose: false,
-    canManage: true,
-    ...commonFlags,
-    ...commonHandlers,
-  },
-};
-
-/** Ready — Dispatch is enabled and "Back to draft" is available. */
-export const Ready: Story = {
-  args: {
-    orderTitle: "Ready: patch retry logic for duplicate refunds",
-    statusMeta: readyMeta,
-    displayStatus: "ready",
-    isOpen: false,
     isDispatchable: true,
-    isDraft: false,
-    isReady: true,
     isClosed: false,
     canDispatch: true,
     canClose: false,
@@ -151,7 +123,7 @@ export const Ready: Story = {
   },
 };
 
-/** Closed as failed — same reopen actions, but the badge uses the failed styling. */
+/** Closed as failed — reopen action, but the badge uses the failed styling. */
 export const ClosedFailed: Story = {
   name: "Closed (failed)",
   args: {
@@ -160,8 +132,6 @@ export const ClosedFailed: Story = {
     displayStatus: "closedFailed",
     isOpen: false,
     isDispatchable: false,
-    isDraft: false,
-    isReady: false,
     isClosed: true,
     canDispatch: false,
     canClose: false,
@@ -175,13 +145,11 @@ export const ClosedFailed: Story = {
 export const ReadOnly: Story = {
   name: "Read Only",
   args: {
-    orderTitle: "Ready: patch retry logic for duplicate refunds",
-    statusMeta: readyMeta,
-    displayStatus: "ready",
-    isOpen: false,
+    orderTitle: "Reconcile duplicate refunds in ledger",
+    statusMeta: openMeta,
+    displayStatus: "open",
+    isOpen: true,
     isDispatchable: true,
-    isDraft: false,
-    isReady: true,
     isClosed: false,
     canDispatch: false,
     canClose: false,

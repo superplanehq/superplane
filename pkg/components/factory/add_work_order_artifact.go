@@ -18,13 +18,22 @@ func init() {
 
 type AddWorkOrderArtifact struct{}
 
+// Data is a free-form list of `{name, value}` entries the component
+// author fills in per invocation. We turn it into a `map[string]any`
+// before handing it to the context so callers downstream still see
+// familiar structured metadata; keeping the config as a list avoids
+// baking a fixed PR schema into the component (see PR #6569 review).
+type ArtifactDataEntry struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
 type AddWorkOrderArtifactConfiguration struct {
-	WorkOrderID  string         `json:"workOrderId" mapstructure:"workOrderId"`
-	ArtifactType string         `json:"artifactType" mapstructure:"artifactType"`
-	URL          string         `json:"url" mapstructure:"url"`
-	Title        string         `json:"title" mapstructure:"title"`
-	Body         string         `json:"body" mapstructure:"body"`
-	Data         map[string]any `json:"data" mapstructure:"data"`
+	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
+	URL          string              `json:"url" mapstructure:"url"`
+	Title        string              `json:"title" mapstructure:"title"`
+	Body         string              `json:"body" mapstructure:"body"`
+	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
 func (c *AddWorkOrderArtifact) Name() string {
@@ -40,7 +49,7 @@ func (c *AddWorkOrderArtifact) Description() string {
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required, plus optional rich metadata) and markdown notes (an inline body is required). This component can only be used in factory-owned apps.`
+	return `The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required) and markdown notes (an inline body is required). Free-form metadata can be attached as name/value pairs. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -57,11 +66,14 @@ func (c *AddWorkOrderArtifact) ExampleOutput() map[string]any {
 		"type":      "workOrder.artifactAdded",
 		"data": map[string]any{
 			"artifact": map[string]any{
-				"id":          "art-123",
-				"workOrderId": "wo-123",
-				"type":        "pr",
-				"url":         "https://github.com/example/repo/pull/42",
-				"title":       "Draft implementation",
+				"id":    "art-123",
+				"type":  "pr",
+				"url":   "https://github.com/example/repo/pull/42",
+				"title": "Draft implementation",
+				"data": map[string]any{
+					"number":   "42",
+					"provider": "github",
+				},
 			},
 		},
 	}
@@ -76,13 +88,6 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	markdownVisibility := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 
 	return []configuration.Field{
-		{
-			Name:        "workOrderId",
-			Label:       "Work Order ID",
-			Description: "The ID of the work order the artifact belongs to",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-		},
 		{
 			Name:        "artifactType",
 			Label:       "Type",
@@ -135,23 +140,20 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:                 "data",
-			Label:                "Metadata",
-			Description:          "Optional structured metadata for the artifact (e.g. PR number, provider, refs)",
-			Type:                 configuration.FieldTypeObject,
-			Required:             false,
-			VisibilityConditions: prVisibility,
+			Name:        "data",
+			Label:       "Metadata",
+			Description: "Free-form name/value pairs stored alongside the artifact (e.g. PR number, provider, refs)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
 			TypeOptions: &configuration.TypeOptions{
-				Object: &configuration.ObjectTypeOptions{
-					Schema: []configuration.Field{
-						{Name: "number", Label: "Number", Type: configuration.FieldTypeString},
-						{Name: "repository", Label: "Repository", Type: configuration.FieldTypeString},
-						{Name: "owner", Label: "Owner", Type: configuration.FieldTypeString},
-						{Name: "provider", Label: "Provider", Type: configuration.FieldTypeString, Description: "e.g. github, gitlab"},
-						{Name: "headRef", Label: "Head Ref", Type: configuration.FieldTypeString},
-						{Name: "baseRef", Label: "Base Ref", Type: configuration.FieldTypeString},
-						{Name: "state", Label: "State", Type: configuration.FieldTypeString, Description: "e.g. open, merged, closed"},
-						{Name: "externalId", Label: "External ID", Type: configuration.FieldTypeString},
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Entry",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true},
+							{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true},
+						},
 					},
 				},
 			},
@@ -165,13 +167,14 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	data := artifactDataToMap(config.Data)
+
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		WorkOrderID: config.WorkOrderID,
-		Type:        config.ArtifactType,
-		URL:         config.URL,
-		Title:       config.Title,
-		Body:        config.Body,
-		Data:        config.Data,
+		Type:  config.ArtifactType,
+		URL:   config.URL,
+		Title: config.Title,
+		Body:  config.Body,
+		Data:  data,
 	})
 	if err != nil {
 		return err
@@ -212,4 +215,24 @@ func (c *AddWorkOrderArtifact) Hooks() []core.Hook {
 
 func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+// artifactDataToMap flattens the free-form `{name, value}` entries the
+// component author configured into the `map[string]any` shape the model
+// layer expects. Duplicate names take the last value written, matching
+// how the UI would render them in-order.
+func artifactDataToMap(entries []ArtifactDataEntry) map[string]any {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	result := make(map[string]any, len(entries))
+	for _, entry := range entries {
+		if entry.Name == "" {
+			continue
+		}
+		result[entry.Name] = entry.Value
+	}
+
+	return result
 }

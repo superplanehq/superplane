@@ -17,8 +17,6 @@ import {
   OPEN_WORK_ORDER_ARTIFACTS,
   OPEN_WORK_ORDER_EVENTS,
   PRIMARY_FACTORY_ID,
-  READY_WORK_ORDER,
-  READY_WORK_ORDER_EVENTS,
   REFUND_FACTORY,
   REFUND_FACTORY_LINES,
   RICH_OPEN_WORK_ORDER_EVENTS,
@@ -82,8 +80,6 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     isOpen: derived.isOpen,
     isDispatchable: derived.isDispatchable,
     isClosed: derived.isClosed,
-    isDraft: order.state === "STATE_DRAFT",
-    isReady: order.state === "STATE_READY",
     canDispatch: true,
     canClose: true,
     canAssign: true,
@@ -138,14 +134,9 @@ export const Closed: Story = {
   args: buildLoadedViewArgs(CLOSED_WORK_ORDER, { events: CLOSED_WORK_ORDER_EVENTS }),
 };
 
-/** Draft — only "Mark ready" appears; timeline shows the scoping notes. */
+/** Draft — Dispatch surfaces alongside the scoping notes. */
 export const Draft: Story = {
   args: buildLoadedViewArgs(DRAFT_WORK_ORDER, { events: DRAFT_WORK_ORDER_EVENTS }),
-};
-
-/** Ready — Dispatch + Back-to-draft in the header, LLM comment in the timeline. */
-export const Ready: Story = {
-  args: buildLoadedViewArgs(READY_WORK_ORDER, { events: READY_WORK_ORDER_EVENTS }),
 };
 
 /** Rich detail — inline comments, both artifact kinds, and the sidebar list. */

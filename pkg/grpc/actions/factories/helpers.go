@@ -101,8 +101,6 @@ func workOrderStateFromProto(state pb.WorkOrder_State) (string, bool) {
 	switch state {
 	case pb.WorkOrder_STATE_DRAFT:
 		return models.FactoryWorkOrderStateDraft, true
-	case pb.WorkOrder_STATE_READY:
-		return models.FactoryWorkOrderStateReady, true
 	case pb.WorkOrder_STATE_OPEN:
 		return models.FactoryWorkOrderStateOpen, true
 	case pb.WorkOrder_STATE_CLOSED:

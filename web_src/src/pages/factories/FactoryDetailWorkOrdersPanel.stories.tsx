@@ -88,7 +88,7 @@ export const Populated: Story = {
   render: () => <InteractivePanel />,
 };
 
-/** Page default filters — `mine + active` — draft/ready/open/running/failed for me. */
+/** Page default filters — `mine + active` — draft/open/running/failed for me. */
 export const MyActive: Story = {
   name: "My Active",
   render: () => <InteractivePanel initialOwner="mine" initialStatus="active" />,

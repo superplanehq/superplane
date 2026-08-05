@@ -4,8 +4,6 @@ export function formatWorkOrderState(state?: FactoriesWorkOrder["state"]) {
   switch (state) {
     case "STATE_DRAFT":
       return "Draft";
-    case "STATE_READY":
-      return "Ready";
     case "STATE_OPEN":
       return "Open";
     case "STATE_CLOSED":

@@ -12,7 +12,6 @@ const STATUS_FILTERS: Array<{ id: WorkOrderStatusFilter; label: string }> = [
   { id: "all", label: "All statuses" },
   { id: "active", label: "Active" },
   { id: "draft", label: "Draft" },
-  { id: "ready", label: "Ready" },
   { id: "open", label: "Open" },
   { id: "running", label: "Running" },
   { id: "failed", label: "Failed" },

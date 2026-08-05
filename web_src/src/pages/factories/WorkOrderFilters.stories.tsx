@@ -6,7 +6,7 @@ import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrde
 
 /**
  * Row of interactive pills: "My Work / Unassigned / All" on the left and
- * status filters ("All / Active / Draft / Ready / Open / Running / Failed /
+ * status filters ("All / Active / Draft / Open / Running / Failed /
  * Completed / Rejected") on the right. Stories manage local state so the
  * pills toggle live.
  */
@@ -45,7 +45,7 @@ function InteractiveFilters({
   );
 }
 
-/** Default: "My Work" + "Active" (draft/ready/open/running/failed) active. */
+/** Default: "My Work" + "Active" (draft/open/running/failed) active. */
 export const Default: Story = {
   render: () => <InteractiveFilters />,
 };
@@ -65,9 +65,4 @@ export const UnassignedFailed: Story = {
 /** Draft-only — surface work orders still being scoped. */
 export const Draft: Story = {
   render: () => <InteractiveFilters initialOwner="all" initialStatus="draft" />,
-};
-
-/** Ready-only — dispatch-ready work orders waiting to run. */
-export const Ready: Story = {
-  render: () => <InteractiveFilters initialOwner="all" initialStatus="ready" />,
 };

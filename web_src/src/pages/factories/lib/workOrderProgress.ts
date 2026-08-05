@@ -3,7 +3,6 @@ import { hasActiveWorkOrderExecution, latestFinishedWorkOrderExecution } from ".
 
 export type WorkOrderDisplayStatus =
   | "draft"
-  | "ready"
   | "open"
   | "running"
   | "failed"
@@ -18,15 +17,8 @@ const DISPLAY_STATUS_META: Record<
   draft: {
     label: "Draft",
     filterLabel: "Draft",
-    summary: "Being scoped — not ready to run",
+    summary: "Being scoped — not yet dispatched",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  },
-  ready: {
-    label: "Ready",
-    filterLabel: "Ready",
-    summary: "Ready to dispatch",
-    className:
-      "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
   },
   open: {
     label: "Open",
@@ -68,7 +60,7 @@ const DISPLAY_STATUS_META: Record<
   },
 };
 
-export type WorkOrderSectionId = "failed" | "running" | "open" | "draft" | "ready" | "closed";
+export type WorkOrderSectionId = "failed" | "running" | "open" | "draft" | "closed";
 
 export interface WorkOrderSectionDefinition {
   id: WorkOrderSectionId;
@@ -99,15 +91,9 @@ export const WORK_ORDER_SECTIONS: WorkOrderSectionDefinition[] = [
     statuses: ["open"],
   },
   {
-    id: "ready",
-    title: "Ready",
-    description: "Ready to dispatch — waiting to start.",
-    statuses: ["ready"],
-  },
-  {
     id: "draft",
     title: "Draft",
-    description: "Being scoped — not yet ready.",
+    description: "Being scoped — not yet dispatched.",
     statuses: ["draft"],
   },
   {
@@ -140,10 +126,6 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  if (order.state === "STATE_READY") {
-    return "ready";
-  }
-
   const executions = order.executions ?? [];
   if (hasActiveWorkOrderExecution(executions)) {
     return "running";
@@ -155,11 +137,11 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
   // failure (its finish timestamp is newer), so the pill clears without
   // needing a state transition. On top of that we fence the failure
   // against `order.stateUpdatedAt`, which only bumps on lifecycle
-  // transitions (draft → ready → open, reopen, close). Failures older
-  // than the last transition belong to a previous attempt and shouldn't
-  // stick to a reopened order; assignee / comment / artifact writes
-  // don't bump the fence, so re-assigning a failed order doesn't hide
-  // the failure.
+  // transitions (draft → open on dispatch, close, reopen, back to
+  // draft). Failures older than the last transition belong to a
+  // previous attempt and shouldn't stick to a reopened order; assignee
+  // / comment / artifact writes don't bump the fence, so re-assigning
+  // a failed order doesn't hide the failure.
   //
   const latestFinished = latestFinishedWorkOrderExecution(executions);
   if (latestFinished?.result === "RESULT_FAILED") {
@@ -217,9 +199,9 @@ export function groupWorkOrdersBySection(
 //
 // countActiveWorkOrders is what the "Work Orders" badge and the factory
 // detail header render — the count of orders that need attention, which
-// matches the default `active` status filter (draft + ready + open +
-// running + failed). Closed orders (completed / rejected / closed-failed)
-// are not counted.
+// matches the default `active` status filter (draft + open + running +
+// failed). Closed orders (completed / rejected / closed-failed) are not
+// counted.
 //
 export function countActiveWorkOrders(orders: FactoriesWorkOrder[]): number {
   return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order))).length;
@@ -231,11 +213,11 @@ export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
 
 //
 // Display statuses that are considered "active" — anything not yet closed.
-// The `Active` pill is the default view so newly-created `draft` orders and
-// dispatch-ready `ready` orders don't get hidden behind the old `Open` pill,
-// which only matched STATE_OPEN.
+// The `Active` pill is the default view so newly-created `draft` orders
+// don't get hidden behind the old `Open` pill, which only matched
+// STATE_OPEN.
 //
-const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "ready", "open", "running", "failed"];
+const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
 
 //
 // Display statuses that count as "failed" for the Failed pill. Both open
@@ -291,7 +273,7 @@ export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined)
 
   const displayStatus = getWorkOrderDisplayStatus(order);
   const isOpen = order.state === "STATE_OPEN";
-  const isReady = order.state === "STATE_READY";
+  const isDraft = order.state === "STATE_DRAFT";
 
   return {
     displayStatus,
@@ -299,7 +281,7 @@ export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined)
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     assigneeNames: (order.assignees ?? []).map((assignee) => assignee.name ?? "Unknown"),
     isOpen,
-    isDispatchable: isOpen || isReady,
+    isDispatchable: isOpen || isDraft,
     isClosed: order.state === "STATE_CLOSED",
   };
 }

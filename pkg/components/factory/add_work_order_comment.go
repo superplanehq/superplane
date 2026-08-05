@@ -19,10 +19,7 @@ func init() {
 type AddWorkOrderComment struct{}
 
 type AddWorkOrderCommentConfiguration struct {
-	WorkOrderID string `json:"workOrderId" mapstructure:"workOrderId"`
-	Body        string `json:"body" mapstructure:"body"`
-	AuthorKind  string `json:"authorKind" mapstructure:"authorKind"`
-	AuthorLabel string `json:"authorLabel" mapstructure:"authorLabel"`
+	Body string `json:"body" mapstructure:"body"`
 }
 
 func (c *AddWorkOrderComment) Name() string {
@@ -38,7 +35,7 @@ func (c *AddWorkOrderComment) Description() string {
 }
 
 func (c *AddWorkOrderComment) Documentation() string {
-	return `The Add Work Order Comment component appends a comment (from a human, an LLM, or the system) to the work order's activity timeline. This component can only be used in factory-owned apps.`
+	return `The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderComment) Icon() string {
@@ -54,9 +51,7 @@ func (c *AddWorkOrderComment) ExampleOutput() map[string]any {
 		"timestamp": "2026-01-01T00:00:00Z",
 		"type":      "workOrder.commentAdded",
 		"data": map[string]any{
-			"workOrderId": "wo-123",
-			"body":        "Ready for review",
-			"authorKind":  "llm",
+			"body": "Ready for review",
 		},
 	}
 }
@@ -66,51 +61,20 @@ func (c *AddWorkOrderComment) OutputChannels(configuration any) []core.OutputCha
 }
 
 func (c *AddWorkOrderComment) Configuration() []configuration.Field {
+	//
+	// Author identity is derived from the executing canvas node (node
+	// name + app name) instead of being configured on the component.
+	// This keeps the timeline honest — you can always trace an automation
+	// comment back to the exact node that wrote it — and removes an
+	// author-spoofing footgun in canvas configs.
+	//
 	return []configuration.Field{
-		{
-			Name:        "workOrderId",
-			Label:       "Work Order ID",
-			Description: "The ID of the work order to comment on",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-		},
 		{
 			Name:        "body",
 			Label:       "Comment",
 			Description: "The comment body — plain text or markdown",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-		},
-		{
-			Name:  "authorKind",
-			Label: "Author Kind",
-			//
-			// Canvas automation is never a human — the "Human" (`user`)
-			// author kind is deliberately absent here. Human attribution
-			// only happens through the interactive API path, which reads
-			// the authenticated caller's id. Offering `user` on the
-			// canvas would leave the comment attributed to "Someone"
-			// because there is no acting user to attach.
-			//
-			Description: "Where the comment came from (canvas comments are LLM or system, never a human)",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Default:     "llm",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "LLM", Value: "llm"},
-						{Label: "System", Value: "system"},
-					},
-				},
-			},
-		},
-		{
-			Name:        "authorLabel",
-			Label:       "Author Label",
-			Description: "Optional display label (e.g. \"Claude\", \"Reviewer bot\")",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
 		},
 	}
 }
@@ -122,10 +86,7 @@ func (c *AddWorkOrderComment) Execute(ctx core.ExecutionContext) error {
 	}
 
 	err := ctx.Factory.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		WorkOrderID: config.WorkOrderID,
-		Body:        config.Body,
-		AuthorKind:  config.AuthorKind,
-		AuthorLabel: config.AuthorLabel,
+		Body: config.Body,
 	})
 	if err != nil {
 		return err
@@ -135,9 +96,7 @@ func (c *AddWorkOrderComment) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"workOrder.commentAdded",
 		[]any{map[string]any{
-			"workOrderId": config.WorkOrderID,
-			"body":        config.Body,
-			"authorKind":  config.AuthorKind,
+			"body": config.Body,
 		}},
 	)
 }

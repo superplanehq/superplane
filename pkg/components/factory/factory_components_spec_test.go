@@ -10,19 +10,9 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 	c := &UpdateWorkOrderStatus{}
 	fields := c.Configuration()
 
-	t.Run("rejects missing work order id", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"status": "ready",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing workOrderId")
-		}
-	})
-
 	t.Run("rejects unknown status", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"status":      "bogus",
+			"status": "bogus",
 		})
 		if err == nil {
 			t.Fatal("expected error for invalid status option")
@@ -31,18 +21,25 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires result when closing", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"status":      "closed",
+			"status": "closed",
 		})
 		if err == nil {
 			t.Fatal("expected error for closing without a result")
 		}
 	})
 
-	t.Run("accepts ready transition", func(t *testing.T) {
+	t.Run("accepts draft status", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"status":      "ready",
+			"status": "draft",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts open status", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"status": "open",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -51,9 +48,8 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts closed with failed result", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"status":      "closed",
-			"result":      "failed",
+			"status": "closed",
+			"result": "failed",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -66,43 +62,23 @@ func TestAddWorkOrderComment_ValidatesConfiguration(t *testing.T) {
 	fields := c.Configuration()
 
 	t.Run("rejects missing body", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-		})
+		err := configuration.ValidateConfiguration(fields, map[string]any{})
 		if err == nil {
 			t.Fatal("expected error for missing body")
 		}
 	})
 
-	t.Run("accepts llm default author kind", func(t *testing.T) {
+	//
+	// `authorKind` and `authorLabel` were removed from the config —
+	// automation identity is derived from the executing canvas node.
+	// The only knob left is the comment body itself.
+	//
+	t.Run("accepts body-only configuration", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"body":        "hello",
+			"body": "hello",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("rejects invalid author kind", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"body":        "hello",
-			"authorKind":  "elf",
-		})
-		if err == nil {
-			t.Fatal("expected error for invalid author kind")
-		}
-	})
-
-	t.Run("rejects `user` author kind (canvas has no acting human)", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId": "wo-1",
-			"body":        "hello",
-			"authorKind":  "user",
-		})
-		if err == nil {
-			t.Fatal("expected error for `user` author kind on the canvas component")
 		}
 	})
 }
@@ -113,7 +89,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires url for pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId":  "wo-1",
 			"artifactType": "pr",
 		})
 		if err == nil {
@@ -123,7 +98,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires body for markdown", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId":  "wo-1",
 			"artifactType": "markdown",
 		})
 		if err == nil {
@@ -133,7 +107,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts valid pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId":  "wo-1",
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",
 			"title":        "Draft",
@@ -145,7 +118,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts valid markdown", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"workOrderId":  "wo-1",
 			"artifactType": "markdown",
 			"body":         "notes",
 		})
@@ -153,4 +125,44 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
+		//
+		// Free-form data replaces the old PR-specific schema. Entries are
+		// name/value pairs the author fills in per invocation; the exec
+		// path flattens them to `map[string]any` before persisting.
+		//
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "pr",
+			"url":          "https://github.com/example/repo/pull/1",
+			"data": []any{
+				map[string]any{"name": "number", "value": "482"},
+				map[string]any{"name": "provider", "value": "github"},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
+	entries := []ArtifactDataEntry{
+		{Name: "number", Value: "482"},
+		{Name: "provider", Value: "github"},
+		{Name: "", Value: "ignored"},
+	}
+	out := artifactDataToMap(entries)
+	if got := out["number"]; got != "482" {
+		t.Fatalf("expected number=482, got %v", got)
+	}
+	if got := out["provider"]; got != "github" {
+		t.Fatalf("expected provider=github, got %v", got)
+	}
+	if len(out) != 2 {
+		t.Fatalf("expected only two entries (blank names skipped), got %d", len(out))
+	}
+	if artifactDataToMap(nil) != nil {
+		t.Fatal("expected nil map when no entries were provided")
+	}
 }

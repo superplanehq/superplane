@@ -64,7 +64,7 @@ func TestFactoryWorkOrder_StateUpdatedAtOnlyBumpsOnLifecycleTransitions(t *testi
 	//
 	time.Sleep(5 * time.Millisecond)
 	require.NoError(t, reloaded.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
-		ToState: FactoryWorkOrderStateReady,
+		ToState: FactoryWorkOrderStateOpen,
 		Actor:   &userID,
 	}))
 	assert.True(t, reloaded.StateUpdatedAt.After(createdFence),
@@ -79,15 +79,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Lifecycle", "", &userID, nil)
 	require.NoError(t, err)
 
-	t.Run("draft to ready is allowed", func(t *testing.T) {
-		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
-			ToState: FactoryWorkOrderStateReady,
-			Actor:   &userID,
-		}))
-		assert.Equal(t, FactoryWorkOrderStateReady, order.State)
-	})
-
-	t.Run("ready to open is allowed and re-emits opened event", func(t *testing.T) {
+	t.Run("draft to open is allowed and emits opened event", func(t *testing.T) {
 		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
@@ -140,7 +132,6 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, step := range []FactoryWorkOrderStatusUpdate{
-			{ToState: FactoryWorkOrderStateReady, Actor: &userID},
 			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
 			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultCompleted, Actor: &userID},
 		} {

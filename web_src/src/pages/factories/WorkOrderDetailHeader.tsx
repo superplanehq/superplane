@@ -14,8 +14,6 @@ interface WorkOrderDetailHeaderProps {
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
   isDispatchable: boolean;
-  isDraft: boolean;
-  isReady: boolean;
   isClosed: boolean;
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
@@ -38,8 +36,6 @@ export function WorkOrderDetailHeader({
   displayStatus,
   isOpen,
   isDispatchable,
-  isDraft,
-  isReady,
   isClosed,
   factoryLines,
   canDispatch,
@@ -72,21 +68,6 @@ export function WorkOrderDetailHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {isDraft ? (
-            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-              <LoadingButton
-                type="button"
-                disabled={!canManage || isUpdatingStatus}
-                loading={isUpdatingStatus}
-                loadingText="Marking ready..."
-                onClick={() => void onStatusChange("STATE_READY")}
-                data-testid="work-order-mark-ready-button"
-              >
-                Mark ready
-              </LoadingButton>
-            </PermissionTooltip>
-          ) : null}
-
           {isDispatchable ? (
             <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
               <DispatchWorkOrderPopover
@@ -107,24 +88,22 @@ export function WorkOrderDetailHeader({
             </PermissionTooltip>
           ) : null}
 
-          {isReady ? (
-            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canManage || isUpdatingStatus}
-                loading={isUpdatingStatus}
-                loadingText="Moving to draft..."
-                onClick={() => void onStatusChange("STATE_DRAFT")}
-                data-testid="work-order-back-to-draft-button"
-              >
-                Back to draft
-              </LoadingButton>
-            </PermissionTooltip>
-          ) : null}
-
           {isOpen ? (
             <>
+              <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
+                <LoadingButton
+                  type="button"
+                  variant="ghost"
+                  disabled={!canManage || isUpdatingStatus}
+                  loading={isUpdatingStatus}
+                  loadingText="Moving to draft..."
+                  onClick={() => void onStatusChange("STATE_DRAFT")}
+                  data-testid="work-order-back-to-draft-button"
+                >
+                  Back to draft
+                </LoadingButton>
+              </PermissionTooltip>
+
               <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
                 <LoadingButton
                   type="button"
@@ -156,35 +135,19 @@ export function WorkOrderDetailHeader({
           ) : null}
 
           {isClosed ? (
-            <>
-              <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  disabled={!canManage || isUpdatingStatus}
-                  loading={isUpdatingStatus}
-                  loadingText="Reopening..."
-                  onClick={() => void onStatusChange("STATE_OPEN")}
-                  data-testid="work-order-reopen-open-button"
-                >
-                  Reopen as open
-                </LoadingButton>
-              </PermissionTooltip>
-
-              <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  disabled={!canManage || isUpdatingStatus}
-                  loading={isUpdatingStatus}
-                  loadingText="Moving to ready..."
-                  onClick={() => void onStatusChange("STATE_READY")}
-                  data-testid="work-order-reopen-ready-button"
-                >
-                  Reopen as ready
-                </LoadingButton>
-              </PermissionTooltip>
-            </>
+            <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
+              <LoadingButton
+                type="button"
+                variant="ghost"
+                disabled={!canManage || isUpdatingStatus}
+                loading={isUpdatingStatus}
+                loadingText="Reopening..."
+                onClick={() => void onStatusChange("STATE_OPEN")}
+                data-testid="work-order-reopen-open-button"
+              >
+                Reopen
+              </LoadingButton>
+            </PermissionTooltip>
           ) : null}
         </div>
       </div>

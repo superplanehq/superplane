@@ -47,10 +47,17 @@ export interface WorkOrderTimelineStatusChange {
   toResult?: string;
 }
 
+export interface WorkOrderTimelineCommentAutomation {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+}
+
 export interface WorkOrderTimelineComment {
   body: string;
   authorKind?: string;
-  authorLabel?: string;
+  automation?: WorkOrderTimelineCommentAutomation;
 }
 
 export interface WorkOrderTimelineArtifact {

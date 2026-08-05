@@ -48,19 +48,18 @@ func AddWorkOrderComment(
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to add work order comment")
 	}
 
-	kind := commentAuthorKindFromProto(req.GetAuthorKind())
+	//
+	// The REST/gRPC comment endpoint is the interactive path: the human
+	// hitting it is always the author. Automation-authored comments go
+	// through the `addWorkOrderComment` canvas component, which fills in
+	// `Automation` from the executing node instead of taking an author
+	// from the request. Keeping only `user` here removes the previous
+	// spoofing surface where any caller could stamp a comment as `llm`
+	// or `system`.
+	//
 	author := factory.WorkOrderCommentAuthor{
-		Kind:  kind,
-		Label: strings.TrimSpace(req.GetAuthorLabel()),
-	}
-	//
-	// Only user-authored comments carry the authenticated caller's id. LLM /
-	// system comments intentionally omit `UserID` so the timeline doesn't
-	// misattribute automated notes to the human that made the API call
-	// (matching the canvas-side `addWorkOrderComment` component's shape).
-	//
-	if kind == factory.CommentAuthorKindUser {
-		author.UserID = &userIDStr
+		Kind:   factory.CommentAuthorKindUser,
+		UserID: &userIDStr,
 	}
 
 	db := database.DB(ctx)
@@ -90,32 +89,28 @@ func AddWorkOrderComment(
 	}, nil
 }
 
-func commentAuthorKindFromProto(kind pb.WorkOrderCommentAuthor_Kind) string {
-	switch kind {
-	case pb.WorkOrderCommentAuthor_KIND_LLM:
-		return factory.CommentAuthorKindLLM
-	case pb.WorkOrderCommentAuthor_KIND_SYSTEM:
-		return factory.CommentAuthorKindSystem
-	default:
-		return factory.CommentAuthorKindUser
-	}
-}
-
 func serializeCommentAuthor(author factory.WorkOrderCommentAuthor) *pb.WorkOrderCommentAuthor {
 	result := &pb.WorkOrderCommentAuthor{
-		Kind:  commentAuthorKindToProto(author.Kind),
-		Label: author.Label,
+		Kind: commentAuthorKindToProto(author.Kind),
 	}
 	if author.UserID != nil {
 		result.UserId = *author.UserID
+	}
+	if author.Automation != nil {
+		result.Automation = &pb.AutomationRef{
+			NodeId:   author.Automation.NodeID,
+			NodeName: author.Automation.NodeName,
+			AppId:    author.Automation.AppID.String(),
+			AppName:  author.Automation.AppName,
+		}
 	}
 	return result
 }
 
 func commentAuthorKindToProto(kind string) pb.WorkOrderCommentAuthor_Kind {
 	switch kind {
-	case factory.CommentAuthorKindLLM:
-		return pb.WorkOrderCommentAuthor_KIND_LLM
+	case factory.CommentAuthorKindAutomation:
+		return pb.WorkOrderCommentAuthor_KIND_AUTOMATION
 	case factory.CommentAuthorKindSystem:
 		return pb.WorkOrderCommentAuthor_KIND_SYSTEM
 	case factory.CommentAuthorKindUser:

@@ -15,7 +15,6 @@ import (
 
 const (
 	FactoryWorkOrderStateDraft  = "draft"
-	FactoryWorkOrderStateReady  = "ready"
 	FactoryWorkOrderStateOpen   = "open"
 	FactoryWorkOrderStateClosed = "closed"
 
@@ -32,7 +31,6 @@ var (
 var (
 	factoryWorkOrderStates = []string{
 		FactoryWorkOrderStateDraft,
-		FactoryWorkOrderStateReady,
 		FactoryWorkOrderStateOpen,
 		FactoryWorkOrderStateClosed,
 	}
@@ -48,11 +46,14 @@ var (
 	// `order.status.updated` event; explicit lifecycle events (`order.opened`,
 	// `order.closed`) remain for backwards compatibility with the timeline.
 	//
+	// Dispatching a `draft` order promotes it to `open` (see
+	// TransitionOnDispatch). `open → draft` supports "back to draft" edits.
+	// `closed → open` is the reopen path.
+	//
 	factoryWorkOrderAllowedTransitions = map[string][]string{
-		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateReady},
-		FactoryWorkOrderStateReady:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateDraft},
-		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed},
-		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen, FactoryWorkOrderStateReady},
+		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
+		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
 	}
 )
 
@@ -94,11 +95,11 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 }
 
 // IsDispatchable reports whether the work order can be dispatched to a line.
-// Both `ready` and `open` work orders accept new dispatches; the first
-// dispatch from `ready` also transitions the order into `open` (see
+// Both `draft` and `open` work orders accept new dispatches; the first
+// dispatch from `draft` also transitions the order into `open` (see
 // TransitionOnDispatch).
 func (o *FactoryWorkOrder) IsDispatchable() bool {
-	return o.State == FactoryWorkOrderStateReady || o.State == FactoryWorkOrderStateOpen
+	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
 }
 
 type FactoryWorkOrderAssignee struct {
@@ -213,12 +214,13 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// keeps working:
 		//
 		//   * `order.opened` fires only on the initial promotion from
-		//     `ready` (the "first opened" event). Reopens from `closed`
-		//     are covered by the `order.status.updated` event alone so the
-		//     timeline can distinguish "opened" from "reopened".
+		//     `draft` (the "first opened" event, mirroring a dispatch).
+		//     Reopens from `closed` are covered by the
+		//     `order.status.updated` event alone so the timeline can
+		//     distinguish "opened" from "reopened".
 		//   * `order.closed` fires whenever the order becomes `closed`.
 		//
-		if toState == FactoryWorkOrderStateOpen && fromState == FactoryWorkOrderStateReady {
+		if toState == FactoryWorkOrderStateOpen && fromState == FactoryWorkOrderStateDraft {
 			if err := o.RecordOpened(tx, update.Actor); err != nil {
 				return err
 			}
@@ -255,15 +257,15 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 }
 
 // TransitionOnDispatch is called when the work order is being dispatched to a
-// factory line. Ready work orders promote to open at that moment; open ones
+// factory line. Draft work orders promote to open at that moment; open ones
 // stay put. Any other state means the work order is not dispatchable.
 func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
 	if o.State == FactoryWorkOrderStateOpen {
 		return nil
 	}
 
-	if o.State != FactoryWorkOrderStateReady {
-		return fmt.Errorf("%w: work order must be ready or open to dispatch", ErrFactoryWorkOrderInvalidState)
+	if o.State != FactoryWorkOrderStateDraft {
+		return fmt.Errorf("%w: work order must be draft or open to dispatch", ErrFactoryWorkOrderInvalidState)
 	}
 
 	return o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
@@ -487,7 +489,7 @@ func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload an
 func IsValidWorkOrderCommentAuthorKind(kind string) bool {
 	switch kind {
 	case factory.CommentAuthorKindUser,
-		factory.CommentAuthorKindLLM,
+		factory.CommentAuthorKindAutomation,
 		factory.CommentAuthorKindSystem:
 		return true
 	}
