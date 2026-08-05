@@ -109,6 +109,8 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
       return response.data?.orders ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
+    // Live via websocket; remount must refetch instead of serving 5m global stale cache.
+    staleTime: 0,
   });
 }
 
@@ -128,6 +130,7 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
       return response.data.order;
     },
     enabled: Boolean(organizationId && factoryId && orderId),
+    staleTime: 0,
   });
 }
 
@@ -150,6 +153,7 @@ export function useWorkOrderEvents(organizationId: string, factoryId: string, or
     getNextPageParam: getWorkOrderEventsNextPageParam,
     initialPageParam: undefined as string | undefined,
     enabled: Boolean(organizationId && factoryId && orderId),
+    staleTime: 0,
   });
 }
 
