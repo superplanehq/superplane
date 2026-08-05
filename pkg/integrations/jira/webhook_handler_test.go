@@ -56,6 +56,9 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Contains(t, string(body), `"jira:issue_created"`)
 		assert.Contains(t, string(body), `"jira:issue_updated"`)
 		assert.Contains(t, string(body), `"jira:issue_deleted"`)
+		assert.Contains(t, string(body), `"comment_created"`)
+		assert.Contains(t, string(body), `"comment_updated"`)
+		assert.Contains(t, string(body), `"comment_deleted"`)
 		// Regression test: Atlassian rejects an empty jqlFilter outright ("Empty JQL search not
 		// supported", confirmed live) even though the key must be present - this must be a real,
 		// always-true clause instead.

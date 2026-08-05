@@ -42,11 +42,12 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// This single registration must cover every project, since it is shared by every
-	// jira.onIssue trigger on this integration - each one filters to its own configured project
+	// This single registration must cover every project and every trigger type sharing it
+	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
 	// and events itself, in HandleWebhook.
 	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, []string{
 		issueEventCreated, issueEventUpdated, issueEventDeleted,
+		commentEventCreated, commentEventUpdated, commentEventDeleted,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
