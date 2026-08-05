@@ -421,6 +421,7 @@ message UpdateCanvasPreferenceResponse {
 message CreateCanvasRequest {
   string name = 1;
   string description = 2;
+  optional string factory_id = 3;
 }
 
 message CreateCanvasResponse {
@@ -570,6 +571,7 @@ message CanvasSummary {
   repeated Components.Edge edges = 9;
   bool starred = 10;
   google.protobuf.Timestamp starred_at = 11;
+  string factory_id = 12;
 }
 
 message CanvasPreference {
@@ -590,6 +592,7 @@ message Canvas {
     string folder_id = 8;
     string live_version_id = 9;
     repeated string dismissed_agent_suggestion_ids = 10;
+    string factory_id = 11;
   }
 
   message Spec {

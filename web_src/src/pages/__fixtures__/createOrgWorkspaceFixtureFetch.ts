@@ -5,6 +5,11 @@ import {
 } from "@/pages/app/__fixtures__/agentChatResponses";
 import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
+  factoriesOrganizationUsersResponse,
+  matchFactoryPageFixture,
+  type FactoriesFixture,
+} from "@/pages/factories/__fixtures__/handlers";
+import {
   fixtureResponse,
   matchFactorySetupFixture,
   matchHomePageFixture,
@@ -42,10 +47,16 @@ export function createOrgWorkspaceFixtureFetch(
   options?: {
     homeFixture?: HomePageFixture;
     appFixture?: CanvasAppFixture;
+    factoriesFixture?: FactoriesFixture;
   },
 ): typeof fetch {
   const homeFixture = options?.homeFixture ?? defaultHomePageFixture;
   const appFixture = options?.appFixture;
+  // Factories handlers mutate the fixture in place (create/dispatch/close/assign),
+  // so each fetch impl owns a private deep-clone. Otherwise interactive stories
+  // would permanently alter the module-level `defaultFactoriesFixture` (and every
+  // fixture that shares nested arrays with it).
+  const factoriesFixture = options?.factoriesFixture ? structuredClone(options.factoriesFixture) : undefined;
   const orgIntegrations: StorybookOrgIntegration[] = [];
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
 
@@ -72,6 +83,7 @@ export function createOrgWorkspaceFixtureFetch(
       body,
       homeFixture,
       appFixture,
+      factoriesFixture,
       orgIntegrations,
     });
     if (!resolved) {
@@ -96,6 +108,26 @@ async function readRequestJson(input: RequestInfo | URL, init?: RequestInit): Pr
   return undefined;
 }
 
+function resolveFactoryFixtures(
+  url: URL,
+  method: string,
+  body: unknown,
+  factoriesFixture: FactoriesFixture | undefined,
+) {
+  if (!factoriesFixture) {
+    return { factoryPagesResolved: null, factoryUsersResolved: null };
+  }
+  const factoryPagesResolved = matchFactoryPageFixture(
+    url,
+    method,
+    (body ?? null) as Record<string, unknown> | null,
+    factoriesFixture,
+  );
+  const factoryUsersResolved =
+    url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse() : null;
+  return { factoryPagesResolved, factoryUsersResolved };
+}
+
 async function resolveOrgWorkspaceFixture(args: {
   url: URL;
   method: string;
@@ -104,17 +136,26 @@ async function resolveOrgWorkspaceFixture(args: {
   body: unknown;
   homeFixture: HomePageFixture;
   appFixture?: CanvasAppFixture;
+  factoriesFixture?: FactoriesFixture;
   orgIntegrations: StorybookOrgIntegration[];
 }) {
-  const { url, method, input, init, body, homeFixture, appFixture, orgIntegrations } = args;
+  const { url, method, input, init, body, homeFixture, appFixture, factoriesFixture, orgIntegrations } = args;
   // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
   const homeResolved = matchHomePageFixture(url, method, homeFixture);
   const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
-  const factoryResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
+  const factorySetupResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
+  const { factoryPagesResolved, factoryUsersResolved } = resolveFactoryFixtures(url, method, body, factoriesFixture);
   // AppPageHarness always supplies `appFixture`, so canvas integrations win there.
   // HomePageHarness omits it, so factory GitHub/Claude stubs stay available for setup.
   if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture !== undefined) {
-    return canvasResolved ?? factoryResolved ?? homeResolved ?? emptyOrgWorkspaceCatchAll(url);
+    return canvasResolved ?? factorySetupResolved ?? homeResolved ?? emptyOrgWorkspaceCatchAll(url);
   }
-  return factoryResolved ?? homeResolved ?? canvasResolved ?? emptyOrgWorkspaceCatchAll(url);
+  return (
+    factoryPagesResolved ??
+    factoryUsersResolved ??
+    factorySetupResolved ??
+    homeResolved ??
+    canvasResolved ??
+    emptyOrgWorkspaceCatchAll(url)
+  );
 }

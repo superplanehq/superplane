@@ -2,7 +2,11 @@ import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useC
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { Link } from "@/components/Link/link";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useParams } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasRunsSidebarTrigger } from "./components/CanvasRunsSidebarTrigger";
@@ -16,6 +20,8 @@ export type HeaderMode = "default" | "version-live" | "console" | "memory" | "fi
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
   canvasName?: string;
+  /** When set, shows a link back to the owning factory. */
+  factoryId?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -107,6 +113,7 @@ export function Header(props: HeaderProps) {
     <header>
       <PageHeader
         organizationId={props.organizationId}
+        factoryId={props.factoryId}
         headerTitle={headerTitle}
         isEditing={props.isEditing}
         isEditSessionActive={props.isEditSessionActive}
@@ -128,6 +135,7 @@ export function Header(props: HeaderProps) {
 
 interface PageHeaderBarProps {
   organizationId?: string;
+  factoryId?: string;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
   isEditing?: boolean;
@@ -144,6 +152,7 @@ interface PageHeaderBarProps {
 
 function PageHeader({
   organizationId,
+  factoryId,
   headerTitle,
   isEditing = false,
   isEditSessionActive,
@@ -168,11 +177,14 @@ function PageHeader({
   }>();
   const activeCanvasId = appId || canvasIdParam || workflowId;
   const inEditSession = isEditSessionActive ?? isEditing;
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const showFactoryReturnLink = Boolean(organizationId && factoryId && hasExperimentalFeature(FEATURE_FACTORIES));
 
   return (
     <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 pl-2 pr-1 sm:pl-3 sm:pr-1.5 dark:border-gray-700/70">
-      <div className="relative z-10 flex min-w-0 shrink-0 items-center">
+      <div className="relative z-10 flex min-w-0 shrink-0 items-center gap-1">
         <OrganizationMenuButton organizationId={organizationId} />
+        {showFactoryReturnLink ? <FactoryReturnLink organizationId={organizationId!} factoryId={factoryId!} /> : null}
       </div>
       <div className="pointer-events-none absolute inset-x-0 flex items-center justify-center px-24">
         <div className="pointer-events-auto">
@@ -218,6 +230,19 @@ function PageHeader({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function FactoryReturnLink({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
+  return (
+    <Link
+      href={`/${organizationId}/factories/${factoryId}`}
+      className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+      data-testid="return-to-factory-link"
+    >
+      <ChevronLeft className="h-4 w-4" aria-hidden />
+      Return to factory
+    </Link>
   );
 }
 

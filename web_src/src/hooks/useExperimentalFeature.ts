@@ -6,12 +6,15 @@ import { useOrganizationId } from "./useOrganizationId";
 export interface ExperimentalFeatureAccess {
   has: (featureId: string) => boolean;
   enabledExperimentalFeatures: string[];
+  isLoading: boolean;
 }
 
 export function useExperimentalFeature(organizationId?: string): ExperimentalFeatureAccess {
   const _organizationId = useOrganizationId();
-  const { data: organization } = useOrganization(organizationId || _organizationId || "");
-  const { data: features } = useExperimentalFeaturesRegistry();
+  const resolvedOrganizationId = organizationId || _organizationId || "";
+  const { data: organization, isLoading: organizationLoading } = useOrganization(resolvedOrganizationId);
+  const { data: features, isLoading: registryLoading } = useExperimentalFeaturesRegistry();
+  const isLoading = registryLoading || (!!resolvedOrganizationId && organizationLoading);
 
   const enabledFeatures = useMemo(
     () => new Set(organization?.spec?.enabledExperimentalFeatures ?? []),
@@ -30,5 +33,5 @@ export function useExperimentalFeature(organizationId?: string): ExperimentalFea
 
   const has = useCallback((featureId: string) => availableFeatures.has(featureId), [availableFeatures]);
 
-  return { has, enabledExperimentalFeatures: [...availableFeatureIds] };
+  return { has, enabledExperimentalFeatures: [...availableFeatureIds], isLoading };
 }
