@@ -60,6 +60,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactory(UpdateFactoryRequest) returns (UpdateFactoryResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory";
+      description: "Updates factory metadata";
+      tags: "Factory";
+    };
+  }
+
   //
   // Factory line APIs
   //
@@ -213,6 +225,16 @@ message DescribeFactoryRequest {
 }
 
 message DescribeFactoryResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message UpdateFactoryResponse {
   Factory factory = 1;
 }
 
