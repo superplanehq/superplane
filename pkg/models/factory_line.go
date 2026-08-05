@@ -114,6 +114,11 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 		return nil, err
 	}
 
+	runInput, err := factoryWorkOrderRunInput(tx, order)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	run := &CanvasRun{
 		ID:         uuid.New(),
@@ -127,7 +132,7 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 				Hook: "onMessage",
 			},
 		},
-		Input:     NewJSONValue(factoryWorkOrderRunInput(order)),
+		Input:     NewJSONValue(runInput),
 		State:     CanvasRunStatePending,
 		CreatedAt: &now,
 		UpdatedAt: &now,
