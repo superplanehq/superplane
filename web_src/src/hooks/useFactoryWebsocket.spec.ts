@@ -94,11 +94,17 @@ describe("useFactoryWebsocket", () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
-  it("invalidates work-order queries on reconnect", () => {
+  it("skips invalidation on the first open and invalidates on reconnect", () => {
     const { invalidateSpy } = renderFactoryWebsocket();
     invalidateSpy.mockClear();
     const [, options] = lastCall();
     const onOpen = options.onOpen as () => void;
+
+    act(() => {
+      onOpen();
+    });
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
     act(() => {
       onOpen();
     });

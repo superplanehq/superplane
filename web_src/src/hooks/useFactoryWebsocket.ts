@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { factoryQueryKeys } from "./useFactoryData";
@@ -49,6 +49,7 @@ export function invalidateFactoryWorkOrderQueries(
 
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
   const queryClient = useQueryClient();
+  const hasConnectedOnce = useRef(false);
 
   const invalidate = useCallback(
     (orderId?: string) => {
@@ -75,6 +76,11 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
   );
 
   const onOpen = useCallback(() => {
+    if (!hasConnectedOnce.current) {
+      hasConnectedOnce.current = true;
+      return;
+    }
+
     // Catch updates missed while disconnected; WS is the only push channel.
     invalidate();
   }, [invalidate]);
