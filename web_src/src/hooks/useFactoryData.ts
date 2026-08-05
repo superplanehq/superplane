@@ -3,6 +3,7 @@ import {
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
+  factoriesDeleteFactory,
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
@@ -201,6 +202,26 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactory(organizationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (factoryId: string) => {
+      await factoriesDeleteFactory(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+        }),
+      );
+      return factoryId;
+    },
+    onSuccess: (factoryId) => {
+      queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
     },
   });
 }
