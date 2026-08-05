@@ -86,3 +86,33 @@ var exampleDataOnIssueComment map[string]any
 func (i *OnIssueComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
 }
+
+//go:embed example_output_create_attachment.json
+var exampleOutputCreateAttachmentBytes []byte
+
+var exampleOutputCreateAttachmentOnce sync.Once
+var exampleOutputCreateAttachment map[string]any
+
+func (c *CreateAttachment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAttachmentOnce, exampleOutputCreateAttachmentBytes, &exampleOutputCreateAttachment)
+}
+
+//go:embed example_output_delete_attachment.json
+var exampleOutputDeleteAttachmentBytes []byte
+
+var exampleOutputDeleteAttachmentOnce sync.Once
+var exampleOutputDeleteAttachment map[string]any
+
+func (c *DeleteAttachment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAttachmentOnce, exampleOutputDeleteAttachmentBytes, &exampleOutputDeleteAttachment)
+}
+
+//go:embed example_data_on_issue_attachment.json
+var exampleDataOnIssueAttachmentBytes []byte
+
+var exampleDataOnIssueAttachmentOnce sync.Once
+var exampleDataOnIssueAttachment map[string]any
+
+func (i *OnIssueAttachment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueAttachmentOnce, exampleDataOnIssueAttachmentBytes, &exampleDataOnIssueAttachment)
+}
