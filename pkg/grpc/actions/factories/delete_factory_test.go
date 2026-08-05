@@ -82,4 +82,20 @@ func Test__DeleteFactory(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
+
+	t.Run("soft deletes factory apps", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+		require.NoError(t, err)
+
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		require.NoError(t, database.DB(t.Context()).Model(canvas).Update("factory_id", factory.ID).Error)
+
+		_, err = DeleteFactory(context.Background(), r.Organization.ID.String(), factory.ID.String())
+		require.NoError(t, err)
+
+		deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
+		require.NoError(t, err)
+		assert.True(t, deletedCanvas.DeletedAt.Valid)
+		assert.Contains(t, deletedCanvas.Name, "(deleted-")
+	})
 }

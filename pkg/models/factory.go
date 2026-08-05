@@ -169,6 +169,120 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
+func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Model(&Factory{}).
+		Unscoped().
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.created_at",
+			"factories.updated_at",
+			// Earliest deletion wins so neither factory nor org soft-delete resets grace.
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
+func LockDeletedFactory(tx *gorm.DB, id uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.
+		Unscoped().
+		Model(&Factory{}).
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.created_at",
+			"factories.updated_at",
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "factories"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("factories.id = ?", id).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		First(&factory).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func (f *Factory) CountCanvases(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Canvas{}).
+		Where("factory_id = ?", f.ID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
+	canvases, err := f.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+
+	for i := range canvases {
+		if err := canvases[i].SoftDeleteInTransaction(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) error {
+	var factories []Factory
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Find(&factories).
+		Error
+	if err != nil {
+		return err
+	}
+
+	for i := range factories {
+		if factories[i].DeletedAt.Valid {
+			continue
+		}
+		if err := factories[i].SoftDelete(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
