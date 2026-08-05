@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -33,6 +35,24 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, "From GitHub issue", workOrder.Title)
 		assert.Equal(t, "Automated intake", workOrder.Description)
 		assert.NotEmpty(t, workOrder.ID)
+
+		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(workOrder.ID))
+		require.NoError(t, err)
+		require.NotNil(t, persisted.SourceRunID)
+		assert.Equal(t, run.ID, *persisted.SourceRunID)
+
+		events, err := persisted.ListEvents(database.Conn(), 0, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		assert.Equal(t, factoryevents.EventTypeOrderOpened, events[0].Type)
+
+		var opened factoryevents.WorkOrderOpened
+		require.NoError(t, json.Unmarshal(events[0].Data, &opened))
+		require.NotNil(t, opened.Run)
+		assert.Equal(t, run.ID, opened.Run.ID)
+		require.NotNil(t, opened.App)
+		assert.Equal(t, canvas.ID, opened.App.ID)
+		assert.Nil(t, opened.User)
 	})
 
 	t.Run("rejects blank title", func(t *testing.T) {
@@ -56,7 +76,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		line, err := factory.CreateLine(database.Conn(), "ship", nil)
 		require.NoError(t, err)
 
-		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil)
+		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil, nil)
 		require.NoError(t, err)
 
 		now := time.Now()

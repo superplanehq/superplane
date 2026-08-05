@@ -283,7 +283,7 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 	return nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -299,6 +299,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		State:          FactoryWorkOrderStateOpen,
 		Result:         "",
 		CreatedByID:    createdBy,
+		SourceRunID:    sourceRunID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

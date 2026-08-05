@@ -183,13 +183,42 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 	return result, nil
 }
 
-func factoryWorkOrderRunInput(order *FactoryWorkOrder) map[string]any {
-	return map[string]any{
-		"work_order": map[string]any{
-			"id":          order.ID.String(),
-			"title":       order.Title,
-			"description": order.Description,
-			"factory_id":  order.FactoryID.String(),
-		},
+func factoryWorkOrderRunInput(tx *gorm.DB, order *FactoryWorkOrder) (map[string]any, error) {
+	workOrder := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
 	}
+
+	if order.SourceRunID != nil {
+		rootEvent, err := FindRootEventForRun(tx, *order.SourceRunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if rootEvent != nil {
+			if source := rootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+				workOrder["source"] = source
+			}
+		}
+	}
+
+	return map[string]any{
+		"work_order": workOrder,
+	}, nil
+}
+
+func rootEventSourcePayload(eventData any) any {
+	payload, ok := eventData.(map[string]any)
+	if !ok {
+		return eventData
+	}
+
+	source, ok := payload["data"]
+	if !ok {
+		return eventData
+	}
+
+	return source
 }

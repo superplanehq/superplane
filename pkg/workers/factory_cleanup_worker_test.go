@@ -41,7 +41,7 @@ func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {
 		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 		require.NoError(t, err)
 
-		order, err := factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, nil)
+		order, err := factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, order)
 
@@ -95,7 +95,7 @@ func Test__OrganizationCleanupWorker_WaitsForFactories(t *testing.T) {
 
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
-	_, err = factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, []uuid.UUID{r.User})
+	_, err = factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 
 	worker := NewOrganizationCleanupWorker(r.GitProvider)
