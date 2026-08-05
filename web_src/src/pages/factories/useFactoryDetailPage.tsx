@@ -92,6 +92,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
     isAppsLoading,
     canCreateWork: canAct("factories", "create"),
     canUpdateFactory: canAct("factories", "update"),
+    canDeleteFactory: canAct("factories", "delete"),
     canCreateApps: canAct("canvases", "create"),
     canDispatch: canAct("factories", "update"),
     permissionsLoading,

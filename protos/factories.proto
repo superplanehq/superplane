@@ -60,6 +60,29 @@ service Factories {
     };
   }
 
+  rpc UpdateFactory(UpdateFactoryRequest) returns (UpdateFactoryResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory";
+      description: "Updates factory metadata";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory";
+      description: "Soft-deletes an existing factory";
+      tags: "Factory";
+    };
+  }
+
   //
   // Factory line APIs
   //
@@ -263,6 +286,22 @@ message DescribeFactoryResponse {
   Factory factory = 1;
 }
 
+message UpdateFactoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message UpdateFactoryResponse {
+  Factory factory = 1;
+}
+
+message DeleteFactoryRequest {
+  string id = 1;
+}
+
+message DeleteFactoryResponse {}
+
 message Factory {
   message App {
     string id = 1;
@@ -366,10 +405,17 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
-    STATE_DRAFT = 1;
-    STATE_READY = 2;
-    STATE_OPEN = 3;
-    STATE_CLOSED = 4;
+    //
+    // Enum numbers are ordered so the pre-existing OPEN / CLOSED values
+    // keep the numbers they've always had; the new DRAFT / READY states
+    // are appended. Even though our protos are only used for JSON
+    // conversion (see AGENTS.md), stable numbers keep any snapshot or
+    // stored numeric enum consistent across versions.
+    //
+    STATE_OPEN = 1;
+    STATE_CLOSED = 2;
+    STATE_DRAFT = 3;
+    STATE_READY = 4;
   }
 
   enum Result {

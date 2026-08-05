@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { useState } from "react";
 
@@ -143,13 +144,12 @@ export function WorkOrderAttachArtifactDialog({
               <label htmlFor="artifact-body" className="text-sm font-medium text-gray-800 dark:text-gray-200">
                 Body <span className="text-red-500">*</span>
               </label>
-              <textarea
+              <Textarea
                 id="artifact-body"
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 rows={5}
                 placeholder="Write markdown..."
-                className="block w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none dark:border-gray-600/70 dark:bg-gray-800 dark:text-gray-100"
                 disabled={isSubmitting}
               />
             </div>

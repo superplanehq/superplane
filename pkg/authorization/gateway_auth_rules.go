@@ -37,6 +37,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{IDPathParam},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{id}"}: {
+			Resource:                     "factories",
+			Action:                       "delete",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -584,6 +590,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:             "read",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
+		},
+		{Method: "PUT", Pattern: "/api/v1/factories/{id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "PUT", Pattern: "/api/v1/canvases/{id}"}: {
 			Resource:           "canvases",

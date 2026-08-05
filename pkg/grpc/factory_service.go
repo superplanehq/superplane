@@ -31,6 +31,16 @@ func (s *FactoryService) DescribeFactory(ctx context.Context, req *pb.DescribeFa
 	return actions.DescribeFactory(ctx, organizationID, req.GetId())
 }
 
+func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactoryRequest) (*pb.UpdateFactoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactory(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactory(ctx context.Context, req *pb.DeleteFactoryRequest) (*pb.DeleteFactoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactory(ctx, organizationID, req.GetId())
+}
+
 func (s *FactoryService) CreateFactoryLine(ctx context.Context, req *pb.CreateFactoryLineRequest) (*pb.CreateFactoryLineResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactoryLine(ctx, organizationID, req)

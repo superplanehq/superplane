@@ -243,6 +243,29 @@ function TimelineItem({
   );
 }
 
+interface CommentAuthorLabelInput {
+  isLLM: boolean;
+  isSystem: boolean;
+  authorLabel: string | null | undefined;
+  actorName: string | null | undefined;
+}
+
+//
+// Resolve the display name shown next to "commented" in the timeline.
+// Split out from the render path so the LLM / system / human fallback
+// order is a single readable switch instead of a chained ternary.
+//
+function resolveCommentAuthorLabel({ isLLM, isSystem, authorLabel, actorName }: CommentAuthorLabelInput): string {
+  const label = authorLabel?.trim();
+  if (isLLM) {
+    return label || "Assistant";
+  }
+  if (isSystem) {
+    return label || "System";
+  }
+  return actorName || label || "Someone";
+}
+
 function CommentTimelineBody({
   event,
   actorDisplay,
@@ -258,11 +281,12 @@ function CommentTimelineBody({
   const kind = (comment.authorKind ?? "").toLowerCase();
   const isLLM = kind === "llm";
   const isSystem = kind === "system";
-  const authorLabel = isLLM
-    ? comment.authorLabel || "Assistant"
-    : isSystem
-      ? comment.authorLabel || "System"
-      : (actorDisplay?.name ?? comment.authorLabel ?? "Someone");
+  const authorLabel = resolveCommentAuthorLabel({
+    isLLM,
+    isSystem,
+    authorLabel: comment.authorLabel,
+    actorName: actorDisplay?.name,
+  });
 
   return (
     <div>
