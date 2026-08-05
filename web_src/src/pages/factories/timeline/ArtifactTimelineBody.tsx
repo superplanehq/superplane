@@ -74,4 +74,3 @@ export function ArtifactTimelineBody({
     </div>
   );
 }
-

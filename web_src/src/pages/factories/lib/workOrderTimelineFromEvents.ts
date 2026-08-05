@@ -213,25 +213,20 @@ function appendOpenedEvent(
   at: string,
   resolveUserName?: UserNameLookup,
 ): void {
-  if (payload.run?.id) {
-    events.push({
-      id: `opened-${index}`,
-      kind: "created",
-      at,
-      title: "Work order created from",
-      sourceRunId: payload.run.id,
-      sourceAppId: payload.app?.id,
-    });
-    return;
-  }
-
+  // `order.opened` now fires on the first `draft → open` transition, not at
+  // creation. Emit it as a status change so we don't duplicate the "created"
+  // entry that `order.status.updated ("" → draft)` already produced. The
+  // originating run / app are attached for attribution when present.
   events.push({
     id: `opened-${index}`,
-    kind: "created",
+    kind: "statusChanged",
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
     actorAutomation: toAutomationActor(payload.automation),
+    sourceRunId: payload.run?.id,
+    sourceAppId: payload.app?.id,
+    statusChange: { fromState: "draft", toState: "open", fromResult: "", toResult: "" },
     title: "opened this work order",
   });
 }

@@ -275,13 +275,17 @@ function UserActionEventDescription({
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
-  const isAutomationCreated = event.kind === "created" && Boolean(event.sourceRunId);
+  // Attribution via an originating canvas run + app (main's "created from run"
+  // surface). Applies to any user-action kind that may carry a source run
+  // reference — currently `created` (initial status.updated) and
+  // `statusChanged` (the `draft → open` marker).
+  const hasSourceRun = Boolean(event.sourceRunId);
   const automationActor =
-    !actorDisplay && !isAutomationCreated && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind)
+    !actorDisplay && !hasSourceRun && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind)
       ? event.actorAutomation
       : undefined;
   const showSomeoneFallback =
-    !actorDisplay && !isAutomationCreated && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
+    !actorDisplay && !hasSourceRun && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
 
   return (
     <p className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-900 dark:text-gray-100">
@@ -298,8 +302,8 @@ function UserActionEventDescription({
           assigneeChange={event.assigneeChange}
           resolveUserDisplay={resolveUserDisplay}
         />
-      ) : isAutomationCreated ? (
-        <AutomationCreatedDescription event={event} organizationId={organizationId} />
+      ) : hasSourceRun ? (
+        <SourceRunAttribution event={event} organizationId={organizationId} />
       ) : (
         <span>{event.title}</span>
       )}
@@ -312,19 +316,22 @@ function UserActionEventDescription({
   );
 }
 
-function AutomationCreatedDescription({
-  event,
-  organizationId,
-}: {
-  event: WorkOrderTimelineEvent;
-  organizationId: string;
-}) {
+// Renders an event title followed by "run" (linked to the originating canvas
+// run when the app+run ids are known). Used for events attributed to a run
+// rather than to a user or a factory-line automation.
+function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimelineEvent; organizationId: string }) {
   const runHref =
     event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+
+  // `created` events read "Work order created from run"; other kinds (e.g.
+  // `statusChanged` for the `draft → open` marker) read "opened this work
+  // order via run". We choose the connector accordingly.
+  const connector = event.kind === "created" ? "from" : "via";
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
       <span>{event.title}</span>
+      <span>{connector}</span>
       {runHref ? (
         <Link href={runHref} className={timelineRunLinkClassName}>
           <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden />

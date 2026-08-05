@@ -90,19 +90,26 @@ export function WorkOrderDetailHeader({
 
           {isOpen ? (
             <>
-              <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-                <LoadingButton
-                  type="button"
-                  variant="ghost"
-                  disabled={!canManage || isUpdatingStatus}
-                  loading={isUpdatingStatus}
-                  loadingText="Moving to draft..."
-                  onClick={() => void onStatusChange("STATE_DRAFT")}
-                  data-testid="work-order-back-to-draft-button"
-                >
-                  Back to draft
-                </LoadingButton>
-              </PermissionTooltip>
+              {/*
+               * Back-to-draft hits the `open → draft` FSM guard, which rejects
+               * while a line execution is pending/running. Only render the
+               * control when the order is at rest.
+               */}
+              {displayStatus !== "running" ? (
+                <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
+                  <LoadingButton
+                    type="button"
+                    variant="ghost"
+                    disabled={!canManage || isUpdatingStatus}
+                    loading={isUpdatingStatus}
+                    loadingText="Moving to draft..."
+                    onClick={() => void onStatusChange("STATE_DRAFT")}
+                    data-testid="work-order-back-to-draft-button"
+                  >
+                    Back to draft
+                  </LoadingButton>
+                </PermissionTooltip>
+              ) : null}
 
               <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
                 <LoadingButton

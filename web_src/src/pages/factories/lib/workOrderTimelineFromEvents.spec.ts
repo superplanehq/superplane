@@ -53,7 +53,10 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(view.events[0]?.title).toBe("self-assigned");
   });
 
-  it("links automation-created work orders to the source run", () => {
+  it("renders order.opened (draft→open) as a status change and links it to the source run", () => {
+    // Under the new FSM `order.opened` fires on the first `draft → open`
+    // transition, not at creation. It must not duplicate the `created` entry
+    // produced by the initial `status.updated ("" → draft)`.
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
@@ -66,11 +69,13 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       },
     ]);
 
+    expect(view.events).toHaveLength(1);
     expect(view.events[0]).toMatchObject({
-      kind: "created",
+      kind: "statusChanged",
       sourceRunId: "run-1",
       sourceAppId: "app-1",
-      title: "Work order created from",
+      title: "opened this work order",
+      statusChange: { fromState: "draft", toState: "open", fromResult: "", toResult: "" },
     });
     expect(view.events[0]?.actorUserId).toBeUndefined();
   });

@@ -71,7 +71,11 @@ export const Open: Story = {
   },
 };
 
-/** Running — badge shows the spinner; actions still visible for cancel/complete. */
+/**
+ * Running — badge shows the spinner; Complete/Reject remain available so an
+ * operator can close mid-run. Back-to-draft is hidden because the FSM rejects
+ * `open → draft` while a step is still executing.
+ */
 export const Running: Story = {
   args: {
     orderTitle: "Add refund reconciliation test",
