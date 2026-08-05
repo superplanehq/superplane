@@ -3,6 +3,7 @@ import {
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
+  factoriesDeleteFactory,
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
@@ -10,6 +11,7 @@ import {
   factoriesListFactoryApps,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
+  factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrderAssignees,
 } from "@/api-client";
@@ -171,6 +173,54 @@ export function useCreateFactory(organizationId: string) {
       return response.data.factory;
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+    },
+  });
+}
+
+export function useUpdateFactory(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { name?: string; description?: string }) => {
+      const response = await factoriesUpdateFactory(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+          body: {
+            name: input.name,
+            description: input.description,
+          },
+        }),
+      );
+      if (!response.data?.factory) {
+        throw new Error("Failed to update factory");
+      }
+      return response.data.factory;
+    },
+    onSuccess: (factory) => {
+      queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useDeleteFactory(organizationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (factoryId: string) => {
+      await factoriesDeleteFactory(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+        }),
+      );
+      return factoryId;
+    },
+    onSuccess: (factoryId) => {
+      queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
     },
   });
