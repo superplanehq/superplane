@@ -9,7 +9,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useState } from "react";
 import { EditFactoryDialog } from "./EditFactoryDialog";
 
 interface FactoryDetailHeaderProps {
@@ -82,8 +82,7 @@ export function FactoryDetailHeader({
                 <DropdownMenuContent align="start">
                   <PermissionTooltip allowed={canUpdate} message="You don't have permission to update factories.">
                     <DropdownMenuItem
-                      onClick={(event: MouseEvent<HTMLElement>) => {
-                        event.preventDefault();
+                      onClick={() => {
                         if (!canUpdate) return;
                         setEditOpen(true);
                       }}
@@ -96,8 +95,7 @@ export function FactoryDetailHeader({
                   </PermissionTooltip>
                   <PermissionTooltip allowed={canDelete} message="You don't have permission to delete factories.">
                     <DropdownMenuItem
-                      onClick={(event: MouseEvent<HTMLElement>) => {
-                        event.preventDefault();
+                      onClick={() => {
                         if (!canDelete) return;
                         setDeleteOpen(true);
                       }}
