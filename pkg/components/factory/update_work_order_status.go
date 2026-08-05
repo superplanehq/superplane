@@ -36,7 +36,7 @@ func (c *UpdateWorkOrderStatus) Description() string {
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Work Order Status component transitions a work order across the lifecycle draft → open → closed (with reopen from closed back to open). When closing, a result (completed, rejected, or failed) must be provided. This component can only be used in factory-owned apps.`
+	return `The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran). This component can only be used in factory-owned apps.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
