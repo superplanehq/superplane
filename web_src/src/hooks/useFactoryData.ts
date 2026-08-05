@@ -211,7 +211,6 @@ export function useDeleteFactory(organizationId: string) {
 
   return useMutation({
     mutationFn: async (factoryId: string) => {
-      queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
       await factoriesDeleteFactory(
         withOrganizationHeader({
           organizationId,
