@@ -1,11 +1,12 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { formatTimeAgo } from "@/lib/date";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
-import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
+import { ExternalLink, FileText, GitBranch, GitPullRequest } from "lucide-react";
 import { useState } from "react";
 
 import {
   extractArtifactMarkdownBody,
+  extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
   formatPrArtifactLabel,
@@ -45,13 +46,12 @@ export function WorkOrderArtifactsPanel({ artifacts, isLoading, error }: WorkOrd
 }
 
 function WorkOrderArtifactRow({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
-  const isPr = artifact.type === "TYPE_PR";
   const data = toDataRecord(artifact.data);
   const title = extractArtifactTitle(data);
 
   return (
     <li className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700/70 dark:bg-gray-900/40">
-      {isPr ? <PrArtifactRow data={data} title={title} /> : <MarkdownArtifactRow data={data} title={title} />}
+      <ArtifactRowContent type={artifact.type} data={data} title={title} />
 
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
         {artifact.createdBy?.name ? `${artifact.createdBy.name} · ` : ""}
@@ -59,6 +59,26 @@ function WorkOrderArtifactRow({ artifact }: { artifact: FactoriesWorkOrderArtifa
       </p>
     </li>
   );
+}
+
+function ArtifactRowContent({
+  type,
+  data,
+  title,
+}: {
+  type: FactoriesWorkOrderArtifact["type"];
+  data: Record<string, unknown> | undefined;
+  title: string | undefined;
+}) {
+  switch (type) {
+    case "TYPE_PR":
+      return <PrArtifactRow data={data} title={title} />;
+    case "TYPE_BRANCH":
+      return <BranchArtifactRow data={data} />;
+    case "TYPE_MARKDOWN":
+    default:
+      return <MarkdownArtifactRow data={data} title={title} />;
+  }
 }
 
 function PrArtifactRow({ data, title }: { data: Record<string, unknown> | undefined; title: string | undefined }) {
@@ -82,6 +102,17 @@ function PrArtifactRow({ data, title }: { data: Record<string, unknown> | undefi
       ) : (
         <span className="min-w-0 truncate font-medium text-gray-900 dark:text-gray-100">{label}</span>
       )}
+    </div>
+  );
+}
+
+function BranchArtifactRow({ data }: { data: Record<string, unknown> | undefined }) {
+  const label = extractArtifactName(data) || "Branch";
+
+  return (
+    <div className="flex items-center gap-2">
+      <GitBranch className="h-4 w-4 text-sky-500" aria-hidden />
+      <span className="min-w-0 truncate font-medium text-gray-900 dark:text-gray-100">{label}</span>
     </div>
   );
 }

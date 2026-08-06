@@ -298,6 +298,21 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
 
+	t.Run("branch requires data.name", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "   "},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
 	t.Run("markdown rejects non-http(s) data.url", func(t *testing.T) {
 		cases := []string{
 			"javascript:alert(1)",
@@ -366,6 +381,28 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		require.NotNil(t, payload.Artifact)
 		assert.Equal(t, FactoryWorkOrderArtifactTypeMarkdown, payload.Artifact.Type)
 		assert.Equal(t, "Design notes", payload.Artifact.Data["title"])
+	})
+
+	t.Run("creates branch and emits event", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{
+				"name": "feature/refund-retry",
+			},
+			CreatedBy: &userID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeBranch, artifact.Type)
+
+		events, err := order.ListEvents(database.Conn(), 10, nil)
+		require.NoError(t, err)
+
+		artifactEvent := findEventOfType(t, events, factory.EventTypeOrderArtifactAdded)
+		var payload factory.WorkOrderArtifactAdded
+		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
+		require.NotNil(t, payload.Artifact)
+		assert.Equal(t, "feature/refund-retry", payload.Artifact.Data["name"])
 	})
 
 	// A markdown artifact with no data.url must succeed — the http(s)

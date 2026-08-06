@@ -23,7 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
-  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR or markdown) to a work order" />
+  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, or branch) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
@@ -434,8 +434,9 @@ Supported types:
 
 - **Pull request** (`pr`): requires `url`; optional `number` and `title`.
 - **Markdown note** (`markdown`): requires `body`; optional `title`.
+- **Branch** (`branch`): requires `name` (the branch name).
 
-Both types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.
+PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.
 
 ### Example Output
 

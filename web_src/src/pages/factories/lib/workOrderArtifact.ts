@@ -38,6 +38,10 @@ export function extractArtifactTitle(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "title");
 }
 
+export function extractArtifactName(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "name");
+}
+
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {
   if (!data) {
     return undefined;
