@@ -323,6 +323,39 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	// Regression test: an empty paragraph (a blank line) still occupies a slot in the block join,
+	// so it must be dropped rather than joined in - otherwise it leaves a surrounding separator
+	// behind and a single-space filter like "Hello World" no longer matches (BUGBOT_BUG_ID 822862ec).
+	t.Run("skips empty paragraphs when joining block text", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		adfBody := []byte(`{
+			"webhookEvent": "comment_created",
+			"comment": {
+				"id": "10019",
+				"body": {"type": "doc", "content": [
+					{"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+					{"type": "paragraph"},
+					{"type": "paragraph", "content": [{"type": "text", "text": "World"}]}
+				]}
+			},
+			"issue": {
+				"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {"project": {"key": "ENG"}}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          adfBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "^Hello World$"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+	})
+
 	// Regression test: a comment delivered without extractable text must fail closed against a
 	// configured filter rather than matching everything by default.
 	t.Run("a comment with no extractable text never matches a configured filter", func(t *testing.T) {

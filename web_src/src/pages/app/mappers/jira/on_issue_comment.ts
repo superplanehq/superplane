@@ -51,11 +51,14 @@ function adfText(node: unknown): string {
   if (typeof text === "string") return text;
   if (typeof attrs?.text === "string") return attrs.text;
   if (Array.isArray(content)) {
+    // Empty blocks (blank lines, which are paragraph nodes with no text) contribute nothing and
+    // must be dropped rather than joined in, or they'd still add a surrounding separator.
+    const parts = content.map(adfText).filter((part) => part !== "");
     // Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
     // those with a separator would double it up - but block siblings (paragraphs, list items)
     // don't, so those need a space to avoid running words together across them.
     const separator = content.some(hasBlockContent) ? " " : "";
-    return content.map(adfText).join(separator);
+    return parts.join(separator);
   }
   return "";
 }

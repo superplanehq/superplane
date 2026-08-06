@@ -270,9 +270,13 @@ func commentPlainText(body any) string {
 		return ""
 	}
 
+	// Empty blocks (blank lines, which are paragraph nodes with no text) contribute nothing and
+	// must be dropped rather than joined in, or they'd still add a surrounding separator.
 	parts := make([]string, 0, len(content))
 	for _, child := range content {
-		parts = append(parts, commentPlainText(child))
+		if part := commentPlainText(child); part != "" {
+			parts = append(parts, part)
+		}
 	}
 
 	// Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
