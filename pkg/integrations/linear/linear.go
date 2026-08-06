@@ -109,6 +109,8 @@ func (l *Linear) Actions() []core.Action {
 		&UpdateIssue{},
 		&AddIssueLabel{},
 		&AddIssueComment{},
+		&RemoveIssueLabel{},
+		&AddReaction{},
 	}
 }
 
