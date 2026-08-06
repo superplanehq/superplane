@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -380,4 +382,133 @@ func Test__CanvasRun__DeleteChain__ClearsWorkOrderSourceRunID(t *testing.T) {
 	var runCount int64
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
 	assert.Equal(t, int64(0), runCount)
+}
+
+// Reverting an open work order back to draft while a step is still running
+// would leave the executor and FSM out of sync; UpdateStatus must reject it
+// with the same guard DispatchWorkOrder uses.
+func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActive(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(db, "line", nil)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	now := time.Now()
+	execution := models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		StepIndex:      0,
+		StepName:       "step",
+		RunID:          run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, db.Create(&execution).Error)
+
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateDraft,
+		Actor:   &r.User,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionActive)
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State,
+		"failed back-to-draft must not mutate the row")
+
+	require.NoError(t, execution.MarkFinished(db, models.FactoryWorkOrderResultCompleted))
+
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateDraft,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+}
+
+// A canvas-created work order (SourceRunID set) must carry the source run
+// + app refs on its very first `order.status.updated` event, so the
+// timeline can link back to the originating run without waiting for the
+// draft → open promotion.
+func Test__Factory__CreateWorkOrder__WithSourceRun__EnrichesInitialStatusEvent(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	order, err := factory.CreateWorkOrder(db, "Canvas-created", "", &r.User, nil, &run.ID)
+	require.NoError(t, err)
+
+	events, err := order.ListEvents(db, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderStatusUpdated, events[0].Type)
+
+	var initial factoryevents.WorkOrderStatusUpdated
+	require.NoError(t, json.Unmarshal(events[0].Data, &initial))
+	assert.Equal(t, "", initial.FromState)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, initial.ToState)
+	require.NotNil(t, initial.Run, "source-run created orders must attribute run on creation")
+	assert.Equal(t, run.ID, initial.Run.ID)
+	require.NotNil(t, initial.App, "source-run created orders must attribute app on creation")
+	assert.Equal(t, canvas.ID, initial.App.ID)
+}
+
+// The plain path (no source run) still records a bare "" → draft event.
+func Test__Factory__CreateWorkOrder__WithoutSourceRun__OmitsRunAndApp(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Manual intake", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	events, err := order.ListEvents(db, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	var initial factoryevents.WorkOrderStatusUpdated
+	require.NoError(t, json.Unmarshal(events[0].Data, &initial))
+	assert.Nil(t, initial.Run)
+	assert.Nil(t, initial.App)
 }
