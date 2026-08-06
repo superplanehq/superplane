@@ -1,4 +1,5 @@
-import { ExternalLink, GitPullRequest } from "lucide-react";
+import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
+import { useState } from "react";
 
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
@@ -11,6 +12,7 @@ import {
   formatPrArtifactLabel,
 } from "../lib/workOrderArtifact";
 import type { WorkOrderTimelineArtifact, WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
+import { WorkOrderMarkdownArtifactDialog } from "../WorkOrderMarkdownArtifactDialog";
 import { formatArtifactKindLong } from "./authorLabels";
 import { TimelineAutomationActor } from "./TimelineAutomationActor";
 
@@ -27,11 +29,7 @@ export function ArtifactTimelineBody({
   }
 
   const isPr = artifact.type === "pr";
-  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
-  const prLabel = isPr ? formatPrArtifactLabel(artifact.data) : undefined;
   const title = extractArtifactTitle(artifact.data);
-  const label = prLabel || title || safeUrl || (isPr ? "Pull request" : "Note");
-  const markdownBody = artifact.type === "markdown" ? extractArtifactMarkdownBody(artifact.data) : undefined;
 
   return (
     <div>
@@ -41,14 +39,55 @@ export function ArtifactTimelineBody({
         automationActor={event.actorAutomation}
       />
       <div className="mt-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700/70 dark:bg-gray-900/40 dark:text-gray-200">
-        <ArtifactLabel isPr={isPr} label={label} safeUrl={safeUrl} />
-        {markdownBody ? (
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-            {markdownBody}
-          </p>
-        ) : null}
+        {isPr ? (
+          <PrArtifactBody artifact={artifact} title={title} />
+        ) : (
+          <MarkdownArtifactBody artifact={artifact} title={title} />
+        )}
       </div>
     </div>
+  );
+}
+
+function PrArtifactBody({ artifact, title }: { artifact: WorkOrderTimelineArtifact; title: string | undefined }) {
+  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
+  const prLabel = formatPrArtifactLabel(artifact.data);
+  const label = prLabel || title || safeUrl || "Pull request";
+
+  if (!safeUrl) {
+    return <p className="font-medium">{label}</p>;
+  }
+  return (
+    <a
+      href={safeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex max-w-full items-center gap-2 font-medium text-violet-700 hover:underline dark:text-violet-300"
+    >
+      <GitPullRequest className="h-4 w-4" aria-hidden />
+      <span className="truncate">{label}</span>
+      <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+    </a>
+  );
+}
+
+function MarkdownArtifactBody({ artifact, title }: { artifact: WorkOrderTimelineArtifact; title: string | undefined }) {
+  const [open, setOpen] = useState(false);
+  const body = extractArtifactMarkdownBody(artifact.data) ?? "";
+  const label = title || "Note";
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex max-w-full items-center gap-2 font-medium text-violet-700 hover:underline dark:text-violet-300"
+      >
+        <FileText className="h-4 w-4" aria-hidden />
+        <span className="truncate">{label}</span>
+      </button>
+      <WorkOrderMarkdownArtifactDialog open={open} onClose={() => setOpen(false)} title={label} body={body} />
+    </>
   );
 }
 
@@ -78,22 +117,5 @@ function ArtifactAttribution({
         </span>
       ) : null}
     </p>
-  );
-}
-
-function ArtifactLabel({ isPr, label, safeUrl }: { isPr: boolean; label: string; safeUrl: string | null }) {
-  if (!safeUrl) {
-    return <p className="font-medium">{label}</p>;
-  }
-  return (
-    <a
-      href={safeUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex max-w-full items-center gap-2 font-medium text-violet-700 hover:underline dark:text-violet-300"
-    >
-      {isPr ? <GitPullRequest className="h-4 w-4" aria-hidden /> : <ExternalLink className="h-4 w-4" aria-hidden />}
-      <span className="truncate">{label}</span>
-    </a>
   );
 }
