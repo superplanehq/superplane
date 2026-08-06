@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 const factoryNameUniqueConstraint = "factories_organization_id_name_key"
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
+var ErrFactoryNameRequired = errors.New("factory name is required")
 var ErrFactoryNotFound = errors.New("factory not found")
 var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 
@@ -24,6 +26,7 @@ type Factory struct {
 	Description    string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
 func MapFactoryNameUniqueConstraintError(err error) error {
@@ -88,6 +91,69 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	return factories, nil
 }
 
+func (f *Factory) SoftDelete(tx *gorm.DB) error {
+	now := time.Now()
+	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
+
+	err := tx.Model(f).Updates(map[string]any{
+		"name":       newName,
+		"deleted_at": now,
+		"updated_at": now,
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	f.Name = newName
+	f.DeletedAt = gorm.DeletedAt{Time: now, Valid: true}
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Update(tx *gorm.DB, name, description *string) error {
+	updates := map[string]any{}
+
+	if name != nil {
+		nextName := strings.TrimSpace(*name)
+		if nextName == "" {
+			return ErrFactoryNameRequired
+		}
+		if f.Name != nextName {
+			updates["name"] = nextName
+		}
+	}
+
+	if description != nil && f.Description != *description {
+		updates["description"] = *description
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	updates["updated_at"] = now
+
+	err := MapFactoryNameUniqueConstraintError(
+		tx.Model(f).
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			Updates(updates).
+			Error,
+	)
+	if err != nil {
+		return err
+	}
+
+	if nextName, ok := updates["name"].(string); ok {
+		f.Name = nextName
+	}
+	if nextDescription, ok := updates["description"].(string); ok {
+		f.Description = nextDescription
+	}
+	f.UpdatedAt = now
+	return nil
+}
+
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	var canvases []Canvas
 	err := tx.
@@ -103,7 +169,121 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Model(&Factory{}).
+		Unscoped().
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.created_at",
+			"factories.updated_at",
+			// Earliest deletion wins so neither factory nor org soft-delete resets grace.
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
+func LockDeletedFactory(tx *gorm.DB, id uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.
+		Unscoped().
+		Model(&Factory{}).
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.created_at",
+			"factories.updated_at",
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "factories"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("factories.id = ?", id).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		First(&factory).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func (f *Factory) CountCanvases(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Canvas{}).
+		Where("factory_id = ?", f.ID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
+	canvases, err := f.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+
+	for i := range canvases {
+		if err := canvases[i].SoftDeleteInTransaction(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) error {
+	var factories []Factory
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Find(&factories).
+		Error
+	if err != nil {
+		return err
+	}
+
+	for i := range factories {
+		if factories[i].DeletedAt.Valid {
+			continue
+		}
+		if err := factories[i].SoftDelete(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -116,9 +296,10 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		FactoryID:      f.ID,
 		Title:          title,
 		Description:    description,
-		State:          FactoryWorkOrderStateOpen,
+		State:          FactoryWorkOrderStateDraft,
 		Result:         "",
 		CreatedByID:    createdBy,
+		SourceRunID:    sourceRunID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -131,6 +312,27 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		if err := order.ReplaceAssignees(tx, assignees); err != nil {
 			return nil, err
 		}
+	}
+
+	// Creation is a status transition into `draft` (fromState == "").
+	// For orders spawned by a canvas run we snapshot the originating
+	// run + app here so the very first timeline entry links back to
+	// the run that created the order — matching the enrichment
+	// UpdateStatus performs on the draft → open promotion.
+	initialStatus := statusUpdatedRecord{
+		Actor:   createdBy,
+		ToState: FactoryWorkOrderStateDraft,
+	}
+	if sourceRunID != nil {
+		sourceRun, sourceApp, err := order.loadSourceRunRefs(tx)
+		if err != nil {
+			return nil, err
+		}
+		initialStatus.Run = sourceRun
+		initialStatus.App = sourceApp
+	}
+	if err := order.RecordStatusUpdated(tx, initialStatus); err != nil {
+		return nil, err
 	}
 
 	return f.FindWorkOrder(tx, order.ID)

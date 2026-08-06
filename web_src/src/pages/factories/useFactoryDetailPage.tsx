@@ -1,29 +1,32 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useMemo, useState } from "react";
-import { getFactoryDetailLoadingState } from "./factoryDetailLoading";
-import { createWorkOrderPath, factoryDetailPath } from "./factoryPagePaths";
+import { getFactoryDetailLoadingState } from "./lib/factoryDetailLoading";
+import { createWorkOrderPath, factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveFactoryLoadRedirect } from "./factoryPageRedirects";
 import { useFactoryDetailActions } from "./useFactoryDetailActions";
 import {
-  countOpenWorkOrders,
+  countActiveWorkOrders,
   filterWorkOrdersByOwner,
   filterWorkOrdersByStatus,
   type WorkOrderOwnerFilter,
   type WorkOrderStatusFilter,
-} from "./workOrderProgress";
+} from "./lib/workOrderProgress";
 
 export function useFactoryDetailPage(organizationId: string, factoryId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
   const [createAppOpen, setCreateAppOpen] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState<WorkOrderOwnerFilter>("mine");
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("open");
+  // "active" covers draft/open/running/failed so new drafts show up by default.
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("active");
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
+  useFactoryWebsocket(organizationId, factoryId);
   const {
     data: workOrders = [],
     isLoading: ordersLoading,
@@ -77,7 +80,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
     createWorkOrderHref: createWorkOrderPath(organizationId, factoryId),
     factoryApps,
     filteredWorkOrders,
-    openWorkOrderCount: countOpenWorkOrders(workOrders),
+    activeWorkOrderCount: countActiveWorkOrders(workOrders),
     ownerFilter,
     statusFilter,
     setOwnerFilter,
@@ -87,6 +90,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
     isAppsLoading,
     canCreateWork: canAct("factories", "create"),
     canUpdateFactory: canAct("factories", "update"),
+    canDeleteFactory: canAct("factories", "delete"),
     canCreateApps: canAct("canvases", "create"),
     canDispatch: canAct("factories", "update"),
     permissionsLoading,

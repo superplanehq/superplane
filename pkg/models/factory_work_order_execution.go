@@ -1,10 +1,13 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +20,7 @@ const (
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
 	ErrFactoryWorkOrderExecutionActive   = errors.New("work order already has an active execution")
-	ErrFactoryWorkOrderNotOpen           = errors.New("work order is not open")
+	ErrFactoryWorkOrderNotDispatchable   = errors.New("work order cannot be dispatched in its current state")
 )
 
 type FactoryWorkOrderExecution struct {
@@ -75,12 +78,61 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 	e.UpdatedAt = now
 	e.FinishedAt = &now
 
-	return tx.Model(e).Updates(map[string]any{
+	if err := tx.Model(e).Updates(map[string]any{
 		"status":      FactoryWorkOrderExecutionStatusFinished,
 		"result":      result,
 		"updated_at":  now,
 		"finished_at": &now,
-	}).Error
+	}).Error; err != nil {
+		return err
+	}
+
+	return e.RecordFinished(tx, result)
+}
+
+func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {
+	f, err := FindFactory(tx, e.OrganizationID, e.FactoryID)
+	if err != nil {
+		return err
+	}
+
+	line, err := f.FindLine(tx, e.LineID)
+	if err != nil {
+		return err
+	}
+
+	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
+	if err != nil {
+		return err
+	}
+
+	run, err := LockCanvasRunInTransaction(tx, e.RunID)
+	if err != nil {
+		return err
+	}
+
+	data := factory.LineStepExecutionFinished{
+		StepName: e.StepName,
+		Order:    order.Ref(),
+		Line:     &factory.LineRef{ID: line.ID, Name: line.Name},
+		App:      &factory.AppRef{ID: run.WorkflowID},
+		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: e.WorkOrderID,
+		Type:        factory.EventTypeLineStepExecutionFinished,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
 }
 
 type FactoryWorkOrderExecutionRecord struct {
@@ -131,13 +183,42 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 	return result, nil
 }
 
-func factoryWorkOrderRunInput(order *FactoryWorkOrder) map[string]any {
-	return map[string]any{
-		"work_order": map[string]any{
-			"id":          order.ID.String(),
-			"title":       order.Title,
-			"description": order.Description,
-			"factory_id":  order.FactoryID.String(),
-		},
+func factoryWorkOrderRunInput(tx *gorm.DB, order *FactoryWorkOrder) (map[string]any, error) {
+	workOrder := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
 	}
+
+	if order.SourceRunID != nil {
+		rootEvent, err := FindRootEventForRun(tx, *order.SourceRunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if rootEvent != nil {
+			if source := rootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+				workOrder["source"] = source
+			}
+		}
+	}
+
+	return map[string]any{
+		"work_order": workOrder,
+	}, nil
+}
+
+func rootEventSourcePayload(eventData any) any {
+	payload, ok := eventData.(map[string]any)
+	if !ok {
+		return eventData
+	}
+
+	source, ok := payload["data"]
+	if !ok {
+		return eventData
+	}
+
+	return source
 }

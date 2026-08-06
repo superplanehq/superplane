@@ -1,6 +1,8 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Settings2 } from "lucide-react";
+import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
 
 interface WorkOrderAssigneesFieldProps {
@@ -20,6 +22,8 @@ export function WorkOrderAssigneesField({
   isSaving,
   onSave,
 }: WorkOrderAssigneesFieldProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+
   return (
     <section>
       <div className="flex items-center justify-between gap-2">
@@ -48,11 +52,15 @@ export function WorkOrderAssigneesField({
         </PermissionTooltip>
       </div>
 
-      {assigneeNames.length > 0 ? (
-        <ul className="mt-2 space-y-1">
-          {assigneeNames.map((name) => (
-            <li key={name} className="text-sm text-gray-700 dark:text-gray-300">
-              {name}
+      {assigneeIds.length > 0 ? (
+        <ul className="mt-2 space-y-2">
+          {assigneeIds.map((assigneeId, index) => (
+            <li key={assigneeId}>
+              <OrgUserReference
+                display={resolveUser(assigneeId, assigneeNames[index])}
+                size="md"
+                nameClassName="text-sm text-gray-700 dark:text-gray-300"
+              />
             </li>
           ))}
         </ul>

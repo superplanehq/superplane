@@ -5,11 +5,14 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -35,13 +38,20 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
-	tx := database.DB(ctx)
+	var actor *uuid.UUID
+	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
+		parsed, err := uuid.Parse(userIDStr)
+		if err == nil {
+			actor = &parsed
+		}
+	}
+
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
-
 	var logger *log.Entry
 
-	err = tx.Transaction(func(tx *gorm.DB) error {
+	db := database.DB(ctx)
+	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
@@ -53,8 +63,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 
 		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
-		if order.State != models.FactoryWorkOrderStateOpen {
-			return models.ErrFactoryWorkOrderNotOpen
+		if !order.IsDispatchable() {
+			return models.ErrFactoryWorkOrderNotDispatchable
 		}
 
 		line, err := factory.FindLineByName(tx, lineName)
@@ -75,6 +85,11 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
+		// Promote draft → open before the first step; no-op if already open.
+		if err := order.TransitionOnDispatch(tx, actor); err != nil {
+			return err
+		}
+
 		result, err := line.StartStep(tx, order, 0)
 		if err != nil {
 			return err
@@ -92,6 +107,14 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
 			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
 		}
+	}
+
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeLineStepExecutionCreated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, order)

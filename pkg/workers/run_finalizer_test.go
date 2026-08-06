@@ -550,8 +550,9 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)
@@ -614,6 +615,16 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
 }
 
+// dispatchWorkOrderForTest promotes a draft order to open, mirroring
+// the dispatch API — needed by tests that poke `StartStep` directly.
+func dispatchWorkOrderForTest(t *testing.T, order *models.FactoryWorkOrder) {
+	t.Helper()
+	_, err := order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+}
+
 func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -621,8 +632,9 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)
@@ -688,8 +700,9 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
 	require.NoError(t, err)
 
-	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)

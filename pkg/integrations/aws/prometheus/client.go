@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -64,6 +65,41 @@ type CreateWorkspaceResponse struct {
 	Status      WorkspaceStatus   `json:"status"`
 	Tags        map[string]string `json:"tags,omitempty"`
 	WorkspaceID string            `json:"workspaceId"`
+}
+
+type RuleGroupsNamespaceStatus struct {
+	StatusCode   string `json:"statusCode"`
+	StatusReason string `json:"statusReason,omitempty"`
+}
+
+type RuleGroupsNamespaceSummary struct {
+	Arn        string                    `json:"arn"`
+	Name       string                    `json:"name"`
+	Status     RuleGroupsNamespaceStatus `json:"status"`
+	CreatedAt  common.FloatTime          `json:"createdAt,omitempty"`
+	ModifiedAt common.FloatTime          `json:"modifiedAt,omitempty"`
+	Tags       map[string]string         `json:"tags,omitempty"`
+}
+
+// Data holds the decoded plain-text rules YAML, not the AWS base64 wire format.
+type RuleGroupsNamespaceDescription struct {
+	RuleGroupsNamespaceSummary
+	Data string `json:"data"`
+}
+
+type CreateRuleGroupsNamespaceInput struct {
+	WorkspaceID string
+	Name        string
+	Data        string
+	ClientToken string
+	Tags        []common.Tag
+}
+
+type CreateRuleGroupsNamespaceResponse struct {
+	Name   string                    `json:"name"`
+	Arn    string                    `json:"arn"`
+	Status RuleGroupsNamespaceStatus `json:"status"`
+	Tags   map[string]string         `json:"tags,omitempty"`
 }
 
 type QueryMetricsInput struct {
@@ -182,6 +218,105 @@ func (c *Client) ListWorkspaces(alias string) ([]WorkspaceSummary, error) {
 	}
 
 	return workspaces, nil
+}
+
+func (c *Client) CreateRuleGroupsNamespace(input CreateRuleGroupsNamespaceInput) (*CreateRuleGroupsNamespaceResponse, error) {
+	payload := map[string]any{
+		"name": input.Name,
+		"data": base64.StdEncoding.EncodeToString([]byte(input.Data)),
+	}
+	if input.ClientToken != "" {
+		payload["clientToken"] = input.ClientToken
+	}
+	if tags := tagsForAPI(input.Tags); len(tags) > 0 {
+		payload["tags"] = tags
+	}
+
+	response := CreateRuleGroupsNamespaceResponse{}
+	path := "/workspaces/" + url.PathEscape(input.WorkspaceID) + "/rulegroupsnamespaces"
+	if err := c.requestJSON(http.MethodPost, path, url.Values{}, payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DescribeRuleGroupsNamespace(workspaceID string, name string) (*RuleGroupsNamespaceDescription, error) {
+	var response struct {
+		RuleGroupsNamespace RuleGroupsNamespaceDescription `json:"ruleGroupsNamespace"`
+	}
+
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces/" + url.PathEscape(name)
+	if err := c.requestJSON(http.MethodGet, path, url.Values{}, nil, &response); err != nil {
+		return nil, err
+	}
+
+	namespace := response.RuleGroupsNamespace
+	data, err := base64.StdEncoding.DecodeString(namespace.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode rule groups namespace data: %w", err)
+	}
+	namespace.Data = string(data)
+
+	return &namespace, nil
+}
+
+func (c *Client) PutRuleGroupsNamespace(workspaceID string, name string, data string, clientToken string) (*CreateRuleGroupsNamespaceResponse, error) {
+	payload := map[string]any{
+		"data": base64.StdEncoding.EncodeToString([]byte(data)),
+	}
+	if clientToken != "" {
+		payload["clientToken"] = clientToken
+	}
+
+	response := CreateRuleGroupsNamespaceResponse{}
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces/" + url.PathEscape(name)
+	if err := c.requestJSON(http.MethodPut, path, url.Values{}, payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DeleteRuleGroupsNamespace(workspaceID string, name string, clientToken string) error {
+	query := url.Values{}
+	if clientToken != "" {
+		query.Set("clientToken", clientToken)
+	}
+
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces/" + url.PathEscape(name)
+	return c.requestJSON(http.MethodDelete, path, query, nil, nil)
+}
+
+func (c *Client) ListRuleGroupsNamespaces(workspaceID string) ([]RuleGroupsNamespaceSummary, error) {
+	namespaces := []RuleGroupsNamespaceSummary{}
+	nextToken := ""
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces"
+
+	for {
+		query := url.Values{}
+		query.Set("maxResults", maxResults)
+		if nextToken != "" {
+			query.Set("nextToken", nextToken)
+		}
+
+		var response struct {
+			NextToken            string                       `json:"nextToken"`
+			RuleGroupsNamespaces []RuleGroupsNamespaceSummary `json:"ruleGroupsNamespaces"`
+		}
+		if err := c.requestJSON(http.MethodGet, path, query, nil, &response); err != nil {
+			return nil, err
+		}
+
+		namespaces = append(namespaces, response.RuleGroupsNamespaces...)
+		if response.NextToken == "" {
+			break
+		}
+
+		nextToken = response.NextToken
+	}
+
+	return namespaces, nil
 }
 
 func (c *Client) QueryMetrics(input QueryMetricsInput) (map[string]any, error) {

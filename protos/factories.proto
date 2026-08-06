@@ -3,6 +3,7 @@ syntax = "proto3";
 package Superplane.Factories;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -59,9 +60,30 @@ service Factories {
     };
   }
 
-  //
+  rpc UpdateFactory(UpdateFactoryRequest) returns (UpdateFactoryResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory";
+      description: "Updates factory metadata";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory";
+      description: "Soft-deletes an existing factory";
+      tags: "Factory";
+    };
+  }
+
   // Factory line APIs
-  //
 
   rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
     option (google.api.http) = {
@@ -87,9 +109,7 @@ service Factories {
     };
   }
 
-  //
   // Factory app APIs
-  //
 
   rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
     option (google.api.http) = {
@@ -102,9 +122,7 @@ service Factories {
     };
   }
 
-  //
   // Work orders APIs
-  //
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
     option (google.api.http) = {
@@ -136,6 +154,17 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory work order";
       description: "Returns a work order by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderEvents(ListWorkOrderEventsRequest) returns (ListWorkOrderEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work order events";
+      description: "Returns a list of events for a work order";
       tags: "Factory";
     };
   }
@@ -175,11 +204,45 @@ service Factories {
       tags: "Factory";
     };
   }
+
+  rpc UpdateWorkOrderStatus(UpdateWorkOrderStatusRequest) returns (UpdateWorkOrderStatusResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/status"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update work order status";
+      description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderComment(AddWorkOrderCommentRequest) returns (AddWorkOrderCommentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order comment";
+      description: "Appends a comment to the work order timeline";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderArtifacts(ListWorkOrderArtifactsRequest) returns (ListWorkOrderArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List work order artifacts";
+      description: "Returns artifacts attached to a work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
-//
 // Factories
-//
 
 message ListFactoriesRequest {}
 
@@ -203,6 +266,22 @@ message DescribeFactoryRequest {
 message DescribeFactoryResponse {
   Factory factory = 1;
 }
+
+message UpdateFactoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message UpdateFactoryResponse {
+  Factory factory = 1;
+}
+
+message DeleteFactoryRequest {
+  string id = 1;
+}
+
+message DeleteFactoryResponse {}
 
 message Factory {
   message App {
@@ -267,9 +346,7 @@ message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
 }
 
-//
 // Work orders
-//
 
 message ListWorkOrdersRequest {
   string factory_id = 1;
@@ -307,14 +384,16 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
-    STATE_OPEN = 1;
-    STATE_CLOSED = 2;
+    STATE_DRAFT = 1;
+    STATE_OPEN = 2;
+    STATE_CLOSED = 3;
   }
 
   enum Result {
     RESULT_UNSPECIFIED = 0;
     RESULT_COMPLETED = 1;
     RESULT_REJECTED = 2;
+    RESULT_FAILED = 3;
   }
 
   string id = 1;
@@ -398,4 +477,106 @@ message DispatchWorkOrderRequest {
 
 message DispatchWorkOrderResponse {
   WorkOrder order = 1;
+}
+
+message ListWorkOrderEventsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListWorkOrderEventsResponse {
+  repeated WorkOrderEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message WorkOrderEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  string type = 2;
+  google.protobuf.Struct event = 3;
+}
+
+// Status / comments / artifacts
+
+message UpdateWorkOrderStatusRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrder.State state = 3;
+  WorkOrder.Result result = 4;
+}
+
+message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message AddWorkOrderCommentRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string body = 3;
+}
+
+message AddWorkOrderCommentResponse {
+  WorkOrderComment comment = 1;
+}
+
+message WorkOrderComment {
+  string id = 1;
+  string body = 2;
+  WorkOrderCommentAuthor author = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message WorkOrderCommentAuthor {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_AUTOMATION = 2;
+  }
+
+  Kind kind = 1;
+  string user_id = 2;
+  // Populated for `automation` comments: identifies the canvas node
+  // (and app) that wrote the comment.
+  AutomationRef automation = 3;
+}
+
+message AutomationRef {
+  string node_id = 1;
+  string node_name = 2;
+  string app_id = 3;
+  string app_name = 4;
+}
+
+message ListWorkOrderArtifactsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message ListWorkOrderArtifactsResponse {
+  repeated WorkOrderArtifact artifacts = 1;
+}
+
+message WorkOrderArtifact {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_PR = 1;
+    TYPE_MARKDOWN = 2;
+  }
+
+  string id = 1;
+  Type type = 2;
+  google.protobuf.Struct data = 3;
+  UserRef created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// Internal AMQP message for factory work-order websocket fan-out.
+message FactoryWorkOrderUpdatedMessage {
+  string factory_id = 1;
+  string order_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }

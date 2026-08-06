@@ -1,17 +1,24 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactory, useWorkOrder } from "@/hooks/useFactoryData";
+import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
+import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { factoryDetailPath } from "./factoryPagePaths";
+import { useMemo } from "react";
+import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { resolveWorkOrderDetailRedirect } from "./factoryPageRedirects";
 import { useWorkOrderDetailActions } from "./useWorkOrderDetailActions";
-import { getWorkOrderDetailDerived } from "./workOrderProgress";
+import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
+import { flattenWorkOrderEventsPages } from "./lib/workOrderEventsPagination";
 
 export function useWorkOrderDetailPage(organizationId: string, factoryId: string, orderId: string) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
+  useFactoryWebsocket(organizationId, factoryId);
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
+  const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
+  const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
+  const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   const derived = getWorkOrderDetailDerived(order);
@@ -37,10 +44,68 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     return { kind: "redirect" as const, element: redirect };
   }
 
+  return buildReadyState({
+    organizationId,
+    factoryId,
+    factory,
+    order,
+    events,
+    eventsQuery,
+    artifactsQuery,
+    actions,
+    derived,
+    isLoading,
+    canManageWorkOrders,
+    permissionsLoading,
+  });
+}
+
+type EventsQuery = ReturnType<typeof useWorkOrderEvents>;
+type ArtifactsQuery = ReturnType<typeof useWorkOrderArtifacts>;
+
+function buildReadyState(input: {
+  organizationId: string;
+  factoryId: string;
+  factory: ReturnType<typeof useFactory>["data"];
+  order: ReturnType<typeof useWorkOrder>["data"];
+  events: ReturnType<typeof flattenWorkOrderEventsPages>;
+  eventsQuery: EventsQuery;
+  artifactsQuery: ArtifactsQuery;
+  actions: ReturnType<typeof useWorkOrderDetailActions>;
+  derived: ReturnType<typeof getWorkOrderDetailDerived>;
+  isLoading: boolean;
+  canManageWorkOrders: boolean;
+  permissionsLoading: boolean;
+}) {
+  const {
+    organizationId,
+    factoryId,
+    factory,
+    order,
+    events,
+    eventsQuery,
+    artifactsQuery,
+    actions,
+    derived,
+    isLoading,
+    canManageWorkOrders,
+    permissionsLoading,
+  } = input;
   return {
     kind: "ready" as const,
     factory,
     order,
+    events,
+    eventsError: eventsQuery.error ?? null,
+    isEventsLoading: eventsQuery.isLoading,
+    hasMoreEvents: eventsQuery.hasNextPage ?? false,
+    isLoadingMoreEvents: eventsQuery.isFetchingNextPage,
+    onLoadMoreEvents: () => {
+      void eventsQuery.fetchNextPage();
+    },
+    onRetryEvents: () => {
+      void eventsQuery.refetch();
+    },
     factoryHref: factoryDetailPath(organizationId, factoryId),
     organizationId,
     factoryLines: factory?.lines ?? [],
@@ -48,7 +113,11 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
     canDispatch: canManageWorkOrders,
     canClose: canManageWorkOrders,
     canAssign: canManageWorkOrders,
+    canManage: canManageWorkOrders,
     permissionsLoading,
+    artifacts: artifactsQuery.data ?? [],
+    isArtifactsLoading: artifactsQuery.isLoading,
+    artifactsError: artifactsQuery.error ?? null,
     ...derived,
     ...actions,
   };
