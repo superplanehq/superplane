@@ -1,5 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -24,6 +25,7 @@ export function useFactoryDetailPage(organizationId: string, factoryId: string) 
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatusFilter>("open");
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
+  useFactoryWebsocket(organizationId, factoryId);
   const {
     data: workOrders = [],
     isLoading: ordersLoading,

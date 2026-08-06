@@ -6,13 +6,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 )
 
 type FactoryContext struct {
-	tx        *gorm.DB
-	canvas    *models.Canvas
-	execution *models.CanvasNodeExecution
+	tx                 *gorm.DB
+	canvas             *models.Canvas
+	execution          *models.CanvasNodeExecution
+	onWorkOrderUpdated func(factoryID, orderID, reason string)
 }
 
 func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.CanvasNodeExecution) *FactoryContext {
@@ -21,6 +23,11 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 		canvas:    canvas,
 		execution: execution,
 	}
+}
+
+func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
+	c.onWorkOrderUpdated = callback
+	return c
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -45,9 +52,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, err
 	}
 
-	workOrder, err := factory.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{})
+	sourceRunID := c.execution.RunID
+	workOrder, err := factory.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.onWorkOrderUpdated != nil {
+		c.onWorkOrderUpdated(factory.ID.String(), workOrder.ID.String(), factoryevents.EventTypeOrderOpened)
 	}
 
 	return &core.WorkOrder{

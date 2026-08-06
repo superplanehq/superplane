@@ -30,6 +30,7 @@ type FactoryWorkOrder struct {
 	State          string
 	Result         string
 	CreatedByID    *uuid.UUID
+	SourceRunID    *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -210,8 +211,29 @@ func (o *FactoryWorkOrder) RecordOpened(tx *gorm.DB, createdBy *uuid.UUID) error
 	data := factory.WorkOrderOpened{
 		Order: o.Ref(),
 	}
+
 	if createdBy != nil {
 		data.User = &factory.UserRef{ID: *createdBy}
+	}
+
+	if o.SourceRunID != nil {
+		run, err := FindUnscopedCanvasRun(tx, *o.SourceRunID)
+		if err != nil {
+			return err
+		}
+
+		runRef := &factory.RunRef{
+			ID:    run.ID,
+			State: run.State,
+		}
+
+		if run.Result != "" {
+			result := run.Result
+			runRef.Result = &result
+		}
+
+		data.Run = runRef
+		data.App = &factory.AppRef{ID: run.WorkflowID}
 	}
 
 	jsonData, err := json.Marshal(data)
