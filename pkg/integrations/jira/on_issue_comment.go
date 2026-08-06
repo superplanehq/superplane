@@ -243,9 +243,8 @@ func commentEventAction(webhookEvent string) (string, bool) {
 	}
 }
 
-// commentPlainText extracts plain text from a comment body. Jira sends either a plain string or
-// an Atlassian Document Format tree (e.g. {"type":"doc","content":[...]}) - ADF is walked for its
-// text nodes so content filtering works the same way regardless of which shape a site returns.
+// commentPlainText walks an Atlassian Document Format tree (Jira's alternative to a plain string
+// comment body) for its text nodes, so content filtering works the same way regardless of shape.
 func commentPlainText(body any) string {
 	if text, ok := body.(string); ok {
 		return text
@@ -271,8 +270,8 @@ func commentPlainText(body any) string {
 	return strings.Join(parts, " ")
 }
 
-// matchesContentFilter checks the comment body's plain text against the regex filter. An empty
-// filter always matches, and a comment with no extractable text never does.
+// matchesContentFilter reports whether the comment's plain text matches filter - an empty filter
+// always matches, and a comment with no extractable text never does.
 func matchesContentFilter(filter string, body any) (bool, error) {
 	if filter == "" {
 		return true, nil
