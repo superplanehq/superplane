@@ -198,7 +198,7 @@ func factoryWorkOrderRunInput(tx *gorm.DB, order *FactoryWorkOrder) (map[string]
 		}
 
 		if rootEvent != nil {
-			if source := rootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+			if source := RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
 				workOrder["source"] = source
 			}
 		}
@@ -209,7 +209,9 @@ func factoryWorkOrderRunInput(tx *gorm.DB, order *FactoryWorkOrder) (map[string]
 	}, nil
 }
 
-func rootEventSourcePayload(eventData any) any {
+// RootEventSourcePayload peels a root event envelope down to its `.data`
+// payload — used as work-order `source` for both run input and order().
+func RootEventSourcePayload(eventData any) any {
 	payload, ok := eventData.(map[string]any)
 	if !ok {
 		return eventData

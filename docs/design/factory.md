@@ -46,6 +46,15 @@ Run input shape (for app triggers):
 run. Manual work orders omit it. `source` is the root trigger event from the
 linked source run (`source_run_id` on the work order record).
 
+Expressions on a dispatched run should prefer `order()` over
+`root().data.work_order`. `order()` resolves the live work order for the
+current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
+`source`) and returns `nil` when the run is not attached to a work order.
+`order().artifacts` is a list field loaded lazily only when the expression
+references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
+`root().data.work_order` remains the onRun snapshot and does not include
+artifacts.
+
 ## Work order lifecycle
 
 States (persisted on `factory_work_orders.state`; `result` is set only on `closed`):
