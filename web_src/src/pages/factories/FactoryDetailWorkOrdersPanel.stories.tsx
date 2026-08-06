@@ -11,6 +11,7 @@ import {
 } from "./__fixtures__/factoryPageResponses";
 import { FactoryDetailWorkOrdersPanel } from "./FactoryDetailWorkOrdersPanel";
 import {
+  countActiveWorkOrders,
   filterWorkOrdersByOwner,
   filterWorkOrdersByStatus,
   type WorkOrderOwnerFilter,
@@ -61,7 +62,7 @@ function InteractivePanel({
   );
   return (
     <FactoryDetailWorkOrdersPanel
-      openWorkOrderCount={workOrders.filter((order) => order.state === "STATE_OPEN").length}
+      activeWorkOrderCount={countActiveWorkOrders(workOrders)}
       ownerFilter={ownerFilter}
       statusFilter={statusFilter}
       onOwnerFilterChange={setOwnerFilter}
@@ -87,13 +88,13 @@ export const Populated: Story = {
   render: () => <InteractivePanel />,
 };
 
-/** Page default filters — `mine + open` — showing only orders assigned to me. */
-export const MyOpen: Story = {
-  name: "My Open",
-  render: () => <InteractivePanel initialOwner="mine" initialStatus="open" />,
+/** Page default filters — `mine + active` — draft/open/running/failed for me. */
+export const MyActive: Story = {
+  name: "My Active",
+  render: () => <InteractivePanel initialOwner="mine" initialStatus="active" />,
 };
 
-/** Only failed orders — status filter set to `failed`. */
+/** Only failed orders — status filter set to `failed` (includes closed-as-failed). */
 export const FailedOnly: Story = {
   name: "Failed Only",
   render: () => <InteractivePanel initialStatus="failed" />,

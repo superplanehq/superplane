@@ -6,8 +6,9 @@ import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrde
 
 /**
  * Row of interactive pills: "My Work / Unassigned / All" on the left and
- * status filters ("All / Open / Running / Failed / Completed / Rejected")
- * on the right. Stories manage local state so the pills toggle live.
+ * status filters ("All / Active / Draft / Open / Running / Failed /
+ * Completed / Rejected") on the right. Stories manage local state so the
+ * pills toggle live.
  */
 const meta = {
   title: "Factories/WorkOrderFilters",
@@ -21,7 +22,7 @@ type Story = StoryObj<typeof meta>;
 
 function InteractiveFilters({
   initialOwner = "mine",
-  initialStatus = "open",
+  initialStatus = "active",
 }: {
   initialOwner?: WorkOrderOwnerFilter;
   initialStatus?: WorkOrderStatusFilter;
@@ -44,7 +45,7 @@ function InteractiveFilters({
   );
 }
 
-/** Default: "My Work" + "Open" active. */
+/** Default: "My Work" + "Active" (draft/open/running/failed) active. */
 export const Default: Story = {
   render: () => <InteractiveFilters />,
 };
@@ -55,8 +56,13 @@ export const AllRunning: Story = {
   render: () => <InteractiveFilters initialOwner="all" initialStatus="running" />,
 };
 
-/** Unassigned + Failed — used to triage stuck work. */
+/** Unassigned + Failed — triage view (includes closed-as-failed orders). */
 export const UnassignedFailed: Story = {
   name: "Unassigned / Failed",
   render: () => <InteractiveFilters initialOwner="unassigned" initialStatus="failed" />,
+};
+
+/** Draft-only — surface work orders still being scoped. */
+export const Draft: Story = {
+  render: () => <InteractiveFilters initialOwner="all" initialStatus="draft" />,
 };

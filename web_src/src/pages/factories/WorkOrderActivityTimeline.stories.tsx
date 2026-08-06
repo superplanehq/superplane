@@ -2,16 +2,23 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
+  CLOSED_FAILED_WORK_ORDER,
   CLOSED_WORK_ORDER,
-  CLOSED_WORK_ORDER_EVENTS,
+  DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
-  FAILED_WORK_ORDER_EVENTS,
   OPEN_WORK_ORDER,
-  OPEN_WORK_ORDER_EVENTS,
   RUNNING_WORK_ORDER,
-  RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageResponses";
+import {
+  CLOSED_FAILED_WORK_ORDER_EVENTS,
+  CLOSED_WORK_ORDER_EVENTS,
+  DRAFT_WORK_ORDER_EVENTS,
+  FAILED_WORK_ORDER_EVENTS,
+  OPEN_WORK_ORDER_EVENTS,
+  RICH_OPEN_WORK_ORDER_EVENTS,
+  RUNNING_WORK_ORDER_EVENTS,
+} from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 
 /**
@@ -68,6 +75,35 @@ export const Closed: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: CLOSED_WORK_ORDER,
     events: CLOSED_WORK_ORDER_EVENTS,
+  },
+};
+
+/** Draft — scoping notes + a status transition into `draft`. */
+export const Draft: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: DRAFT_WORK_ORDER,
+    events: DRAFT_WORK_ORDER_EVENTS,
+  },
+};
+
+/** Rich open order — comments (user + LLM) and both artifact kinds inline. */
+export const WithCommentsAndArtifacts: Story = {
+  name: "With Comments & Artifacts",
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+  },
+};
+
+/** Closed as failed — markdown artifact + failed close footer. */
+export const ClosedFailed: Story = {
+  name: "Closed (failed)",
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: CLOSED_FAILED_WORK_ORDER,
+    events: CLOSED_FAILED_WORK_ORDER_EVENTS,
   },
 };
 
