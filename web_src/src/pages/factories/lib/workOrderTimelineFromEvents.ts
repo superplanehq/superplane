@@ -1,17 +1,19 @@
-import type {
-  FactoriesWorkOrderEvent,
-  FactoriesWorkOrderExecution,
-  FactoriesWorkOrderExecutionResult,
-  FactoriesWorkOrderExecutionState,
-} from "@/api-client";
+import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
+import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
+  WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
-  WorkOrderTimelineStep,
+  WorkOrderTimelineEventKind,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
+import {
+  appendStepExecutionEvent,
+  type DispatchBatchContext,
+  type LineStepExecutionPayload,
+} from "./workOrderTimelineStepBuilder";
 
 const UNKNOWN_MEMBER_LABEL = UNKNOWN_ORG_USER_NAME;
 
@@ -19,37 +21,48 @@ interface EventUserRef {
   id?: string;
 }
 
-interface EventLineRef {
-  id?: string;
-  name?: string;
-}
-
-interface EventRunRef {
-  id?: string;
-  state?: string;
-  result?: string;
-}
-
-interface EventAppRef {
-  id?: string;
-}
-
-interface LineStepExecutionPayload {
+interface EventAutomationRefPayload {
+  nodeId?: string;
+  nodeName?: string;
+  appId?: string;
+  appName?: string;
+  lineId?: string;
+  lineName?: string;
+  stepIndex?: number;
   stepName?: string;
-  line?: EventLineRef;
-  app?: EventAppRef;
-  run?: EventRunRef;
+}
+
+interface EventCommentAuthorPayload {
+  kind?: string;
+  userId?: string;
+  automation?: EventAutomationRefPayload;
+}
+
+interface EventArtifactPayload {
+  id?: string;
+  type?: string;
+  data?: Record<string, unknown>;
 }
 
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
-  run?: EventRunRef;
+  automation?: EventAutomationRefPayload;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
   order?: {
     result?: string;
   };
   result?: string;
+  fromState?: string;
+  toState?: string;
+  fromResult?: string;
+  toResult?: string;
+  body?: string;
+  author?: EventCommentAuthorPayload;
+  artifact?: EventArtifactPayload;
+  // LineStepExecutionPayload already exposes `run` + `app`; they are
+  // populated on `order.status.updated` when the transition is attributed
+  // to a canvas run (source-run enrichment or automation caller).
 }
 
 interface TimelineBuildState {
@@ -57,36 +70,13 @@ interface TimelineBuildState {
   dispatchBatchByLine: Map<string, WorkOrderTimelineEvent>;
 }
 
-interface DispatchBatchContext {
-  timelineEvents: WorkOrderTimelineEvent[];
-  dispatchBatchByLine: Map<string, WorkOrderTimelineEvent>;
-}
-
-interface DispatchBatchRequest {
-  lineId: string;
-  lineName: string;
-  stepName: string;
-  at: string;
-  isCreatedEvent: boolean;
-}
-
-interface StepFromExecutionEventInput {
-  payload: LineStepExecutionPayload;
-  runId: string;
-  stepName: string;
-  at: string;
-  eventType: StepExecutionEventType;
-  batch: WorkOrderTimelineEvent;
-}
-
-type StepExecutionEventType = "step.execution.created" | "step.execution.finished";
-
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
-  "order.opened": 10,
+  "order.status.updated": 15,
   "order.assignees.updated": 20,
   "step.execution.created": 30,
   "step.execution.finished": 40,
-  "order.closed": 50,
+  "order.comment.added": 45,
+  "order.artifact.added": 47,
 };
 
 function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
@@ -136,8 +126,8 @@ function applyApiEventToTimeline(
   const at = apiEvent.timestamp ?? "";
 
   switch (apiEvent.type) {
-    case "order.opened":
-      appendOpenedEvent(state.events, index, payload, at, resolveUserName);
+    case "order.status.updated":
+      appendStatusUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
@@ -148,8 +138,11 @@ function applyApiEventToTimeline(
     case "step.execution.finished":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
       return;
-    case "order.closed":
-      appendClosedEvent(state.events, index, payload, at, resolveUserName);
+    case "order.comment.added":
+      appendCommentEvent(state.events, index, payload, at, resolveUserName);
+      return;
+    case "order.artifact.added":
+      appendArtifactEvent(state.events, index, payload, at, resolveUserName);
   }
 }
 
@@ -158,35 +151,6 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
     timelineEvents: state.events,
     dispatchBatchByLine: state.dispatchBatchByLine,
   };
-}
-
-function appendOpenedEvent(
-  events: WorkOrderTimelineEvent[],
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
-  if (payload.run?.id) {
-    events.push({
-      id: `opened-${index}`,
-      kind: "created",
-      at,
-      title: "Work order created from",
-      sourceRunId: payload.run.id,
-      sourceAppId: payload.app?.id,
-    });
-    return;
-  }
-
-  events.push({
-    id: `opened-${index}`,
-    kind: "created",
-    at,
-    actorUserId: payload.user?.id,
-    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    title: "opened this work order",
-  });
 }
 
 function appendAssigneesUpdatedEvent(
@@ -210,26 +174,196 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
-function appendClosedEvent(
+// `order.status.updated` is the sole authoritative lifecycle event. The
+// visual kind (`created` / `closed` / `statusChanged`) is derived from
+// `fromState` + `toState` so downstream renderers keep their per-kind
+// styling (badges, colors, action verbs) without needing coarse events.
+function appendStatusUpdatedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
   payload: EventPayload,
   at: string,
   resolveUserName?: UserNameLookup,
 ): void {
-  const closedResult = payload.result ?? payload.order?.result;
-  const result = formatWorkOrderResult(
-    closedResult === "completed" ? "RESULT_COMPLETED" : closedResult === "rejected" ? "RESULT_REJECTED" : undefined,
-  );
+  const toState = payload.toState ?? "";
+  if (!toState) {
+    return;
+  }
 
+  const fromState = payload.fromState ?? "";
+  const toResult = payload.toResult ?? "";
+  const fromResult = payload.fromResult ?? "";
+
+  const kind = deriveStatusEventKind(fromState, toState);
   events.push({
-    id: `closed-${index}`,
-    kind: "closed",
+    id: `${kind}-${index}`,
+    kind,
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    title: result ? `closed as ${result.toLowerCase()}` : "closed this work order",
+    actorAutomation: toAutomationActor(payload.automation),
+    sourceRunId: payload.run?.id,
+    sourceAppId: payload.app?.id,
+    statusChange: { fromState, toState, fromResult, toResult },
+    title: describeStatusTransition(fromState, toState, toResult),
   });
+}
+
+function deriveStatusEventKind(fromState: string, toState: string): WorkOrderTimelineEventKind {
+  if (!fromState) {
+    return "created";
+  }
+  if (toState === "closed") {
+    return "closed";
+  }
+  return "statusChanged";
+}
+
+function describeStatusTransition(fromState: string, toState: string, toResult: string): string {
+  if (!fromState) {
+    return "created this work order";
+  }
+  if (toState === "closed") {
+    const result = formatWorkOrderResult(CLOSED_RESULT_TO_PROTO[toResult] ?? undefined);
+    return result ? `closed as ${result.toLowerCase()}` : "closed this work order";
+  }
+  if (fromState === "draft" && toState === "open") {
+    return "opened this work order";
+  }
+  if (fromState === "open" && toState === "draft") {
+    return "moved this work order back to Draft";
+  }
+  if (fromState === "closed" && toState === "open") {
+    return "reopened this work order";
+  }
+  return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
+}
+
+function humanizeState(state: string): string {
+  switch (state) {
+    case "draft":
+      return "Draft";
+    case "open":
+      return "Open";
+    case "closed":
+      return "Closed";
+    default:
+      return state || "Unknown";
+  }
+}
+
+function appendCommentEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const body = (payload.body ?? "").trim();
+  if (!body) {
+    return;
+  }
+
+  const author = payload.author ?? {};
+  const automationActor = toAutomationActor(author.automation);
+  events.push({
+    id: `comment-${index}`,
+    kind: "commented",
+    at,
+    actorUserId: author.userId ?? payload.user?.id,
+    actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
+    actorAutomation: automationActor,
+    comment: {
+      body,
+      authorKind: author.kind,
+      automation: automationActor,
+    },
+    title: "commented",
+  });
+}
+
+function appendArtifactEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+  resolveUserName?: UserNameLookup,
+): void {
+  const artifact = payload.artifact;
+  if (!artifact?.type) {
+    return;
+  }
+
+  events.push({
+    id: `artifact-${index}`,
+    kind: "artifactAdded",
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: toAutomationActor(payload.automation),
+    artifact: {
+      id: artifact.id,
+      type: artifact.type,
+      data: artifact.data,
+    },
+    title: describeArtifactAdded(artifact),
+  });
+}
+
+// Short-form artifact label ("PR", "note") for event descriptions.
+// See timeline/authorLabels.ts for the long form used in bodies.
+const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
+  pr: "PR",
+  markdown: "note",
+  branch: "branch",
+};
+
+function formatArtifactKindShort(type: string | undefined): string {
+  if (!type) {
+    return "artifact";
+  }
+  return ARTIFACT_KIND_SHORT_LABEL[type] ?? "artifact";
+}
+
+function describeArtifactAdded(artifact: EventArtifactPayload): string {
+  const label =
+    extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data) || extractArtifactName(artifact.data);
+  const type = formatArtifactKindShort(artifact.type);
+  return label ? `attached ${type}: ${label}` : `attached ${type}`;
+}
+
+// Close-result string (from `status.updated.toResult`) → proto enum the
+// presentation helpers expect. Kept centralized so `describeStatusTransition`
+// stays a pure formatter.
+const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
+  completed: "RESULT_COMPLETED",
+  rejected: "RESULT_REJECTED",
+  failed: "RESULT_FAILED",
+};
+
+function toAutomationActor(
+  payload: EventAutomationRefPayload | undefined,
+): WorkOrderTimelineAutomationActor | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const anySet =
+    payload.nodeId || payload.nodeName || payload.appId || payload.appName || payload.lineId || payload.lineName;
+  if (!anySet) {
+    return undefined;
+  }
+
+  return {
+    nodeId: payload.nodeId,
+    nodeName: payload.nodeName,
+    appId: payload.appId,
+    appName: payload.appName,
+    lineId: payload.lineId,
+    lineName: payload.lineName,
+    stepIndex: payload.stepIndex,
+    stepName: payload.stepName,
+  };
 }
 
 function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
@@ -297,176 +431,4 @@ function formatNameList(names: string[]): string {
   }
 
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-}
-
-function appendStepExecutionEvent(
-  ctx: DispatchBatchContext,
-  payload: LineStepExecutionPayload,
-  at: string,
-  eventType: StepExecutionEventType,
-): void {
-  const line = payload.line;
-  const runId = payload.run?.id;
-  if (!line?.id || !runId) {
-    return;
-  }
-
-  const stepName = payload.stepName?.trim() || "Unnamed step";
-  const batch = findOrCreateDispatchBatch(ctx, {
-    lineId: line.id,
-    lineName: line.name?.trim() || "Unnamed line",
-    stepName,
-    at,
-    isCreatedEvent: eventType === "step.execution.created",
-  });
-
-  const step = buildStepFromExecutionEvent({
-    payload,
-    runId,
-    stepName,
-    at,
-    eventType,
-    batch,
-  });
-  upsertTimelineStep(batch, step);
-}
-
-function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOrderTimelineStep {
-  const { payload, runId, stepName, at, eventType, batch } = input;
-  const stepId = `run-${runId}`;
-  const existingStep = batch.steps?.find((item) => item.id === stepId);
-
-  if (eventType === "step.execution.created" && existingStep?.finishedAt) {
-    return existingStep;
-  }
-
-  const { startedAt, finishedAt } = resolveStepTiming(existingStep, at, eventType === "step.execution.finished");
-
-  return {
-    id: stepId,
-    stepName,
-    at: finishedAt ?? startedAt,
-    startedAt,
-    finishedAt,
-    execution: executionFromStepPayload(payload, startedAt, at, eventType),
-  };
-}
-
-function resolveStepTiming(
-  existingStep: WorkOrderTimelineStep | undefined,
-  at: string,
-  isFinishedEvent: boolean,
-): { startedAt: string; finishedAt?: string } {
-  const startedAt = existingStep?.startedAt ?? at;
-  const finishedAt = isFinishedEvent ? at : existingStep?.finishedAt;
-  return { startedAt, finishedAt };
-}
-
-function upsertTimelineStep(batch: WorkOrderTimelineEvent, step: WorkOrderTimelineStep): void {
-  const existingIndex = batch.steps?.findIndex((item) => item.id === step.id) ?? -1;
-  if (existingIndex >= 0 && batch.steps) {
-    batch.steps[existingIndex] = step;
-    return;
-  }
-
-  batch.steps = [...(batch.steps ?? []), step];
-}
-
-function findOrCreateDispatchBatch(ctx: DispatchBatchContext, request: DispatchBatchRequest): WorkOrderTimelineEvent {
-  let batch = ctx.dispatchBatchByLine.get(request.lineId);
-
-  if (batch && request.isCreatedEvent && shouldStartNewDispatchBatch(batch, request.stepName)) {
-    batch = undefined;
-  }
-
-  if (!batch) {
-    batch = createDispatchBatchEvent(request.lineId, request.lineName, request.at);
-    ctx.timelineEvents.push(batch);
-    ctx.dispatchBatchByLine.set(request.lineId, batch);
-  }
-
-  return batch;
-}
-
-function shouldStartNewDispatchBatch(batch: WorkOrderTimelineEvent, stepName: string): boolean {
-  if (!batch.steps?.length) {
-    return false;
-  }
-
-  return stepName === batch.steps[0]?.stepName;
-}
-
-function createDispatchBatchEvent(lineId: string, lineName: string, at: string): WorkOrderTimelineEvent {
-  return {
-    id: `dispatch-${lineId}-${at}`,
-    kind: "dispatched",
-    at,
-    lineName,
-    title: `Dispatched to ${lineName}`,
-    steps: [],
-  };
-}
-
-function executionFromStepPayload(
-  payload: LineStepExecutionPayload,
-  startedAt: string,
-  at: string,
-  eventType: StepExecutionEventType,
-): FactoriesWorkOrderExecution {
-  const run = payload.run;
-  const isFinished = eventType === "step.execution.finished";
-
-  return {
-    id: run?.id,
-    step: payload.stepName,
-    state: mapExecutionState(run?.state, eventType),
-    result: isFinished ? mapExecutionResult(run?.result) : "RESULT_UNKNOWN",
-    createdAt: startedAt,
-    updatedAt: at,
-    line: payload.line?.id
-      ? {
-          id: payload.line.id,
-          name: payload.line.name,
-        }
-      : undefined,
-    run:
-      run?.id && payload.app?.id
-        ? {
-            id: run.id,
-            appId: payload.app.id,
-          }
-        : undefined,
-  };
-}
-
-function mapExecutionState(
-  state: string | undefined,
-  eventType: StepExecutionEventType,
-): FactoriesWorkOrderExecutionState {
-  switch (state) {
-    case "running":
-    case "started":
-      return "STATE_STARTED";
-    case "pending":
-      return "STATE_PENDING";
-    case "cancelling":
-      return "STATE_CANCELLING";
-    case "finished":
-      return "STATE_FINISHED";
-    default:
-      return eventType === "step.execution.finished" ? "STATE_FINISHED" : "STATE_PENDING";
-  }
-}
-
-function mapExecutionResult(result: string | undefined): FactoriesWorkOrderExecutionResult {
-  switch (result) {
-    case "passed":
-      return "RESULT_PASSED";
-    case "failed":
-      return "RESULT_FAILED";
-    case "cancelled":
-      return "RESULT_CANCELLED";
-    default:
-      return "RESULT_UNKNOWN";
-  }
 }
