@@ -43,10 +43,12 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("draft to open emits status.updated", func(t *testing.T) {
-		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
-		}))
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateOpen, order.State)
 
 		events, err := order.ListEvents(database.Conn(), 10, nil)
@@ -59,20 +61,23 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("open to closed requires a valid close result", func(t *testing.T) {
-		err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Actor:   &userID,
 		})
 		require.Error(t, err)
+		assert.False(t, changed)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
 	})
 
 	t.Run("open to closed with failed result emits status.updated", func(t *testing.T) {
-		require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultFailed,
 			Actor:   &userID,
-		}))
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
 		assert.Equal(t, FactoryWorkOrderResultFailed, order.Result)
 
@@ -93,7 +98,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 		// `completed` and `failed` imply the order actually ran; only `rejected`
 		// (abandon-before-dispatch) makes sense for a never-opened draft.
 		for _, invalid := range []string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed} {
-			err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			_, err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 				ToState: FactoryWorkOrderStateClosed,
 				Result:  invalid,
 				Actor:   &userID,
@@ -102,11 +107,12 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 			assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
 		}
 
-		require.NoError(t, other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		_, err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			Actor:   &userID,
-		}))
+		})
+		require.NoError(t, err)
 		assert.Equal(t, FactoryWorkOrderStateClosed, other.State)
 		assert.Equal(t, FactoryWorkOrderResultRejected, other.Result)
 
@@ -131,17 +137,19 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
 			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultCompleted, Actor: &userID},
 		} {
-			require.NoError(t, reopened.UpdateStatus(database.Conn(), step))
+			_, err := reopened.UpdateStatus(database.Conn(), step)
+			require.NoError(t, err)
 		}
 
 		before, err := reopened.ListEvents(database.Conn(), 50, nil)
 		require.NoError(t, err)
 		statusBefore := countEventsOfType(before, factory.EventTypeOrderStatusUpdated)
 
-		require.NoError(t, reopened.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		_, err = reopened.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateOpen,
 			Actor:   &userID,
-		}))
+		})
+		require.NoError(t, err)
 
 		after, err := reopened.ListEvents(database.Conn(), 50, nil)
 		require.NoError(t, err)
@@ -173,15 +181,17 @@ func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 		StepName:  "step-01",
 	}
 
-	require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+	_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 		ToState:    FactoryWorkOrderStateOpen,
 		Automation: automation,
-	}))
-	require.NoError(t, order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+	})
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 		ToState:    FactoryWorkOrderStateClosed,
 		Result:     FactoryWorkOrderResultCompleted,
 		Automation: automation,
-	}))
+	})
+	require.NoError(t, err)
 
 	events, err := order.ListEvents(database.Conn(), 50, nil)
 	require.NoError(t, err)
@@ -288,6 +298,29 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
 
+	t.Run("markdown rejects non-http(s) data.url", func(t *testing.T) {
+		cases := []string{
+			"javascript:alert(1)",
+			"data:text/html,<script>alert(1)</script>",
+			"file:///etc/passwd",
+			"mailto:someone@example.com",
+			"//evil.example/notes",
+		}
+		for _, badURL := range cases {
+			t.Run(badURL, func(t *testing.T) {
+				_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeMarkdown,
+					Data: map[string]any{
+						"body": "note body",
+						"url":  badURL,
+					},
+				})
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+			})
+		}
+	})
+
 	t.Run("creates pr and emits event", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 			Type: FactoryWorkOrderArtifactTypePR,
@@ -333,6 +366,20 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		require.NotNil(t, payload.Artifact)
 		assert.Equal(t, FactoryWorkOrderArtifactTypeMarkdown, payload.Artifact.Type)
 		assert.Equal(t, "Design notes", payload.Artifact.Data["title"])
+	})
+
+	// A markdown artifact with no data.url must succeed — the http(s)
+	// guard only kicks in when url is actually present. Runs last so
+	// earlier subtests that count artifacts stay accurate.
+	t.Run("markdown accepts absent data.url", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"body": "note without a url",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact)
 	})
 }
 

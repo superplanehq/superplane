@@ -2,7 +2,10 @@ package core
 
 type FactoryContext interface {
 	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
-	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (*WorkOrder, error)
+	// UpdateWorkOrderStatus reports whether the row actually transitioned
+	// via the second return value; callers must skip downstream emits
+	// when `changed` is false so a no-op doesn't leak into the timeline.
+	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
 }

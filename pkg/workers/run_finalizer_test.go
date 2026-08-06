@@ -619,9 +619,10 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 // the dispatch API — needed by tests that poke `StartStep` directly.
 func dispatchWorkOrderForTest(t *testing.T, order *models.FactoryWorkOrder) {
 	t.Helper()
-	require.NoError(t, order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+	_, err := order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateOpen,
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *testing.T) {

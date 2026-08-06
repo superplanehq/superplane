@@ -315,10 +315,23 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 	}
 
 	// Creation is a status transition into `draft` (fromState == "").
-	if err := order.RecordStatusUpdated(tx, statusUpdatedRecord{
+	// For orders spawned by a canvas run we snapshot the originating
+	// run + app here so the very first timeline entry links back to
+	// the run that created the order — matching the enrichment
+	// UpdateStatus performs on the draft → open promotion.
+	initialStatus := statusUpdatedRecord{
 		Actor:   createdBy,
 		ToState: FactoryWorkOrderStateDraft,
-	}); err != nil {
+	}
+	if sourceRunID != nil {
+		sourceRun, sourceApp, err := order.loadSourceRunRefs(tx)
+		if err != nil {
+			return nil, err
+		}
+		initialStatus.Run = sourceRun
+		initialStatus.App = sourceApp
+	}
+	if err := order.RecordStatusUpdated(tx, initialStatus); err != nil {
 		return nil, err
 	}
 

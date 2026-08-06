@@ -3,8 +3,82 @@ package factory
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// fakeFactoryContext lets Execute-level tests drive `core.FactoryContext`
+// without spinning up a database. Only UpdateWorkOrderStatus is wired up;
+// the rest of the interface returns zero values.
+type fakeFactoryContext struct {
+	statusCalls int
+	nextChanged bool
+	nextErr     error
+	returnOrder *core.WorkOrder
+}
+
+func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) UpdateWorkOrderStatus(_ core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
+	f.statusCalls++
+	return f.returnOrder, f.nextChanged, f.nextErr
+}
+
+func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParams) error {
+	return nil
+}
+
+func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	return nil, nil
+}
+
+func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
+	component := &UpdateWorkOrderStatus{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "open"}
+
+	t.Run("emits workOrder.statusUpdated on a real transition", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{nextChanged: true, returnOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"status": "open"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.statusCalls)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Equal(t, "workOrder.statusUpdated", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
+
+	// A re-run against an already-open order must not fan out a
+	// phantom `workOrder.statusUpdated` — otherwise downstream nodes
+	// re-fire on every replay.
+	t.Run("passes silently when the transition is a no-op", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{nextChanged: false, returnOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"status": "open"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.statusCalls)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Empty(t, stateCtx.Channel, "no-op must not emit on any channel")
+		assert.Empty(t, stateCtx.Type)
+		assert.Nil(t, stateCtx.Payloads)
+	})
+}
 
 func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 	c := &UpdateWorkOrderStatus{}

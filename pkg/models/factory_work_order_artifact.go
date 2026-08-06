@@ -60,14 +60,8 @@ func (o *FactoryWorkOrder) CreateArtifact(
 
 	switch artifactType {
 	case FactoryWorkOrderArtifactTypePR:
-		prURL := extractArtifactString(params.Data, "url")
-		if prURL == "" {
+		if extractArtifactString(params.Data, "url") == "" {
 			return nil, fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
-		}
-		// URLs land in clickable `href`s — reject non-http(s) so
-		// `factories:update` can't smuggle a `javascript:` scheme.
-		if !isSafeArtifactURL(prURL) {
-			return nil, fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(params.Data, "body") == "" {
@@ -75,6 +69,17 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		}
 	default:
 		return nil, fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, params.Type)
+	}
+
+	// `data.url` lands in a clickable `href` for every artifact type the
+	// UI knows about (extractArtifactUrl reads it unconditionally), so
+	// reject non-http(s) schemes here rather than only inside the PR
+	// branch — no caller should be able to smuggle `javascript:` past
+	// the model.
+	if artifactURL := extractArtifactString(params.Data, "url"); artifactURL != "" {
+		if !isSafeArtifactURL(artifactURL) {
+			return nil, fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
+		}
 	}
 
 	dataJSON, err := encodeArtifactData(params.Data)

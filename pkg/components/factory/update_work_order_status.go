@@ -115,12 +115,19 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	workOrder, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+	workOrder, changed, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
 		State:  config.Status,
 		Result: config.Result,
 	})
 	if err != nil {
 		return err
+	}
+
+	// Re-runs land here with the work order already in the target state;
+	// emitting `workOrder.statusUpdated` on a no-op would trick downstream
+	// nodes into treating a replay as a fresh transition.
+	if !changed {
+		return ctx.ExecutionState.Pass()
 	}
 
 	return ctx.ExecutionState.Emit(

@@ -53,13 +53,21 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, json.Unmarshal(events[0].Data, &initialStatus))
 		assert.Equal(t, "", initialStatus.FromState)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, initialStatus.ToState)
+		// The "" → draft creation event carries the same source-run
+		// snapshot as the draft → open promotion so the very first
+		// timeline entry already links back to the originating run.
+		require.NotNil(t, initialStatus.Run)
+		assert.Equal(t, run.ID, initialStatus.Run.ID)
+		require.NotNil(t, initialStatus.App)
+		assert.Equal(t, canvas.ID, initialStatus.App.ID)
 
 		// On the first `draft → open` promotion the source-run snapshot from
 		// `o.SourceRunID` is enriched into the status.updated event so the
 		// timeline can link back to the originating canvas run.
-		require.NoError(t, persisted.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		_, err = persisted.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
 			ToState: models.FactoryWorkOrderStateOpen,
-		}))
+		})
+		require.NoError(t, err)
 
 		statusEvents := listWorkOrderEvents(t, persisted, factoryevents.EventTypeOrderStatusUpdated)
 		require.Len(t, statusEvents, 2)
@@ -135,10 +143,11 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
 		State: models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
+	assert.True(t, changed)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
 
 	// `order.status.updated` is now the sole authoritative event. The
@@ -148,6 +157,45 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	assert.Equal(t, nodeExecution.NodeID, statusAutomation.NodeID)
 	assert.Equal(t, line.Name, statusAutomation.LineName)
 	assert.Equal(t, "component-under-test", statusAutomation.StepName)
+}
+
+// A re-run of the component with the same target state must be a
+// silent no-op: no duplicate `order.status.updated` event, no
+// websocket fan-out, and the caller sees `changed=false`.
+func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	var notifications int
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, _ string) { notifications++ })
+
+	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, 1, notifications)
+
+	_, changed, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		State: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+	assert.False(t, changed, "re-hitting the same state must report changed=false")
+	assert.Equal(t, 1, notifications, "no-op transition must not fan out again")
+
+	statusEvents := listWorkOrderEvents(t, order, factoryevents.EventTypeOrderStatusUpdated)
+	// Creation ("" → draft) + one real draft → open transition = 2.
+	// A second event would indicate the no-op leaked into the timeline.
+	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
 func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
@@ -162,17 +210,19 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	require.NoError(t, err)
 	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
 
-	require.NoError(t, order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateOpen,
 		Actor:   &r.User,
-	}))
+	})
+	require.NoError(t, err)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-	updated, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
 		State:  models.FactoryWorkOrderStateClosed,
 		Result: models.FactoryWorkOrderResultCompleted,
 	})
 	require.NoError(t, err)
+	assert.True(t, changed)
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, updated.State)
 
 	// The most recent status.updated (open → closed) is the close event.
@@ -195,7 +245,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-	_, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+	_, _, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
 		State: models.FactoryWorkOrderStateOpen,
 	})
 	require.Error(t, err)

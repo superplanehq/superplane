@@ -71,11 +71,12 @@ func UpdateWorkOrderStatus(
 			return err
 		}
 
-		return order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+		_, err = order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 			ToState: toState,
 			Result:  result,
 			Actor:   &actor,
 		})
+		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")

@@ -151,30 +151,36 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
 // can always trace an order back to the run that created it.
-func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
+//
+// The bool return reports whether a transition was actually recorded:
+// `true` on a real state change, `false` when SkipSame swallowed a no-op
+// (target state equals current state). Callers that fan out an
+// `order.status.updated` event downstream must check this so a re-run
+// doesn't emit a phantom transition — see FactoryContext.
+func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) (bool, error) {
 	toState := update.ToState
 	if !slices.Contains(factoryWorkOrderStates, toState) {
-		return fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
+		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
 	if o.State == toState {
 		if update.SkipSame {
-			return nil
+			return false, nil
 		}
 
-		return fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
+		return false, fmt.Errorf("%w: work order is already %s", ErrFactoryWorkOrderInvalidState, toState)
 	}
 
 	fromState := o.State
 	if !slices.Contains(factoryWorkOrderAllowedTransitions[fromState], toState) {
-		return fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
+		return false, fmt.Errorf("%w: cannot move from %s to %s", ErrFactoryWorkOrderInvalidState, fromState, toState)
 	}
 
 	nextResult := ""
 	if toState == FactoryWorkOrderStateClosed {
 		allowed := factoryWorkOrderCloseResultsByFromState[fromState]
 		if !slices.Contains(allowed, update.Result) {
-			return fmt.Errorf(
+			return false, fmt.Errorf(
 				"%w: closing from %s requires result in %v (got %q)",
 				ErrFactoryWorkOrderInvalidState, fromState, allowed, update.Result,
 			)
@@ -185,7 +191,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	fromResult := o.Result
 	now := time.Now()
 
-	return db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		// Reverting `open → draft` while a step is still pending/running would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
@@ -238,6 +244,10 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			ToResult:   nextResult,
 		})
 	})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // loadSourceRunRefs resolves the originating canvas run + app for an order
@@ -263,13 +273,12 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 		return o, nil
 	}
 
-	err := o.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+	if _, err := o.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 		ToState:  FactoryWorkOrderStateClosed,
 		Result:   result,
 		Actor:    closedBy,
 		SkipSame: true,
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 
@@ -287,10 +296,11 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 		return fmt.Errorf("%w: work order must be draft or open to dispatch", ErrFactoryWorkOrderInvalidState)
 	}
 
-	return o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+	_, err := o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
 		ToState: FactoryWorkOrderStateOpen,
 		Actor:   actor,
 	})
+	return err
 }
 
 // ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if a

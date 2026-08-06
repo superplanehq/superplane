@@ -76,13 +76,13 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	return workOrderToCore(order), nil
 }
 
-func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, error) {
+func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	order, err := c.currentWorkOrder()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	err = order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
+	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    params.State,
 		Result:     params.Result,
 		Automation: c.automationRef(),
@@ -91,11 +91,18 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		SkipSame:   true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+
+	// A SkipSame no-op leaves the row untouched — skipping the fan-out
+	// keeps downstream nodes from re-firing on a phantom transition when
+	// the component is re-run.
+	if !changed {
+		return workOrderToCore(order), false, nil
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
-	return workOrderToCore(order), nil
+	return workOrderToCore(order), true, nil
 }
 
 func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {

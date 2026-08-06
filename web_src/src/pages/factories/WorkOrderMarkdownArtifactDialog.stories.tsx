@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
@@ -36,13 +37,32 @@ Retry policy exceeded the idempotency window when the ledger writer was under lo
 See the [design doc](https://example.com/design) for the write-path diagram.
 `;
 
-/** User provided a title — the dialog shows it verbatim. */
+/**
+ * Controlled story that lets the user actually dismiss the dialog (Escape,
+ * backdrop click, or the top-right close button), then reopen it.
+ */
 export const WithTitle: Story = {
   args: {
     open: true,
     onClose: () => {},
     title: "Investigation notes",
     body: SAMPLE_BODY,
+  },
+  render: (args) => {
+    const [open, setOpen] = useState(args.open);
+
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+        >
+          Open dialog
+        </button>
+        <WorkOrderMarkdownArtifactDialog {...args} open={open} onClose={() => setOpen(false)} />
+      </>
+    );
   },
 };
 
