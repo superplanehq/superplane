@@ -2,7 +2,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
-  FactoriesWorkOrderEvent,
+  FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
   FactoryApp,
   FactoryLineStep,
@@ -18,19 +18,17 @@ export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
 
-// Anchored to Date.now() at module load so `formatTimeAgo` renders the intended
-// "1 hour ago" / "yesterday" / "last week" labels regardless of when a story is
-// opened. (Absolute dates cause labels to drift over time.)
+// Relative timestamps so `formatTimeAgo` stays stable across story loads.
 const NOW_MS = Date.now();
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const relativeIso = (offsetMs: number) => new Date(NOW_MS - offsetMs).toISOString();
 
-const HOUR_AGO = relativeIso(HOUR_MS);
-const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
-const YESTERDAY = relativeIso(DAY_MS);
-const LAST_WEEK = relativeIso(7 * DAY_MS);
+export const HOUR_AGO = relativeIso(HOUR_MS);
+export const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
+export const YESTERDAY = relativeIso(DAY_MS);
+export const LAST_WEEK = relativeIso(7 * DAY_MS);
 
 export const REVIEWER_USER = {
   id: "user-reviewer-alex",
@@ -178,9 +176,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   executions: [],
 };
 
-// Assignees include the storybook user so the running/failed variants surface
-// under the "mine + running" and "mine + failed" filters. Reviewer/operator
-// remain listed to demonstrate multi-assignee cards.
+// Storybook user is co-assigned so "mine + running" surfaces this order.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   title: "Add refund reconciliation test",
@@ -206,8 +202,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   ],
 };
 
-// Failed order stays authored by operator; storybook user co-assigned so the
-// "mine + failed" filter is meaningfully populated.
+// Storybook user is co-assigned so "mine + failed" surfaces this order.
 export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-failed-refunds",
   title: "Ship idempotent refund retries",
@@ -228,6 +223,32 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
       updatedAt: HOUR_AGO,
     }),
   ],
+};
+
+export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-draft-refunds",
+  title: "Draft: rework refund telemetry",
+  description: "Still scoping the metric shape and dashboards before we mark this ready.",
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: HOUR_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [],
+};
+
+export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-closed-failed-refunds",
+  title: "Failed: reconcile refund ledger for Q1 audit",
+  description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
+  state: "STATE_CLOSED",
+  result: "RESULT_FAILED",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  createdBy: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [],
 };
 
 export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
@@ -259,177 +280,27 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   ],
 };
 
-const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" };
-
-interface StepExecutionEventFixture {
-  order: FactoriesWorkOrder;
-  stepName: string;
-  at: string;
-  runId: string;
-  appId: string;
-  result?: "passed" | "failed";
-}
-
-function openedWorkOrderEvent(order: FactoriesWorkOrder, at: string): FactoriesWorkOrderEvent {
-  return {
-    type: "order.opened",
-    timestamp: at,
-    event: {
-      user: { id: order.createdBy?.id },
-      order: { id: order.id, title: order.title },
-    },
-  };
-}
-
-function stepExecutionCreatedEvent(input: StepExecutionEventFixture): FactoriesWorkOrderEvent {
-  const { order, stepName, at, runId, appId } = input;
-  return {
-    type: "step.execution.created",
-    timestamp: at,
-    event: {
-      stepName,
-      order: { id: order.id, title: order.title },
-      line: REFUND_LINE,
-      app: { id: appId },
-      run: { id: runId, state: "pending" },
-    },
-  };
-}
-
-function stepExecutionFinishedEvent(
-  input: StepExecutionEventFixture & { result: "passed" | "failed" },
-): FactoriesWorkOrderEvent {
-  const { order, stepName, at, runId, appId, result } = input;
-  return {
-    type: "step.execution.finished",
-    timestamp: at,
-    event: {
-      stepName,
-      order: { id: order.id, title: order.title },
-      line: REFUND_LINE,
-      app: { id: appId },
-      run: { id: runId, state: "finished", result },
-    },
-  };
-}
-
-export const OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [openedWorkOrderEvent(OPEN_WORK_ORDER, HOUR_AGO)];
-
-export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
-  openedWorkOrderEvent(RUNNING_WORK_ORDER, YESTERDAY),
-  stepExecutionCreatedEvent({
-    order: RUNNING_WORK_ORDER,
-    stepName: "plan",
-    at: TWO_HOURS_AGO,
-    runId: "run-plan",
-    appId: "app-refund-planner",
-  }),
-  stepExecutionFinishedEvent({
-    order: RUNNING_WORK_ORDER,
-    stepName: "plan",
-    at: TWO_HOURS_AGO,
-    runId: "run-plan",
-    appId: "app-refund-planner",
-    result: "passed",
-  }),
-  stepExecutionCreatedEvent({
-    order: RUNNING_WORK_ORDER,
-    stepName: "implement",
-    at: HOUR_AGO,
-    runId: "run-implement",
-    appId: "app-refund-implementer",
-  }),
-];
-
-export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
-  openedWorkOrderEvent(FAILED_WORK_ORDER, YESTERDAY),
-  stepExecutionCreatedEvent({
-    order: FAILED_WORK_ORDER,
-    stepName: "plan",
-    at: TWO_HOURS_AGO,
-    runId: "run-plan-2",
-    appId: "app-refund-planner",
-  }),
-  stepExecutionFinishedEvent({
-    order: FAILED_WORK_ORDER,
-    stepName: "plan",
-    at: TWO_HOURS_AGO,
-    runId: "run-plan-2",
-    appId: "app-refund-planner",
-    result: "passed",
-  }),
-  stepExecutionCreatedEvent({
-    order: FAILED_WORK_ORDER,
-    stepName: "implement",
-    at: HOUR_AGO,
-    runId: "run-implement-2",
-    appId: "app-refund-implementer",
-  }),
-  stepExecutionFinishedEvent({
-    order: FAILED_WORK_ORDER,
-    stepName: "implement",
-    at: HOUR_AGO,
-    runId: "run-implement-2",
-    appId: "app-refund-implementer",
-    result: "failed",
-  }),
-];
-
-export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
-  openedWorkOrderEvent(CLOSED_WORK_ORDER, LAST_WEEK),
-  stepExecutionCreatedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "plan",
-    at: LAST_WEEK,
-    runId: "run-plan-3",
-    appId: "app-refund-planner",
-  }),
-  stepExecutionFinishedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "plan",
-    at: LAST_WEEK,
-    runId: "run-plan-3",
-    appId: "app-refund-planner",
-    result: "passed",
-  }),
-  stepExecutionCreatedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "implement",
-    at: LAST_WEEK,
-    runId: "run-implement-3",
-    appId: "app-refund-implementer",
-  }),
-  stepExecutionFinishedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "implement",
-    at: LAST_WEEK,
-    runId: "run-implement-3",
-    appId: "app-refund-implementer",
-    result: "passed",
-  }),
-  stepExecutionCreatedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "verify",
-    at: YESTERDAY,
-    runId: "run-verify-3",
-    appId: "app-refund-verifier",
-  }),
-  stepExecutionFinishedEvent({
-    order: CLOSED_WORK_ORDER,
-    stepName: "verify",
-    at: YESTERDAY,
-    runId: "run-verify-3",
-    appId: "app-refund-verifier",
-    result: "passed",
-  }),
+export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
   {
-    type: "order.closed",
-    timestamp: YESTERDAY,
-    event: {
-      user: { id: STORYBOOK_ME_USER_ID },
-      order: { id: CLOSED_WORK_ORDER.id, title: CLOSED_WORK_ORDER.title },
-      result: "completed",
+    id: "art-pr-1",
+    type: "TYPE_PR",
+    data: {
+      url: "https://github.com/example/ledger/pull/482",
+      title: "Fix duplicate refund on retry",
+      number: 482,
     },
+    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+    createdAt: HOUR_AGO,
+  },
+  {
+    id: "art-md-1",
+    type: "TYPE_MARKDOWN",
+    data: {
+      title: "Investigation notes",
+      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
+    },
+    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+    createdAt: HOUR_AGO,
   },
 ];
 
@@ -438,7 +309,9 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER_SECONDARY,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
+  DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  CLOSED_FAILED_WORK_ORDER,
 ];
 
 export interface FactoriesFixture {

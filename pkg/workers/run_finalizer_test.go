@@ -552,6 +552,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 
 	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)
@@ -614,6 +615,15 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
 }
 
+// dispatchWorkOrderForTest promotes a draft order to open, mirroring
+// the dispatch API — needed by tests that poke `StartStep` directly.
+func dispatchWorkOrderForTest(t *testing.T, order *models.FactoryWorkOrder) {
+	t.Helper()
+	require.NoError(t, order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	}))
+}
+
 func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -623,6 +633,7 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 
 	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)
@@ -690,6 +701,7 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 
 	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
 	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)

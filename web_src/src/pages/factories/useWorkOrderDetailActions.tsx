@@ -1,13 +1,21 @@
-import type { FactoriesWorkOrderResult } from "@/api-client";
-import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
+import {
+  useAddWorkOrderComment,
+  useCloseWorkOrder,
+  useDispatchWorkOrder,
+  useUpdateWorkOrderAssignees,
+  useUpdateWorkOrderStatus,
+} from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { formatWorkOrderResult } from "./lib/workOrderPresentation";
+import { formatWorkOrderResult, formatWorkOrderState } from "./lib/workOrderPresentation";
 
 export function useWorkOrderDetailActions(organizationId: string, factoryId: string, orderId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const closeWorkOrder = useCloseWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
+  const addComment = useAddWorkOrderComment(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -33,6 +41,26 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
+  const handleStatusChange = async (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => {
+    try {
+      await updateStatus.mutateAsync({ orderId, state, result });
+      showSuccessToast(`Work order moved to ${formatWorkOrderState(state).toLowerCase()}.`);
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update status"));
+      throw error;
+    }
+  };
+
+  const handleAddComment = async (body: string) => {
+    try {
+      await addComment.mutateAsync({ orderId, body });
+      showSuccessToast("Comment added.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to add comment"));
+      throw error;
+    }
+  };
+
   const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
   const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
 
@@ -40,10 +68,14 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleAssigneesSave,
     handleDispatch,
     handleClose,
+    handleStatusChange,
+    handleAddComment,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,
     isClosing: closeWorkOrder.isPending,
     isAssigneesSaving: updateAssignees.isPending,
+    isUpdatingStatus: updateStatus.isPending,
+    isAddingComment: addComment.isPending,
   };
 }

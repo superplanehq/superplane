@@ -20,7 +20,7 @@ const (
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
 	ErrFactoryWorkOrderExecutionActive   = errors.New("work order already has an active execution")
-	ErrFactoryWorkOrderNotOpen           = errors.New("work order is not open")
+	ErrFactoryWorkOrderNotDispatchable   = errors.New("work order cannot be dispatched in its current state")
 )
 
 type FactoryWorkOrderExecution struct {
