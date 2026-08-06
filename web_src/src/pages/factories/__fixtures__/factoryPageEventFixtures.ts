@@ -149,7 +149,7 @@ function artifactAddedEvent(
   at: string,
   artifact: {
     id: string;
-    type: "pr" | "markdown";
+    type: "pr" | "markdown" | "branch";
     data?: Record<string, unknown>;
   },
   actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },

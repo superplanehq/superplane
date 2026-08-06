@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
+import { ExternalLink, FileText, GitBranch, GitPullRequest } from "lucide-react";
 import { useState } from "react";
 
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
@@ -7,6 +7,7 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { OrgUserReference } from "../OrgUserReference";
 import {
   extractArtifactMarkdownBody,
+  extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
   formatPrArtifactLabel,
@@ -28,7 +29,6 @@ export function ArtifactTimelineBody({
     return null;
   }
 
-  const isPr = artifact.type === "pr";
   const title = extractArtifactTitle(artifact.data);
 
   return (
@@ -39,14 +39,22 @@ export function ArtifactTimelineBody({
         automationActor={event.actorAutomation}
       />
       <div className="mt-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700/70 dark:bg-gray-900/40 dark:text-gray-200">
-        {isPr ? (
-          <PrArtifactBody artifact={artifact} title={title} />
-        ) : (
-          <MarkdownArtifactBody artifact={artifact} title={title} />
-        )}
+        <ArtifactBodyContent artifact={artifact} title={title} />
       </div>
     </div>
   );
+}
+
+function ArtifactBodyContent({ artifact, title }: { artifact: WorkOrderTimelineArtifact; title: string | undefined }) {
+  switch (artifact.type) {
+    case "pr":
+      return <PrArtifactBody artifact={artifact} title={title} />;
+    case "branch":
+      return <BranchArtifactBody artifact={artifact} />;
+    case "markdown":
+    default:
+      return <MarkdownArtifactBody artifact={artifact} title={title} />;
+  }
 }
 
 function PrArtifactBody({ artifact, title }: { artifact: WorkOrderTimelineArtifact; title: string | undefined }) {
@@ -68,6 +76,17 @@ function PrArtifactBody({ artifact, title }: { artifact: WorkOrderTimelineArtifa
       <span className="truncate">{label}</span>
       <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
     </a>
+  );
+}
+
+function BranchArtifactBody({ artifact }: { artifact: WorkOrderTimelineArtifact }) {
+  const label = extractArtifactName(artifact.data) || "Branch";
+
+  return (
+    <p className="inline-flex max-w-full items-center gap-2 font-medium">
+      <GitBranch className="h-4 w-4 text-sky-500" aria-hidden />
+      <span className="truncate">{label}</span>
+    </p>
   );
 }
 
