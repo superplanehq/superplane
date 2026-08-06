@@ -9,9 +9,12 @@ func TestKindFromTopic(t *testing.T) {
 	}{
 		{topic: "agent-session:abc", want: KindAgent},
 		{topic: "agent-session:", want: KindAgent},
+		{topic: "factory:abc", want: KindFactory},
+		{topic: "factory:", want: KindFactory},
 		{topic: "11111111-1111-1111-1111-111111111111", want: KindCanvas},
 		{topic: "", want: KindCanvas},
 		{topic: "agent-sessions:nope", want: KindCanvas},
+		{topic: "factories:nope", want: KindCanvas},
 	}
 
 	for _, tt := range tests {

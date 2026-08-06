@@ -2,6 +2,7 @@ package eventdistributer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	factoriespb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -137,7 +139,27 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 	wsHub.BroadcastToWorkflow(workflowID, event)
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
+	broadcastFactoryWorkOrderForRun(wsHub, runUUID, eventName)
+
 	return nil
+}
+
+func broadcastFactoryWorkOrderForRun(wsHub *ws.Hub, runID uuid.UUID, reason string) {
+	execution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), runID)
+	if err != nil {
+		if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			log.WithError(err).Warnf("Failed to look up factory work order execution for run %s", runID)
+		}
+		return
+	}
+
+	if err := BroadcastFactoryWorkOrderUpdated(wsHub, &factoriespb.FactoryWorkOrderUpdatedMessage{
+		FactoryId: execution.FactoryID.String(),
+		OrderId:   execution.WorkOrderID.String(),
+		Reason:    reason,
+	}); err != nil {
+		log.WithError(err).Warnf("Failed to broadcast factory work order update for run %s", runID)
+	}
 }
 
 func marshalCanvasRunJSON(run *pb.CanvasRun) ([]byte, error) {

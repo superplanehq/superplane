@@ -17,6 +17,11 @@ type FactoryContext struct {
 	canvas    *models.Canvas
 	execution *models.CanvasNodeExecution
 
+	// Optional websocket fan-out callback: invoked after every successful
+	// mutation with a `reason` string (currently the event type that was
+	// recorded). Wired by the node executor via WithWorkOrderUpdated.
+	onWorkOrderUpdated func(factoryID, orderID, reason string)
+
 	lineStepOnce   bool
 	lineStepLoaded bool
 	lineStepCache  lineStepInfo
@@ -35,6 +40,11 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 		canvas:    canvas,
 		execution: execution,
 	}
+}
+
+func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
+	c.onWorkOrderUpdated = callback
+	return c
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -62,6 +72,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, err
 	}
 
+	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
 }
 
@@ -83,6 +94,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		return nil, err
 	}
 
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
 }
 
@@ -104,7 +116,12 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		Automation: c.automationRef(),
 	}
 
-	return order.RecordCommentAdded(c.tx, body, author, c.runRef())
+	if err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
+		return err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
+	return nil
 }
 
 func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
@@ -125,7 +142,15 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
 	return artifactToCore(artifact)
+}
+
+func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, reason string) {
+	if c.onWorkOrderUpdated == nil {
+		return
+	}
+	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
 // currentWorkOrder resolves the work order that owns the current run

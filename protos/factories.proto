@@ -574,3 +574,11 @@ message WorkOrderArtifact {
   UserRef created_by = 6;
   google.protobuf.Timestamp created_at = 7;
 }
+
+// Internal AMQP message for factory work-order websocket fan-out.
+message FactoryWorkOrderUpdatedMessage {
+  string factory_id = 1;
+  string order_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}

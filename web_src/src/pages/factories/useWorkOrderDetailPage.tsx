@@ -1,5 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
+import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useMemo } from "react";
@@ -13,6 +14,7 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: factory, isLoading: factoryLoading, error: factoryError } = useFactory(organizationId, factoryId);
+  useFactoryWebsocket(organizationId, factoryId);
   const { data: order, isLoading: orderLoading, error: orderError } = useWorkOrder(organizationId, factoryId, orderId);
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);

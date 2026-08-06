@@ -92,6 +92,11 @@ function stepExecutionFinishedEvent(
   };
 }
 
+// `actor` is intentionally NOT defaulted: canvas-driven transitions in
+// production carry `automation` (+ run/app) with no `user`, and the
+// timeline's attribution logic prefers a user over an automation actor.
+// A silent default would spoof user attribution onto canvas events and
+// hide the factory-line actor stories were meant to showcase.
 function statusUpdatedEvent(
   order: FactoriesWorkOrder,
   at: string,
@@ -105,12 +110,12 @@ function statusUpdatedEvent(
     app?: { id: string };
   },
 ): FactoriesWorkOrderEvent {
-  const { fromState, toState, toResult, actor = { id: STORYBOOK_ME_USER_ID }, automation, run, app } = transition;
+  const { fromState, toState, toResult, actor, automation, run, app } = transition;
   return {
     type: "order.status.updated",
     timestamp: at,
     event: {
-      user: { id: actor.id },
+      ...(actor ? { user: { id: actor.id } } : {}),
       ...(automation ? { automation } : {}),
       ...(run ? { run } : {}),
       ...(app ? { app } : {}),
@@ -184,7 +189,11 @@ function automationClosedEvent(
 export const OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [openedWorkOrderEvent(OPEN_WORK_ORDER, HOUR_AGO)];
 
 export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
-  statusUpdatedEvent(DRAFT_WORK_ORDER, TWO_HOURS_AGO, { fromState: "", toState: "draft" }),
+  statusUpdatedEvent(DRAFT_WORK_ORDER, TWO_HOURS_AGO, {
+    fromState: "",
+    toState: "draft",
+    actor: { id: STORYBOOK_ME_USER_ID },
+  }),
   commentAddedEvent(
     DRAFT_WORK_ORDER,
     HOUR_AGO,
@@ -325,6 +334,7 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     fromState: "open",
     toState: "closed",
     toResult: "completed",
+    actor: { id: STORYBOOK_ME_USER_ID },
   }),
 ];
 
