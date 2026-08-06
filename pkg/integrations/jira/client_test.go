@@ -1573,6 +1573,76 @@ func Test__Auth__AccessibleResources(t *testing.T) {
 	})
 }
 
+func Test__Client__CreateAlertWebhookIntegration(t *testing.T) {
+	t.Run("successful create", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"int-1","name":"SuperPlane webhook"}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		integration, err := client.CreateAlertWebhookIntegration(testCloudID, "SuperPlane webhook", "https://sp.test/webhooks/w1", "team-1")
+		require.NoError(t, err)
+		assert.Equal(t, "int-1", integration.ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.Contains(t, req.URL.String(), "/jsm/ops/api/"+testCloudID+"/v1/integrations")
+		body, _ := io.ReadAll(req.Body)
+		assert.Contains(t, string(body), `"type":"Webhook"`)
+		assert.Contains(t, string(body), `"url":"https://sp.test/webhooks/w1"`)
+		assert.Contains(t, string(body), `"teamId":"team-1"`)
+	})
+
+	t.Run("response missing an id is an error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateAlertWebhookIntegration(testCloudID, "SuperPlane webhook", "https://sp.test/webhooks/w1", "")
+		require.ErrorContains(t, err, "missing id")
+	})
+
+	t.Run("failure is surfaced", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"message":"requires a Premium or Enterprise plan"}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.CreateAlertWebhookIntegration(testCloudID, "SuperPlane webhook", "https://sp.test/webhooks/w1", "")
+		require.ErrorContains(t, err, "Premium or Enterprise plan")
+	})
+}
+
+func Test__Client__DeleteAlertWebhookIntegration(t *testing.T) {
+	t.Run("successful delete", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = client.DeleteAlertWebhookIntegration(testCloudID, "int-1")
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/jsm/ops/api/"+testCloudID+"/v1/integrations/int-1")
+	})
+}
+
 func Test__TokenResponse__GetExpiration(t *testing.T) {
 	t.Run("half the token lifetime", func(t *testing.T) {
 		response := TokenResponse{ExpiresIn: 3600}

@@ -1513,9 +1513,10 @@ type ServiceDesk struct {
 
 // RequestType is returned by GET /rest/servicedeskapi/servicedesk/{id}/requesttype (use expand=practice for the practice field).
 type RequestType struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Practice string `json:"practice,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Practice    string `json:"practice,omitempty"`
+	IssueTypeID string `json:"issueTypeId,omitempty"`
 }
 
 type pagedServiceDesks struct {
@@ -2891,4 +2892,68 @@ func (c *Client) ResolveAlertIDAfterOpsRequest(cloudID, requestID, knownAlertID 
 		"timed out waiting for Ops alert async request %s to finish processing",
 		requestID,
 	)
+}
+
+// opsIntegrationsBasePath is the JSM Ops "Integrations" API - a separate resource from alerts
+// themselves, used to register an outgoing webhook that Atlassian POSTs alert activity to.
+func (c *Client) opsIntegrationsBasePath(cloudID string) string {
+	return fmt.Sprintf(
+		"https://api.atlassian.com/jsm/ops/api/%s/v1/integrations",
+		url.PathEscape(strings.TrimSpace(cloudID)),
+	)
+}
+
+type createAlertWebhookIntegrationRequest struct {
+	Name                   string                            `json:"name"`
+	Type                   string                            `json:"type"`
+	Enabled                bool                              `json:"enabled"`
+	TeamID                 string                            `json:"teamId,omitempty"`
+	TypeSpecificProperties alertWebhookIntegrationProperties `json:"typeSpecificProperties"`
+}
+
+type alertWebhookIntegrationProperties struct {
+	URL string `json:"url"`
+}
+
+// AlertWebhookIntegration is the JSM Ops integration CreateAlertWebhookIntegration registers.
+type AlertWebhookIntegration struct {
+	ID string `json:"id"`
+}
+
+// CreateAlertWebhookIntegration registers an outgoing Webhook-type JSM Ops integration that
+// Atlassian POSTs alert activity to - unlike Jira's dynamic issue webhook, each trigger gets its
+// own dedicated integration here, since this API has no "one URL per connection" restriction.
+func (c *Client) CreateAlertWebhookIntegration(cloudID, name, callbackURL, teamID string) (*AlertWebhookIntegration, error) {
+	req := createAlertWebhookIntegrationRequest{
+		Name:                   name,
+		Type:                   "Webhook",
+		Enabled:                true,
+		TeamID:                 teamID,
+		TypeSpecificProperties: alertWebhookIntegrationProperties{URL: callbackURL},
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create integration body: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, c.opsIntegrationsBasePath(cloudID), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out AlertWebhookIntegration
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse create integration response: %w", err)
+	}
+	if out.ID == "" {
+		return nil, fmt.Errorf("create integration response missing id: %s", string(responseBody))
+	}
+	return &out, nil
+}
+
+// DeleteAlertWebhookIntegration removes a previously-registered JSM Ops integration.
+func (c *Client) DeleteAlertWebhookIntegration(cloudID, integrationID string) error {
+	u := fmt.Sprintf("%s/%s", c.opsIntegrationsBasePath(cloudID), url.PathEscape(integrationID))
+	_, err := c.execRequest(http.MethodDelete, u, nil)
+	return err
 }
