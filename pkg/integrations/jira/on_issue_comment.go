@@ -259,6 +259,11 @@ func commentPlainText(body any) string {
 	if text, ok := node["text"].(string); ok {
 		return text
 	}
+	if attrs, ok := node["attrs"].(map[string]any); ok {
+		if text, ok := attrs["text"].(string); ok {
+			return text
+		}
+	}
 
 	content, ok := node["content"].([]any)
 	if !ok {

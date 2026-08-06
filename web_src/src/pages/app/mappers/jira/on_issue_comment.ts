@@ -47,8 +47,9 @@ const COMMENT_PREVIEW_LENGTH = 140;
 // latter's `content` nodes for a plain-text preview instead of rendering the document.
 function adfText(node: unknown): string {
   if (!node || typeof node !== "object") return "";
-  const { text, content } = node as { text?: string; content?: unknown[] };
+  const { text, content, attrs } = node as { text?: string; content?: unknown[]; attrs?: { text?: string } };
   if (typeof text === "string") return text;
+  if (typeof attrs?.text === "string") return attrs.text;
   if (Array.isArray(content)) return content.map(adfText).join(" ");
   return "";
 }

@@ -260,6 +260,37 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	// Regression test: mention and emoji ADF nodes carry their visible text under attrs.text,
+	// not text or content - a filter matching that text must not be treated as unmatched (BUGBOT_BUG_ID 4a3fed5e).
+	t.Run("matches a content filter against a mention's attrs.text", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		adfBody := []byte(`{
+			"webhookEvent": "comment_created",
+			"comment": {
+				"id": "10019",
+				"body": {"type": "doc", "content": [{"type": "paragraph", "content": [
+					{"type": "mention", "attrs": {"id": "abc", "text": "@Alice Smith"}},
+					{"type": "text", "text": " please take a look"}
+				]}]}
+			},
+			"issue": {
+				"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {"project": {"key": "ENG"}}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          adfBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "Alice"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+	})
+
 	// Regression test: a comment delivered without extractable text must fail closed against a
 	// configured filter rather than matching everything by default.
 	t.Run("a comment with no extractable text never matches a configured filter", func(t *testing.T) {

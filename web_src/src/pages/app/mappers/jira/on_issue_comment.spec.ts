@@ -66,6 +66,27 @@ describe("onIssueCommentTriggerRenderer", () => {
     expect(onIssueCommentTriggerRenderer.getRootEventValues(context)["Comment"]).toBe("Looking into this now.");
   });
 
+  it("includes a mention's attrs.text when extracting plain text", () => {
+    const adfBody = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "mention", attrs: { id: "abc", text: "@Alice Smith" } },
+            { type: "text", text: " please take a look" },
+          ],
+        },
+      ],
+    };
+    const context: TriggerEventContext = {
+      event: event({ ...commentData, comment: { ...commentData.comment, body: adfBody } }),
+    };
+    expect(onIssueCommentTriggerRenderer.getRootEventValues(context)["Comment"]).toBe(
+      "@Alice Smith please take a look",
+    );
+  });
+
   it("falls back to a dash when the comment body is missing", () => {
     const context: TriggerEventContext = {
       event: event({ ...commentData, comment: { ...commentData.comment, body: undefined } }),
