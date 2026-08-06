@@ -43,6 +43,18 @@ var exampleOutputGetRuleGroupNamespaceBytes []byte
 var exampleOutputGetRuleGroupNamespaceOnce sync.Once
 var exampleOutputGetRuleGroupNamespace map[string]any
 
+//go:embed example_output_update_rule_group_namespace.json
+var exampleOutputUpdateRuleGroupNamespaceBytes []byte
+
+var exampleOutputUpdateRuleGroupNamespaceOnce sync.Once
+var exampleOutputUpdateRuleGroupNamespace map[string]any
+
+//go:embed example_output_delete_rule_group_namespace.json
+var exampleOutputDeleteRuleGroupNamespaceBytes []byte
+
+var exampleOutputDeleteRuleGroupNamespaceOnce sync.Once
+var exampleOutputDeleteRuleGroupNamespace map[string]any
+
 //go:embed example_output_query.json
 var exampleOutputQueryBytes []byte
 
@@ -100,6 +112,22 @@ func (c *GetRuleGroupNamespace) ExampleOutput() map[string]any {
 		&exampleOutputGetRuleGroupNamespaceOnce,
 		exampleOutputGetRuleGroupNamespaceBytes,
 		&exampleOutputGetRuleGroupNamespace,
+	)
+}
+
+func (c *UpdateRuleGroupNamespace) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateRuleGroupNamespaceOnce,
+		exampleOutputUpdateRuleGroupNamespaceBytes,
+		&exampleOutputUpdateRuleGroupNamespace,
+	)
+}
+
+func (c *DeleteRuleGroupNamespace) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteRuleGroupNamespaceOnce,
+		exampleOutputDeleteRuleGroupNamespaceBytes,
+		&exampleOutputDeleteRuleGroupNamespace,
 	)
 }
 
