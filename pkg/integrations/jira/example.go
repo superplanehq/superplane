@@ -97,6 +97,16 @@ func onIssueExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
 
+//go:embed example_data_on_issue_comment.json
+var exampleDataOnIssueCommentBytes []byte
+
+var exampleDataOnIssueCommentOnce sync.Once
+var exampleDataOnIssueComment map[string]any
+
+func onIssueCommentExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
 //go:embed example_output_update_issue.json
 var exampleOutputUpdateIssueBytes []byte
 
