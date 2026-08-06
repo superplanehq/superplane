@@ -1108,11 +1108,26 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 		}
 	}
 
-	return map[string]any{
+	normalizedData := normalizeExpressionValue(data)
+	payload := map[string]any{
 		"id":   artifact.ID.String(),
 		"type": artifact.Type,
-		"data": normalizeExpressionValue(data),
-	}, nil
+		"data": normalizedData,
+	}
+
+	// Promote data keys onto the artifact so expressions can use
+	// find(order().artifacts, {.type == "markdown" and .title == "PLAN.md"}).body
+	// without nesting under .data. Reserved keys keep the artifact identity.
+	if dataMap, ok := normalizedData.(map[string]any); ok {
+		for key, value := range dataMap {
+			if key == "id" || key == "type" || key == "data" {
+				continue
+			}
+			payload[key] = value
+		}
+	}
+
+	return payload, nil
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {

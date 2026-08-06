@@ -98,7 +98,16 @@ function buildOrderExample(): Record<string, unknown> {
       {
         id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
         type: "pr",
+        url: "https://github.com/org/repo/pull/7",
+        number: 7,
         data: { url: "https://github.com/org/repo/pull/7", number: 7 },
+      },
+      {
+        id: "d4e5f6a7-b8c9-0123-def0-234567890123",
+        type: "markdown",
+        title: "PLAN.md",
+        body: "# Plan",
+        data: { title: "PLAN.md", body: "# Plan" },
       },
     ],
   };
