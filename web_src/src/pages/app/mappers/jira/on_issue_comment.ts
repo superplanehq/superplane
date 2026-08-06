@@ -17,6 +17,7 @@ interface OnIssueCommentEventData {
 interface OnIssueCommentConfiguration {
   project?: string;
   events?: string[];
+  contentFilter?: string;
 }
 
 interface OnIssueCommentNodeMetadata {
@@ -104,6 +105,10 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
         icon: "funnel",
         label: configuration.events.map((event) => actionLabel(event)).join(", "),
       });
+    }
+
+    if (configuration?.contentFilter) {
+      metadataItems.push({ icon: "funnel", label: `Filter: ${configuration.contentFilter}` });
     }
 
     const props: TriggerProps = {
