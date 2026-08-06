@@ -270,11 +270,14 @@ func commentPlainText(body any) string {
 		return ""
 	}
 
+	// Adjacent text nodes already carry their own boundary whitespace (e.g. a mention is
+	// typically followed by a text node starting with a space), so joining with a separator
+	// would double it up.
 	parts := make([]string, 0, len(content))
 	for _, child := range content {
 		parts = append(parts, commentPlainText(child))
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, "")
 }
 
 // matchesContentFilter reports whether the comment's plain text matches filter - an empty filter

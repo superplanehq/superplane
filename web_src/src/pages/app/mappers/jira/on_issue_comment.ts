@@ -50,7 +50,9 @@ function adfText(node: unknown): string {
   const { text, content, attrs } = node as { text?: string; content?: unknown[]; attrs?: { text?: string } };
   if (typeof text === "string") return text;
   if (typeof attrs?.text === "string") return attrs.text;
-  if (Array.isArray(content)) return content.map(adfText).join(" ");
+  // Adjacent nodes already carry their own boundary whitespace (e.g. a mention is typically
+  // followed by a text node starting with a space), so joining with a separator would double it up.
+  if (Array.isArray(content)) return content.map(adfText).join("");
   return "";
 }
 
