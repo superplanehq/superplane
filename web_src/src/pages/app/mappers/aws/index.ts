@@ -62,11 +62,13 @@ import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 import {
   createRuleGroupNamespaceMapper,
   createWorkspaceMapper,
+  deleteRuleGroupNamespaceMapper,
   deleteWorkspaceMapper,
   getRuleGroupNamespaceMapper,
   getWorkspaceMapper,
   queryMapper,
   queryRangeMapper,
+  updateRuleGroupNamespaceMapper,
   updateWorkspaceMapper,
 } from "./prometheus";
 import { createLoadBalancerMapper } from "./ec2/create_load_balancer";
@@ -93,6 +95,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "prometheus.deleteWorkspace": deleteWorkspaceMapper,
   "prometheus.createRuleGroupNamespace": createRuleGroupNamespaceMapper,
   "prometheus.getRuleGroupNamespace": getRuleGroupNamespaceMapper,
+  "prometheus.updateRuleGroupNamespace": updateRuleGroupNamespaceMapper,
+  "prometheus.deleteRuleGroupNamespace": deleteRuleGroupNamespaceMapper,
   "prometheus.query": queryMapper,
   "prometheus.queryRange": queryRangeMapper,
   "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
@@ -171,6 +175,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "prometheus.deleteWorkspace": buildActionStateRegistry("deleted"),
   "prometheus.createRuleGroupNamespace": buildActionStateRegistry("created"),
   "prometheus.getRuleGroupNamespace": buildActionStateRegistry("retrieved"),
+  "prometheus.updateRuleGroupNamespace": buildActionStateRegistry("updated"),
+  "prometheus.deleteRuleGroupNamespace": buildActionStateRegistry("deleted"),
   "prometheus.query": buildActionStateRegistry("success"),
   "prometheus.queryRange": buildActionStateRegistry("success"),
   "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
