@@ -564,6 +564,7 @@ message WorkOrderArtifact {
     TYPE_UNSPECIFIED = 0;
     TYPE_PR = 1;
     TYPE_MARKDOWN = 2;
+    TYPE_BRANCH = 3;
   }
 
   string id = 1;
