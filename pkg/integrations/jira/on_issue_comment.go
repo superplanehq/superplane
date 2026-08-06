@@ -149,7 +149,9 @@ func (t *OnIssueComment) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{})
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Events: []string{commentEventCreated, commentEventUpdated, commentEventDeleted},
+	})
 }
 
 func (t *OnIssueComment) Hooks() []core.Hook {

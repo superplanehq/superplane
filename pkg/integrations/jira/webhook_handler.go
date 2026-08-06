@@ -2,18 +2,21 @@ package jira
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// WebhookConfiguration has no fields on purpose: Jira's dynamic webhook API accepts only one
-// registered callback URL per OAuth connection ("Only a single URL per user is allowed to be
-// registered via REST API"), so every jira.onIssue trigger under the same integration must
-// share the one Jira-side registration, regardless of which project or events it configures.
-// CompareConfig below always reports a match so the platform's webhook provisioner dedups them
-// into a single webhook record instead of trying to register a distinct URL for each trigger.
-type WebhookConfiguration struct{}
+// WebhookConfiguration tracks the union of native Jira event names the shared webhook must
+// deliver: Jira's dynamic webhook API accepts only one registered callback URL per OAuth
+// connection ("Only a single URL per user is allowed to be registered via REST API"), so every
+// jira.onIssue/jira.onIssueComment trigger under the same integration shares one Jira-side
+// registration - CompareConfig always reports a match so they dedup onto it, and Merge widens
+// Events (triggering re-provisioning) whenever a trigger needs an event the registration lacks.
+type WebhookConfiguration struct {
+	Events []string `json:"events,omitempty" mapstructure:"events,omitempty"`
+}
 
 type WebhookMetadata struct {
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
@@ -33,22 +36,54 @@ func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig, requestedConfig := WebhookConfiguration{}, WebhookConfiguration{}
+	_ = mapstructure.Decode(current, &currentConfig)
+	_ = mapstructure.Decode(requested, &requestedConfig)
+
+	merged := mergeEvents(currentConfig.Events, requestedConfig.Events)
+	if len(merged) == len(currentConfig.Events) {
+		return current, false, nil
+	}
+
+	return WebhookConfiguration{Events: merged}, true, nil
+}
+
+// mergeEvents returns the union of current and additional, preserving current's order so an
+// unrelated Merge call doesn't reorder (and thus needlessly re-provision) an unchanged webhook.
+func mergeEvents(current, additional []string) []string {
+	merged := append([]string{}, current...)
+	for _, event := range additional {
+		if !slices.Contains(merged, event) {
+			merged = append(merged, event)
+		}
+	}
+	return merged
 }
 
 func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	config := WebhookConfiguration{}
+	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	// A prior registration for this webhook record means Merge widened Events (e.g. a new
+	// jira.onIssueComment trigger joining a connection that already had jira.onIssue) - Jira
+	// allows only one registration per connection, so replace it instead of leaving it orphaned.
+	previous := WebhookMetadata{}
+	_ = mapstructure.Decode(ctx.Webhook.GetMetadata(), &previous)
+	if previous.WebhookID != nil {
+		if err := client.DeleteIssueWebhooks([]int64{*previous.WebhookID}); err != nil {
+			return nil, fmt.Errorf("failed to delete previous Jira webhook: %w", err)
+		}
+	}
+
 	// This single registration must cover every project and every trigger type sharing it
 	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
 	// and events itself, in HandleWebhook.
-	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, []string{
-		issueEventCreated, issueEventUpdated, issueEventDeleted,
-		commentEventCreated, commentEventUpdated, commentEventDeleted,
-	})
+	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, config.Events)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
 	}

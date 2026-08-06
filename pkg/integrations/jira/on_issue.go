@@ -178,13 +178,15 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection,
-	// so this doesn't create a webhook itself - it requests one from the platform's webhook
-	// provisioner, which dedups all jira.onIssue triggers on this integration (see
-	// JiraWebhookHandler.CompareConfig) into a single shared registration, and fans out incoming
-	// events to every trigger sharing it. Each trigger filters to its own project and events in
+	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection, so
+	// this doesn't create a webhook itself - it requests one from the platform's webhook
+	// provisioner, which dedups every jira.onIssue/jira.onIssueComment trigger on this integration
+	// (see JiraWebhookHandler.CompareConfig) into one registration covering the union of their
+	// events and fans events out to each trigger, which filters to its own project and events in
 	// HandleWebhook.
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{})
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+	})
 }
 
 func (t *OnIssue) Hooks() []core.Hook {
