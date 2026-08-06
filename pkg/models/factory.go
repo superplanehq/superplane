@@ -296,7 +296,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		FactoryID:      f.ID,
 		Title:          title,
 		Description:    description,
-		State:          FactoryWorkOrderStateOpen,
+		State:          FactoryWorkOrderStateDraft,
 		Result:         "",
 		CreatedByID:    createdBy,
 		SourceRunID:    sourceRunID,
@@ -314,7 +314,11 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		}
 	}
 
-	if err := order.RecordOpened(tx, createdBy); err != nil {
+	// Creation is a status transition into `draft` (fromState == "").
+	if err := order.RecordStatusUpdated(tx, statusUpdatedRecord{
+		Actor:   createdBy,
+		ToState: FactoryWorkOrderStateDraft,
+	}); err != nil {
 		return nil, err
 	}
 

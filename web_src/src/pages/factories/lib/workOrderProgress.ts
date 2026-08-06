@@ -1,12 +1,25 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { hasActiveWorkOrderExecution, hasFailedWorkOrderExecution } from "./workOrderExecutions";
+import { hasActiveWorkOrderExecution, latestFinishedWorkOrderExecution } from "./workOrderExecutions";
 
-export type WorkOrderDisplayStatus = "open" | "running" | "failed" | "completed" | "rejected";
+export type WorkOrderDisplayStatus =
+  | "draft"
+  | "open"
+  | "running"
+  | "failed"
+  | "completed"
+  | "rejected"
+  | "closedFailed";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
   { label: string; filterLabel: string; summary: string; className: string }
 > = {
+  draft: {
+    label: "Draft",
+    filterLabel: "Draft",
+    summary: "Being scoped — not yet dispatched",
+    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  },
   open: {
     label: "Open",
     filterLabel: "Open",
@@ -39,9 +52,15 @@ const DISPLAY_STATUS_META: Record<
     summary: "Work order rejected",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
   },
+  closedFailed: {
+    label: "Failed",
+    filterLabel: "Failed",
+    summary: "Work order closed as failed",
+    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+  },
 };
 
-export type WorkOrderSectionId = "failed" | "running" | "open" | "closed";
+export type WorkOrderSectionId = "failed" | "running" | "open" | "draft" | "closed";
 
 export interface WorkOrderSectionDefinition {
   id: WorkOrderSectionId;
@@ -72,10 +91,16 @@ export const WORK_ORDER_SECTIONS: WorkOrderSectionDefinition[] = [
     statuses: ["open"],
   },
   {
+    id: "draft",
+    title: "Draft",
+    description: "Being scoped — not yet dispatched.",
+    statuses: ["draft"],
+  },
+  {
     id: "closed",
     title: "Closed",
-    description: "Completed or rejected work orders.",
-    statuses: ["completed", "rejected"],
+    description: "Completed, rejected, or failed work orders.",
+    statuses: ["completed", "rejected", "closedFailed"],
   },
 ];
 
@@ -88,7 +113,17 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder): string {
 
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
-    return order.result === "RESULT_REJECTED" ? "rejected" : "completed";
+    if (order.result === "RESULT_REJECTED") {
+      return "rejected";
+    }
+    if (order.result === "RESULT_FAILED") {
+      return "closedFailed";
+    }
+    return "completed";
+  }
+
+  if (order.state === "STATE_DRAFT") {
+    return "draft";
   }
 
   const executions = order.executions ?? [];
@@ -96,8 +131,16 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "running";
   }
 
-  if (hasFailedWorkOrderExecution(executions)) {
-    return "failed";
+  // "failed" only if the newest execution failed AND finished after
+  // the last write to the order (reopen / reassign / comment / artifact),
+  // so a fresh attempt or triage clears the pill until a new failure.
+  const latestFinished = latestFinishedWorkOrderExecution(executions);
+  if (latestFinished?.result === "RESULT_FAILED") {
+    const finishedAt = Date.parse(latestFinished.updatedAt ?? latestFinished.createdAt ?? "");
+    const orderUpdatedAt = Date.parse(order.updatedAt ?? "");
+    if (Number.isNaN(finishedAt) || Number.isNaN(orderUpdatedAt) || finishedAt >= orderUpdatedAt) {
+      return "failed";
+    }
   }
 
   return "open";
@@ -112,7 +155,10 @@ export function getWorkOrderStatusSummary(order: FactoriesWorkOrder): string {
 }
 
 export function isUnassignedWorkOrder(order: FactoriesWorkOrder): boolean {
-  return order.state === "STATE_OPEN" && !order.assignees?.length;
+  if (order.state === "STATE_CLOSED") {
+    return false;
+  }
+  return !order.assignees?.length;
 }
 
 export function isAssignedToUser(order: FactoriesWorkOrder, userId?: string): boolean {
@@ -141,13 +187,22 @@ export function groupWorkOrdersBySection(
     .filter((entry) => entry.orders.length > 0);
 }
 
-export function countOpenWorkOrders(orders: FactoriesWorkOrder[]): number {
-  return orders.filter((order) => order.state === "STATE_OPEN").length;
+// countActiveWorkOrders backs the "Work Orders" badge; it matches the
+// default `active` filter (draft + open + running + failed).
+export function countActiveWorkOrders(orders: FactoriesWorkOrder[]): number {
+  return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order))).length;
 }
 
 export type WorkOrderOwnerFilter = "all" | "mine" | "unassigned";
 
-export type WorkOrderStatusFilter = "all" | WorkOrderDisplayStatus;
+export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
+
+// "Active" pill covers everything not yet closed (draft included, so
+// new orders aren't hidden behind the STATE_OPEN-only `Open` pill).
+const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
+
+// "Failed" pill unions in-flight failures with closed-as-failed orders.
+const FAILED_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["failed", "closedFailed"];
 
 export function filterWorkOrdersByOwner(
   orders: FactoriesWorkOrder[],
@@ -172,6 +227,12 @@ export function filterWorkOrdersByStatus(
   if (statusFilter === "all") {
     return orders;
   }
+  if (statusFilter === "active") {
+    return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order)));
+  }
+  if (statusFilter === "failed") {
+    return orders.filter((order) => FAILED_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order)));
+  }
   return orders.filter((order) => getWorkOrderDisplayStatus(order) === statusFilter);
 }
 
@@ -183,16 +244,22 @@ export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined)
       assigneeIds: [] as string[],
       assigneeNames: [] as string[],
       isOpen: false,
+      isDispatchable: false,
+      isClosed: false,
     };
   }
 
   const displayStatus = getWorkOrderDisplayStatus(order);
+  const isOpen = order.state === "STATE_OPEN";
+  const isDraft = order.state === "STATE_DRAFT";
 
   return {
     displayStatus,
     statusMeta: getWorkOrderDisplayStatusMeta(displayStatus),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     assigneeNames: (order.assignees ?? []).map((assignee) => assignee.name ?? "Unknown"),
-    isOpen: order.state === "STATE_OPEN",
+    isOpen,
+    isDispatchable: isOpen || isDraft,
+    isClosed: order.state === "STATE_CLOSED",
   };
 }
