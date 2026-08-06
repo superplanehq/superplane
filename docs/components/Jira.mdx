@@ -150,6 +150,9 @@ The On Issue Comment trigger starts a workflow execution when a comment is added
 
 - **Project**: The Jira project to listen for comment events in
 - **Events**: Which comment events to listen for (Created, Updated, Deleted)
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `urgent` to
+  only trigger on comments containing "urgent". A comment with no extractable text never matches
+  when a filter is set.
 
 ### Webhook Setup
 

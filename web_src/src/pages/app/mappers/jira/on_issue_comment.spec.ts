@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EventInfo, TriggerEventContext } from "../types";
+import type { ComponentDefinition, EventInfo, NodeInfo, TriggerEventContext, TriggerRendererContext } from "../types";
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
 
 function event(data: Record<string, unknown>): EventInfo {
@@ -71,5 +71,76 @@ describe("onIssueCommentTriggerRenderer", () => {
       event: event({ ...commentData, comment: { ...commentData.comment, body: undefined } }),
     };
     expect(onIssueCommentTriggerRenderer.getRootEventValues(context)["Comment"]).toBe("-");
+  });
+});
+
+function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
+  return {
+    id: "node-1",
+    name: "On Issue Comment",
+    componentName: "jira.onIssueComment",
+    isCollapsed: false,
+    configuration: {},
+    metadata: {},
+    ...overrides,
+  };
+}
+
+function buildTriggerContext(overrides?: {
+  node?: Partial<NodeInfo>;
+  lastEvent?: EventInfo;
+  definition?: Partial<ComponentDefinition>;
+}): TriggerRendererContext {
+  return {
+    node: buildNode(overrides?.node),
+    definition: {
+      name: "jira.onIssueComment",
+      label: "On Issue Comment",
+      description: "",
+      icon: "jira",
+      color: "blue",
+      ...overrides?.definition,
+    },
+    lastEvent: overrides?.lastEvent,
+  } as TriggerRendererContext;
+}
+
+describe("onIssueCommentTriggerRenderer.getTriggerProps", () => {
+  it("renders the project and selected events", () => {
+    const props = onIssueCommentTriggerRenderer.getTriggerProps(
+      buildTriggerContext({
+        node: {
+          configuration: { project: "ENG", events: ["created", "updated"] },
+          metadata: { project: { key: "ENG", name: "Engineering" } },
+        },
+      }),
+    );
+
+    expect(props.metadata?.[0]).toEqual({ icon: "folder", label: "Engineering (ENG)" });
+    expect(props.metadata?.[1]).toEqual({ icon: "funnel", label: "Created, Updated" });
+  });
+
+  it("renders the content filter after the selected events", () => {
+    const props = onIssueCommentTriggerRenderer.getTriggerProps(
+      buildTriggerContext({
+        node: {
+          configuration: { project: "ENG", events: ["created"], contentFilter: "urgent" },
+          metadata: { project: { key: "ENG", name: "Engineering" } },
+        },
+      }),
+    );
+
+    expect(props.metadata?.[1]).toEqual({ icon: "funnel", label: "Created" });
+    expect(props.metadata?.[2]).toEqual({ icon: "funnel", label: "Filter: urgent" });
+  });
+
+  it("omits the content filter when it is not configured", () => {
+    const props = onIssueCommentTriggerRenderer.getTriggerProps(
+      buildTriggerContext({
+        node: { configuration: { project: "ENG", events: ["created"] } },
+      }),
+    );
+
+    expect(props.metadata).toHaveLength(2);
   });
 });
