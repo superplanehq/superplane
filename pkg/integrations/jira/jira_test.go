@@ -966,6 +966,8 @@ func Test__Jira__Definition(t *testing.T) {
 	assert.Len(t, actions, 18)
 
 	triggers := integration.Triggers()
-	require.Len(t, triggers, 1)
+	require.Len(t, triggers, 3)
 	assert.Equal(t, "jira.onIssue", triggers[0].Name())
+	assert.Equal(t, "jira.onIncident", triggers[1].Name())
+	assert.Equal(t, "jira.onAlert", triggers[2].Name())
 }
