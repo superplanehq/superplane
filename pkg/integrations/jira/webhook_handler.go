@@ -7,16 +7,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// WebhookConfiguration has no fields on purpose: Jira's dynamic webhook API accepts only one
-// registered callback URL per OAuth connection ("Only a single URL per user is allowed to be
-// registered via REST API"), so every jira.onIssue trigger under the same integration must
-// share the one Jira-side registration, regardless of which project or events it configures.
-// CompareConfig below always reports a match so the platform's webhook provisioner dedups them
-// into a single webhook record instead of trying to register a distinct URL for each trigger.
-type WebhookConfiguration struct{}
+// webhookKindAlert marks a WebhookConfiguration as a dedicated JSM Ops alert webhook rather than
+// the shared Jira issue/comment webhook (the default, empty Kind) - the two use entirely
+// different Atlassian APIs and need different registration, dedup, and cleanup behavior.
+const webhookKindAlert = "alert"
+
+// WebhookConfiguration covers two unrelated registrations: an empty Kind for the shared Jira
+// issue/comment webhook (see allProjectsJQLFilter), and Kind "alert" for a dedicated JSM Ops
+// alert webhook (see webhookKindAlert) - CompareConfig decides which of the two gets deduped.
+type WebhookConfiguration struct {
+	Kind   string `json:"kind,omitempty" mapstructure:"kind,omitempty"`
+	TeamID string `json:"teamId,omitempty" mapstructure:"teamId,omitempty"`
+}
 
 type WebhookMetadata struct {
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
+}
+
+// AlertWebhookMetadata is the JSM Ops integration id for a dedicated jira.onAlert webhook.
+type AlertWebhookMetadata struct {
+	IntegrationID string `json:"integrationId,omitempty" mapstructure:"integrationId,omitempty"`
 }
 
 // allProjectsJQLFilter matches every issue in every project. An empty jqlFilter is rejected
@@ -29,6 +39,14 @@ const allProjectsJQLFilter = "project != EMPTY"
 type JiraWebhookHandler struct{}
 
 func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
+	configA, configB := WebhookConfiguration{}, WebhookConfiguration{}
+	_ = mapstructure.Decode(a, &configA)
+	_ = mapstructure.Decode(b, &configB)
+
+	if configA.Kind == webhookKindAlert || configB.Kind == webhookKindAlert {
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -37,6 +55,37 @@ func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
 }
 
 func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	config := WebhookConfiguration{}
+	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+
+	if config.Kind == webhookKindAlert {
+		return h.setupAlertWebhook(ctx, config)
+	}
+
+	return h.setupIssueWebhook(ctx)
+}
+
+func (h *JiraWebhookHandler) setupAlertWebhook(ctx core.WebhookHandlerContext, config WebhookConfiguration) (any, error) {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	name := fmt.Sprintf("SuperPlane (%s)", ctx.Webhook.GetID())
+	integration, err := client.CreateAlertWebhookIntegration(cloudID, name, ctx.Webhook.GetURL(), config.TeamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JSM Ops alert webhook: %w", err)
+	}
+
+	return &AlertWebhookMetadata{IntegrationID: integration.ID}, nil
+}
+
+func (h *JiraWebhookHandler) setupIssueWebhook(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -76,6 +125,39 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 }
 
 func (h *JiraWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	config := WebhookConfiguration{}
+	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+
+	if config.Kind == webhookKindAlert {
+		return h.cleanupAlertWebhook(ctx)
+	}
+
+	return h.cleanupIssueWebhook(ctx)
+}
+
+func (h *JiraWebhookHandler) cleanupAlertWebhook(ctx core.WebhookHandlerContext) error {
+	metadata := AlertWebhookMetadata{}
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode webhook metadata: %w", err)
+	}
+	if metadata.IntegrationID == "" {
+		return nil
+	}
+
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	return client.DeleteAlertWebhookIntegration(cloudID, metadata.IntegrationID)
+}
+
+func (h *JiraWebhookHandler) cleanupIssueWebhook(ctx core.WebhookHandlerContext) error {
 	metadata := WebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode webhook metadata: %w", err)

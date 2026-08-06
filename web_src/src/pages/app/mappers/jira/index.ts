@@ -19,6 +19,8 @@ import { getAlertMapper } from "./get_alert";
 import { deleteAlertMapper } from "./delete_alert";
 import { updateAlertMapper } from "./update_alert";
 import { onIssueTriggerRenderer } from "./on_issue";
+import { onIncidentTriggerRenderer } from "./on_incident";
+import { onAlertTriggerRenderer } from "./on_alert";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: createIssueMapper,
@@ -43,6 +45,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onIssue: onIssueTriggerRenderer,
+  onIncident: onIncidentTriggerRenderer,
+  onAlert: onAlertTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -65,4 +69,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteAlert: buildActionStateRegistry("deleted"),
   updateAlert: buildActionStateRegistry("updated"),
   onIssue: buildActionStateRegistry("triggered"),
+  onIncident: buildActionStateRegistry("triggered"),
+  onAlert: buildActionStateRegistry("triggered"),
 };
