@@ -6,6 +6,7 @@ describe("resolveConsoleAvatar", () => {
   it("uses the GitHub avatar for a plain username string", () => {
     expect(resolveConsoleAvatar("forestileao")).toEqual({
       src: "https://github.com/forestileao.png",
+      initials: "F",
       name: "forestileao",
     });
   });
@@ -20,7 +21,16 @@ describe("resolveConsoleAvatar", () => {
   it("uses the GitHub avatar when author.username is present", () => {
     expect(resolveConsoleAvatar({ name: "Pedro Leão", username: "forestileao" }, { name: "Pedro Leão" })).toEqual({
       src: "https://github.com/forestileao.png",
+      initials: "P",
       name: "Pedro Leão",
+    });
+  });
+
+  it("falls back to username initial when author name is empty", () => {
+    expect(resolveConsoleAvatar({ username: "cloud-robot" })).toEqual({
+      src: "https://github.com/cloud-robot.png",
+      initials: "C",
+      name: "cloud-robot",
     });
   });
 

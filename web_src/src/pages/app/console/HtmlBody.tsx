@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -55,6 +55,37 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
     return sanitizeHtml(interpolated, rootId);
   }, [body, vars, rootId]);
 
+  const htmlRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = htmlRef.current;
+    if (!container) return;
+
+    const images = container.querySelectorAll<HTMLImageElement>("img.avatar-image");
+    const cleanups: (() => void)[] = [];
+
+    images.forEach((img) => {
+      const replaceWithFallback = () => {
+        if (!img.isConnected) return;
+        const fallback = document.createElement("span");
+        fallback.className = "avatar avatar-fallback";
+        fallback.textContent = img.getAttribute("title") || "?";
+        img.replaceWith(fallback);
+      };
+
+      // `error` does not bubble; attach handlers directly. Also replace images
+      // that already failed before the listener was attached (cached 404).
+      img.addEventListener("error", replaceWithFallback);
+      cleanups.push(() => img.removeEventListener("error", replaceWithFallback));
+
+      if (img.complete && img.naturalWidth === 0) {
+        replaceWithFallback();
+      }
+    });
+
+    return () => cleanups.forEach((fn) => fn());
+  }, [sanitized]);
+
   if (!sanitized.trim()) return null;
 
   return (
@@ -62,6 +93,7 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
     // the sanitized html root uses `dark-mode-disabled` (which opts out of dark:).
     <div className={cn(CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES, CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES)}>
       <div
+        ref={htmlRef}
         className={cn("dark-mode-disabled", HTML_ROOT_CLASSES)}
         data-testid="console-html"
         {...{ [HTML_WIDGET_ROOT_ATTR]: rootId }}
