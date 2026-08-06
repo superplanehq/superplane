@@ -5,6 +5,8 @@ import { getIssueMapper } from "./get_issue";
 import { updateIssueMapper } from "./update_issue";
 import { addIssueLabelMapper } from "./add_issue_label";
 import { addIssueCommentMapper } from "./add_issue_comment";
+import { removeIssueLabelMapper } from "./remove_issue_label";
+import { addReactionMapper } from "./add_reaction";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onIssueLabelTriggerRenderer } from "./on_issue_label";
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
@@ -15,6 +17,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateIssue: updateIssueMapper,
   addIssueLabel: addIssueLabelMapper,
   addIssueComment: addIssueCommentMapper,
+  removeIssueLabel: removeIssueLabelMapper,
+  addReaction: addReactionMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -29,4 +33,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateIssue: buildActionStateRegistry("updated"),
   addIssueLabel: buildActionStateRegistry("labeled"),
   addIssueComment: buildActionStateRegistry("commented"),
+  removeIssueLabel: buildActionStateRegistry("unlabeled"),
+  addReaction: buildActionStateRegistry("reacted"),
 };

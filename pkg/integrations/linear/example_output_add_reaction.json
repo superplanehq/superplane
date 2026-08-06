@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "c9e1f7a3-5b2d-4e8c-9a0f-1b2c3d4e5f60",
+    "emoji": "eyes",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "user": {
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace",
+      "displayName": "ada",
+      "email": "ada@example.com"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.reaction"
+}
