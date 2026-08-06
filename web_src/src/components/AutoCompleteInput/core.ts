@@ -1479,6 +1479,11 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
     return `__app${expr.slice(appMatch[0].length)}`;
   }
 
+  const orderMatch = expr.match(/^order\(\)/);
+  if (orderMatch) {
+    return `__order${expr.slice(orderMatch[0].length)}`;
+  }
+
   return expr;
 }
 
