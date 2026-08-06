@@ -54,6 +54,22 @@ func Test__WebhookHandler__Merge(t *testing.T) {
 		assert.False(t, changed)
 		assert.Equal(t, current, merged)
 	})
+
+	// Regression test: a webhook row created before WebhookConfiguration tracked Events stores an
+	// empty list even though it already delivers issue events - treating that as "delivers
+	// nothing" would widen to comment-only and stop existing jira.onIssue triggers from receiving
+	// anything (BUGBOT_BUG_ID 98e002e6).
+	t.Run("treats an empty stored config as the legacy issue-event baseline, not as empty", func(t *testing.T) {
+		current := WebhookConfiguration{}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
+		}, merged)
+	})
 }
 
 func Test__WebhookHandler__Setup(t *testing.T) {
@@ -149,6 +165,31 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
 		assert.Contains(t, string(body), "1000")
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+	})
+
+	// Regression test: an empty Events config (e.g. a legacy row Merge hasn't touched yet) must
+	// still register the pre-existing issue-event baseline, not a Jira webhook with zero events
+	// (BUGBOT_BUG_ID 98e002e6).
+	t.Run("falls back to the legacy issue-event baseline when Events is empty", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+		assert.Contains(t, string(body), `"jira:issue_updated"`)
+		assert.Contains(t, string(body), `"jira:issue_deleted"`)
 	})
 
 	t.Run("create failure is surfaced", func(t *testing.T) {

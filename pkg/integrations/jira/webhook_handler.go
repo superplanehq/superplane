@@ -29,6 +29,12 @@ type WebhookMetadata struct {
 // jira.onIssue trigger on the integration regardless of project.
 const allProjectsJQLFilter = "project != EMPTY"
 
+// legacyIssueEvents is what every shared Jira webhook registered before WebhookConfiguration
+// tracked Events explicitly - an empty stored Events list means a row predates that change, not
+// that the webhook currently delivers nothing, since jira.onIssue was the only trigger able to
+// create it and always registered exactly these.
+var legacyIssueEvents = []string{issueEventCreated, issueEventUpdated, issueEventDeleted}
+
 type JiraWebhookHandler struct{}
 
 func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
@@ -40,7 +46,12 @@ func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
 	_ = mapstructure.Decode(current, &currentConfig)
 	_ = mapstructure.Decode(requested, &requestedConfig)
 
-	merged := mergeEvents(currentConfig.Events, requestedConfig.Events)
+	baseline := currentConfig.Events
+	if len(baseline) == 0 {
+		baseline = legacyIssueEvents
+	}
+
+	merged := mergeEvents(baseline, requestedConfig.Events)
 	if len(merged) == len(currentConfig.Events) {
 		return current, false, nil
 	}
@@ -64,6 +75,11 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 	config := WebhookConfiguration{}
 	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 
+	events := config.Events
+	if len(events) == 0 {
+		events = legacyIssueEvents
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -83,7 +99,7 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 	// This single registration must cover every project and every trigger type sharing it
 	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
 	// and events itself, in HandleWebhook.
-	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, config.Events)
+	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, events)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
 	}
