@@ -17,10 +17,42 @@ import (
 func Test__WebhookHandler__CompareConfig(t *testing.T) {
 	handler := &JiraWebhookHandler{}
 
-	t.Run("always matches - Jira allows only one registered URL per connection", func(t *testing.T) {
-		equal, err := handler.CompareConfig(WebhookConfiguration{}, WebhookConfiguration{})
+	t.Run("always matches, even with different events - Jira allows only one registered URL per connection", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{Events: []string{issueEventCreated}},
+			WebhookConfiguration{Events: []string{commentEventCreated}},
+		)
 		require.NoError(t, err)
 		assert.True(t, equal)
+	})
+}
+
+// Regression test: a jira.onIssueComment trigger joining an integration that already has a
+// jira.onIssue webhook must widen the shared registration's events, not silently attach to a
+// registration that will never deliver comment events (BUGBOT_BUG_ID 29ee5f8c).
+func Test__WebhookHandler__Merge(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("widens events when the requested config adds a new one", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted}}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
+		}, merged)
+	})
+
+	t.Run("reports no change when the requested events are already covered", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, current, merged)
 	})
 }
 
@@ -38,7 +70,15 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: integration,
-			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+			Webhook: &contexts.WebhookContext{
+				URL: "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{
+					Events: []string{
+						issueEventCreated, issueEventUpdated, issueEventDeleted,
+						commentEventCreated, commentEventUpdated, commentEventDeleted,
+					},
+				},
+			},
 		})
 		require.NoError(t, err)
 
@@ -74,6 +114,41 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		require.Len(t, integration.ActionRequests, 1)
 		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)
 		assert.Equal(t, webhookRefreshInterval, integration.ActionRequests[0].Interval)
+	})
+
+	// Regression test: re-running Setup on a webhook that already has a Jira registration (e.g. a
+	// jira.onIssueComment trigger widening an integration's events via Merge) must replace that
+	// registration instead of leaving it orphaned - Jira allows only one per connection.
+	t.Run("re-provisioning replaces the previous Jira registration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+		previousID := int64(1000)
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Metadata:      WebhookMetadata{WebhookID: &previousID},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}},
+			},
+		})
+		require.NoError(t, err)
+
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, int64(2000), *webhookMetadata.WebhookID)
+
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
 	})
 
 	t.Run("create failure is surfaced", func(t *testing.T) {
