@@ -28,7 +28,9 @@ type ArtifactDataEntry struct {
 type AddWorkOrderArtifactConfiguration struct {
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
+	Number       string              `json:"number" mapstructure:"number"`
 	Title        string              `json:"title" mapstructure:"title"`
+	Body         string              `json:"body" mapstructure:"body"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -45,7 +47,14 @@ func (c *AddWorkOrderArtifact) Description() string {
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required) and markdown notes. Free-form metadata can be attached as name/value pairs — markdown notes typically use a ` + "`body`" + ` entry for the inline content. This component can only be used in factory-owned apps.`
+	return `The Add Work Order Artifact component stores a typed artifact against a work order.
+
+Supported types:
+
+- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + ` and ` + "`title`" + `.
+- **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
+
+Both types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -62,12 +71,12 @@ func (c *AddWorkOrderArtifact) ExampleOutput() map[string]any {
 		"type":      "workOrder.artifactAdded",
 		"data": map[string]any{
 			"artifact": map[string]any{
-				"id":    "art-123",
-				"type":  "pr",
-				"url":   "https://github.com/example/repo/pull/42",
-				"title": "Draft implementation",
+				"id":   "art-123",
+				"type": "pr",
 				"data": map[string]any{
+					"url":      "https://github.com/example/repo/pull/42",
 					"number":   "42",
+					"title":    "Draft implementation",
 					"provider": "github",
 				},
 			},
@@ -80,7 +89,9 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
-	prVisibility := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
+	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
+	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
+	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
 	return []configuration.Field{
 		{
@@ -102,12 +113,31 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request",
+			Description:          "Link to the pull request (must be http or https)",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: prVisibility,
+			VisibilityConditions: prOnly,
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "artifactType", Values: []string{"pr"}},
+			},
+		},
+		{
+			Name:                 "number",
+			Label:                "Number",
+			Description:          "Optional pull request number (rendered as #<n>)",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: prOnly,
+		},
+		{
+			Name:                 "body",
+			Label:                "Body",
+			Description:          "Markdown note body — rendered inline in the work order timeline",
+			Type:                 configuration.FieldTypeText,
+			Required:             false,
+			VisibilityConditions: markdownOnly,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "artifactType", Values: []string{"markdown"}},
 			},
 		},
 		{
@@ -116,14 +146,15 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Description:          "Optional artifact title",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}},
+			VisibilityConditions: bothTypes,
 		},
 		{
-			Name:        "data",
-			Label:       "Metadata",
-			Description: "Free-form name/value pairs stored alongside the artifact (e.g. PR number, provider, refs; use `body` for markdown notes)",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
+			Name:                 "data",
+			Label:                "Metadata",
+			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
+			Type:                 configuration.FieldTypeList,
+			Required:             false,
+			VisibilityConditions: bothTypes,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Entry",
@@ -146,13 +177,11 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data := artifactDataToMap(config.Data)
+	data := buildArtifactData(config)
 
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type:  config.ArtifactType,
-		URL:   config.URL,
-		Title: config.Title,
-		Data:  data,
+		Type: config.ArtifactType,
+		Data: data,
 	})
 	if err != nil {
 		return err
@@ -193,6 +222,32 @@ func (c *AddWorkOrderArtifact) Hooks() []core.Hook {
 
 func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+// buildArtifactData folds the free-form list into a map and layers the
+// typed inputs on top, so a user who defines both `url` and a `url`
+// row still ends up with the typed value on the wire.
+func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any {
+	data := artifactDataToMap(config.Data)
+
+	typed := map[string]string{
+		"url":    config.URL,
+		"number": config.Number,
+		"title":  config.Title,
+		"body":   config.Body,
+	}
+
+	for key, value := range typed {
+		if value == "" {
+			continue
+		}
+		if data == nil {
+			data = map[string]any{}
+		}
+		data[key] = value
+	}
+
+	return data
 }
 
 // artifactDataToMap flattens the list into a map; blank names are

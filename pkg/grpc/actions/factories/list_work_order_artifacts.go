@@ -76,8 +76,6 @@ func serializeArtifact(artifact *models.FactoryWorkOrderArtifact) (*pb.WorkOrder
 	return &pb.WorkOrderArtifact{
 		Id:        artifact.ID.String(),
 		Type:      artifactTypeToProto(artifact.Type),
-		Url:       artifact.URL,
-		Title:     artifact.Title,
 		Data:      data,
 		CreatedBy: serializeArtifactCreator(artifact),
 		CreatedAt: timestamppb.New(artifact.CreatedAt),

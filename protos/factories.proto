@@ -568,11 +568,9 @@ message WorkOrderArtifact {
 
   string id = 1;
   Type type = 2;
-  string url = 3;
-  string title = 4;
-  google.protobuf.Struct data = 5;
-  UserRef created_by = 6;
-  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Struct data = 3;
+  UserRef created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

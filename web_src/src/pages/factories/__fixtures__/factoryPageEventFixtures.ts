@@ -150,8 +150,6 @@ function artifactAddedEvent(
   artifact: {
     id: string;
     type: "pr" | "markdown";
-    url?: string;
-    title?: string;
     data?: Record<string, unknown>;
   },
   actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },
@@ -210,8 +208,10 @@ export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     {
       id: "art-audit-report",
       type: "markdown",
-      title: "Reconciliation report",
-      data: { body: "Ledger totals mismatched by $412.66 — see attached JIRA for follow-up." },
+      data: {
+        title: "Reconciliation report",
+        body: "Ledger totals mismatched by $412.66 — see attached JIRA for follow-up.",
+      },
     },
     { id: OPERATOR_USER.id },
   ),
@@ -361,9 +361,11 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     {
       id: "art-pr-1",
       type: "pr",
-      url: "https://github.com/example/ledger/pull/482",
-      title: "Fix duplicate refund on retry",
-      data: { number: 482 },
+      data: {
+        url: "https://github.com/example/ledger/pull/482",
+        title: "Fix duplicate refund on retry",
+        number: 482,
+      },
     },
     { id: REVIEWER_USER.id },
   ),
@@ -373,8 +375,8 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     {
       id: "art-md-1",
       type: "markdown",
-      title: "Investigation notes",
       data: {
+        title: "Investigation notes",
         body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
       },
     },
@@ -386,9 +388,11 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     {
       id: "art-auto-1",
       type: "pr",
-      url: "https://github.com/example/ledger/pull/483",
-      title: "Automated retry fix",
-      data: { number: 483 },
+      data: {
+        url: "https://github.com/example/ledger/pull/483",
+        title: "Automated retry fix",
+        number: 483,
+      },
     },
     null,
     { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },

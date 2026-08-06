@@ -10,8 +10,6 @@ CREATE TABLE factory_work_order_artifacts (
   factory_id      UUID NOT NULL REFERENCES factories(id) ON DELETE RESTRICT,
   work_order_id   UUID NOT NULL REFERENCES factory_work_orders(id) ON DELETE RESTRICT,
   type            VARCHAR(32) NOT NULL,
-  url             TEXT,
-  title           TEXT,
   data            JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_by_id   UUID REFERENCES users(id) ON DELETE RESTRICT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -91,10 +91,20 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("requires body for markdown", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "markdown",
+		})
+		if err == nil {
+			t.Fatal("expected error for markdown without body")
+		}
+	})
+
 	t.Run("accepts valid pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",
+			"number":       "1",
 			"title":        "Draft",
 		})
 		if err != nil {
@@ -102,12 +112,11 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts markdown with data-only body", func(t *testing.T) {
+	t.Run("accepts markdown with body", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "markdown",
-			"data": []any{
-				map[string]any{"name": "body", "value": "notes"},
-			},
+			"body":         "investigation notes",
+			"title":        "Design notes",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -119,7 +128,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",
 			"data": []any{
-				map[string]any{"name": "number", "value": "482"},
 				map[string]any{"name": "provider", "value": "github"},
 			},
 		})
@@ -147,5 +155,48 @@ func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
 	}
 	if artifactDataToMap(nil) != nil {
 		t.Fatal("expected nil map when no entries were provided")
+	}
+}
+
+func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		Number:       "9",
+		Title:        "Typed title",
+		Data: []ArtifactDataEntry{
+			{Name: "url", Value: "https://evil.example/typosquat"},
+			{Name: "provider", Value: "github"},
+		},
+	})
+
+	if got := data["url"]; got != "https://github.com/example/repo/pull/9" {
+		t.Fatalf("expected typed url to win, got %v", got)
+	}
+	if got := data["provider"]; got != "github" {
+		t.Fatalf("expected free-form provider to survive, got %v", got)
+	}
+	if got := data["number"]; got != "9" {
+		t.Fatalf("expected typed number, got %v", got)
+	}
+	if got := data["title"]; got != "Typed title" {
+		t.Fatalf("expected typed title, got %v", got)
+	}
+}
+
+func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "markdown",
+		Body:         "note body",
+	})
+
+	if got := data["body"]; got != "note body" {
+		t.Fatalf("expected body to be set, got %v", got)
+	}
+	if _, ok := data["title"]; ok {
+		t.Fatal("expected blank title to be skipped")
+	}
+	if _, ok := data["url"]; ok {
+		t.Fatal("expected blank url to be skipped")
 	}
 }

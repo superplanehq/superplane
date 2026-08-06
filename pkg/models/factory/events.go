@@ -135,9 +135,7 @@ type RunRef struct {
 }
 
 type ArtifactRef struct {
-	ID    uuid.UUID      `json:"id"`
-	Type  string         `json:"type"`
-	URL   string         `json:"url,omitempty"`
-	Title string         `json:"title,omitempty"`
-	Data  map[string]any `json:"data,omitempty"`
+	ID   uuid.UUID      `json:"id"`
+	Type string         `json:"type"`
+	Data map[string]any `json:"data,omitempty"`
 }

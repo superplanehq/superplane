@@ -132,8 +132,6 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 
 	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
-		URL:        params.URL,
-		Title:      params.Title,
 		Data:       params.Data,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
@@ -291,8 +289,6 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 		ID:          artifact.ID.String(),
 		WorkOrderID: artifact.WorkOrderID.String(),
 		Type:        artifact.Type,
-		URL:         artifact.URL,
-		Title:       artifact.Title,
 		Data:        data,
 	}, nil
 }

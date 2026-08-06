@@ -237,15 +237,22 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Artifact target", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	t.Run("pr requires a url", func(t *testing.T) {
+	t.Run("pr requires data.url", func(t *testing.T) {
 		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 			Type: FactoryWorkOrderArtifactTypePR,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "   "},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
 
-	t.Run("pr rejects non-http(s) urls", func(t *testing.T) {
+	t.Run("pr rejects non-http(s) data.url", func(t *testing.T) {
 		cases := []string{
 			"javascript:alert(1)",
 			"data:text/html,<script>alert(1)</script>",
@@ -254,11 +261,11 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 			"//evil.example/pull/1",
 			"not a url at all",
 		}
-		for _, url := range cases {
-			t.Run(url, func(t *testing.T) {
+		for _, prURL := range cases {
+			t.Run(prURL, func(t *testing.T) {
 				_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 					Type: FactoryWorkOrderArtifactTypePR,
-					URL:  url,
+					Data: map[string]any{"url": prURL},
 				})
 				require.Error(t, err)
 				assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
@@ -266,11 +273,16 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		}
 	})
 
-	t.Run("markdown rejects non-http(s) urls when a url is provided", func(t *testing.T) {
+	t.Run("markdown requires data.body", func(t *testing.T) {
 		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
 			Type: FactoryWorkOrderArtifactTypeMarkdown,
-			URL:  "javascript:alert(1)",
-			Data: map[string]any{"body": "note body"},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": "   "},
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
@@ -278,10 +290,12 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 
 	t.Run("creates pr and emits event", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type:      FactoryWorkOrderArtifactTypePR,
-			URL:       "https://github.com/example/repo/pull/1",
-			Title:     "Draft PR",
-			Data:      map[string]any{"number": 1},
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{
+				"url":    "https://github.com/example/repo/pull/1",
+				"title":  "Draft PR",
+				"number": "1",
+			},
 			CreatedBy: &userID,
 		})
 		require.NoError(t, err)
@@ -300,9 +314,11 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 
 	t.Run("markdown persists free-form data", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type:      FactoryWorkOrderArtifactTypeMarkdown,
-			Title:     "Design notes",
-			Data:      map[string]any{"body": "Investigation notes: retry policy exceeded idempotency window."},
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"title": "Design notes",
+				"body":  "Investigation notes: retry policy exceeded idempotency window.",
+			},
 			CreatedBy: &userID,
 		})
 		require.NoError(t, err)
@@ -316,7 +332,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
 		require.NotNil(t, payload.Artifact)
 		assert.Equal(t, FactoryWorkOrderArtifactTypeMarkdown, payload.Artifact.Type)
-		assert.Equal(t, "Design notes", payload.Artifact.Title)
+		assert.Equal(t, "Design notes", payload.Artifact.Data["title"])
 	})
 }
 

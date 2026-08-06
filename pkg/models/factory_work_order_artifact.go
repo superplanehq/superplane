@@ -31,8 +31,6 @@ type FactoryWorkOrderArtifact struct {
 	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	Type           string
-	URL            string
-	Title          string
 	Data           datatypes.JSON
 	CreatedByID    *uuid.UUID
 	CreatedAt      time.Time
@@ -46,8 +44,6 @@ func (FactoryWorkOrderArtifact) TableName() string {
 
 type FactoryWorkOrderArtifactParams struct {
 	Type       string
-	URL        string
-	Title      string
 	Data       map[string]any
 	CreatedBy  *uuid.UUID
 	Automation *factory.AutomationRef
@@ -61,24 +57,24 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	params FactoryWorkOrderArtifactParams,
 ) (*FactoryWorkOrderArtifact, error) {
 	artifactType := strings.TrimSpace(params.Type)
-	url := strings.TrimSpace(params.URL)
-	title := strings.TrimSpace(params.Title)
 
 	switch artifactType {
 	case FactoryWorkOrderArtifactTypePR:
-		if url == "" {
+		prURL := extractArtifactString(params.Data, "url")
+		if prURL == "" {
 			return nil, fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
 		}
+		// URLs land in clickable `href`s — reject non-http(s) so
+		// `factories:update` can't smuggle a `javascript:` scheme.
+		if !isSafeArtifactURL(prURL) {
+			return nil, fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
+		}
 	case FactoryWorkOrderArtifactTypeMarkdown:
-		// Markdown content lives in `data` (conventionally `data.body`).
+		if extractArtifactString(params.Data, "body") == "" {
+			return nil, fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
+		}
 	default:
 		return nil, fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, params.Type)
-	}
-
-	// URLs land in clickable `href`s — reject non-http(s) so
-	// `factories:update` can't smuggle a `javascript:` scheme.
-	if url != "" && !isSafeArtifactURL(url) {
-		return nil, fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
 	dataJSON, err := encodeArtifactData(params.Data)
@@ -93,8 +89,6 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		FactoryID:      o.FactoryID,
 		WorkOrderID:    o.ID,
 		Type:           artifactType,
-		URL:            url,
-		Title:          title,
 		Data:           dataJSON,
 		CreatedByID:    params.CreatedBy,
 		CreatedAt:      now,
@@ -106,11 +100,9 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		}
 
 		ref := &factory.ArtifactRef{
-			ID:    artifact.ID,
-			Type:  artifact.Type,
-			URL:   artifact.URL,
-			Title: artifact.Title,
-			Data:  params.Data,
+			ID:   artifact.ID,
+			Type: artifact.Type,
+			Data: params.Data,
 		}
 
 		return o.RecordArtifactAdded(tx, ref, params.CreatedBy, params.Automation, params.Run)
@@ -175,4 +167,22 @@ func encodeArtifactData(data map[string]any) (datatypes.JSON, error) {
 	}
 
 	return datatypes.JSON(encoded), nil
+}
+
+func extractArtifactString(data map[string]any, key string) string {
+	if len(data) == 0 {
+		return ""
+	}
+
+	raw, ok := data[key]
+	if !ok {
+		return ""
+	}
+
+	value, ok := raw.(string)
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
 }

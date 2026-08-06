@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "./workOrderArtifact";
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactTitle,
+  extractArtifactUrl,
+  formatPrArtifactLabel,
+} from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
   it("returns #<number> when data.number is set (backend convention)", () => {
@@ -41,5 +46,32 @@ describe("extractArtifactMarkdownBody", () => {
     expect(extractArtifactMarkdownBody({})).toBeUndefined();
     expect(extractArtifactMarkdownBody({ body: "" })).toBeUndefined();
     expect(extractArtifactMarkdownBody({ body: 123 })).toBe("123");
+  });
+});
+
+describe("extractArtifactUrl", () => {
+  it("returns data.url when present", () => {
+    expect(extractArtifactUrl({ url: "https://example.com/pr/1" })).toBe("https://example.com/pr/1");
+  });
+
+  it("returns undefined for missing / blank / non-string urls", () => {
+    expect(extractArtifactUrl(undefined)).toBeUndefined();
+    expect(extractArtifactUrl({})).toBeUndefined();
+    expect(extractArtifactUrl({ url: "" })).toBeUndefined();
+    expect(extractArtifactUrl({ url: "   " })).toBeUndefined();
+    expect(extractArtifactUrl({ url: null })).toBeUndefined();
+  });
+});
+
+describe("extractArtifactTitle", () => {
+  it("returns data.title when present", () => {
+    expect(extractArtifactTitle({ title: "Draft PR" })).toBe("Draft PR");
+  });
+
+  it("returns undefined for missing / blank titles", () => {
+    expect(extractArtifactTitle(undefined)).toBeUndefined();
+    expect(extractArtifactTitle({})).toBeUndefined();
+    expect(extractArtifactTitle({ title: "" })).toBeUndefined();
+    expect(extractArtifactTitle({ title: "  " })).toBeUndefined();
   });
 });

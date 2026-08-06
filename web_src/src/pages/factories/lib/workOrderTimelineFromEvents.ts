@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
+import { extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
@@ -40,8 +41,6 @@ interface EventCommentAuthorPayload {
 interface EventArtifactPayload {
   id?: string;
   type?: string;
-  url?: string;
-  title?: string;
   data?: Record<string, unknown>;
 }
 
@@ -305,8 +304,6 @@ function appendArtifactEvent(
     artifact: {
       id: artifact.id,
       type: artifact.type,
-      url: artifact.url,
-      title: artifact.title,
       data: artifact.data,
     },
     title: describeArtifactAdded(artifact),
@@ -328,7 +325,7 @@ function formatArtifactKindShort(type: string | undefined): string {
 }
 
 function describeArtifactAdded(artifact: EventArtifactPayload): string {
-  const label = artifact.title?.trim() || artifact.url?.trim();
+  const label = extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data);
   const type = formatArtifactKindShort(artifact.type);
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }

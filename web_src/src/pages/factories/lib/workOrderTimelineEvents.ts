@@ -70,8 +70,6 @@ export interface WorkOrderTimelineComment {
 export interface WorkOrderTimelineArtifact {
   id?: string;
   type: string;
-  url?: string;
-  title?: string;
   data?: Record<string, unknown>;
 }
 

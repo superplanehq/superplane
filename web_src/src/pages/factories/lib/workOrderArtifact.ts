@@ -30,6 +30,14 @@ export function extractArtifactMarkdownBody(data: ArtifactData): string | undefi
   return extractArtifactField(data, "body");
 }
 
+export function extractArtifactUrl(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "url");
+}
+
+export function extractArtifactTitle(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "title");
+}
+
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {
   if (!data) {
     return undefined;

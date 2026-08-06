@@ -256,19 +256,21 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type:  "pr",
-		URL:   "https://github.com/example/repo/pull/1",
-		Title: "Draft",
-		Data:  map[string]any{"number": "1"},
+		Type: "pr",
+		Data: map[string]any{
+			"url":    "https://github.com/example/repo/pull/1",
+			"title":  "Draft",
+			"number": "1",
+		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, artifact)
 	assert.Equal(t, "pr", artifact.Type)
+	assert.Equal(t, "https://github.com/example/repo/pull/1", artifact.Data["url"])
 
 	artifacts, err := order.ListArtifacts(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
-	assert.Equal(t, "https://github.com/example/repo/pull/1", artifacts[0].URL)
 
 	artifactEvent := findWorkOrderEvent(t, order, "order.artifact.added")
 	artifactAutomation := extractAutomationPayload(t, artifactEvent)

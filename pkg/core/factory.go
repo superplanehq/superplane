@@ -22,10 +22,8 @@ type AddWorkOrderCommentParams struct {
 }
 
 type AddWorkOrderArtifactParams struct {
-	Type  string
-	URL   string
-	Title string
-	Data  map[string]any
+	Type string
+	Data map[string]any
 }
 
 type WorkOrder struct {
@@ -40,7 +38,5 @@ type WorkOrderArtifact struct {
 	ID          string         `json:"id"`
 	WorkOrderID string         `json:"workOrderId"`
 	Type        string         `json:"type"`
-	URL         string         `json:"url,omitempty"`
-	Title       string         `json:"title,omitempty"`
 	Data        map[string]any `json:"data,omitempty"`
 }

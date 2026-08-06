@@ -4,7 +4,12 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import { OrgUserReference } from "../OrgUserReference";
-import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "../lib/workOrderArtifact";
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactTitle,
+  extractArtifactUrl,
+  formatPrArtifactLabel,
+} from "../lib/workOrderArtifact";
 import type { WorkOrderTimelineArtifact, WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
 import { formatArtifactKindLong } from "./authorLabels";
 import { TimelineAutomationActor } from "./TimelineAutomationActor";
@@ -22,9 +27,10 @@ export function ArtifactTimelineBody({
   }
 
   const isPr = artifact.type === "pr";
-  const safeUrl = safeExternalUrl(artifact.url);
+  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
   const prLabel = isPr ? formatPrArtifactLabel(artifact.data) : undefined;
-  const label = prLabel || artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
+  const title = extractArtifactTitle(artifact.data);
+  const label = prLabel || title || safeUrl || (isPr ? "Pull request" : "Note");
   const markdownBody = artifact.type === "markdown" ? extractArtifactMarkdownBody(artifact.data) : undefined;
 
   return (

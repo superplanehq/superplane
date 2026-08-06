@@ -236,8 +236,10 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
           artifact: {
             id: "art-1",
             type: "pr",
-            url: "https://github.com/example/repo/pull/1",
-            title: "Add checkout",
+            data: {
+              url: "https://github.com/example/repo/pull/1",
+              title: "Add checkout",
+            },
           },
         },
       },
@@ -248,10 +250,31 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       artifact: {
         id: "art-1",
         type: "pr",
-        url: "https://github.com/example/repo/pull/1",
-        title: "Add checkout",
+        data: {
+          url: "https://github.com/example/repo/pull/1",
+          title: "Add checkout",
+        },
       },
+      title: "attached PR: Add checkout",
     });
+  });
+
+  it("falls back to data.url when data.title is absent", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          artifact: {
+            id: "art-2",
+            type: "pr",
+            data: { url: "https://github.com/example/repo/pull/2" },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.title).toBe("attached PR: https://github.com/example/repo/pull/2");
   });
 
   it("attributes automation-driven status changes with the factory line", () => {
@@ -324,7 +347,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
             lineName: "Plan",
             stepName: "step-01",
           },
-          artifact: { id: "art-1", type: "pr", url: "https://example.com/pull/1", title: "PR" },
+          artifact: { id: "art-1", type: "pr", data: { url: "https://example.com/pull/1", title: "PR" } },
         },
       },
     ]);

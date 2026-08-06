@@ -3,7 +3,12 @@ import { formatTimeAgo } from "@/lib/date";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
 
-import { extractArtifactMarkdownBody, formatPrArtifactLabel } from "./lib/workOrderArtifact";
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactTitle,
+  extractArtifactUrl,
+  formatPrArtifactLabel,
+} from "./lib/workOrderArtifact";
 
 interface WorkOrderArtifactsPanelProps {
   artifacts: FactoriesWorkOrderArtifact[];
@@ -39,10 +44,12 @@ export function WorkOrderArtifactsPanel({ artifacts, isLoading, error }: WorkOrd
 
 function WorkOrderArtifactRow({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
   const isPr = artifact.type === "TYPE_PR";
-  const safeUrl = safeExternalUrl(artifact.url);
-  const prLabel = isPr ? formatPrArtifactLabel(toDataRecord(artifact.data)) : undefined;
-  const label = prLabel || artifact.title?.trim() || safeUrl || (isPr ? "Pull request" : "Note");
-  const markdownBody = !isPr ? extractArtifactMarkdownBody(toDataRecord(artifact.data)) : undefined;
+  const data = toDataRecord(artifact.data);
+  const safeUrl = safeExternalUrl(extractArtifactUrl(data));
+  const prLabel = isPr ? formatPrArtifactLabel(data) : undefined;
+  const title = extractArtifactTitle(data);
+  const label = prLabel || title || safeUrl || (isPr ? "Pull request" : "Note");
+  const markdownBody = !isPr ? extractArtifactMarkdownBody(data) : undefined;
 
   return (
     <li className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700/70 dark:bg-gray-900/40">

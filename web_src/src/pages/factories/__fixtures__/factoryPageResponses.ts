@@ -284,17 +284,19 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
   {
     id: "art-pr-1",
     type: "TYPE_PR",
-    url: "https://github.com/example/ledger/pull/482",
-    title: "Fix duplicate refund on retry",
-    data: { number: 482 },
+    data: {
+      url: "https://github.com/example/ledger/pull/482",
+      title: "Fix duplicate refund on retry",
+      number: 482,
+    },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,
   },
   {
     id: "art-md-1",
     type: "TYPE_MARKDOWN",
-    title: "Investigation notes",
     data: {
+      title: "Investigation notes",
       body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
     },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },

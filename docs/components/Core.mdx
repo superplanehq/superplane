@@ -428,7 +428,14 @@ A single `memory.added` event is emitted with all written rows and the total `co
 
 **Component key:** `addWorkOrderArtifact`
 
-The Add Work Order Artifact component stores a typed artifact against a work order. Supported types today are: pull requests (URL is required) and markdown notes. Free-form metadata can be attached as name/value pairs — markdown notes typically use a `body` entry for the inline content. This component can only be used in factory-owned apps.
+The Add Work Order Artifact component stores a typed artifact against a work order.
+
+Supported types:
+
+- **Pull request** (`pr`): requires `url`; optional `number` and `title`.
+- **Markdown note** (`markdown`): requires `body`; optional `title`.
+
+Both types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -438,12 +445,12 @@ The Add Work Order Artifact component stores a typed artifact against a work ord
     "artifact": {
       "data": {
         "number": "42",
-        "provider": "github"
+        "provider": "github",
+        "title": "Draft implementation",
+        "url": "https://github.com/example/repo/pull/42"
       },
       "id": "art-123",
-      "title": "Draft implementation",
-      "type": "pr",
-      "url": "https://github.com/example/repo/pull/42"
+      "type": "pr"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",
