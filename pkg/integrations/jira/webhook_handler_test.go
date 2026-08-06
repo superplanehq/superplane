@@ -27,9 +27,6 @@ func Test__WebhookHandler__CompareConfig(t *testing.T) {
 	})
 }
 
-// Regression test: a jira.onIssueComment trigger joining an integration that already has a
-// jira.onIssue webhook must widen the shared registration's events, not silently attach to a
-// registration that will never deliver comment events (BUGBOT_BUG_ID 29ee5f8c).
 func Test__WebhookHandler__Merge(t *testing.T) {
 	handler := &JiraWebhookHandler{}
 
@@ -53,6 +50,18 @@ func Test__WebhookHandler__Merge(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, changed)
 		assert.Equal(t, current, merged)
+	})
+
+	t.Run("treats an empty stored config as the legacy issue-event baseline, not as empty", func(t *testing.T) {
+		current := WebhookConfiguration{}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
+		}, merged)
 	})
 }
 
@@ -151,6 +160,28 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
 	})
 
+	t.Run("falls back to the legacy issue-event baseline when Events is empty", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+		assert.Contains(t, string(body), `"jira:issue_updated"`)
+		assert.Contains(t, string(body), `"jira:issue_deleted"`)
+	})
+
 	t.Run("create failure is surfaced", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -168,10 +199,6 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
 	})
 
-	// Regression test: Jira allows only one URL per OAuth connection. If ScheduleActionCall fails
-	// after CreateIssueWebhook succeeds, leaving the Jira registration behind makes retries fail
-	// on that limit and leaves Cleanup unable to delete it (WebhookID never reaches the SuperPlane
-	// webhook record). Setup must delete the registration on that path.
 	t.Run("schedule failure rolls back the Jira registration", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -259,12 +286,6 @@ func Test__WebhookHandler__Cleanup(t *testing.T) {
 	})
 }
 
-// Regression test: the platform persists webhook metadata by JSON-encoding it into a
-// map[string]any (see models.Webhook.Metadata / WebhookContext.GetMetadata), which turns
-// WebhookID into a float64 before mapstructure decodes it back - unlike the test doubles above,
-// which store the struct directly. mapstructure (the version pinned in go.mod) does convert
-// float64 into a *int64 field, so WebhookID survives the round trip; this pins that behavior so a
-// future mapstructure upgrade can't silently break it.
 func Test__WebhookMetadata__SurvivesJSONMetadataRoundTrip(t *testing.T) {
 	webhookID := int64(1000)
 	original := WebhookMetadata{WebhookID: &webhookID}
