@@ -132,6 +132,10 @@ func (c *RemoveIssueLabel) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
+	if spec.Team == "" {
+		return fmt.Errorf("team is required")
+	}
+
 	if strings.TrimSpace(spec.Issue) == "" {
 		return fmt.Errorf("issue is required")
 	}
@@ -140,7 +144,12 @@ func (c *RemoveIssueLabel) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least one label is required")
 	}
 
-	return nil
+	team, err := requireTeam(ctx.Integration, spec.Team)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Metadata.Set(NodeMetadata{Team: team})
 }
 
 func (c *RemoveIssueLabel) Execute(ctx core.ExecutionContext) error {

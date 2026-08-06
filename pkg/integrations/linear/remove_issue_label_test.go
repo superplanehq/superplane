@@ -26,12 +26,39 @@ func labelNotOnIssueResponse() string {
 func Test__RemoveIssueLabel__Setup(t *testing.T) {
 	component := RemoveIssueLabel{}
 
+	t.Run("missing team -> error", func(t *testing.T) {
+		config := removeLabelConfig()
+		delete(config, "team")
+
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: config,
+		})
+
+		require.ErrorContains(t, err, "team is required")
+	})
+
+	t.Run("unknown team -> error", func(t *testing.T) {
+		config := removeLabelConfig()
+		config["team"] = "other"
+
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: config,
+		})
+
+		require.ErrorContains(t, err, "team other not found")
+	})
+
 	t.Run("missing issue -> error", func(t *testing.T) {
 		config := removeLabelConfig()
 		delete(config, "issue")
 
 		err := component.Setup(core.SetupContext{
-			Integration:   newAuthorizedIntegration(),
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
 			Configuration: config,
 		})
 
@@ -43,7 +70,8 @@ func Test__RemoveIssueLabel__Setup(t *testing.T) {
 		delete(config, "labels")
 
 		err := component.Setup(core.SetupContext{
-			Integration:   newAuthorizedIntegration(),
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
 			Configuration: config,
 		})
 
@@ -55,20 +83,33 @@ func Test__RemoveIssueLabel__Setup(t *testing.T) {
 		config["labels"] = []string{"  ", ""}
 
 		err := component.Setup(core.SetupContext{
-			Integration:   newAuthorizedIntegration(),
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
 			Configuration: config,
 		})
 
 		require.ErrorContains(t, err, "at least one label is required")
 	})
 
-	t.Run("valid setup", func(t *testing.T) {
+	//
+	// The canvas card reads the team off node metadata, so a successful setup has
+	// to store it rather than leaving the card to fall back to the raw team id.
+	//
+	t.Run("stores the resolved team on the node", func(t *testing.T) {
+		metadataContext := &contexts.MetadataContext{}
+
 		err := component.Setup(core.SetupContext{
-			Integration:   newAuthorizedIntegration(),
+			Integration:   integrationWithTeam(),
+			Metadata:      metadataContext,
 			Configuration: removeLabelConfig(),
 		})
 
 		require.NoError(t, err)
+
+		metadata, ok := metadataContext.Metadata.(NodeMetadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.Team)
+		assert.Equal(t, "ENG", metadata.Team.Key)
 	})
 }
 
