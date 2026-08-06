@@ -23,6 +23,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
+  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR or markdown) to a work order" />
+  <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
   <LinkCard title="Create Work Order" href="#create-work-order" description="Create a new work order" />
@@ -46,6 +48,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
+  <LinkCard title="Update Work Order Status" href="#update-work-order-status" description="Transition a work order between lifecycle states" />
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
@@ -416,6 +419,62 @@ A single `memory.added` event is emitted with all written rows and the total `co
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "memory.added"
+}
+```
+
+<a id="add-work-order-artifact"></a>
+
+## Add Work Order Artifact
+
+**Component key:** `addWorkOrderArtifact`
+
+The Add Work Order Artifact component stores a typed artifact against a work order.
+
+Supported types:
+
+- **Pull request** (`pr`): requires `url`; optional `number` and `title`.
+- **Markdown note** (`markdown`): requires `body`; optional `title`.
+
+Both types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "artifact": {
+      "data": {
+        "number": "42",
+        "provider": "github",
+        "title": "Draft implementation",
+        "url": "https://github.com/example/repo/pull/42"
+      },
+      "id": "art-123",
+      "type": "pr"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.artifactAdded"
+}
+```
+
+<a id="add-work-order-comment"></a>
+
+## Add Work Order Comment
+
+**Component key:** `addWorkOrderComment`
+
+The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Ready for review"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.commentAdded"
 }
 ```
 
@@ -1541,6 +1600,31 @@ iteration starts) instead of a bare expression.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.updated"
+}
+```
+
+<a id="update-work-order-status"></a>
+
+## Update Work Order Status
+
+**Component key:** `updateWorkOrderStatus`
+
+The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran). This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workOrder": {
+      "id": "wo-123",
+      "result": "completed",
+      "state": "closed",
+      "title": "Work Order 1"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.statusUpdated"
 }
 ```
 
