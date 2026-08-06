@@ -89,6 +89,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"linear.onIssue":                      "{{ root().data.data.identifier }} - {{ root().data.data.title }}",
 	"linear.onIssueComment":               "{{ root().data.data.issue.identifier }} - {{ root().data.data.issue.title }}",
 	"linear.onIssueLabel":                 "{{ root().data.data.identifier }} - {{ root().data.data.title }}",
+	"linear.onIssueAttachment":            "{{ root().data.data.issue != nil ? root().data.data.issue.identifier + \" - \" + root().data.data.title : root().data.data.title }}",
 	"logfire.onAlertReceived":             "{{ root().data.alertName }}",
 	"newrelic.onIssue":                    "{{ root().data.title }} {{ root().data.state }}",
 	"oci.onComputeInstanceCreated":        "{{ root().data.data.resourceName }}",
