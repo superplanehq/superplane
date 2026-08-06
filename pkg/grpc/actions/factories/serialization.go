@@ -180,6 +180,8 @@ func serializeWorkOrderExecutionResult(executionResult, runResult string) pb.Wor
 
 func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	switch state {
+	case models.FactoryWorkOrderStateDraft:
+		return pb.WorkOrder_STATE_DRAFT
 	case models.FactoryWorkOrderStateOpen:
 		return pb.WorkOrder_STATE_OPEN
 	case models.FactoryWorkOrderStateClosed:
@@ -195,6 +197,8 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 		return pb.WorkOrder_RESULT_COMPLETED
 	case models.FactoryWorkOrderResultRejected:
 		return pb.WorkOrder_RESULT_REJECTED
+	case models.FactoryWorkOrderResultFailed:
+		return pb.WorkOrder_RESULT_FAILED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
 	}
