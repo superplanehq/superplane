@@ -40,7 +40,7 @@ func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
 	}
 
 	merged := mergeEvents(baseline, requestedConfig.Events)
-	if len(merged) == len(currentConfig.Events) {
+	if len(merged) == len(baseline) {
 		return current, false, nil
 	}
 

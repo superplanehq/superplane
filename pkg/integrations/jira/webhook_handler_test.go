@@ -63,6 +63,19 @@ func Test__WebhookHandler__Merge(t *testing.T) {
 			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
 		}, merged)
 	})
+
+	// Regression test: re-saving a jira.onIssue trigger on a legacy webhook must not force a
+	// destructive re-provision every time - only genuinely new events should (BUGBOT_BUG_ID
+	// 4df366b5).
+	t.Run("reports no change when a request against a legacy row is already covered by the baseline", func(t *testing.T) {
+		current := WebhookConfiguration{}
+		requested := WebhookConfiguration{Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, current, merged)
+	})
 }
 
 func Test__WebhookHandler__Setup(t *testing.T) {
