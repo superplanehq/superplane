@@ -118,8 +118,6 @@ func (t *OnIssue) Configuration() []configuration.Field {
 	return projectAndEventsFields("The Jira project to listen for issue events in", "Which issue events to listen for")
 }
 
-// projectAndEventsFields is the Project + Events configuration shared by every project-scoped,
-// created/updated/deleted event trigger (jira.onIssue, jira.onIssueComment).
 func projectAndEventsFields(projectDescription, eventsDescription string) []configuration.Field {
 	return []configuration.Field{
 		{
@@ -178,12 +176,7 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection, so
-	// this doesn't create a webhook itself - it requests one from the platform's webhook
-	// provisioner, which dedups every jira.onIssue/jira.onIssueComment trigger on this integration
-	// (see JiraWebhookHandler.CompareConfig) into one registration covering the union of their
-	// events and fans events out to each trigger, which filters to its own project and events in
-	// HandleWebhook.
+	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection.
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
 	})

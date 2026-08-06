@@ -181,9 +181,6 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
-	// Regression test: the webhook is shared by every trigger on the integration, so a payload
-	// that doesn't carry a project key must not fail open and fire for every trigger regardless
-	// of project.
 	t.Run("ignores an event missing project info rather than fanning it out to every trigger", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		bodyWithoutProject := []byte(`{
@@ -260,8 +257,6 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
-	// Regression test: mention and emoji ADF nodes carry their visible text under attrs.text,
-	// not text or content - a filter matching that text must not be treated as unmatched (BUGBOT_BUG_ID 4a3fed5e).
 	t.Run("matches a content filter against a mention's attrs.text", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		adfBody := []byte(`{
@@ -291,9 +286,6 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
-	// Regression test: block siblings (paragraphs) don't carry their own boundary whitespace the
-	// way inline siblings do, so joining them with no separator ran adjacent paragraphs' words
-	// together (BUGBOT_BUG_ID fd762348).
 	t.Run("separates text across paragraphs with a space", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		adfBody := []byte(`{
@@ -323,9 +315,6 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
-	// Regression test: an empty paragraph (a blank line) still occupies a slot in the block join,
-	// so it must be dropped rather than joined in - otherwise it leaves a surrounding separator
-	// behind and a single-space filter like "Hello World" no longer matches (BUGBOT_BUG_ID 822862ec).
 	t.Run("skips empty paragraphs when joining block text", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		adfBody := []byte(`{
@@ -356,8 +345,6 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
-	// Regression test: a comment delivered without extractable text must fail closed against a
-	// configured filter rather than matching everything by default.
 	t.Run("a comment with no extractable text never matches a configured filter", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		bodyWithoutText := []byte(`{

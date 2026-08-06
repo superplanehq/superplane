@@ -194,9 +194,6 @@ func (t *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	// The webhook is shared by every trigger on the integration (see JiraWebhookHandler), so this
-	// project check is the only thing keeping one trigger from reacting to another project's
-	// events - fail closed when the payload doesn't carry a project key to compare against.
 	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
 		return http.StatusOK, nil, nil
@@ -224,9 +221,6 @@ func (t *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-// Cleanup does nothing: the shared Jira webhook registered via RequestWebhook is torn down by
-// the platform's webhook cleanup worker (through JiraWebhookHandler.Cleanup) once the last
-// trigger referencing it is removed.
 func (t *OnIssueComment) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
@@ -270,8 +264,6 @@ func commentPlainText(body any) string {
 		return ""
 	}
 
-	// Empty blocks (blank lines, which are paragraph nodes with no text) contribute nothing and
-	// must be dropped rather than joined in, or they'd still add a surrounding separator.
 	parts := make([]string, 0, len(content))
 	for _, child := range content {
 		if part := commentPlainText(child); part != "" {
@@ -279,17 +271,12 @@ func commentPlainText(body any) string {
 		}
 	}
 
-	// Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
-	// those with a separator would double it up - but block siblings (paragraphs, list items)
-	// don't, so those need a space to avoid running words together across them.
 	if hasBlockChild(content) {
 		return strings.Join(parts, " ")
 	}
 	return strings.Join(parts, "")
 }
 
-// hasBlockChild reports whether any of content's elements nest further content of their own,
-// which is how block nodes (paragraphs, list items) are told apart from inline leaves.
 func hasBlockChild(content []any) bool {
 	for _, child := range content {
 		if node, ok := child.(map[string]any); ok {
@@ -301,8 +288,6 @@ func hasBlockChild(content []any) bool {
 	return false
 }
 
-// matchesContentFilter reports whether the comment's plain text matches filter - an empty filter
-// always matches, and a comment with no extractable text never does.
 func matchesContentFilter(filter string, body any) (bool, error) {
 	if filter == "" {
 		return true, nil

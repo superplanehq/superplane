@@ -43,28 +43,19 @@ function issueTitle(issue?: JiraIssue): string {
 
 const COMMENT_PREVIEW_LENGTH = 140;
 
-// Jira comment bodies are either plain text or an Atlassian Document Format tree - walk the
-// latter's `content` nodes for a plain-text preview instead of rendering the document.
 function adfText(node: unknown): string {
   if (!node || typeof node !== "object") return "";
   const { text, content, attrs } = node as { text?: string; content?: unknown[]; attrs?: { text?: string } };
   if (typeof text === "string") return text;
   if (typeof attrs?.text === "string") return attrs.text;
   if (Array.isArray(content)) {
-    // Empty blocks (blank lines, which are paragraph nodes with no text) contribute nothing and
-    // must be dropped rather than joined in, or they'd still add a surrounding separator.
     const parts = content.map(adfText).filter((part) => part !== "");
-    // Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
-    // those with a separator would double it up - but block siblings (paragraphs, list items)
-    // don't, so those need a space to avoid running words together across them.
     const separator = content.some(hasBlockContent) ? " " : "";
     return parts.join(separator);
   }
   return "";
 }
 
-// hasBlockContent reports whether node nests further content of its own, which is how block
-// nodes (paragraphs, list items) are told apart from inline leaves.
 function hasBlockContent(node: unknown): boolean {
   return !!node && typeof node === "object" && Array.isArray((node as { content?: unknown[] }).content);
 }
