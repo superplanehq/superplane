@@ -474,7 +474,7 @@ func Test__Linear__Definition(t *testing.T) {
 	assert.Equal(t, "linear", integration.Icon())
 
 	actions := integration.Actions()
-	require.Len(t, actions, 7)
+	require.Len(t, actions, 9)
 	assert.Equal(t, "linear.createIssue", actions[0].Name())
 	assert.Equal(t, "linear.getIssue", actions[1].Name())
 	assert.Equal(t, "linear.updateIssue", actions[2].Name())
@@ -482,6 +482,8 @@ func Test__Linear__Definition(t *testing.T) {
 	assert.Equal(t, "linear.addIssueComment", actions[4].Name())
 	assert.Equal(t, "linear.createAttachment", actions[5].Name())
 	assert.Equal(t, "linear.deleteAttachment", actions[6].Name())
+	assert.Equal(t, "linear.removeIssueLabel", actions[7].Name())
+	assert.Equal(t, "linear.addReaction", actions[8].Name())
 
 	triggers := integration.Triggers()
 	require.Len(t, triggers, 4)

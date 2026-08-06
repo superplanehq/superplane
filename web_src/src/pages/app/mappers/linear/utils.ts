@@ -7,6 +7,7 @@ import type {
   LinearAttachmentDeletion,
   LinearComment,
   LinearIssue,
+  LinearReaction,
   LinearTeam,
   LinearUser,
   LinearWebhookIssue,
@@ -169,6 +170,37 @@ export function buildCommentSubtitle(execution: ExecutionInfo): string | React.R
 
   const label = getIssueLabel(comment?.issue);
   if (label) return label;
+
+  if (execution.createdAt) {
+    return renderTimeAgo(new Date(execution.createdAt));
+  }
+
+  return "";
+}
+
+/** Execution details for the addReaction action, timestamp first, at most six rows. */
+export function buildReactionDetails(execution: ExecutionInfo): Record<string, string> {
+  const details: Record<string, string> = {
+    "Executed At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+  };
+
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const reaction = outputs?.default?.[0]?.data as LinearReaction | undefined;
+  if (!reaction) return details;
+
+  addDetail(details, "Reaction", reaction.emoji);
+  addDetail(details, "Reaction ID", reaction.id);
+  addDetail(details, "Author", getUserLabel(reaction.user));
+
+  return details;
+}
+
+/** Subtitle for the addReaction action: the emoji, else a relative time. */
+export function buildReactionSubtitle(execution: ExecutionInfo): string | React.ReactNode {
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const reaction = outputs?.default?.[0]?.data as LinearReaction | undefined;
+
+  if (reaction?.emoji) return reaction.emoji;
 
   if (execution.createdAt) {
     return renderTimeAgo(new Date(execution.createdAt));
