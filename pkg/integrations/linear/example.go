@@ -87,6 +87,26 @@ func (i *OnIssueComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
 }
 
+//go:embed example_output_remove_issue_label.json
+var exampleOutputRemoveIssueLabelBytes []byte
+
+var exampleOutputRemoveIssueLabelOnce sync.Once
+var exampleOutputRemoveIssueLabel map[string]any
+
+func (c *RemoveIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueLabelOnce, exampleOutputRemoveIssueLabelBytes, &exampleOutputRemoveIssueLabel)
+}
+
+//go:embed example_output_add_reaction.json
+var exampleOutputAddReactionBytes []byte
+
+var exampleOutputAddReactionOnce sync.Once
+var exampleOutputAddReaction map[string]any
+
+func (c *AddReaction) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddReactionOnce, exampleOutputAddReactionBytes, &exampleOutputAddReaction)
+}
+
 //go:embed example_output_create_attachment.json
 var exampleOutputCreateAttachmentBytes []byte
 

@@ -223,6 +223,31 @@ export interface AddIssueLabelConfiguration {
   newLabels?: string[];
 }
 
+export interface RemoveIssueLabelConfiguration {
+  team?: string;
+  issue?: string;
+  labels?: string[];
+  failIfNotFound?: boolean;
+}
+
+export interface AddReactionConfiguration {
+  target?: string;
+  issue?: string;
+  comment?: string;
+  emoji?: string;
+}
+
+/**
+ * Reaction as returned by the `reactionCreate` mutation. Linear normalizes emoji
+ * aliases on write, so `emoji` can differ from the value that was sent.
+ */
+export interface LinearReaction {
+  id?: string;
+  emoji?: string;
+  createdAt?: string;
+  user?: LinearUser;
+}
+
 export interface AddIssueCommentConfiguration {
   issue?: string;
   body?: string;
