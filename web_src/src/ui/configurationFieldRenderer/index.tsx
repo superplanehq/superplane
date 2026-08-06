@@ -9,6 +9,8 @@ import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTi
 import { ReadonlyConfigurationField } from "./ReadonlyFieldRenderer";
 import { ConfigurationFieldInput } from "./ConfigurationFieldInput";
 import { buildReadonlyExpressionPreview } from "./expressionPreview";
+import { FieldDescriptionTooltip } from "./FieldDescriptionTooltip";
+import { expressionQuickTipForField, fieldShowsExpressionQuickTip } from "./expressionQuickTip";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-950/30 dark:text-orange-300";
@@ -269,6 +271,12 @@ export const ConfigurationFieldRenderer = ({
   // so fall back to the field name whenever the label is blank.
   const fieldLabel = runTitlePresentation?.label || field.label || field.name;
   const fieldDescription = runTitlePresentation?.description ?? field.description;
+  // When an expression quick tip would stack under the field description, move the
+  // description (and tip) into a label tooltip so the sidebar stays readable.
+  const showDescriptionInTooltip = Boolean(
+    fieldDescription && fieldShowsExpressionQuickTip(field, fieldAllowsExpressions),
+  );
+  const expressionTipForTooltip = showDescriptionInTooltip ? expressionQuickTipForField(field) : undefined;
 
   const commonProps = {
     field,
@@ -427,6 +435,13 @@ export const ConfigurationFieldRenderer = ({
               <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
             )}
         </Label>
+        {showDescriptionInTooltip && fieldDescription ? (
+          <FieldDescriptionTooltip
+            title={fieldLabel}
+            description={fieldDescription}
+            expressionTip={expressionTipForTooltip}
+          />
+        ) : null}
         <div ref={labelRightRef} className="ml-auto shrink-0" />
       </div>
       {isEnabled && (
@@ -449,8 +464,8 @@ export const ConfigurationFieldRenderer = ({
         </div>
       )}
 
-      {/* Display field description */}
-      {fieldDescription && (
+      {/* Display field description inline when it is not moved into the label tooltip */}
+      {fieldDescription && !showDescriptionInTooltip && (
         <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
       )}
     </div>
