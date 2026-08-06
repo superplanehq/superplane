@@ -60,7 +60,7 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
 		order.ID.String(),
-		factoryevents.EventTypeOrderOpened,
+		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
