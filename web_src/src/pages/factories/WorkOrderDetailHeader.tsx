@@ -1,4 +1,4 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrderResult } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -13,34 +13,25 @@ interface WorkOrderDetailHeaderProps {
   statusMeta: { label: string; className: string };
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
+  isDispatchable: boolean;
+  isClosed: boolean;
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canClose: boolean;
+  canManage: boolean;
   permissionsLoading: boolean;
   isDispatching: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
+  isUpdatingStatus: boolean;
   onDispatch: (lineName: string) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
+  onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
 
-export function WorkOrderDetailHeader({
-  orderTitle,
-  statusMeta,
-  displayStatus,
-  isOpen,
-  factoryLines,
-  canDispatch,
-  canClose,
-  permissionsLoading,
-  isDispatching,
-  isCompleting,
-  isRejecting,
-  isClosing,
-  onDispatch,
-  onClose,
-}: WorkOrderDetailHeaderProps) {
+export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
+  const { orderTitle, statusMeta, displayStatus } = props;
   return (
     <header className="border-b border-gray-200 pb-6 dark:border-gray-700/70">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -57,56 +48,139 @@ export function WorkOrderDetailHeader({
           </h1>
         </div>
 
-        {isOpen ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-              <DispatchWorkOrderPopover
-                lines={factoryLines}
-                isSaving={isDispatching}
-                canDispatch={canDispatch || permissionsLoading}
-                onDispatch={onDispatch}
-              >
-                <Button
-                  type="button"
-                  disabled={!canDispatch || factoryLines.length === 0}
-                  data-testid="work-order-dispatch-button"
-                >
-                  Dispatch
-                  <Forward className="ml-1.5 h-4 w-4" aria-hidden />
-                </Button>
-              </DispatchWorkOrderPopover>
-            </PermissionTooltip>
-
-            <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canClose || isClosing}
-                loading={isCompleting}
-                loadingText="Completing..."
-                onClick={() => void onClose("RESULT_COMPLETED")}
-                data-testid="work-order-complete-button"
-              >
-                Complete
-              </LoadingButton>
-            </PermissionTooltip>
-
-            <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canClose || isClosing}
-                loading={isRejecting}
-                loadingText="Rejecting..."
-                onClick={() => void onClose("RESULT_REJECTED")}
-                data-testid="work-order-reject-button"
-              >
-                Reject
-              </LoadingButton>
-            </PermissionTooltip>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <HeaderActions {...props} />
+        </div>
       </div>
     </header>
+  );
+}
+
+function HeaderActions({
+  displayStatus,
+  isOpen,
+  isDispatchable,
+  isClosed,
+  factoryLines,
+  canDispatch,
+  canClose,
+  canManage,
+  permissionsLoading,
+  isDispatching,
+  isCompleting,
+  isRejecting,
+  isClosing,
+  isUpdatingStatus,
+  onDispatch,
+  onClose,
+  onStatusChange,
+}: WorkOrderDetailHeaderProps) {
+  // Draft is "dispatchable, not yet open, not closed" — the only lifecycle
+  // stage where an operator can abandon the order before any work runs.
+  const isDraft = isDispatchable && !isOpen && !isClosed;
+
+  return (
+    <>
+      {isDispatchable ? (
+        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <DispatchWorkOrderPopover
+            lines={factoryLines}
+            isSaving={isDispatching}
+            canDispatch={canDispatch || permissionsLoading}
+            onDispatch={onDispatch}
+          >
+            <Button
+              type="button"
+              disabled={!canDispatch || factoryLines.length === 0}
+              data-testid="work-order-dispatch-button"
+            >
+              Dispatch
+              <Forward className="ml-1.5 h-4 w-4" aria-hidden />
+            </Button>
+          </DispatchWorkOrderPopover>
+        </PermissionTooltip>
+      ) : null}
+
+      {isDraft ? (
+        <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+          <LoadingButton
+            type="button"
+            variant="ghost"
+            disabled={!canClose || isClosing}
+            loading={isRejecting}
+            loadingText="Rejecting..."
+            onClick={() => void onClose("RESULT_REJECTED")}
+            data-testid="work-order-reject-draft-button"
+          >
+            Reject
+          </LoadingButton>
+        </PermissionTooltip>
+      ) : null}
+
+      {isOpen ? (
+        <>
+          {/* Back-to-draft hits the `open → draft` FSM guard, which rejects while a line execution is pending/running. */}
+          {displayStatus !== "running" ? (
+            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
+              <LoadingButton
+                type="button"
+                variant="ghost"
+                disabled={!canManage || isUpdatingStatus}
+                loading={isUpdatingStatus}
+                loadingText="Moving to draft..."
+                onClick={() => void onStatusChange("STATE_DRAFT")}
+                data-testid="work-order-back-to-draft-button"
+              >
+                Back to draft
+              </LoadingButton>
+            </PermissionTooltip>
+          ) : null}
+
+          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+            <LoadingButton
+              type="button"
+              variant="ghost"
+              disabled={!canClose || isClosing}
+              loading={isCompleting}
+              loadingText="Completing..."
+              onClick={() => void onClose("RESULT_COMPLETED")}
+              data-testid="work-order-complete-button"
+            >
+              Complete
+            </LoadingButton>
+          </PermissionTooltip>
+
+          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
+            <LoadingButton
+              type="button"
+              variant="ghost"
+              disabled={!canClose || isClosing}
+              loading={isRejecting}
+              loadingText="Rejecting..."
+              onClick={() => void onClose("RESULT_REJECTED")}
+              data-testid="work-order-reject-button"
+            >
+              Reject
+            </LoadingButton>
+          </PermissionTooltip>
+        </>
+      ) : null}
+
+      {isClosed ? (
+        <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
+          <LoadingButton
+            type="button"
+            variant="ghost"
+            disabled={!canManage || isUpdatingStatus}
+            loading={isUpdatingStatus}
+            loadingText="Reopening..."
+            onClick={() => void onStatusChange("STATE_OPEN")}
+            data-testid="work-order-reopen-open-button"
+          >
+            Reopen
+          </LoadingButton>
+        </PermissionTooltip>
+      ) : null}
+    </>
   );
 }
