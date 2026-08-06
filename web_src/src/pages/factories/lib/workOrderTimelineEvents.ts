@@ -39,6 +39,8 @@ export interface WorkOrderTimelineEvent {
   at: string;
   actorUserId?: string;
   actorName?: string;
+  sourceRunId?: string;
+  sourceAppId?: string;
   assigneeChange?: WorkOrderTimelineAssigneeChange;
   title: string;
   lineName?: string;
