@@ -68,11 +68,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="Prometheus • Create Rule Group Namespace" href="#prometheus-•-create-rule-group-namespace" description="Create a rule group namespace in an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Create Workspace" href="#prometheus-•-create-workspace" description="Create an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Delete Rule Group Namespace" href="#prometheus-•-delete-rule-group-namespace" description="Delete a rule group namespace from an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Delete Workspace" href="#prometheus-•-delete-workspace" description="Delete an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Get Rule Group Namespace" href="#prometheus-•-get-rule-group-namespace" description="Get a rule group namespace from an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Get Workspace" href="#prometheus-•-get-workspace" description="Get an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Query" href="#prometheus-•-query" description="Execute a PromQL instant query against an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Query Range" href="#prometheus-•-query-range" description="Execute a PromQL range query against an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Update Rule Group Namespace" href="#prometheus-•-update-rule-group-namespace" description="Replace the rules document of a rule group namespace in an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Update Workspace" href="#prometheus-•-update-workspace" description="Update a Prometheus workspace alias" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
@@ -2885,6 +2887,35 @@ The Create Workspace component creates an Amazon Managed Service for Prometheus 
 }
 ```
 
+<a id="prometheus-•-delete-rule-group-namespace"></a>
+
+## Prometheus • Delete Rule Group Namespace
+
+**Component key:** `aws.prometheus.deleteRuleGroupNamespace`
+
+The Delete Rule Group Namespace component permanently removes a rule group namespace and all its associated alerting and recording rules from an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Namespace**: Target rule group namespace
+- **Client Token**: Optional idempotency token
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "namespace": "example-alerts",
+    "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+  },
+  "timestamp": "2026-01-01T00:20:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace.deleted"
+}
+```
+
 <a id="prometheus-•-delete-workspace"></a>
 
 ## Prometheus • Delete Workspace
@@ -3100,6 +3131,56 @@ Emits one `aws.prometheus.queryRange` payload with the result type and results.
   },
   "timestamp": "2026-01-01T00:05:00.000000000Z",
   "type": "aws.prometheus.queryRange"
+}
+```
+
+<a id="prometheus-•-update-rule-group-namespace"></a>
+
+## Prometheus • Update Rule Group Namespace
+
+**Component key:** `aws.prometheus.updateRuleGroupNamespace`
+
+The Update Rule Group Namespace component replaces the rules document of an existing rule group namespace with a new YAML definition. This is a full replacement — the entire rules document is overwritten.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Namespace**: Target rule group namespace
+- **Rules Document (YAML)**: New YAML document containing one or more rule groups
+- **Client Token**: Optional idempotency token
+
+### Example Rules Document
+
+```yaml
+groups:
+  - name: example-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status="500"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+```
+
+### Example Output
+
+```json
+{
+  "data": {
+    "namespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-11111111-1111-4111-8111-111111111111/example-alerts",
+      "name": "example-alerts",
+      "status": {
+        "statusCode": "UPDATING"
+      }
+    },
+    "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+  },
+  "timestamp": "2026-01-01T00:15:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace.updated"
 }
 ```
 

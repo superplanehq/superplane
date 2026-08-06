@@ -226,6 +226,21 @@ type CommentIssue struct {
 	URL        string `json:"url"`
 }
 
+// Attachment is a link card on an issue. Linear deduplicates attachments by url
+// within an issue, so creating one with an existing url updates it in place.
+// iconUrl is deliberately absent: Linear accepts it on AttachmentCreateInput but
+// does not expose it on the Attachment type, so it can never be read back.
+type Attachment struct {
+	ID        string        `json:"id"`
+	Title     string        `json:"title"`
+	Subtitle  string        `json:"subtitle,omitempty"`
+	URL       string        `json:"url"`
+	CreatedAt string        `json:"createdAt,omitempty"`
+	UpdatedAt string        `json:"updatedAt,omitempty"`
+	Creator   *User         `json:"creator,omitempty"`
+	Issue     *CommentIssue `json:"issue,omitempty"`
+}
+
 // Viewer identifies the account behind the access token and the workspace it belongs to.
 type Viewer struct {
 	User         *User        `json:"viewer"`
@@ -567,6 +582,101 @@ func (c *Client) CreateComment(input map[string]any) (*Comment, error) {
 	}
 
 	return response.CommentCreate.Comment, nil
+}
+
+const attachmentFields = `
+      id title subtitle url createdAt updatedAt
+      creator { id name displayName email }
+      issue { id identifier title url }`
+
+const createAttachmentMutation = `
+mutation AttachmentCreate($input: AttachmentCreateInput!) {
+  attachmentCreate(input: $input) {
+    success
+    attachment {` + attachmentFields + `
+    }
+  }
+}`
+
+// CreateAttachment adds a link attachment to an issue. Linear deduplicates by
+// url within an issue, so an existing url updates that attachment instead of
+// creating a second one. The input's issueId may be the issue UUID or its
+// identifier (e.g. ENG-142).
+func (c *Client) CreateAttachment(input map[string]any) (*Attachment, error) {
+	response := struct {
+		AttachmentCreate struct {
+			Success    bool        `json:"success"`
+			Attachment *Attachment `json:"attachment"`
+		} `json:"attachmentCreate"`
+	}{}
+
+	if err := c.execute(createAttachmentMutation, map[string]any{"input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.AttachmentCreate.Success || response.AttachmentCreate.Attachment == nil {
+		return nil, fmt.Errorf("linear reported the attachment was not created")
+	}
+
+	return response.AttachmentCreate.Attachment, nil
+}
+
+const deleteAttachmentMutation = `
+mutation AttachmentDelete($id: String!) {
+  attachmentDelete(id: $id) {
+    success
+  }
+}`
+
+// DeleteAttachment removes an attachment by its ID. Linear has no delete-by-url,
+// so the ID must come from createAttachment's output or an attachment event.
+func (c *Client) DeleteAttachment(id string) error {
+	response := struct {
+		AttachmentDelete struct {
+			Success bool `json:"success"`
+		} `json:"attachmentDelete"`
+	}{}
+
+	if err := c.execute(deleteAttachmentMutation, map[string]any{"id": id}, &response); err != nil {
+		return err
+	}
+
+	if !response.AttachmentDelete.Success {
+		return fmt.Errorf("linear reported the attachment was not deleted")
+	}
+
+	return nil
+}
+
+const issueAttachmentsQuery = `
+query IssueAttachments($id: String!) {
+  issue(id: $id) {
+    attachments(first: 100) {
+      nodes { id title subtitle url }
+    }
+  }
+}`
+
+// ListIssueAttachments returns the attachments on a single issue, for the
+// attachment picker. Issues carry few enough attachments that one page is plenty.
+func (c *Client) ListIssueAttachments(issueID string) ([]Attachment, error) {
+	response := struct {
+		Issue *struct {
+			Attachments struct {
+				Nodes []Attachment `json:"nodes"`
+			} `json:"attachments"`
+		} `json:"issue"`
+	}{}
+
+	if err := c.execute(issueAttachmentsQuery, map[string]any{"id": issueID}, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Issue == nil {
+		return nil, fmt.Errorf("issue %s not found", issueID)
+	}
+
+	return response.Issue.Attachments.Nodes, nil
 }
 
 // Reaction is an emoji reaction on an issue or a comment. Linear normalizes

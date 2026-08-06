@@ -2,7 +2,16 @@ import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { ExecutionInfo, OutputPayload } from "../types";
-import type { LinearComment, LinearIssue, LinearReaction, LinearTeam, LinearUser, LinearWebhookIssue } from "./types";
+import type {
+  LinearAttachment,
+  LinearAttachmentDeletion,
+  LinearComment,
+  LinearIssue,
+  LinearReaction,
+  LinearTeam,
+  LinearUser,
+  LinearWebhookIssue,
+} from "./types";
 
 /** Adds a detail row only when there is a real value, rather than padding with dashes. */
 export function addDetail(details: Record<string, string>, label: string, value: string | undefined): void {
@@ -102,6 +111,54 @@ export function buildCommentDetails(execution: ExecutionInfo): Record<string, st
   addDetail(details, "Issue", getIssueLabel(comment.issue));
   addDetail(details, "Author", getUserLabel(comment.user));
   addDetail(details, "Comment", comment.body);
+
+  return details;
+}
+
+/** Execution details for the createAttachment action, timestamp first, at most six rows. */
+export function buildAttachmentDetails(execution: ExecutionInfo): Record<string, string> {
+  const details: Record<string, string> = {
+    "Executed At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+  };
+
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const attachment = outputs?.default?.[0]?.data as LinearAttachment | undefined;
+  if (!attachment) return details;
+
+  addDetail(details, "Attachment URL", attachment.url);
+  addDetail(details, "Issue", getIssueLabel(attachment.issue));
+  addDetail(details, "Title", attachment.title);
+  addDetail(details, "Subtitle", attachment.subtitle);
+
+  return details;
+}
+
+/** Subtitle for the createAttachment action: the attachment title, else a relative time. */
+export function buildAttachmentSubtitle(execution: ExecutionInfo): string | React.ReactNode {
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const attachment = outputs?.default?.[0]?.data as LinearAttachment | undefined;
+
+  if (attachment?.title) return attachment.title;
+
+  if (execution.createdAt) {
+    return renderTimeAgo(new Date(execution.createdAt));
+  }
+
+  return "";
+}
+
+/** Execution details for the deleteAttachment action, which only returns the deleted ID. */
+export function buildAttachmentDeletionDetails(execution: ExecutionInfo): Record<string, string> {
+  const details: Record<string, string> = {
+    "Executed At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+  };
+
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const deletion = outputs?.default?.[0]?.data as LinearAttachmentDeletion | undefined;
+  if (!deletion) return details;
+
+  addDetail(details, "Attachment", deletion.id);
+  addDetail(details, "Deleted", deletion.deleted ? "Yes" : "No");
 
   return details;
 }
