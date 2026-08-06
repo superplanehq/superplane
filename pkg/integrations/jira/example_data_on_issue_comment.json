@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issueComment",
+  "data": {
+    "action": "created",
+    "comment": {
+      "id": "10019",
+      "body": "Thanks for the update, looking into this now.",
+      "author": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      },
+      "updateAuthor": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      }
+    },
+    "issue": {
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001",
+      "fields": {
+        "summary": "Login page returns 500 on invalid password",
+        "issuetype": { "name": "Bug" },
+        "project": { "id": "10000", "key": "ENG", "name": "Engineering" },
+        "status": { "name": "To Do", "statusCategory": { "name": "To Do", "key": "new" } }
+      }
+    }
+  }
+}
