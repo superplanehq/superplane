@@ -34,6 +34,15 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one event")
 	})
 
+	t.Run("invalid content filter pattern -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"project": "ENG", "events": []string{"created"}, "contentFilter": "["},
+		})
+		require.ErrorContains(t, err, "invalid content filter pattern")
+	})
+
 	t.Run("valid config resolves the project and requests the shared Jira webhook", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -185,6 +194,87 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 			Events:        events,
 			Metadata:      meta(),
 			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("emits when the comment body matches the content filter", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "Looking into"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("ignores a comment that does not match the content filter", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "deploy"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("matches a content filter against an Atlassian Document Format body", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		adfBody := []byte(`{
+			"webhookEvent": "comment_created",
+			"comment": {
+				"id": "10019",
+				"body": {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "please deploy this"}]}]}
+			},
+			"issue": {
+				"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {"project": {"key": "ENG"}}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          adfBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "deploy"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	// Regression test: a comment delivered without extractable text must fail closed against a
+	// configured filter rather than matching everything by default.
+	t.Run("a comment with no extractable text never matches a configured filter", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		bodyWithoutText := []byte(`{
+			"webhookEvent": "comment_created",
+			"comment": {"id": "10019"},
+			"issue": {
+				"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {"project": {"key": "ENG"}}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          bodyWithoutText,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "deploy"},
 			Headers:       http.Header{},
 			Logger:        log.NewEntry(log.New()),
 		})

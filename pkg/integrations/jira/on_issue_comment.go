@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -24,8 +25,9 @@ const (
 type OnIssueComment struct{}
 
 type OnIssueCommentConfiguration struct {
-	Project string   `json:"project" mapstructure:"project"`
-	Events  []string `json:"events" mapstructure:"events"`
+	Project       string   `json:"project" mapstructure:"project"`
+	Events        []string `json:"events" mapstructure:"events"`
+	ContentFilter string   `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 type OnIssueCommentMetadata struct {
@@ -79,6 +81,9 @@ func (t *OnIssueComment) Documentation() string {
 
 - **Project**: The Jira project to listen for comment events in
 - **Events**: Which comment events to listen for (Created, Updated, Deleted)
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. ` + "`urgent`" + ` to
+  only trigger on comments containing "urgent". A comment with no extractable text never matches
+  when a filter is set.
 
 ## Webhook Setup
 
@@ -105,7 +110,15 @@ func (t *OnIssueComment) ExampleData() map[string]any {
 }
 
 func (t *OnIssueComment) Configuration() []configuration.Field {
-	return projectAndEventsFields("The Jira project to listen for comment events in", "Which comment events to listen for")
+	fields := projectAndEventsFields("The Jira project to listen for comment events in", "Which comment events to listen for")
+	return append(fields, configuration.Field{
+		Name:        "contentFilter",
+		Label:       "Content Filter",
+		Type:        configuration.FieldTypeString,
+		Required:    false,
+		Placeholder: "e.g., urgent",
+		Description: "Optional regex pattern to filter comments by content",
+	})
 }
 
 func (t *OnIssueComment) Setup(ctx core.TriggerContext) error {
@@ -120,6 +133,11 @@ func (t *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	}
 	if len(config.Events) == 0 {
 		return fmt.Errorf("at least one event must be selected")
+	}
+	if config.ContentFilter != "" {
+		if _, err := regexp.Compile(config.ContentFilter); err != nil {
+			return fmt.Errorf("invalid content filter pattern: %w", err)
+		}
 	}
 
 	project, err := requireProject(ctx.HTTP, ctx.Integration, projectKey)
@@ -182,6 +200,15 @@ func (t *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
+	matched, err := matchesContentFilter(config.ContentFilter, payload.Comment.Body)
+	if err != nil {
+		return http.StatusBadRequest, nil, err
+	}
+	if !matched {
+		ctx.Logger.Info("Ignoring event - comment does not match the content filter")
+		return http.StatusOK, nil, nil
+	}
+
 	event := IssueCommentEvent{
 		Action:  action,
 		Comment: payload.Comment,
@@ -214,4 +241,52 @@ func commentEventAction(webhookEvent string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// commentPlainText extracts plain text from a comment body. Jira sends either a plain string or
+// an Atlassian Document Format tree (e.g. {"type":"doc","content":[...]}) - ADF is walked for its
+// text nodes so content filtering works the same way regardless of which shape a site returns.
+func commentPlainText(body any) string {
+	if text, ok := body.(string); ok {
+		return text
+	}
+
+	node, ok := body.(map[string]any)
+	if !ok {
+		return ""
+	}
+	if text, ok := node["text"].(string); ok {
+		return text
+	}
+
+	content, ok := node["content"].([]any)
+	if !ok {
+		return ""
+	}
+
+	parts := make([]string, 0, len(content))
+	for _, child := range content {
+		parts = append(parts, commentPlainText(child))
+	}
+	return strings.Join(parts, " ")
+}
+
+// matchesContentFilter checks the comment body's plain text against the regex filter. An empty
+// filter always matches, and a comment with no extractable text never does.
+func matchesContentFilter(filter string, body any) (bool, error) {
+	if filter == "" {
+		return true, nil
+	}
+
+	text := commentPlainText(body)
+	if text == "" {
+		return false, nil
+	}
+
+	matched, err := regexp.MatchString(filter, text)
+	if err != nil {
+		return false, fmt.Errorf("invalid content filter pattern: %w", err)
+	}
+
+	return matched, nil
 }
