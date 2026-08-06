@@ -30,6 +30,7 @@ export function formatAutomationLabel(nodeName: string | undefined, appName: str
 const ARTIFACT_KIND_LONG_LABEL: Record<string, string> = {
   pr: "pull request",
   markdown: "note",
+  branch: "branch",
 };
 
 export function formatArtifactKindLong(type: string | null | undefined): string {
