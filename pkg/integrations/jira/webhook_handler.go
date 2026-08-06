@@ -2,29 +2,26 @@ package jira
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// WebhookConfiguration has no fields on purpose: Jira's dynamic webhook API accepts only one
-// registered callback URL per OAuth connection ("Only a single URL per user is allowed to be
-// registered via REST API"), so every jira.onIssue trigger under the same integration must
-// share the one Jira-side registration, regardless of which project or events it configures.
-// CompareConfig below always reports a match so the platform's webhook provisioner dedups them
-// into a single webhook record instead of trying to register a distinct URL for each trigger.
-type WebhookConfiguration struct{}
+// WebhookConfiguration tracks the union of native Jira event names the shared webhook must
+// deliver: Jira's dynamic webhook API accepts only one registered callback URL per OAuth
+// connection
+type WebhookConfiguration struct {
+	Events []string `json:"events,omitempty" mapstructure:"events,omitempty"`
+}
 
 type WebhookMetadata struct {
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
-// allProjectsJQLFilter matches every issue in every project. An empty jqlFilter is rejected
-// outright by Atlassian ("Empty JQL search not supported") even though the key itself must be
-// present - this is the simplest clause confirmed (live, against a real site) to both be accepted
-// and match unconditionally, needed since this single registration is shared by every
-// jira.onIssue trigger on the integration regardless of project.
 const allProjectsJQLFilter = "project != EMPTY"
+
+var legacyIssueEvents = []string{issueEventCreated, issueEventUpdated, issueEventDeleted}
 
 type JiraWebhookHandler struct{}
 
@@ -33,21 +30,61 @@ func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig, requestedConfig := WebhookConfiguration{}, WebhookConfiguration{}
+	_ = mapstructure.Decode(current, &currentConfig)
+	_ = mapstructure.Decode(requested, &requestedConfig)
+
+	baseline := currentConfig.Events
+	if len(baseline) == 0 {
+		baseline = legacyIssueEvents
+	}
+
+	merged := mergeEvents(baseline, requestedConfig.Events)
+	if len(merged) == len(currentConfig.Events) {
+		return current, false, nil
+	}
+
+	return WebhookConfiguration{Events: merged}, true, nil
+}
+
+// mergeEvents returns the union of current and additional, preserving current's order so an
+// unrelated Merge call doesn't reorder (and thus needlessly re-provision) an unchanged webhook.
+func mergeEvents(current, additional []string) []string {
+	merged := append([]string{}, current...)
+	for _, event := range additional {
+		if !slices.Contains(merged, event) {
+			merged = append(merged, event)
+		}
+	}
+	return merged
 }
 
 func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	config := WebhookConfiguration{}
+	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+
+	events := config.Events
+	if len(events) == 0 {
+		events = legacyIssueEvents
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// This single registration must cover every project, since it is shared by every
-	// jira.onIssue trigger on this integration - each one filters to its own configured project
+	previous := WebhookMetadata{}
+	_ = mapstructure.Decode(ctx.Webhook.GetMetadata(), &previous)
+	if previous.WebhookID != nil {
+		if err := client.DeleteIssueWebhooks([]int64{*previous.WebhookID}); err != nil {
+			return nil, fmt.Errorf("failed to delete previous Jira webhook: %w", err)
+		}
+	}
+
+	// This single registration must cover every project and every trigger type sharing it
+	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
 	// and events itself, in HandleWebhook.
-	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, []string{
-		issueEventCreated, issueEventUpdated, issueEventDeleted,
-	})
+	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, events)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
 	}

@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue created, updated, or deleted events in Jira" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to comment created, updated, or deleted events on Jira issues" />
 </CardGrid>
 
 ## Actions
@@ -128,6 +129,88 @@ Emits one event per matching issue webhook with:
   },
   "timestamp": "2026-07-17T09:30:00Z",
   "type": "jira.issue"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `jira.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is added, edited, or removed on an issue in a Jira project.
+
+### Use Cases
+
+- **Customer response workflows**: React when a customer comments on a service desk request
+- **Notification workflows**: Send notifications when someone comments on an issue
+- **Sync workflows**: Mirror Jira comments into other tools
+
+### Configuration
+
+- **Project**: The Jira project to listen for comment events in
+- **Events**: Which comment events to listen for (Created, Updated, Deleted)
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `urgent` to
+  only trigger on comments containing "urgent". A comment with no extractable text never matches
+  when a filter is set.
+
+### Webhook Setup
+
+This is provisioned automatically, sharing the same webhook registration `jira.onIssue` uses - see that trigger's documentation for how Jira's dynamic webhook registration works.
+
+### Output
+
+Emits one event per matching comment webhook with:
+- **action**: `created`, `updated`, or `deleted`
+- **comment**: The comment (id, body, author, updateAuthor)
+- **issue**: The full issue the comment belongs to (id, key, self, fields)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "author": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      },
+      "body": "Thanks for the update, looking into this now.",
+      "id": "10019",
+      "updateAuthor": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      }
+    },
+    "issue": {
+      "fields": {
+        "issuetype": {
+          "name": "Bug"
+        },
+        "project": {
+          "id": "10000",
+          "key": "ENG",
+          "name": "Engineering"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new",
+            "name": "To Do"
+          }
+        },
+        "summary": "Login page returns 500 on invalid password"
+      },
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issueComment"
 }
 ```
 
