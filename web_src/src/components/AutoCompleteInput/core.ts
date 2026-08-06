@@ -114,8 +114,8 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     name: "order",
     snippet: "order().",
     description:
-      "Returns the work order for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, and artifacts (loaded when accessed).",
-    example: 'none(order().artifacts, {#.type == "pr"})',
+      "Returns the work order for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, and artifacts (loaded when accessed; data fields like title/body/url are promoted onto each artifact).",
+    example: 'find(order().artifacts, {.type == "markdown" and .title == "PLAN.md"}).body',
   },
   // String
   {

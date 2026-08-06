@@ -260,7 +260,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 
 	markdownArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
 		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
-		Data: map[string]any{"body": "notes from implement"},
+		Data: map[string]any{"body": "notes from implement", "title": "PLAN.md"},
 	})
 	require.NoError(t, err)
 
@@ -347,6 +347,11 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "https://github.com/org/repo/pull/7", prURL)
 
+		// Data keys are also promoted onto the artifact for ergonomic filters.
+		promotedURL, err := builder.ResolveExpression(`order().artifacts[0].url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/org/repo/pull/7", promotedURL)
+
 		bracketType, err := builder.ResolveExpression(`order()["artifacts"][0]["type"]`)
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, bracketType)
@@ -359,6 +364,16 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "notes from implement", body)
 		assert.Equal(t, markdownArtifact.ID.String(), mustResolveString(t, builder, `order().artifacts[1].id`))
+
+		promotedBody, err := builder.ResolveExpression(`order().artifacts[1].body`)
+		require.NoError(t, err)
+		assert.Equal(t, "notes from implement", promotedBody)
+
+		planBody, err := builder.ResolveExpression(
+			`find(order().artifacts, {.type == "markdown" and .title == "PLAN.md"}).body`,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "notes from implement", planBody)
 	})
 
 	t.Run("none and any over artifact types", func(t *testing.T) {

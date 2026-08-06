@@ -52,7 +52,10 @@ current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
-`root().data.work_order` remains the onRun snapshot and does not include
+Each artifact exposes `id`, `type`, nested `data`, and the `data` keys
+promoted onto the artifact itself (`title`, `body`, `url`, …) so filters like
+`find(order().artifacts, {.type == "markdown" and .title == "PLAN.md"}).body`
+work. `root().data.work_order` remains the onRun snapshot and does not include
 artifacts.
 
 ## Work order lifecycle
