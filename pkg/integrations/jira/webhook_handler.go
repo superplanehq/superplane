@@ -3,9 +3,11 @@ package jira
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/retry"
 )
 
 // WebhookConfiguration tracks the union of native Jira event names the shared webhook must
@@ -75,18 +77,38 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 
 	previous := WebhookMetadata{}
 	_ = mapstructure.Decode(ctx.Webhook.GetMetadata(), &previous)
-	if previous.WebhookID != nil {
-		if err := client.DeleteIssueWebhooks([]int64{*previous.WebhookID}); err != nil {
-			return nil, fmt.Errorf("failed to delete previous Jira webhook: %w", err)
-		}
-	}
 
 	// This single registration must cover every project and every trigger type sharing it
 	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
 	// and events itself, in HandleWebhook.
-	webhookID, err := client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, events)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
+	var webhookID int64
+	createWebhook := func() error {
+		var createErr error
+		webhookID, createErr = client.CreateIssueWebhook(ctx.Webhook.GetURL(), allProjectsJQLFilter, events)
+		return createErr
+	}
+
+	if previous.WebhookID == nil {
+		if err := createWebhook(); err != nil {
+			return nil, fmt.Errorf("failed to create Jira webhook: %w", err)
+		}
+	} else {
+		if err := client.DeleteIssueWebhooks([]int64{*previous.WebhookID}); err != nil {
+			return nil, fmt.Errorf("failed to delete previous Jira webhook: %w", err)
+		}
+
+		// Deleting a working registration before its replacement exists briefly silences every
+		// trigger sharing it, since Jira allows only one registration per connection - retry the
+		// create tightly so a transient failure recovers in seconds rather than waiting for the
+		// provisioner's own, much slower retry cadence.
+		retryErr := retry.WithConstantWait(createWebhook, retry.Options{
+			Task:        "recreate Jira webhook after widening events",
+			MaxAttempts: 2,
+			Wait:        2 * time.Second,
+		})
+		if retryErr != nil {
+			return nil, fmt.Errorf("failed to create Jira webhook: %w", retryErr)
+		}
 	}
 
 	// Atlassian expires dynamic webhooks 30 days after creation unless refreshed. Mirror the id

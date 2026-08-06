@@ -173,6 +173,63 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
 	})
 
+	// Regression test: deleting a working shared webhook before its replacement exists silences
+	// every trigger sharing it if the create then fails - retry the create tightly so a transient
+	// failure recovers in seconds instead of waiting for the provisioner's own retry cadence
+	// (BUGBOT_BUG_ID 2fb96a18).
+	t.Run("retries the create after a transient failure following a delete", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["timeout"]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":3000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+		previousID := int64(1000)
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Metadata:      WebhookMetadata{WebhookID: &previousID},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}},
+			},
+		})
+		require.NoError(t, err)
+
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, int64(3000), *webhookMetadata.WebhookID)
+		require.Len(t, httpCtx.Requests, 3)
+	})
+
+	t.Run("surfaces the error once retries are exhausted after a delete", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["down"]}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["down"]}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessages":["down"]}`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+		previousID := int64(1000)
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Metadata:      WebhookMetadata{WebhookID: &previousID},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated}},
+			},
+		})
+		require.ErrorContains(t, err, "failed to create Jira webhook")
+		require.Len(t, httpCtx.Requests, 4)
+	})
+
 	t.Run("falls back to the legacy issue-event baseline when Events is empty", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
