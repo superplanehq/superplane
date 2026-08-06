@@ -115,13 +115,17 @@ func (t *OnIssue) ExampleData() map[string]any {
 }
 
 func (t *OnIssue) Configuration() []configuration.Field {
+	return projectAndEventsFields("The Jira project to listen for issue events in", "Which issue events to listen for")
+}
+
+func projectAndEventsFields(projectDescription, eventsDescription string) []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "project",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Jira project to listen for issue events in",
+			Description: projectDescription,
 			Placeholder: "Select a project",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -135,7 +139,7 @@ func (t *OnIssue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    true,
 			Default:     []string{"created"},
-			Description: "Which issue events to listen for",
+			Description: eventsDescription,
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -172,13 +176,10 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection,
-	// so this doesn't create a webhook itself - it requests one from the platform's webhook
-	// provisioner, which dedups all jira.onIssue triggers on this integration (see
-	// JiraWebhookHandler.CompareConfig) into a single shared registration, and fans out incoming
-	// events to every trigger sharing it. Each trigger filters to its own project and events in
-	// HandleWebhook.
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{})
+	// Jira's dynamic webhook API allows only one registered callback URL per OAuth connection.
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+	})
 }
 
 func (t *OnIssue) Hooks() []core.Hook {
