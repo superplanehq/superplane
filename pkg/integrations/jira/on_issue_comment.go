@@ -270,14 +270,31 @@ func commentPlainText(body any) string {
 		return ""
 	}
 
-	// Adjacent text nodes already carry their own boundary whitespace (e.g. a mention is
-	// typically followed by a text node starting with a space), so joining with a separator
-	// would double it up.
 	parts := make([]string, 0, len(content))
 	for _, child := range content {
 		parts = append(parts, commentPlainText(child))
 	}
+
+	// Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
+	// those with a separator would double it up - but block siblings (paragraphs, list items)
+	// don't, so those need a space to avoid running words together across them.
+	if hasBlockChild(content) {
+		return strings.Join(parts, " ")
+	}
 	return strings.Join(parts, "")
+}
+
+// hasBlockChild reports whether any of content's elements nest further content of their own,
+// which is how block nodes (paragraphs, list items) are told apart from inline leaves.
+func hasBlockChild(content []any) bool {
+	for _, child := range content {
+		if node, ok := child.(map[string]any); ok {
+			if _, ok := node["content"].([]any); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // matchesContentFilter reports whether the comment's plain text matches filter - an empty filter

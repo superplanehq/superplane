@@ -50,10 +50,20 @@ function adfText(node: unknown): string {
   const { text, content, attrs } = node as { text?: string; content?: unknown[]; attrs?: { text?: string } };
   if (typeof text === "string") return text;
   if (typeof attrs?.text === "string") return attrs.text;
-  // Adjacent nodes already carry their own boundary whitespace (e.g. a mention is typically
-  // followed by a text node starting with a space), so joining with a separator would double it up.
-  if (Array.isArray(content)) return content.map(adfText).join("");
+  if (Array.isArray(content)) {
+    // Inline siblings (text, mentions) already carry their own boundary whitespace, so joining
+    // those with a separator would double it up - but block siblings (paragraphs, list items)
+    // don't, so those need a space to avoid running words together across them.
+    const separator = content.some(hasBlockContent) ? " " : "";
+    return content.map(adfText).join(separator);
+  }
   return "";
+}
+
+// hasBlockContent reports whether node nests further content of its own, which is how block
+// nodes (paragraphs, list items) are told apart from inline leaves.
+function hasBlockContent(node: unknown): boolean {
+  return !!node && typeof node === "object" && Array.isArray((node as { content?: unknown[] }).content);
 }
 
 function commentPreview(body: unknown): string {

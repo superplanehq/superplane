@@ -87,6 +87,20 @@ describe("onIssueCommentTriggerRenderer", () => {
     );
   });
 
+  it("separates text across paragraphs with a space", () => {
+    const adfBody = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Hello" }] },
+        { type: "paragraph", content: [{ type: "text", text: "World" }] },
+      ],
+    };
+    const context: TriggerEventContext = {
+      event: event({ ...commentData, comment: { ...commentData.comment, body: adfBody } }),
+    };
+    expect(onIssueCommentTriggerRenderer.getRootEventValues(context)["Comment"]).toBe("Hello World");
+  });
+
   it("falls back to a dash when the comment body is missing", () => {
     const context: TriggerEventContext = {
       event: event({ ...commentData, comment: { ...commentData.comment, body: undefined } }),

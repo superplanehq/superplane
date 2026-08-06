@@ -291,6 +291,38 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	// Regression test: block siblings (paragraphs) don't carry their own boundary whitespace the
+	// way inline siblings do, so joining them with no separator ran adjacent paragraphs' words
+	// together (BUGBOT_BUG_ID fd762348).
+	t.Run("separates text across paragraphs with a space", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		adfBody := []byte(`{
+			"webhookEvent": "comment_created",
+			"comment": {
+				"id": "10019",
+				"body": {"type": "doc", "content": [
+					{"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+					{"type": "paragraph", "content": [{"type": "text", "text": "World"}]}
+				]}
+			},
+			"issue": {
+				"id": "10001", "key": "ENG-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {"project": {"key": "ENG"}}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          adfBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}, "contentFilter": "Hello World"},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 1, events.Count())
+	})
+
 	// Regression test: a comment delivered without extractable text must fail closed against a
 	// configured filter rather than matching everything by default.
 	t.Run("a comment with no extractable text never matches a configured filter", func(t *testing.T) {
