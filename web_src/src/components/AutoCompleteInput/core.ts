@@ -110,6 +110,13 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     description: "Returns the current run, exposing its id, url, and started_at.",
     example: "run().url",
   },
+  {
+    name: "order",
+    snippet: "order().",
+    description:
+      "Returns the work order for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, and artifacts (loaded when accessed).",
+    example: 'none(order().artifacts, {#.type == "pr"})',
+  },
   // String
   {
     name: "trim",
