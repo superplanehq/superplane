@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -71,6 +73,14 @@ func AddWorkOrderComment(
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		orderID.String(),
+		factory.EventTypeOrderCommentAdded,
+	); err != nil {
+		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
 	}
 
 	return &pb.AddWorkOrderCommentResponse{
