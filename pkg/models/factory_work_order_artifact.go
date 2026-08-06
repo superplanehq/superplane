@@ -18,6 +18,7 @@ import (
 const (
 	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
+	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
 )
 
 var (
@@ -66,6 +67,10 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(params.Data, "body") == "" {
 			return nil, fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeBranch:
+		if extractArtifactString(params.Data, "name") == "" {
+			return nil, fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return nil, fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, params.Type)
@@ -138,7 +143,7 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {
-	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown:
+	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch:
 		return true
 	}
 	return false

@@ -20,10 +20,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Issue Comment" href="#add-issue-comment" description="Add a comment to an issue in Linear" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to an issue in Linear" />
+  <LinkCard title="Add Reaction" href="#add-reaction" description="Add an emoji reaction to an issue or comment in Linear" />
   <LinkCard title="Create Attachment" href="#create-attachment" description="Attach a link to an issue in Linear" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
   <LinkCard title="Delete Attachment" href="#delete-attachment" description="Remove an attachment from an issue in Linear" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single issue from Linear" />
+  <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from an issue in Linear" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing issue in Linear" />
 </CardGrid>
 
@@ -559,6 +561,63 @@ one at a time, so a mid-way failure may leave some already applied.
 }
 ```
 
+<a id="add-reaction"></a>
+
+## Add Reaction
+
+**Component key:** `linear.addReaction`
+
+The Add Reaction component adds an emoji reaction to a Linear issue or to a comment on one.
+
+### Use Cases
+
+- **Acknowledge commands**: React with 👀 so the author sees a `/deploy` comment was picked up
+- **Signal results**: React with ✅ or ❌ when the run finishes, without another notification
+- **Quiet status**: Reactions notify nobody, unlike a comment per run
+
+### Configuration
+
+- **Target** (required): React to the issue itself, or to a comment on it. Default: issue.
+- **Issue** (required for the issue target): The issue, by identifier (e.g. ENG-142) or ID
+- **Comment** (required for the comment target): The comment ID to react to
+- **Reaction** (required): The emoji to add. Default: eyes.
+
+### Re-running
+
+Adding a reaction that is already present is treated as success, so this component is safe to
+re-run. Linear also normalizes emoji aliases - thumbsup is stored as `+1` - which this
+component accounts for.
+
+### Output
+
+Returns the created reaction, including its `id`, `emoji` and the
+`user` it is attributed to. Keep the `id` if a later step needs to remove it.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to see the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers adding reactions.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "emoji": "eyes",
+    "id": "c9e1f7a3-5b2d-4e8c-9a0f-1b2c3d4e5f60",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.reaction"
+}
+```
+
 <a id="create-attachment"></a>
 
 ## Create Attachment
@@ -853,6 +912,75 @@ be visible to the user who authorized the Linear connection.
     "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
   },
   "timestamp": "2026-03-27T08:12:04.512873941Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="remove-issue-label"></a>
+
+## Remove Issue Label
+
+**Component key:** `linear.removeIssueLabel`
+
+The Remove Issue Label component removes one or more labels from an existing Linear issue,
+leaving its other labels untouched.
+
+### Use Cases
+
+- **Status transitions**: Clear `in-progress` once a workflow finishes
+- **Triage cleanup**: Strip a temporary triage label after processing
+- **Undo**: Remove a label a previous step added
+
+### Configuration
+
+- **Team** (required): The Linear team whose labels populate the picker below
+- **Issue** (required): The issue to remove labels from, by identifier (e.g. ENG-142) or ID. Supports
+  expressions.
+- **Labels** (required): One or more labels to remove. Other labels on the issue are kept.
+- **Fail if not found** (optional): By default a label that is not on the issue is skipped, so the
+  component is safe to re-run. Turn this on to fail the execution instead.
+
+### Output
+
+Returns the updated issue, including its full remaining set of `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers removing labels.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "state": {
+      "id": "9f0c2f1a-3b4c-4d5e-8f60-a1b2c3d4e5f6",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-1d2e-4f30-8a5b-6c7d8e9f0a1b",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T16:45:02.981Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T16:45:02.981456789Z",
   "type": "linear.issue"
 }
 ```

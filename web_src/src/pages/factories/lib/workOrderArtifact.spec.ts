@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractArtifactMarkdownBody,
+  extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
   formatPrArtifactLabel,
@@ -73,5 +74,18 @@ describe("extractArtifactTitle", () => {
     expect(extractArtifactTitle({})).toBeUndefined();
     expect(extractArtifactTitle({ title: "" })).toBeUndefined();
     expect(extractArtifactTitle({ title: "  " })).toBeUndefined();
+  });
+});
+
+describe("extractArtifactName", () => {
+  it("returns data.name when present", () => {
+    expect(extractArtifactName({ name: "feature/refund-retry" })).toBe("feature/refund-retry");
+  });
+
+  it("returns undefined for missing / blank names", () => {
+    expect(extractArtifactName(undefined)).toBeUndefined();
+    expect(extractArtifactName({})).toBeUndefined();
+    expect(extractArtifactName({ name: "" })).toBeUndefined();
+    expect(extractArtifactName({ name: "  " })).toBeUndefined();
   });
 });

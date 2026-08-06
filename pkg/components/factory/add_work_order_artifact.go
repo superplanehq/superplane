@@ -31,6 +31,7 @@ type AddWorkOrderArtifactConfiguration struct {
 	Number       string              `json:"number" mapstructure:"number"`
 	Title        string              `json:"title" mapstructure:"title"`
 	Body         string              `json:"body" mapstructure:"body"`
+	Name         string              `json:"name" mapstructure:"name"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -43,7 +44,7 @@ func (c *AddWorkOrderArtifact) Label() string {
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (PR or markdown) to a work order"
+	return "Attach a typed artifact (PR, markdown note, or branch) to a work order"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
@@ -53,8 +54,9 @@ Supported types:
 
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + ` and ` + "`title`" + `.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name).
 
-Both types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.`
+PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -91,7 +93,9 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
+	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
+	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
 	return []configuration.Field{
 		{
@@ -106,6 +110,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Pull Request", Value: "pr"},
 						{Label: "Markdown", Value: "markdown"},
+						{Label: "Branch", Value: "branch"},
 					},
 				},
 			},
@@ -141,6 +146,17 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:                 "name",
+			Label:                "Name",
+			Description:          "Branch name (e.g. feature/refund-retry)",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: branchOnly,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "artifactType", Values: []string{"branch"}},
+			},
+		},
+		{
 			Name:                 "title",
 			Label:                "Title",
 			Description:          "Optional artifact title",
@@ -154,7 +170,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
 			Type:                 configuration.FieldTypeList,
 			Required:             false,
-			VisibilityConditions: bothTypes,
+			VisibilityConditions: withMetadata,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Entry",
@@ -235,6 +251,7 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		"number": config.Number,
 		"title":  config.Title,
 		"body":   config.Body,
+		"name":   config.Name,
 	}
 
 	for key, value := range typed {

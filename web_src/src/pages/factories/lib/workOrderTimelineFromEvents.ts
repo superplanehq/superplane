@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
-import { extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
+import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
@@ -315,6 +315,7 @@ function appendArtifactEvent(
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
   pr: "PR",
   markdown: "note",
+  branch: "branch",
 };
 
 function formatArtifactKindShort(type: string | undefined): string {
@@ -325,7 +326,8 @@ function formatArtifactKindShort(type: string | undefined): string {
 }
 
 function describeArtifactAdded(artifact: EventArtifactPayload): string {
-  const label = extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data);
+  const label =
+    extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data) || extractArtifactName(artifact.data);
   const type = formatArtifactKindShort(artifact.type);
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }

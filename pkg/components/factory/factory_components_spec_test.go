@@ -174,6 +174,15 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("requires name for branch", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "branch",
+		})
+		if err == nil {
+			t.Fatal("expected error for branch without name")
+		}
+	})
+
 	t.Run("accepts valid pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "pr",
@@ -191,6 +200,16 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			"artifactType": "markdown",
 			"body":         "investigation notes",
 			"title":        "Design notes",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts branch with name", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

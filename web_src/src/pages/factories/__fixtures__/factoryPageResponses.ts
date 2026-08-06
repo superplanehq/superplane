@@ -302,6 +302,15 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,
   },
+  {
+    id: "art-branch-1",
+    type: "TYPE_BRANCH",
+    data: {
+      name: "feature/refund-retry",
+    },
+    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+    createdAt: HOUR_AGO,
+  },
 ];
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [

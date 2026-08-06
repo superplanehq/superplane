@@ -111,6 +111,8 @@ func (l *Linear) Actions() []core.Action {
 		&AddIssueComment{},
 		&CreateAttachment{},
 		&DeleteAttachment{},
+		&RemoveIssueLabel{},
+		&AddReaction{},
 	}
 }
 
