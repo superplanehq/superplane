@@ -65,9 +65,9 @@ func (r *CanvasRun) TableName() string {
 	return "workflow_runs"
 }
 
-func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
+func FindCanvasRunInTransaction(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.
 		Where("workflow_id = ?", workflowID).
 		Where("id = ?", runID).
 		First(&run).
@@ -79,9 +79,19 @@ func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*Canv
 	return &run, nil
 }
 
-func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+func FindUnscopedCanvasRun(db *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.Where("id = ?", runID).First(&run).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func FindCanvasRunByRootEventInTransaction(db *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := db.
 		Joins("INNER JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
 		Where("workflow_events.id = ?", rootEventID).
 		First(&run).
@@ -91,6 +101,20 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 	}
 
 	return &run, nil
+}
+
+func FindRootEventForRun(tx *gorm.DB, runID uuid.UUID) (*CanvasEvent, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Select("root_event_id").
+		Where("run_id = ?", runID).
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return FindCanvasEventInTransaction(tx, execution.RootEventID)
 }
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
@@ -297,6 +321,11 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 
 func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	summary := &RunDeletionSummary{}
+
+	// Factory work-order executions reference workflow_runs with ON DELETE RESTRICT.
+	if _, err := deleteRows(db, &FactoryWorkOrderExecution{}, "run_id = ?", r.ID); err != nil {
+		return nil, err
+	}
 
 	var executionIDs []uuid.UUID
 	err := db.

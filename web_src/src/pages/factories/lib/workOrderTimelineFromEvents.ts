@@ -43,6 +43,7 @@ interface LineStepExecutionPayload {
 
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
+  run?: EventRunRef;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
   order?: {
@@ -166,6 +167,18 @@ function appendOpenedEvent(
   at: string,
   resolveUserName?: UserNameLookup,
 ): void {
+  if (payload.run?.id) {
+    events.push({
+      id: `opened-${index}`,
+      kind: "created",
+      at,
+      title: "Work order created from",
+      sourceRunId: payload.run.id,
+      sourceAppId: payload.app?.id,
+    });
+    return;
+  }
+
   events.push({
     id: `opened-${index}`,
     kind: "created",
