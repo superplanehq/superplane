@@ -17,10 +17,64 @@ import (
 func Test__WebhookHandler__CompareConfig(t *testing.T) {
 	handler := &JiraWebhookHandler{}
 
-	t.Run("always matches - Jira allows only one registered URL per connection", func(t *testing.T) {
-		equal, err := handler.CompareConfig(WebhookConfiguration{}, WebhookConfiguration{})
+	t.Run("always matches, even with different events - Jira allows only one registered URL per connection", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{Events: []string{issueEventCreated}},
+			WebhookConfiguration{Events: []string{commentEventCreated}},
+		)
 		require.NoError(t, err)
 		assert.True(t, equal)
+	})
+}
+
+func Test__WebhookHandler__Merge(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("widens events when the requested config adds a new one", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted}}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
+		}, merged)
+	})
+
+	t.Run("reports no change when the requested events are already covered", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, current, merged)
+	})
+
+	t.Run("treats an empty stored config as the legacy issue-event baseline, not as empty", func(t *testing.T) {
+		current := WebhookConfiguration{}
+		requested := WebhookConfiguration{Events: []string{commentEventCreated}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted, commentEventCreated},
+		}, merged)
+	})
+
+	// Regression test: re-saving a jira.onIssue trigger on a legacy webhook must not force a
+	// destructive re-provision every time - only genuinely new events should (BUGBOT_BUG_ID
+	// 4df366b5).
+	t.Run("reports no change when a request against a legacy row is already covered by the baseline", func(t *testing.T) {
+		current := WebhookConfiguration{}
+		requested := WebhookConfiguration{Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted}}
+
+		merged, changed, err := handler.Merge(current, requested)
+		require.NoError(t, err)
+		assert.False(t, changed)
+		assert.Equal(t, current, merged)
 	})
 }
 
@@ -38,7 +92,15 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: integration,
-			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+			Webhook: &contexts.WebhookContext{
+				URL: "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{
+					Events: []string{
+						issueEventCreated, issueEventUpdated, issueEventDeleted,
+						commentEventCreated, commentEventUpdated, commentEventDeleted,
+					},
+				},
+			},
 		})
 		require.NoError(t, err)
 
@@ -56,6 +118,9 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Contains(t, string(body), `"jira:issue_created"`)
 		assert.Contains(t, string(body), `"jira:issue_updated"`)
 		assert.Contains(t, string(body), `"jira:issue_deleted"`)
+		assert.Contains(t, string(body), `"comment_created"`)
+		assert.Contains(t, string(body), `"comment_updated"`)
+		assert.Contains(t, string(body), `"comment_deleted"`)
 		// Regression test: Atlassian rejects an empty jqlFilter outright ("Empty JQL search not
 		// supported", confirmed live) even though the key must be present - this must be a real,
 		// always-true clause instead.
@@ -71,6 +136,63 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		require.Len(t, integration.ActionRequests, 1)
 		assert.Equal(t, refreshWebhookHookName, integration.ActionRequests[0].ActionName)
 		assert.Equal(t, webhookRefreshInterval, integration.ActionRequests[0].Interval)
+	})
+
+	// Regression test: re-running Setup on a webhook that already has a Jira registration (e.g. a
+	// jira.onIssueComment trigger widening an integration's events via Merge) must replace that
+	// registration instead of leaving it orphaned - Jira allows only one per connection.
+	t.Run("re-provisioning replaces the previous Jira registration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":2000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+		previousID := int64(1000)
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Metadata:      WebhookMetadata{WebhookID: &previousID},
+				Configuration: WebhookConfiguration{Events: []string{issueEventCreated, commentEventCreated}},
+			},
+		})
+		require.NoError(t, err)
+
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, int64(2000), *webhookMetadata.WebhookID)
+
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), "1000")
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+	})
+
+	t.Run("falls back to the legacy issue-event baseline when Events is empty", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"createdWebhookId":1000}]`))},
+			},
+		}
+		integration := newAuthorizedIntegration()
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{URL: "https://sp.test/webhooks/w1"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), `"jira:issue_created"`)
+		assert.Contains(t, string(body), `"jira:issue_updated"`)
+		assert.Contains(t, string(body), `"jira:issue_deleted"`)
 	})
 
 	t.Run("create failure is surfaced", func(t *testing.T) {
@@ -90,10 +212,6 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		assert.Empty(t, integration.ActionRequests, "must not schedule a refresh when creation failed")
 	})
 
-	// Regression test: Jira allows only one URL per OAuth connection. If ScheduleActionCall fails
-	// after CreateIssueWebhook succeeds, leaving the Jira registration behind makes retries fail
-	// on that limit and leaves Cleanup unable to delete it (WebhookID never reaches the SuperPlane
-	// webhook record). Setup must delete the registration on that path.
 	t.Run("schedule failure rolls back the Jira registration", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -181,12 +299,6 @@ func Test__WebhookHandler__Cleanup(t *testing.T) {
 	})
 }
 
-// Regression test: the platform persists webhook metadata by JSON-encoding it into a
-// map[string]any (see models.Webhook.Metadata / WebhookContext.GetMetadata), which turns
-// WebhookID into a float64 before mapstructure decodes it back - unlike the test doubles above,
-// which store the struct directly. mapstructure (the version pinned in go.mod) does convert
-// float64 into a *int64 field, so WebhookID survives the round trip; this pins that behavior so a
-// future mapstructure upgrade can't silently break it.
 func Test__WebhookMetadata__SurvivesJSONMetadataRoundTrip(t *testing.T) {
 	webhookID := int64(1000)
 	original := WebhookMetadata{WebhookID: &webhookID}
