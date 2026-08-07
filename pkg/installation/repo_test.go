@@ -27,6 +27,27 @@ func TestParseRepository(t *testing.T) {
 		_, err := ParseRepository("github.com/widget")
 		require.Error(t, err)
 	})
+
+	t.Run("strips .git suffix", func(t *testing.T) {
+		repo, err := ParseRepository("https://github.com/acme/widgets.git")
+		require.NoError(t, err)
+		assert.Equal(t, "acme", repo.Owner)
+		assert.Equal(t, "widgets", repo.Name)
+	})
+
+	t.Run("strips .git before trailing slash", func(t *testing.T) {
+		repo, err := ParseRepository("https://github.com/acme/widgets.git/")
+		require.NoError(t, err)
+		assert.Equal(t, "acme", repo.Owner)
+		assert.Equal(t, "widgets", repo.Name)
+	})
+
+	t.Run("strips .git before multiple trailing slashes", func(t *testing.T) {
+		repo, err := ParseRepository("https://github.com/acme/widgets.git///")
+		require.NoError(t, err)
+		assert.Equal(t, "acme", repo.Owner)
+		assert.Equal(t, "widgets", repo.Name)
+	})
 }
 
 func TestDefaultInstallationName(t *testing.T) {
