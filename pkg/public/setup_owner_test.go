@@ -65,6 +65,30 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 
+	account, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.True(t, account.IsInstallationAdmin())
+
+	var accountToken string
+	for _, cookie := range response.Result().Cookies() {
+		if cookie.Name == "account_token" {
+			accountToken = cookie.Value
+			break
+		}
+	}
+	require.NotEmpty(t, accountToken)
+
+	accountResponse := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/account",
+		authCookie: accountToken,
+	})
+	require.Equal(t, http.StatusOK, accountResponse.Code)
+
+	var currentAccount AccountResponse
+	require.NoError(t, json.Unmarshal(accountResponse.Body.Bytes(), &currentAccount))
+	assert.True(t, currentAccount.InstallationAdmin)
+
 	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(t, err)
 	assert.False(t, metadata.AllowPrivateNetworkAccess)
