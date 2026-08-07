@@ -56,14 +56,23 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
           )}
           data-testid="factory-settings-sidebar"
         >
-          <NavLink
-            to={factoryDetailPath(organizationId, factoryId)}
-            className="flex items-center gap-2 border-b border-slate-950/10 px-4 py-3 text-sm text-gray-600 hover:text-gray-900 dark:border-gray-700/70 dark:text-gray-300 dark:hover:text-gray-100"
-            data-testid="factory-settings-back"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to workspace
-          </NavLink>
+          <div className="border-b border-slate-950/10 px-4 py-3 dark:border-gray-700/70">
+            <NavLink
+              to={factoryDetailPath(organizationId, factoryId)}
+              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              data-testid="factory-settings-back"
+            >
+              <ArrowLeft className="h-3 w-3" aria-hidden />
+              Back to workspace
+            </NavLink>
+            <p
+              className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+              title={factory.name ?? undefined}
+              data-testid="factory-settings-workspace-name"
+            >
+              {factory.name}
+            </p>
+          </div>
           <nav className="flex flex-1 flex-col gap-4 px-2 py-4">
             <SettingsNavGroup organizationId={organizationId} factoryId={factoryId} items={workspaceGroup} />
             <SettingsNavGroup organizationId={organizationId} factoryId={factoryId} items={governanceGroup} />
