@@ -104,12 +104,27 @@ func serializeCanvasSummaries(
 		liveSpec := liveSpecs[canvas.ID]
 		preference := preferencesByCanvasID[canvas.ID]
 
+		//
+		// canvas.CreatedAt/UpdatedAt are *time.Time and are expected to always be
+		// populated by the DB (NOT NULL columns), but we guard against nil here
+		// anyway so a missing value never turns into a panic (and a 500 for the
+		// whole endpoint).
+		//
+		var createdAt, updatedAt *timestamppb.Timestamp
+		if canvas.CreatedAt != nil {
+			createdAt = timestamppb.New(*canvas.CreatedAt)
+		}
+
+		if canvas.UpdatedAt != nil {
+			updatedAt = timestamppb.New(*canvas.UpdatedAt)
+		}
+
 		protoCanvases[i] = &pb.CanvasSummary{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
-			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
 			Edges:       actions.EdgesToProto(liveSpec.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
 			Starred:     preference.StarredAt != nil,
