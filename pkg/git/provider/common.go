@@ -24,12 +24,23 @@ func NormalizePath(value string) (string, error) {
 	}
 
 	for _, segment := range strings.Split(normalized, "/") {
-		if segment == "" || segment == "." || segment == ".." || segment == ".git" {
+		if segment == "" || segment == "." || segment == ".." || strings.EqualFold(segment, ".git") {
 			return "", ErrInvalidPath
 		}
 	}
 
 	return normalized, nil
+}
+
+// IsReservedPath reports whether an already normalized path points at the
+// directory SuperPlane reserves for itself.
+//
+// The comparison ignores case because git checkouts on case-insensitive
+// filesystems (macOS, Windows) resolve ".SuperPlane" and ".superplane" to the
+// same directory, so a case variant would otherwise land in the reserved one.
+func IsReservedPath(normalized string) bool {
+	lowered := strings.ToLower(normalized)
+	return lowered == ReservedSuperPlanePath || strings.HasPrefix(lowered, ReservedSuperPlanePath+"/")
 }
 
 func ValidateUserPath(value string) (string, error) {
@@ -38,7 +49,7 @@ func ValidateUserPath(value string) (string, error) {
 		return "", err
 	}
 
-	if normalized == ReservedSuperPlanePath || strings.HasPrefix(normalized, ReservedSuperPlanePath+"/") {
+	if IsReservedPath(normalized) {
 		return "", ErrReservedPath
 	}
 
