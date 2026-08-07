@@ -11,18 +11,36 @@ describe("timezone", () => {
     vi.useRealTimers();
   });
 
-  it("formats timestamps in the requested timezone", () => {
-    const toLocaleDateStringSpy = vi.spyOn(Date.prototype, "toLocaleDateString").mockReturnValue("Mar 29, 2026, 14:30");
-
+  it("renders the timestamp in the requested timezone, not just labels it", () => {
+    // 14:30 UTC is 10:30 in New York and 23:30 in Tokyo on this date.
     expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "UTC")).toBe("Mar 29, 2026, 14:30 UTC");
-    expect(toLocaleDateStringSpy).toHaveBeenCalledWith("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "America/New_York")).toBe(
+      "Mar 29, 2026, 10:30 America/New_York",
+    );
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "Asia/Tokyo")).toBe(
+      "Mar 29, 2026, 23:30 Asia/Tokyo",
+    );
+  });
+
+  it("accepts a Date instance as well as an ISO string", () => {
+    expect(formatTimestampInUserTimezone(new Date("2026-03-29T14:30:00.000Z"), "UTC")).toBe("Mar 29, 2026, 14:30 UTC");
+  });
+
+  it("defaults to the browser timezone when none is given", () => {
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z")).toBe(
+      formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", browserTimezone),
+    );
+  });
+
+  it("falls back to the browser timezone when the timezone is not a valid IANA name", () => {
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // The backend stores some timezones as numeric offsets, which Intl rejects.
+    expect(formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", "-5")).toBe(
+      formatTimestampInUserTimezone("2026-03-29T14:30:00.000Z", browserTimezone),
+    );
   });
 
   it("formats relative time in abbreviated and long forms", () => {
