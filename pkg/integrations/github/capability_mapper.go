@@ -110,6 +110,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &issues.RemoveIssueAssignee{}},
 					{ReadOnly: false, Action: &issues.AddIssueLabel{}},
 					{ReadOnly: false, Action: &issues.AddIssueAssignee{}},
+					{ReadOnly: false, Action: &issues.AddIssueReaction{}},
 				},
 			},
 			PermissionMetadata: {

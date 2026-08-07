@@ -175,9 +175,14 @@ func (c *Client) ListBranches(ctx context.Context, repository string, opts *gith
 	return c.underlying.Repositories.ListBranches(ctx, owner, name, opts)
 }
 
-func (c *Client) CreateIssueReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
+func (c *Client) CreateIssueCommentReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Reactions.CreateIssueCommentReaction(ctx, owner, name, commentID, content)
+}
+
+func (c *Client) CreateIssueReaction(ctx context.Context, repository string, issueNumber int, content string) (*github.Reaction, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Reactions.CreateIssueReaction(ctx, owner, name, issueNumber, content)
 }
 
 func (c *Client) CreateReviewCommentReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
