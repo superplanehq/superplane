@@ -17,6 +17,7 @@ export function ConsoleContextProvider({
   runNodesDisabledReason,
   onTriggerNode,
   onOpenNode,
+  onSelectRun,
 }: ConsoleContextProviderProps) {
   const value = useMemo<ConsoleContextValue>(
     () => ({
@@ -29,6 +30,7 @@ export function ConsoleContextProvider({
       runNodesDisabledReason,
       onTriggerNode,
       onOpenNode,
+      onSelectRun,
     }),
     [
       canvasId,
@@ -40,6 +42,7 @@ export function ConsoleContextProvider({
       runNodesDisabledReason,
       onTriggerNode,
       onOpenNode,
+      onSelectRun,
     ],
   );
 

@@ -60,6 +60,8 @@ export type ConsoleOverlayProps = {
   nodeStatuses?: Record<string, ConsoleNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
   onTriggerNode?: ConsoleContextValue["onTriggerNode"];
+  /** Callback invoked when a run link (e.g. a table's run id) is clicked. */
+  onSelectRun?: ConsoleContextValue["onSelectRun"];
   showConsoleEditControls?: boolean;
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
@@ -89,6 +91,7 @@ export function ConsoleOverlay({
   canvasNodesLoading,
   nodeStatuses,
   onTriggerNode,
+  onSelectRun,
   showConsoleEditControls = false,
   onConsoleAddPanel,
   onConsoleOpenYaml,
@@ -177,6 +180,7 @@ export function ConsoleOverlay({
       canRunNodes={canRunNodes}
       runNodesDisabledReason={runNodesDisabledReason}
       onTriggerNode={canRunNodes ? onTriggerNode : undefined}
+      onSelectRun={onSelectRun}
     >
       {overlayContent}
     </ConsoleContextProvider>
