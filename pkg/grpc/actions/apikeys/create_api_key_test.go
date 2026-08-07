@@ -166,7 +166,7 @@ func countAPIKeyRoleAssignment(t *testing.T, userID, roleName, orgID string) int
 	t.Helper()
 
 	var count int64
-	require.NoError(t, database.Conn().Table("casbin_rule").
+	require.NoError(t, database.DB(t.Context()).Table("casbin_rule").
 		Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "g", "/users/"+userID, "/roles/"+roleName, "/org/"+orgID).
 		Count(&count).
 		Error)
@@ -178,7 +178,7 @@ func countAPIKeys(t *testing.T, orgID string) int64 {
 	t.Helper()
 
 	var count int64
-	require.NoError(t, database.Conn().Unscoped().Model(&models.User{}).
+	require.NoError(t, database.DB(t.Context()).Unscoped().Model(&models.User{}).
 		Where("organization_id = ? AND type = ?", orgID, models.UserTypeAPIKey).
 		Count(&count).
 		Error)

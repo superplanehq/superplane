@@ -216,7 +216,7 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	require.NoError(t, err)
 	user, err := models.CreateUser(organizationID, account.ID, account.Name, account.Email)
 	require.NoError(t, err)
-	err = r.AuthService.AssignRole(database.Conn(), user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
+	err = r.AuthService.AssignRole(database.DB(t.Context()), user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
 }

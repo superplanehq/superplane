@@ -181,7 +181,7 @@ func createAccountForRole(t *testing.T, sess *session.TestSession, label, roleNa
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 
-	err = authService.AssignRole(database.Conn(), user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.DB(t.Context()), user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	return account

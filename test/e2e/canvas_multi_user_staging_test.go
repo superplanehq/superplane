@@ -81,7 +81,7 @@ func (s *canvasMultiUserStagingSteps) createCollaborator() (*models.Account, uui
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
-	err = authService.AssignRole(database.Conn(), user.ID.String(), models.RoleOrgAdmin, s.session.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.DB(s.t.Context()), user.ID.String(), models.RoleOrgAdmin, s.session.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(s.t, err)
 
 	return account, user.ID

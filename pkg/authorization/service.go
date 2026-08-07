@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/casbin/casbin/v2"
@@ -1191,7 +1192,7 @@ func (a *AuthService) validateRoleAssignment(
 	if err != nil {
 		return fmt.Errorf("failed to get inherited roles for %s: %w", roleName, err)
 	}
-	if contains(inheritedRoles, prefixRoleName(models.RoleOrgOwner)) {
+	if slices.Contains(inheritedRoles, prefixRoleName(models.RoleOrgOwner)) {
 		return fmt.Errorf("%w: %s inherits %s", ErrRoleNotAssignable, roleName, models.RoleOrgOwner)
 	}
 

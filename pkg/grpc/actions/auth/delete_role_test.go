@@ -98,7 +98,7 @@ func Test_DeleteRole(t *testing.T) {
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
-		err = r.AuthService.AssignRole(database.Conn(), userID, "test-role-with-users", orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), userID, "test-role-with-users", orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-with-users", r.AuthService)
@@ -135,7 +135,7 @@ func Test_DeleteRole(t *testing.T) {
 		user, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 		require.NoError(t, err)
 
-		err = r.AuthService.AssignRole(database.Conn(), user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-only-users", r.AuthService)
