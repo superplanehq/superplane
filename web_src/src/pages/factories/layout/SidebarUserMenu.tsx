@@ -37,7 +37,10 @@ function initialsFor(name: string): string {
   if (parts.length === 0) {
     return "?";
   }
-  return `${parts[0]}${parts[parts.length - 1] ?? ""}`;
+  if (parts.length === 1) {
+    return parts[0];
+  }
+  return `${parts[0]}${parts[parts.length - 1]}`;
 }
 
 export function SidebarUserMenu({
