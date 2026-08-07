@@ -48,7 +48,11 @@ export function FactoryLineEditPage() {
     return <Navigate to={automationsHref} replace />;
   }
 
-  const isInitialLoading = appsLoading && !factory;
+  // Show a loading state while apps are still fetching so the form isn't
+  // mounted with an empty apps list. `FactoriesLayout` already guarantees
+  // `factory` is loaded before rendering us, so apps are the only remaining
+  // dependency.
+  const isInitialLoading = appsLoading;
 
   return (
     <div className={factoryContentBodyClassName} data-testid="factory-line-edit-page">
