@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -326,6 +327,33 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
 	assert.NotNil(t, listedCanvas.FolderId)
+}
+
+func Test__SerializeCanvasSummaries__HandlesNilTimestamps(t *testing.T) {
+	r := support.Setup(t)
+
+	//
+	// Build a canvas value directly, without going through the DB, leaving
+	// CreatedAt/UpdatedAt nil. This should never happen for canvases loaded
+	// from the DB (those columns are NOT NULL), but serializeCanvasSummaries
+	// must not panic if it ever does - it should just omit the timestamps.
+	//
+	canvas := models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		Name:           "canvas-with-nil-timestamps",
+		Description:    "",
+		CreatedAt:      nil,
+		UpdatedAt:      nil,
+	}
+
+	summaries, err := serializeCanvasSummaries(database.Conn(), r.Organization.ID, r.User, []models.Canvas{canvas})
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+
+	assert.Nil(t, summaries[0].CreatedAt)
+	assert.Nil(t, summaries[0].UpdatedAt)
+	assert.Equal(t, canvas.ID.String(), summaries[0].Id)
 }
 
 func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {
