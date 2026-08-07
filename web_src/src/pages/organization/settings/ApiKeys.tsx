@@ -29,6 +29,51 @@ interface APIKeysProps {
 
 type AccessMode = "organization" | "canvas";
 
+interface RoleQueryStatusProps {
+  isLoading: boolean;
+  isFetching: boolean;
+  hasError: boolean;
+  onRetry: () => void;
+}
+
+function RoleQueryStatus({ isLoading, isFetching, hasError, onRetry }: RoleQueryStatusProps) {
+  if (isLoading) {
+    return (
+      <p role="status" aria-live="polite" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        Loading custom roles...
+      </p>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div role="alert" className="mt-1 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
+        <span>Custom roles could not be loaded. Available options may be incomplete.</span>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs text-current"
+          onClick={onRetry}
+          disabled={isFetching}
+        >
+          {isFetching ? "Retrying..." : "Retry"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (isFetching) {
+    return (
+      <p role="status" aria-live="polite" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        Refreshing custom roles...
+      </p>
+    );
+  }
+
+  return null;
+}
+
 function toApiTimestamp(localValue: string) {
   if (!localValue) return undefined;
   return new Date(localValue).toISOString();
@@ -146,7 +191,13 @@ export function APIKeys({ organizationId }: APIKeysProps) {
 
   const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
-  const { data: roles = [] } = useOrganizationRoles(organizationId);
+  const {
+    data: roles = [],
+    isLoading: rolesLoading,
+    isFetching: rolesFetching,
+    isError: rolesLoadFailed,
+    refetch: refetchRoles,
+  } = useOrganizationRoles(organizationId);
   const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
 
@@ -154,8 +205,8 @@ export function APIKeys({ organizationId }: APIKeysProps) {
     const reserved = new Set(["org_owner", "org_viewer", "org_admin"]);
     const customRoles = roles
       .flatMap((role) => {
-        const name = role.metadata?.name?.trim();
-        if (!name || reserved.has(name)) return [];
+        const name = role.metadata?.name;
+        if (!name || name !== name.trim() || reserved.has(name)) return [];
         return [{ name, label: role.spec?.displayName?.trim() || name }];
       })
       .sort((a, b) => a.label.localeCompare(b.label) || a.name.localeCompare(b.name));
@@ -302,6 +353,12 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Determines what this API key can do within its access scope.
                   </p>
+                  <RoleQueryStatus
+                    isLoading={rolesLoading}
+                    isFetching={rolesFetching}
+                    hasError={rolesLoadFailed}
+                    onRetry={() => void refetchRoles()}
+                  />
                 </div>
                 <div>
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
