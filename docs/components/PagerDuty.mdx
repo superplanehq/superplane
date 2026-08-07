@@ -317,7 +317,7 @@ The Acknowledge Incident component acknowledges an existing PagerDuty incident.
 ### Configuration
 
 - **Incident ID**: The ID of the incident to acknowledge (e.g., A12BC34567...)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 
 ### Behavior
 
@@ -429,7 +429,7 @@ The Annotate Incident component adds a note to an existing PagerDuty incident.
 
 - **Incident ID**: The ID of the incident to annotate (e.g., A12BC34567...)
 - **Content**: The note content to add to the incident (supports expressions)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 
 ### Output
 
@@ -542,7 +542,7 @@ The Create Incident component creates a new incident in PagerDuty.
 - **Description**: Additional details about the incident (optional, supports expressions)
 - **Urgency**: Incident urgency level (high or low)
 - **Service**: Select the PagerDuty service to create the incident in
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 
 ### Output
 
@@ -672,7 +672,7 @@ Escalating an incident moves it to a higher level, notifying the responders at t
 
 - **Incident ID**: The ID of the incident to escalate (e.g., A12BC34567...)
 - **Escalation Level**: The level to escalate to (1-10). This is the level number within the incident's current escalation policy.
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 
 ### Output
 
@@ -1091,7 +1091,7 @@ The Resolve Incident component resolves an existing PagerDuty incident.
 ### Configuration
 
 - **Incident ID**: The ID of the incident to resolve (e.g., A12BC34567...)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 - **Resolution Notes**: Optional notes about the resolution (saved to incident description)
 
 ### Behavior
@@ -1192,7 +1192,7 @@ The Snooze Incident component temporarily pauses notifications for an acknowledg
 
 - **Incident ID**: The ID of the incident to snooze (must be in acknowledged state)
 - **Duration**: How long to snooze the incident (1 hour, 4 hours, 8 hours, or 24 hours)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 
 ### Behavior
 
@@ -1304,7 +1304,7 @@ The Update Incident component modifies an existing PagerDuty incident.
 ### Configuration
 
 - **Incident ID**: The ID of the incident to update (e.g., A12BC34567...)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **From Email**: Email of the PagerDuty user to act as, sent as the From header. Required with App OAuth or an account-scoped API token; optional with a user-scoped API token, which already identifies the user.
 - **Status**: Update incident status (acknowledged, resolved)
 - **Priority**: Update incident priority (select from available priorities)
 - **Title**: Update incident title (optional, supports expressions)
