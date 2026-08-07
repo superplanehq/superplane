@@ -100,7 +100,7 @@ Every transition writes exactly one `order.status.updated` event (`fromState`, `
 ## Comments and artifacts
 
 - **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is `user` or `automation`. `user` comments carry the authenticated caller's id; `automation` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation comments show a small badge.
-- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifact add`). Each artifact has a required `type` (`pr`, `markdown`, or `branch`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
+- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifacts add`). Each artifact has a required `type` (`pr`, `markdown`, or `branch`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
 
 ## API
 
@@ -164,24 +164,47 @@ Entrypoints must be `onRun` triggers on the factory app’s live version.
 
 ## CLI
 
-Minimal factory CLI for artifacts:
+Minimal factory CLI for artifacts (flag-based; optional active factory):
 
 ```bash
-superplane factory artifact add <factory> <order-id> <type> [flags]
-superplane factory artifact list <factory> <order-id>
+superplane factory active [factory]   # set/show active factory (name or UUID)
+superplane factory artifacts list --factory <name-or-id> --order-id <uuid>
+superplane factory artifacts add --order-id <uuid> --type <pr|markdown|branch> [flags]
 ```
 
-`<factory>` accepts a factory name or UUID. `<order-id>` is the work-order UUID.
-`<type>` is `pr`, `markdown`, or `branch`. Typed flags build the API `data` map:
+`--factory` accepts a factory name or UUID. When omitted, the active factory
+from `superplane factory active` is used. `--order-id` is the work-order UUID.
+`--type` is `pr`, `markdown`, or `branch`. Typed flags build the API `data` map:
 
 ```bash
-superplane factory artifact add shipping "$OID" markdown \
-  --title PLAN.md -f ./PLAN.md
+superplane factory artifacts list \
+  --factory shipping \
+  --order-id "$OID"
 
-superplane factory artifact add shipping "$OID" pr \
-  --url https://github.com/org/repo/pull/7 --number 7
+# Uses the active factory
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type markdown \
+  --title "PLAN.md" \
+  -f ./PLAN.md
 
-superplane factory artifact add shipping "$OID" branch --name feature/login
+superplane factory artifacts add \
+  --factory shipping \
+  --order-id "$OID" \
+  --type markdown \
+  --title "PLAN.md" \
+  -f ./PLAN.md
+
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type pr \
+  --url https://github.com/org/repo/pull/7 \
+  --number 7
+
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type branch \
+  --name feature/login
 ```
 
 For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`). Full factory CLI surface beyond artifacts is still pending.

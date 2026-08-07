@@ -12,24 +12,26 @@ import (
 )
 
 type artifactAddCommand struct {
-	title  *string
-	body   *string
-	file   *string
-	url    *string
-	number *int64
-	name   *string
+	factory *string
+	orderID *string
+	typ     *string
+	title   *string
+	body    *string
+	file    *string
+	url     *string
+	number  *int64
+	name    *string
 }
 
 func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
-	factoryArg := ctx.Args[0]
-	orderID := strings.TrimSpace(ctx.Args[1])
-	artifactType := strings.ToLower(strings.TrimSpace(ctx.Args[2]))
+	orderID := strings.TrimSpace(stringValue(c.orderID))
+	artifactType := strings.ToLower(strings.TrimSpace(stringValue(c.typ)))
 
 	if _, err := uuid.Parse(orderID); err != nil {
-		return fmt.Errorf("order-id must be a UUID")
+		return fmt.Errorf("--order-id must be a UUID")
 	}
 
-	factoryID, err := FindFactoryID(ctx, factoryArg)
+	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
 	if err != nil {
 		return err
 	}

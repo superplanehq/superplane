@@ -9,6 +9,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
+// ResolveFactoryID returns the factory id from --factory or the active factory.
+// Name values are resolved via ListFactories; UUIDs pass through.
+func ResolveFactoryID(ctx core.CommandContext, factoryFlag string) (string, error) {
+	trimmed := strings.TrimSpace(factoryFlag)
+	if trimmed == "" {
+		if ctx.Config == nil {
+			return "", errFactoryRequired()
+		}
+		trimmed = strings.TrimSpace(ctx.Config.GetActiveFactory())
+	}
+	if trimmed == "" {
+		return "", errFactoryRequired()
+	}
+	return FindFactoryID(ctx, trimmed)
+}
+
+func errFactoryRequired() error {
+	return fmt.Errorf("factory is required; pass --factory or set one with \"superplane factory active\"")
+}
+
 // FindFactoryID returns the factory id for a name or UUID.
 // UUID values pass through; names are resolved via ListFactories.
 func FindFactoryID(ctx core.CommandContext, nameOrID string) (string, error) {

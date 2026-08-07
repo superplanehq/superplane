@@ -9,17 +9,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type artifactListCommand struct{}
+type artifactListCommand struct {
+	factory *string
+	orderID *string
+}
 
 func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
-	factoryArg := ctx.Args[0]
-	orderID := strings.TrimSpace(ctx.Args[1])
+	orderID := strings.TrimSpace(stringValue(c.orderID))
 
 	if _, err := uuid.Parse(orderID); err != nil {
-		return fmt.Errorf("order-id must be a UUID")
+		return fmt.Errorf("--order-id must be a UUID")
 	}
 
-	factoryID, err := FindFactoryID(ctx, factoryArg)
+	factoryID, err := ResolveFactoryID(ctx, stringValue(c.factory))
 	if err != nil {
 		return err
 	}
