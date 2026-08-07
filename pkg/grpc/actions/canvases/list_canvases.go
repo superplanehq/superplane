@@ -108,19 +108,15 @@ func serializeCanvasSummaries(
 		// canvas.CreatedAt/UpdatedAt are *time.Time and are expected to always be
 		// populated by the DB (NOT NULL columns), but we guard against nil here
 		// anyway so a missing value never turns into a panic (and a 500 for the
-		// whole endpoint). If this ever happens, log it so it's diagnosable.
+		// whole endpoint).
 		//
 		var createdAt, updatedAt *timestamppb.Timestamp
 		if canvas.CreatedAt != nil {
 			createdAt = timestamppb.New(*canvas.CreatedAt)
-		} else {
-			log.Errorf("canvas %s has nil CreatedAt", canvas.ID)
 		}
 
 		if canvas.UpdatedAt != nil {
 			updatedAt = timestamppb.New(*canvas.UpdatedAt)
-		} else {
-			log.Errorf("canvas %s has nil UpdatedAt", canvas.ID)
 		}
 
 		protoCanvases[i] = &pb.CanvasSummary{
