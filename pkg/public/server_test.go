@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -109,6 +110,197 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	})
 
 	require.Equal(t, 200, response.Code)
+}
+
+func Test__ReadinessCheckEndpoint(t *testing.T) {
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+	signer := jwt.NewSigner("test")
+	oidcProvider := support.NewOIDCProvider()
+	gitProvider := inmemory.NewProvider()
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	require.NoError(t, err)
+
+	t.Run("returns OK when PostgreSQL is reachable", func(t *testing.T) {
+		server.checkReadiness = func(ctx context.Context) error {
+			deadline, ok := ctx.Deadline()
+			require.True(t, ok, "readiness checks must be bounded")
+			require.LessOrEqual(t, time.Until(deadline), time.Second)
+			return nil
+		}
+
+		response := execRequest(server, requestParams{
+			method: http.MethodGet,
+			path:   "/ready",
+		})
+
+		require.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+		require.Empty(t, response.Body.String())
+	})
+
+	t.Run("returns a generic unavailable response when PostgreSQL is unreachable", func(t *testing.T) {
+		server.checkReadiness = func(context.Context) error {
+			return errors.New("dial postgres://admin:secret@database")
+		}
+
+		response := execRequest(server, requestParams{
+			method: http.MethodGet,
+			path:   "/ready",
+		})
+
+		require.Equal(t, http.StatusServiceUnavailable, response.Code)
+		require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+		require.Equal(t, "Service unavailable\n", response.Body.String())
+		require.NotContains(t, response.Body.String(), "admin")
+		require.NotContains(t, response.Body.String(), "secret")
+	})
+
+	t.Run("keeps liveness independent from PostgreSQL", func(t *testing.T) {
+		server.checkReadiness = func(context.Context) error {
+			return errors.New("database unavailable")
+		}
+
+		response := execRequest(server, requestParams{
+			method: http.MethodGet,
+			path:   "/health",
+		})
+
+		require.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("fails closed when the readiness checker is unavailable", func(t *testing.T) {
+		server.checkReadiness = nil
+
+		response := execRequest(server, requestParams{
+			method: http.MethodGet,
+			path:   "/ready",
+		})
+
+		require.Equal(t, http.StatusServiceUnavailable, response.Code)
+		require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+		require.Equal(t, "Service unavailable\n", response.Body.String())
+	})
+}
+
+func Test__CachedReadinessCheck(t *testing.T) {
+	t.Run("coalesces concurrent checks and caches the result", func(t *testing.T) {
+		expectedErr := errors.New("database unavailable")
+		started := make(chan struct{})
+		release := make(chan struct{})
+		var calls atomic.Int32
+
+		check := newCachedReadinessCheck(func(ctx context.Context) error {
+			if calls.Add(1) == 1 {
+				close(started)
+			}
+
+			select {
+			case <-release:
+				return expectedErr
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}, time.Second)
+
+		const callers = 32
+		results := make(chan error, callers)
+		for i := 0; i < callers; i++ {
+			go func() {
+				results <- check(context.Background())
+			}()
+		}
+
+		<-started
+		close(release)
+
+		for i := 0; i < callers; i++ {
+			require.ErrorIs(t, <-results, expectedErr)
+		}
+		require.EqualValues(t, 1, calls.Load())
+
+		require.ErrorIs(t, check(context.Background()), expectedErr)
+		require.EqualValues(t, 1, calls.Load())
+	})
+
+	t.Run("does not return a cached result to a canceled caller", func(t *testing.T) {
+		started := make(chan struct{})
+		release := make(chan struct{})
+		firstResult := make(chan error, 1)
+		secondResult := make(chan error, 1)
+		var calls atomic.Int32
+
+		check := newCachedReadinessCheck(func(ctx context.Context) error {
+			if calls.Add(1) == 1 {
+				close(started)
+			}
+
+			select {
+			case <-release:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}, time.Second)
+
+		go func() {
+			firstResult <- check(context.Background())
+		}()
+		<-started
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			secondResult <- check(ctx)
+		}()
+		cancel()
+
+		select {
+		case err := <-secondResult:
+			require.ErrorIs(t, err, context.Canceled)
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("canceled readiness waiter did not return while a check was active")
+		}
+
+		close(release)
+
+		require.NoError(t, <-firstResult)
+		require.EqualValues(t, 1, calls.Load())
+	})
+
+	t.Run("does not cache a leading caller cancellation", func(t *testing.T) {
+		started := make(chan struct{})
+		release := make(chan struct{})
+		firstResult := make(chan error, 1)
+		var calls atomic.Int32
+
+		check := newCachedReadinessCheck(func(ctx context.Context) error {
+			calls.Add(1)
+			close(started)
+
+			select {
+			case <-release:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}, time.Second)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		go func() {
+			firstResult <- check(ctx)
+		}()
+		<-started
+
+		cancel()
+		close(release)
+
+		require.NoError(t, <-firstResult)
+		require.NoError(t, check(context.Background()))
+		require.EqualValues(t, 1, calls.Load())
+	})
 }
 
 func Test__OpenAPIEndpoints(t *testing.T) {
