@@ -74,6 +74,14 @@ var coreTriggerNames = map[string]bool{
 	"start": true,
 }
 
+// dataCheckExemptions lists nodes whose example documents fields that no single
+// Emit call spells out — a third-party webhook body forwarded verbatim, say —
+// and are therefore exempt from the phantom-field check. Keys use exampleKey.
+//
+// Reach for this when the example is right and the analysis cannot prove it.
+// Deleting a field users can legitimately read is the wrong way out.
+var dataCheckExemptions = map[string]bool{}
+
 type exampleRecord struct {
 	Name    string
 	Kind    nodeKind
@@ -117,6 +125,20 @@ type packageAnalyzer struct {
 	typeMetas    map[string]typeMeta
 	summaryCache map[string]summary
 	summarizing  map[string]bool
+
+	// mutations of the method currently being walked, keyed by local variable.
+	currentMutations *mutations
+}
+
+// mutations records how a function body changes its local map variables after
+// they are first assigned. Inference reads only the initial assignment, so
+// these two facts decide whether the resulting schema can be trusted to list
+// every key the payload may carry.
+type mutations struct {
+	// keys added through v["name"] = …, anywhere in the body.
+	addedKeys map[string]map[string]bool
+	// variables whose key set can no longer be claimed complete.
+	inexact map[string]bool
 }
 
 func Run() ([]Issue, error) {
@@ -137,7 +159,7 @@ func Run() ([]Issue, error) {
 	var issues []Issue
 	for _, pkg := range pkgs {
 		analyzer := newPackageAnalyzer(pkg)
-		typeIssues, specs := analyzer.collectEmitSpecs()
+		typeIssues, specs, shared := analyzer.collectEmitSpecs()
 		issues = append(issues, typeIssues...)
 
 		for _, meta := range analyzer.typeMetas {
@@ -159,7 +181,7 @@ func Run() ([]Issue, error) {
 			}
 
 			issues = append(issues, validateExampleEnvelope(example)...)
-			issues = append(issues, validateExampleAgainstSpecs(example, specs[key])...)
+			issues = append(issues, validateExampleAgainstSpecs(example, specs[key], shared)...)
 		}
 	}
 
@@ -173,7 +195,13 @@ func Run() ([]Issue, error) {
 		if issues[i].Kind != issues[j].Kind {
 			return issues[i].Kind < issues[j].Kind
 		}
-		return issues[i].Name < issues[j].Name
+		if issues[i].Name != issues[j].Name {
+			return issues[i].Name < issues[j].Name
+		}
+		// One example can raise several issues that share every field above,
+		// and package order comes from a map, so the message settles the tie
+		// to keep CI output identical between runs.
+		return issues[i].Message < issues[j].Message
 	})
 
 	return issues, nil
@@ -390,7 +418,10 @@ func (a *packageAnalyzer) collectGenDecl(genDecl *ast.GenDecl) {
 	}
 }
 
-func (a *packageAnalyzer) collectEmitSpecs() ([]Issue, map[string][]emitSpec) {
+// collectEmitSpecs returns the Emit calls made by each component's own methods,
+// plus the ones made by package-level helpers. Helper calls describe a shape but
+// say nothing about which component owns a payload type, so they are kept apart.
+func (a *packageAnalyzer) collectEmitSpecs() ([]Issue, map[string][]emitSpec, []emitSpec) {
 	specs := map[string][]emitSpec{}
 	var issues []Issue
 
@@ -414,14 +445,231 @@ func (a *packageAnalyzer) collectEmitSpecs() ([]Issue, map[string][]emitSpec) {
 					continue
 				}
 
-				methodSpecs := a.collectEmitSpecsFromBlock(fn.Body, map[string]schema{})
 				key := exampleKey(meta.Kind, meta.Name)
-				specs[key] = append(specs[key], methodSpecs...)
+				specs[key] = append(specs[key], a.emitSpecsIn(fn)...)
 			}
 		}
 	}
 
-	return issues, specs
+	shared := a.sharedEmitSpecs()
+	a.stepDownUnreadEmitters(specs, shared)
+
+	return issues, specs, shared
+}
+
+func (a *packageAnalyzer) emitSpecsIn(fn *ast.FuncDecl) []emitSpec {
+	a.currentMutations = a.collectMutations(fn.Body)
+	defer func() { a.currentMutations = nil }()
+
+	return a.collectEmitSpecsFromBlock(fn.Body, map[string]schema{})
+}
+
+func (a *packageAnalyzer) sharedEmitSpecs() []emitSpec {
+	var shared []emitSpec
+
+	for _, file := range a.pkg.Syntax {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+
+			if fn.Recv != nil {
+				if _, ok := a.typeMetas[receiverTypeName(fn.Recv.List[0].Type)]; ok {
+					continue
+				}
+			}
+
+			shared = append(shared, a.emitSpecsIn(fn)...)
+		}
+	}
+
+	return shared
+}
+
+// stepDownUnreadEmitters clears exactness wherever an Emit still escaped the
+// walker — inside a closure, or with a payload type that is not a constant.
+// Claiming a complete key set from only the calls we managed to read is what
+// would let the checker call a legitimate field phantom.
+//
+// An unread Emit outside a component method cannot be tied to one component, so
+// every component in that package steps down.
+func (a *packageAnalyzer) stepDownUnreadEmitters(specs map[string][]emitSpec, shared []emitSpec) {
+	read := map[token.Position]bool{}
+	for _, list := range specs {
+		for _, spec := range list {
+			read[spec.Position] = true
+		}
+	}
+
+	for _, spec := range shared {
+		read[spec.Position] = true
+	}
+
+	unreadOwners := map[string]bool{}
+	packageWide := false
+
+	for _, file := range a.pkg.Syntax {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+
+			owner := ""
+			if fn.Recv != nil {
+				owner = receiverTypeName(fn.Recv.List[0].Type)
+			}
+
+			if !a.hasUnreadEmit(fn.Body, read) {
+				continue
+			}
+
+			if _, ok := a.typeMetas[owner]; !ok {
+				packageWide = true
+				continue
+			}
+
+			unreadOwners[owner] = true
+		}
+	}
+
+	for recvType, meta := range a.typeMetas {
+		if !packageWide && !unreadOwners[recvType] {
+			continue
+		}
+
+		key := exampleKey(meta.Kind, meta.Name)
+		for i := range specs[key] {
+			specs[key][i].Data.Exact = false
+		}
+	}
+
+	if !packageWide {
+		return
+	}
+
+	for i := range shared {
+		shared[i].Data.Exact = false
+	}
+}
+
+func (a *packageAnalyzer) hasUnreadEmit(body *ast.BlockStmt, read map[token.Position]bool) bool {
+	unread := false
+
+	ast.Inspect(body, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok || !isEmitCall(call) {
+			return true
+		}
+
+		if !read[a.pkg.Fset.Position(call.Pos())] {
+			unread = true
+		}
+
+		return true
+	})
+
+	return unread
+}
+
+// collectMutations walks the entire body, including conditional and loop
+// branches. The spec walker clones its environment per branch, so a key added
+// inside an if or switch is otherwise lost by the time Emit is reached.
+func (a *packageAnalyzer) collectMutations(body *ast.BlockStmt) *mutations {
+	m := &mutations{
+		addedKeys: map[string]map[string]bool{},
+		inexact:   map[string]bool{},
+	}
+
+	ast.Inspect(body, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range n.Lhs {
+				a.recordIndexAssign(m, lhs)
+			}
+		case *ast.CallExpr:
+			recordEscapes(m, n)
+		}
+
+		return true
+	})
+
+	return m
+}
+
+func (a *packageAnalyzer) recordIndexAssign(m *mutations, lhs ast.Expr) {
+	indexExpr, ok := lhs.(*ast.IndexExpr)
+	if !ok {
+		return
+	}
+
+	base, ok := indexExpr.X.(*ast.Ident)
+	if !ok {
+		return
+	}
+
+	key, ok := a.stringLiteral(indexExpr.Index)
+	if !ok {
+		// A computed key can add anything, so the key set stops being known.
+		m.inexact[base.Name] = true
+		return
+	}
+
+	if m.addedKeys[base.Name] == nil {
+		m.addedKeys[base.Name] = map[string]bool{}
+	}
+
+	m.addedKeys[base.Name][key] = true
+}
+
+// recordEscapes marks variables passed to another call. Helpers commonly enrich
+// a payload map in place, and that call is invisible to schema inference.
+func recordEscapes(m *mutations, call *ast.CallExpr) {
+	if isEmitCall(call) {
+		return
+	}
+
+	for _, arg := range call.Args {
+		ident, ok := arg.(*ast.Ident)
+		if !ok {
+			continue
+		}
+
+		m.inexact[ident.Name] = true
+	}
+}
+
+// apply folds the recorded mutations into the schema inferred from the
+// variable's initial assignment.
+func (m *mutations) apply(data schema, name string) schema {
+	if data.Kind != schemaObject {
+		return data
+	}
+
+	if m.inexact[name] {
+		data.Exact = false
+	}
+
+	added := m.addedKeys[name]
+	if len(added) == 0 {
+		return data
+	}
+
+	fields := make(map[string]schema, len(data.Fields)+len(added))
+	for key, value := range data.Fields {
+		fields[key] = value
+	}
+
+	for key := range added {
+		if _, ok := fields[key]; !ok {
+			fields[key] = schema{Kind: schemaUnknown}
+		}
+	}
+
+	data.Fields = fields
+
+	return data
 }
 
 func (a *packageAnalyzer) collectEmitSpecsFromBlock(block *ast.BlockStmt, env map[string]schema) []emitSpec {
@@ -469,8 +717,19 @@ func (a *packageAnalyzer) collectEmitSpecsFromStmt(stmt ast.Stmt, env map[string
 			}
 		}
 		return specs
+	case *ast.AssignStmt:
+		// Components commonly emit as `err = ctx.…Emit(…)` before inspecting
+		// err, so the payload of an assigned Emit counts like any other.
+		var specs []emitSpec
+		for _, rhs := range s.Rhs {
+			if spec, ok := a.emitSpecFromCall(rhs, env); ok {
+				specs = append(specs, spec)
+			}
+		}
+		return specs
 	case *ast.IfStmt:
 		var specs []emitSpec
+		specs = append(specs, a.collectEmitSpecsFromStmt(s.Init, cloneEnv(env))...)
 		specs = append(specs, a.collectEmitSpecsFromBlock(s.Body, cloneEnv(env))...)
 		if elseBlock, ok := s.Else.(*ast.BlockStmt); ok {
 			specs = append(specs, a.collectEmitSpecsFromBlock(elseBlock, cloneEnv(env))...)
@@ -506,8 +765,7 @@ func (a *packageAnalyzer) emitSpecFromCall(expr ast.Expr, env map[string]schema)
 		return emitSpec{}, false
 	}
 
-	selector, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || selector.Sel.Name != "Emit" {
+	if !isEmitCall(call) {
 		return emitSpec{}, false
 	}
 
@@ -520,7 +778,7 @@ func (a *packageAnalyzer) emitSpecFromCall(expr ast.Expr, env map[string]schema)
 
 		return emitSpec{
 			PayloadType: payloadType,
-			Data:        a.inferExpr(call.Args[1], env),
+			Data:        a.withMutations(a.inferExpr(call.Args[1], env), call.Args[1]),
 			Position:    a.pkg.Fset.Position(call.Pos()),
 		}, true
 	case 3:
@@ -531,12 +789,54 @@ func (a *packageAnalyzer) emitSpecFromCall(expr ast.Expr, env map[string]schema)
 
 		return emitSpec{
 			PayloadType: payloadType,
-			Data:        a.inferPayloadList(call.Args[2], env),
+			Data:        a.withMutations(a.inferPayloadList(call.Args[2], env), call.Args[2]),
 			Position:    a.pkg.Fset.Position(call.Pos()),
 		}, true
 	}
 
 	return emitSpec{}, false
+}
+
+func isEmitCall(call *ast.CallExpr) bool {
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	return ok && selector.Sel.Name == "Emit"
+}
+
+// withMutations adjusts a payload schema by what the surrounding method does to
+// the variable it came from. Inline literals reference no variable and are left
+// untouched.
+func (a *packageAnalyzer) withMutations(data schema, expr ast.Expr) schema {
+	if a.currentMutations == nil {
+		return data
+	}
+
+	for _, name := range payloadVarNames(expr) {
+		data = a.currentMutations.apply(data, name)
+	}
+
+	return data
+}
+
+// payloadVarNames returns the variables a payload argument refers to, unwrapping
+// the []any{…} wrapper the three-argument Emit form uses. A list carrying
+// several payloads contributes each of them, since the schemas were merged and
+// any one of them can make the key set incomplete.
+func payloadVarNames(expr ast.Expr) []string {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return []string{e.Name}
+	case *ast.ParenExpr:
+		return payloadVarNames(e.X)
+	case *ast.CompositeLit:
+		var names []string
+		for _, elt := range e.Elts {
+			names = append(names, payloadVarNames(elt)...)
+		}
+
+		return names
+	}
+
+	return nil
 }
 
 func (a *packageAnalyzer) inferPayloadList(expr ast.Expr, env map[string]schema) schema {
@@ -1071,13 +1371,18 @@ func validateExampleEnvelope(example exampleRecord) []Issue {
 	return issues
 }
 
-func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec) []Issue {
+// validateExampleAgainstSpecs checks an example against the Emit calls of its
+// own component. Shared specs come from package-level helpers, so they widen the
+// known shape of a payload type but never define which types a component emits —
+// counting them as its vocabulary would accuse unrelated components in the same
+// package of declaring the wrong type.
+func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec, shared []emitSpec) []Issue {
 	if len(specs) == 0 {
 		return nil
 	}
 
 	var payloadTypes []string
-	typeMatched := false
+	var matched []emitSpec
 	exampleType, _ := example.Payload["type"].(string)
 	for _, spec := range specs {
 		payloadTypes = append(payloadTypes, spec.PayloadType)
@@ -1085,11 +1390,10 @@ func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec) []Issu
 			continue
 		}
 
-		typeMatched = true
-		break
+		matched = append(matched, spec)
 	}
 
-	if !typeMatched {
+	if len(matched) == 0 {
 		return []Issue{{
 			Name:    example.Name,
 			Kind:    example.Kind,
@@ -1097,7 +1401,109 @@ func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec) []Issu
 		}}
 	}
 
-	return nil
+	position := matched[0].Position
+
+	for _, spec := range shared {
+		if spec.PayloadType == exampleType {
+			matched = append(matched, spec)
+		}
+	}
+
+	return validateExampleData(example, mergeEmitSchemas(matched), position)
+}
+
+// mergeEmitSchemas combines every Emit call that publishes the same payload
+// type, since a component may emit one type from several places. A call the
+// analyzer could not read says nothing about the full key set, so the result
+// stops being exact.
+func mergeEmitSchemas(specs []emitSpec) schema {
+	if len(specs) == 0 {
+		return schema{Kind: schemaUnknown}
+	}
+
+	merged := specs[0].Data
+	exact := merged.Kind != schemaUnknown
+
+	for _, spec := range specs[1:] {
+		if spec.Data.Kind == schemaUnknown {
+			exact = false
+		}
+
+		merged = mergeSchema(merged, spec.Data)
+	}
+
+	if !exact {
+		merged.Exact = false
+	}
+
+	return merged
+}
+
+// validateExampleData reports fields an example advertises that the component
+// never emits. Users write expressions from these examples, so a field that
+// cannot exist at runtime silently resolves to nothing.
+//
+// It reports only when the inferred schema is known to list every key the
+// payload can carry. A payload returned by a client call, enriched by a helper,
+// or keyed dynamically offers no such guarantee and is left alone.
+func validateExampleData(example exampleRecord, data schema, position token.Position) []Issue {
+	if dataCheckExemptions[exampleKey(example.Kind, example.Name)] {
+		return nil
+	}
+
+	if data.Kind != schemaObject || !data.Exact || len(data.Fields) == 0 {
+		return nil
+	}
+
+	raw, ok := example.Payload["data"]
+	if !ok {
+		return nil
+	}
+
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	var phantom []string
+	for key := range fields {
+		if _, ok := data.Fields[key]; !ok {
+			phantom = append(phantom, key)
+		}
+	}
+
+	sort.Strings(phantom)
+
+	emitted := make([]string, 0, len(data.Fields))
+	for key := range data.Fields {
+		emitted = append(emitted, key)
+	}
+	sort.Strings(emitted)
+
+	issues := make([]Issue, 0, len(phantom))
+	for _, key := range phantom {
+		issues = append(issues, Issue{
+			Name: example.Name,
+			Kind: example.Kind,
+			Path: relativePath(position.Filename),
+			Line: position.Line,
+			Message: fmt.Sprintf(
+				"example advertises data.%s, but this Emit sends only [%s]; drop it from the example payload or emit it",
+				key, strings.Join(emitted, " "),
+			),
+		})
+	}
+
+	return issues
+}
+
+func relativePath(path string) string {
+	relative, err := filepath.Rel(repoRoot(), path)
+	if err != nil {
+		return path
+	}
+
+	return relative
 }
 
 func mergeSchema(left, right schema) schema {
