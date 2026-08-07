@@ -100,7 +100,7 @@ Every transition writes exactly one `order.status.updated` event (`fromState`, `
 ## Comments and artifacts
 
 - **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is `user` or `automation`. `user` comments carry the authenticated caller's id; `automation` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation comments show a small badge.
-- **Artifacts** are first-class rows in `factory_work_order_artifacts`, only ever produced by the `addWorkOrderArtifact` canvas component (no manual attach flow today). Each artifact has a required `type` (`pr` or `markdown`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only.
+- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifact add`). Each artifact has a required `type` (`pr`, `markdown`, or `branch`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
 
 ## API
 
@@ -109,7 +109,7 @@ REST gateway on `protos/factories.proto`:
 - Factories: list, create, describe (includes lines).
 - Lines: create, update.
 - Apps: list factory-owned canvases.
-- Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, list events. Artifact creation is intentionally not exposed as an interactive API — it flows through the `addWorkOrderArtifact` canvas component instead.
+- Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
 New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 
@@ -118,6 +118,7 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 | `UpdateWorkOrderStatus` | `PATCH …/status` | `factories:update` |
 | `AddWorkOrderComment` | `POST …/comments` | `factories:update` |
 | `ListWorkOrderArtifacts` | `GET …/artifacts` | `factories:read` |
+| `CreateWorkOrderArtifact` | `POST …/artifacts` | `factories:update` |
 
 Permissions use the `factories` resource (`read`, `create`, `update`); all endpoints stay behind the `factories` experimental feature flag.
 
@@ -161,11 +162,36 @@ steps:
 
 Entrypoints must be `onRun` triggers on the factory app’s live version.
 
+## CLI
+
+Minimal factory CLI for artifacts:
+
+```bash
+superplane factory artifact add <factory> <order-id> <type> [flags]
+superplane factory artifact list <factory> <order-id>
+```
+
+`<factory>` accepts a factory name or UUID. `<order-id>` is the work-order UUID.
+`<type>` is `pr`, `markdown`, or `branch`. Typed flags build the API `data` map:
+
+```bash
+superplane factory artifact add shipping "$OID" markdown \
+  --title PLAN.md -f ./PLAN.md
+
+superplane factory artifact add shipping "$OID" pr \
+  --url https://github.com/org/repo/pull/7 --number 7
+
+superplane factory artifact add shipping "$OID" branch --name feature/login
+```
+
+For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`). Full factory CLI surface beyond artifacts is still pending.
+
 ## Not implemented yet
 
-- CLI (`superplane factory …`).
+- Broader CLI (`superplane factory` list/create/dispatch/…).
 - Work orders sourced from external systems or factory-app components.
 - Full PRD approval flow (gated approvals on `open → closed`).
 - Auto-close work order when a line finishes all steps.
 - Editing or deleting comments and artifacts.
+- UI attach-artifact composer (sidebar remains read-only; API/CLI/canvas create still refresh via websocket).
 - Additional artifact types (screenshots, recordings). The schema is extensible via `type` + JSONB `data` when needed.
