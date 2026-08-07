@@ -151,11 +151,11 @@ function AppRouter() {
                   />
                   <Route
                     path=":factoryId/orders/new"
-                    element={withAuthPermissionAndFactoriesFeature(CreateWorkOrderPage, "factories", "create")}
+                    element={withAuthPermissionAndFactoriesFeature(CreateWorkOrderPage, "work_orders", "create")}
                   />
                   <Route
                     path=":factoryId/orders/:orderId"
-                    element={withAuthPermissionAndFactoriesFeature(WorkOrderDetailPage, "factories", "read")}
+                    element={withAuthPermissionAndFactoriesFeature(WorkOrderDetailPage, "work_orders", "read")}
                   />
                   <Route
                     path=":factoryId/lines/new"

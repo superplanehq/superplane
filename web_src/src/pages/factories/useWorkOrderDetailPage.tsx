@@ -26,7 +26,7 @@ export function useWorkOrderDetailPage(organizationId: string, factoryId: string
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Factory"]);
 
   const isLoading = factoryLoading || orderLoading;
-  const canManageWorkOrders = canAct("factories", "update");
+  const canManageWorkOrders = canAct("work_orders", "update");
 
   useReportPageReady(!isLoading && Boolean(factory && order), {
     failed: Boolean(factoryError || orderError),

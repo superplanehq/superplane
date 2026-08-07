@@ -10,7 +10,7 @@ import { FactoryLinesSidebar } from "./FactoryLinesSidebar";
 
 /**
  * Sidebar section listing configured factory lines and their steps. Names
- * link to the line editor when the viewer has `factories:update` permission.
+ * link to the line editor when the viewer has `factories:update`.
  */
 const meta = {
   title: "Factories/FactoryLinesSidebar",
