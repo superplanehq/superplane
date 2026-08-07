@@ -238,7 +238,7 @@ function OrganizationScope() {
 
 function CreateWorkOrderPageGate() {
   return (
-    <RequirePermission resource="factories" action="create">
+    <RequirePermission resource="work_orders" action="create">
       <CreateWorkOrderPage />
     </RequirePermission>
   );

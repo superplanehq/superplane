@@ -73,7 +73,7 @@ function WorkOrderDetailPageContent({
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
-      canManageWorkOrders={canAct("factories", "update")}
+      canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />

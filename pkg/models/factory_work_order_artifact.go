@@ -19,6 +19,9 @@ const (
 	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
+
+	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
+	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
 )
 
 var (
@@ -90,6 +93,13 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	dataJSON, err := encodeArtifactData(params.Data)
 	if err != nil {
 		return nil, err
+	}
+	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
+		return nil, fmt.Errorf(
+			"%w: artifact data exceeds %d bytes",
+			ErrFactoryWorkOrderArtifactInvalid,
+			MaxFactoryWorkOrderArtifactDataBytes,
+		)
 	}
 
 	now := time.Now()

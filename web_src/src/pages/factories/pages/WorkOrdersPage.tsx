@@ -51,8 +51,8 @@ export function WorkOrdersPage() {
   }, [workOrders, ownerFilter, statusFilter, me?.id]);
 
   const activeCount = countActiveWorkOrders(workOrders);
-  const canCreate = canAct("factories", "create");
-  const canDispatch = canAct("factories", "update");
+  const canCreate = canAct("work_orders", "create");
+  const canDispatch = canAct("work_orders", "update");
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
   const factoryLines = factory?.lines ?? [];

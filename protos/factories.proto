@@ -240,6 +240,18 @@ service Factories {
     };
   }
 
+  rpc CreateWorkOrderArtifact(CreateWorkOrderArtifactRequest) returns (CreateWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create work order artifact";
+      description: "Attaches a typed artifact to a work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -557,6 +569,17 @@ message ListWorkOrderArtifactsRequest {
 
 message ListWorkOrderArtifactsResponse {
   repeated WorkOrderArtifact artifacts = 1;
+}
+
+message CreateWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrderArtifact.Type type = 3;
+  google.protobuf.Struct data = 4;
+}
+
+message CreateWorkOrderArtifactResponse {
+  WorkOrderArtifact artifact = 1;
 }
 
 message WorkOrderArtifact {
