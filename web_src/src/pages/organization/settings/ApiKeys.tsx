@@ -16,10 +16,11 @@ import { settingsModalClassName, settingsTableCardClassName } from "./settingsPa
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
+import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 import { ApiKeysContent } from "./ApiKeysContent";
 
 interface APIKeysProps {
@@ -145,8 +146,22 @@ export function APIKeys({ organizationId }: APIKeysProps) {
 
   const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
+  const { data: roles = [] } = useOrganizationRoles(organizationId);
   const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
+
+  const assignableRoles = useMemo(() => {
+    const reserved = new Set(["org_owner", "org_viewer", "org_admin"]);
+    const customRoles = roles
+      .flatMap((role) => {
+        const name = role.metadata?.name?.trim();
+        if (!name || reserved.has(name)) return [];
+        return [{ name, label: role.spec?.displayName?.trim() || name }];
+      })
+      .sort((a, b) => a.label.localeCompare(b.label) || a.name.localeCompare(b.name));
+
+    return [{ name: "org_viewer", label: "Viewer" }, { name: "org_admin", label: "Admin" }, ...customRoles];
+  }, [roles]);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -277,8 +292,11 @@ export function APIKeys({ organizationId }: APIKeysProps) {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
-                      <SelectItem value="org_admin">Admin</SelectItem>
+                      {assignableRoles.map((role) => (
+                        <SelectItem key={role.name} value={role.name}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
