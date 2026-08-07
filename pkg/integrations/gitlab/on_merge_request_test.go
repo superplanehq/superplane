@@ -7,9 +7,46 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func Test__OnMergeRequest__Setup(t *testing.T) {
+	trigger := &OnMergeRequest{}
+	metadata := Metadata{
+		Projects: []ProjectMetadata{
+			{ID: 123, Name: "group/example", URL: "https://gitlab.com/group/example"},
+		},
+	}
+
+	t.Run("metadata is set and webhook is requested", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{Metadata: metadata}
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"project": "123"},
+		}))
+
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookConfig, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Equal(t, "merge_requests", webhookConfig.EventType)
+		assert.Equal(t, "123", webhookConfig.ProjectID)
+	})
+
+	t.Run("expression project is rejected", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{Metadata: metadata}
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"project": "{{ root().data.project.id }}"},
+		})
+
+		require.ErrorContains(t, err, "project does not support expressions")
+		require.Empty(t, integrationCtx.WebhookRequests)
+	})
+}
 
 func Test__OnMergeRequest__HandleWebhook__MissingEventHeader(t *testing.T) {
 	trigger := &OnMergeRequest{}
