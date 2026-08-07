@@ -61,7 +61,7 @@ export function DispatchWorkOrderPopover({
         <div className="space-y-3">
           {lines.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Configure at least one factory line before dispatching work orders.
+              Configure at least one line before dispatching work orders.
             </p>
           ) : (
             <Select value={lineName} onValueChange={setLineName}>

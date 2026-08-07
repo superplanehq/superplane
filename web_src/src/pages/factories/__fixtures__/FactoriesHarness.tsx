@@ -5,7 +5,7 @@ import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageRespon
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
 
 interface FactoriesHarnessProps {
-  /** Path under the org. Defaults to `factories` (list page). */
+  /** Path under the org. Defaults to `workspaces` (list page). */
   pathSuffix?: string;
   /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
   factoriesFixture?: FactoriesFixture;
@@ -14,10 +14,10 @@ interface FactoriesHarnessProps {
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
  * backend for factory list/detail/orders/lines/apps endpoints. Shares the same
- * `OrgWorkspaceHarness` shell so links between Home → Factories → App work.
+ * `OrgWorkspaceHarness` shell so links between Home → Workspaces → App work.
  */
 export function FactoriesHarness({
-  pathSuffix = "factories",
+  pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {

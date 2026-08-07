@@ -18,7 +18,7 @@ import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
  * story self-contained.
  */
 const meta = {
-  title: "Factories/WorkOrderAssigneesField",
+  title: "Factories/Components/WorkOrderAssigneesField",
   component: WorkOrderAssigneesField,
   parameters: { layout: "padded" },
   decorators: [

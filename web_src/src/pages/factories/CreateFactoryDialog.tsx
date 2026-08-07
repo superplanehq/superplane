@@ -51,10 +51,10 @@ export function CreateFactoryDialog({ open, isSaving, onClose, onCreate }: Creat
         description: description.trim(),
       });
     } catch (error) {
-      const message = getApiErrorMessage(error, "Failed to create factory");
+      const message = getApiErrorMessage(error, "Failed to create workspace");
       showErrorToast(message);
       if (message.toLowerCase().includes("already") || message.toLowerCase().includes("exists")) {
-        setNameError("A factory with this name already exists");
+        setNameError("A workspace with this name already exists");
       }
     }
   };
@@ -70,7 +70,7 @@ export function CreateFactoryDialog({ open, isSaving, onClose, onCreate }: Creat
     >
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create factory</DialogTitle>
+          <DialogTitle>Create workspace</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
