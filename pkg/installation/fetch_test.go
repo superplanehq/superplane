@@ -82,3 +82,29 @@ func TestRawFileURLBuildsExpectedPath(t *testing.T) {
 		rawFileURL(repo, "main", consoleFileName),
 	)
 }
+
+func TestFetchURLFileSizeLimit(t *testing.T) {
+	const rawURL = "https://raw.githubusercontent.com/acme/demo/main/canvas.yaml"
+	const maxFileSize = 2 << 20
+
+	t.Run("accepts a file at the limit", func(t *testing.T) {
+		body := strings.Repeat("x", maxFileSize)
+		stubHTTP(t, map[string]stubResponse{
+			rawURL: {status: http.StatusOK, body: body},
+		})
+
+		result, err := fetchURL(rawURL)
+		require.NoError(t, err)
+		assert.Len(t, result, maxFileSize)
+	})
+
+	t.Run("rejects a file over the limit", func(t *testing.T) {
+		stubHTTP(t, map[string]stubResponse{
+			rawURL: {status: http.StatusOK, body: strings.Repeat("x", maxFileSize+1)},
+		})
+
+		_, err := fetchURL(rawURL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds 2 MiB limit")
+	})
+}
