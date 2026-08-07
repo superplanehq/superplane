@@ -731,16 +731,28 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 		validWeekdays[weekday] = true
 	}
 
-	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
+	// Walk forward from the week that contains `now`, one active week at a time
+	// (an active week every `interval` weeks), and return the first selected
+	// weekday whose trigger time is strictly after `now`. Scanning the current
+	// week first is what lets the schedule fire on every selected weekday rather
+	// than only the first one. https://github.com/superplanehq/superplane/issues/6514
+	weekStart := time.Date(nowInTZ.Year(), nowInTZ.Month(), nowInTZ.Day(), 0, 0, 0, 0, nowInTZ.Location())
+	weekStart = weekStart.AddDate(0, 0, -int(weekStart.Weekday())) // back up to the Sunday that opens the week
 
-	// start the search on Sunday of the next week
-	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
-	for i := 0; i < 7; i++ {
-		checkDate := nextIntervalStart.AddDate(0, 0, i)
-		if validWeekdays[checkDate.Weekday()] {
-			candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
-			utcResult := candidateTime.UTC()
-			return &utcResult, nil
+	// interval is at most 52, so a matching weekday is always found within the
+	// current week or the next active one; the bound is just a safety net.
+	for weekOffset := 0; weekOffset <= 104; weekOffset += interval {
+		weekStartDay := weekStart.AddDate(0, 0, weekOffset*7)
+		for i := 0; i < 7; i++ {
+			day := weekStartDay.AddDate(0, 0, i)
+			if !validWeekdays[day.Weekday()] {
+				continue
+			}
+			candidate := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, nowInTZ.Location())
+			if candidate.After(nowInTZ) {
+				utcResult := candidate.UTC()
+				return &utcResult, nil
+			}
 		}
 	}
 
