@@ -273,6 +273,44 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "sess_1", httpContext.Requests[4].URL.Query().Get("scope_id"))
 }
 
+// A session.error event means the session produced no real result (e.g. the
+// workspace hit its Anthropic usage/credit limit); the run must fail rather
+// than pass with an empty message.
+func Test__RunAgent__Execute__syncSessionError(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete session
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "sk-test"},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  map[string]any{"agent": "ag_1", "environmentId": "ev_1", "prompt": "Hello"},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: executionState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Workspace usage limit reached")
+	assert.False(t, executionState.Finished, "the worker (not Execute itself) fails the execution")
+
+	_, deleted := sessionCalls(httpContext)
+	assert.True(t, deleted, "a failed session must still be reclaimed")
+}
+
 func Test__RunAgent__Execute__structuredOutput(t *testing.T) {
 	a := &RunAgent{}
 	agentMessage := "Here is the result.\n\n```json\n{\"summary\": \"looks good\"}\n```\n"
@@ -437,6 +475,47 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
 	assert.Equal(t, "text", out.Artifacts[0].Encoding)
 	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
+}
+
+// A session.error event surfaced during polling must fail the execution
+// (via ExecutionState.Fail), not emit a passing payload with an empty message.
+func Test__RunAgent__poll__sessionErrorFailsExecution(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete session
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{
+			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
+		},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	err := a.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	assert.False(t, executionState.Passed)
+	assert.Equal(t, "error", executionState.FailureReason)
+	assert.Contains(t, executionState.FailureMessage, "Workspace usage limit reached")
+	assert.Empty(t, executionState.Payloads, "no payload should be emitted for a failed session")
+
+	_, deleted := sessionCalls(httpContext)
+	assert.True(t, deleted, "a failed session must still be reclaimed")
 }
 
 func Test__RunAgent__poll__structuredOutput(t *testing.T) {
