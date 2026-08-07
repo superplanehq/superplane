@@ -45,6 +45,7 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		assert.Equal(t, "# Plan", resp.Artifact.Data.AsMap()["body"])
 		require.NotNil(t, resp.Artifact.CreatedBy)
 		assert.Equal(t, r.User.String(), resp.Artifact.CreatedBy.Id)
+		assert.Equal(t, r.UserModel.Name, resp.Artifact.CreatedBy.Name)
 
 		artifacts, err := order.ListArtifacts(database.DB(t.Context()))
 		require.NoError(t, err)

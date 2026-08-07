@@ -37,6 +37,9 @@ func (c *activeCommand) printActive(ctx core.CommandContext) error {
 	if active == "" {
 		return fmt.Errorf("no active factory; pass a name or id, or run interactively")
 	}
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(map[string]string{"id": active})
+	}
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, err := fmt.Fprintln(stdout, active)
 		return err
