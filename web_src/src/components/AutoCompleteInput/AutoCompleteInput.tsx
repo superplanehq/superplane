@@ -979,8 +979,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       setDropdownPosition(
         calculateDropdownPosition({
           cursor,
+          cursorTop: markerRect.top - input.scrollTop,
           viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
           dropdownWidth,
+          dropdownHeight: SUGGESTION_LIST_MAX_HEIGHT_PX,
           valuePreviewWidth,
           showValuePreview,
         }),
