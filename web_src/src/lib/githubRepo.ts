@@ -5,8 +5,8 @@ export function parseGitHubRepoParam(raw: string | null | undefined): { owner: s
   }
 
   trimmed = trimmed.replace(/^https?:\/\//i, "");
-  trimmed = trimmed.replace(/\.git$/i, "");
   trimmed = trimmed.replace(/^\/+|\/+$/g, "");
+  trimmed = trimmed.replace(/\.git$/i, "");
 
   if (/^github\.com\//i.test(trimmed)) {
     trimmed = trimmed.slice("github.com/".length);
