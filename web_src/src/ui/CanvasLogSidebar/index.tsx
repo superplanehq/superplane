@@ -8,6 +8,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
+import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
 export type ConsoleTab = "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error";
@@ -92,6 +93,14 @@ export function CanvasLogSidebar({
   onRunExecutionSelect,
   onAcknowledgeErrors,
 }: CanvasLogSidebarProps) {
+  // Inset the log console from the right so it doesn't slide under the
+  // component/building-blocks sidebar when one is open — those sidebars are
+  // absolutely positioned on top of it (see ui/CanvasPage/index.tsx) and
+  // resize independently via this same shared store.
+  const rightSidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  const isRightSidebarMounted = useSidebarLayoutStore((state) => state.rightMountCount > 0);
+  const rightInset = isRightSidebarMounted ? rightSidebarWidth : 0;
+
   const [internalTab, setInternalTab] = useState<ConsoleTab>("errors");
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = useCallback(
@@ -235,7 +244,10 @@ export function CanvasLogSidebar({
   const searchPlaceholder = activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
-    <aside className="ph-no-capture absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
+    <aside
+      className="ph-no-capture absolute left-0 bottom-0 z-31 pointer-events-auto"
+      style={{ right: rightInset }}
+    >
       <div
         className={cn("flex flex-col border-t bg-white dark:bg-gray-900", appDarkModeClasses.sidebarEdge)}
         style={{ height: sidebarHeight, minHeight, maxHeight }}
