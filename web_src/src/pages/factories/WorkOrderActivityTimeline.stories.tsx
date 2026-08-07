@@ -26,7 +26,7 @@ import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
  * batches per line, and (when closed) a "Closed as …" footer.
  */
 const meta = {
-  title: "Factories/WorkOrderActivityTimeline",
+  title: "Factories/Components/WorkOrderActivityTimeline",
   component: WorkOrderActivityTimeline,
   parameters: { layout: "padded" },
   decorators: [

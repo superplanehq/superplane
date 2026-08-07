@@ -38,7 +38,7 @@ import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
  * `WorkOrderDetailPage.stories.tsx`.
  */
 const meta = {
-  title: "Factories/WorkOrderDetailLoadedView",
+  title: "Factories/Components/WorkOrderDetailLoadedView",
   component: WorkOrderDetailLoadedView,
   parameters: { layout: "fullscreen" },
   decorators: [
