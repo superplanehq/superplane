@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -296,6 +297,17 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("rejects artifact data over 64KiB", func(t *testing.T) {
+		body := strings.Repeat("a", MaxFactoryWorkOrderArtifactDataBytes)
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": body},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+		assert.Contains(t, err.Error(), "exceeds")
 	})
 
 	t.Run("branch requires data.name", func(t *testing.T) {

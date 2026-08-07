@@ -22,6 +22,7 @@ type ConfigContext struct {
 	APIToken       string  `json:"apiToken" yaml:"apiToken"`
 	App            *string `json:"app,omitempty" yaml:"app,omitempty"`
 	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"` // deprecated: use app
+	Factory        *string `json:"factory,omitempty" yaml:"factory,omitempty"`
 }
 
 func activeAppID(context ConfigContext) string {
@@ -362,6 +363,24 @@ func (c *CurrentContext) SetActiveApp(appID string) error {
 	appID = strings.TrimSpace(appID)
 	c.context.App = &appID
 	c.context.Canvas = nil
+	_, err := UpsertContext(c.context)
+	return err
+}
+
+func (c *CurrentContext) GetActiveFactory() string {
+	if c.context.Factory == nil {
+		return ""
+	}
+	return strings.TrimSpace(*c.context.Factory)
+}
+
+func (c *CurrentContext) SetActiveFactory(factoryID string) error {
+	if c.readOnly {
+		return fmt.Errorf("cannot set active factory when using %s and %s; pass --factory instead", EnvURL, EnvToken)
+	}
+
+	factoryID = strings.TrimSpace(factoryID)
+	c.context.Factory = &factoryID
 	_, err := UpsertContext(c.context)
 	return err
 }

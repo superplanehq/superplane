@@ -31,6 +31,8 @@ type CommandContext struct {
 type ConfigContext interface {
 	GetActiveApp() string
 	SetActiveApp(appID string) error
+	GetActiveFactory() string
+	SetActiveFactory(factoryID string) error
 	GetURL() string
 }
 
