@@ -66,6 +66,12 @@ func Test_AssignRole(t *testing.T) {
 		assert.Equal(t, "invalid role", msg)
 	})
 
+	t.Run("invalid request - unknown role", func(t *testing.T) {
+		newUser := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, "missing-role", newUser.ID.String(), "", r.AuthService)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
 		assert.Error(t, err)

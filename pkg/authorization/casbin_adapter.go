@@ -14,7 +14,7 @@ func newCasbinAdapter(db *gorm.DB) (*gormadapter.Adapter, error) {
 	return gormadapter.NewTransactionalAdapterByDB(db)
 }
 
-// newCasbinFilteredAdapter creates a filtered Casbin adapter for read paths without AutoMigrate.
+// newCasbinFilteredAdapter creates a filtered Casbin adapter without AutoMigrate.
 func newCasbinFilteredAdapter(db *gorm.DB) (*gormadapter.Adapter, error) {
 	return gormadapter.NewFilteredAdapterByDB(db, "", casbinRuleTable)
 }

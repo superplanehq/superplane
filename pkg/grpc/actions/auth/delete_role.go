@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -91,7 +92,7 @@ func removeUsersForDeletedRole(ctx context.Context, authService authorization.Au
 				continue
 			}
 			if grpcerrors.Code(err) == codes.NotFound {
-				err = authService.RemoveRole(userID, roleName, domainID, domainType)
+				err = authService.RemoveRole(database.DB(ctx), userID, roleName, domainID, domainType)
 			}
 			if err != nil {
 				log.Errorf("failed to remove user %s for role %s: %v", userID, roleName, err)
@@ -100,7 +101,7 @@ func removeUsersForDeletedRole(ctx context.Context, authService authorization.Au
 			continue
 		}
 
-		if err := authService.RemoveRole(userID, roleName, domainID, domainType); err != nil {
+		if err := authService.RemoveRole(database.DB(ctx), userID, roleName, domainID, domainType); err != nil {
 			log.Errorf("failed to remove role %s for user %s: %v", roleName, userID, err)
 			return grpcerrors.Internal(err, "failed to remove role for user")
 		}

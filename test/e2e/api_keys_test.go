@@ -327,7 +327,7 @@ func (s *apiKeySteps) loginAsViewer() {
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	err = authService.AssignRole(viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.Conn(), viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(s.t, err)
 
 	s.session.Account = viewerAccount

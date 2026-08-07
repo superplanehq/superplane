@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -80,7 +81,7 @@ func (s *canvasMultiUserStagingSteps) createCollaborator() (*models.Account, uui
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, s.session.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.Conn(), user.ID.String(), models.RoleOrgAdmin, s.session.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(s.t, err)
 
 	return account, user.ID

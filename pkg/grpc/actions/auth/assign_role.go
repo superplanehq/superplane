@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -34,9 +36,12 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 
-	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
+	err = authService.AssignRole(database.DB(ctx), user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
 		log.Errorf("Error assigning role %s to %s: %v", roleName, user.ID.String(), err)
+		if errors.Is(err, authorization.ErrRoleNotFound) || errors.Is(err, authorization.ErrRoleNotAssignable) {
+			return nil, grpcerrors.InvalidArgument(err, "invalid role")
+		}
 		return nil, grpcerrors.Internal(err, "failed to assign role")
 	}
 

@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
@@ -41,7 +42,7 @@ func DeleteAPIKey(ctx context.Context, req *pb.DeleteAPIKeyRequest, authService 
 		log.Errorf("Error determining roles for API key %s: %v", user.ID, err)
 	} else {
 		for _, role := range roles {
-			err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
+			err = authService.RemoveRole(database.DB(ctx), user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 			if err != nil {
 				log.Errorf("Error removing role %s for API key %s: %v", role.Name, user.ID, err)
 			}
