@@ -234,26 +234,27 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	return core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
 		Name:  SetupStepSelectOwner,
-		Label: "Select the user account / organization",
+		Label: "Select the GitHub user account or organization",
 		Inputs: []configuration.Field{
 			{
 				Name:     common.PropertyOwnerType,
-				Label:    "Owner Type",
+				Label:    "GitHub owner type",
 				Type:     configuration.FieldTypeSelect,
 				Required: true,
 				Default:  common.OwnerTypeUser,
 				TypeOptions: &configuration.TypeOptions{
 					Select: &configuration.SelectTypeOptions{
 						Options: []configuration.FieldOption{
-							{Label: "User Account", Value: common.OwnerTypeUser},
-							{Label: "Organization", Value: common.OwnerTypeOrganization},
+							{Label: "GitHub user account", Value: common.OwnerTypeUser},
+							{Label: "GitHub organization", Value: common.OwnerTypeOrganization},
 						},
 					},
 				},
 			},
 			{
 				Name:        common.PropertyOwner,
-				Label:       "User account / organization name",
+				Label:       "GitHub username or organization name",
+				Description: "The GitHub account or organization that owns the repositories — not your SuperPlane organization.",
 				Type:        configuration.FieldTypeString,
 				Required:    true,
 				Placeholder: "e.g. superplanehq",
