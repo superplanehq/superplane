@@ -93,6 +93,12 @@ describe("RunParametersFieldRenderer", () => {
       <ControlledRenderer initialValue={{ message: "hello" }} allValues={{ app: "canvas_target", node: "on-run" }} />,
     );
 
+    expect(mockUseCanvas).toHaveBeenCalledWith(
+      "org-1",
+      "canvas_target",
+      expect.objectContaining({ staleTime: Number.POSITIVE_INFINITY }),
+    );
+
     await waitFor(() => {
       expect(screen.getByTestId("string-field-message")).toBeTruthy();
     });
