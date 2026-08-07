@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Accept Merge Request" href="#accept-merge-request" description="Merge an open GitLab merge request" />
+  <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitLab issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitLab issue" />
   <LinkCard title="Add Merge Request Reviewers" href="#add-merge-request-reviewers" description="Add reviewers to a GitLab merge request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add an award emoji reaction to a GitLab merge request or comment" />
@@ -49,6 +50,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
   <LinkCard title="Mark Merge Request Ready for Review" href="#mark-merge-request-ready-for-review" description="Take a draft merge request out of the draft state in a GitLab project" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a build/CI status on a GitLab commit" />
+  <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitLab issue" />
   <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
@@ -1452,6 +1454,88 @@ Returns the merged merge request object, including state, merge commit SHA, sour
   },
   "timestamp": "2026-02-13T11:16:17.520Z",
   "type": "gitlab.mergeRequest"
+}
+```
+
+<a id="add-issue-assignee"></a>
+
+## Add Issue Assignee
+
+**Component key:** `gitlab.addIssueAssignee`
+
+The Add Issue Assignee component adds one or more assignees to an existing GitLab issue. Existing assignees are kept.
+
+### Use Cases
+
+- **Auto-assignment**: Automatically assign issues to team members based on workflow triggers
+- **Escalation**: Add an additional assignee when an issue requires attention from a specific person
+- **On-call routing**: Assign issues to the current on-call engineer
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to add assignees to (supports expressions)
+- **Assignees** (required): Users to assign the issue to. These are added to any existing assignees.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change assignees.
+
+### Output
+
+Returns the updated issue object, including its full assignee list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      },
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456?s=80\u0026d=identicon",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "http://gitlab.example.com/amorgan"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue updated via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "opened",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:05:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:05:00.000Z",
+  "type": "gitlab.updateIssue"
 }
 ```
 
@@ -3066,6 +3150,80 @@ Returns the created commit status object.
   },
   "timestamp": "2026-02-13T18:04:12.000Z",
   "type": "gitlab.commitStatus"
+}
+```
+
+<a id="remove-issue-assignee"></a>
+
+## Remove Issue Assignee
+
+**Component key:** `gitlab.removeIssueAssignee`
+
+The Remove Issue Assignee component removes one or more assignees from an existing GitLab issue. Assignees that are not listed are kept.
+
+### Use Cases
+
+- **Automated cleanup**: Remove an assignee once their involvement is no longer needed
+- **Reassignment**: Remove an assignee before adding a different one as part of a workflow
+- **Rotation**: Drop an out-of-office assignee from an open issue
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to remove assignees from (supports expressions)
+- **Assignees** (required): Users to remove from the issue's assignees. Assignees not listed are kept.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change assignees.
+
+### Output
+
+Returns the updated issue object, including its remaining assignee list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue updated via SuperPlane",
+    "due_date": null,
+    "id": 1,
+    "iid": 1,
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "milestone": null,
+    "project_id": 3,
+    "state": "opened",
+    "title": "Example Issue",
+    "updated_at": "2023-01-01T10:05:00.000Z",
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1"
+  },
+  "timestamp": "2023-01-01T10:05:00.000Z",
+  "type": "gitlab.updateIssue"
 }
 ```
 
