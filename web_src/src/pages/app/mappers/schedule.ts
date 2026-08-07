@@ -81,7 +81,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
   }
 }
 
-function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
+export function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
   // Always use backend-calculated nextTrigger first if available
   if (referenceNextTrigger) {
     try {
@@ -203,15 +203,31 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (validDayIndices.size === 0) return null;
 
-      // Match Go backend: add interval weeks in timezone, then find first valid weekday
-      const nextIntervalStart = new Date(nowInTZ);
+      // Match Go backend: the week containing now is active (weeks start on
+      // Sunday), and every configured weekday in an active week fires.
+      const currentWeekStart = new Date(nowInTZ);
+      currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+      currentWeekStart.setHours(0, 0, 0, 0);
+
+      for (let i = 0; i < 7; i++) {
+        const checkDate = new Date(currentWeekStart);
+        checkDate.setDate(checkDate.getDate() + i);
+        if (!validDayIndices.has(checkDate.getDay())) {
+          continue;
+        }
+        checkDate.setHours(hour);
+        checkDate.setMinutes(minute);
+        checkDate.setSeconds(0);
+        checkDate.setMilliseconds(0);
+        if (checkDate > nowInTZ) {
+          return new Date(checkDate.getTime());
+        }
+      }
+
+      // Current week exhausted: the next active week starts a full interval later
+      const nextIntervalStart = new Date(currentWeekStart);
       nextIntervalStart.setDate(nextIntervalStart.getDate() + interval * 7);
 
-      // Go to start of week (Sunday = 0)
-      const daysToSubtract = nextIntervalStart.getDay();
-      nextIntervalStart.setDate(nextIntervalStart.getDate() - daysToSubtract);
-
-      // Find first valid weekday in that week
       for (let i = 0; i < 7; i++) {
         const checkDate = new Date(nextIntervalStart);
         checkDate.setDate(checkDate.getDate() + i);
