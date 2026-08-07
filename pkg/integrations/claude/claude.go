@@ -47,7 +47,7 @@ func (i *Claude) Configuration() []configuration.Field {
 			Label:       "API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Claude API key",
+			Description: "Claude API key, or a Claude Code OAuth token for Text Prompt only.",
 			Required:    true,
 		},
 		{
@@ -77,6 +77,12 @@ func (i *Claude) Triggers() []core.Trigger {
 
 func (i *Claude) Instructions() string {
 	return `To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+## Claude Code OAuth tokens
+
+The API Key field also accepts a Claude Code OAuth token (` + "`sk-ant-oat…`" + `, from ` + "`claude setup-token`" + `), which bills against a Claude subscription instead of API credits.
+
+Such a token carries inference scope only. It covers **Text Prompt**, and it is also what the **Run Claude Code** component needs to run the CLI on a subscription. Everything that touches workspace resources — **Run Agent**, **Run Code Agent**, **Create Batch Message**, file attachments, and usage reports — still requires a regular API key and fails with a scope error otherwise.
 
 ## Files & artifacts
 
