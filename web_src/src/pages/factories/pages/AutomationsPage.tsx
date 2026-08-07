@@ -19,7 +19,7 @@ import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { automationsPath, createFactoryLinePath, editFactoryLinePath } from "../lib/factoryPagePaths";
+import { createFactoryLinePath, editFactoryLinePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import { LineStepArrow, LineStepDisplayNode, LineStepFlow } from "../FactoryLineStepFlow";
 import { factoryContentBodyClassName, factoryContentHeaderClassName } from "./factoryPageLayoutStyles";
 
@@ -153,7 +153,7 @@ function LinesList({
             return (
               <li key={line.id}>
                 <NavLink
-                  to={`${automationsPath(organizationId, factoryId)}/${line.id}`}
+                  to={factoryLineDetailPath(organizationId, factoryId, line.id)}
                   className={cn(
                     "flex items-center gap-2 border-b border-slate-950/5 px-3 py-2 text-sm text-gray-700 last:border-b-0 hover:bg-gray-50 dark:border-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-800/40",
                     isActive && "bg-gray-50 font-medium text-gray-900 dark:bg-gray-800/60 dark:text-gray-100",

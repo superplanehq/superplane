@@ -8,7 +8,7 @@ import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { editFactoryLinePath, workOrderDetailPath, workOrdersPath, automationsPath } from "../lib/factoryPagePaths";
+import { factoryLineDetailPath, workOrderDetailPath, workOrdersPath, automationsPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { factoryContentBodyClassName, factoryContentHeaderClassName } from "./factoryPageLayoutStyles";
 
@@ -183,7 +183,7 @@ function LinesOverviewCard({
         <ul>
           {lines.map((line) => {
             const stepsCount = line.steps?.length ?? 0;
-            const href = line.id ? editFactoryLinePath(organizationId, factoryId, line.id) : "#";
+            const href = line.id ? factoryLineDetailPath(organizationId, factoryId, line.id) : "#";
             return (
               <li
                 key={line.id ?? line.name}

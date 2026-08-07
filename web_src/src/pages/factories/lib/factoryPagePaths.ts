@@ -30,6 +30,10 @@ export function createFactoryLinePath(organizationId: string, factoryId: string)
   return `${automationsPath(organizationId, factoryId)}/new`;
 }
 
+export function factoryLineDetailPath(organizationId: string, factoryId: string, lineId: string) {
+  return `${automationsPath(organizationId, factoryId)}/${lineId}`;
+}
+
 export function editFactoryLinePath(organizationId: string, factoryId: string, lineId: string) {
   return `${automationsPath(organizationId, factoryId)}/${lineId}/edit`;
 }
