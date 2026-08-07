@@ -115,12 +115,13 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 
 | RPC | HTTP | Action |
 | --- | --- | --- |
-| `UpdateWorkOrderStatus` | `PATCH …/status` | `factories:update` |
-| `AddWorkOrderComment` | `POST …/comments` | `factories:update` |
-| `ListWorkOrderArtifacts` | `GET …/artifacts` | `factories:read` |
-| `CreateWorkOrderArtifact` | `POST …/artifacts` | `factories:update` |
+| `UpdateWorkOrderStatus` | `PATCH …/status` | `work_orders:update` |
+| `AddWorkOrderComment` | `POST …/comments` | `work_orders:update` |
+| `ListWorkOrderArtifacts` | `GET …/artifacts` | `work_orders:read` |
+| `CreateWorkOrderArtifact` | `POST …/artifacts` | `work_orders:update` |
 
-Permissions use the `factories` resource (`read`, `create`, `update`); all endpoints stay behind the `factories` experimental feature flag.
+Factory structure (create/update/delete factory + lines) uses the `factories` resource.
+Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
 
 ## Canvas components
 
