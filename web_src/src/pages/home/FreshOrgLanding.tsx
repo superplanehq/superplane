@@ -107,7 +107,12 @@ export function FreshOrgLanding({
       )}
 
       {installingApp && (
-        <InstallProgressPanel app={installingApp} folder={folder} onClose={() => setInstallingApp(null)} />
+        <InstallProgressPanel
+          app={installingApp}
+          canvasName={installingApp.title}
+          folder={folder}
+          onClose={() => setInstallingApp(null)}
+        />
       )}
 
       {!inFocusedSetup && (
