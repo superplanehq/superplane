@@ -44,7 +44,7 @@ const meta = {
   decorators: [
     (Story) => (
       <ComponentStoryShell
-        initialPath={`/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`}
+        initialPath={`/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_ID}`}
         className="min-h-screen w-full bg-gray-50 dark:bg-gray-950"
       >
         <Story />
@@ -57,7 +57,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`;
+const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_ID}`;
 
 interface BuildLoadedViewOverrides {
   events?: FactoriesWorkOrderEvent[];

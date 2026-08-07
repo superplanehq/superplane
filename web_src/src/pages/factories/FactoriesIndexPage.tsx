@@ -14,6 +14,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { factoryDetailPath } from "./lib/factoryPagePaths";
 import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
+import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
 
 export function FactoriesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -33,7 +34,8 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
 
-  usePageTitle(["Factories"]);
+  useFactoriesThemeClass();
+  usePageTitle(["Workspaces"]);
 
   if (isLoading) {
     return (
@@ -85,7 +87,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           Create your first workspace
         </Heading>
         <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Workspaces group work orders, automations, and apps for a factory.
+          Workspaces group work orders, automations, and apps.
         </Text>
         <PermissionTooltip
           allowed={canCreate || permissionsLoading}

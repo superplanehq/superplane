@@ -2,12 +2,12 @@ import { useAccount } from "@/contexts/useAccount";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { Navigate, NavLink, Outlet, useParams } from "react-router-dom";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
+import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FACTORY_SETTINGS_NAV_ITEMS } from "./settingsNavItems";
 
@@ -22,6 +22,7 @@ export function FactorySettingsLayout() {
 }
 
 function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
+  useFactoriesThemeClass();
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
@@ -34,8 +35,8 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
 
   if (!factory) {
     return (
-      <div className={cn("flex min-h-screen items-center justify-center bg-gray-50", appDarkModeClasses.surface)}>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading settings…</p>
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-[13px] text-muted-foreground">Loading settings…</p>
       </div>
     );
   }
@@ -45,28 +46,22 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
-      <div
-        className={cn("flex min-h-screen w-full bg-gray-50", appDarkModeClasses.surface)}
-        data-testid="factory-settings-layout"
-      >
+      <div className="flex min-h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
         <aside
-          className={cn(
-            "flex w-60 shrink-0 flex-col border-r border-slate-950/10 bg-white",
-            "dark:border-gray-700/70 dark:bg-gray-950",
-          )}
+          className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
           data-testid="factory-settings-sidebar"
         >
-          <div className="border-b border-slate-950/10 px-4 py-3 dark:border-gray-700/70">
+          <div className="border-b border-sidebar-border px-3 py-3">
             <NavLink
               to={factoryDetailPath(organizationId, factoryId)}
-              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               data-testid="factory-settings-back"
             >
-              <ArrowLeft className="h-3 w-3" aria-hidden />
+              <ArrowLeft className="size-3.5" aria-hidden />
               Back to workspace
             </NavLink>
             <p
-              className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+              className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
               title={factory.name ?? undefined}
               data-testid="factory-settings-workspace-name"
             >
@@ -85,7 +80,7 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
             organizationName={organization?.metadata?.name ?? "Organization"}
           />
         </aside>
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
           <Outlet />
         </main>
       </div>
@@ -112,13 +107,13 @@ function SettingsNavGroup({
               to={factorySettingsSectionPath(organizationId, factoryId, item.id)}
               className={({ isActive }) =>
                 cn(
-                  "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-                  isActive && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
+                  "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                  isActive && "bg-sidebar-accent font-medium text-foreground",
                 )
               }
               data-testid={`factory-settings-nav-${item.id}`}
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
               <span>{item.label}</span>
             </NavLink>
           </li>

@@ -1,4 +1,3 @@
-import { Text } from "@/components/Text/text";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -55,7 +54,7 @@ function WorkOrderDetailPageContent({
   if (factoryLoading || orderLoading) {
     return (
       <div className={factoryContentBodyClassName}>
-        <Text className="text-sm text-gray-500">Loading work order…</Text>
+        <p className="text-[13px] text-muted-foreground">Loading work order…</p>
       </div>
     );
   }

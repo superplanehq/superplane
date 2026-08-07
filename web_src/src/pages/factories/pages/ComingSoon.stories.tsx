@@ -21,7 +21,7 @@ type Story = StoryObj<typeof meta>;
 export const Missions: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/missions`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/missions`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -29,14 +29,14 @@ export const Missions: Story = {
 
 export const Wiki: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={`factories/${PRIMARY_FACTORY_ID}/wiki`} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/wiki`} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
 export const Velocity: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/velocity`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/velocity`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

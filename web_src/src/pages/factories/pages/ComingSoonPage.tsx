@@ -1,7 +1,12 @@
 import { Heading } from "@/components/Heading/heading";
-import { Text } from "@/components/Text/text";
+import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryContentBodyClassName,
+  factoryContentHeaderClassName,
+  factoryPageSubtitleClassName,
+  factoryPageTitleClassName,
+} from "./factoryPageLayoutStyles";
 
 interface ComingSoonPageProps {
   title: string;
@@ -14,22 +19,22 @@ export function ComingSoonPage({ title, description, Icon }: ComingSoonPageProps
     <>
       <header className={factoryContentHeaderClassName}>
         <div>
-          <Heading level={1} className="!text-xl text-gray-900 dark:text-gray-100">
+          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
             {title}
           </Heading>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</Text>
+          <p className={cn("mt-1", factoryPageSubtitleClassName)}>{description}</p>
         </div>
       </header>
       <div className={factoryContentBodyClassName}>
         <div
-          className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-8 py-16 text-center dark:border-gray-700 dark:bg-gray-900"
+          className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-8 py-16 text-center"
           data-testid="coming-soon-body"
         >
-          <Icon className="h-10 w-10 text-slate-400 dark:text-gray-500" aria-hidden />
-          <p className="mt-4 text-base font-semibold text-slate-900 dark:text-gray-100">Soon</p>
-          <Text className="mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+          <Icon className="h-10 w-10 text-muted-foreground" aria-hidden />
+          <p className="mt-4 text-[15px] font-semibold text-foreground">Soon</p>
+          <p className="mt-2 max-w-md text-[13px] text-muted-foreground">
             This section is coming soon. Content for this page comes next.
-          </Text>
+          </p>
         </div>
       </div>
     </>

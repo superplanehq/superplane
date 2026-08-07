@@ -6,14 +6,13 @@ import { useCreateFactory, useFactories, useFactory, useFactoryWorkOrders } from
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { cn } from "@/lib/utils";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
 import { factoryDetailPath, factoryListPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
+import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -32,6 +31,7 @@ export function FactoriesLayout() {
 }
 
 function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
+  useFactoriesThemeClass();
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -45,7 +45,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
 
   const createFactory = useCreateFactory(organizationId);
 
-  const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Factories"]), [factory?.name]);
+  const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
   usePageTitle(pageTitle);
 
   useEffect(() => {
@@ -93,10 +93,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <div
-        className={cn("flex min-h-screen w-full bg-gray-50", appDarkModeClasses.surface)}
-        data-testid="factories-layout"
-      >
+      <div className="flex min-h-screen w-full bg-background text-foreground" data-testid="factories-layout">
         <FactoriesSidebar
           organizationId={organizationId}
           factoryId={factoryId}
@@ -112,7 +109,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
           recentWorkOrders={recentWorkOrders}
           onOpenCreateFactory={() => setCreateFactoryOpen(true)}
         />
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
           <Outlet />
         </main>
       </div>
@@ -160,10 +157,7 @@ function FactoriesSidebar({
 }: FactoriesSidebarProps) {
   return (
     <aside
-      className={cn(
-        "flex w-60 shrink-0 flex-col border-r border-slate-950/10 bg-white",
-        "dark:border-gray-700/70 dark:bg-gray-950",
-      )}
+      className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       data-testid="factories-sidebar"
     >
       <WorkspaceSwitcher
@@ -191,8 +185,8 @@ function FactoriesSidebar({
 
 function FactoriesLayoutLoading() {
   return (
-    <div className={cn("flex min-h-screen items-center justify-center bg-gray-50", appDarkModeClasses.surface)}>
-      <p className="text-sm text-gray-500 dark:text-gray-400">Loading workspace…</p>
+    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+      <p className="text-[13px] text-muted-foreground">Loading workspace…</p>
     </div>
   );
 }
@@ -200,22 +194,20 @@ function FactoriesLayoutLoading() {
 function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
   return (
     <div
-      className={cn("flex min-h-screen items-center justify-center bg-gray-50 px-6", appDarkModeClasses.surface)}
+      className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground"
       data-testid="factories-layout-error"
     >
-      <div className="max-w-md rounded-lg border border-slate-950/10 bg-white p-8 text-center dark:border-gray-700/70 dark:bg-gray-900">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+      <div className="max-w-md rounded-lg border border-border bg-card p-8 text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertTriangle className="h-5 w-5" aria-hidden />
         </div>
-        <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-gray-100">
-          This workspace can't be opened
-        </h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        <h1 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">This workspace can't be opened</h1>
+        <p className="mt-2 text-[13px] text-muted-foreground">
           It may have been deleted or you may not have access to it.
         </p>
         <Link
           href={factoryListPath(organizationId)}
-          className="mt-6 inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-gray-100 dark:text-slate-900 dark:hover:bg-white"
+          className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:opacity-90"
         >
           Back to workspaces
         </Link>

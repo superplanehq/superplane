@@ -67,7 +67,7 @@ function fixtureFetchState(): FixtureFetchState {
 export interface OrgWorkspaceHarnessProps {
   /** Where to land when the story mounts. */
   startAt?: "home" | "app";
-  /** Path under the org when `startAt` is `home`, e.g. `apps/new` or `factories/...`. */
+  /** Path under the org when `startAt` is `home`, e.g. `apps/new` or `workspaces/...`. */
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
   appQuery?: string;
@@ -159,7 +159,7 @@ function OrgWorkspaceRoutes() {
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={<AppPage />} />
-        <Route path="factories">
+        <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
           <Route path=":factoryId" element={factoryRoute(<FactoriesLayout />)}>
             <Route index element={<Navigate to="overview" replace />} />

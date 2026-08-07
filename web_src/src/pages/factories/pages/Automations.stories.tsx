@@ -21,7 +21,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const automationsPath = `factories/${PRIMARY_FACTORY_ID}/automations`;
+const automationsPath = `workspaces/${PRIMARY_FACTORY_ID}/automations`;
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={automationsPath} factoriesFixture={defaultFactoriesFixture} />,

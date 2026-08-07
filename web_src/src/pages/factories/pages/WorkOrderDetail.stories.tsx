@@ -25,7 +25,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function detailPath(orderId?: string) {
-  return `factories/${PRIMARY_FACTORY_ID}/work-orders/${orderId ?? OPEN_WORK_ORDER.id}`;
+  return `workspaces/${PRIMARY_FACTORY_ID}/work-orders/${orderId ?? OPEN_WORK_ORDER.id}`;
 }
 
 export const Open: Story = {

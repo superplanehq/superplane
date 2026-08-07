@@ -17,7 +17,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const createPath = `factories/${PRIMARY_FACTORY_ID}/work-orders/new`;
+const createPath = `workspaces/${PRIMARY_FACTORY_ID}/work-orders/new`;
 
 export const Empty: Story = {
   render: () => <FactoriesHarness pathSuffix={createPath} factoriesFixture={defaultFactoriesFixture} />,

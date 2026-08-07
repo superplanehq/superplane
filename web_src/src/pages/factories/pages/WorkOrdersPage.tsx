@@ -2,12 +2,10 @@ import { Icon } from "@/components/Icon";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Heading } from "@/components/Heading/heading";
-import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDispatchWorkOrder, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useMemo, useState } from "react";
@@ -22,7 +20,13 @@ import {
 } from "../lib/workOrderProgress";
 import { WorkOrderCard } from "../WorkOrderCard";
 import { WorkOrderFilters } from "../WorkOrderFilters";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factoryContentBodyClassName,
+  factoryContentHeaderClassName,
+  factoryPageSubtitleClassName,
+  factoryPageTitleClassName,
+} from "./factoryPageLayoutStyles";
 
 export function WorkOrdersPage() {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
@@ -67,31 +71,25 @@ export function WorkOrdersPage() {
       <header className={factoryContentHeaderClassName}>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Heading level={1} className="!text-xl text-gray-900 dark:text-gray-100">
+            <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
               Work Orders
             </Heading>
             <span
-              className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
               data-testid="work-orders-active-count"
             >
               {activeCount}
             </span>
           </div>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
             Track intake, planning, and delivery for this workspace.
-          </Text>
+          </p>
         </div>
         <PermissionTooltip
           allowed={canCreate || permissionsLoading}
           message="You don't have permission to create work orders."
         >
-          <Button
-            type="button"
-            asChild
-            disabled={!canCreate}
-            className={cn(appDarkModeClasses.primaryAction)}
-            data-testid="work-order-list-create-button"
-          >
+          <Button type="button" asChild disabled={!canCreate} data-testid="work-order-list-create-button">
             <Link href={canCreate ? createWorkOrderPath(organizationId, factoryId) : "#"}>
               <Icon name="plus" />
               New Work Order
@@ -101,10 +99,7 @@ export function WorkOrdersPage() {
       </header>
 
       <div className={factoryContentBodyClassName}>
-        <div
-          className="rounded-lg border border-slate-950/10 bg-white p-6 dark:border-gray-700/70 dark:bg-gray-900"
-          data-testid="work-orders-panel"
-        >
+        <div className={cn("p-6", factoryCardClassName)} data-testid="work-orders-panel">
           <WorkOrderFilters
             ownerFilter={ownerFilter}
             statusFilter={statusFilter}
@@ -114,13 +109,13 @@ export function WorkOrdersPage() {
 
           <div className="mt-6">
             {workOrdersError ? (
-              <div className="rounded-md border border-red-300 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:text-red-400">
+              <div className="rounded-md border border-destructive/50 px-4 py-3 text-[13px] text-destructive">
                 Failed to load work orders.
               </div>
             ) : isOrdersLoading ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">Loading work orders…</p>
+              <p className="text-[13px] text-muted-foreground">Loading work orders…</p>
             ) : filteredWorkOrders.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              <p className="px-4 py-8 text-center text-[13px] text-muted-foreground">
                 No work orders match these filters.
                 <br />
                 Create a work order or adjust filters to see more results.

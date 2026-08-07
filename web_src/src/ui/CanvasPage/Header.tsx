@@ -236,12 +236,12 @@ function PageHeader({
 function FactoryReturnLink({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
   return (
     <Link
-      href={`/${organizationId}/factories/${factoryId}/overview`}
+      href={`/${organizationId}/workspaces/${factoryId}/overview`}
       className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
       data-testid="return-to-factory-link"
     >
       <ChevronLeft className="h-4 w-4" aria-hidden />
-      Return to factory
+      Return to workspace
     </Link>
   );
 }

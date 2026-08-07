@@ -21,7 +21,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const workOrdersPath = `factories/${PRIMARY_FACTORY_ID}/work-orders`;
+const workOrdersPath = `workspaces/${PRIMARY_FACTORY_ID}/work-orders`;
 
 /** Populated list — active/mine filter is the default. */
 export const Populated: Story = {

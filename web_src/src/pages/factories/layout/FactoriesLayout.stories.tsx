@@ -22,7 +22,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/overview`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/overview`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

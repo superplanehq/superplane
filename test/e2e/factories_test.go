@@ -69,12 +69,12 @@ func (s *factorySteps) givenFactoryExists(name, description string) *models.Fact
 }
 
 func (s *factorySteps) visitFactoriesList() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/factories")
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces")
 	s.session.Sleep(500)
 }
 
 func (s *factorySteps) visitFactorySettings(factoryID uuid.UUID) {
-	s.session.Visit("/" + s.session.OrgID.String() + "/factories/" + factoryID.String() + "/settings/general")
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factoryID.String() + "/settings/general")
 	s.session.Sleep(500)
 }
 
@@ -120,7 +120,7 @@ func (s *factorySteps) confirmDeleteFactory() {
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
-	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/factories")
+	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
 }
 
 func (s *factorySteps) assertFactoryVisibleInList(name string) {

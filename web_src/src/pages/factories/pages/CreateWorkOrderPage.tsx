@@ -16,7 +16,13 @@ import { useNavigate } from "react-router-dom";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factoryContentBodyClassName,
+  factoryPageSubtitleClassName,
+  factoryPageTitleClassName,
+} from "./factoryPageLayoutStyles";
+import { cn } from "@/lib/utils";
 
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -68,19 +74,19 @@ export function CreateWorkOrderPage() {
     <div className={factoryContentBodyClassName} data-testid="create-work-order-page">
       <Link
         href={workOrdersHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
+        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Work Orders
       </Link>
 
-      <div className="rounded-lg border border-slate-950/10 bg-white px-6 py-8 sm:px-8 dark:border-gray-700/70 dark:bg-gray-900">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">Describe the work</h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+      <div className={cn("px-6 py-8 sm:px-8", factoryCardClassName)}>
+        <h1 className={factoryPageTitleClassName}>Describe the work</h1>
+        <p className={cn("mt-2", factoryPageSubtitleClassName)}>
           Capture one concrete software change. Assign owners and dispatch it to a line when ready.
         </p>
 
-        <div className="mt-8 space-y-6 border-t border-slate-200 pt-8 dark:border-gray-700/70">
+        <div className="mt-8 space-y-6 border-t border-border pt-8">
           <TitleField
             value={title}
             onChange={setTitle}
@@ -146,7 +152,7 @@ function TitleField({ value, onChange, errorMessage, onClearError }: TitleFieldP
         placeholder="Add refund reconciliation test"
         autoFocus
       />
-      {errorMessage ? <p className="text-xs text-red-600">{errorMessage}</p> : null}
+      {errorMessage ? <p className="text-[11px] text-destructive">{errorMessage}</p> : null}
     </div>
   );
 }
@@ -202,11 +208,9 @@ function AssigneesField({ organizationId, assigneeIds, onChange, disabled, selec
         </Button>
       </WorkOrderAssigneesPopover>
       {selectedLabels.length > 0 ? (
-        <p className="text-sm text-gray-600 dark:text-gray-400">{selectedLabels.join(", ")}</p>
+        <p className="text-[13px] text-muted-foreground">{selectedLabels.join(", ")}</p>
       ) : (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Optional. Select one or more people to own this work order.
-        </p>
+        <p className="text-[11px] text-muted-foreground">Optional. Select one or more people to own this work order.</p>
       )}
     </div>
   );

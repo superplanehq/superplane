@@ -22,7 +22,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const overviewPath = `factories/${PRIMARY_FACTORY_ID}/overview`;
+const overviewPath = `workspaces/${PRIMARY_FACTORY_ID}/overview`;
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={overviewPath} factoriesFixture={defaultFactoriesFixture} />,

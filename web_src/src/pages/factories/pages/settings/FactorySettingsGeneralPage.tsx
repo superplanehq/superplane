@@ -1,5 +1,4 @@
 import { Heading } from "@/components/Heading/heading";
-import { Text } from "@/components/Text/text";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +14,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { factoryListPath } from "../../lib/factoryPagePaths";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "../factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factoryContentBodyClassName,
+  factoryContentHeaderClassName,
+  factoryPageSubtitleClassName,
+  factoryPageTitleClassName,
+} from "../factoryPageLayoutStyles";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { cn } from "@/lib/utils";
 
 const MAX_NAME_LENGTH = 128;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -73,12 +79,12 @@ export function FactorySettingsGeneralPage() {
     <>
       <header className={factoryContentHeaderClassName}>
         <div>
-          <Heading level={1} className="!text-xl text-gray-900 dark:text-gray-100">
+          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
             General
           </Heading>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
             General workspace preferences. Content for this page comes next.
-          </Text>
+          </p>
         </div>
       </header>
 
@@ -146,11 +152,8 @@ function WorkspaceDetailsSection({
   onSave,
 }: WorkspaceDetailsSectionProps) {
   return (
-    <section
-      className="rounded-lg border border-slate-950/10 bg-white p-6 dark:border-gray-700/70 dark:bg-gray-900"
-      data-testid="factory-settings-general-form"
-    >
-      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Workspace details</h2>
+    <section className={cn("p-6", factoryCardClassName)} data-testid="factory-settings-general-form">
+      <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Workspace details</h2>
       <div className="mt-4 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="factory-settings-name">Name</Label>
@@ -166,7 +169,7 @@ function WorkspaceDetailsSection({
             maxLength={MAX_NAME_LENGTH}
             disabled={!canUpdate}
           />
-          {nameError ? <p className="text-xs text-red-600">{nameError}</p> : null}
+          {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="factory-settings-description">Description</Label>
@@ -212,12 +215,9 @@ interface DangerZoneSectionProps {
 
 function DangerZoneSection({ canDelete, permissionsLoading, onOpenDelete }: DangerZoneSectionProps) {
   return (
-    <section
-      className="rounded-lg border border-red-300 bg-white p-6 dark:border-red-800 dark:bg-gray-900"
-      data-testid="factory-settings-danger-zone"
-    >
-      <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">Danger zone</h2>
-      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+    <section className="rounded-lg border border-destructive/40 bg-card p-6" data-testid="factory-settings-danger-zone">
+      <h2 className="text-[13px] font-medium tracking-[-0.01em] text-destructive">Danger zone</h2>
+      <p className="mt-1 text-[13px] text-muted-foreground">
         Deleting a workspace permanently removes its work orders, lines, and apps.
       </p>
       <div className="mt-4">

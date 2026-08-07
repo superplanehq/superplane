@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 export const General: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/settings/general`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/general`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -30,7 +30,7 @@ export const RepositoriesSoon: Story = {
   name: "Repositories (Soon)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/settings/repositories`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/repositories`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -40,7 +40,7 @@ export const MembersSoon: Story = {
   name: "Members (Soon)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`factories/${PRIMARY_FACTORY_ID}/settings/members`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/members`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

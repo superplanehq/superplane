@@ -1,6 +1,5 @@
 import type { FactoriesFactoryLine, FactoryApp, FactoryLineStep } from "@/api-client";
 import { Link } from "@/components/Link/link";
-import { Text } from "@/components/Text/text";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -11,7 +10,12 @@ import { FactoryLineForm } from "../FactoryLineForm";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { automationsPath } from "../lib/factoryPagePaths";
 import { useFactoryLineEditActions } from "../useFactoryLineEditActions";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factoryContentBodyClassName,
+  factoryPageTitleClassName,
+} from "./factoryPageLayoutStyles";
+import { cn } from "@/lib/utils";
 
 export function FactoryLineEditPage() {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
@@ -58,14 +62,14 @@ export function FactoryLineEditPage() {
     <div className={factoryContentBodyClassName} data-testid="factory-line-edit-page">
       <Link
         href={returnHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
+        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Automations
       </Link>
 
       {isInitialLoading ? (
-        <Text className="text-sm text-gray-500">Loading…</Text>
+        <p className="text-[13px] text-muted-foreground">Loading…</p>
       ) : (
         <LineEditCard
           isCreate={isCreate}
@@ -100,15 +104,15 @@ function LineEditCard({ isCreate, line, organizationId, factoryApps, isSaving, o
   const title = isCreate ? "Configure the line" : (line?.name ?? "Edit line");
 
   return (
-    <div className="rounded-lg border border-slate-950/10 bg-white px-6 py-8 sm:px-8 dark:border-gray-700/70 dark:bg-gray-900">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">{title}</h1>
+    <div className={cn("px-6 py-8 sm:px-8", factoryCardClassName)}>
+      <h1 className={factoryPageTitleClassName}>{title}</h1>
       {isCreate ? (
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-[13px] text-muted-foreground">
           Define the apps and triggers that run when work is dispatched to this line.
         </p>
       ) : null}
 
-      <div className="mt-8 border-t border-slate-200 pt-8 dark:border-gray-700/70">
+      <div className="mt-8 border-t border-border pt-8">
         <FactoryLineForm
           organizationId={organizationId}
           apps={factoryApps}

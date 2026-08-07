@@ -23,7 +23,7 @@ const RECENT_STATUS_DOT_CLASS: Record<string, string> = {
 
 export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: FactoriesNavProps) {
   return (
-    <nav className="flex flex-1 flex-col gap-6 px-2 pt-4 pb-4" data-testid="factories-nav">
+    <nav className="flex flex-1 flex-col gap-4 px-2 pt-2 pb-4" data-testid="factories-nav">
       <ul className="flex flex-col gap-0.5">
         {FACTORIES_NAV_ITEMS.map((item) => {
           const Icon = item.Icon;
@@ -35,12 +35,12 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
                 data-testid={`factories-nav-${item.id}`}
                 className={({ isActive }) =>
                   cn(
-                    "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-                    isActive && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
+                    "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                    isActive && "bg-sidebar-accent font-medium text-foreground",
                   )
                 }
               >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
                 <span>{item.label}</span>
               </NavLink>
             </li>
@@ -50,7 +50,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
 
       {recentWorkOrders.length > 0 ? (
         <section aria-label="Recent work orders">
-          <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-500">
+          <p className="px-2.5 pb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
             Recent
           </p>
           <ul className="flex flex-col gap-0.5">
@@ -67,14 +67,14 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
                     to={workOrderDetailPath(organizationId, factoryId, order.id)}
                     className={({ isActive }) =>
                       cn(
-                        "group block rounded-md px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-                        isActive && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
+                        "group block rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                        isActive && "bg-sidebar-accent font-medium text-foreground",
                       )
                     }
                     data-testid={`factories-nav-recent-${order.id}`}
                   >
-                    <p className="truncate font-medium">{order.title || "Untitled work order"}</p>
-                    <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="truncate">{order.title || "Untitled work order"}</p>
+                    <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} aria-hidden />
                       {statusMeta.label}
                     </p>

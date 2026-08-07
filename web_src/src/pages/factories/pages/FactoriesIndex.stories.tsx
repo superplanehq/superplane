@@ -5,7 +5,7 @@ import { defaultFactoriesFixture, emptyFactoriesFixture } from "../__fixtures__/
 import { FactoriesIndexPage } from "../FactoriesIndexPage";
 
 /**
- * Landing route `/:orgId/factories`: redirects to the last-visited (or first)
+ * Landing route `/:orgId/workspaces`: redirects to the last-visited (or first)
  * factory when any exist, and shows the create-workspace empty state otherwise.
  */
 const meta = {
@@ -21,11 +21,11 @@ type Story = StoryObj<typeof meta>;
 /** Populated org — auto-redirects to the primary factory's overview. */
 export const RedirectsToPrimary: Story = {
   name: "Redirect to primary",
-  render: () => <FactoriesHarness pathSuffix="factories" factoriesFixture={defaultFactoriesFixture} />,
+  render: () => <FactoriesHarness pathSuffix="workspaces" factoriesFixture={defaultFactoriesFixture} />,
 };
 
 /** No factories yet — shows the "Create workspace" empty state. */
 export const EmptyState: Story = {
   name: "Empty state",
-  render: () => <FactoriesHarness pathSuffix="factories" factoriesFixture={emptyFactoriesFixture} />,
+  render: () => <FactoriesHarness pathSuffix="workspaces" factoriesFixture={emptyFactoriesFixture} />,
 };

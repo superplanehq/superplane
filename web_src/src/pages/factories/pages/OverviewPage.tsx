@@ -1,6 +1,5 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Heading } from "@/components/Heading/heading";
-import { Text } from "@/components/Text/text";
 import { Badge } from "@/components/ui/badge";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,13 @@ import { Link } from "react-router-dom";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryLineDetailPath, workOrderDetailPath, workOrdersPath, automationsPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factoryContentBodyClassName,
+  factoryContentHeaderClassName,
+  factoryPageSubtitleClassName,
+  factoryPageTitleClassName,
+} from "./factoryPageLayoutStyles";
 
 const MAX_ROWS = 8;
 
@@ -36,12 +41,12 @@ export function OverviewPage() {
     <>
       <header className={factoryContentHeaderClassName}>
         <div>
-          <Heading level={1} className="!text-xl text-gray-900 dark:text-gray-100">
+          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
             Overview
           </Heading>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
             Your workspace at a glance. Content for this page comes next.
-          </Text>
+          </p>
         </div>
       </header>
 
@@ -75,18 +80,15 @@ function WorkOrdersOverviewCard({
   error: Error | null;
 }) {
   return (
-    <section
-      className="overflow-hidden rounded-lg border border-slate-950/10 bg-white dark:border-gray-700/70 dark:bg-gray-900"
-      data-testid="overview-work-orders-card"
-    >
-      <div className="flex items-center justify-between border-b border-slate-950/10 px-4 py-3 dark:border-gray-700/70">
+    <section className={cn("overflow-hidden", factoryCardClassName)} data-testid="overview-work-orders-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Work Orders</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Recent activity by status.</p>
+          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Work Orders</h2>
+          <p className="text-[12px] text-muted-foreground">Recent activity by status.</p>
         </div>
         <Link
           to={workOrdersPath(organizationId, factoryId)}
-          className="text-xs font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+          className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-work-orders-view-all"
         >
           View all
@@ -95,11 +97,11 @@ function WorkOrdersOverviewCard({
 
       <div>
         {error ? (
-          <p className="px-4 py-6 text-sm text-red-600 dark:text-red-400">Failed to load work orders.</p>
+          <p className="px-4 py-6 text-[13px] text-destructive">Failed to load work orders.</p>
         ) : isLoading ? (
-          <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Loading work orders…</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">Loading work orders…</p>
         ) : orders.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No work orders yet.</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">No work orders yet.</p>
         ) : (
           <ul>
             {orders.map((order) => {
@@ -109,13 +111,10 @@ function WorkOrdersOverviewCard({
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (
-                <li
-                  key={order.id ?? order.title}
-                  className="border-b border-slate-950/5 last:border-b-0 dark:border-gray-700/50"
-                >
+                <li key={order.id ?? order.title} className="border-b border-border/60 last:border-b-0">
                   <Link
                     to={href}
-                    className="group flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                    className="group flex items-center gap-3 px-4 py-3 hover:bg-accent"
                     data-testid={`overview-work-order-row-${order.id}`}
                   >
                     <Badge
@@ -130,12 +129,12 @@ function WorkOrdersOverviewCard({
                       ) : null}
                       {statusMeta.label}
                     </Badge>
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
                       {order.title || "Untitled work order"}
                     </p>
-                    <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{timeLabel}</span>
+                    <span className="shrink-0 text-[12px] text-muted-foreground">{timeLabel}</span>
                     <ChevronRight
-                      className="h-4 w-4 shrink-0 text-gray-400 transition group-hover:text-gray-700 dark:text-gray-500 dark:group-hover:text-gray-300"
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-foreground"
                       aria-hidden
                     />
                   </Link>
@@ -159,18 +158,15 @@ function LinesOverviewCard({
   lines: FactoriesFactoryLine[];
 }) {
   return (
-    <section
-      className="overflow-hidden rounded-lg border border-slate-950/10 bg-white dark:border-gray-700/70 dark:bg-gray-900"
-      data-testid="overview-lines-card"
-    >
-      <div className="flex items-center justify-between border-b border-slate-950/10 px-4 py-3 dark:border-gray-700/70">
+    <section className={cn("overflow-hidden", factoryCardClassName)} data-testid="overview-lines-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Automations</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Lines and their steps.</p>
+          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Automations</h2>
+          <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
           to={automationsPath(organizationId, factoryId)}
-          className="text-xs font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+          className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >
           View all
@@ -178,30 +174,27 @@ function LinesOverviewCard({
       </div>
 
       {lines.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No lines configured yet.</p>
+        <p className="px-4 py-6 text-[13px] text-muted-foreground">No lines configured yet.</p>
       ) : (
         <ul>
           {lines.map((line) => {
             const stepsCount = line.steps?.length ?? 0;
             const href = line.id ? factoryLineDetailPath(organizationId, factoryId, line.id) : "#";
             return (
-              <li
-                key={line.id ?? line.name}
-                className="border-b border-slate-950/5 last:border-b-0 dark:border-gray-700/50"
-              >
+              <li key={line.id ?? line.name} className="border-b border-border/60 last:border-b-0">
                 <Link
                   to={href}
-                  className="group flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                  className="group flex items-center gap-3 px-4 py-3 hover:bg-accent"
                   data-testid={`overview-line-row-${line.id}`}
                 >
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
                     {line.name || "Unnamed line"}
                   </p>
-                  <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="shrink-0 text-[12px] text-muted-foreground">
                     {stepsCount} {stepsCount === 1 ? "phase" : "phases"}
                   </span>
                   <ChevronRight
-                    className="h-4 w-4 shrink-0 text-gray-400 transition group-hover:text-gray-700 dark:text-gray-500 dark:group-hover:text-gray-300"
+                    className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-foreground"
                     aria-hidden
                   />
                 </Link>

@@ -9,7 +9,7 @@ import { Forward, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
-import { workOrderDetailPath } from "./lib/factoryPagePaths";
+import { factoryDetailPath, workOrderDetailPath } from "./lib/factoryPagePaths";
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
@@ -40,7 +40,7 @@ export function WorkOrderCard({
   const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
   const href = order.id
     ? workOrderDetailPath(organizationId, factoryId, order.id)
-    : `/${organizationId}/factories/${factoryId}`;
+    : factoryDetailPath(organizationId, factoryId);
   const creatorDisplay = resolveUser(order.createdBy?.id, order.createdBy?.name);
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)

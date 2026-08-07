@@ -36,15 +36,9 @@ export function WorkspaceSwitcher({
   const settingsHref = factory.id ? factorySettingsPath(organizationId, factory.id) : "#";
 
   return (
-    <div className="flex items-center gap-1.5 px-2 pt-3 pb-2" data-testid="factories-workspace-switcher">
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-        aria-hidden
-      >
-        <FactoryIcon className="h-3.5 w-3.5" />
-      </span>
+    <div className="flex items-center gap-0.5 px-2 pt-3 pb-1" data-testid="factories-workspace-switcher">
       <p
-        className="flex-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+        className="flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-sidebar-accent"
         title={factory.name ?? undefined}
       >
         {factory.name}
@@ -63,11 +57,11 @@ export function WorkspaceSwitcher({
           aria-label="Workspace settings"
           data-testid="factories-workspace-settings-link"
           className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+            "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
             !canOpenSettings && "pointer-events-none opacity-60",
           )}
         >
-          <Settings className="h-3.5 w-3.5" aria-hidden />
+          <Settings className="size-3.5" aria-hidden />
         </Link>
       </PermissionTooltip>
       <DropdownMenu>
@@ -75,10 +69,10 @@ export function WorkspaceSwitcher({
           <button
             type="button"
             aria-label="Switch workspace"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
             data-testid="factories-workspace-switch"
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden />
+            <ArrowRightLeft className="size-3.5" aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">

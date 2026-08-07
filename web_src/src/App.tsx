@@ -153,7 +153,7 @@ function AppRouter() {
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
-                <Route path="factories">
+                <Route path="workspaces">
                   <Route
                     index
                     element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")}

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
+import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import { EMPTY_FACTORY, FACTORIES_ORGANIZATION_ID, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -10,10 +11,11 @@ const meta = {
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="min-h-40 w-64 bg-white p-2 dark:bg-gray-900">
+      <ComponentStoryShell className="min-h-40 w-[240px] border-r border-sidebar-border bg-sidebar p-2">
         <Story />
       </ComponentStoryShell>
     ),
+    withFactoriesTheme,
   ],
 } satisfies Meta<typeof WorkspaceSwitcher>;
 

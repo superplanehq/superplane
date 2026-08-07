@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
+import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import { FACTORIES_ORGANIZATION_ID } from "../__fixtures__/factoryPageResponses";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 
@@ -10,10 +11,11 @@ const meta = {
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="w-64 bg-white dark:bg-gray-900">
+      <ComponentStoryShell className="w-[240px] border-r border-sidebar-border bg-sidebar">
         <Story />
       </ComponentStoryShell>
     ),
+    withFactoriesTheme,
   ],
 } satisfies Meta<typeof SidebarUserMenu>;
 

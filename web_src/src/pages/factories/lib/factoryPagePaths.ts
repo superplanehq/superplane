@@ -1,5 +1,5 @@
 export function factoryListPath(organizationId: string) {
-  return `/${organizationId}/factories`;
+  return `/${organizationId}/workspaces`;
 }
 
 export function factoryDetailPath(organizationId: string, factoryId: string) {
