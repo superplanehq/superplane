@@ -389,6 +389,14 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
+		} else if sm != nil && sm.Complete && sm.Err != nil {
+			ctx.Logger.Errorf("Managed session %s failed: %s", session.ID, sm.Err.Message)
+			mergeSessionIntoMetadata(&metadata, refreshed)
+			_ = ctx.Metadata.Set(metadata)
+			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
+			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+			return fmt.Errorf("managed agent session failed: %s", sm.Err.Message)
 		} else if sm != nil && sm.Complete {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
 			applyStructuredOutput(&out, refreshed.Status, schema)

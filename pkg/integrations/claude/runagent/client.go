@@ -64,11 +64,19 @@ type ManagedSession struct {
 type ManagedSessionEvent struct {
 	Type    string                       `json:"type"`
 	Content []ManagedSessionContentBlock `json:"content"`
+	Error   *SessionEventError           `json:"error,omitempty"`
 }
 
 type ManagedSessionContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
+}
+
+// SessionEventError is the error payload carried by a session.error event,
+// e.g. when the workspace has hit its Anthropic usage/credit limit mid-session.
+type SessionEventError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
 
 // sessionResourceBody is a file resource mounted into the session.
@@ -308,6 +316,11 @@ type SessionMessages struct {
 	// ExpectsArtifacts is true when the session events mention the outputs
 	// directory, i.e. the agent (very likely) wrote deliverables.
 	ExpectsArtifacts bool
+	// Err is set from the most recent session.error event, if any. A terminal
+	// session with Err set produced no real result (e.g. the workspace hit its
+	// Anthropic usage/credit limit mid-session) and should be treated as a
+	// failed run rather than emitted as a passing one.
+	Err *SessionEventError
 }
 
 func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) {
@@ -330,11 +343,16 @@ func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) 
 	}
 	result.ExpectsArtifacts = c.sawSessionOutputs
 
-	// Check for terminal event (events are in desc order, so status_idle is first)
+	// Check for a terminal event and the most recent session.error, if any
+	// (events are in desc order, so the first match of each is the latest).
 	for _, e := range allEvents {
-		if e.Type == "session.status_idle" || e.Type == "session.status_terminated" {
+		switch e.Type {
+		case "session.status_idle", "session.status_terminated":
 			result.Complete = true
-			break
+		case "session.error":
+			if result.Err == nil {
+				result.Err = sessionEventErrorFrom(e)
+			}
 		}
 	}
 
@@ -434,18 +452,35 @@ func lastAgentMessageFromEvents(events []ManagedSessionEvent) string {
 		if event.Type != "agent.message" && event.Type != "assistant.message" {
 			continue
 		}
-
-		parts := []string{}
-		for _, block := range event.Content {
-			if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
-				parts = append(parts, block.Text)
-			}
-		}
-		if len(parts) > 0 {
-			return strings.Join(parts, "\n")
+		if text := textFromBlocks(event.Content); text != "" {
+			return text
 		}
 	}
 	return ""
+}
+
+func textFromBlocks(blocks []ManagedSessionContentBlock) string {
+	parts := []string{}
+	for _, block := range blocks {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			parts = append(parts, block.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// sessionEventErrorFrom extracts the error carried by a session.error event.
+// The event may carry a structured `error` object, or (like agent.message)
+// describe the failure as a text content block; either is accepted since the
+// exact shape isn't documented for this beta event type.
+func sessionEventErrorFrom(e ManagedSessionEvent) *SessionEventError {
+	if e.Error != nil && (e.Error.Message != "" || e.Error.Type != "") {
+		return e.Error
+	}
+	if text := textFromBlocks(e.Content); text != "" {
+		return &SessionEventError{Message: text}
+	}
+	return &SessionEventError{Message: "the session reported an error"}
 }
 
 func managedSessionEventTypes(events []ManagedSessionEvent) string {
