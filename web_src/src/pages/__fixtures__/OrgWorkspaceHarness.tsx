@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
@@ -14,11 +14,21 @@ import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
+  AutomationsPage,
   CreateWorkOrderPage,
-  FactoryDetailPage,
+  FactoriesIndexPage,
+  FactoriesLayout,
   FactoryLineEditPage,
-  FactoryListPage,
+  FactorySettingsGeneralPage,
+  FactorySettingsLayout,
+  FactorySettingsSoonPage,
+  FACTORY_SETTINGS_NAV_ITEMS,
+  MissionsPage,
+  OverviewPage,
+  VelocityPage,
+  WikiPage,
   WorkOrderDetailPage,
+  WorkOrdersPage,
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { HomePage } from "@/pages/home";
@@ -150,12 +160,42 @@ function OrgWorkspaceRoutes() {
         <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={<AppPage />} />
         <Route path="factories">
-          <Route index element={factoryRoute(<FactoryListPage />)} />
-          <Route path=":factoryId" element={factoryRoute(<FactoryDetailPage />)} />
-          <Route path=":factoryId/orders/new" element={factoryRoute(<CreateWorkOrderPage />)} />
-          <Route path=":factoryId/orders/:orderId" element={factoryRoute(<WorkOrderDetailPage />)} />
-          <Route path=":factoryId/lines/new" element={factoryRoute(<FactoryLineEditPage />)} />
-          <Route path=":factoryId/lines/:lineId/edit" element={factoryRoute(<FactoryLineEditPage />)} />
+          <Route index element={factoryRoute(<FactoriesIndexPage />)} />
+          <Route path=":factoryId" element={factoryRoute(<FactoriesLayout />)}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<OverviewPage />} />
+            <Route path="missions" element={<MissionsPage />} />
+            <Route path="wiki" element={<WikiPage />} />
+            <Route path="velocity" element={<VelocityPage />} />
+            <Route path="work-orders">
+              <Route index element={<WorkOrdersPage />} />
+              <Route path="new" element={<CreateWorkOrderPage />} />
+              <Route path=":orderId" element={<WorkOrderDetailPage />} />
+            </Route>
+            <Route path="automations">
+              <Route index element={<AutomationsPage />} />
+              <Route path="new" element={<FactoryLineEditPage />} />
+              <Route path=":lineId" element={<AutomationsPage />} />
+              <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
+            </Route>
+          </Route>
+          <Route path=":factoryId/settings" element={factoryRoute(<FactorySettingsLayout />)}>
+            <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+            <Route path="general" element={<FactorySettingsGeneralPage />} />
+            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
+              <Route
+                key={item.id}
+                path={item.id}
+                element={
+                  <FactorySettingsSoonPage
+                    title={item.label}
+                    description={`${item.label} settings for this workspace.`}
+                    Icon={item.Icon}
+                  />
+                }
+              />
+            ))}
+          </Route>
         </Route>
         <Route
           path="settings/integrations/:integrationName/setup"

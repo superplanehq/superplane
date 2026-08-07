@@ -11,7 +11,7 @@ import { CreateFactoryDialog } from "./CreateFactoryDialog";
  * a story-level state harness so the dialog can be opened and re-opened.
  */
 const meta = {
-  title: "Factories/CreateFactoryDialog",
+  title: "Factories/Components/CreateFactoryDialog",
   component: CreateFactoryDialog,
   parameters: { layout: "centered" },
   decorators: [
