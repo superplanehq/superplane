@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -21,6 +22,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
+		steps.assertOwnerAccountIsInstallationAdmin("owner@example.com")
 		steps.assertRedirectedToOrganizationHome()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
@@ -33,6 +35,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
+		steps.assertOwnerAccountIsInstallationAdmin("owner@example.com")
 		steps.assertRedirectedToOrganizationHome()
 		steps.clearCookies()
 		steps.visitLoginPage()
@@ -134,6 +137,12 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 func (s *ownerSetupSteps) assertRedirectedToOrganizationHome() {
 	currentURL := s.session.Page().URL()
 	assert.Contains(s.t, currentURL, "/"+s.orgID, "expected to be redirected to organization home")
+}
+
+func (s *ownerSetupSteps) assertOwnerAccountIsInstallationAdmin(email string) {
+	account, err := models.FindAccountByEmail(email)
+	require.NoError(s.t, err)
+	assert.True(s.t, account.IsInstallationAdmin(), "owner account should be an installation admin")
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
