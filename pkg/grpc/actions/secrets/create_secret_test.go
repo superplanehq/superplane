@@ -45,6 +45,46 @@ func Test__CreateSecret(t *testing.T) {
 		assert.Equal(t, "user not authenticated", msg)
 	})
 
+	t.Run("invalid domain type", func(t *testing.T) {
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: support.RandomName("secret"),
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{"test": "test"},
+				},
+			},
+		}
+
+		_, err := CreateSecret(ctx, encryptor, "bogus", r.Organization.ID.String(), secret)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("secret is created with canvas domain", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: support.RandomName("secret"),
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{"test": "test"},
+				},
+			},
+		}
+
+		response, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, canvas.ID.String(), secret)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_CANVAS, response.Secret.Metadata.DomainType)
+		assert.Equal(t, canvas.ID.String(), response.Secret.Metadata.DomainId)
+	})
+
 	t.Run("secret is created", func(t *testing.T) {
 		secret := &protos.Secret{
 			Metadata: &protos.Secret_Metadata{

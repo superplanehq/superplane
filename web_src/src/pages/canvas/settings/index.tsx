@@ -12,6 +12,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { buildSettingsInitialValues } from "./buildInitialValues";
 import { PageHeader } from "./PageHeader";
+import { SettingsTabs } from "./SettingsTabs";
 import type { SettingsSavePayload } from "./types";
 import { SettingsView } from "./View";
 
@@ -96,6 +97,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-slate-100", appDarkModeClasses.surface)}>
       <PageHeader organizationId={orgId} title={`${canvasName} · Settings`} />
+      <SettingsTabs organizationId={orgId} appId={resolvedCanvasId} />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <SettingsView

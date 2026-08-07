@@ -7,6 +7,9 @@ const (
 	ProviderGoogle = "google"
 
 	DomainTypeOrganization = "org"
+	// DomainTypeCanvas scopes a resource to a single canvas (a.k.a. "app" in
+	// user-facing CLI/UI copy). Currently only used by secrets.
+	DomainTypeCanvas = "canvas"
 
 	DisplayNameOwner  = "Owner"
 	DisplayNameAdmin  = "Admin"
@@ -36,11 +39,25 @@ var (
 	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
 )
 
+// ValidateDomainType validates domain types used for RBAC (roles/groups),
+// which are only ever scoped to an organization. Do not loosen this to
+// accept other domain types - use ValidateSecretDomainType for secrets.
 func ValidateDomainType(domainType string) error {
 	if domainType != DomainTypeOrganization {
 		return fmt.Errorf("invalid domain type %s", domainType)
 	}
 	return nil
+}
+
+// ValidateSecretDomainType validates domain types accepted for secrets,
+// which can be scoped to either an organization or a single canvas ("app").
+func ValidateSecretDomainType(domainType string) error {
+	switch domainType {
+	case DomainTypeOrganization, DomainTypeCanvas:
+		return nil
+	default:
+		return fmt.Errorf("invalid domain type %s", domainType)
+	}
 }
 
 func FormatDomain(domainType, domainID string) string {

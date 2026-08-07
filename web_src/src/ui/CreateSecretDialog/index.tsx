@@ -9,6 +9,7 @@ import { Textarea } from "@/components/Textarea/textarea";
 import { useCreateSecret, type CreateSecretParams } from "@/hooks/useSecrets";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import type { AuthorizationDomainType } from "@/api-client";
 
 export interface CreatedSecretSummary {
   id: string;
@@ -20,6 +21,9 @@ export interface CreateSecretDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId: string;
+  /** Scopes the created secret to a domain other than the organization, e.g. a canvas ("app"). */
+  domainId?: string;
+  domainType?: AuthorizationDomainType;
   /** Called after a secret is successfully created. */
   onCreated?: (secret: CreatedSecretSummary) => void;
   /** Prefills the first key name when the dialog opens (value left blank). */
@@ -147,12 +151,14 @@ export function CreateSecretDialog({
   open,
   onOpenChange,
   organizationId,
+  domainId = organizationId,
+  domainType = "DOMAIN_TYPE_ORGANIZATION",
   onCreated,
   initialKeyName,
 }: CreateSecretDialogProps) {
   const [secretName, setSecretName] = useState("");
   const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>(() => initialPairs(initialKeyName));
-  const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+  const createSecretMutation = useCreateSecret(domainId, domainType);
   const isPending = createSecretMutation.isPending;
 
   const reset = () => {

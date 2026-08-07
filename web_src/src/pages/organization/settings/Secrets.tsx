@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSecrets } from "@/hooks/useSecrets";
 import { CreateSecretDialog } from "@/ui/CreateSecretDialog";
-import type { SuperplaneSecretsSecret } from "@/api-client";
+import type { AuthorizationDomainType, SuperplaneSecretsSecret } from "@/api-client";
 import { cn } from "@/lib/utils";
 import {
   settingsEmptyStateIconClassName,
@@ -21,6 +21,11 @@ import {
 
 interface SecretsProps {
   organizationId: string;
+  /** Scopes the list to a domain other than the organization, e.g. a canvas ("app"). */
+  domainId?: string;
+  domainType?: AuthorizationDomainType;
+  /** Base path used for links to secret detail pages. Defaults to the organization settings path. */
+  basePath?: string;
 }
 
 interface CreateSecretButtonProps {
@@ -96,14 +101,19 @@ function SecretsTableRows({
   );
 }
 
-export function Secrets({ organizationId }: SecretsProps) {
+export function Secrets({
+  organizationId,
+  domainId = organizationId,
+  domainType = "DOMAIN_TYPE_ORGANIZATION",
+  basePath = `/${organizationId}/settings/secrets`,
+}: SecretsProps) {
   usePageTitle(["Secrets"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const canCreateSecrets = canAct("secrets", "create");
 
-  const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+  const { data: secrets = [], isLoading } = useSecrets(domainId, domainType);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -112,7 +122,7 @@ export function Secrets({ organizationId }: SecretsProps) {
     setIsCreateModalOpen(true);
   };
 
-  const getSecretDetailPath = (id: string) => `/${organizationId}/settings/secrets/${id}`;
+  const getSecretDetailPath = (id: string) => `${basePath}/${id}`;
 
   if (isLoading) {
     return (
@@ -164,9 +174,11 @@ export function Secrets({ organizationId }: SecretsProps) {
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         organizationId={organizationId}
+        domainId={domainId}
+        domainType={domainType}
         onCreated={(created) => {
           if (created.id) {
-            navigate(`/${organizationId}/settings/secrets/${created.id}`);
+            navigate(`${basePath}/${created.id}`);
           }
         }}
       />

@@ -16,6 +16,15 @@ const (
 	SecretKind = "Secret"
 )
 
+// appIDFlag safely dereferences an --app-id flag pointer, returning "" for
+// commands that didn't bind one.
+func appIDFlag(appID *string) string {
+	if appID == nil {
+		return ""
+	}
+	return *appID
+}
+
 type secretResource struct {
 	APIVersion string                                `json:"apiVersion"`
 	Kind       string                                `json:"kind"`

@@ -9,7 +9,8 @@ import (
 )
 
 type createCommand struct {
-	file *string
+	file  *string
+	appID *string
 }
 
 func (c *createCommand) Execute(ctx core.CommandContext) error {
@@ -21,7 +22,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("--file is required")
 	}
 
-	organizationID, err := core.ResolveOrganizationID(ctx)
+	domainType, domainID, err := core.ResolveSecretDomain(ctx, appIDFlag(c.appID))
 	if err != nil {
 		return err
 	}
@@ -35,8 +36,8 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 	request := openapi_client.SecretsCreateSecretRequest{}
 	request.SetSecret(secret)
-	request.SetDomainType(core.OrganizationDomainType())
-	request.SetDomainId(organizationID)
+	request.SetDomainType(domainType)
+	request.SetDomainId(domainID)
 
 	response, _, err := ctx.API.SecretAPI.SecretsCreateSecret(ctx.Context).Body(request).Execute()
 	if err != nil {

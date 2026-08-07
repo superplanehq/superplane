@@ -9,7 +9,8 @@ import (
 )
 
 type updateCommand struct {
-	file *string
+	file  *string
+	appID *string
 }
 
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
@@ -24,7 +25,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("update does not accept positional arguments")
 	}
 
-	organizationID, err := core.ResolveOrganizationID(ctx)
+	domainType, domainID, err := core.ResolveSecretDomain(ctx, appIDFlag(c.appID))
 	if err != nil {
 		return err
 	}
@@ -41,8 +42,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	request := openapi_client.SecretsUpdateSecretBody{}
 	request.SetSecret(secret)
-	request.SetDomainType(core.OrganizationDomainType())
-	request.SetDomainId(organizationID)
+	request.SetDomainType(domainType)
+	request.SetDomainId(domainID)
 
 	response, _, err := ctx.API.SecretAPI.SecretsUpdateSecret(ctx.Context, resource.Metadata.GetId()).Body(request).Execute()
 	if err != nil {

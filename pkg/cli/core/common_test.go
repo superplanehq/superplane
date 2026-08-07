@@ -1,11 +1,15 @@
 package core_test
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
@@ -74,6 +78,43 @@ func TestResolveAppID(t *testing.T) {
 			require.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestResolveSecretDomain(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"user":{"id":"me","email":"me@example.com","organizationId":"org-1"}}`))
+	}))
+	defer server.Close()
+
+	config := openapi_client.NewConfiguration()
+	config.Servers = openapi_client.ServerConfigurations{{URL: server.URL}}
+
+	ctx := core.CommandContext{
+		Context: context.Background(),
+		API:     openapi_client.NewAPIClient(config),
+	}
+
+	t.Run("with app id, targets the app domain without calling the API", func(t *testing.T) {
+		domainType, domainID, err := core.ResolveSecretDomain(core.CommandContext{}, "app-123")
+		require.NoError(t, err)
+		require.Equal(t, core.AppDomainType(), domainType)
+		require.Equal(t, "app-123", domainID)
+	})
+
+	t.Run("trims app id", func(t *testing.T) {
+		domainType, domainID, err := core.ResolveSecretDomain(core.CommandContext{}, "  app-123  ")
+		require.NoError(t, err)
+		require.Equal(t, core.AppDomainType(), domainType)
+		require.Equal(t, "app-123", domainID)
+	})
+
+	t.Run("without app id, falls back to the caller's organization", func(t *testing.T) {
+		domainType, domainID, err := core.ResolveSecretDomain(ctx, "")
+		require.NoError(t, err)
+		require.Equal(t, core.OrganizationDomainType(), domainType)
+		require.Equal(t, "org-1", domainID)
+	})
 }
 
 func TestBindAppIDFlag(t *testing.T) {

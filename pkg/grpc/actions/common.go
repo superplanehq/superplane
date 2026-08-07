@@ -40,8 +40,23 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
 	case models.DomainTypeOrganization:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
+	case models.DomainTypeCanvas:
+		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
+	}
+}
+
+// DomainTypeFromProto is the reverse of DomainTypeToProto. It returns an
+// empty string for domain types that don't map to a model domain type.
+func DomainTypeFromProto(domainType pbAuth.DomainType) string {
+	switch domainType {
+	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		return models.DomainTypeOrganization
+	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
+		return models.DomainTypeCanvas
+	default:
+		return ""
 	}
 }
 

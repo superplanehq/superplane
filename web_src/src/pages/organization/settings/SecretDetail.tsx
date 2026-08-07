@@ -19,17 +19,28 @@ import {
   useDeleteSecretKey,
   useUpdateSecretName,
 } from "@/hooks/useSecrets";
+import type { AuthorizationDomainType } from "@/api-client";
 
 interface SecretDetailProps {
   organizationId: string;
+  /** Scopes the secret to a domain other than the organization, e.g. a canvas ("app"). */
+  domainId?: string;
+  domainType?: AuthorizationDomainType;
+  /** Base path used for links back to the secrets list. Defaults to the organization settings path. */
+  basePath?: string;
 }
 
-export function SecretDetail({ organizationId }: SecretDetailProps) {
+export function SecretDetail({
+  organizationId,
+  domainId = organizationId,
+  domainType = "DOMAIN_TYPE_ORGANIZATION",
+  basePath = `/${organizationId}/settings/secrets`,
+}: SecretDetailProps) {
   const navigate = useNavigate();
   const { secretId } = useParams<{ secretId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
-  const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  const { data: secret, isLoading, error } = useSecret(domainId, domainType, secretId || "");
   usePageTitle(["Secrets", secret?.metadata?.name]);
 
   useReportPageReady(!isLoading && !!secretId, {
@@ -45,10 +56,10 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const [editingSecretName, setEditingSecretName] = useState(false);
   const [editingSecretNameValue, setEditingSecretNameValue] = useState("");
 
-  const setSecretKeyMutation = useSetSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
-  const deleteSecretKeyMutation = useDeleteSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
-  const updateSecretNameMutation = useUpdateSecretName(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
-  const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+  const setSecretKeyMutation = useSetSecretKey(domainId, domainType, secretId || "");
+  const deleteSecretKeyMutation = useDeleteSecretKey(domainId, domainType, secretId || "");
+  const updateSecretNameMutation = useUpdateSecretName(domainId, domainType, secretId || "");
+  const deleteSecretMutation = useDeleteSecret(domainId, domainType);
   const canUpdateSecrets = canAct("secrets", "update");
   const canDeleteSecrets = canAct("secrets", "delete");
 
@@ -184,7 +195,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
     try {
       await deleteSecretMutation.mutateAsync(secret.metadata?.id ?? "");
       showSuccessToast("Secret deleted successfully");
-      navigate(`/${organizationId}/settings/secrets`);
+      navigate(basePath);
     } catch (err) {
       showErrorToast(`Failed to delete secret: ${getApiErrorMessage(err)}`);
     }
@@ -192,7 +203,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
 
   const isUpdating =
     setSecretKeyMutation.isPending || deleteSecretKeyMutation.isPending || updateSecretNameMutation.isPending;
-  const handleBackToSecrets = () => navigate(`/${organizationId}/settings/secrets`);
+  const handleBackToSecrets = () => navigate(basePath);
 
   if (isLoading || !secretId) {
     return (

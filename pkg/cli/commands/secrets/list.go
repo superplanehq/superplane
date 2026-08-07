@@ -6,18 +6,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type listCommand struct{}
+type listCommand struct {
+	appID *string
+}
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
-	organizationID, err := core.ResolveOrganizationID(ctx)
+	domainType, domainID, err := core.ResolveSecretDomain(ctx, appIDFlag(c.appID))
 	if err != nil {
 		return err
 	}
 
 	response, _, err := ctx.API.SecretAPI.
 		SecretsListSecrets(ctx.Context).
-		DomainType(string(core.OrganizationDomainType())).
-		DomainId(organizationID).
+		DomainType(string(domainType)).
+		DomainId(domainID).
 		Execute()
 	if err != nil {
 		return err

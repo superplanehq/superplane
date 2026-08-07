@@ -34,3 +34,7 @@ export function parseAppRunPath(value: string): string | null {
 export function appSettingsPath(organizationId: string, appId: string): string {
   return `/${organizationId}/apps/${appId}/settings`;
 }
+
+export function appSecretsPath(organizationId: string, appId: string): string {
+  return `${appSettingsPath(organizationId, appId)}/secrets`;
+}

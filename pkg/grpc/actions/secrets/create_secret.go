@@ -22,6 +22,10 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
+	if err := models.ValidateSecretDomainType(domainType); err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid domain type")
+	}
+
 	if spec == nil {
 		return nil, grpcerrors.InvalidArgument(nil, "missing secret")
 	}

@@ -5,6 +5,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+// Note on /api/v1/secrets* rules below: secrets can be scoped to either an
+// organization or a single canvas ("app"), but there is no per-canvas RBAC
+// domain in this codebase. All secrets routes are therefore always
+// authorized against the caller's *organization* "secrets" permission here
+// (DomainType: models.DomainTypeOrganization), regardless of which domain a
+// given request's domain_type/domain_id targets. Ownership of a
+// canvas-scoped secret's target canvas (i.e. that it belongs to the
+// caller's organization) is validated separately, in
+// pkg/grpc/actions/secrets.ResolveSecretDomain. A known limitation of this
+// model is that any org member with "secrets" permissions can manage any
+// canvas's secrets in the organization, same as they can already reach any
+// canvas's other resources today.
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
 		{Method: "DELETE", Pattern: "/api/v1/canvas-folders/{id}"}: {

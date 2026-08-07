@@ -17,22 +17,42 @@ import (
 
 /*
  * SecretsContext implements core.SecretsContext,
- * resolving organization secret key values for component execution.
+ * resolving secret key values for component execution.
+ *
+ * A secret name is resolved first against the canvas ("app") the component
+ * is running in, and falls back to the organization if no canvas-scoped
+ * secret with that name exists. This gives canvas secrets "shadowing"
+ * semantics over organization secrets of the same name.
  */
 type SecretsContext struct {
 	tx             *gorm.DB
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
+	canvasID       uuid.UUID
 }
 
-func NewSecretsContext(tx *gorm.DB, reg *registry.Registry, organizationID uuid.UUID, encryptor crypto.Encryptor) *SecretsContext {
+func NewSecretsContext(tx *gorm.DB, reg *registry.Registry, organizationID uuid.UUID, canvasID uuid.UUID, encryptor crypto.Encryptor) *SecretsContext {
 	return &SecretsContext{
 		tx:             tx,
 		encryptor:      encryptor,
 		registry:       reg,
 		organizationID: organizationID,
+		canvasID:       canvasID,
 	}
+}
+
+// findSecret looks up secretName scoped to the canvas first, falling back
+// to the organization if it isn't defined for the canvas.
+func (c *SecretsContext) findSecret(secretName string) (*models.Secret, error) {
+	if c.canvasID != uuid.Nil {
+		secret, err := models.FindSecretByNameInTransaction(c.tx, models.DomainTypeCanvas, c.canvasID, secretName)
+		if err == nil {
+			return secret, nil
+		}
+	}
+
+	return models.FindSecretByNameInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, secretName)
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -40,7 +60,7 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 		return nil, core.ErrSecretKeyNotFound
 	}
 
-	secret, err := models.FindSecretByNameInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, secretName)
+	secret, err := c.findSecret(secretName)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +84,7 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 		return nil, fmt.Errorf("secret name is required")
 	}
 
-	secret, err := models.FindSecretByNameInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, secretName)
+	secret, err := c.findSecret(secretName)
 	if err != nil {
 		return nil, err
 	}

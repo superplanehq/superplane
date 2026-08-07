@@ -23,6 +23,8 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
+import { CanvasSecretsPage } from "./pages/canvas/settings/Secrets";
+import { CanvasSecretDetailPage } from "./pages/canvas/settings/SecretDetail";
 import {
   FactoryDetailPage,
   FactoryListPage,
@@ -138,6 +140,14 @@ function AppRouter() {
                   <Route
                     path=":appId/settings"
                     element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
+                  />
+                  <Route
+                    path=":appId/settings/secrets"
+                    element={withAuthAndPermission(CanvasSecretsPage, "secrets", "read")}
+                  />
+                  <Route
+                    path=":appId/settings/secrets/:secretId"
+                    element={withAuthAndPermission(CanvasSecretDetailPage, "secrets", "read")}
                   />
                   <Route path=":appId" element={withAuthAndPermission(AppDefaultTabGate, "canvases", "read")} />
                 </Route>

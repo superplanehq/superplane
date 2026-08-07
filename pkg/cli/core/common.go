@@ -21,6 +21,12 @@ func OrganizationDomainType() openapi_client.AuthorizationDomainType {
 	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
 }
 
+// AppDomainType returns the authorization domain type used for app
+// (canvas)-scoped CLI requests, e.g. app-level secrets.
+func AppDomainType() openapi_client.AuthorizationDomainType {
+	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_CANVAS
+}
+
 func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	m := make(map[string]interface{})
 
@@ -98,4 +104,25 @@ func BindAppIDFlag(cmd *cobra.Command, dest *string, usage string) {
 	cmd.Flags().StringVar(dest, "app-id", "", usage)
 	cmd.Flags().StringVar(dest, "canvas-id", "", usage)
 	_ = cmd.Flags().MarkDeprecated("canvas-id", "use --app-id")
+}
+
+// ResolveSecretDomain resolves the (domainType, domainID) pair a secrets
+// CLI command should target: the given app when appID is non-empty
+// (regardless of any active app set via "superplane apps active" - an
+// explicit --app-id always wins), otherwise the caller's organization.
+// Unlike ResolveAppID, this does not fall back to the active app, so
+// existing scripts that manage organization secrets keep working
+// unchanged unless --app-id is passed explicitly.
+func ResolveSecretDomain(ctx CommandContext, appID string) (openapi_client.AuthorizationDomainType, string, error) {
+	appID = strings.TrimSpace(appID)
+	if appID != "" {
+		return AppDomainType(), appID, nil
+	}
+
+	organizationID, err := ResolveOrganizationID(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	return OrganizationDomainType(), organizationID, nil
 }
