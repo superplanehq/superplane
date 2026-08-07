@@ -3,24 +3,17 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/Textarea/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { settingsModalClassName, settingsTableCardClassName } from "./settingsPageStyles";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { KeyRound } from "lucide-react";
-import { CopyButton } from "@/ui/CopyButton";
-import { useState } from "react";
+import { settingsTableCardClassName } from "./settingsPageStyles";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
+import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 import { ApiKeysContent } from "./ApiKeysContent";
+import { CreateApiKeyModal, CreatedApiKeyModal } from "./ApiKeyCreationDialogs";
 
 interface APIKeysProps {
   organizationId: string;
@@ -145,8 +138,28 @@ export function APIKeys({ organizationId }: APIKeysProps) {
 
   const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
+  const {
+    data: roles = [],
+    isLoading: rolesLoading,
+    isFetching: rolesFetching,
+    isError: rolesLoadFailed,
+    refetch: refetchRoles,
+  } = useOrganizationRoles(organizationId);
   const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
+
+  const assignableRoles = useMemo(() => {
+    const reserved = new Set(["org_owner", "org_viewer", "org_admin"]);
+    const customRoles = roles
+      .flatMap((role) => {
+        const name = role.metadata?.name;
+        if (!name || name !== name.trim() || reserved.has(name)) return [];
+        return [{ name, label: role.spec?.displayName?.trim() || name }];
+      })
+      .sort((a, b) => a.label.localeCompare(b.label) || a.name.localeCompare(b.name));
+
+    return [{ name: "org_viewer", label: "Viewer" }, { name: "org_admin", label: "Admin" }, ...customRoles];
+  }, [roles]);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -218,194 +231,18 @@ export function APIKeys({ organizationId }: APIKeysProps) {
           />
         </div>
       </div>
-      {form.isCreateModalOpen && !form.newToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className={cn(settingsModalClassName, "max-w-lg")}>
-            <form
-              className="p-6"
-              onSubmit={(e) => {
-                e.preventDefault();
-                form.handleCreate();
-              }}
-              data-testid="api-key-create-form"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <KeyRound className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Create API Key</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={form.handleCloseCreateModal}
-                  className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                  disabled={form.createMutation.isPending}
-                >
-                  <Icon name="x" size="sm" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => form.setName(e.target.value)}
-                    placeholder="e.g., ci-deploy-bot"
-                    required
-                    data-testid="api-key-create-name"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Description</Label>
-                  <Textarea
-                    value={form.description}
-                    onChange={(e) => form.setDescription(e.target.value)}
-                    placeholder="What is this API key used for?"
-                    rows={3}
-                    data-testid="api-key-create-description"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Role <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={form.role} onValueChange={form.setRole}>
-                    <SelectTrigger className="w-full" data-testid="api-key-create-role">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
-                      <SelectItem value="org_admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Determines what this API key can do within its access scope.
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
-                  <Select value={form.accessMode} onValueChange={(value) => form.setAccessMode(value as AccessMode)}>
-                    <SelectTrigger className="w-full" data-testid="api-key-create-access-mode">
-                      <SelectValue placeholder="Select access" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="organization">Organization-wide</SelectItem>
-                      <SelectItem value="canvas">Selected apps</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {form.accessMode === "canvas" && (
-                  <div>
-                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                      Apps <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="max-h-44 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
-                      {canvases.map((canvas) => {
-                        const canvasId = canvas.id || "";
-                        return (
-                          <label
-                            key={canvasId}
-                            className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 dark:border-gray-800"
-                          >
-                            <Checkbox
-                              checked={form.selectedCanvasIds.includes(canvasId)}
-                              onChange={() => form.toggleCanvas(canvasId)}
-                              data-testid="api-key-create-canvas"
-                            />
-                            <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Expiration</Label>
-                  <Input
-                    type="datetime-local"
-                    value={form.expiresAt}
-                    onChange={(e) => form.setExpiresAt(e.target.value)}
-                    data-testid="api-key-create-expires-at"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-start gap-3 mt-6">
-                <LoadingButton
-                  type="submit"
-                  disabled={!form.name?.trim()}
-                  loading={form.createMutation.isPending}
-                  loadingText="Creating..."
-                  className="flex items-center gap-2"
-                  data-testid="api-key-create-submit"
-                >
-                  Create
-                </LoadingButton>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={form.handleCloseCreateModal}
-                  disabled={form.createMutation.isPending}
-                >
-                  Cancel
-                </Button>
-              </div>
-
-              {form.createMutation.isError && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to create: {getApiErrorMessage(form.createMutation.error)}
-                  </p>
-                </div>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
-      {form.isCreateModalOpen && form.newToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className={cn(settingsModalClassName, "max-w-lg")}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <KeyRound className="h-6 w-6 text-green-600 dark:text-green-400" />
-                <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">API Key Created</h3>
-              </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  Copy this token now. You won't be able to see it again.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 ph-no-capture">
-                <Input
-                  readOnly
-                  value={form.newToken}
-                  className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
-                  data-testid="api-key-token-display"
-                />
-                <CopyButton
-                  variant="button"
-                  text={form.newToken}
-                  data-testid="api-key-token-copy"
-                  onCopyError={() => showErrorToast("Failed to copy token")}
-                >
-                  Copy
-                </CopyButton>
-              </div>
-
-              <div className="flex justify-start mt-6">
-                <Button onClick={form.handleTokenModalClose} data-testid="api-key-token-done">
-                  Done
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateApiKeyModal
+        form={form}
+        canvases={canvases}
+        assignableRoles={assignableRoles}
+        roleQueryStatus={{
+          isLoading: rolesLoading,
+          isFetching: rolesFetching,
+          hasError: rolesLoadFailed,
+          onRetry: () => void refetchRoles(),
+        }}
+      />
+      <CreatedApiKeyModal form={form} />
     </div>
   );
 }

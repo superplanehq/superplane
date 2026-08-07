@@ -42,6 +42,21 @@ func TestAPIKeys(t *testing.T) {
 		steps.assertAPIKeySavedInDB("admin-bot", "Admin automation", models.RoleOrgAdmin)
 	})
 
+	t.Run("creating an API key with a custom role", func(t *testing.T) {
+		steps := &apiKeySteps{t: t}
+		steps.start()
+		roleName := steps.givenCustomRoleExists("Release Bot")
+		steps.visitAPIKeysPage()
+		steps.clickCreateAPIKey()
+		steps.fillName("release-bot")
+		steps.fillDescription("Custom role automation")
+		steps.selectRole("Release Bot")
+		steps.submitCreate()
+		steps.assertTokenDisplayed()
+		steps.dismissTokenModal()
+		steps.assertAPIKeySavedInDB("release-bot", "Custom role automation", roleName)
+	})
+
 	t.Run("viewing API keys in the list", func(t *testing.T) {
 		steps := &apiKeySteps{t: t}
 		steps.start()
@@ -327,7 +342,7 @@ func (s *apiKeySteps) loginAsViewer() {
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	err = authService.AssignRole(viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.DB(s.t.Context()), viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(s.t, err)
 
 	s.session.Account = viewerAccount
@@ -344,6 +359,22 @@ func (s *apiKeySteps) assertEditButtonDisabled() {
 
 func (s *apiKeySteps) assertDeleteButtonDisabled() {
 	s.session.AssertDisabled(q.TestID("api-key-detail-delete"))
+}
+
+func (s *apiKeySteps) givenCustomRoleExists(displayName string) string {
+	roleName := support.RandomName("api-key-role")
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+	require.NoError(s.t, authService.CreateCustomRole(s.session.OrgID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: displayName,
+		DomainType:  models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{
+			{Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		},
+	}))
+
+	return roleName
 }
 
 // givenAPIKeyExists creates an API key directly in the DB for test setup.

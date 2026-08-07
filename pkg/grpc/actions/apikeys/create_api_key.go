@@ -2,6 +2,7 @@ package apikeys
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -36,17 +37,13 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
-	validRoles := map[string]bool{
-		models.RoleOrgAdmin:  true,
-		models.RoleOrgViewer: true,
-	}
-
-	if req.Role == "" {
+	role := strings.TrimSpace(req.Role)
+	if role == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "role is required")
 	}
 
-	if !validRoles[req.Role] {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; must be org_admin or org_viewer")
+	if role == models.RoleOrgOwner {
+		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)
@@ -99,11 +96,14 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 			return txErr
 		}
 
-		txErr = authService.AssignRole(apiKey.ID.String(), req.Role, orgID, models.DomainTypeOrganization)
+		txErr = authService.AssignRole(tx, apiKey.ID.String(), role, orgID, models.DomainTypeOrganization)
 		return txErr
 	})
 
 	if err != nil {
+		if errors.Is(err, authorization.ErrRoleNotFound) || errors.Is(err, authorization.ErrRoleNotAssignable) {
+			return nil, grpcerrors.InvalidArgument(err, "role cannot be assigned to an API key")
+		}
 		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 

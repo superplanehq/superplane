@@ -100,7 +100,7 @@ func AcceptInviteLinkWithUsage(
 		}
 	}
 
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(tx, user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization)
 	if err != nil {
 		tx.Rollback()
 		return nil, grpcerrors.Internal(err, "failed to accept invite")

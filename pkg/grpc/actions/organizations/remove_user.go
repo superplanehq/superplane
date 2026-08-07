@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -38,7 +39,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	}
 
 	for _, role := range roles {
-		err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
+		err = authService.RemoveRole(database.DB(ctx), user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 		if err != nil {
 			log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
 			return nil, grpcerrors.Internal(err, "error removing role")

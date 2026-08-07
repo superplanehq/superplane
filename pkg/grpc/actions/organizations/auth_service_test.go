@@ -10,11 +10,11 @@ type mockAuthService struct {
 	Error error
 }
 
-func (m *mockAuthService) AssignRole(userID, role, domainID string, domainType string) error {
+func (m *mockAuthService) AssignRole(db *gorm.DB, userID, role, domainID string, domainType string) error {
 	if m.Error != nil {
 		return m.Error
 	}
-	return m.Authorization.AssignRole(userID, role, domainID, domainType)
+	return m.Authorization.AssignRole(db, userID, role, domainID, domainType)
 }
 
 func (m *mockAuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {

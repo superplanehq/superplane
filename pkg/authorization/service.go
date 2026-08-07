@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/casbin/casbin/v2"
@@ -125,6 +127,15 @@ func policyFiltersForDomain(domainType, domainID string) []gormadapter.Filter {
 	}
 }
 
+func exactPolicyFiltersForDomain(domainType, domainID string) []gormadapter.Filter {
+	domain := prefixDomain(domainType, domainID)
+
+	return []gormadapter.Filter{
+		{Ptype: []string{"p"}, V1: []string{domain}},
+		{Ptype: []string{"g"}, V2: []string{domain}},
+	}
+}
+
 func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter.Filter) (casbin.IEnforcer, error) {
 	adapter, err := newCasbinFilteredAdapter(database.DB(ctx))
 	if err != nil {
@@ -146,6 +157,34 @@ func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter
 	if err := a.loadDefaultPoliciesOn(enforcer); err != nil {
 		return nil, fmt.Errorf("failed to load default policies: %w", err)
 	}
+
+	return enforcer, nil
+}
+
+func (a *AuthService) newWriteEnforcer(tx *gorm.DB, domainType, domainID string) (casbin.IEnforcer, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("database handle is required")
+	}
+
+	adapter, err := newCasbinFilteredAdapter(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
+	}
+
+	enforcer, err := casbin.NewEnforcer(a.casbinModel.Copy(), adapter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
+	}
+
+	enforcer.EnableAutoSave(false)
+	enforcer.AddNamedDomainMatchingFunc("g", "keyMatch", util.KeyMatch)
+	if err := enforcer.LoadFilteredPolicy(exactPolicyFiltersForDomain(domainType, domainID)); err != nil {
+		return nil, fmt.Errorf("failed to load filtered policy: %w", err)
+	}
+	if err := a.loadDefaultPoliciesOn(enforcer); err != nil {
+		return nil, fmt.Errorf("failed to load default policies: %w", err)
+	}
+	enforcer.EnableAutoSave(true)
 
 	return enforcer, nil
 }
@@ -492,34 +531,42 @@ func (a *AuthService) GetGroupRole(ctx context.Context, domainID string, domainT
 	return role, nil
 }
 
-func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
-	adapter := a.enforcer.GetAdapter().(*gormadapter.Adapter)
+func (a *AuthService) AssignRole(db *gorm.DB, userID, role, domainID string, domainType string) error {
+	if db == nil {
+		return fmt.Errorf("database handle is required")
+	}
 
-	return adapter.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
-		return a.assignRoleWithEnforcer(enforcerTx, userID, role, domainID, domainType)
+	return db.Transaction(func(tx *gorm.DB) error {
+		var subject *models.User
+		if domainType == models.DomainTypeOrganization {
+			user, err := models.FindActiveUserByIDInTransaction(tx, domainID, userID)
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("failed to load role subject: %w", err)
+			}
+			if err == nil {
+				subject = user
+			}
+		}
+
+		enforcer, err := a.newWriteEnforcer(tx, domainType, domainID)
+		if err != nil {
+			return err
+		}
+
+		return a.assignRoleWithEnforcer(subject, enforcer, userID, role, domainID, domainType)
 	})
 }
 
-func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, role, domainID, domainType string) error {
+func (a *AuthService) assignRoleWithEnforcer(
+	subject *models.User,
+	enforcer casbin.IEnforcer,
+	userID, role, domainID, domainType string,
+) error {
 	domain := prefixDomain(domainType, domainID)
 	prefixedRole := prefixRoleName(role)
 
-	// Check if it's a default role
-	validRoles := map[string][]string{
-		models.DomainTypeOrganization: {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
-	}
-
-	isValidDefaultRole := false
-	if roles, exists := validRoles[domainType]; exists {
-		isValidDefaultRole = contains(roles, role)
-	}
-
-	// If not a default role, check if it's a custom role that exists
-	if !isValidDefaultRole {
-		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
-		if len(policies) == 0 {
-			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
-		}
+	if err := a.validateRoleAssignment(subject, enforcer, role, domainID, domainType); err != nil {
+		return err
 	}
 
 	prefixedUserID := prefixUserID(userID)
@@ -532,7 +579,7 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 		if strings.HasPrefix(existingRole[1], "/roles/") {
 			_, err := enforcer.RemoveGroupingPolicy(prefixedUserID, existingRole[1], domain)
 			if err != nil {
-				log.Warnf("failed to remove existing role %s for user %s: %v", existingRole[1], userID, err)
+				return fmt.Errorf("failed to remove existing role %s for user %s: %w", existingRole[1], userID, err)
 			}
 		}
 	}
@@ -549,11 +596,16 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 	return nil
 }
 
-func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
+func (a *AuthService) RemoveRole(db *gorm.DB, userID, role, domainID string, domainType string) error {
+	enforcer, err := a.newWriteEnforcer(db, domainType, domainID)
+	if err != nil {
+		return err
+	}
+
 	domain := prefixDomain(domainType, domainID)
 	prefixedRole := prefixRoleName(role)
 	prefixedUserID := prefixUserID(userID)
-	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
+	ruleRemoved, err := enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
 	}
@@ -615,7 +667,7 @@ func (a *AuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) erro
 		//
 		// Setup the organization owner
 		//
-		err = a.assignRoleWithEnforcer(enforcerTx, ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = a.assignRoleWithEnforcer(nil, enforcerTx, ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		if err != nil {
 			return fmt.Errorf("failed to assign organization owner: %w", err)
 		}
@@ -636,23 +688,15 @@ func (a *AuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) erro
 func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 	domain := prefixDomain(models.DomainTypeOrganization, orgID)
 
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err := db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
-		_, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
-		if err != nil {
-			return fmt.Errorf("failed to remove organization roles: %w", err)
-		}
-
-		_, err = a.enforcer.RemoveFilteredPolicy(1, domain)
-		if err != nil {
-			return fmt.Errorf("failed to remove organization policies: %w", err)
-		}
-
-		return nil
-	})
-
+	enforcer, err := a.newWriteEnforcer(tx, models.DomainTypeOrganization, orgID)
 	if err != nil {
-		return fmt.Errorf("failed to remove policies for %s: %w", orgID, err)
+		return fmt.Errorf("failed to load policies for %s: %w", orgID, err)
+	}
+	if _, err := enforcer.RemoveFilteredGroupingPolicy(2, domain); err != nil {
+		return fmt.Errorf("failed to remove organization roles: %w", err)
+	}
+	if _, err := enforcer.RemoveFilteredPolicy(1, domain); err != nil {
+		return fmt.Errorf("failed to remove organization policies: %w", err)
 	}
 
 	err = models.DeleteMetadataForOrganization(tx, models.DomainTypeOrganization, orgID)
@@ -1102,6 +1146,57 @@ func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 	}
 
 	return false
+}
+
+func (a *AuthService) validateRoleAssignment(
+	subject *models.User,
+	enforcer casbin.IEnforcer,
+	roleName, domainID, domainType string,
+) error {
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return err
+	}
+
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(roleName)
+	if !a.IsDefaultRole(roleName, domainType) {
+		policies, err := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
+		}
+
+		inherits, err := enforcer.GetFilteredGroupingPolicy(0, prefixedRole, "", domain)
+		if err != nil {
+			return fmt.Errorf("failed to get inheritance for role %s: %w", roleName, err)
+		}
+		hasInheritance := false
+		for _, policy := range inherits {
+			if len(policy) >= 3 && strings.HasPrefix(policy[1], "/roles/") {
+				hasInheritance = true
+				break
+			}
+		}
+		if len(policies) == 0 && !hasInheritance {
+			return fmt.Errorf("%w: %s", ErrRoleNotFound, roleName)
+		}
+	}
+
+	if subject == nil || !subject.IsAPIKey() {
+		return nil
+	}
+	if roleName == models.RoleOrgOwner {
+		return fmt.Errorf("%w: %s", ErrRoleNotAssignable, roleName)
+	}
+
+	inheritedRoles, err := enforcer.GetImplicitRolesForUser(prefixedRole, domain)
+	if err != nil {
+		return fmt.Errorf("failed to get inherited roles for %s: %w", roleName, err)
+	}
+	if slices.Contains(inheritedRoles, prefixRoleName(models.RoleOrgOwner)) {
+		return fmt.Errorf("%w: %s inherits %s", ErrRoleNotAssignable, roleName, models.RoleOrgOwner)
+	}
+
+	return nil
 }
 
 func (a *AuthService) getRolePermissions(enforcer casbin.IEnforcer, roleName, domain, domainType string) []*Permission {
