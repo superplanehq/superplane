@@ -57,6 +57,16 @@ func (c *AddIssueComment) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueCommentOnce, exampleOutputAddIssueCommentBytes, &exampleOutputAddIssueComment)
 }
 
+//go:embed example_output_update_issue_comment.json
+var exampleOutputUpdateIssueCommentBytes []byte
+
+var exampleOutputUpdateIssueCommentOnce sync.Once
+var exampleOutputUpdateIssueComment map[string]any
+
+func (c *UpdateIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueCommentOnce, exampleOutputUpdateIssueCommentBytes, &exampleOutputUpdateIssueComment)
+}
+
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
 
