@@ -168,11 +168,12 @@ func (c *UpdateRelease) Configuration() []configuration.Field {
 			Togglable: true,
 		},
 		{
-			Name:      "milestones",
-			Label:     "Milestones",
-			Type:      configuration.FieldTypeIntegrationResource,
-			Required:  false,
-			Togglable: true,
+			Name:        "milestones",
+			Label:       "Milestones",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Milestones to associate. Replaces the existing milestones; selecting none clears them.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           ResourceTypeMilestone,
