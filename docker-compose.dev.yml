@@ -90,10 +90,19 @@ services:
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       # Task broker /v1 (Runner component). Base URL has no trailing slash.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      # Defaults to the in-container dev broker (cmd/dev-broker), started by
+      # docker-entrypoint.dev.sh; point these at a real broker to use one.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://localhost:9000}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN when auth is enabled
-      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-broker-token}
+      START_DEV_BROKER: ${START_DEV_BROKER:-yes}
+      # The outbound HTTP policy blocks loopback by default, which also blocks
+      # the dev broker above. These lists are the defaults from
+      # pkg/networkpolicy/http.go minus the loopback entries — cloud metadata
+      # endpoints and private ranges stay blocked.
+      BLOCKED_HTTP_HOSTS: ${BLOCKED_HTTP_HOSTS:-metadata.google.internal,metadata.goog,metadata.azure.com,169.254.169.254,fd00:ec2::254,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster.local,0.0.0.0,::}
+      BLOCKED_PRIVATE_IP_RANGES: ${BLOCKED_PRIVATE_IP_RANGES:-0.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fc00::/7,fe80::/10}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
