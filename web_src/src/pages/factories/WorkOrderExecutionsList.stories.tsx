@@ -10,7 +10,7 @@ import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
  * `WorkOrderCard`), and `inline` (single flat list).
  */
 const meta = {
-  title: "Factories/WorkOrderExecutionsList",
+  title: "Factories/Components/WorkOrderExecutionsList",
   component: WorkOrderExecutionsList,
   parameters: { layout: "padded" },
   decorators: [

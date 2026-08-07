@@ -33,7 +33,7 @@ interface WorkOrderDetailHeaderProps {
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
   const { orderTitle, statusMeta, displayStatus } = props;
   return (
-    <header className="border-b border-gray-200 pb-6 dark:border-gray-700/70">
+    <header className="pb-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <Badge

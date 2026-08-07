@@ -70,7 +70,7 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
     >
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create factory app</DialogTitle>
+          <DialogTitle>Create app</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

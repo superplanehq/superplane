@@ -10,7 +10,7 @@ import { getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
  * Dispatch / Complete / Reject actions.
  */
 const meta = {
-  title: "Factories/WorkOrderDetailHeader",
+  title: "Factories/Components/WorkOrderDetailHeader",
   component: WorkOrderDetailHeader,
   parameters: { layout: "padded" },
   decorators: [

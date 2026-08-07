@@ -475,7 +475,7 @@ export function useCreateFactoryLine(organizationId: string, factoryId: string) 
         }),
       );
       if (!response.data?.line) {
-        throw new Error("Failed to create factory line");
+        throw new Error("Failed to create line");
       }
       return response.data.line;
     },
@@ -501,7 +501,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
         }),
       );
       if (!response.data?.line) {
-        throw new Error("Failed to update factory line");
+        throw new Error("Failed to update line");
       }
       return response.data.line;
     },
