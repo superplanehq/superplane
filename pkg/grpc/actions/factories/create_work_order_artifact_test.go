@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,6 +99,23 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 
 	t.Run("rejects markdown without body", func(t *testing.T) {
 		data, err := structpb.NewStruct(map[string]any{"title": "PLAN.md"})
+		require.NoError(t, err)
+
+		_, err = CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
+			FactoryId: factoryModel.ID.String(),
+			OrderId:   order.ID.String(),
+			Type:      pb.WorkOrderArtifact_TYPE_MARKDOWN,
+			Data:      data,
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("rejects artifact data over 64KiB", func(t *testing.T) {
+		data, err := structpb.NewStruct(map[string]any{
+			"body": strings.Repeat("a", models.MaxFactoryWorkOrderArtifactDataBytes),
+		})
 		require.NoError(t, err)
 
 		_, err = CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
