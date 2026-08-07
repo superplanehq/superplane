@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import yaml from "js-yaml";
+
 import { getFactoryDefinition } from "./index";
 import {
   FACTORY_CANVAS_ID_PLACEHOLDER,
@@ -23,6 +25,24 @@ function materializeSoftwareFactory() {
       claude: { id: "int-2", name: "acme-claude", ready: true },
     },
   });
+}
+
+type FactoryCanvasNode = {
+  id?: string;
+  configuration?: { script?: unknown };
+};
+
+// Materializes the Software Factory and returns the generated Create Branch
+// runner script, so regression coverage can assert on its actual behavior
+// instead of substring-matching the whole ~1,400-line template.
+function findCreateBranchScript(canvasYaml: string): string {
+  const doc = yaml.load(canvasYaml) as { spec?: { nodes?: FactoryCanvasNode[] } };
+  const node = doc.spec?.nodes?.find((n) => n.id === "runner-create-branch-2");
+  const script = node?.configuration?.script;
+  if (typeof script !== "string") {
+    throw new Error("runner-create-branch-2 configuration.script not found in materialized canvas");
+  }
+  return script;
 }
 
 describe("materializeFactoryTemplate", () => {
@@ -118,5 +138,41 @@ spec:
       template: "Create Task",
       description: "fix a bug",
     });
+  });
+});
+
+describe("Software Factory Create Branch", () => {
+  it("handles empty repositories when the default branch has no remote ref", () => {
+    const script = findCreateBranchScript(materializeSoftwareFactory());
+
+    // Resolves the configured default branch dynamically; never hardcodes `main`.
+    expect(script).toContain('gh api "repos/${REPO}" --jq .default_branch');
+    expect(script).not.toMatch(/--branch main\b/);
+    expect(script).not.toMatch(/checkout --orphan main\b/);
+    expect(script).not.toMatch(/push -u origin main\b/);
+    expect(script).not.toMatch(/checkout -b main\b/);
+
+    // Lists remote branch refs once so real git failures (auth/network/permission)
+    // are not misclassified as an empty repository.
+    expect(script).toMatch(/git ls-remote --heads "\$GITURL"/);
+    expect(script).toMatch(/Failed to list remote branches/);
+    expect(script).toMatch(/exit 1/);
+
+    // Existing-repository path is preserved: shallow clone of the default branch.
+    expect(script).toMatch(/git clone --depth 1 --branch "\$BASE"/);
+
+    // Empty-repository fallback: clone without --branch, initialize, push base.
+    expect(script).toMatch(/git clone "\$GITURL" "\$WORKDIR"/);
+    expect(script).toMatch(/git checkout --orphan "\$BASE"/);
+    expect(script).toMatch(/git push -u origin "\$BASE"/);
+
+    // Work branch is still created and pushed from the base commit.
+    expect(script).toMatch(/git checkout -b "\$BRANCH"/);
+    expect(script).toMatch(/git push -u origin "\$BRANCH"/);
+
+    // Result JSON contract is unchanged (base = resolved default branch).
+    expect(script).toContain("SUPERPLANE_RESULT_FILE");
+    expect(script).toMatch(/"branch":"%s"/);
+    expect(script).toMatch(/"base":"%s"/);
   });
 });
