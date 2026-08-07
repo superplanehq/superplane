@@ -8,7 +8,9 @@ import { setupApiInterceptor } from "./lib/api-interceptor.ts";
 import { Sentry } from "./sentry.ts";
 import "./posthog.ts";
 import { ErrorPage } from "./components/ErrorPage.tsx";
+import { configureMonaco } from "./lib/configureMonaco.ts";
 
+configureMonaco();
 // Setup the API interceptor to handle 401 responses
 setupApiInterceptor();
 
