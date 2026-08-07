@@ -85,8 +85,15 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
   });
 };
 
+type UseIntegrationOptions = {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+  refetchIntervalInBackground?: boolean;
+  staleTime?: number;
+};
+
 // Hook to fetch a single integration
-export const useIntegration = (organizationId: string, integrationId: string) => {
+export const useIntegration = (organizationId: string, integrationId: string, options?: UseIntegrationOptions) => {
   return useQuery({
     queryKey: integrationKeys.integration(organizationId, integrationId),
     queryFn: async () => {
@@ -98,9 +105,11 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
       );
       return response.data?.integration || null;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: options?.staleTime ?? 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!organizationId && !!integrationId,
+    enabled: !!organizationId && !!integrationId && (options?.enabled ?? true),
+    refetchInterval: options?.refetchInterval,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground,
   });
 };
 
