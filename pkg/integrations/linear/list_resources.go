@@ -3,6 +3,7 @@ package linear
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,8 +18,8 @@ const (
 	ResourceTypeAttachment    = "attachment"
 	ResourceTypeComment       = "comment"
 
-	// commentPreviewLength caps how much of a comment body the picker shows.
-	commentPreviewLength = 60
+	// commentPreviewRunes caps how much of a comment body the picker shows.
+	commentPreviewRunes = 60
 )
 
 func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -237,11 +238,13 @@ func ListComments(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 }
 
 // commentLabel identifies a comment in the picker by its author and the opening
-// of its body, since comments have no title of their own.
+// of its body, since comments have no title of their own. The preview is cut on
+// a rune boundary, so an emoji or accented character at the limit survives whole.
 func commentLabel(comment Comment) string {
 	preview := strings.Join(strings.Fields(comment.Body), " ")
-	if len(preview) > commentPreviewLength {
-		preview = strings.TrimSpace(preview[:commentPreviewLength]) + "…"
+	if utf8.RuneCountInString(preview) > commentPreviewRunes {
+		runes := []rune(preview)
+		preview = strings.TrimSpace(string(runes[:commentPreviewRunes])) + "…"
 	}
 
 	author := memberLabel(userOrEmpty(comment.User))
