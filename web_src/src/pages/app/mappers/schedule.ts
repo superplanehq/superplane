@@ -16,6 +16,7 @@ type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "month
 
 interface ScheduleConfiguration {
   type: ScheduleConfigurationType;
+  concurrencyPolicy?: "allow" | "skip";
   minutesInterval?: number;
   hoursInterval?: number;
   daysInterval?: number;
@@ -344,21 +345,31 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
+    const scheduleConfiguration = node.configuration as ScheduleConfiguration;
+    const metadata = [
+      {
+        icon: "calendar-cog",
+        label: formatScheduleDescription(scheduleConfiguration),
+      },
+      {
+        icon: "arrow-big-right",
+        label: formatNextTrigger(scheduleConfiguration, node.metadata as ScheduleMetadata),
+      },
+    ];
+
+    if (scheduleConfiguration.concurrencyPolicy === "skip") {
+      metadata.push({
+        icon: "ban",
+        label: "Skips overlapping runs",
+      });
+    }
+
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSlug: definition.icon,
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",
-      metadata: [
-        {
-          icon: "calendar-cog",
-          label: formatScheduleDescription(node.configuration as ScheduleConfiguration),
-        },
-        {
-          icon: "arrow-big-right",
-          label: formatNextTrigger(node.configuration as ScheduleConfiguration, node.metadata as ScheduleMetadata),
-        },
-      ],
+      metadata,
     };
 
     if (lastEvent) {
