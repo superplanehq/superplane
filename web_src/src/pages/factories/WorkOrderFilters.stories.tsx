@@ -11,7 +11,7 @@ import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrde
  * pills toggle live.
  */
 const meta = {
-  title: "Factories/WorkOrderFilters",
+  title: "Factories/Components/WorkOrderFilters",
   component: WorkOrderFilters,
   parameters: { layout: "padded" },
 } satisfies Meta<typeof WorkOrderFilters>;

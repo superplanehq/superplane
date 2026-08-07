@@ -9,14 +9,15 @@ import { Forward, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
+import { workOrderDetailPath } from "./lib/factoryPagePaths";
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
 
 interface WorkOrderCardProps {
   order: FactoriesWorkOrder;
-  factoryHref: string;
   organizationId: string;
+  factoryId: string;
   lines: FactoriesFactoryLine[];
   canDispatch?: boolean;
   isDispatching?: boolean;
@@ -25,8 +26,8 @@ interface WorkOrderCardProps {
 
 export function WorkOrderCard({
   order,
-  factoryHref,
   organizationId,
+  factoryId,
   lines,
   canDispatch = false,
   isDispatching = false,
@@ -37,7 +38,9 @@ export function WorkOrderCard({
   const statusMeta = getWorkOrderDisplayStatusMeta(displayStatus);
   const updatedAt = order.updatedAt ?? order.createdAt;
   const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
-  const href = order.id ? `${factoryHref}/orders/${order.id}` : factoryHref;
+  const href = order.id
+    ? workOrderDetailPath(organizationId, factoryId, order.id)
+    : `/${organizationId}/factories/${factoryId}`;
   const creatorDisplay = resolveUser(order.createdBy?.id, order.createdBy?.name);
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)

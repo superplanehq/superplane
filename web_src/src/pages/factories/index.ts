@@ -1,5 +1,17 @@
-export { CreateWorkOrderPage } from "./CreateWorkOrderPage";
-export { FactoryDetailPage } from "./FactoryDetailPage";
-export { FactoryLineEditPage } from "./FactoryLineEditPage";
-export { FactoryListPage } from "./FactoryListPage";
-export { WorkOrderDetailPage } from "./WorkOrderDetailPage";
+export { FactoriesIndexPage } from "./FactoriesIndexPage";
+export { FactoriesLayout } from "./layout/FactoriesLayout";
+export {
+  AutomationsPage,
+  CreateWorkOrderPage,
+  FactoryLineEditPage,
+  FactorySettingsGeneralPage,
+  FactorySettingsLayout,
+  FactorySettingsSoonPage,
+  FACTORY_SETTINGS_NAV_ITEMS,
+  MissionsPage,
+  OverviewPage,
+  VelocityPage,
+  WikiPage,
+  WorkOrderDetailPage,
+  WorkOrdersPage,
+} from "./pages";
