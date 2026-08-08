@@ -183,8 +183,8 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 
 ## Security
 
-- **RBAC** and **API keys** for programmatic access — see [access control](https://docs.superplane.com/concepts/access-control/) and [API keys](https://docs.superplane.com/concepts/service-accounts/)
-- **Secrets** stored encrypted — see [secrets](https://docs.superplane.com/concepts/secrets/)
+- **RBAC** and **API keys** for programmatic access — see [access control](https://docs.superplane.com/security/access-control/) and [API keys](https://docs.superplane.com/security/api-keys/)
+- **Secrets** stored encrypted — see [secrets](https://docs.superplane.com/security/secrets/)
 
 ## Production installation
 
