@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
+import { getWebsocketReconnectInterval } from "@/lib/websocketReconnect";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { upsertAgentMessageInCache } from "./useAgentChats";
 import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/CanvasToolSidebar/types";
@@ -113,7 +114,7 @@ export function useAgentSessionWebsocket(
     {
       shouldReconnect: () => true,
       reconnectAttempts: Number.POSITIVE_INFINITY,
-      reconnectInterval: 3000,
+      reconnectInterval: getWebsocketReconnectInterval,
       heartbeat: false,
       share: false,
       onMessage,
