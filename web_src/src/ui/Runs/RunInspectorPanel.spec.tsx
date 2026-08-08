@@ -101,6 +101,19 @@ afterEach(() => {
 });
 
 describe("RunInspectorPanel", () => {
+  it("offers the selected run component to Agent without toggling the accordion", () => {
+    const onAskAgentAboutNode = vi.fn();
+    renderInspector({ selectedNodeId: "action-2", onAskAgentAboutNode });
+
+    const accordionTrigger = screen.getByRole("button", { name: /^Save Assessment/ });
+    expect(accordionTrigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask Agent about Save Assessment" }));
+
+    expect(onAskAgentAboutNode).toHaveBeenCalledWith("action-2", "Save Assessment");
+    expect(accordionTrigger).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("renders the selected node accordion with backend-provided output sections", () => {
     renderInspector({ selectedNodeId: "action-2" });
 

@@ -41,6 +41,7 @@ export interface RunInspectorPanelProps {
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
   onClose: () => void;
+  onAskAgentAboutNode?: (nodeId: string, nodeName: string) => void;
 }
 
 type AccountFallback = {
@@ -122,6 +123,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         currentUser={model.resolvedCurrentUser}
         errorScrollRequest={model.errorScrollRequest}
         onErrorScrolled={model.clearErrorScrollRequest}
+        onAskAgentAboutNode={props.onAskAgentAboutNode}
       />
     </aside>
   );
@@ -226,6 +228,7 @@ function RunInspectorContent({
   currentUser,
   errorScrollRequest,
   onErrorScrolled,
+  onAskAgentAboutNode,
 }: {
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
@@ -244,6 +247,7 @@ function RunInspectorContent({
   currentUser: RunInspectorCurrentUser | undefined;
   errorScrollRequest: { nodeId: string; requestId: number } | null;
   onErrorScrolled: () => void;
+  onAskAgentAboutNode?: (nodeId: string, nodeName: string) => void;
 }) {
   return (
     <RunInspectorStepsList
@@ -264,6 +268,7 @@ function RunInspectorContent({
       currentUser={currentUser}
       errorScrollRequest={errorScrollRequest}
       onErrorScrolled={onErrorScrolled}
+      onAskAgentAboutNode={onAskAgentAboutNode}
     />
   );
 }

@@ -1,5 +1,5 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
@@ -26,6 +26,7 @@ export function RunInspectorNodeAccordion({
   errorScrollRequestId,
   onErrorScrolled,
   onSelectSection,
+  onAskAgentAboutNode,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
@@ -40,6 +41,7 @@ export function RunInspectorNodeAccordion({
   errorScrollRequestId?: number | null;
   onErrorScrolled?: () => void;
   onSelectSection: (sectionValue: string) => void;
+  onAskAgentAboutNode?: (nodeId: string, nodeName: string) => void;
 }) {
   const iconSrc = getHeaderIconSrc(section.workflowNode?.component);
   const iconSlug = section.workflowNode?.component ? componentIconMap[section.workflowNode.component] : undefined;
@@ -110,6 +112,7 @@ export function RunInspectorNodeAccordion({
           </span>
         </NodeHeaderButton>
         <NodeActions section={section} actions={actions} currentUser={currentUser} />
+        <AskAgentAboutNodeButton section={section} onAskAgentAboutNode={onAskAgentAboutNode} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
@@ -126,6 +129,33 @@ export function RunInspectorNodeAccordion({
         </AccordionContent>
       )}
     </AccordionItem>
+  );
+}
+
+function AskAgentAboutNodeButton({
+  section,
+  onAskAgentAboutNode,
+}: {
+  section: RunInspectorNodeSection;
+  onAskAgentAboutNode?: (nodeId: string, nodeName: string) => void;
+}) {
+  if (!onAskAgentAboutNode) return null;
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 w-7 shrink-0 p-0"
+      aria-label={`Ask Agent about ${section.nodeName}`}
+      title={`Ask Agent about ${section.nodeName}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onAskAgentAboutNode(section.nodeId, section.nodeName);
+      }}
+    >
+      <Sparkles className="h-3.5 w-3.5" aria-hidden />
+    </Button>
   );
 }
 
