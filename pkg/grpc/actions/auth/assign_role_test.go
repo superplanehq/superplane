@@ -83,4 +83,26 @@ func Test_AssignRole(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 		assert.Equal(t, "user not found", msg)
 	})
+
+	t.Run("cannot demote the last organization owner", func(t *testing.T) {
+		adminUser := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, adminUser.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		adminCtx := authentication.SetUserIdInMetadata(context.Background(), adminUser.ID.String())
+		_, err = AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgViewer, r.User.String(), "", r.AuthService)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "cannot demote the last organization owner", msg)
+	})
+
+	t.Run("can demote an organization owner when another owner remains", func(t *testing.T) {
+		secondOwner := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgOwner, secondOwner.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		_, err = AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, secondOwner.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+	})
 }

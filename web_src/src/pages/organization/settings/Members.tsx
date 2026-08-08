@@ -176,13 +176,18 @@ export function Members({ organizationId }: MembersProps) {
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
     if (!canUpdateMembers || me?.id === memberId) return;
+    if (ownerIds.has(memberId) && ownerIds.size <= 1 && newRoleName !== "org_owner") {
+      showErrorToast("You must have at least one organization owner.");
+      return;
+    }
+
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
         roleName: newRoleName,
       });
-    } catch {
-      showErrorToast("Failed to update role.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update role."));
     }
   };
 
@@ -402,11 +407,14 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       {(() => {
                         const isSelf = me?.id === member.id;
-                        const roleChangeAllowed = canUpdateMembers && !isSelf;
-                        const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
+                        const isLastOwner = ownerIds.has(member.id) && ownerIds.size <= 1;
+                        const roleChangeAllowed = canUpdateMembers && !isSelf && !isLastOwner;
+                        const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf && !isLastOwner);
                         const tooltipMessage = isSelf
                           ? "You can't change your own role."
-                          : "You don't have permission to update member roles.";
+                          : isLastOwner
+                            ? "Cannot demote the last organization owner."
+                            : "You don't have permission to update member roles.";
 
                         return (
                           <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
