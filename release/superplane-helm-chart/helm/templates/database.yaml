@@ -5,7 +5,7 @@ metadata:
   name: {{ include "secrets.database.name" . }}
   namespace: "{{ .Release.Namespace }}"
 data:
-  DB_NAME: superplane
+  DB_NAME: {{ "superplane" | b64enc }}
   DB_HOST: {{ .Values.database.host | b64enc }}
   DB_PORT: {{ .Values.database.port | toString | b64enc }}
   DB_USERNAME: {{ .Values.database.username | b64enc }}
