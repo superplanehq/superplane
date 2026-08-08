@@ -192,6 +192,37 @@ describe("Block fallback rendering", () => {
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
   });
 
+  it("marks removed ghost nodes so their handles lose the enlarged hit area", () => {
+    const { container } = render(
+      <Block
+        canvasMode="edit"
+        nodeId="ghost-node"
+        data={{
+          label: "Removed Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Removed Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _draftDiffStatus: "removed",
+          _allEdges: [
+            {
+              source: "ghost-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(container.firstChild).toHaveClass("sp-block-removed");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
   it("shows an append connector button for end nodes in edit mode", () => {
     const onAppendFromNode = vi.fn();
 
