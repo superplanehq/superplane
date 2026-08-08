@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -64,22 +65,37 @@ type installationSettingsRequest struct {
 	SMTPUseTLS                *bool   `json:"smtp_use_tls"`
 }
 
-func parsePagination(r *http.Request) (search string, limit, offset int) {
+func parsePagination(r *http.Request) (search string, limit, offset int, err error) {
 	search = r.URL.Query().Get("search")
 
 	limit = defaultPageSize
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 {
-		limit = v
+	if rawLimit := r.URL.Query().Get("limit"); rawLimit != "" {
+		parsedLimit, parseErr := strconv.Atoi(rawLimit)
+		if parseErr != nil {
+			return "", 0, 0, fmt.Errorf("invalid limit: %q is not an integer", rawLimit)
+		}
+		if parsedLimit <= 0 {
+			return "", 0, 0, fmt.Errorf("invalid limit: must be a positive integer")
+		}
+		limit = parsedLimit
 	}
 	if limit > maxPageSize {
 		limit = maxPageSize
 	}
 
-	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v > 0 {
-		offset = v
+	offset = 0
+	if rawOffset := r.URL.Query().Get("offset"); rawOffset != "" {
+		parsedOffset, parseErr := strconv.Atoi(rawOffset)
+		if parseErr != nil {
+			return "", 0, 0, fmt.Errorf("invalid offset: %q is not an integer", rawOffset)
+		}
+		if parsedOffset < 0 {
+			return "", 0, 0, fmt.Errorf("invalid offset: must be a non-negative integer")
+		}
+		offset = parsedOffset
 	}
 
-	return search, limit, offset
+	return search, limit, offset, nil
 }
 
 func parseSorting(r *http.Request) (sortBy, sortDirection string) {
@@ -301,7 +317,11 @@ func resolveBoolField(value *bool, fallback bool) bool {
 // adminListOrganizations returns paginated organizations in the installation.
 // adminListAccounts returns paginated accounts in the installation.
 func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
-	search, limit, offset := parsePagination(r)
+	search, limit, offset, err := parsePagination(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	sortBy, sortDirection := parseSorting(r)
 
 	accounts, total, err := models.ListAccounts(search, limit, offset, sortBy, sortDirection)
@@ -349,7 +369,11 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	search, limit, offset := parsePagination(r)
+	search, limit, offset, err := parsePagination(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	sortBy, sortDirection := parseSorting(r)
 
 	organizations, total, err := listAllOrganizations(ctx, search, limit, offset, sortBy, sortDirection)
@@ -381,7 +405,11 @@ func (s *Server) adminListCanvases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	search, limit, offset := parsePagination(r)
+	search, limit, offset, err := parsePagination(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	canvases, total, err := models.ListCanvasesPaginated(orgID, search, limit, offset)
 	if err != nil {
@@ -423,7 +451,11 @@ func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	search, limit, offset := parsePagination(r)
+	search, limit, offset, err := parsePagination(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	users, total, err := models.ListActiveUsersByOrganization(orgID, search, limit, offset)
 	if err != nil {
