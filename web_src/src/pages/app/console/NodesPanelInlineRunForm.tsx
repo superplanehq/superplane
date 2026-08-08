@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play } from "lucide-react";
 
 import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/lib/toast";
@@ -104,7 +103,7 @@ export function NodesPanelInlineRunForm({
         <div className="flex justify-end">
           <LoadingButton
             type="button"
-            size="xs"
+            size="sm"
             loading={running || runInFlight}
             loadingText="Running…"
             onClick={handleSubmit}
@@ -112,7 +111,6 @@ export function NodesPanelInlineRunForm({
             title={disabled ? disabledTitle : undefined}
             data-testid={`${testIdPrefix}-inline-submit`}
           >
-            <Play className="mr-1 h-3 w-3" />
             {submitLabel?.trim() || "Run"}
           </LoadingButton>
         </div>
