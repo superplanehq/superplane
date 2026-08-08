@@ -169,6 +169,28 @@ func FindUsersByIDsInOrganization(db *gorm.DB, orgID string, ids []string) ([]Us
 	return users, err
 }
 
+// ListActiveHumanUsersByIDs returns active human users in an organization with usable email addresses.
+func ListActiveHumanUsersByIDs(db *gorm.DB, organizationID string, userIDs []string) ([]User, error) {
+	if len(userIDs) == 0 {
+		return []User{}, nil
+	}
+
+	var users []User
+	err := db.
+		Where("organization_id = ?", organizationID).
+		Where("id IN ?", userIDs).
+		Where("type = ?", UserTypeHuman).
+		Where("email IS NOT NULL AND TRIM(email) <> ''").
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func FindUnscopedUserByID(id string) (*User, error) {
 	var user User
 	userUUID, err := uuid.Parse(id)
