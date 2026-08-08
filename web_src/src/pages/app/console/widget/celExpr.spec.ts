@@ -488,6 +488,7 @@ describe("celExpr", () => {
           buildEnv(),
         );
         expect(out).toContain('src="https://github.com/forestileao.png"');
+        expect(out).toContain('title="P"');
       });
 
       it("renders an initial badge when author.username is missing", () => {
