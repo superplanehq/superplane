@@ -24,7 +24,7 @@ There are many ways to contribute to SuperPlane:
 Getting started with SuperPlane development is fast. It only takes a couple of
 minutes to set up your local development environment!
 
-### Pre-requisites
+### Prerequisites
 
 The complete development is done inside of Docker, so you don't need any
 programming languages, databases, or other dependencies installed directly on
@@ -32,7 +32,7 @@ your machine. Everything runs in containers managed by Make and Docker.
 
 Before you begin, make sure you have the following:
 
-- You are running MacOS or Linux
+- You are running macOS or Linux
 - [Make](https://www.gnu.org/software/make/)
 - [Docker](https://www.docker.com/)
 
@@ -74,7 +74,7 @@ When `make dev.server` reports the app as healthy, open SuperPlane at [http://lo
 
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
-- **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
+- **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
 - **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
