@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
@@ -14,7 +15,7 @@ import (
 
 func TestUpdateGroup(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
 	t.Run("successful role update", func(t *testing.T) {
