@@ -71,7 +71,9 @@ func (j *Jenkins) Configuration() []configuration.Field {
 }
 
 func (j *Jenkins) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		&TriggerBuild{},
+	}
 }
 
 func (j *Jenkins) Triggers() []core.Trigger {
