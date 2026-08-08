@@ -1,4 +1,4 @@
-import { useCallback, useState, type ChangeEvent } from "react";
+import { useCallback, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -70,6 +70,23 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
     onAction?.(parts.join("\n"));
   }, [answers, onAction, questions, submitted]);
 
+  const handleCustomInputKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== "Enter") return;
+      if ("isComposing" in event.nativeEvent && event.nativeEvent.isComposing) return;
+
+      event.preventDefault();
+
+      if (currentIndex === questions.length - 1) {
+        handleSubmit();
+        return;
+      }
+
+      handleNext();
+    },
+    [currentIndex, handleNext, handleSubmit, questions.length],
+  );
+
   if (!questions.length || submitted) return null;
 
   const current = questions[currentIndex];
@@ -108,20 +125,14 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
 
         {/* Custom input option */}
         {current.hasInput && (
-          <div className="mt-1 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Type your own answer..."
-              value={customInputs[currentIndex]}
-              onChange={handleCustomInputChange}
-              className={cn(
-                "flex-1 rounded border px-3 py-2 text-xs outline-none transition-colors dark:text-gray-100 dark:placeholder:text-gray-500",
-                customInputs[currentIndex] && answers[currentIndex] === customInputs[currentIndex].trim()
-                  ? "border-slate-400 bg-slate-50 ring-1 ring-slate-300 dark:border-gray-500 dark:bg-gray-700 dark:ring-gray-600"
-                  : "border-slate-200 bg-white focus:border-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-gray-500",
-              )}
-            />
-          </div>
+          <SurveyCustomInput
+            value={customInputs[currentIndex]}
+            selected={
+              Boolean(customInputs[currentIndex]) && answers[currentIndex] === customInputs[currentIndex].trim()
+            }
+            onChange={handleCustomInputChange}
+            onKeyDown={handleCustomInputKeyDown}
+          />
         )}
       </div>
 
@@ -227,6 +238,36 @@ function SurveyOptionButton({
       </span>
       {option}
     </Button>
+  );
+}
+
+function SurveyCustomInput({
+  value,
+  selected,
+  onChange,
+  onKeyDown,
+}: {
+  value: string;
+  selected: boolean;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      <input
+        type="text"
+        placeholder="Type your own answer..."
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        className={cn(
+          "flex-1 rounded border px-3 py-2 text-xs outline-none transition-colors dark:text-gray-100 dark:placeholder:text-gray-500",
+          selected
+            ? "border-slate-400 bg-slate-50 ring-1 ring-slate-300 dark:border-gray-500 dark:bg-gray-700 dark:ring-gray-600"
+            : "border-slate-200 bg-white focus:border-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-gray-500",
+        )}
+      />
+    </div>
   );
 }
 
