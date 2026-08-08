@@ -194,6 +194,39 @@ func (c *Client) TriggerBuild(job string, params map[string]string) (*TriggerBui
 	return &TriggerBuildResult{QueueURL: headers.Get("Location")}, nil
 }
 
+type BuildResponse struct {
+	Building bool    `json:"building"`
+	Result   *string `json:"result"`
+	Number   int     `json:"number"`
+	URL      string  `json:"url"`
+	Duration int64   `json:"duration"`
+}
+
+// GetBuild fetches the status of a specific build for a job.
+func (c *Client) GetBuild(job string, number int) (*BuildResponse, error) {
+	path := fmt.Sprintf("/job/%s/%d/api/json", url.PathEscape(job), number)
+
+	statusCode, body, err := c.execRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("build %d not found for job %q", number, job)
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, statusError(statusCode, body)
+	}
+
+	var build BuildResponse
+	if err := json.Unmarshal(body, &build); err != nil {
+		return nil, fmt.Errorf("error unmarshaling build response: %w", err)
+	}
+
+	return &build, nil
+}
+
 func sanitizeErrorBody(body []byte) string {
 	text := strings.TrimSpace(string(body))
 	if text == "" {

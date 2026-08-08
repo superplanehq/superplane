@@ -20,3 +20,17 @@ func (t *TriggerBuild) ExampleOutput() map[string]any {
 		&exampleOutputTriggerBuild,
 	)
 }
+
+//go:embed example_output_get_build.json
+var exampleOutputGetBuildBytes []byte
+
+var exampleOutputGetBuildOnce sync.Once
+var exampleOutputGetBuild map[string]any
+
+func (g *GetBuild) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetBuildOnce,
+		exampleOutputGetBuildBytes,
+		&exampleOutputGetBuild,
+	)
+}
