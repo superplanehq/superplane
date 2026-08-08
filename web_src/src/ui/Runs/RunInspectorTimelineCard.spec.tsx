@@ -12,11 +12,12 @@ describe("escapeJsonStringValue", () => {
 });
 
 describe("JsonPayload", () => {
-  it("allows long string values to wrap inside the viewer", () => {
+  it("shows complete long string values in the expanded viewer", () => {
     const longValue = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=".repeat(4);
     const { container } = render(<JsonPayload value={{ content: longValue }} jsonViewStyle={{}} collapsed={false} />);
     const viewer = container.querySelector(".w-json-view-container");
 
     expect(viewer).toHaveClass("json-viewer-wrap-values");
+    expect(viewer).toHaveTextContent(longValue);
   });
 });
