@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render as testingLibraryRender, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render as testingLibraryRender, screen, waitFor, fireEvent } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,9 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 vi.mock("../componentSidebar", () => ({
-  ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
+  ComponentSidebar: ({ currentTab }: { currentTab?: string }) => (
+    <div data-testid="live-node-detail-pane-content" data-current-tab={currentTab} />
+  ),
 }));
 
 vi.mock("../Runs/RunInspectorPanel", () => ({
@@ -456,5 +458,58 @@ describe("CanvasPage run inspection sidebar", () => {
     );
 
     expect(screen.queryByTestId("run-inspector-panel")).not.toBeInTheDocument();
+  });
+
+  it("opens node configuration when live run inspection cannot handle the click", async () => {
+    const onNodeClick = vi.fn(() => false);
+    const sidebarData = {
+      title: "Node without runs",
+      iconSrc: "",
+      iconSlug: "box",
+      latestEvents: [],
+      nextInQueueEvents: [],
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+      isLoading: false,
+    };
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[
+            {
+              id: "node-without-runs",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node without runs",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          workflowNodes={[{ id: "node-without-runs", type: "TYPE_ACTION", name: "Node without runs" }]}
+          getSidebarData={() => sidebarData}
+          onNodeClick={onNodeClick}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    const nodes = reactFlowPropsRef.current?.nodes as Array<{
+      data: { _callbacksRef?: { current?: { handleNodeClick?: (nodeId: string) => void } } };
+    }>;
+
+    act(() => {
+      nodes[0].data._callbacksRef?.current?.handleNodeClick?.("node-without-runs");
+    });
+
+    expect(onNodeClick).toHaveBeenCalledWith("node-without-runs");
+    const sidebar = await screen.findByTestId("live-node-detail-pane-content");
+    expect(sidebar).toHaveAttribute("data-current-tab", "settings");
   });
 });

@@ -289,7 +289,8 @@ export interface CanvasPageProps {
   ) => void;
   onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
-  onNodeClick?: (nodeId: string) => void;
+  /** Return false when the host cannot inspect a run so the configuration sidebar opens instead. */
+  onNodeClick?: (nodeId: string) => void | boolean;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
@@ -1591,7 +1592,9 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
+            {isComponentSidebarVisibleMode(props.headerMode) &&
+            !props.isRunInspectionMode &&
+            state.componentSidebar.isOpen
               ? renderInspectorSidebar("sidebar")
               : null}
           </div>
@@ -2237,7 +2240,7 @@ function CanvasContent({
   fitViewContentKey?: string;
   lastFittedContentKeyRef?: React.MutableRefObject<string | null>;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
-  onNodeClick?: (nodeId: string) => void;
+  onNodeClick?: (nodeId: string) => void | boolean;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
@@ -2432,15 +2435,20 @@ function CanvasContent({
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
-      } else if (onNodeClick) {
-        onNodeClick(nodeId);
       } else {
-        const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
-        stateRef.current.componentSidebar.open(nodeId);
+        const liveClickHandled = onNodeClick?.(nodeId);
+        if (!onNodeClick || liveClickHandled === false) {
+          const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
+          stateRef.current.componentSidebar.open(nodeId);
 
-        const nodeData = clickedNode?.data as NodeConfigurationWarningData;
-        applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, shouldOpenSidebarSettingsTab(nodeData, isEditMode));
-        onBuildingBlocksSidebarToggle?.(false);
+          const nodeData = clickedNode?.data as NodeConfigurationWarningData;
+          applySidebarTabOnNodeOpen(
+            setCurrentTab,
+            wasSidebarOpen,
+            liveClickHandled === false || shouldOpenSidebarSettingsTab(nodeData, isEditMode),
+          );
+          onBuildingBlocksSidebarToggle?.(false);
+        }
       }
 
       stateRef.current.setNodes((nodes) =>
