@@ -1,9 +1,11 @@
 package jenkins
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -40,26 +42,42 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	}, nil
 }
 
-func (c *Client) execRequest(method, path string, body io.Reader) (int, []byte, error) {
+// newRequest builds a Basic-authenticated request against the configured Base URL.
+// Callers that need extra headers (e.g. a CSRF crumb) should set them before calling do().
+func (c *Client) newRequest(method, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", c.BaseURL, path), body)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error building request: %w", err)
+		return nil, fmt.Errorf("error building request: %w", err)
 	}
 
 	req.SetBasicAuth(c.Username, c.APIToken)
 
+	return req, nil
+}
+
+func (c *Client) do(req *http.Request) (int, []byte, http.Header, error) {
 	res, err := c.http.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error executing request: %w", err)
+		return 0, nil, nil, fmt.Errorf("error executing request: %w", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error reading body: %w", err)
+		return 0, nil, nil, fmt.Errorf("error reading body: %w", err)
 	}
 
-	return res.StatusCode, responseBody, nil
+	return res.StatusCode, responseBody, res.Header, nil
+}
+
+func (c *Client) execRequest(method, path string, body io.Reader) (int, []byte, error) {
+	req, err := c.newRequest(method, path, body)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	statusCode, responseBody, _, err := c.do(req)
+	return statusCode, responseBody, err
 }
 
 // Verify checks that the configured Base URL and credentials are valid.
@@ -93,6 +111,87 @@ func statusError(statusCode int, body []byte) error {
 	default:
 		return fmt.Errorf("request got %d: %s", statusCode, sanitizeErrorBody(body))
 	}
+}
+
+type CrumbResponse struct {
+	CrumbRequestField string `json:"crumbRequestField"`
+	Crumb             string `json:"crumb"`
+}
+
+// getCrumb fetches a CSRF crumb to send on POST requests. Returns a nil
+// crumb (no error) when the crumb issuer is disabled on the Jenkins server (404).
+func (c *Client) getCrumb() (*CrumbResponse, error) {
+	statusCode, body, err := c.execRequest(http.MethodGet, "/crumbIssuer/api/json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, nil
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, statusError(statusCode, body)
+	}
+
+	var crumb CrumbResponse
+	if err := json.Unmarshal(body, &crumb); err != nil {
+		return nil, fmt.Errorf("error unmarshaling crumb response: %w", err)
+	}
+
+	return &crumb, nil
+}
+
+type TriggerBuildResult struct {
+	QueueURL string
+}
+
+// TriggerBuild starts a build for the given job. When params is non-empty,
+// it POSTs to buildWithParameters instead of build.
+func (c *Client) TriggerBuild(job string, params map[string]string) (*TriggerBuildResult, error) {
+	path := fmt.Sprintf("/job/%s/build", url.PathEscape(job))
+
+	var body io.Reader
+	if len(params) > 0 {
+		path = fmt.Sprintf("/job/%s/buildWithParameters", url.PathEscape(job))
+		form := url.Values{}
+		for name, value := range params {
+			form.Set(name, value)
+		}
+		body = strings.NewReader(form.Encode())
+	}
+
+	req, err := c.newRequest(http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	crumb, err := c.getCrumb()
+	if err != nil {
+		return nil, fmt.Errorf("error getting CSRF crumb: %w", err)
+	}
+	if crumb != nil {
+		req.Header.Set(crumb.CrumbRequestField, crumb.Crumb)
+	}
+
+	statusCode, responseBody, headers, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("job %q not found", job)
+	}
+
+	if statusCode != http.StatusCreated {
+		return nil, statusError(statusCode, responseBody)
+	}
+
+	return &TriggerBuildResult{QueueURL: headers.Get("Location")}, nil
 }
 
 func sanitizeErrorBody(body []byte) string {
