@@ -1,241 +1,138 @@
 /**
- * Tiny expression evaluator for Dashboard widget `show` / row filter clauses.
+ * Dashboard widget `show` / row filter clause evaluation.
  *
- * Intentionally minimal: we support comparisons (`==`, `!=`, `>`, `<`, `>=`,
- * `<=`), logical operators (`&&`, `||`, `!`), parentheses, field paths, and
- * primitive literals (strings, numbers, booleans, `null`). Anything else
- * throws. We never call `eval` or `new Function` so widgets imported from
- * untrusted YAML can't escape the sandbox.
+ * Clauses are bare CEL expressions (no `{{ }}` wrapper) routed through the
+ * same engine as column templates (`celExpr.ts` + the builtins registered in
+ * `celBuiltins.ts`), so comparisons (`==`, `!=`, `>`, `<`, `>=`, `<=`),
+ * logical operators (`&&`, `||`, `!`), parentheses, arithmetic
+ * (`+ - * / %`), function calls (`epochMs(...)`, `lower(...)`, …), the `in`
+ * operator, and ternaries all work — one expression language everywhere.
  *
- * Field paths are evaluated against a single `row` object passed at runtime.
+ * We never call `eval` or `new Function`: `@marcbachmann/cel-js` interprets
+ * its own AST, so widgets imported from untrusted YAML can't escape the
+ * sandbox.
+ *
+ * Sugar preserved from the retired hand-rolled evaluator:
+ * - `row.status` and bare `status` both resolve against the row (a `row`
+ *   binding pointing at the row itself is injected; an actual `row` field on
+ *   the row takes precedence).
+ * - Root identifiers absent from the row are bound to `null` instead of
+ *   raising CEL's "Unknown variable", so `status == "deleted"` is simply
+ *   `false` on rows without a `status` field.
+ * - Any compile or eval error logs a console warning and returns
+ *   `defaultValue`, so widgets remain functional even when authoring
+ *   mistakes are present.
+ *
+ * Known divergence: equality is typed (CEL semantics) — the old evaluator's
+ * loose scalar normalization made `10 == "10"` and `true == "true"` true;
+ * they are now false. Ordering comparisons on stringified rows still work
+ * via `evalExprDetailed`'s numeric-string retry.
  */
 
-import { getValueAtPath } from "./fieldPath";
+import { buildEnv, compileExpr, type CompiledExpr, evalExprDetailed } from "./celExpr";
 
-type Token =
-  | { kind: "number"; value: number }
-  | { kind: "string"; value: string }
-  | { kind: "bool"; value: boolean }
-  | { kind: "null" }
-  | { kind: "ident"; value: string }
-  | { kind: "op"; value: string }
-  | { kind: "lparen" }
-  | { kind: "rparen" };
-
-const OPERATORS = ["==", "!=", ">=", "<=", "&&", "||", "!", ">", "<"];
-
-interface TokenRead {
-  token?: Token;
-  nextIndex: number;
-}
-
-function tokenize(input: string): Token[] {
-  const tokens: Token[] = [];
-  let i = 0;
-  while (i < input.length) {
-    const read = readToken(input, i);
-    if (read.token) tokens.push(read.token);
-    i = read.nextIndex;
-  }
-  return tokens;
-}
-
-function readToken(input: string, index: number): TokenRead {
-  const ch = input[index];
-  if (isWhitespace(ch)) return { nextIndex: index + 1 };
-  if (ch === "(") return { token: { kind: "lparen" }, nextIndex: index + 1 };
-  if (ch === ")") return { token: { kind: "rparen" }, nextIndex: index + 1 };
-  if (ch === '"' || ch === "'") return readStringToken(input, index, ch);
-  if (isNumberStart(input, index)) return readNumberToken(input, index);
-
-  const operator = readOperator(input, index);
-  if (operator) return { token: { kind: "op", value: operator }, nextIndex: index + operator.length };
-  if (isIdentifierStart(ch)) return readIdentifierToken(input, index);
-
-  throw new Error(`Unexpected character '${ch}' in expression: ${input}`);
-}
-
-function readStringToken(input: string, index: number, quote: string): TokenRead {
-  let j = index + 1;
-  let buffer = "";
-  while (j < input.length && input[j] !== quote) {
-    if (input[j] === "\\" && j + 1 < input.length) {
-      buffer += input[j + 1];
-      j += 2;
-      continue;
-    }
-    buffer += input[j];
-    j++;
-  }
-  if (j >= input.length) throw new Error(`Unterminated string in expression: ${input}`);
-  return { token: { kind: "string", value: buffer }, nextIndex: j + 1 };
-}
-
-function readNumberToken(input: string, index: number): TokenRead {
-  let j = index + 1;
-  while (j < input.length && /[0-9.]/.test(input[j])) j++;
-  return { token: { kind: "number", value: Number(input.slice(index, j)) }, nextIndex: j };
-}
-
-function readOperator(input: string, index: number): string | undefined {
-  return OPERATORS.find((op) => input.slice(index, index + op.length) === op);
-}
-
-function readIdentifierToken(input: string, index: number): TokenRead {
-  let j = index + 1;
-  while (j < input.length && /[A-Za-z0-9_.$[\]]/.test(input[j])) j++;
-  const raw = input.slice(index, j);
-  return { token: tokenForIdentifier(raw), nextIndex: j };
-}
-
-function tokenForIdentifier(raw: string): Token {
-  if (raw === "true") return { kind: "bool", value: true };
-  if (raw === "false") return { kind: "bool", value: false };
-  if (raw === "null") return { kind: "null" };
-  return { kind: "ident", value: raw };
-}
-
-function isWhitespace(ch: string | undefined): boolean {
-  return ch === " " || ch === "\t" || ch === "\n";
-}
-
-function isNumberStart(input: string, index: number): boolean {
-  const ch = input[index];
-  return /[0-9]/.test(ch) || (ch === "-" && /[0-9]/.test(input[index + 1] ?? ""));
-}
-
-function isIdentifierStart(ch: string | undefined): boolean {
-  return Boolean(ch && /[A-Za-z_$]/.test(ch));
-}
-
-interface ParserState {
-  index: number;
-  tokens: Token[];
-}
-
-function peek(state: ParserState): Token | undefined {
-  return state.tokens[state.index];
-}
-function consume(state: ParserState): Token {
-  return state.tokens[state.index++];
-}
-
-function parseOr(state: ParserState, row: unknown): unknown {
-  let left = parseAnd(state, row);
-  while (peek(state)?.kind === "op" && (peek(state) as { value: string }).value === "||") {
-    consume(state);
-    const right = parseAnd(state, row);
-    left = Boolean(left) || Boolean(right);
-  }
-  return left;
-}
-
-function parseAnd(state: ParserState, row: unknown): unknown {
-  let left = parseComparison(state, row);
-  while (peek(state)?.kind === "op" && (peek(state) as { value: string }).value === "&&") {
-    consume(state);
-    const right = parseComparison(state, row);
-    left = Boolean(left) && Boolean(right);
-  }
-  return left;
-}
-
-function parseComparison(state: ParserState, row: unknown): unknown {
-  let left = parseUnary(state, row);
-  const cmpOps = new Set(["==", "!=", ">", "<", ">=", "<="]);
-  while (peek(state)?.kind === "op" && cmpOps.has((peek(state) as { value: string }).value)) {
-    const op = (consume(state) as { value: string }).value;
-    const right = parseUnary(state, row);
-    left = compare(op, left, right);
-  }
-  return left;
-}
-
-function parseUnary(state: ParserState, row: unknown): unknown {
-  const tok = peek(state);
-  if (tok?.kind === "op" && tok.value === "!") {
-    consume(state);
-    return !parseUnary(state, row);
-  }
-  return parsePrimary(state, row);
-}
-
-function parsePrimary(state: ParserState, row: unknown): unknown {
-  const tok = consume(state);
-  if (!tok) throw new Error("Unexpected end of expression");
-  if (tok.kind === "lparen") {
-    const inner = parseOr(state, row);
-    const closing = consume(state);
-    if (!closing || closing.kind !== "rparen") throw new Error("Expected closing ')'");
-    return inner;
-  }
-  if (tok.kind === "number" || tok.kind === "bool") return tok.value;
-  if (tok.kind === "null") return null;
-  if (tok.kind === "string") return tok.value;
-  if (tok.kind === "ident") {
-    // `row.foo.bar` and bare `foo.bar` both refer to the row.
-    const path = tok.value.startsWith("row.") ? tok.value.slice(4) : tok.value;
-    return getValueAtPath(row, path);
-  }
-  throw new Error(`Unexpected token: ${JSON.stringify(tok)}`);
-}
-
-function compare(op: string, left: unknown, right: unknown): boolean {
-  switch (op) {
-    case "==":
-      return valuesEqual(left, right);
-    case "!=":
-      return !valuesEqual(left, right);
-    case ">":
-      return (left as number) > (right as number);
-    case "<":
-      return (left as number) < (right as number);
-    case ">=":
-      return (left as number) >= (right as number);
-    case "<=":
-      return (left as number) <= (right as number);
-    default:
-      throw new Error(`Unknown comparison: ${op}`);
-  }
-}
-
-function valuesEqual(left: unknown, right: unknown): boolean {
-  if (left === right) return true;
-  return normalizeComparableScalar(left) === normalizeComparableScalar(right);
-}
-
-function normalizeComparableScalar(value: unknown): unknown {
-  if (typeof value !== "string") return value;
-  const trimmed = value.trim();
-  if (trimmed === "") return value;
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
-  if (trimmed === "null") return null;
-
-  const numberValue = Number(trimmed);
-  return Number.isFinite(numberValue) ? numberValue : value;
+interface CompiledShow {
+  expr: CompiledExpr;
+  roots: string[];
 }
 
 /**
- * Evaluate the given expression against a row context. Returns a boolean (the
- * truthiness of the resulting value). On parse error this logs to console and
- * returns `defaultValue` (defaults to `true`), so widgets remain functional
- * even when authoring mistakes are present.
+ * Compile cache: filters re-evaluate the same clause once per row, and
+ * `Environment.parse` is the expensive step. Cleared wholesale at a size
+ * bound so transient strings typed in the widget editor can't grow it
+ * forever.
+ */
+const COMPILED = new Map<string, CompiledShow>();
+const COMPILED_CACHE_LIMIT = 500;
+
+function compiledFor(source: string): CompiledShow {
+  let entry = COMPILED.get(source);
+  if (!entry) {
+    if (COMPILED.size >= COMPILED_CACHE_LIMIT) COMPILED.clear();
+    entry = { expr: compileExpr(source), roots: rootIdentifiers(source) };
+    COMPILED.set(source, entry);
+  }
+  return entry;
+}
+
+const IDENT_START = /[A-Za-z_]/;
+const IDENT_CHAR = /[A-Za-z0-9_]/;
+
+/**
+ * Names that must never be null-bound as "missing row fields": CEL keywords
+ * and literals, plus the adapter-provided `row` alias and the `now` global
+ * from `buildEnv`.
+ */
+const RESERVED_IDENTIFIERS = new Set(["true", "false", "null", "in", "row", "now"]);
+
+/**
+ * Collect the root identifiers referenced by `source` — identifier tokens
+ * outside string literals that are not preceded by `.` (those are field
+ * selections, not roots). Used to bind missing row fields to `null` so a
+ * clause over a heterogeneous row set degrades to `false` comparisons
+ * instead of "Unknown variable" errors. Function names may be collected
+ * too; binding them is harmless because CEL resolves calls through the
+ * function registry, not the variable context.
+ */
+function rootIdentifiers(source: string): string[] {
+  const roots = new Set<string>();
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'") {
+      i = skipStringLiteral(source, i, ch);
+      continue;
+    }
+    if (IDENT_START.test(ch)) {
+      let j = i + 1;
+      while (j < source.length && IDENT_CHAR.test(source[j])) j++;
+      const name = source.slice(i, j);
+      const isRawStringPrefix = name === "r" && (source[j] === '"' || source[j] === "'");
+      if (source[i - 1] !== "." && !isRawStringPrefix && !RESERVED_IDENTIFIERS.has(name)) {
+        roots.add(name);
+      }
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return [...roots];
+}
+
+/** Skip past a quoted string literal (honoring backslash escapes). */
+function skipStringLiteral(source: string, start: number, quote: string): number {
+  let i = start + 1;
+  while (i < source.length && source[i] !== quote) {
+    i += source[i] === "\\" ? 2 : 1;
+  }
+  return i + 1;
+}
+
+/**
+ * Evaluate the given expression against a row context. Returns a boolean
+ * (the truthiness of the resulting value). On any compile or eval error
+ * this logs to console and returns `defaultValue` (defaults to `true`), so
+ * widgets remain functional even when authoring mistakes are present.
  */
 export function evaluateShow(expression: string | undefined, row: unknown, defaultValue = true): boolean {
   if (!expression || !expression.trim()) return defaultValue;
-  try {
-    const tokens = tokenize(expression);
-    const state: ParserState = { index: 0, tokens };
-    const result = parseOr(state, row);
-    if (state.index < tokens.length) {
-      throw new Error("Trailing tokens after expression");
-    }
-    return Boolean(result);
-  } catch (err) {
-    if (typeof console !== "undefined") {
-      console.warn(`Dashboard widget expression failed: ${(err as Error).message}`);
-    }
-    return defaultValue;
+  const { expr, roots } = compiledFor(expression.trim());
+  if (!expr.ok) return warnAndDefault(expr.error, defaultValue);
+
+  const record = row && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>) : {};
+  const globals: Record<string, unknown> = { row: record };
+  for (const name of roots) {
+    if (!Object.prototype.hasOwnProperty.call(record, name)) globals[name] = null;
   }
+
+  const result = evalExprDetailed(expr, record, buildEnv(globals));
+  if (!result.ok) return warnAndDefault(result.error, defaultValue);
+  return Boolean(result.value);
+}
+
+function warnAndDefault(message: string, defaultValue: boolean): boolean {
+  if (typeof console !== "undefined") {
+    console.warn(`Dashboard widget expression failed: ${message}`);
+  }
+  return defaultValue;
 }
