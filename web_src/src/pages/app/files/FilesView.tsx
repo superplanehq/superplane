@@ -81,6 +81,7 @@ export function FilesView({
           onNewFileCommit={editor.createNewFile}
           onNewFilePathChange={editor.setNewFilePath}
           onSelect={editor.openFile}
+          gitStatus={editor.gitStatus}
         />
       </aside>
 
@@ -99,7 +100,7 @@ export function FilesView({
           content={editor.selectedContent}
           canvasId={canvasId}
           organizationId={organizationId}
-          deleted={editor.selectedIsDeleted}
+          status={editor.selectedFileStatus}
           language={editor.selectedGeneratedFile?.language}
           loading={editor.editorLoading}
           errorMessage={editor.editorErrorMessage}

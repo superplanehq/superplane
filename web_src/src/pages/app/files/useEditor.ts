@@ -1,5 +1,6 @@
 import { useCanvasStaging } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
+import type { GitStatusEntry } from "@pierre/trees";
 import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
@@ -93,12 +94,19 @@ export function useEditor({
 
   const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
+  const selectedPendingChange = tabs.selectedPath ? pending.pendingChangesByPath[tabs.selectedPath] : undefined;
+  const gitStatus = useMemo<GitStatusEntry[]>(
+    () => pendingChanges.map((change) => ({ path: change.path, status: change.type })),
+    [pendingChanges],
+  );
 
   const selection = useRepositorySelectedFileQuery({
     canvasId,
     selectedPath: tabs.selectedPath,
     repositoryPathSet: effectiveRepositoryPathSet,
+    committedRepositoryPathSet: catalog.repositoryPathSet,
     generatedFilesByPath: catalog.generatedFilesByPath,
+    selectedChange: selectedPendingChange,
     versionId,
     stage: isEditing,
   });
@@ -164,5 +172,6 @@ export function useEditor({
     isDiffOpen,
     setIsDiffOpen,
     headerActionsHost,
+    gitStatus,
   });
 }

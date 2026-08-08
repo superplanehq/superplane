@@ -12,8 +12,7 @@ export function nextUntitledPath(paths: Set<string>): string {
 }
 
 export function buildRenderableTreePaths(repositoryPaths: string[], changes: PendingFileChange[]): string[] {
-  const deletedPaths = new Set(changes.filter((change) => change.type === "deleted").map((change) => change.path));
-  const paths = repositoryPaths.filter((path) => !deletedPaths.has(path));
+  const paths = [...repositoryPaths];
 
   for (const change of changes) {
     if (change.type === "deleted") continue;

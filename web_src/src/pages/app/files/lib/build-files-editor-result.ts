@@ -1,4 +1,5 @@
 import { isWorkflowSpecPath } from "../../lib/workflow-spec-paths";
+import type { GitStatusEntry } from "@pierre/trees";
 import {
   getRepositoryFileListErrorMessage,
   getRepositoryFileListLoading,
@@ -47,6 +48,7 @@ type EditorViewParams = {
   isDiffOpen: boolean;
   setIsDiffOpen: (open: boolean) => void;
   headerActionsHost: HTMLElement | null;
+  gitStatus: GitStatusEntry[];
 };
 
 export function buildFilesEditorResult({
@@ -65,6 +67,7 @@ export function buildFilesEditorResult({
   isDiffOpen,
   setIsDiffOpen,
   headerActionsHost,
+  gitStatus,
 }: EditorViewParams) {
   const selectedChange = tabs.selectedPath ? pending.pendingChangesByPath[tabs.selectedPath] : undefined;
   const selectedSpecDraft =
@@ -75,6 +78,7 @@ export function buildFilesEditorResult({
     selectedChange,
     selectedSpecDraft,
     loadedContentByPath,
+    committedContentByPath,
     selectedPathExistsInRepository: selection.selectedPathExistsInRepository,
     selectedFileQuery: selection.selectedFileQuery,
     canManageRepositoryFiles,
@@ -99,7 +103,7 @@ export function buildFilesEditorResult({
     stagedDiffPaths,
     stagedFileDiffs,
     selectedContent: editorView.selectedContent,
-    selectedIsDeleted: editorView.selectedIsDeleted,
+    selectedFileStatus: selectedChange?.type,
     selectedGeneratedFile: selection.selectedGeneratedFile,
     editorLoading: editorView.editorLoading,
     editorErrorMessage: editorView.editorErrorMessage,
@@ -119,5 +123,6 @@ export function buildFilesEditorResult({
     openFile: tabs.openFile,
     closeTab: tabs.closeTab,
     setNewFilePath: pending.setNewFilePath,
+    gitStatus,
   };
 }
