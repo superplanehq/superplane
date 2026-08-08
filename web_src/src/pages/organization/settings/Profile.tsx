@@ -87,9 +87,13 @@ export function Profile() {
 
   return (
     <div className="pt-6 max-w-none">
-      <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-4">
+      <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-0">
         Profile Information
       </Heading>
+      <Text className="text-gray-800 text-left dark:text-gray-400 text-sm mb-4">
+        Your profile and API token belong to this organization. If you are a member of more than one, each organization
+        has its own profile and its own token.
+      </Text>
       <div className="space-y-6">
         {/* Profile Section */}
         <div className={settingsCardClassName}>
@@ -147,7 +151,9 @@ export function Profile() {
           API Token
         </Heading>
         <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
-          Use this token to authenticate API requests to SuperPlane. Keep your token secure and do not share it.
+          Use this token to authenticate API requests to SuperPlane for this organization. It does not grant access to
+          any other organization you belong to. Regenerating it invalidates the previous token for this organization
+          only. Keep your token secure and do not share it.
         </Text>
 
         {/* API Token Section */}
