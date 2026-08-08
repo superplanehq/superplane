@@ -93,6 +93,7 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		ExpectedHeadSHA: strings.TrimSpace(options.ExpectedHeadSHA),
 		Message:         strings.TrimSpace(options.Message),
 		Author:          options.Author,
+		Committer:       options.Committer,
 	})
 
 	if err != nil {

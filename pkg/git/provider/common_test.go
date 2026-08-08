@@ -7,6 +7,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCommitterOrAuthor(t *testing.T) {
+	author := CommitAuthor{Name: "Octo Cat", Email: "octo@github.com"}
+
+	// No committer set: defaults to the author so the commit is never
+	// attributed to the code-storage host's "ubuntu" identity.
+	got := CommitterOrAuthor(CommitOptions{Author: author})
+	require.Equal(t, author, got)
+
+	// Committer set explicitly: it is used as-is.
+	committer := CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"}
+	got = CommitterOrAuthor(CommitOptions{Author: author, Committer: committer})
+	require.Equal(t, committer, got)
+
+	// A committer with only a name (no email) still counts as set.
+	got = CommitterOrAuthor(CommitOptions{Author: author, Committer: CommitAuthor{Name: "Bot"}})
+	require.Equal(t, "Bot", got.Name)
+}
+
 func TestValidateCommitOperationsNormalizesPaths(t *testing.T) {
 	operations, err := ValidateCommitOperations([]FileOperation{
 		{

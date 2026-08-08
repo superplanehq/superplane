@@ -263,6 +263,8 @@ func buildCommitNDJSON(operations []provider.FileOperation, options provider.Com
 	files := make([]fileEntry, 0, len(operations))
 	var lines []string
 
+	committer := provider.CommitterOrAuthor(options)
+
 	metadata := map[string]any{
 		"metadata": map[string]any{
 			"target_branch":     options.Branch,
@@ -272,6 +274,10 @@ func buildCommitNDJSON(operations []provider.FileOperation, options provider.Com
 			"author": map[string]string{
 				"name":  options.Author.Name,
 				"email": options.Author.Email,
+			},
+			"committer": map[string]string{
+				"name":  committer.Name,
+				"email": committer.Email,
 			},
 			"files": files,
 		},

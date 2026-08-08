@@ -98,5 +98,20 @@ type CommitOptions struct {
 	ExpectedHeadSHA string
 	Message         string
 	Author          CommitAuthor
-	Operations      []FileOperation
+	// Committer is the identity that creates the commit. When left empty it
+	// defaults to Author (see CommitterOrAuthor). Setting it explicitly keeps
+	// the code-storage service from falling back to its host's git identity
+	// (the "ubuntu" OS user), which otherwise shows up as the committer.
+	Committer  CommitAuthor
+	Operations []FileOperation
+}
+
+// CommitterOrAuthor returns the commit's committer identity, defaulting to the
+// author when no committer is provided. This guarantees a commit never inherits
+// the code-storage host's default git identity.
+func CommitterOrAuthor(options CommitOptions) CommitAuthor {
+	if options.Committer.Name != "" || options.Committer.Email != "" {
+		return options.Committer
+	}
+	return options.Author
 }
