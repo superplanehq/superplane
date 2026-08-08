@@ -32,7 +32,15 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
 
   const removePredicate = (index: number) => {
     const newPredicates = predicates.filter((_, i) => i !== index);
-    onChange(newPredicates.length > 0 ? newPredicates : undefined);
+    if (newPredicates.length === 0) {
+      // For required fields, keep the key present as an empty list. Clearing it
+      // with undefined drops the key from the saved configuration, and the
+      // settings form re-merges the field default for missing keys — showing a
+      // phantom row the saved configuration does not contain.
+      onChange(field.required ? [] : undefined);
+      return;
+    }
+    onChange(newPredicates);
   };
 
   const updatePredicate = (index: number, field: keyof Predicate, newValue: string) => {
@@ -87,6 +95,9 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
           </Button>
         </div>
       ))}
+      {field.required && predicates.length === 0 && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">At least one condition is required</p>
+      )}
       <Button variant="outline" onClick={addPredicate} className="w-full mt-3">
         <Plus className="h-4 w-4 mr-2" />
         Add Condition
