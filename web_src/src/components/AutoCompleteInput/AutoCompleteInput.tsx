@@ -980,7 +980,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         calculateDropdownPosition({
           cursor,
           viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
           dropdownWidth,
+          dropdownHeight: SUGGESTION_LIST_MAX_HEIGHT_PX,
           valuePreviewWidth,
           showValuePreview,
         }),
@@ -1543,7 +1545,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 {shouldShowValuePreview && isOpen && (
                   <div
                     data-testid="autocomplete-value-preview"
-                    className="border border-gray-200 dark:border-gray-600 sm:border-r-0 sm:border-t p-3 bg-white dark:bg-gray-800 sm:rounded-l-lg sm:rounded-br-none h-fit self-start shadow-lg dark:shadow-gray-950/50"
+                    className="border border-gray-200 dark:border-gray-600 sm:border-r-0 sm:border-t p-3 bg-white dark:bg-gray-800 sm:rounded-l-lg sm:rounded-br-none h-fit max-h-[244px] overflow-y-auto self-start shadow-lg dark:shadow-gray-950/50"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
                     {/* $ selector */}
