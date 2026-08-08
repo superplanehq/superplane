@@ -71,7 +71,7 @@ func UpdateAPIKey(ctx context.Context, req *pb.UpdateAPIKeyRequest) (*pb.UpdateA
 	user.UpdatedAt = time.Now()
 	err = db.Save(user).Error
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to update API key")
+		return nil, apiKeyErrorToStatus(err, "failed to update API key")
 	}
 
 	creator, err := creatorUserForAPIKey(db, orgID, user)

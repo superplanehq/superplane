@@ -52,6 +52,42 @@ func TestCreateAPIKeyRejectsInvalidCanvasScope(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
+func TestCreateAPIKeyRejectsDuplicateName(t *testing.T) {
+	r := support.Setup(t)
+	ctx := apiKeyContext(r)
+
+	_, err := CreateAPIKey(ctx, &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: models.RoleOrgViewer,
+	}, r.AuthService)
+	require.NoError(t, err)
+
+	_, err = CreateAPIKey(ctx, &pb.CreateAPIKeyRequest{
+		Name: " ci-bot ",
+		Role: models.RoleOrgViewer,
+	}, r.AuthService)
+
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
+
+func TestCreateAPIKeyAllowsNamesDifferingByCase(t *testing.T) {
+	r := support.Setup(t)
+	ctx := apiKeyContext(r)
+
+	_, err := CreateAPIKey(ctx, &pb.CreateAPIKeyRequest{
+		Name: "ci-bot",
+		Role: models.RoleOrgViewer,
+	}, r.AuthService)
+	require.NoError(t, err)
+
+	_, err = CreateAPIKey(ctx, &pb.CreateAPIKeyRequest{
+		Name: "CI-Bot",
+		Role: models.RoleOrgViewer,
+	}, r.AuthService)
+	require.NoError(t, err)
+}
+
 func apiKeyContext(r *support.ResourceRegistry) context.Context {
 	return metadata.NewIncomingContext(
 		context.Background(),
