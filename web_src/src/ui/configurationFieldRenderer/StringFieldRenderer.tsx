@@ -9,6 +9,8 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
@@ -70,6 +72,8 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       inputSize="md"
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
+      payloadSourceLabel={payloadSourceLabel}
+      payloadSourceIsExample={payloadSourceIsExample}
       quickTip="Tip: type `{{` to start an expression."
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}

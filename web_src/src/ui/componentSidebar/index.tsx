@@ -148,6 +148,8 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  payloadSourceLabel?: string;
+  payloadSourceIsExample?: boolean;
 
   workflowNodes?: ComponentsNode[];
   readOnly?: boolean;
@@ -208,6 +210,8 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
@@ -725,6 +729,8 @@ export const ComponentSidebar = ({
                     canUpdateIntegrations={canUpdateIntegrations}
                     integrationDefinition={createIntegrationDefinition}
                     autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                    payloadSourceLabel={payloadSourceLabel}
+                    payloadSourceIsExample={payloadSourceIsExample}
                     onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                     onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
                   />
