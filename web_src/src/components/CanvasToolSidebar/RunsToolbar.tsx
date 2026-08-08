@@ -9,6 +9,7 @@ import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 interface RunsToolbarProps {
   selectedStatuses: Set<RunStatusFilter>;
   selectedTriggerIds: Set<string>;
+  myRunsOnly: boolean;
   searchQuery: string;
   triggerOptions: TriggerOption[];
   onToggleStatus: (status: RunStatusFilter) => void;
@@ -16,11 +17,13 @@ interface RunsToolbarProps {
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
   onSearchQueryChange: (query: string) => void;
+  onMyRunsOnlyChange: (enabled: boolean) => void;
 }
 
 export function RunsToolbar({
   selectedStatuses,
   selectedTriggerIds,
+  myRunsOnly,
   searchQuery,
   triggerOptions,
   onToggleStatus,
@@ -28,6 +31,7 @@ export function RunsToolbar({
   onToggleTrigger,
   onClearTriggers,
   onSearchQueryChange,
+  onMyRunsOnlyChange,
 }: RunsToolbarProps) {
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     onSearchQueryChange(event.target.value);
@@ -62,11 +66,13 @@ export function RunsToolbar({
       <RunFiltersPopover
         selectedStatuses={selectedStatuses}
         selectedTriggerIds={selectedTriggerIds}
+        myRunsOnly={myRunsOnly}
         triggerOptions={triggerOptions}
         onToggleStatus={onToggleStatus}
         onClearStatuses={onClearStatuses}
         onToggleTrigger={onToggleTrigger}
         onClearTriggers={onClearTriggers}
+        onMyRunsOnlyChange={onMyRunsOnlyChange}
       />
     </div>
   );

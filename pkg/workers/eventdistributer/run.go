@@ -118,7 +118,7 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 		return err
 	}
 
-	serializedRun, err := canvases.SerializeCanvasRun(db, *run, rootEvent, executions, queueItems, nil, map[string][]models.CanvasRun{})
+	serializedRun, err := canvases.SerializeCanvasRun(db, *run, rootEvent, executions, queueItems, map[uuid.UUID]models.User{}, nil, map[string][]models.CanvasRun{})
 	if err != nil {
 		return fmt.Errorf("failed to serialize run: %w", err)
 	}

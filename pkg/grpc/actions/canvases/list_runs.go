@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,10 +19,29 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
+func ListRuns(
+	ctx context.Context,
+	db *gorm.DB,
+	canvas *models.Canvas,
+	limit uint32,
+	before *timestamppb.Timestamp,
+	states []pb.CanvasRun_State,
+	results []pb.CanvasRun_Result,
+	triggeredByUserID string,
+) (*pb.ListRunsResponse, error) {
+	if triggeredByUserID != "" {
+		userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+		if !userIsSet {
+			return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+		}
+		if userID != triggeredByUserID {
+			return nil, grpcerrors.PermissionDenied(nil, "cannot filter runs for another user")
+		}
+	}
+
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	filters, err := buildCanvasRunFilters(states, results)
+	filters, err := buildCanvasRunFilters(states, results, triggeredByUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +67,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		runDetails.rootEventsByRunID,
 		runDetails.executionsByRunID,
 		runDetails.queueItemsByRunID,
+		runDetails.triggeredByUsersByID,
 		runDetails.parentRunsByRunID,
 		runDetails.childRunsByExecutionID,
 	)
@@ -62,7 +83,11 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 	}, nil
 }
 
-func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (models.CanvasRunFilters, error) {
+func buildCanvasRunFilters(
+	states []pb.CanvasRun_State,
+	results []pb.CanvasRun_Result,
+	triggeredByUserID string,
+) (models.CanvasRunFilters, error) {
 	modelStates := make([]string, 0, len(states))
 	for _, state := range states {
 		modelState, err := ProtoRunStateToModel(state)
@@ -83,9 +108,19 @@ func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_R
 		modelResults = append(modelResults, modelResult)
 	}
 
+	var triggeredByUUID *uuid.UUID
+	if triggeredByUserID != "" {
+		id, err := uuid.Parse(triggeredByUserID)
+		if err != nil {
+			return models.CanvasRunFilters{}, grpcerrors.InvalidArgument(err, "invalid triggered_by_user_id")
+		}
+		triggeredByUUID = &id
+	}
+
 	return models.CanvasRunFilters{
-		States:  modelStates,
-		Results: modelResults,
+		States:      modelStates,
+		Results:     modelResults,
+		TriggeredBy: triggeredByUUID,
 	}, nil
 }
 
@@ -119,6 +154,7 @@ func SerializeCanvasRuns(
 	rootEventsByRunID map[string]models.CanvasEvent,
 	executionsByRunID map[string][]models.CanvasNodeExecution,
 	queueItemsByRunID map[string][]models.CanvasNodeQueueItem,
+	triggeredByUsersByID map[uuid.UUID]models.User,
 	parentRunsByRunID map[string]models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) ([]*pb.CanvasRun, error) {
@@ -136,6 +172,7 @@ func SerializeCanvasRuns(
 			executionsByRunID[run.ID.String()],
 			queueItemsByRunID[run.ID.String()],
 			inputEvents,
+			triggeredByUsersByID,
 			parentRunsByRunID[run.ID.String()],
 			childRunsByExecutionID,
 		)
@@ -155,6 +192,7 @@ func SerializeCanvasRun(
 	rootEvent models.CanvasEvent,
 	executions []models.CanvasNodeExecution,
 	queueItems []models.CanvasNodeQueueItem,
+	triggeredByUsersByID map[uuid.UUID]models.User,
 	parentRun *models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
@@ -168,7 +206,16 @@ func SerializeCanvasRun(
 		parent = *parentRun
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	return serializeCanvasRunWithQueueItemInputs(
+		run,
+		rootEvent,
+		executions,
+		queueItems,
+		inputEvents,
+		triggeredByUsersByID,
+		parent,
+		childRunsByExecutionID,
+	)
 }
 
 func serializeCanvasRunWithQueueItemInputs(
@@ -177,6 +224,7 @@ func serializeCanvasRunWithQueueItemInputs(
 	executions []models.CanvasNodeExecution,
 	queueItems []models.CanvasNodeQueueItem,
 	inputEvents []models.CanvasEvent,
+	triggeredByUsersByID map[uuid.UUID]models.User,
 	parentRun models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
@@ -227,7 +275,24 @@ func serializeCanvasRunWithQueueItemInputs(
 		serialized.CancelledAt = timestamppb.New(*run.CancelledAt)
 	}
 
+	if run.TriggeredBy != nil {
+		serialized.TriggeredBy = triggeredByRef(run.TriggeredBy, triggeredByUsersByID)
+	}
+
 	return serialized, nil
+}
+
+func triggeredByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef {
+	if id == nil {
+		return nil
+	}
+
+	name := "Unknown"
+	if user, ok := users[*id]; ok && user.Name != "" {
+		name = user.Name
+	}
+
+	return &pb.UserRef{Id: id.String(), Name: name}
 }
 
 func queueItemsForRuns(runs []models.CanvasRun, queueItemsByRunID map[string][]models.CanvasNodeQueueItem) []models.CanvasNodeQueueItem {
@@ -304,6 +369,7 @@ type runDetailsForRuns struct {
 	rootEventsByRunID      map[string]models.CanvasEvent
 	executionsByRunID      map[string][]models.CanvasNodeExecution
 	queueItemsByRunID      map[string][]models.CanvasNodeQueueItem
+	triggeredByUsersByID   map[uuid.UUID]models.User
 	parentRunsByRunID      map[string]models.CanvasRun
 	childRunsByExecutionID map[string][]models.CanvasRun
 }
@@ -319,6 +385,7 @@ func loadRunDetailsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 			rootEventsByRunID:      map[string]models.CanvasEvent{},
 			executionsByRunID:      map[string][]models.CanvasNodeExecution{},
 			queueItemsByRunID:      map[string][]models.CanvasNodeQueueItem{},
+			triggeredByUsersByID:   map[uuid.UUID]models.User{},
 			parentRunsByRunID:      map[string]models.CanvasRun{},
 			childRunsByExecutionID: map[string][]models.CanvasRun{},
 		}, nil
@@ -327,6 +394,7 @@ func loadRunDetailsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 	var rootEventsByRunID map[string]models.CanvasEvent
 	var executionsByRunID map[string][]models.CanvasNodeExecution
 	var queueItemsByRunID map[string][]models.CanvasNodeQueueItem
+	var triggeredByUsersByID map[uuid.UUID]models.User
 	var parentRunsByRunID map[string]models.CanvasRun
 	var childRunsByExecutionID map[string][]models.CanvasRun
 	g, gctx := errgroup.WithContext(ctx)
@@ -379,6 +447,21 @@ func loadRunDetailsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 		return err
 	})
 
+	g.Go(func() error {
+		ids := triggeredByIDs(runs)
+		users, err := models.FindMaybeDeletedUsersByIDs(db, ids)
+		if err != nil {
+			return err
+		}
+
+		triggeredByUsersByID = make(map[uuid.UUID]models.User, len(users))
+		for _, user := range users {
+			triggeredByUsersByID[user.ID] = user
+		}
+
+		return nil
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -387,9 +470,28 @@ func loadRunDetailsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 		rootEventsByRunID:      rootEventsByRunID,
 		executionsByRunID:      executionsByRunID,
 		queueItemsByRunID:      queueItemsByRunID,
+		triggeredByUsersByID:   triggeredByUsersByID,
 		parentRunsByRunID:      parentRunsByRunID,
 		childRunsByExecutionID: childRunsByExecutionID,
 	}, nil
+}
+
+func triggeredByIDs(runs []models.CanvasRun) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(runs))
+	seen := make(map[uuid.UUID]struct{}, len(runs))
+
+	for _, run := range runs {
+		if run.TriggeredBy == nil {
+			continue
+		}
+		if _, ok := seen[*run.TriggeredBy]; ok {
+			continue
+		}
+		seen[*run.TriggeredBy] = struct{}{}
+		ids = append(ids, *run.TriggeredBy)
+	}
+
+	return ids
 }
 
 func groupExecutionsByRunID(executions []models.CanvasNodeExecution, runCount int) map[string][]models.CanvasNodeExecution {
@@ -415,6 +517,7 @@ func serializeCanvasRuns(
 	rootEventsByRunID map[string]models.CanvasEvent,
 	executionsByRunID map[string][]models.CanvasNodeExecution,
 	queueItemsByRunID map[string][]models.CanvasNodeQueueItem,
+	triggeredByUsersByID map[uuid.UUID]models.User,
 	parentRunsByRunID map[string]models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (serialized []*pb.CanvasRun, err error) {
@@ -427,6 +530,7 @@ func serializeCanvasRuns(
 		rootEventsByRunID,
 		executionsByRunID,
 		queueItemsByRunID,
+		triggeredByUsersByID,
 		parentRunsByRunID,
 		childRunsByExecutionID,
 	)

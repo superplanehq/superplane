@@ -148,6 +148,7 @@ export function RunsTabPanelContent({
           hasAnyFilter={filterState.hasAnyFilter}
           selectedStatuses={filterState.selectedStatuses}
           selectedTriggerIds={filterState.selectedTriggerIds}
+          myRunsOnly={filterState.myRunsOnly}
           searchQuery={filterState.searchQuery}
           triggerOptions={filterState.triggerOptions}
           onToggleStatus={filterState.toggleStatus}
@@ -155,6 +156,7 @@ export function RunsTabPanelContent({
           onToggleTrigger={filterState.toggleTrigger}
           onClearTriggers={filterState.clearTriggers}
           onSearchQueryChange={filterState.setSearchQuery}
+          onMyRunsOnlyChange={filterState.setMyRunsOnly}
         />
       </div>
     </div>

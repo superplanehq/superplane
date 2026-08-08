@@ -66,6 +66,15 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
   const filters: CanvasRunsFilters = {};
   let index = infiniteIndex + 1;
 
+  if (queryKey[index] === "triggeredByUserId") {
+    index += 1;
+    const value = queryKey[index];
+    if (typeof value === "string" && value.length > 0) {
+      filters.triggeredByUserId = value;
+    }
+    index += 1;
+  }
+
   if (queryKey[index] === "states") {
     index += 1;
     const states: CanvasesCanvasRunState[] = [];
@@ -94,6 +103,10 @@ export function parseRunsFiltersFromQueryKey(queryKey: readonly unknown[]): Canv
 }
 
 export function runMatchesFilters(run: CanvasesCanvasRun, filters: CanvasRunsFilters): boolean {
+  if (filters.triggeredByUserId && run.triggeredBy?.id !== filters.triggeredByUserId) {
+    return false;
+  }
+
   if (filters.states?.length && (!run.state || !filters.states.includes(run.state))) {
     return false;
   }

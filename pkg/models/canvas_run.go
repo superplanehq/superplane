@@ -45,6 +45,7 @@ type CanvasRun struct {
 	UpdatedAt         *time.Time
 	CancelledAt       *time.Time
 	CancelledBy       *uuid.UUID
+	TriggeredBy       *uuid.UUID
 	FinishedAt        *time.Time
 }
 
@@ -467,8 +468,9 @@ func oldestCanvasRunsFirst(tx *gorm.DB) *gorm.DB {
 }
 
 type CanvasRunFilters struct {
-	States  []string
-	Results []string
+	States      []string
+	Results     []string
+	TriggeredBy *uuid.UUID
 }
 
 func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
@@ -517,6 +519,10 @@ func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters Can
 }
 
 func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
+	if filters.TriggeredBy != nil {
+		query = query.Where("triggered_by = ?", *filters.TriggeredBy)
+	}
+
 	hasStates := len(filters.States) > 0
 	hasResults := len(filters.Results) > 0
 

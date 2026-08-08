@@ -30,6 +30,7 @@ interface RunsTabListViewProps {
   hasAnyFilter: boolean;
   selectedStatuses: Set<RunStatusFilter>;
   selectedTriggerIds: Set<string>;
+  myRunsOnly: boolean;
   searchQuery: string;
   triggerOptions: TriggerOption[];
   onToggleStatus: (status: RunStatusFilter) => void;
@@ -37,6 +38,7 @@ interface RunsTabListViewProps {
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
   onSearchQueryChange: (query: string) => void;
+  onMyRunsOnlyChange: (enabled: boolean) => void;
 }
 
 export function RunsTabListView({
@@ -56,6 +58,7 @@ export function RunsTabListView({
   hasAnyFilter,
   selectedStatuses,
   selectedTriggerIds,
+  myRunsOnly,
   searchQuery,
   triggerOptions,
   onToggleStatus,
@@ -63,6 +66,7 @@ export function RunsTabListView({
   onToggleTrigger,
   onClearTriggers,
   onSearchQueryChange,
+  onMyRunsOnlyChange,
 }: RunsTabListViewProps) {
   return (
     <div
@@ -73,6 +77,7 @@ export function RunsTabListView({
       <RunsToolbar
         selectedStatuses={selectedStatuses}
         selectedTriggerIds={selectedTriggerIds}
+        myRunsOnly={myRunsOnly}
         searchQuery={searchQuery}
         triggerOptions={triggerOptions}
         onToggleStatus={onToggleStatus}
@@ -80,6 +85,7 @@ export function RunsTabListView({
         onToggleTrigger={onToggleTrigger}
         onClearTriggers={onClearTriggers}
         onSearchQueryChange={onSearchQueryChange}
+        onMyRunsOnlyChange={onMyRunsOnlyChange}
       />
 
       <div
