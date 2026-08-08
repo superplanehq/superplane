@@ -1,85 +1,142 @@
-import React, { useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useEffect, useMemo, useRef } from "react";
+import { AutoCompleteSelect } from "@/components/AutoCompleteSelect/AutoCompleteSelect";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
-// Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")
-const getUserTimezoneOffset = (): string => {
-  const offset = -new Date().getTimezoneOffset() / 60;
-  return offset.toString();
-};
-
-// Timezone options with labels and values
-const timezoneOptions = [
-  { label: "GMT-12 (Baker Island)", value: "-12" },
-  { label: "GMT-11 (American Samoa)", value: "-11" },
-  { label: "GMT-10 (Hawaii)", value: "-10" },
-  { label: "GMT-9 (Alaska)", value: "-9" },
-  { label: "GMT-8 (Los Angeles, Vancouver)", value: "-8" },
-  { label: "GMT-7 (Denver, Phoenix)", value: "-7" },
-  { label: "GMT-6 (Chicago, Mexico City)", value: "-6" },
-  { label: "GMT-5 (New York, Toronto)", value: "-5" },
-  { label: "GMT-4 (Santiago, Atlantic)", value: "-4" },
-  { label: "GMT-3 (São Paulo, Buenos Aires)", value: "-3" },
-  { label: "GMT-2 (South Georgia)", value: "-2" },
-  { label: "GMT-1 (Azores)", value: "-1" },
-  { label: "GMT+0 (London, Dublin, UTC)", value: "0" },
-  { label: "GMT+1 (Paris, Berlin, Rome)", value: "1" },
-  { label: "GMT+2 (Cairo, Helsinki, Athens)", value: "2" },
-  { label: "GMT+3 (Moscow, Istanbul, Riyadh)", value: "3" },
-  { label: "GMT+4 (Dubai, Baku)", value: "4" },
-  { label: "GMT+5 (Karachi, Tashkent)", value: "5" },
-  { label: "GMT+5:30 (Mumbai, Delhi)", value: "5.5" },
-  { label: "GMT+6 (Dhaka, Almaty)", value: "6" },
-  { label: "GMT+7 (Bangkok, Jakarta)", value: "7" },
-  { label: "GMT+8 (Beijing, Singapore, Perth)", value: "8" },
-  { label: "GMT+9 (Tokyo, Seoul)", value: "9" },
-  { label: "GMT+9:30 (Adelaide)", value: "9.5" },
-  { label: "GMT+10 (Sydney, Melbourne)", value: "10" },
-  { label: "GMT+11 (Solomon Islands)", value: "11" },
-  { label: "GMT+12 (Auckland, Fiji)", value: "12" },
-  { label: "GMT+13 (Tonga, Samoa)", value: "13" },
-  { label: "GMT+14 (Kiribati)", value: "14" },
+const FALLBACK_TIMEZONES = [
+  "UTC",
+  "America/Anchorage",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/New_York",
+  "America/Phoenix",
+  "America/Sao_Paulo",
+  "America/Toronto",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Shanghai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Melbourne",
+  "Australia/Sydney",
+  "Europe/Berlin",
+  "Europe/Dublin",
+  "Europe/London",
+  "Europe/Madrid",
+  "Europe/Paris",
+  "Pacific/Auckland",
+  "Pacific/Honolulu",
 ];
 
-export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+/**
+ * Every IANA timezone the browser knows about, falling back to a short list on
+ * engines without Intl.supportedValuesOf.
+ */
+function listTimezones(): string[] {
+  const supportedValuesOf = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+
+  if (typeof supportedValuesOf === "function") {
+    try {
+      const zones = supportedValuesOf("timeZone");
+      if (zones.length > 0) {
+        return zones;
+      }
+    } catch {
+      // fall through to the static list
+    }
+  }
+
+  return FALLBACK_TIMEZONES;
+}
+
+function getBrowserTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/**
+ * Current UTC offset for a timezone, e.g. "GMT-4". Shown next to the identifier
+ * so the list stays scannable. It reflects daylight saving, so the same zone can
+ * read differently depending on the time of year.
+ */
+function formatOffset(timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+
+    return parts.find((part) => part.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Legacy configurations stored a bare UTC offset such as "-5" instead of an
+ * identifier. Those values still work, so they are kept selectable rather than
+ * silently replaced.
+ */
+function isLegacyOffset(value: string): boolean {
+  return /^[+-]?\d+(\.\d+)?$/.test(value);
+}
+
+export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const hasSetDefault = useRef(false);
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
-  // Set user's current timezone as default on first render if no value is present
-  // or if the value is "current" (which signals to use user's timezone)
-  useEffect(() => {
-    if (!hasSetDefault.current && (value === undefined || value === null || value === "current")) {
-      const userTimezone = getUserTimezoneOffset();
-      // Use user's timezone if it matches one of our options, otherwise fallback to "0" (UTC)
-      const defaultTimezone = timezoneOptions.find((tz) => tz.value === userTimezone) ? userTimezone : "0";
+  const options = useMemo(() => {
+    const timezones = listTimezones().map((timeZone) => {
+      const offset = formatOffset(timeZone);
+      const [group] = timeZone.split("/");
 
-      onChange(defaultTimezone);
+      return {
+        value: timeZone,
+        label: offset ? `${timeZone} (${offset})` : timeZone,
+        group: timeZone.includes("/") ? group : "Other",
+      };
+    });
+
+    //
+    // Keep a stored legacy offset visible so opening an existing configuration
+    // does not blank the field.
+    //
+    const current = typeof value === "string" ? value : "";
+    if (current && isLegacyOffset(current)) {
+      timezones.unshift({
+        value: current,
+        label: `GMT${current.startsWith("-") ? current : `+${current.replace("+", "")}`} (fixed offset)`,
+        group: "Other",
+      });
+    }
+
+    return timezones;
+  }, [value]);
+
+  //
+  // "current" is a placeholder the backend rejects, so it is resolved to the
+  // browser's timezone before anything is submitted.
+  //
+  useEffect(() => {
+    if (hasSetDefault.current) return;
+
+    if (value === undefined || value === null || value === "current") {
+      onChange(getBrowserTimezone());
       hasSetDefault.current = true;
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [value, onChange]);
 
-  // Get the display value - if value is "current", show user's timezone
-  const displayValue = (() => {
-    if (value === "current") {
-      const userTimezone = getUserTimezoneOffset();
-      return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
-    }
-    return (value as string) ?? "0";
-  })();
+  const displayValue = typeof value === "string" && value !== "current" ? value : "";
 
   return (
-    <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>
-      <SelectTrigger className="w-full" data-testid={testId}>
-        <SelectValue placeholder={`Select ${field.label || field.name}`} />
-      </SelectTrigger>
-      <SelectContent className="max-h-60">
-        {timezoneOptions.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div data-testid={testId}>
+      <AutoCompleteSelect
+        options={options}
+        value={displayValue}
+        onChange={onChange}
+        placeholder={`Select ${field.label || field.name}`}
+        error={hasError}
+      />
+    </div>
   );
 };
