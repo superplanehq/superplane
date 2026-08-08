@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/mattn/go-isatty"
@@ -49,6 +50,12 @@ type BindOptions struct {
 	NewAPIClient        func() *openapi_client.APIClient
 	NewConfigContext    func() ConfigContext
 	DefaultOutputFormat func() string
+	// CLIVersion and ServerVersion feed the version-skew hint that is
+	// appended to "not found" API errors, which on self-hosted servers
+	// usually mean the CLI is newer than the server. Both are optional;
+	// the hint is skipped when either is unset.
+	CLIVersion    string
+	ServerVersion func(ctx context.Context) (string, error)
 }
 
 func NewCommandContext(cmd *cobra.Command, args []string, options BindOptions) (CommandContext, error) {
@@ -97,6 +104,18 @@ func Bind(cmd *cobra.Command, command Command, options BindOptions) {
 			return err
 		}
 
-		return FormatCommandError(command.Execute(ctx))
+		execErr := command.Execute(ctx)
+		formatted := FormatCommandError(execErr)
+		if formatted == nil {
+			return nil
+		}
+
+		// The skew check runs on the raw error because formatting
+		// flattens the API error into a plain string.
+		if hint := VersionSkewHint(ctx.Context, execErr, options); hint != "" {
+			return fmt.Errorf("%s\n%s", formatted.Error(), hint)
+		}
+
+		return formatted
 	}
 }

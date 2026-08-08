@@ -78,7 +78,8 @@ COPY protos /app/protos
 COPY api/swagger /app/api/swagger
 COPY rbac /app/rbac
 COPY templates /app/templates
-RUN rm -rf build && go build -o build/superplane cmd/server/main.go
+ARG VERSION="dev"
+RUN rm -rf build && go build -ldflags "-X github.com/superplanehq/superplane/pkg/buildinfo.Version=${VERSION}" -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
