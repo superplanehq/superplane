@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	claudeStepPrompt   = "prompt"
-	claudeStepBash     = "bash"
-	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
+	claudeStepPrompt      = "prompt"
+	claudeStepBash        = "bash"
+	envAnthropicAPIKey    = "ANTHROPIC_API_KEY"
+	envAnthropicAuthToken = "ANTHROPIC_AUTH_TOKEN"
 
 	claudeCredentialsSourceSecret      = "secret"
 	claudeCredentialsSourceIntegration = "integration"
@@ -130,8 +131,9 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 		return err
 	}
 	for i, variable := range spec.Environment {
-		if strings.TrimSpace(variable.Name) == envAnthropicAPIKey {
-			return fmt.Errorf("environment[%d].name cannot be %s; use the Anthropic API Key field", i, envAnthropicAPIKey)
+		name := strings.TrimSpace(variable.Name)
+		if name == envAnthropicAPIKey || name == envAnthropicAuthToken {
+			return fmt.Errorf("environment[%d].name cannot be %s; use the Anthropic API Key field", i, name)
 		}
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
