@@ -183,6 +183,53 @@ func Test__TriggerBuild__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `"missing-job" not found`)
 	})
+
+	t.Run("crumb request fails at transport level -> error, build never attempted", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{}}
+
+		executionState, err := executeTriggerBuild(t, map[string]any{"jobName": "my-job"}, httpContext)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CSRF crumb")
+		assert.False(t, executionState.Finished)
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("crumb issuer returns error status -> error, build never attempted", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader("crumb issuer exploded")),
+				},
+			},
+		}
+
+		executionState, err := executeTriggerBuild(t, map[string]any{"jobName": "my-job"}, httpContext)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CSRF crumb")
+		assert.False(t, executionState.Finished)
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("crumb issuer returns malformed JSON -> error, build never attempted", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("not json")),
+				},
+			},
+		}
+
+		executionState, err := executeTriggerBuild(t, map[string]any{"jobName": "my-job"}, httpContext)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CSRF crumb")
+		assert.False(t, executionState.Finished)
+		assert.Len(t, httpContext.Requests, 1)
+	})
 }
 
 func Test__TriggerBuild__Setup(t *testing.T) {
