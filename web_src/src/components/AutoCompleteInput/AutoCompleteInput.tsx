@@ -21,7 +21,13 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   noExampleObjectText?: string;
   showValuePreview?: boolean;
   valuePreviewLabel?: string;
-  quickTip?: string;
+  /**
+   * Tip shown on the right of the bottom bar.
+   * - `string`: render this tip
+   * - `null`: hide the tip (also skips the default expression tip)
+   * - omitted/`undefined`: keep the default "Use {{ ... }}" tip
+   */
+  quickTip?: string | null;
   expressionMode?: "wrapped" | "raw";
   /** Labels of suggestions to hide (e.g., ["$", "previous"] to restrict to root() only). */
   excludedSuggestions?: string[];
@@ -1376,7 +1382,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     const showPreviewToggle = showValuePreview;
-    const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
+    const hasCustomQuickTip = typeof quickTip === "string" && quickTip.length > 0;
+    const hideQuickTip = quickTip === null || quickTip === "";
+    const showBottomBar = showPreviewToggle || (isFocused && hasCustomQuickTip);
 
     return (
       <div
@@ -1471,7 +1479,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             {...rest}
           />
         </span>
-        {/* Bottom bar with preview toggle and quickTip — rendered in normal flow so it
+        {/* Bottom bar with preview toggle and quickTip - rendered in normal flow so it
             never overlaps the input regardless of the parent layout (grid, flex, etc.) */}
         {showBottomBar && (
           <div className="flex items-center justify-between mt-1 px-0.5">
@@ -1497,31 +1505,35 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             ) : (
               <span />
             )}
-            {/* QuickTip - right side */}
-            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-              {quickTip
-                ? renderQuickTip(quickTip)
-                : [
-                    "Use ",
-                    <code
-                      key="default-tip"
-                      className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
-                    >
-                      {"{{"}
-                    </code>,
-                    " to write ",
-                    <a
-                      key="expr-link"
-                      href="https://expr-lang.org/docs/language-definition"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      expr
-                    </a>,
-                    " expressions",
-                  ]}
-            </span>
+            {/* QuickTip - right side. null/"" hides the tip; undefined keeps the default. */}
+            {!hideQuickTip ? (
+              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                {hasCustomQuickTip
+                  ? renderQuickTip(quickTip)
+                  : [
+                      "Use ",
+                      <code
+                        key="default-tip"
+                        className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+                      >
+                        {"{{"}
+                      </code>,
+                      " to write ",
+                      <a
+                        key="expr-link"
+                        href="https://expr-lang.org/docs/language-definition"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        expr
+                      </a>,
+                      " expressions",
+                    ]}
+              </span>
+            ) : (
+              <span />
+            )}
           </div>
         )}
 
