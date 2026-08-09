@@ -84,7 +84,7 @@ type SourceNode struct {
 type Merge struct{}
 
 func (m *Merge) Name() string        { return "merge" }
-func (m *Merge) Label() string       { return "Merge" }
+func (m *Merge) Label() string       { return "Join" }
 func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
 func (m *Merge) Documentation() string {
 	return `The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
