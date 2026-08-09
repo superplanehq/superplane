@@ -25,6 +25,7 @@ import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 interface WorkOrderDetailLoadedViewProps {
   factory: FactoriesFactory;
   factoryHref: string;
+  backLabel?: string;
   organizationId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
@@ -67,6 +68,7 @@ interface WorkOrderDetailLoadedViewProps {
 export function WorkOrderDetailLoadedView({
   factory,
   factoryHref,
+  backLabel,
   organizationId,
   order,
   events,
@@ -112,7 +114,7 @@ export function WorkOrderDetailLoadedView({
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        {factory.name}
+        {backLabel ?? factory.name}
       </Link>
 
       <WorkOrderDetailHeader

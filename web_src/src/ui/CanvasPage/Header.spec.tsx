@@ -125,8 +125,8 @@ describe("Header", () => {
     renderHeader("version-live", { factoryId: "factory-123" });
 
     const link = screen.getByTestId("return-to-factory-link");
-    expect(link).toHaveTextContent("Return to factory");
-    expect(link).toHaveAttribute("href", "/org-1/factories/factory-123");
+    expect(link).toHaveTextContent("Return to workspace");
+    expect(link).toHaveAttribute("href", "/org-1/workspaces/factory-123/overview");
   });
 
   it("hides return to factory link when factoryId is absent", () => {
