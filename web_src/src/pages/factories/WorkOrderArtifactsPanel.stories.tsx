@@ -11,7 +11,7 @@ import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
  * `addWorkOrderArtifact` canvas components.
  */
 const meta = {
-  title: "Factories/WorkOrderArtifactsPanel",
+  title: "Factories/Components/WorkOrderArtifactsPanel",
   component: WorkOrderArtifactsPanel,
   parameters: { layout: "padded" },
   decorators: [

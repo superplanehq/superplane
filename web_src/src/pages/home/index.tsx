@@ -14,7 +14,7 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
-import { HomeFactoriesSection } from "./HomeFactoriesSection";
+import { HomeFactoriesLink } from "./HomeFactoriesLink";
 import { HomePageShell } from "./HomePageShell";
 import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
@@ -75,7 +75,7 @@ export function HomePage() {
   return (
     <HomePageShell>
       <div className="mx-auto w-full max-w-6xl p-8">
-        {factoriesEnabled ? <HomeFactoriesSection organizationId={organizationId} /> : null}
+        {factoriesEnabled ? <HomeFactoriesLink organizationId={organizationId} /> : null}
 
         <Header />
 

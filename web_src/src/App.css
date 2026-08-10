@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 #root {
   width: 100%;
@@ -372,6 +373,88 @@
   --border: theme("colors.gray.300");
   --input: oklch(0.922 0 0);
   color: #1f2937;
+}
+
+/*
+ * v3 design tokens (Cursor-inspired), scoped to the factories area.
+ * Applied via `document.body.classList.add("theme-factories")` while a
+ * /factories route is mounted (see useFactoriesThemeClass). Values here
+ * mirror superplanehq/v3 src/index.css verbatim; only the CSS variables
+ * that shadcn primitives already consume are overridden, so components
+ * repaint themselves without needing bespoke wrappers.
+ */
+.theme-factories {
+  --radius: 0.5rem;
+
+  --background: #ffffff;
+  --foreground: #26251e;
+  --card: #ffffff;
+  --card-foreground: #26251e;
+  --popover: #ffffff;
+  --popover-foreground: #26251e;
+
+  --primary: #26251e;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3f3;
+  --secondary-foreground: #26251e;
+  --muted: #f7f7f7;
+  --muted-foreground: #737373;
+  --accent: #f3f3f3;
+  --accent-foreground: #26251e;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a3a3a3;
+
+  --sidebar: #f7f7f7;
+  --sidebar-foreground: #26251e;
+  --sidebar-border: #e5e5e5;
+  --sidebar-accent: #e9e9e9;
+  --sidebar-accent-foreground: #26251e;
+
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.theme-factories.dark,
+.dark .theme-factories {
+  --background: #14120b;
+  --foreground: #edecec;
+  --card: #1b1913;
+  --card-foreground: #edecec;
+  --popover: #1b1913;
+  --popover-foreground: #edecec;
+  --primary: #f7f7f4;
+  --primary-foreground: #26251e;
+  --secondary: #26251e;
+  --secondary-foreground: #edecec;
+  --muted: #26251e;
+  --muted-foreground: #a3a3a3;
+  --accent: #26251e;
+  --accent-foreground: #edecec;
+  --border: #33312b;
+  --input: #33312b;
+  --ring: #737373;
+  --sidebar: #1b1913;
+  --sidebar-foreground: #edecec;
+  --sidebar-border: #33312b;
+  --sidebar-accent: #26251e;
+  --sidebar-accent-foreground: #edecec;
+}
+
+/*
+ * v3 uses subtly-rounded buttons, not the pill shape our base variants apply
+ * globally. Compound-selector specificity (0,2,0) beats Tailwind's `rounded-full`
+ * utility (0,1,0), so every shadcn Button inside the factories theme gets the
+ * v3 radius without needing per-call overrides. Avatars and other bare
+ * `rounded-full` elements are untouched because they don't carry `data-slot`.
+ */
+.theme-factories [data-slot="button"] {
+  border-radius: calc(var(--radius) - 2px);
 }
 
 @layer base {

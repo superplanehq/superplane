@@ -11,7 +11,7 @@ import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
  * any trigger element via `children`; opens a line picker + Dispatch button.
  */
 const meta = {
-  title: "Factories/DispatchWorkOrderPopover",
+  title: "Factories/Components/DispatchWorkOrderPopover",
   component: DispatchWorkOrderPopover,
   parameters: { layout: "centered" },
   decorators: [

@@ -1,0 +1,24 @@
+{
+  "data": {
+    "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+    "body": "Deploy pipeline is green again — root cause was a flaky runner. Retried 3 times, all passing.",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "updatedAt": "2026-03-27T18:05:47.482Z",
+    "editedAt": "2026-03-27T18:05:47.482Z",
+    "user": {
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace",
+      "displayName": "ada",
+      "email": "ada@example.com"
+    },
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    }
+  },
+  "timestamp": "2026-03-27T18:05:47.482913204Z",
+  "type": "linear.comment"
+}
