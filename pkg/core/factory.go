@@ -8,13 +8,9 @@ type FactoryContext interface {
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
-	// LinkedWorkOrder returns the work order attached to the current canvas
-	// run when this execution was factory-dispatched. ok is false when the
-	// run is not linked (not an error).
 	LinkedWorkOrder() (link *LinkedWorkOrder, ok bool, err error)
 }
 
-// LinkedWorkOrder identifies a factory work order attached to a canvas run.
 type LinkedWorkOrder struct {
 	ID              string
 	FactoryID       string

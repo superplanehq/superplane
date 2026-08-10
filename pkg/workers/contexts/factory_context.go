@@ -158,7 +158,6 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
-// LinkedWorkOrder returns the work order for this run when factory-dispatched.
 func (c *FactoryContext) LinkedWorkOrder() (*core.LinkedWorkOrder, bool, error) {
 	if c.canvas == nil || c.canvas.FactoryID == nil || c.execution == nil {
 		return nil, false, nil

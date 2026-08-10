@@ -2,12 +2,12 @@ package runner
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/jwt"
 )
@@ -70,7 +70,7 @@ func appendFactoryRunnerEnvironment(
 
 	baseURL := strings.TrimRight(strings.TrimSpace(ctx.BaseURL), "/")
 	if baseURL == "" {
-		baseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
+		baseURL = config.BaseURL()
 	}
 	if baseURL != "" {
 		env = upsertEnv(env, envSuperplaneURL, baseURL)
@@ -91,8 +91,8 @@ func appendFactoryRunnerEnvironment(
 }
 
 func mintFactoryRunnerToken(orgID, userID, orderID, executionID string, timeoutSeconds int) (string, error) {
-	secret := strings.TrimSpace(os.Getenv("SESSION_SECRET"))
-	if secret == "" {
+	secret, err := config.SessionSecret()
+	if err != nil {
 		return "", errSessionSecretMissing
 	}
 	if _, err := uuid.Parse(orgID); err != nil {
