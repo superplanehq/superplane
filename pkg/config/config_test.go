@@ -21,6 +21,21 @@ func TestSessionSecret(t *testing.T) {
 	})
 }
 
+func TestJWTSecret(t *testing.T) {
+	t.Run("requires JWT_SECRET", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "")
+		_, err := JWTSecret()
+		assert.Error(t, err)
+	})
+
+	t.Run("reads JWT_SECRET", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "  jwt-secret-value  ")
+		secret, err := JWTSecret()
+		assert.NoError(t, err)
+		assert.Equal(t, "jwt-secret-value", secret)
+	})
+}
+
 func TestBaseURL(t *testing.T) {
 	t.Run("trims trailing slash", func(t *testing.T) {
 		t.Setenv("BASE_URL", " https://app.example.com/ ")

@@ -25,6 +25,16 @@ func SessionSecret() (string, error) {
 	return secret, nil
 }
 
+// JWTSecret is the signing key for API bearer JWTs (scoped tokens, sessions).
+// Must match the signer used by OrganizationAuthMiddleware.
+func JWTSecret() (string, error) {
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		return "", fmt.Errorf("JWT_SECRET not set")
+	}
+	return secret, nil
+}
+
 func BaseURL() string {
 	return strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 }

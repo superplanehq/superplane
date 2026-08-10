@@ -212,7 +212,7 @@ For markdown, provide `--body` or `-f` / `--file` (file contents become `data.bo
 
 ### Runner env auth (factory-dispatched runs)
 
-When a Runner node (`runBash` / `runCommands` / `runPython` / `runJavaScript`) executes as part of a factory work-order dispatch, SuperPlane injects:
+When a Runner node (`runBash` / `runCommands` / `runPython` / `runJavaScript`) executes on **Host** as part of a factory work-order dispatch, SuperPlane injects:
 
 | Variable | Purpose |
 |----------|---------|
@@ -232,7 +232,7 @@ superplane factory artifacts add \
   -f ./PLAN.md
 ```
 
-The `superplane` binary must be on `PATH`: **Host** mode gets it from fleet-manager user-data at EC2 boot (GitHub latest release), or use the **SuperPlane Bash (CLI)** Docker preset (`ghcr.io/superplanehq/runner/bash-tools:latest`). Non-factory runs do not get an auto token; set env/secrets manually if needed. On factory-linked runs these keys are always overwritten so a prior task or node env cannot sticky-reuse credentials.
+The `superplane` binary must be on `PATH`. **Host** mode fleets get it from fleet-manager user-data at EC2 boot (GitHub latest release). Docker mode does not get auto token inject yet — install the CLI via **Setup commands** if needed. Non-factory runs do not get an auto token; set env/secrets manually if needed. On factory-linked Host runs these keys are always overwritten so a prior task or node env cannot sticky-reuse credentials.
 
 ## Not implemented yet
 

@@ -36,35 +36,47 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 	userID := uuid.NewString()
 	orgID := uuid.NewString()
 	executionID := uuid.New()
+	linked := &stubFactoryContext{
+		ok: true,
+		link: &core.LinkedWorkOrder{
+			ID:              orderID,
+			FactoryID:       factoryID,
+			CreatedByUserID: userID,
+		},
+	}
 
 	t.Run("no factory context", func(t *testing.T) {
-		env := appendFactoryRunnerEnvironment(core.ExecutionContext{}, nil, 60)
+		env := appendFactoryRunnerEnvironment(core.ExecutionContext{}, nil, 60, ExecutionModeHost)
+		assert.Empty(t, env)
+	})
+
+	t.Run("skips docker mode", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "test-jwt-secret-for-factory-runner")
+		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
+			ID:             executionID,
+			OrganizationID: orgID,
+			BaseURL:        "https://app.example.com",
+			Factory:        linked,
+		}, nil, 60, ExecutionModeDocker)
 		assert.Empty(t, env)
 	})
 
 	t.Run("not linked", func(t *testing.T) {
 		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
 			Factory: &stubFactoryContext{ok: false},
-		}, nil, 60)
+		}, nil, 60, ExecutionModeHost)
 		assert.Empty(t, env)
 	})
 
-	t.Run("injects ids url and execution-bound token", func(t *testing.T) {
-		t.Setenv("SESSION_SECRET", "test-session-secret-for-factory-runner")
+	t.Run("injects ids url and execution-bound token on host", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "test-jwt-secret-for-factory-runner")
 
 		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
 			ID:             executionID,
 			OrganizationID: orgID,
 			BaseURL:        "https://app.example.com/",
-			Factory: &stubFactoryContext{
-				ok: true,
-				link: &core.LinkedWorkOrder{
-					ID:              orderID,
-					FactoryID:       factoryID,
-					CreatedByUserID: userID,
-				},
-			},
-		}, nil, 120)
+			Factory:        linked,
+		}, nil, 120, ExecutionModeHost)
 
 		byName := map[string]string{}
 		for _, item := range env {
@@ -75,7 +87,7 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 		assert.Equal(t, orderID, byName[envSuperplaneOrderID])
 		require.NotEmpty(t, byName[envSuperplaneToken])
 
-		claims, err := jwt.NewSigner("test-session-secret-for-factory-runner").ValidateScopedToken(byName[envSuperplaneToken])
+		claims, err := jwt.NewSigner("test-jwt-secret-for-factory-runner").ValidateScopedToken(byName[envSuperplaneToken])
 		require.NoError(t, err)
 		assert.Equal(t, userID, claims.Subject)
 		assert.Equal(t, orgID, claims.OrgID)
@@ -86,7 +98,7 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 	})
 
 	t.Run("overwrites sticky env from prior task or node config", func(t *testing.T) {
-		t.Setenv("SESSION_SECRET", "test-session-secret-for-factory-runner")
+		t.Setenv("JWT_SECRET", "test-jwt-secret-for-factory-runner")
 
 		existing := []BrokerEnvironmentVariable{
 			{Name: envSuperplaneURL, Value: "https://evil.example"},
@@ -98,15 +110,8 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 			ID:             executionID,
 			OrganizationID: orgID,
 			BaseURL:        "https://app.example.com",
-			Factory: &stubFactoryContext{
-				ok: true,
-				link: &core.LinkedWorkOrder{
-					ID:              orderID,
-					FactoryID:       factoryID,
-					CreatedByUserID: userID,
-				},
-			},
-		}, existing, 60)
+			Factory:        linked,
+		}, existing, 60, ExecutionModeHost)
 
 		byName := map[string]string{}
 		for _, item := range env {
@@ -117,13 +122,13 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 		assert.Equal(t, orderID, byName[envSuperplaneOrderID])
 		assert.NotEqual(t, "stale-token-from-old-task", byName[envSuperplaneToken])
 
-		claims, err := jwt.NewSigner("test-session-secret-for-factory-runner").ValidateScopedToken(byName[envSuperplaneToken])
+		claims, err := jwt.NewSigner("test-jwt-secret-for-factory-runner").ValidateScopedToken(byName[envSuperplaneToken])
 		require.NoError(t, err)
 		assert.Equal(t, executionID.String(), claims.ExecutionID)
 	})
 
 	t.Run("skips token without created by", func(t *testing.T) {
-		t.Setenv("SESSION_SECRET", "test-session-secret-for-factory-runner")
+		t.Setenv("JWT_SECRET", "test-jwt-secret-for-factory-runner")
 
 		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
 			ID:             executionID,
@@ -138,7 +143,7 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 			},
 		}, []BrokerEnvironmentVariable{
 			{Name: envSuperplaneToken, Value: "stale-token"},
-		}, 60)
+		}, 60, ExecutionModeHost)
 
 		byName := map[string]string{}
 		for _, item := range env {
@@ -150,23 +155,16 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 	})
 
 	t.Run("strips token when mint fails", func(t *testing.T) {
-		t.Setenv("SESSION_SECRET", "")
+		t.Setenv("JWT_SECRET", "")
 
 		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
 			ID:             executionID,
 			OrganizationID: orgID,
 			BaseURL:        "https://app.example.com",
-			Factory: &stubFactoryContext{
-				ok: true,
-				link: &core.LinkedWorkOrder{
-					ID:              orderID,
-					FactoryID:       factoryID,
-					CreatedByUserID: userID,
-				},
-			},
+			Factory:        linked,
 		}, []BrokerEnvironmentVariable{
 			{Name: envSuperplaneToken, Value: "stale-token"},
-		}, 60)
+		}, 60, ExecutionModeHost)
 
 		byName := map[string]string{}
 		for _, item := range env {
@@ -177,20 +175,13 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 	})
 
 	t.Run("skips inject when organization id invalid", func(t *testing.T) {
-		t.Setenv("SESSION_SECRET", "test-session-secret-for-factory-runner")
+		t.Setenv("JWT_SECRET", "test-jwt-secret-for-factory-runner")
 
 		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
 			ID:             executionID,
 			OrganizationID: "not-a-uuid",
-			Factory: &stubFactoryContext{
-				ok: true,
-				link: &core.LinkedWorkOrder{
-					ID:              orderID,
-					FactoryID:       factoryID,
-					CreatedByUserID: userID,
-				},
-			},
-		}, nil, 60)
+			Factory:        linked,
+		}, nil, 60, ExecutionModeHost)
 		assert.Empty(t, env)
 	})
 }

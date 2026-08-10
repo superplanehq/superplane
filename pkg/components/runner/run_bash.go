@@ -13,11 +13,7 @@ const (
 	RunBashComponentName       = "runnerBash"
 	RunBashFinishedEventType   = "runnerBash.finished"
 	runBashDefaultDockerPreset = "debian:bookworm-slim"
-	// runBashCLIToolsDockerPreset is the SuperPlane-maintained bash image with
-	// the CLI on PATH (ghcr.io/superplanehq/runner/bash-tools). Rebuilds keep
-	// :latest current; the runner pulls before each Docker task.
-	runBashCLIToolsDockerPreset = "ghcr.io/superplanehq/runner/bash-tools:latest"
-	defaultRunBashScript        = "#!/usr/bin/env bash\nset -euo pipefail\n\necho \"Hello world\"\necho '{\"example\":\"output\"}' > \"$SUPERPLANE_RESULT_FILE\"\n"
+	defaultRunBashScript       = "#!/usr/bin/env bash\nset -euo pipefail\n\necho \"Hello world\"\necho '{\"example\":\"output\"}' > \"$SUPERPLANE_RESULT_FILE\"\n"
 )
 
 func init() {
@@ -58,8 +54,8 @@ func (c *RunBash) Documentation() string {
 	return `Runs a Bash script on a fleet runner.
 
 ## Execution
-- **Host**: Script runs with Bash on the runner machine. Fleets launched with current fleet-manager user-data install the ` + "`superplane`" + ` CLI on the host at boot (GitHub latest release), so Host mode can call the CLI without a task image. Recycle older VMs if the binary is missing.
-- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**), or **SuperPlane Bash (CLI)** which includes the ` + "`superplane`" + ` CLI for isolated task images / fleets without the host CLI.
+- **Host**: Script runs with Bash on the runner machine. Fleets launched with current fleet-manager user-data install the ` + "`superplane`" + ` CLI on the host at boot (GitHub latest release). Recycle older VMs if the binary is missing. Factory-linked Host runs also get injected CLI auth env (see below).
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**). Factory CLI auth auto-inject is Host-only for now; install the CLI via **Setup commands** if you need it inside a container.
 
 ## Script contract
 Your script runs as-is. The runner sets:
@@ -67,12 +63,12 @@ Your script runs as-is. The runner sets:
 - ` + "`SUPERPLANE_PAYLOAD_FILE`" + ` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
 - ` + "`SUPERPLANE_RESULT_FILE`" + ` — path where your script must write a JSON-serializable **result**
 
-When this node runs as part of a **factory work order**, SuperPlane always injects (overwriting any node env with the same names):
+When this node runs on **Host** as part of a **factory work order**, SuperPlane always injects (overwriting any node env with the same names):
 
 - ` + "`SUPERPLANE_URL`" + ` / ` + "`SUPERPLANE_TOKEN`" + ` — short-lived CLI auth bound to this execution (no ` + "`superplane connect`" + `)
 - ` + "`SUPERPLANE_FACTORY_ID`" + ` / ` + "`SUPERPLANE_ORDER_ID`" + ` — work order this run belongs to
 
-Example artifact attach (Host mode with fleet CLI, or Docker **SuperPlane Bash (CLI)** preset):
+Example artifact attach (Host mode):
 
 ` + "```bash" + `
 superplane factory artifacts add \
@@ -98,8 +94,8 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Execution mode**: Host (default) or Docker. Host mode uses the fleet-installed CLI when present; Docker can use **SuperPlane Bash (CLI)** instead.
-- **Container base image**: Defaults to a Debian image in Docker mode. Prefer **SuperPlane Bash (CLI)** when calling the SuperPlane API from an isolated container.
+- **Execution mode**: Host (default) or Docker. Factory CLI env inject applies to Host only.
+- **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Script**: Bash source executed by the runner.
 - **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
@@ -159,7 +155,6 @@ func (c *RunBash) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "SuperPlane Bash (CLI)", Value: runBashCLIToolsDockerPreset},
 						{Label: "Debian Bookworm (slim)", Value: "debian:bookworm-slim"},
 						{Label: "Ubuntu 24.04", Value: "ubuntu:24.04"},
 						{Label: "Alpine 3.20", Value: "alpine:3.20"},
@@ -355,7 +350,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		setupCommands = normalizeCommands(spec.SetupCommands)
 	}
 
-	environment = appendFactoryRunnerEnvironment(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = appendFactoryRunnerEnvironment(ctx, environment, spec.ExecutionTimeoutSeconds, mode)
 
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,

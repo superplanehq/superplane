@@ -26,18 +26,24 @@ const (
 var factoryRunnerMaxTTL = time.Duration(maxExecutionTimeoutSecondsRequest)*time.Second + factoryRunnerTokenSkew
 
 // appendFactoryRunnerEnvironment injects CLI auth + work-order identity when
-// the current canvas run is linked to a factory work order.
+// the current canvas run is linked to a factory work order and the task runs
+// in Host mode (fleet user-data installs the CLI). Docker mode is skipped for
+// now — use setup commands if a custom image needs the CLI.
 //
-// For factory-linked runs, factory/order IDs and SUPERPLANE_TOKEN are always
-// overwritten from the linked order + a freshly minted JWT so node config or
-// a previous task cannot sticky-reuse credentials across executions. The JWT
-// is bound to ctx.ID (node execution) and claims.OrgID so it dies when the
-// execution finishes and cannot authenticate against another org.
+// For factory-linked Host runs, factory/order IDs and SUPERPLANE_TOKEN are
+// always overwritten from the linked order + a freshly minted JWT so node
+// config or a previous task cannot sticky-reuse credentials. The JWT is bound
+// to ctx.ID (node execution) and claims.OrgID so it dies when the execution
+// finishes and cannot authenticate against another org.
 func appendFactoryRunnerEnvironment(
 	ctx core.ExecutionContext,
 	env []BrokerEnvironmentVariable,
 	timeoutSeconds int,
+	executionMode string,
 ) []BrokerEnvironmentVariable {
+	if normalizeExecutionMode(executionMode) != ExecutionModeHost {
+		return env
+	}
 	if ctx.Factory == nil {
 		return env
 	}
@@ -91,9 +97,9 @@ func appendFactoryRunnerEnvironment(
 }
 
 func mintFactoryRunnerToken(orgID, userID, orderID, executionID string, timeoutSeconds int) (string, error) {
-	secret, err := config.SessionSecret()
+	secret, err := config.JWTSecret()
 	if err != nil {
-		return "", errSessionSecretMissing
+		return "", errJWTSecretMissing
 	}
 	if _, err := uuid.Parse(orgID); err != nil {
 		return "", fmtInvalidOrgID(err)
@@ -131,9 +137,9 @@ func mintFactoryRunnerToken(orgID, userID, orderID, executionID string, timeoutS
 }
 
 var (
-	errSessionSecretMissing = errors.New("SESSION_SECRET is not configured")
-	errExecutionIDRequired  = errors.New("execution id is required")
-	errCreatedByRequired    = errors.New("work order has no created-by user")
+	errJWTSecretMissing    = errors.New("JWT_SECRET is not configured")
+	errExecutionIDRequired = errors.New("execution id is required")
+	errCreatedByRequired   = errors.New("work order has no created-by user")
 )
 
 func fmtInvalidOrgID(err error) error {
