@@ -58,8 +58,8 @@ func (c *RunBash) Documentation() string {
 	return `Runs a Bash script on a fleet runner.
 
 ## Execution
-- **Host**: Script runs with Bash on the runner machine.
-- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**), or **SuperPlane Bash (CLI)** which includes the ` + "`superplane`" + ` CLI.
+- **Host**: Script runs with Bash on the runner machine. Fleets launched with current fleet-manager user-data install the ` + "`superplane`" + ` CLI on the host at boot (GitHub latest release), so Host mode can call the CLI without a task image. Recycle older VMs if the binary is missing.
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**), or **SuperPlane Bash (CLI)** which includes the ` + "`superplane`" + ` CLI for isolated task images / fleets without the host CLI.
 
 ## Script contract
 Your script runs as-is. The runner sets:
@@ -72,7 +72,7 @@ When this node runs as part of a **factory work order**, SuperPlane always injec
 - ` + "`SUPERPLANE_URL`" + ` / ` + "`SUPERPLANE_TOKEN`" + ` — short-lived CLI auth bound to this execution (no ` + "`superplane connect`" + `)
 - ` + "`SUPERPLANE_FACTORY_ID`" + ` / ` + "`SUPERPLANE_ORDER_ID`" + ` — work order this run belongs to
 
-Example artifact attach (CLI image preset):
+Example artifact attach (Host mode with fleet CLI, or Docker **SuperPlane Bash (CLI)** preset):
 
 ` + "```bash" + `
 superplane factory artifacts add \
@@ -98,8 +98,8 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Execution mode**: Host (default) or Docker.
-- **Container base image**: Defaults to a Debian image in Docker mode. Prefer **SuperPlane Bash (CLI)** when calling the SuperPlane API from the script.
+- **Execution mode**: Host (default) or Docker. Host mode uses the fleet-installed CLI when present; Docker can use **SuperPlane Bash (CLI)** instead.
+- **Container base image**: Defaults to a Debian image in Docker mode. Prefer **SuperPlane Bash (CLI)** when calling the SuperPlane API from an isolated container.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Script**: Bash source executed by the runner.
 - **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.

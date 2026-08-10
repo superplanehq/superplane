@@ -232,7 +232,7 @@ superplane factory artifacts add \
   -f ./PLAN.md
 ```
 
-Use the **SuperPlane Bash (CLI)** Docker preset (`ghcr.io/superplanehq/runner/bash-tools:latest`) so the `superplane` binary is on `PATH`. Non-factory runs do not get an auto token; set env/secrets manually if needed. On factory-linked runs these keys are always overwritten so a prior task or node env cannot sticky-reuse credentials.
+The `superplane` binary must be on `PATH`: **Host** mode gets it from fleet-manager user-data at EC2 boot (GitHub latest release), or use the **SuperPlane Bash (CLI)** Docker preset (`ghcr.io/superplanehq/runner/bash-tools:latest`). Non-factory runs do not get an auto token; set env/secrets manually if needed. On factory-linked runs these keys are always overwritten so a prior task or node env cannot sticky-reuse credentials.
 
 ## Not implemented yet
 
