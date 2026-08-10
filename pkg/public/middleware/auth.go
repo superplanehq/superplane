@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -355,7 +356,32 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 		}
 	}
 
+	if err := validateFactoryRunnerScopedToken(ctx, claims); err != nil {
+		return nil, nil, err
+	}
+
 	return user, claims, nil
+}
+
+func validateFactoryRunnerScopedToken(ctx context.Context, claims *jwt.ScopedTokenClaims) error {
+	if claims == nil || claims.Purpose != jwt.PurposeFactoryRunner {
+		return nil
+	}
+
+	orgID, err := uuid.Parse(strings.TrimSpace(claims.OrgID))
+	if err != nil {
+		return fmt.Errorf("invalid org_id")
+	}
+	executionID, err := uuid.Parse(strings.TrimSpace(claims.ExecutionID))
+	if err != nil {
+		return fmt.Errorf("invalid execution_id")
+	}
+
+	_, err = models.FindActiveNodeExecutionForOrganization(database.DB(ctx), orgID, executionID)
+	if err != nil {
+		return fmt.Errorf("factory runner token is not valid for an active execution")
+	}
+	return nil
 }
 
 func authenticateUserByCookie(
