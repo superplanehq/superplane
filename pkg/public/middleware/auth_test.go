@@ -237,6 +237,91 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	})
 }
 
+func TestOrganizationAuthMiddleware_FactoryRunnerToken(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	t.Run("active execution reaches next handler", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "n1", "default", nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "n1", rootEvent.ID, rootEvent.ID)
+
+		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject:     r.User.String(),
+			OrgID:       r.Organization.ID.String(),
+			Purpose:     jwt.PurposeFactoryRunner,
+			ExecutionID: execution.ID.String(),
+			Scopes:      []string{"work_orders:read:" + uuid.NewString()},
+		}, time.Minute)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("rejected after execution finishes", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "n2", "default", nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "n2", rootEvent.ID, rootEvent.ID)
+
+		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject:     r.User.String(),
+			OrgID:       r.Organization.ID.String(),
+			Purpose:     jwt.PurposeFactoryRunner,
+			ExecutionID: execution.ID.String(),
+			Scopes:      []string{"work_orders:read:" + uuid.NewString()},
+		}, time.Minute)
+		require.NoError(t, err)
+
+		require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+			"state":  models.CanvasNodeExecutionStateFinished,
+			"result": models.CanvasNodeExecutionResultPassed,
+		}).Error)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
+	t.Run("rejected for other org execution id", func(t *testing.T) {
+		otherOrg, err := models.CreateOrganization("other-org-"+uuid.NewString()[:8], "")
+		require.NoError(t, err)
+		canvas, _ := support.CreateCanvas(t, otherOrg.ID, r.User, nil, nil)
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "n3", "default", nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "n3", rootEvent.ID, rootEvent.ID)
+
+		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject:     r.User.String(),
+			OrgID:       r.Organization.ID.String(),
+			Purpose:     jwt.PurposeFactoryRunner,
+			ExecutionID: execution.ID.String(),
+			Scopes:      []string{"work_orders:read:" + uuid.NewString()},
+		}, time.Minute)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+}
+
 func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")

@@ -333,6 +333,20 @@ func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUI
 	return runningCount, nil
 }
 
+func FindActiveNodeExecutionForOrganization(tx *gorm.DB, orgID, executionID uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := tx.Model(&CanvasNodeExecution{}).
+		Joins("JOIN workflows ON workflows.id = workflow_node_executions.workflow_id AND workflows.deleted_at IS NULL").
+		Where("workflow_node_executions.id = ?", executionID).
+		Where("workflows.organization_id = ?", orgID).
+		Where("workflow_node_executions.state IN ?", CanvasNodeExecutionActiveStates).
+		First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
 func FindNodeExecution(workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
 	return FindNodeExecutionInTransaction(database.Conn(), workflowID, id)
 }
