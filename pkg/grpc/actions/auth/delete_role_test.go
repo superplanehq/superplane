@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -97,7 +98,7 @@ func Test_DeleteRole(t *testing.T) {
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
-		err = r.AuthService.AssignRole(userID, "test-role-with-users", orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), userID, "test-role-with-users", orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-with-users", r.AuthService)
@@ -134,7 +135,7 @@ func Test_DeleteRole(t *testing.T) {
 		user, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 		require.NoError(t, err)
 
-		err = r.AuthService.AssignRole(user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-only-users", r.AuthService)

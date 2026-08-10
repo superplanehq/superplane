@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -180,7 +181,7 @@ func createAccountForRole(t *testing.T, sess *session.TestSession, label, roleNa
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 
-	err = authService.AssignRole(user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(database.DB(t.Context()), user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	return account

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -22,7 +23,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	//
 	// Assign viewer role to user, and prepare context with user ID and organization ID
 	//
-	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
+	require.NoError(t, r.AuthService.AssignRole(database.DB(t.Context()), r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
 	ctx := metadata.NewIncomingContext(
 		context.Background(),
 		metadata.Pairs(

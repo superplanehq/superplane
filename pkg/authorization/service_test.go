@@ -7,8 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__AuthService_BasicPermissions(t *testing.T) {
@@ -32,7 +35,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 	orgPath := "org"
 
 	t.Run("org owner has all permissions", func(t *testing.T) {
-		err := r.AuthService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have all canvas permissions (inherited from admin)
@@ -68,7 +71,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 
 	t.Run("org admin has limited permissions", func(t *testing.T) {
 		adminID := uuid.New().String()
-		err := r.AuthService.AssignRole(adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have canvas management permissions
@@ -104,7 +107,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 
 	t.Run("org viewer has only read permissions", func(t *testing.T) {
 		viewerID := uuid.New().String()
-		err := r.AuthService.AssignRole(viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have canvas read permission
@@ -135,7 +138,7 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 
 	t.Run("assign and remove roles", func(t *testing.T) {
 		// Assign role
-		err := r.AuthService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Verify role assignment
@@ -152,7 +155,7 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		assert.True(t, allowed)
 
 		// Remove role
-		err = r.AuthService.RemoveRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = r.AuthService.RemoveRole(database.DB(t.Context()), userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Verify role removal
@@ -166,10 +169,68 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 	})
 
 	t.Run("invalid role assignment", func(t *testing.T) {
-		err := r.AuthService.AssignRole(userID, "invalid_role", orgID, models.DomainTypeOrganization)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid role")
+		err := r.AuthService.AssignRole(database.DB(t.Context()), userID, "invalid_role", orgID, models.DomainTypeOrganization)
+		assert.ErrorIs(t, err, authorization.ErrRoleNotFound)
 	})
+}
+
+func Test__AuthService_CustomRoleWritesUseCallerDatabase(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+	otherOrganization := support.CreateOrganization(t, r, r.User)
+	assigner := support.AuthService(t)
+	remover := support.AuthService(t)
+	roleName := "automation-viewer"
+
+	require.NoError(t, r.AuthService.CreateCustomRole(orgID, &authorization.RoleDefinition{
+		Name:         roleName,
+		DomainType:   models.DomainTypeOrganization,
+		InheritsFrom: &authorization.RoleDefinition{Name: models.RoleOrgViewer},
+	}))
+
+	userID := uuid.NewString()
+	tx := database.DB(t.Context()).Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, assigner.AssignRole(tx, userID, roleName, orgID, models.DomainTypeOrganization))
+	require.EqualValues(t, 1, countRoleAssignment(t, tx, userID, roleName, orgID))
+	require.NoError(t, tx.Rollback().Error)
+	require.Zero(t, countRoleAssignment(t, database.DB(t.Context()), userID, roleName, orgID))
+
+	require.NoError(t, assigner.AssignRole(database.DB(t.Context()), userID, roleName, orgID, models.DomainTypeOrganization))
+	require.EqualValues(t, 1, countRoleAssignment(t, database.DB(t.Context()), userID, roleName, orgID))
+	require.NoError(t, remover.RemoveRole(database.DB(t.Context()), userID, roleName, orgID, models.DomainTypeOrganization))
+	require.Zero(t, countRoleAssignment(t, database.DB(t.Context()), userID, roleName, orgID))
+
+	err := assigner.AssignRole(database.DB(t.Context()), userID, roleName, otherOrganization.ID.String(), models.DomainTypeOrganization)
+	require.ErrorIs(t, err, authorization.ErrRoleNotFound)
+}
+
+func Test__AuthService_DestroyOrganizationUsesFreshCallerDatabase(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+	destroyer := support.AuthService(t)
+	userID := uuid.NewString()
+	require.NoError(t, r.AuthService.AssignRole(database.DB(t.Context()), userID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
+
+	tx := database.DB(t.Context()).Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, destroyer.DestroyOrganization(tx, orgID))
+	require.Zero(t, countRoleAssignment(t, tx, userID, models.RoleOrgViewer, orgID))
+	require.NoError(t, tx.Rollback().Error)
+
+	require.EqualValues(t, 1, countRoleAssignment(t, database.DB(t.Context()), userID, models.RoleOrgViewer, orgID))
+}
+
+func countRoleAssignment(t *testing.T, db *gorm.DB, userID, roleName, orgID string) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, db.Table("casbin_rule").
+		Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "g", "/users/"+userID, "/roles/"+roleName, "/org/"+orgID).
+		Count(&count).
+		Error)
+
+	return count
 }
 
 func Test__AuthService_GroupManagement(t *testing.T) {
@@ -277,11 +338,11 @@ func Test__AuthService_DuplicateAssignments(t *testing.T) {
 
 	t.Run("duplicate role assignment is idempotent", func(t *testing.T) {
 		// First assignment
-		err := r.AuthService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Duplicate assignment should not error
-		err = r.AuthService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should still have the role only once
@@ -318,9 +379,9 @@ func Test__AuthService_PermissionBoundaries(t *testing.T) {
 		adminID := uuid.New().String()
 
 		// Assign roles
-		err := r.AuthService.AssignRole(viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		err := r.AuthService.AssignRole(database.DB(t.Context()), viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
-		err = r.AuthService.AssignRole(adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(database.DB(t.Context()), adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Check org update permission
