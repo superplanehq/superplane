@@ -1232,13 +1232,29 @@ Runs a Bash script on a fleet runner.
 
 ### Execution
 - **Host**: Script runs with Bash on the runner machine.
-- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**).
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**), or **SuperPlane Bash (CLI)** which includes the `superplane` CLI.
 
 ### Script contract
 Your script runs as-is. The runner sets:
 
 - `SUPERPLANE_PAYLOAD_FILE` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
 - `SUPERPLANE_RESULT_FILE` — path where your script must write a JSON-serializable **result**
+
+When this node runs as part of a **factory work order**, SuperPlane always injects (overwriting any node env with the same names):
+
+- `SUPERPLANE_URL` / `SUPERPLANE_TOKEN` — short-lived CLI auth bound to this execution (no `superplane connect`)
+- `SUPERPLANE_FACTORY_ID` / `SUPERPLANE_ORDER_ID` — work order this run belongs to
+
+Example artifact attach (CLI image preset):
+
+```bash
+superplane factory artifacts add \
+  --factory "$SUPERPLANE_FACTORY_ID" \
+  --order-id "$SUPERPLANE_ORDER_ID" \
+  --type markdown \
+  --title PLAN.md \
+  -f ./PLAN.md
+```
 
 Stdout and stderr (for example `echo`) stream to **View logs**. Write the structured **result** to `SUPERPLANE_RESULT_FILE`; it is emitted on the finished event as **result**.
 
@@ -1256,7 +1272,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Execution mode**: Host (default) or Docker.
-- **Container base image**: Defaults to a Debian image in Docker mode.
+- **Container base image**: Defaults to a Debian image in Docker mode. Prefer **SuperPlane Bash (CLI)** when calling the SuperPlane API from the script.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Script**: Bash source executed by the runner.
 - **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
