@@ -19,30 +19,6 @@ type UpdateIssueCommentSpec struct {
 	Body    string `json:"body" mapstructure:"body"`
 }
 
-// updateIssueCommentToggles records which optional fields were switched on in
-// the UI. mapstructure decodes both "never toggled on" and "toggled on but
-// cleared" to the same Go zero value, so presence is read from the raw
-// configuration map to tell them apart. Body is the only field Linear lets a
-// comment update change, so it is the single toggle.
-type updateIssueCommentToggles struct {
-	Body bool
-}
-
-func newUpdateIssueCommentToggles(raw map[string]any) updateIssueCommentToggles {
-	enabled := func(field string) bool {
-		v, ok := raw[field]
-		return ok && v != nil
-	}
-
-	return updateIssueCommentToggles{
-		Body: enabled("body"),
-	}
-}
-
-func (t updateIssueCommentToggles) hasUpdates() bool {
-	return t.Body
-}
-
 func (c *UpdateIssueComment) Name() string {
 	return "linear.updateIssueComment"
 }
@@ -71,8 +47,8 @@ func (c *UpdateIssueComment) Documentation() string {
   picker, so it can be left empty when the comment comes from an expression.
 - **Comment** (required): The comment to update. Pick one from the issue, or switch the field to an
   expression to supply an ID resolved at run time.
-- **Body** (toggle): The new comment text, written in Markdown. It is the only field Linear lets a
-  comment update change, so it must be enabled for the update to do anything, and it cannot be empty.
+- **Body** (required): The new comment text, written in Markdown. It is the only field Linear lets a
+  comment update change, and it cannot be empty. Supports expressions.
 
 ## Finding the comment ID
 
@@ -139,8 +115,7 @@ func (c *UpdateIssueComment) Configuration() []configuration.Field {
 			Name:        "body",
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Togglable:   true,
+			Required:    true,
 			Description: "The new comment text, written in Markdown",
 		},
 	}
@@ -156,9 +131,11 @@ func (c *UpdateIssueComment) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("comment is required")
 	}
 
-	raw, _ := ctx.Configuration.(map[string]any)
-	_, err := buildUpdateCommentInput(spec, newUpdateIssueCommentToggles(raw))
-	return err
+	if strings.TrimSpace(spec.Body) == "" {
+		return fmt.Errorf("body is required")
+	}
+
+	return nil
 }
 
 func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
@@ -176,10 +153,13 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("comment is required")
 	}
 
-	raw, _ := ctx.Configuration.(map[string]any)
-	input, err := buildUpdateCommentInput(spec, newUpdateIssueCommentToggles(raw))
-	if err != nil {
-		return err
+	//
+	// Body is the only field Linear lets a comment update change, so it is
+	// always required - Linear also rejects a comment with an empty body.
+	//
+	body := strings.TrimSpace(spec.Body)
+	if body == "" {
+		return fmt.Errorf("body is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -187,7 +167,7 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	comment, err := client.UpdateComment(commentID, input)
+	comment, err := client.UpdateComment(commentID, map[string]any{"body": body})
 	if err != nil {
 		return fmt.Errorf("failed to update comment: %v", err)
 	}
@@ -197,22 +177,6 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		CommentPayloadType,
 		[]any{comment},
 	)
-}
-
-// buildUpdateCommentInput turns the enabled toggles into a CommentUpdateInput.
-// Linear rejects a comment with no body, so an enabled but blank body is an
-// error rather than a way to clear the comment.
-func buildUpdateCommentInput(spec UpdateIssueCommentSpec, toggles updateIssueCommentToggles) (map[string]any, error) {
-	if !toggles.hasUpdates() {
-		return nil, fmt.Errorf("at least one field must be enabled to update")
-	}
-
-	body := strings.TrimSpace(spec.Body)
-	if body == "" {
-		return nil, fmt.Errorf("body cannot be empty")
-	}
-
-	return map[string]any{"body": body}, nil
 }
 
 func (c *UpdateIssueComment) Cancel(ctx core.ExecutionContext) error {

@@ -31,31 +31,31 @@ func Test__UpdateIssueComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "comment is required")
 	})
 
-	t.Run("no field enabled -> error", func(t *testing.T) {
+	t.Run("missing body -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   newAuthorizedIntegration(),
 			Configuration: map[string]any{"comment": "c1"},
 		})
 
-		require.ErrorContains(t, err, "at least one field must be enabled to update")
+		require.ErrorContains(t, err, "body is required")
 	})
 
-	t.Run("body toggled off explicitly -> error", func(t *testing.T) {
+	t.Run("null body -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   newAuthorizedIntegration(),
 			Configuration: map[string]any{"comment": "c1", "body": nil},
 		})
 
-		require.ErrorContains(t, err, "at least one field must be enabled to update")
+		require.ErrorContains(t, err, "body is required")
 	})
 
-	t.Run("body enabled but blank -> error", func(t *testing.T) {
+	t.Run("blank body -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   newAuthorizedIntegration(),
 			Configuration: map[string]any{"comment": "c1", "body": "   "},
 		})
 
-		require.ErrorContains(t, err, "body cannot be empty")
+		require.ErrorContains(t, err, "body is required")
 	})
 
 	t.Run("valid setup", func(t *testing.T) {
@@ -150,7 +150,7 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "comment is required")
 	})
 
-	t.Run("no field enabled -> error", func(t *testing.T) {
+	t.Run("missing body -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    newAuthorizedIntegration(),
@@ -158,10 +158,10 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 			Configuration:  map[string]any{"comment": "c1"},
 		})
 
-		require.ErrorContains(t, err, "at least one field must be enabled to update")
+		require.ErrorContains(t, err, "body is required")
 	})
 
-	t.Run("body enabled but blank -> error", func(t *testing.T) {
+	t.Run("blank body -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    newAuthorizedIntegration(),
@@ -169,7 +169,7 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 			Configuration:  map[string]any{"comment": "c1", "body": "   "},
 		})
 
-		require.ErrorContains(t, err, "body cannot be empty")
+		require.ErrorContains(t, err, "body is required")
 	})
 
 	t.Run("unsuccessful update -> error", func(t *testing.T) {
