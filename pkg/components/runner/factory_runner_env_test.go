@@ -136,13 +136,42 @@ func TestAppendFactoryRunnerEnvironment(t *testing.T) {
 					FactoryID: factoryID,
 				},
 			},
-		}, nil, 60)
+		}, []BrokerEnvironmentVariable{
+			{Name: envSuperplaneToken, Value: "stale-token"},
+		}, 60)
 
 		byName := map[string]string{}
 		for _, item := range env {
 			byName[item.Name] = item.Value
 		}
 		assert.Equal(t, factoryID, byName[envSuperplaneFactoryID])
+		assert.Equal(t, orderID, byName[envSuperplaneOrderID])
+		assert.Empty(t, byName[envSuperplaneToken], "stale token must be stripped when mint is skipped")
+	})
+
+	t.Run("strips token when mint fails", func(t *testing.T) {
+		t.Setenv("SESSION_SECRET", "")
+
+		env := appendFactoryRunnerEnvironment(core.ExecutionContext{
+			ID:             executionID,
+			OrganizationID: orgID,
+			BaseURL:        "https://app.example.com",
+			Factory: &stubFactoryContext{
+				ok: true,
+				link: &core.LinkedWorkOrder{
+					ID:              orderID,
+					FactoryID:       factoryID,
+					CreatedByUserID: userID,
+				},
+			},
+		}, []BrokerEnvironmentVariable{
+			{Name: envSuperplaneToken, Value: "stale-token"},
+		}, 60)
+
+		byName := map[string]string{}
+		for _, item := range env {
+			byName[item.Name] = item.Value
+		}
 		assert.Equal(t, orderID, byName[envSuperplaneOrderID])
 		assert.Empty(t, byName[envSuperplaneToken])
 	})

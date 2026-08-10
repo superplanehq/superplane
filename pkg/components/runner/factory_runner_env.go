@@ -19,8 +19,11 @@ const (
 	envSuperplaneOrderID   = "SUPERPLANE_ORDER_ID"
 
 	factoryRunnerTokenSkew = 5 * time.Minute
-	factoryRunnerMaxTTL    = 2 * time.Hour
 )
+
+// factoryRunnerMaxTTL matches the longest allowed runner wall-clock plus skew.
+// Execution-active checks remain the primary kill switch; TTL is a backstop.
+var factoryRunnerMaxTTL = time.Duration(maxExecutionTimeoutSecondsRequest)*time.Second + factoryRunnerTokenSkew
 
 // appendFactoryRunnerEnvironment injects CLI auth + work-order identity when
 // the current canvas run is linked to a factory work order.
@@ -61,6 +64,9 @@ func appendFactoryRunnerEnvironment(
 	// Always pin identity to the linked work order (no sticky override).
 	env = upsertEnv(env, envSuperplaneFactoryID, link.FactoryID)
 	env = upsertEnv(env, envSuperplaneOrderID, link.ID)
+	// Drop any prior token before mint so a failed mint cannot leave a
+	// stale credential paired with the newly pinned order IDs.
+	env = stripEnv(env, envSuperplaneToken)
 
 	baseURL := strings.TrimRight(strings.TrimSpace(ctx.BaseURL), "/")
 	if baseURL == "" {
@@ -165,4 +171,18 @@ func upsertEnv(env []BrokerEnvironmentVariable, name, value string) []BrokerEnvi
 		}
 	}
 	return append(env, BrokerEnvironmentVariable{Name: name, Value: value})
+}
+
+func stripEnv(env []BrokerEnvironmentVariable, name string) []BrokerEnvironmentVariable {
+	if len(env) == 0 {
+		return env
+	}
+	out := make([]BrokerEnvironmentVariable, 0, len(env))
+	for _, item := range env {
+		if item.Name == name {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
