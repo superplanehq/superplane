@@ -89,6 +89,33 @@ spec:
     });
   });
 
+  it("skips null or non-object node entries instead of throwing", () => {
+    const yamlText = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Incomplete nodes
+spec:
+  nodes:
+    -
+    - id: wait-1
+      name: Wait
+      component: wait
+    - not-a-node
+    - []
+  edges: []
+`;
+
+    const spec = parseCanvasYamlToSpec(yamlText);
+    expect(spec).not.toBeNull();
+    expect(spec?.nodes).toHaveLength(1);
+    expect(spec?.nodes?.[0]).toMatchObject({
+      id: "wait-1",
+      name: "Wait",
+      component: "wait",
+      type: "TYPE_ACTION",
+    });
+  });
+
   it("quotes position y keys when exporting yaml", () => {
     const workflow: CanvasesCanvas = {
       ...sampleWorkflow,
