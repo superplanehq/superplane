@@ -12,16 +12,22 @@ import (
 const ScopedTokenType = "scoped"
 const ScopedTokenAudience = "superplane_api"
 
+// PurposeFactoryRunner is minted for factory-dispatched runner tasks.
+// Tokens with this purpose must carry ExecutionID and are rejected once
+// that node execution is no longer active.
+const PurposeFactoryRunner = "factory_runner"
+
 type ScopedTokenClaims struct {
-	Subject   string             `json:"sub"`
-	Audience  string             `json:"aud"`
-	ExpiresAt *gojwt.NumericDate `json:"exp,omitempty"`
-	NotBefore *gojwt.NumericDate `json:"nbf,omitempty"`
-	IssuedAt  *gojwt.NumericDate `json:"iat,omitempty"`
-	TokenType string             `json:"token_type"`
-	OrgID     string             `json:"org_id"`
-	Purpose   string             `json:"purpose"`
-	Scopes    []string           `json:"scopes"`
+	Subject     string             `json:"sub"`
+	Audience    string             `json:"aud"`
+	ExpiresAt   *gojwt.NumericDate `json:"exp,omitempty"`
+	NotBefore   *gojwt.NumericDate `json:"nbf,omitempty"`
+	IssuedAt    *gojwt.NumericDate `json:"iat,omitempty"`
+	TokenType   string             `json:"token_type"`
+	OrgID       string             `json:"org_id"`
+	Purpose     string             `json:"purpose"`
+	ExecutionID string             `json:"execution_id,omitempty"`
+	Scopes      []string           `json:"scopes"`
 }
 
 type Permission struct {
@@ -51,17 +57,23 @@ func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Dur
 		return "", fmt.Errorf("at least one scope is required")
 	}
 
+	executionID := strings.TrimSpace(claims.ExecutionID)
+	if purpose == PurposeFactoryRunner && executionID == "" {
+		return "", fmt.Errorf("execution_id is required for factory_runner tokens")
+	}
+
 	now := time.Now()
 	normalizedClaims := ScopedTokenClaims{
-		Subject:   subject,
-		Audience:  ScopedTokenAudience,
-		ExpiresAt: gojwt.NewNumericDate(now.Add(duration)),
-		NotBefore: gojwt.NewNumericDate(now),
-		IssuedAt:  gojwt.NewNumericDate(now),
-		TokenType: ScopedTokenType,
-		OrgID:     orgID,
-		Purpose:   purpose,
-		Scopes:    scopes,
+		Subject:     subject,
+		Audience:    ScopedTokenAudience,
+		ExpiresAt:   gojwt.NewNumericDate(now.Add(duration)),
+		NotBefore:   gojwt.NewNumericDate(now),
+		IssuedAt:    gojwt.NewNumericDate(now),
+		TokenType:   ScopedTokenType,
+		OrgID:       orgID,
+		Purpose:     purpose,
+		ExecutionID: executionID,
+		Scopes:      scopes,
 	}
 
 	token := gojwt.NewWithClaims(gojwt.SigningMethodHS256, normalizedClaims)
@@ -121,7 +133,12 @@ func (s *Signer) ValidateScopedToken(tokenString string) (*ScopedTokenClaims, er
 	claims.Audience = strings.TrimSpace(claims.Audience)
 	claims.OrgID = orgID
 	claims.Purpose = purpose
+	claims.ExecutionID = strings.TrimSpace(claims.ExecutionID)
 	claims.Scopes = scopes
+
+	if claims.Purpose == PurposeFactoryRunner && claims.ExecutionID == "" {
+		return nil, fmt.Errorf("execution_id is required for factory_runner tokens")
+	}
 
 	return claims, nil
 }

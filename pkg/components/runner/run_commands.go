@@ -313,6 +313,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
+	environment = appendFactoryRunnerEnvironment(ctx, environment, spec.ExecutionTimeoutSeconds)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       BrokerCommandsFromLines(cmds),

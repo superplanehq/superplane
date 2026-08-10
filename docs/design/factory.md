@@ -210,6 +210,30 @@ superplane factory artifacts add \
 
 For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`). Full factory CLI surface beyond artifacts is still pending.
 
+### Runner env auth (factory-dispatched runs)
+
+When a Runner node (`runBash` / `runCommands` / `runPython` / `runJavaScript`) executes as part of a factory work-order dispatch, SuperPlane injects:
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPERPLANE_URL` | Public API base URL |
+| `SUPERPLANE_TOKEN` | Short-lived scoped JWT bound to this node execution + org (`work_orders:read|update:<order_id>` only; no `factories:update`). Dies when the execution finishes; always freshly minted (not sticky across tasks). |
+| `SUPERPLANE_FACTORY_ID` | Factory UUID |
+| `SUPERPLANE_ORDER_ID` | Work-order UUID |
+
+CLI already accepts non-interactive auth via `SUPERPLANE_URL` + `SUPERPLANE_TOKEN` (no `connect`). Env auth cannot persist an active factory, so pass `--factory` / `--order-id` explicitly:
+
+```bash
+superplane factory artifacts add \
+  --factory "$SUPERPLANE_FACTORY_ID" \
+  --order-id "$SUPERPLANE_ORDER_ID" \
+  --type markdown \
+  --title PLAN.md \
+  -f ./PLAN.md
+```
+
+Use the **SuperPlane Bash (CLI)** Docker preset (`ghcr.io/superplanehq/runner/bash-tools:latest`) so the `superplane` binary is on `PATH`. Non-factory runs do not get an auto token; set env/secrets manually if needed. Node env that already defines the same keys is left unchanged.
+
 ## Not implemented yet
 
 - Broader CLI (`superplane factory` list/create/dispatch/…).
