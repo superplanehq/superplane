@@ -656,13 +656,21 @@ func parseTimezone(timezoneStr *string) *time.Location {
 		return time.UTC
 	}
 
-	offsetHours, err := strconv.ParseFloat(*timezoneStr, 64)
-	if err != nil {
-		return time.UTC
+	// Preferred form: an IANA identifier (e.g. "America/New_York"), resolved with
+	// LoadLocation so that DST rules are applied for the instant being evaluated.
+	if loc, err := time.LoadLocation(*timezoneStr); err == nil {
+		return loc
 	}
-	offsetSeconds := int(offsetHours * 3600)
 
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	// Backward compatibility: a bare numeric offset is treated as a genuine fixed
+	// zone. This stays correct for non-DST regions and for anyone who deliberately
+	// wants a fixed offset, and keeps existing configs working until they are re-saved.
+	if offsetHours, err := strconv.ParseFloat(strings.TrimPrefix(*timezoneStr, "+"), 64); err == nil {
+		offsetSeconds := int(offsetHours * 3600)
+		return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	}
+
+	return time.UTC
 }
 
 func nextHoursTrigger(interval int, minute int, now time.Time) (*time.Time, error) {
