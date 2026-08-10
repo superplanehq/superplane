@@ -144,8 +144,12 @@ func TestGetNextTrigger(t *testing.T) {
 				Hour:          intPtr(15),
 				Minute:        intPtr(30),
 			},
-			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
+			now: mustParseTime("2025-01-06T10:00:00Z"), // Monday
+			// This Friday, not the one after. Skipping a whole interval before the first
+			// fire is the same off-by-a-week that made a multi-day schedule collapse onto
+			// one day: it can only hold if the search always starts an interval away from
+			// now, which is what kept the other selected days from ever running.
+			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday of the same week
 		},
 		{
 			name: "months configuration",
@@ -386,8 +390,10 @@ func TestTimezoneHandling(t *testing.T) {
 				Minute:        intPtr(0),       // on the hour
 				Timezone:      stringPtr("-8"), // GMT-8 (PST)
 			},
-			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
-			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+			now: mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
+			// One hour later, not a week later. Someone who sets up "every Monday at 9 AM"
+			// at 8 AM on a Monday means today.
+			expectNext: mustParseTime("2025-01-06T17:00:00Z"), // Monday 9 AM PST (5 PM UTC), same day
 		},
 		{
 			name: "month schedule in GMT+9 timezone (JST)",
