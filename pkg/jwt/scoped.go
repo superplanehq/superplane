@@ -12,9 +12,6 @@ import (
 const ScopedTokenType = "scoped"
 const ScopedTokenAudience = "superplane_api"
 
-// PurposeFactoryRunner is minted for factory-dispatched runner tasks.
-// Tokens with this purpose must carry ExecutionID and are rejected once
-// that node execution is no longer active.
 const PurposeFactoryRunner = "factory_runner"
 
 type ScopedTokenClaims struct {

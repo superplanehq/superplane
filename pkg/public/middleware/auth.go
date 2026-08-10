@@ -363,10 +363,6 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 	return user, claims, nil
 }
 
-// validateFactoryRunnerScopedToken keeps runner JWTs single-use across
-// tasks: the token is bound to one node execution in claims.OrgID and
-// dies when that execution leaves an active state. Wrong-org execution
-// IDs also fail closed.
 func validateFactoryRunnerScopedToken(ctx context.Context, claims *jwt.ScopedTokenClaims) error {
 	if claims == nil || claims.Purpose != jwt.PurposeFactoryRunner {
 		return nil

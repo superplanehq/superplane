@@ -333,9 +333,6 @@ func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUI
 	return runningCount, nil
 }
 
-// FindActiveNodeExecutionForOrganization returns the execution when it is
-// still active and belongs to a canvas in orgID. Used to bind ephemeral
-// factory_runner JWTs to a single in-flight node execution.
 func FindActiveNodeExecutionForOrganization(tx *gorm.DB, orgID, executionID uuid.UUID) (*CanvasNodeExecution, error) {
 	var execution CanvasNodeExecution
 	err := tx.Model(&CanvasNodeExecution{}).

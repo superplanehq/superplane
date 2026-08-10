@@ -21,20 +21,8 @@ const (
 	factoryRunnerTokenSkew = 5 * time.Minute
 )
 
-// factoryRunnerMaxTTL matches the longest allowed runner wall-clock plus skew.
-// Execution-active checks remain the primary kill switch; TTL is a backstop.
 var factoryRunnerMaxTTL = time.Duration(maxExecutionTimeoutSecondsRequest)*time.Second + factoryRunnerTokenSkew
 
-// appendFactoryRunnerEnvironment injects CLI auth + work-order identity when
-// the current canvas run is linked to a factory work order and the task runs
-// in Host mode (fleet user-data installs the CLI). Docker mode is skipped for
-// now — use setup commands if a custom image needs the CLI.
-//
-// For factory-linked Host runs, factory/order IDs and SUPERPLANE_TOKEN are
-// always overwritten from the linked order + a freshly minted JWT so node
-// config or a previous task cannot sticky-reuse credentials. The JWT is bound
-// to ctx.ID (node execution) and claims.OrgID so it dies when the execution
-// finishes and cannot authenticate against another org.
 func appendFactoryRunnerEnvironment(
 	ctx core.ExecutionContext,
 	env []BrokerEnvironmentVariable,
@@ -67,11 +55,8 @@ func appendFactoryRunnerEnvironment(
 		return env
 	}
 
-	// Always pin identity to the linked work order (no sticky override).
 	env = upsertEnv(env, envSuperplaneFactoryID, link.FactoryID)
 	env = upsertEnv(env, envSuperplaneOrderID, link.ID)
-	// Drop any prior token before mint so a failed mint cannot leave a
-	// stale credential paired with the newly pinned order IDs.
 	env = stripEnv(env, envSuperplaneToken)
 
 	baseURL := strings.TrimRight(strings.TrimSpace(ctx.BaseURL), "/")
