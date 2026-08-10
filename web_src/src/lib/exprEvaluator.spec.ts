@@ -52,6 +52,31 @@ describe("exprEvaluator", () => {
     );
   });
 
+  it("sorts numbers numerically, not lexicographically", () => {
+    const context = { __root: { data: { durations: [10, 2, 1] } } };
+    expect(evaluateExpr("sort(root().data.durations)", context)).toEqual([1, 2, 10]);
+    expect(evaluateExpr('sort(root().data.durations, "desc")', context)).toEqual([10, 2, 1]);
+  });
+
+  it("sorts strings lexicographically", () => {
+    const context = { __root: { data: { names: ["charlie", "alpha", "bravo"] } } };
+    expect(evaluateExpr("sort(root().data.names)", context)).toEqual(["alpha", "bravo", "charlie"]);
+  });
+
+  it("leaves the sorted array's source untouched", () => {
+    const durations = [10, 2, 1];
+    evaluateExpr("sort(root().data.durations)", { __root: { data: { durations } } });
+    expect(durations).toEqual([10, 2, 1]);
+  });
+
+  it("flattens nested arrays to a single dimension", () => {
+    expect(
+      evaluateExpr("flatten(root().data.matrix)", {
+        __root: { data: { matrix: [[1, 2], [3, [4, 5]], 6] } },
+      }),
+    ).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
   it("formats primitive, array, and object results for display", () => {
     expect(formatExprResult(null)).toBe("null");
     expect(formatExprResult(["a", "b", "c"])).toBe("[a, b, c]");
