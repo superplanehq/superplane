@@ -79,13 +79,18 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 //   "execution_timeout_seconds": 600
 // }
 //
+// Serverless tasks send "function_type" instead of "fleet_id", and omit
+// "execution_mode" and "docker_image".
+//
 // Example response:
 // {
 //   "id": "1234567890"
 // }
 
 type brokerCreateTaskRequest struct {
-	FleetID string `json:"fleet_id"`
+	// Exactly one of FleetID (runner machine) or FunctionType (serverless) is sent.
+	FleetID      string `json:"fleet_id,omitempty"`
+	FunctionType string `json:"function_type,omitempty"`
 
 	RunMode                 string                      `json:"run_mode,omitempty"`
 	Script                  string                      `json:"script,omitempty"`
@@ -169,6 +174,7 @@ const (
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
 	MachineType             string
+	FunctionType            string
 	RunMode                 string
 	Script                  string
 	MessageChain            json.RawMessage
@@ -188,24 +194,36 @@ type brokerCreateTaskResponse struct {
 	ID string `json:"id"`
 }
 
-func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
+// setComputeTarget sends execution mode and container image only for fleet runners.
+func (r *brokerCreateTaskRequest) setComputeTarget(p CreateTaskParams) error {
+	if functionType := strings.TrimSpace(p.FunctionType); functionType != "" {
+		r.FunctionType = functionType
+		return nil
+	}
+
+	fleetID, err := requireMachineType(p.MachineType)
+	if err != nil {
+		return err
+	}
+	r.FleetID = fleetID
+
 	mode := strings.ToLower(strings.TrimSpace(p.ExecutionMode))
 	if mode == "" {
 		mode = ExecutionModeHost
 	}
+	r.ExecutionMode = mode
+	r.DockerImage = strings.TrimSpace(p.DockerImage)
 
+	return nil
+}
+
+func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 	webhookPayloadSizeLimit := p.WebhookPayloadSizeLimit
 	if webhookPayloadSizeLimit <= 0 {
 		webhookPayloadSizeLimit = config.MaxWebhookPayloadSize
 	}
 
-	fleetID, err := requireMachineType(p.MachineType)
-	if err != nil {
-		return "", err
-	}
-
 	req := brokerCreateTaskRequest{
-		FleetID:                 fleetID,
 		RunMode:                 strings.TrimSpace(p.RunMode),
 		Script:                  strings.TrimSpace(p.Script),
 		MessageChain:            p.MessageChain,
@@ -215,10 +233,12 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		Files:                   p.Files,
 		WebhookURL:              p.WebhookURL,
 		WebhookPayloadSizeLimit: webhookPayloadSizeLimit,
-		ExecutionMode:           mode,
-		DockerImage:             strings.TrimSpace(p.DockerImage),
 		Labels:                  p.Labels,
 	}
+	if err := req.setComputeTarget(p); err != nil {
+		return "", err
+	}
+
 	timeout := p.TimeoutSeconds
 	if timeout <= 0 {
 		timeout = DefaultExecutionTimeoutSeconds

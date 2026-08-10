@@ -120,6 +120,37 @@ describe("runnerConfigurationDetails", () => {
       },
     ],
     [
+      "serverless — function type replaces machine type",
+      {
+        enableServerless: true,
+        functionType: "1gb",
+        commands: "echo hi",
+        execution_timeout_seconds: 0,
+      },
+      {
+        Execution: "Serverless",
+        "Function type": "1gb",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
+      },
+    ],
+    [
+      "serverless — ignores stray machine and docker configuration",
+      {
+        enableServerless: true,
+        functionType: "512mb",
+        machine_type: "e1-tiny-amd64",
+        execution_mode: "docker",
+        docker_image_preset: "custom",
+        docker_image: "should-not-show:tag",
+        execution_timeout_seconds: 0,
+      },
+      {
+        Execution: "Serverless",
+        "Function type": "512mb",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
+      },
+    ],
+    [
       "timeout as string zero",
       { execution_mode: "host", commands: "x", execution_timeout_seconds: "0" },
       {
