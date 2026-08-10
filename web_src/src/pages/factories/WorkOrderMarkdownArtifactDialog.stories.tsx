@@ -11,7 +11,7 @@ import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDial
  * clicks the artifact label (the user-provided title, or "Note" if none).
  */
 const meta = {
-  title: "Factories/WorkOrderMarkdownArtifactDialog",
+  title: "Factories/Components/WorkOrderMarkdownArtifactDialog",
   component: WorkOrderMarkdownArtifactDialog,
   parameters: { layout: "padded" },
   decorators: [

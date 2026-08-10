@@ -9,7 +9,7 @@ import {
 } from "./FactoryLineStepFlow";
 
 const meta = {
-  title: "Factories/FactoryLineStepFlow",
+  title: "Factories/Components/FactoryLineStepFlow",
   parameters: { layout: "centered" },
 } satisfies Meta;
 

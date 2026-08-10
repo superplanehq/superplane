@@ -15,11 +15,10 @@ import (
 )
 
 // FakeConfig is a test stub implementation of the CLI's core.ConfigContext.
-// The app-active accessors are no-ops because the app commands under test
-// here do not use them.
 type FakeConfig struct {
-	URL       string
-	ActiveApp string
+	URL           string
+	ActiveApp     string
+	ActiveFactory string
 }
 
 func (f *FakeConfig) GetActiveApp() string {
@@ -30,6 +29,16 @@ func (f *FakeConfig) GetActiveApp() string {
 }
 
 func (f *FakeConfig) SetActiveApp(appID string) error {
+	f.ActiveApp = appID
+	return nil
+}
+
+func (f *FakeConfig) GetActiveFactory() string {
+	return f.ActiveFactory
+}
+
+func (f *FakeConfig) SetActiveFactory(factoryID string) error {
+	f.ActiveFactory = factoryID
 	return nil
 }
 
