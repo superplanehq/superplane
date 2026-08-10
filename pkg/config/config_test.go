@@ -6,6 +6,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSessionSecret(t *testing.T) {
+	t.Run("requires SESSION_SECRET", func(t *testing.T) {
+		t.Setenv("SESSION_SECRET", "")
+		_, err := SessionSecret()
+		assert.Error(t, err)
+	})
+
+	t.Run("reads SESSION_SECRET", func(t *testing.T) {
+		t.Setenv("SESSION_SECRET", "  secret-value  ")
+		secret, err := SessionSecret()
+		assert.NoError(t, err)
+		assert.Equal(t, "secret-value", secret)
+	})
+}
+
+func TestBaseURL(t *testing.T) {
+	t.Run("trims trailing slash", func(t *testing.T) {
+		t.Setenv("BASE_URL", " https://app.example.com/ ")
+		assert.Equal(t, "https://app.example.com", BaseURL())
+	})
+}
+
 func TestMaxEmitCount(t *testing.T) {
 	t.Run("defaults to 100", func(t *testing.T) {
 		t.Setenv("SUPERPLANE_MAX_EMIT_COUNT", "")
