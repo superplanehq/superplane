@@ -152,13 +152,18 @@ export interface UpdateIssueConfiguration {
   project?: string;
 }
 
-/** Comment as returned by the `commentCreate` mutation. `user` is null for bot/integration authors. */
+/**
+ * Comment as returned by the `commentCreate` and `commentUpdate` mutations.
+ * `user` is null for bot/integration authors, and `editedAt` stays null until
+ * the body is changed.
+ */
 export interface LinearComment {
   id?: string;
   body?: string;
   url?: string;
   createdAt?: string;
   updatedAt?: string;
+  editedAt?: string;
   user?: LinearUser;
   issue?: { id?: string; identifier?: string; title?: string; url?: string };
 }
@@ -250,5 +255,11 @@ export interface LinearReaction {
 
 export interface AddIssueCommentConfiguration {
   issue?: string;
+  body?: string;
+}
+
+export interface UpdateIssueCommentConfiguration {
+  issue?: string;
+  comment?: string;
   body?: string;
 }
