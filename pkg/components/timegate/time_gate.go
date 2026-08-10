@@ -372,17 +372,27 @@ func (tg *TimeGate) isExcludedDate(date time.Time, excludedDates map[string]stru
 }
 
 func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
+	// Empty and "current" fall back to UTC rather than the server's local zone, so
+	// the same config behaves identically regardless of the host's TZ setting.
 	if timezoneStr == "" || timezoneStr == "current" {
-		return time.Local
-	}
-
-	offsetHours, err := strconv.ParseFloat(timezoneStr, 64)
-	if err != nil {
 		return time.UTC
 	}
-	offsetSeconds := int(offsetHours * 3600)
 
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	// Preferred form: an IANA identifier (e.g. "America/New_York"), resolved with
+	// LoadLocation so that DST rules are applied for the instant being evaluated.
+	if loc, err := time.LoadLocation(timezoneStr); err == nil {
+		return loc
+	}
+
+	// Backward compatibility: a bare numeric offset is treated as a genuine fixed
+	// zone. This stays correct for non-DST regions and for anyone who deliberately
+	// wants a fixed offset, and keeps existing configs working until they are re-saved.
+	if offsetHours, err := strconv.ParseFloat(strings.TrimPrefix(timezoneStr, "+"), 64); err == nil {
+		offsetSeconds := int(offsetHours * 3600)
+		return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	}
+
+	return time.UTC
 }
 
 func parseTimeString(timeStr string) (int, error) {

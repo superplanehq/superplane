@@ -508,17 +508,22 @@ func validateTimezone(_ Field, value any) error {
 	}
 
 	if timezoneStr == "current" {
-		return fmt.Errorf("timezone value 'current' should be replaced with actual timezone offset before submission")
+		return fmt.Errorf("timezone value 'current' should be replaced with an actual timezone before submission")
 	}
 
-	var offsetHours float64
-	var err error
+	// Preferred form: an IANA identifier (e.g. "America/New_York"). Validate it by
+	// loading it, which is also what the consumers do at evaluation time so that DST
+	// rules apply.
+	if _, err := time.LoadLocation(timezoneStr); err == nil {
+		return nil
+	}
 
-	// Handle cases with or without + prefix
+	// Backward compatibility: a bare numeric offset is still accepted as a fixed zone.
+	// Handle cases with or without + prefix.
 	cleanTz := strings.TrimPrefix(timezoneStr, "+")
-	offsetHours, err = strconv.ParseFloat(cleanTz, 64)
+	offsetHours, err := strconv.ParseFloat(cleanTz, 64)
 	if err != nil {
-		return fmt.Errorf("invalid timezone format: must be a numeric offset like '-5', '0', '5.5', or '+8'")
+		return fmt.Errorf("invalid timezone: must be an IANA identifier like 'America/New_York' or a numeric offset like '-5', '0', '5.5', or '+8'")
 	}
 
 	// Check valid range: UTC-12 to UTC+14
