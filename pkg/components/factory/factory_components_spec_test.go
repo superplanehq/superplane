@@ -38,6 +38,10 @@ func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactPar
 	return nil, nil
 }
 
+func (f *fakeFactoryContext) LinkedWorkOrder() (*core.LinkedWorkOrder, bool, error) {
+	return nil, false, nil
+}
+
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
 	component := &UpdateWorkOrderStatus{}
 	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "open"}

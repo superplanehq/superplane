@@ -175,6 +175,39 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 			rule:        liveWriteRule,
 			expectAllow: false,
 		},
+		{
+			name:       "allows work_orders update for matching order id",
+			scopes:     marshalScopes(t, []string{"work_orders:update:order-aaa"}),
+			pathParams: map[string]string{"order_id": "order-aaa"},
+			rule: AuthorizationRule{
+				Resource:           "work_orders",
+				Action:             "update",
+				ResourcePathParams: []string{OrderIDPathParam},
+			},
+			expectAllow: true,
+		},
+		{
+			name:       "rejects work_orders update for other order id",
+			scopes:     marshalScopes(t, []string{"work_orders:update:order-aaa"}),
+			pathParams: map[string]string{"order_id": "order-bbb"},
+			rule: AuthorizationRule{
+				Resource:           "work_orders",
+				Action:             "update",
+				ResourcePathParams: []string{OrderIDPathParam},
+			},
+			expectAllow: false,
+		},
+		{
+			name:       "allows work_orders read for matching order id",
+			scopes:     marshalScopes(t, []string{"work_orders:read:order-aaa"}),
+			pathParams: map[string]string{"order_id": "order-aaa"},
+			rule: AuthorizationRule{
+				Resource:           "work_orders",
+				Action:             "read",
+				ResourcePathParams: []string{OrderIDPathParam},
+			},
+			expectAllow: true,
+		},
 	}
 
 	for _, tt := range tests {

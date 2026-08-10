@@ -8,6 +8,13 @@ type FactoryContext interface {
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
+	LinkedWorkOrder() (link *LinkedWorkOrder, ok bool, err error)
+}
+
+type LinkedWorkOrder struct {
+	ID              string
+	FactoryID       string
+	CreatedByUserID string
 }
 
 type WorkOrderParams struct {
