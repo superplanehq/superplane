@@ -158,6 +158,39 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
+func (c *FactoryContext) LinkedWorkOrder() (*core.LinkedWorkOrder, bool, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil || c.execution == nil {
+		return nil, false, nil
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	order, err := f.FindWorkOrder(c.tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	link := &core.LinkedWorkOrder{
+		ID:        order.ID.String(),
+		FactoryID: order.FactoryID.String(),
+	}
+	if order.CreatedByID != nil {
+		link.CreatedByUserID = order.CreatedByID.String()
+	}
+	return link, true, nil
+}
+
 // currentWorkOrder resolves the work order that owns the current run
 // via its `factory_work_order_executions` row (created by
 // `DispatchWorkOrder`). Runs not attached to a work order fail fast.

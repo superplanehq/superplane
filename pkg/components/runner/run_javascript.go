@@ -332,6 +332,8 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		setupCommands = normalizeCommands(spec.SetupCommands)
 	}
 
+	environment = appendFactoryRunnerEnvironment(ctx, environment, spec.ExecutionTimeoutSeconds, mode)
+
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
 		RunMode:        RunModeJavaScript,

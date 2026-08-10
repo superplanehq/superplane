@@ -8,6 +8,8 @@ const DomainIdContextKey contextKey = "domainId"
 
 const CanvasIDPathParam = "canvas_id"
 const IDPathParam = "id"
+const OrderIDPathParam = "order_id"
+const FactoryIDPathParam = "factory_id"
 
 /*
  * Path parameter keys used to resolve the resource ID referenced by a request.

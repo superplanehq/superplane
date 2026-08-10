@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 const MaxWebhookPayloadSize = 512 * 1024
@@ -14,6 +15,28 @@ func RabbitMQURL() (string, error) {
 	}
 
 	return URL, nil
+}
+
+func SessionSecret() (string, error) {
+	secret := strings.TrimSpace(os.Getenv("SESSION_SECRET"))
+	if secret == "" {
+		return "", fmt.Errorf("SESSION_SECRET not set")
+	}
+	return secret, nil
+}
+
+// JWTSecret is the signing key for API bearer JWTs (scoped tokens, sessions).
+// Must match the signer used by OrganizationAuthMiddleware.
+func JWTSecret() (string, error) {
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		return "", fmt.Errorf("JWT_SECRET not set")
+	}
+	return secret, nil
+}
+
+func BaseURL() string {
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 }
 
 func UsageGRPCURL() string {

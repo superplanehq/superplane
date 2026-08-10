@@ -1231,14 +1231,30 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 Runs a Bash script on a fleet runner.
 
 ### Execution
-- **Host**: Script runs with Bash on the runner machine.
-- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**).
+- **Host**: Script runs with Bash on the runner machine. Fleets launched with current fleet-manager user-data install the `superplane` CLI on the host at boot (GitHub latest release). Recycle older VMs if the binary is missing. Factory-linked Host runs also get injected CLI auth env (see below).
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**). Factory CLI auth auto-inject is Host-only for now; install the CLI via **Setup commands** if you need it inside a container.
 
 ### Script contract
 Your script runs as-is. The runner sets:
 
 - `SUPERPLANE_PAYLOAD_FILE` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
 - `SUPERPLANE_RESULT_FILE` — path where your script must write a JSON-serializable **result**
+
+When this node runs on **Host** as part of a **factory work order**, SuperPlane always injects (overwriting any node env with the same names):
+
+- `SUPERPLANE_URL` / `SUPERPLANE_TOKEN` — short-lived CLI auth bound to this execution (no `superplane connect`)
+- `SUPERPLANE_FACTORY_ID` / `SUPERPLANE_ORDER_ID` — work order this run belongs to
+
+Example artifact attach (Host mode):
+
+```bash
+superplane factory artifacts add \
+  --factory "$SUPERPLANE_FACTORY_ID" \
+  --order-id "$SUPERPLANE_ORDER_ID" \
+  --type markdown \
+  --title PLAN.md \
+  -f ./PLAN.md
+```
 
 Stdout and stderr (for example `echo`) stream to **View logs**. Write the structured **result** to `SUPERPLANE_RESULT_FILE`; it is emitted on the finished event as **result**.
 
@@ -1255,7 +1271,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
-- **Execution mode**: Host (default) or Docker.
+- **Execution mode**: Host (default) or Docker. Factory CLI env inject applies to Host only.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Script**: Bash source executed by the runner.
