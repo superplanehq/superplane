@@ -67,9 +67,9 @@ Your script runs as-is. The runner sets:
 - ` + "`SUPERPLANE_PAYLOAD_FILE`" + ` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
 - ` + "`SUPERPLANE_RESULT_FILE`" + ` — path where your script must write a JSON-serializable **result**
 
-When this node runs as part of a **factory work order**, SuperPlane also injects (unless you already set them):
+When this node runs as part of a **factory work order**, SuperPlane always injects (overwriting any node env with the same names):
 
-- ` + "`SUPERPLANE_URL`" + ` / ` + "`SUPERPLANE_TOKEN`" + ` — CLI auth (no ` + "`superplane connect`" + `)
+- ` + "`SUPERPLANE_URL`" + ` / ` + "`SUPERPLANE_TOKEN`" + ` — short-lived CLI auth bound to this execution (no ` + "`superplane connect`" + `)
 - ` + "`SUPERPLANE_FACTORY_ID`" + ` / ` + "`SUPERPLANE_ORDER_ID`" + ` — work order this run belongs to
 
 Example artifact attach (CLI image preset):
