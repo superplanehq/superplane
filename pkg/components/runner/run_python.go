@@ -327,6 +327,8 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		setupCommands = normalizeCommands(spec.SetupCommands)
 	}
 
+	environment = appendFactoryRunnerEnvironment(ctx, environment, spec.ExecutionTimeoutSeconds)
+
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
 		RunMode:        RunModePython,
