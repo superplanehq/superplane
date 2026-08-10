@@ -63,6 +63,33 @@ func TestGenerateScopedTokenRequiresScopes(t *testing.T) {
 	assert.Equal(t, "at least one scope is required", err.Error())
 }
 
+func TestGenerateScopedTokenFactoryRunnerRequiresExecutionID(t *testing.T) {
+	signer := NewSigner("test-secret")
+
+	_, err := signer.GenerateScopedToken(ScopedTokenClaims{
+		Subject: "user-123",
+		OrgID:   "org-123",
+		Purpose: PurposeFactoryRunner,
+		Scopes:  []string{"work_orders:read:order-1"},
+	}, time.Minute)
+	require.Error(t, err)
+	assert.Equal(t, "execution_id is required for factory_runner tokens", err.Error())
+
+	token, err := signer.GenerateScopedToken(ScopedTokenClaims{
+		Subject:     "user-123",
+		OrgID:       "org-123",
+		Purpose:     PurposeFactoryRunner,
+		ExecutionID: "exec-123",
+		Scopes:      []string{"work_orders:read:order-1"},
+	}, time.Minute)
+	require.NoError(t, err)
+
+	claims, err := signer.ValidateScopedToken(token)
+	require.NoError(t, err)
+	assert.Equal(t, "exec-123", claims.ExecutionID)
+	assert.Equal(t, PurposeFactoryRunner, claims.Purpose)
+}
+
 func TestValidateScopedTokenRejectsWrongTokenType(t *testing.T) {
 	signer := NewSigner("test-secret")
 	now := time.Now()
