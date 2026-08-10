@@ -26,10 +26,12 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		return nil, err
 	}
 
-	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), beforeTime, filters)
+	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit)+1, beforeTime, filters)
 	if err != nil {
 		return nil, err
 	}
+
+	runs, hasNext := trimPage(runs, int(limit))
 
 	count, err := countCanvasRuns(ctx, db, canvas.ID, filters)
 	if err != nil {
@@ -57,7 +59,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 	return &pb.ListRunsResponse{
 		Runs:          serialized,
 		TotalCount:    uint32(count),
-		HasNextPage:   hasNextPage(len(runs), int(limit), count),
+		HasNextPage:   hasNext,
 		LastTimestamp: getLastRunTimestamp(runs),
 	}, nil
 }
