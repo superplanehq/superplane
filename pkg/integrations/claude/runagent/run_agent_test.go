@@ -273,7 +273,6 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "sess_1", httpContext.Requests[4].URL.Query().Get("scope_id"))
 }
 
-// An unrecovered session.error must fail the run rather than pass with an empty message.
 func Test__RunAgent__Execute__syncSessionError(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{
@@ -282,7 +281,7 @@ func Test__RunAgent__Execute__syncSessionError(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"terminated"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete session
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -475,14 +474,13 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
 }
 
-// An unrecovered session.error must fail the execution via ExecutionState.Fail during polling too.
 func Test__RunAgent__poll__sessionErrorFailsExecution(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"terminated"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete session
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
@@ -987,7 +985,6 @@ func Test__SessionMessages__ExpectsArtifacts(t *testing.T) {
 	})
 }
 
-// A session.error is recoverable: a later session.status_idle means the session finished normally and Err must not be set.
 func Test__GetSessionMessages__recoveredSessionErrorIsNotFatal(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -1002,7 +999,6 @@ func Test__GetSessionMessages__recoveredSessionErrorIsNotFatal(t *testing.T) {
 	assert.Equal(t, "Done after retry", sm.LastMessage)
 }
 
-// An unrecovered session.error (no later session.status_idle) must set Err.
 func Test__GetSessionMessages__unrecoveredSessionErrorIsFatal(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{

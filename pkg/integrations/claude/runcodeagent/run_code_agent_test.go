@@ -253,22 +253,21 @@ func Test__RunCodeAgent__Execute__repositoryMode_schedulesPoll(t *testing.T) {
 	assert.Contains(t, string(body), "do the thing")
 }
 
-// An unrecovered session.error must fail the run and reclaim every provisioned resource.
 func Test__RunCodeAgent__Execute__sessionErrorFailsAndReclaims(t *testing.T) {
 	a := &RunCodeAgent{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
-		resp(`{"id":"agent_1"}`),                // create agent
-		resp(`{"id":"env_1"}`),                  // create environment
-		resp(`{"id":"vault_1"}`),                // create vault
-		resp(`{}`),                              // add GITHUB_TOKEN credential
-		resp(`{"id":"sess_1","status":"terminated"}`), // create session
-		resp(`{}`),                                    // send message
-		resp(`{"id":"sess_1","status":"terminated"}`), // get session (fast-path check)
-		resp(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`), // get session events
-		resp(`{}`), // teardown: delete session
-		resp(`{}`), // teardown: delete environment
-		resp(`{}`), // teardown: delete vault
-		resp(`{}`), // teardown: archive agent
+		resp(`{"id":"agent_1"}`),
+		resp(`{"id":"env_1"}`),
+		resp(`{"id":"vault_1"}`),
+		resp(`{}`),
+		resp(`{"id":"sess_1","status":"terminated"}`),
+		resp(`{}`),
+		resp(`{"id":"sess_1","status":"terminated"}`),
+		resp(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`),
+		resp(`{}`),
+		resp(`{}`),
+		resp(`{}`),
+		resp(`{}`),
 	}}
 	metadataCtx := &contexts.MetadataContext{}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -496,13 +495,12 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "# Migration notes\n", out.Artifacts[0].Content)
 }
 
-// An unrecovered session.error must fail the execution via ExecutionState.Fail during polling too.
 func Test__RunCodeAgent__poll__sessionErrorFailsExecution(t *testing.T) {
 	a := &RunCodeAgent{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		resp(`{"id":"sess_1","status":"terminated"}`),
 		resp(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`),
-		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`),
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	hookCtx := core.ActionHookContext{
