@@ -25,7 +25,7 @@ func setupAdminTestServer(t *testing.T) (*Server, *support.ResourceRegistry, str
 	server, _, token := setupTestServer(r, t)
 
 	// Promote the test account to installation admin
-	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+	require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 	return server, r, token
 }
@@ -840,7 +840,7 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &before))
 		assert.Equal(t, otherAccount.ID.String(), before["id"], "impersonation should be active")
 
-		require.NoError(t, models.DemoteFromInstallationAdmin(r.Account.ID.String()))
+		require.NoError(t, models.DemoteFromInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 		req2 := makeImpersonationRequest(t, http.MethodGet, "/account",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
@@ -854,7 +854,7 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		assert.Equal(t, r.Account.ID.String(), after["id"],
 			"after demotion, should return admin's own account, not impersonated")
 
-		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+		require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 	})
 }
 

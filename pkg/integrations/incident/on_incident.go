@@ -255,9 +255,12 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	}
 
 	// incident.io puts incident data under the event type key; some docs also show "incident" key.
-	incidentData, _ := source["incident"].(map[string]any)
-	if incidentData == nil {
-		incidentData, _ = source[eventType].(map[string]any)
+	var incidentData map[string]any
+	if source != nil {
+		incidentData, _ = source["incident"].(map[string]any)
+		if incidentData == nil {
+			incidentData, _ = source[eventType].(map[string]any)
+		}
 	}
 	emitPayload := map[string]any{
 		"event_type": eventType,

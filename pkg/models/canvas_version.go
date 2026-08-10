@@ -168,7 +168,7 @@ func ListCanvasVersionHistoryInTransaction(
 		Order("created_at DESC, id DESC")
 
 	if before != nil {
-		query = query.Where("created_at < ?", *before)
+		query = query.Where("created_at <= ?", *before)
 	}
 
 	if limit > 0 {
