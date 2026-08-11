@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -77,7 +78,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
-	order, err := c.currentWorkOrder()
+	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -106,7 +107,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 }
 
 func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {
-	order, err := c.currentWorkOrder()
+	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 }
 
 func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	order, err := c.currentWorkOrder()
+	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +141,7 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
+		Key:        params.Key,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
 	})
@@ -149,6 +151,79 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
 	return artifactToCore(artifact)
+}
+
+// FindWorkOrder resolves a work order by id or by an artifact key,
+// independent of the current run's `factory_work_order_executions` row.
+// This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
+// locate a work order to act on.
+func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
+	if c.canvas.FactoryID == nil {
+		return nil, errors.New("app is not owned by a factory")
+	}
+
+	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	var order *models.FactoryWorkOrder
+	switch params.By {
+	case "id":
+		orderID, parseErr := uuid.Parse(params.OrderID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid orderId %q: %w", params.OrderID, parseErr)
+		}
+		order, err = f.FindWorkOrder(c.tx, orderID)
+	case "artifactKey":
+		order, err = f.FindWorkOrderByArtifactKey(c.tx, params.ArtifactKey)
+	default:
+		return nil, fmt.Errorf("unknown findWorkOrder lookup %q", params.By)
+	}
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+			return nil, core.ErrWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return workOrderToCore(order), nil
+}
+
+// resolveWorkOrder resolves the work order a mutation should target: the
+// current run's work order when orderID is empty (preserving the original
+// line-dispatch behavior), or the explicitly requested one otherwise —
+// which is what lets a run not attached to any `factory_work_order_executions`
+// row (e.g. a plain github.onPullRequest webhook run) still target a
+// specific order.
+func (c *FactoryContext) resolveWorkOrder(orderID string) (*models.FactoryWorkOrder, error) {
+	if orderID == "" {
+		return c.currentWorkOrder()
+	}
+
+	if c.canvas.FactoryID == nil {
+		return nil, errors.New("app is not owned by a factory")
+	}
+
+	id, err := uuid.Parse(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid orderId %q: %w", orderID, err)
+	}
+
+	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := f.FindWorkOrder(c.tx, id)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+			return nil, fmt.Errorf("work order %q not found", orderID)
+		}
+		return nil, err
+	}
+
+	return order, nil
 }
 
 func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, reason string) {
