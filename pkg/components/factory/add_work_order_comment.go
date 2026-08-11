@@ -19,7 +19,8 @@ func init() {
 type AddWorkOrderComment struct{}
 
 type AddWorkOrderCommentConfiguration struct {
-	Body string `json:"body" mapstructure:"body"`
+	OrderID string `json:"orderId" mapstructure:"orderId"`
+	Body    string `json:"body" mapstructure:"body"`
 }
 
 func (c *AddWorkOrderComment) Name() string {
@@ -35,7 +36,9 @@ func (c *AddWorkOrderComment) Description() string {
 }
 
 func (c *AddWorkOrderComment) Documentation() string {
-	return `The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label. This component can only be used in factory-owned apps.`
+	return `The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label.
+
+By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set ` + "`orderId`" + ` to target a different work order explicitly, e.g. ` + "`{{ order().id }}`" + ` or ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderComment) Icon() string {
@@ -65,6 +68,15 @@ func (c *AddWorkOrderComment) Configuration() []configuration.Field {
 	// label lives in the component config.
 	return []configuration.Field{
 		{
+			Name:        "orderId",
+			Label:       "Work Order ID",
+			Description: "Work order to target. Defaults to the work order driving the current run (only available when this flow was dispatched from a factory line). Required otherwise, e.g. {{ order().id }} or {{ previous().data.workOrder.id }}.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Default:     "",
+		},
+		{
 			Name:        "body",
 			Label:       "Comment",
 			Description: "The comment body — plain text or markdown",
@@ -81,7 +93,8 @@ func (c *AddWorkOrderComment) Execute(ctx core.ExecutionContext) error {
 	}
 
 	err := ctx.Factory.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		Body: config.Body,
+		OrderID: config.OrderID,
+		Body:    config.Body,
 	})
 	if err != nil {
 		return err
