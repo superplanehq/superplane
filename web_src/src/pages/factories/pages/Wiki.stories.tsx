@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
 import { WikiWireframe } from "./wiki/WikiWireframe";
-import { WIKI_DOCUMENTS_DEFAULT } from "./wiki/wikiMocks";
+import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "./wiki/wikiMocks";
 
 /**
  * Storybook-only wiki wireframe inside FactoriesLayout.
@@ -21,15 +21,21 @@ type Story = StoryObj<typeof meta>;
 const wikiPath = `workspaces/${PRIMARY_FACTORY_ID}/wiki`;
 
 function DefaultWikiWireframe() {
-  return <WikiWireframe />;
+  return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
 }
 
 function EmptyWikiWireframe() {
-  return <WikiWireframe initialDocuments={[]} />;
+  return <WikiWireframe initialDocuments={[]} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
 }
 
 function EditingWikiWireframe() {
-  return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} startEditing />;
+  return (
+    <WikiWireframe
+      initialDocuments={WIKI_DOCUMENTS_DEFAULT}
+      refreshedDocuments={WIKI_DOCUMENTS_REFRESHED}
+      startEditing
+    />
+  );
 }
 
 export const Default: Story = {

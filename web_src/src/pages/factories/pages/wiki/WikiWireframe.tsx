@@ -9,17 +9,13 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { factoryPageSubtitleClassName, factoryPageTitleClassName } from "../factoryPageLayoutStyles";
-import {
-  buildWikiTree,
-  wikiFolderPaths,
-  WIKI_DOCUMENTS_DEFAULT,
-  WIKI_DOCUMENTS_REFRESHED,
-  type WikiDocument,
-  type WikiTreeNode,
-} from "./wikiMocks";
+import { buildWikiTree, wikiFolderPaths, type WikiDocument, type WikiTreeNode } from "./wikiMocks";
 
 export type WikiWireframeProps = {
+  /** Documents shown when the wireframe mounts. Supplied by stories — no baked-in fixtures. */
   initialDocuments?: WikiDocument[];
+  /** Corpus swapped in by “Refresh knowledge”. Supplied by stories. */
+  refreshedDocuments?: WikiDocument[];
   /** Story helper — start in edit mode when a doc is selected. */
   startEditing?: boolean;
 };
@@ -103,17 +99,133 @@ function TreeNode({
   );
 }
 
+function WikiDocumentEditor({
+  document,
+  draftTitle,
+  draftContent,
+  onDraftTitleChange,
+  onDraftContentChange,
+  onCancel,
+  onSave,
+}: {
+  document: WikiDocument;
+  draftTitle: string;
+  draftContent: string;
+  onDraftTitleChange: (value: string) => void;
+  onDraftContentChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Input
+            value={draftTitle}
+            onChange={(event) => onDraftTitleChange(event.target.value)}
+            aria-label="Document title"
+            className="h-9 text-[15px] font-medium"
+          />
+          <p className="mt-1 text-[12px] text-muted-foreground">{document.path}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" size="sm" onClick={onSave}>
+            Save
+          </Button>
+        </div>
+      </div>
+      <Textarea
+        value={draftContent}
+        onChange={(event) => onDraftContentChange(event.target.value)}
+        aria-label="Document content"
+        spellCheck={false}
+        className="min-h-[420px] resize-y font-mono text-[13px] leading-relaxed"
+      />
+    </div>
+  );
+}
+
+function WikiDocumentReader({ document, onEdit }: { document: WikiDocument; onEdit: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-[720px]">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-foreground">{document.title}</h2>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{document.path}</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+          Edit
+        </Button>
+      </div>
+      <div className="prose-wiki text-[13px] leading-relaxed text-foreground [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[12px] [&_h1]:mb-3 [&_h1]:text-[22px] [&_h1]:font-semibold [&_h1]:tracking-[-0.02em] [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h2]:font-semibold [&_li]:my-0.5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-accent/40 [&_pre]:p-3 [&_pre]:text-[12px] [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5">
+        <Markdown remarkPlugins={[remarkGfm]}>{document.content}</Markdown>
+      </div>
+    </div>
+  );
+}
+
+function WikiDocumentPane({
+  selected,
+  editing,
+  draftTitle,
+  draftContent,
+  onDraftTitleChange,
+  onDraftContentChange,
+  onCancelEdit,
+  onSaveEdit,
+  onStartEdit,
+}: {
+  selected: WikiDocument | null;
+  editing: boolean;
+  draftTitle: string;
+  draftContent: string;
+  onDraftTitleChange: (value: string) => void;
+  onDraftContentChange: (value: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onStartEdit: () => void;
+}) {
+  if (!selected) {
+    return <p className="text-[13px] text-muted-foreground">Select a document to read or edit.</p>;
+  }
+
+  if (editing) {
+    return (
+      <WikiDocumentEditor
+        document={selected}
+        draftTitle={draftTitle}
+        draftContent={draftContent}
+        onDraftTitleChange={onDraftTitleChange}
+        onDraftContentChange={onDraftContentChange}
+        onCancel={onCancelEdit}
+        onSave={onSaveEdit}
+      />
+    );
+  }
+
+  return <WikiDocumentReader document={selected} onEdit={onStartEdit} />;
+}
+
 /**
  * Storybook-only wiki wireframe (v3 parity). Not mounted on the app `/wiki` route.
+ * Mock corpora must be passed from stories — this component holds no sample documents.
  */
-export function WikiWireframe({ initialDocuments = WIKI_DOCUMENTS_DEFAULT, startEditing = false }: WikiWireframeProps) {
+export function WikiWireframe({
+  initialDocuments = [],
+  refreshedDocuments = [],
+  startEditing = false,
+}: WikiWireframeProps) {
+  const initialSelected = initialDocuments[0] ?? null;
   const [documents, setDocuments] = useState<WikiDocument[]>(initialDocuments);
-  const [selectedId, setSelectedId] = useState<string | null>(initialDocuments[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelected?.id ?? null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [treeReady, setTreeReady] = useState(false);
   const [editing, setEditing] = useState(startEditing);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftContent, setDraftContent] = useState("");
+  const [draftTitle, setDraftTitle] = useState(initialSelected?.title ?? "");
+  const [draftContent, setDraftContent] = useState(initialSelected?.content ?? "");
   const [refreshing, setRefreshing] = useState(false);
 
   const tree = useMemo(() => buildWikiTree(documents), [documents]);
@@ -155,12 +267,22 @@ export function WikiWireframe({ initialDocuments = WIKI_DOCUMENTS_DEFAULT, start
     setEditing(false);
   }
 
+  function cancelEdit() {
+    if (!selected) {
+      setEditing(false);
+      return;
+    }
+    setDraftTitle(selected.title);
+    setDraftContent(selected.content);
+    setEditing(false);
+  }
+
   function refreshKnowledge() {
     if (refreshing) return;
     setRefreshing(true);
     window.setTimeout(() => {
-      setDocuments(WIKI_DOCUMENTS_REFRESHED);
-      setSelectedId(WIKI_DOCUMENTS_REFRESHED[0]?.id ?? null);
+      setDocuments(refreshedDocuments);
+      setSelectedId(refreshedDocuments[0]?.id ?? null);
       setExpanded(new Set());
       setTreeReady(false);
       setEditing(false);
@@ -216,62 +338,17 @@ export function WikiWireframe({ initialDocuments = WIKI_DOCUMENTS_DEFAULT, start
         </aside>
 
         <section className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
-          {!selected ? (
-            <p className="text-[13px] text-muted-foreground">Select a document to read or edit.</p>
-          ) : editing ? (
-            <div className="mx-auto flex w-full max-w-[720px] flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <Input
-                    value={draftTitle}
-                    onChange={(event) => setDraftTitle(event.target.value)}
-                    aria-label="Document title"
-                    className="h-9 text-[15px] font-medium"
-                  />
-                  <p className="mt-1 text-[12px] text-muted-foreground">{selected.path}</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDraftTitle(selected.title);
-                      setDraftContent(selected.content);
-                      setEditing(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="button" size="sm" onClick={saveEdit}>
-                    Save
-                  </Button>
-                </div>
-              </div>
-              <Textarea
-                value={draftContent}
-                onChange={(event) => setDraftContent(event.target.value)}
-                aria-label="Document content"
-                spellCheck={false}
-                className="min-h-[420px] resize-y font-mono text-[13px] leading-relaxed"
-              />
-            </div>
-          ) : (
-            <div className="mx-auto w-full max-w-[720px]">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-foreground">{selected.title}</h2>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">{selected.path}</p>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  Edit
-                </Button>
-              </div>
-              <div className="prose-wiki text-[13px] leading-relaxed text-foreground [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[12px] [&_h1]:mb-3 [&_h1]:text-[22px] [&_h1]:font-semibold [&_h1]:tracking-[-0.02em] [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h2]:font-semibold [&_li]:my-0.5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-accent/40 [&_pre]:p-3 [&_pre]:text-[12px] [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5">
-                <Markdown remarkPlugins={[remarkGfm]}>{selected.content}</Markdown>
-              </div>
-            </div>
-          )}
+          <WikiDocumentPane
+            selected={selected}
+            editing={editing}
+            draftTitle={draftTitle}
+            draftContent={draftContent}
+            onDraftTitleChange={setDraftTitle}
+            onDraftContentChange={setDraftContent}
+            onCancelEdit={cancelEdit}
+            onSaveEdit={saveEdit}
+            onStartEdit={() => setEditing(true)}
+          />
         </section>
       </div>
     </div>
