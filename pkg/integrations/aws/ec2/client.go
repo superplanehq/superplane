@@ -2576,26 +2576,6 @@ func publicImageResourceName(image Image) string {
 
 // ── CloudWatch alarm types and methods ──────────────────────────────────────
 
-type PutMetricAlarmInput struct {
-	AlarmName          string
-	AlarmDescription   string
-	InstanceID         string
-	MetricName         string
-	Statistic          string
-	Period             int
-	EvaluationPeriods  int
-	Threshold          float64
-	ComparisonOperator string
-	TreatMissingData   string
-	// AlarmActions is the complete desired list of action ARNs.
-	// Entries may be SNS topic ARNs or EC2 automation ARNs
-	// (arn:aws:automate:<region>:ec2:recover|reboot|stop|terminate).
-	// An empty (nil) slice is sent as no members, which clears all actions in CloudWatch.
-	AlarmActions []string
-	// IncludeAlarmDescription always sends AlarmDescription, including when empty (to clear an existing description).
-	IncludeAlarmDescription bool
-}
-
 type MetricAlarm struct {
 	AlarmName          string           `json:"alarmName" mapstructure:"alarmName"`
 	AlarmArn           string           `json:"alarmArn" mapstructure:"alarmArn"`
@@ -2651,57 +2631,6 @@ type xmlMetricAlarm struct {
 type xmlAlarmDimension struct {
 	Name  string `xml:"Name"`
 	Value string `xml:"Value"`
-}
-
-func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
-	params := url.Values{}
-	params.Set("AlarmName", strings.TrimSpace(input.AlarmName))
-	params.Set("Namespace", alarmNamespaceEC2)
-	params.Set("MetricName", strings.TrimSpace(input.MetricName))
-	params.Set("Dimensions.member.1.Name", "InstanceId")
-	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
-
-	statistic := strings.TrimSpace(input.Statistic)
-	if statistic == "" {
-		statistic = "Average"
-	}
-	params.Set("Statistic", statistic)
-	params.Set("ComparisonOperator", strings.TrimSpace(input.ComparisonOperator))
-	params.Set("Threshold", strconv.FormatFloat(input.Threshold, 'f', -1, 64))
-
-	period := input.Period
-	if period <= 0 {
-		period = 300
-	}
-	params.Set("Period", strconv.Itoa(period))
-
-	evaluationPeriods := input.EvaluationPeriods
-	if evaluationPeriods <= 0 {
-		evaluationPeriods = 1
-	}
-	params.Set("EvaluationPeriods", strconv.Itoa(evaluationPeriods))
-
-	description := strings.TrimSpace(input.AlarmDescription)
-	if input.IncludeAlarmDescription || description != "" {
-		params.Set("AlarmDescription", description)
-	}
-
-	treatMissing := strings.TrimSpace(input.TreatMissingData)
-	if treatMissing != "" {
-		params.Set("TreatMissingData", treatMissing)
-	}
-
-	actionIndex := 0
-	for _, arn := range input.AlarmActions {
-		arn = strings.TrimSpace(arn)
-		if arn == "" {
-			continue
-		}
-		actionIndex++
-		params.Set(fmt.Sprintf("AlarmActions.member.%d", actionIndex), arn)
-	}
-
-	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "PutMetricAlarm", params, nil)
 }
 
 func (c *Client) DeleteAlarms(alarmNames ...string) error {
