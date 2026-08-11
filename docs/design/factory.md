@@ -131,7 +131,7 @@ Built-in factory components in `pkg/components/factory/`, registered on the stan
 | Component | Config | Effect |
 | --- | --- | --- |
 | `createWorkOrder` | `title`, `description`, `assignees[]` | Creates a work order in `draft`. |
-| `findWorkOrder` | `by` (`id`/`artifactKey`), conditional `orderId` or `artifactKey` | Resolves a work order by id or by an artifact's `key`, without needing a `factory_work_order_executions` row. Emits `workOrder.found`; passes silently (no emit) when nothing matches. |
+| `findWorkOrder` | `by` (`id`/`artifactKey`), conditional `orderId` or `artifactKey` | Resolves a work order by id or by an artifact's `key`, without needing a `factory_work_order_executions` row. Emits `workOrder.found` on the `found` channel on a match, or `workOrder.notFound` on the `notFound` channel otherwise — never fails the run just because nothing matched. |
 | `updateWorkOrderStatus` | required `orderId` (defaults to `{{ order().id }}`), `status` (`draft`/`open`/`closed`), conditional `result` (`completed`/`rejected`/`failed`, required for `closed`; only `rejected` is valid when closing from `draft`) | Runs the FSM and records an enriched `order.status.updated`. |
 | `addWorkOrderComment` | required `orderId` (defaults to `{{ order().id }}`), `body` | Appends an `order.comment.added` event. Authorship is derived from the executing canvas node (`kind = automation`, `automation = { nodeName, appName, lineName, stepName }`). |
 | `addWorkOrderArtifact` | required `orderId` (defaults to `{{ order().id }}`), `artifactType` (`pr`/`markdown`/`branch`); for `pr`: required `url`, optional `number`; for `markdown`: required `body`; for `branch`: required `name`; optional `title` on `pr`/`markdown`; optional `artifactKey`; free-form `data` (`{name, value}` list, merged into the artifact's `data` map — typed fields win on name collisions) | Creates the artifact row + `order.artifact.added` event. |
@@ -146,7 +146,8 @@ Built-in factory components in `pkg/components/factory/`, registered on the stan
 github.onPullRequest (merged)
   -> if ($.pull_request.merged == true)
   -> findWorkOrder (by: artifactKey, artifactKey: {{ $.pull_request.html_url }})
-  -> updateWorkOrderStatus (orderId: {{ previous().data.workOrder.id }}, status: closed, result: completed)
+       [found]    -> updateWorkOrderStatus (orderId: {{ previous().data.workOrder.id }}, status: closed, result: completed)
+       [notFound] -> (no-op; the merged PR isn't tied to a tracked order)
 ```
 
 This assumes an earlier `addWorkOrderArtifact` step (e.g. when the PR was opened) tagged an artifact with `artifactKey: {{ $.pull_request.html_url }}` so `findWorkOrder` has something to match against.

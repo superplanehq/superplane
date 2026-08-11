@@ -12,6 +12,8 @@ import (
 )
 
 const FindWorkOrderComponentName = "findWorkOrder"
+const FindWorkOrderChannelNameFound = "found"
+const FindWorkOrderChannelNameNotFound = "notFound"
 
 func init() {
 	registry.RegisterAction(FindWorkOrderComponentName, &FindWorkOrder{})
@@ -45,7 +47,12 @@ Lookup modes:
 - **Work Order ID** (` + "`by: id`" + `): resolves ` + "`orderId`" + ` directly.
 - **Artifact Key** (` + "`by: artifactKey`" + `): resolves the work order that owns the artifact tagged with ` + "`artifactKey`" + ` (set via ` + "`addWorkOrderArtifact`" + `'s ` + "`artifactKey`" + ` field — e.g. the pull request's URL).
 
-On a match, emits ` + "`workOrder.found`" + ` with ` + "`{ workOrder }`" + ` on the default channel, so downstream components can target it with ` + "`orderId: {{ previous().data.workOrder.id }}`" + `. When nothing matches, the component passes silently (no emit, no error) — a PR merge unrelated to any tracked order shouldn't red a flow. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.`
+On a match, emits ` + "`workOrder.found`" + ` with ` + "`{ workOrder }`" + ` on the ` + "`found`" + ` channel, so downstream components can target it with ` + "`orderId: {{ previous().data.workOrder.id }}`" + `. When nothing matches, emits on the ` + "`notFound`" + ` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the ` + "`notFound`" + ` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+
+## Output Channels
+
+- **Found**: A work order matched the lookup
+- **Not Found**: No work order matched the lookup`
 }
 
 func (c *FindWorkOrder) Icon() string {
@@ -71,7 +78,10 @@ func (c *FindWorkOrder) ExampleOutput() map[string]any {
 }
 
 func (c *FindWorkOrder) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: FindWorkOrderChannelNameFound, Label: "Found"},
+		{Name: FindWorkOrderChannelNameNotFound, Label: "Not Found"},
+	}
 }
 
 func (c *FindWorkOrder) Configuration() []configuration.Field {
@@ -133,16 +143,25 @@ func (c *FindWorkOrder) Execute(ctx core.ExecutionContext) error {
 	})
 	if err != nil {
 		// A PR merge (or similar) unrelated to any tracked order is an
-		// expected outcome, not a failure — let the run pass quietly so
-		// it doesn't need its own error-handling branch.
+		// expected outcome, not a failure — emit on the notFound channel
+		// so the flow can branch on it without needing its own
+		// error-handling logic.
 		if errors.Is(err, core.ErrWorkOrderNotFound) {
-			return ctx.ExecutionState.Pass()
+			return ctx.ExecutionState.Emit(
+				FindWorkOrderChannelNameNotFound,
+				"workOrder.notFound",
+				[]any{map[string]any{
+					"by":          config.By,
+					"orderId":     config.OrderID,
+					"artifactKey": config.ArtifactKey,
+				}},
+			)
 		}
 		return err
 	}
 
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		FindWorkOrderChannelNameFound,
 		"workOrder.found",
 		[]any{map[string]any{
 			"workOrder": order,

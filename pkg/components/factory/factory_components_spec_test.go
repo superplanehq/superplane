@@ -137,7 +137,7 @@ func TestFindWorkOrder_Execute(t *testing.T) {
 		assert.Equal(t, 1, factoryCtx.findCalls)
 		assert.Equal(t, "id", factoryCtx.findParams.By)
 		assert.Equal(t, "wo-1", factoryCtx.findParams.OrderID)
-		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Equal(t, FindWorkOrderChannelNameFound, stateCtx.Channel)
 		assert.Equal(t, "workOrder.found", stateCtx.Type)
 		assert.Len(t, stateCtx.Payloads, 1)
 	})
@@ -160,8 +160,9 @@ func TestFindWorkOrder_Execute(t *testing.T) {
 	})
 
 	// A PR merge (or similar) unrelated to any tracked order must not
-	// red the run — the component passes silently instead.
-	t.Run("passes silently when nothing matches", func(t *testing.T) {
+	// red the run — the component emits on the notFound channel instead
+	// of failing, so the flow can branch on it explicitly.
+	t.Run("emits on the notFound channel when nothing matches", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{findErr: core.ErrWorkOrderNotFound}
 		stateCtx := &contexts.ExecutionStateContext{}
 
@@ -171,11 +172,9 @@ func TestFindWorkOrder_Execute(t *testing.T) {
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
-		assert.True(t, stateCtx.Passed)
-		assert.True(t, stateCtx.Finished)
-		assert.Empty(t, stateCtx.Channel, "not-found must not emit on any channel")
-		assert.Empty(t, stateCtx.Type)
-		assert.Nil(t, stateCtx.Payloads)
+		assert.Equal(t, FindWorkOrderChannelNameNotFound, stateCtx.Channel)
+		assert.Equal(t, "workOrder.notFound", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
 	})
 
 	t.Run("propagates real errors", func(t *testing.T) {

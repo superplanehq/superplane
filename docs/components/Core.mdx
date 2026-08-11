@@ -735,7 +735,12 @@ Lookup modes:
 - **Work Order ID** (`by: id`): resolves `orderId` directly.
 - **Artifact Key** (`by: artifactKey`): resolves the work order that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
 
-On a match, emits `workOrder.found` with `{ workOrder }` on the default channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, the component passes silently (no emit, no error) — a PR merge unrelated to any tracked order shouldn't red a flow. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+
+### Output Channels
+
+- **Found**: A work order matched the lookup
+- **Not Found**: No work order matched the lookup
 
 ### Example Output
 
