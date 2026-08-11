@@ -1,4 +1,13 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useCallback,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import type { Suggestion } from "./core";
@@ -146,6 +155,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
+    // Caret offset to restore once the next render has written the new value to the DOM.
+    const pendingCaretRef = useRef<number | null>(null);
     const highlightedIndexRef = useRef(highlightedIndex);
     const suggestionListKeyRef = useRef("");
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
@@ -1152,6 +1163,21 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // The textarea is controlled, so React rewrites its value on every render and the
+    // browser drops the caret at the end. Any caret we want to place after changing the
+    // value has to be applied once that rewrite has landed in the DOM, which is what
+    // this layout effect does - scheduling it earlier (in a callback or an animation
+    // frame) races the render and the caret snaps back to the end.
+    useLayoutEffect(() => {
+      const caret = pendingCaretRef.current;
+      if (caret === null) {
+        return;
+      }
+
+      pendingCaretRef.current = null;
+      inputRef.current?.setSelectionRange(caret, caret);
+    }, [inputValue]);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       const cursorPosition = e.target.selectionStart ?? newValue.length;
@@ -1175,14 +1201,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         !isAllowedToSuggest(inputValue, cursorPosition)
       ) {
         const composedValue = `${newValue.slice(0, start)}${prefix || ""}${suffix || ""}${newValue.slice(start + word.length)}`;
+        const cursorTarget = start + (prefix || "").length;
         setInputValue(composedValue);
         onChange?.(composedValue);
+        setCursorPosition(cursorTarget);
         setSuggestions([]);
         setIsOpen(false);
-        requestAnimationFrame(() => {
-          const cursorTarget = start + (prefix || "").length;
-          inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
-        });
+        pendingCaretRef.current = cursorTarget;
         return;
       }
 
