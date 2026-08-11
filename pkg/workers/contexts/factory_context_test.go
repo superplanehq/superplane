@@ -145,7 +145,8 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
@@ -180,14 +181,16 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 		WithWorkOrderUpdated(func(_, _, _ string) { notifications++ })
 
 	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, 1, notifications)
 
 	_, changed, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.False(t, changed, "re-hitting the same state must report changed=false")
@@ -219,8 +222,9 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State:  models.FactoryWorkOrderStateClosed,
-		Result: models.FactoryWorkOrderResultCompleted,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultCompleted,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
@@ -234,9 +238,11 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
 }
 
-func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
-	// A run with no work-order execution link must fail loudly rather
-	// than silently target some default order.
+// orderId is required and explicit at the FactoryContext level too — there
+// is no implicit fallback to "the work order driving the current run".
+// That behavior now lives entirely in the `{{ order().id }}` default on the
+// component field, resolved before Execute ever sees the configuration.
+func TestFactoryContext_UpdateWorkOrderStatus_EmptyOrderIDIsRejected(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -250,7 +256,42 @@ func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
 		State: models.FactoryWorkOrderStateOpen,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not attached to a work order")
+	assert.EqualError(t, err, "orderId is required")
+}
+
+func TestFactoryContext_AddWorkOrderComment_EmptyOrderIDIsRejected(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	err = ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		Body: "Ready for review",
+	})
+	require.Error(t, err)
+	assert.EqualError(t, err, "orderId is required")
+}
+
+func TestFactoryContext_AddWorkOrderArtifact_EmptyOrderIDIsRejected(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, err = ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		Type: "pr",
+		Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+	})
+	require.Error(t, err)
+	assert.EqualError(t, err, "orderId is required")
 }
 
 // Regression coverage for the github.onPullRequest -> close-work-order bug:
@@ -443,7 +484,8 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		Body: "Ready for review",
+		OrderID: order.ID.String(),
+		Body:    "Ready for review",
 	}))
 
 	commentEvent := findWorkOrderEvent(t, order, "order.comment.added")
@@ -482,7 +524,8 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type: "pr",
+		OrderID: order.ID.String(),
+		Type:    "pr",
 		Data: map[string]any{
 			"url":    "https://github.com/example/repo/pull/1",
 			"title":  "Draft",

@@ -62,7 +62,7 @@ PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, v
 
 Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
 
-By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set ` + "`orderId`" + ` to target a different work order explicitly, e.g. ` + "`{{ order().id }}`" + ` or ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -107,11 +107,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only available when this flow was dispatched from a factory line). Required otherwise, e.g. {{ order().id }} or {{ previous().data.workOrder.id }}.",
+			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Default:     "",
+			Required:    true,
+			Default:     "{{ order().id }}",
 		},
 		{
 			Name:        "artifactType",

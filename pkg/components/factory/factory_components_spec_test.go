@@ -250,16 +250,27 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires result when closing", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"status": "closed",
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
 		})
 		if err == nil {
 			t.Fatal("expected error for closing without a result")
 		}
 	})
 
+	t.Run("requires orderId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"status": "open",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing orderId")
+		}
+	})
+
 	t.Run("accepts draft status", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"status": "draft",
+			"orderId": "{{ order().id }}",
+			"status":  "draft",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -268,7 +279,8 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts open status", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"status": "open",
+			"orderId": "{{ order().id }}",
+			"status":  "open",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -277,8 +289,9 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts closed with failed result", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"status": "closed",
-			"result": "failed",
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "failed",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -291,15 +304,27 @@ func TestAddWorkOrderComment_ValidatesConfiguration(t *testing.T) {
 	fields := c.Configuration()
 
 	t.Run("rejects missing body", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{})
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+		})
 		if err == nil {
 			t.Fatal("expected error for missing body")
 		}
 	})
 
-	t.Run("accepts body-only configuration", func(t *testing.T) {
+	t.Run("rejects missing orderId", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"body": "hello",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing orderId")
+		}
+	})
+
+	t.Run("accepts orderId and body", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"body":    "hello",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -313,6 +338,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires url for pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "pr",
 		})
 		if err == nil {
@@ -322,6 +348,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires body for markdown", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "markdown",
 		})
 		if err == nil {
@@ -331,6 +358,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires name for branch", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 		})
 		if err == nil {
@@ -338,8 +366,19 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("requires orderId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "pr",
+			"url":          "https://github.com/example/repo/pull/1",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing orderId")
+		}
+	})
+
 	t.Run("accepts valid pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",
 			"number":       "1",
@@ -352,6 +391,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts markdown with body", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "markdown",
 			"body":         "investigation notes",
 			"title":        "Design notes",
@@ -363,6 +403,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts branch with name", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
 		})
@@ -373,6 +414,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
 			"artifactType": "pr",
 			"url":          "https://github.com/example/repo/pull/1",
 			"data": []any{

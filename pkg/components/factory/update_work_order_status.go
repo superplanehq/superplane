@@ -39,7 +39,7 @@ func (c *UpdateWorkOrderStatus) Description() string {
 func (c *UpdateWorkOrderStatus) Documentation() string {
 	return `The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
 
-By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set ` + "`orderId`" + ` to target a different work order explicitly, e.g. ` + "`{{ order().id }}`" + ` or, in a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
@@ -74,11 +74,10 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only available when this flow was dispatched from a factory line). Required otherwise, e.g. {{ order().id }} or {{ previous().data.workOrder.id }}.",
+			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Default:     "",
+			Required:    true,
+			Default:     "{{ order().id }}",
 		},
 		{
 			Name:        "status",

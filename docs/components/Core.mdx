@@ -441,7 +441,7 @@ PR and markdown types accept a free-form `data` list of `{name, value}` entries 
 
 Set `artifactKey` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a `github.onPullRequest` merged event. Keys are unique per factory.
 
-By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set `orderId` to target a different work order explicitly, e.g. `{{ order().id }}` or `{{ previous().data.workOrder.id }}`. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}`. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -472,7 +472,7 @@ By default this targets the work order driving the current run — only availabl
 
 The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label.
 
-By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set `orderId` to target a different work order explicitly, e.g. `{{ order().id }}` or `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -1650,7 +1650,7 @@ iteration starts) instead of a bare expression.
 
 The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
 
-By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set `orderId` to target a different work order explicitly, e.g. `{{ order().id }}` or, in a flow triggered by an external event such as `github.onPullRequest`, `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 

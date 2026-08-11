@@ -37,23 +37,24 @@ type FindWorkOrderParams struct {
 }
 
 type UpdateWorkOrderStatusParams struct {
-	// OrderID optionally targets a specific work order, bypassing the
-	// current run's `factory_work_order_executions` row. Empty means
-	// "the work order driving the current run" (unchanged behavior).
+	// OrderID identifies the work order to target. Required; the
+	// component field defaults to `{{ order().id }}` (the work order
+	// driving the current run) but callers must always resolve and pass
+	// an explicit id.
 	OrderID string
 	State   string
 	Result  string
 }
 
 type AddWorkOrderCommentParams struct {
-	// OrderID optionally targets a specific work order; see
+	// OrderID identifies the work order to target; see
 	// UpdateWorkOrderStatusParams.OrderID.
 	OrderID string
 	Body    string
 }
 
 type AddWorkOrderArtifactParams struct {
-	// OrderID optionally targets a specific work order; see
+	// OrderID identifies the work order to target; see
 	// UpdateWorkOrderStatusParams.OrderID.
 	OrderID string
 	Type    string

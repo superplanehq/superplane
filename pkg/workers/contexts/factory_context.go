@@ -190,15 +190,15 @@ func (c *FactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.W
 	return workOrderToCore(order), nil
 }
 
-// resolveWorkOrder resolves the work order a mutation should target: the
-// current run's work order when orderID is empty (preserving the original
-// line-dispatch behavior), or the explicitly requested one otherwise —
-// which is what lets a run not attached to any `factory_work_order_executions`
-// row (e.g. a plain github.onPullRequest webhook run) still target a
-// specific order.
+// resolveWorkOrder resolves the work order a mutation should target.
+// orderID is always required and explicit — the component field that
+// feeds it defaults to `{{ order().id }}` (the current run's work order)
+// but every caller must resolve and pass a real id, which is what lets a
+// run not attached to any `factory_work_order_executions` row (e.g. a
+// plain github.onPullRequest webhook run) still target a specific order.
 func (c *FactoryContext) resolveWorkOrder(orderID string) (*models.FactoryWorkOrder, error) {
 	if orderID == "" {
-		return c.currentWorkOrder()
+		return nil, errors.New("orderId is required")
 	}
 
 	if c.canvas.FactoryID == nil {
@@ -231,33 +231,6 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 		return
 	}
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
-}
-
-// currentWorkOrder resolves the work order that owns the current run
-// via its `factory_work_order_executions` row (created by
-// `DispatchWorkOrder`). Runs not attached to a work order fail fast.
-func (c *FactoryContext) currentWorkOrder() (*models.FactoryWorkOrder, error) {
-	if c.canvas.FactoryID == nil {
-		return nil, errors.New("app is not owned by a factory")
-	}
-	if c.execution == nil {
-		return nil, errors.New("factory context has no current execution")
-	}
-
-	execution, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
-	if err != nil {
-		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return nil, errors.New("this canvas run is not attached to a work order; dispatch a work order to it first")
-		}
-		return nil, err
-	}
-
-	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
-	if err != nil {
-		return nil, err
-	}
-
-	return f.FindWorkOrder(c.tx, execution.WorkOrderID)
 }
 
 // runRef attributes emitted events back to the currently executing run.
