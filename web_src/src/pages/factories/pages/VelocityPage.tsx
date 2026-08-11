@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { ComingSoonPage } from "./ComingSoonPage";
 
 export function VelocityPage() {
@@ -6,7 +6,7 @@ export function VelocityPage() {
     <ComingSoonPage
       title="Velocity"
       description="Track how quickly work moves through the workspace."
-      Icon={BarChart3}
+      Icon={Gauge}
     />
   );
 }
