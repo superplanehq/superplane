@@ -91,6 +91,7 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 				[]core.Action{
 					&components.RunWorkflow{},
 					&components.GetPipeline{},
+					&components.WaitForPipeline{},
 				},
 				[]core.Trigger{
 					&components.OnPipelineDone{},

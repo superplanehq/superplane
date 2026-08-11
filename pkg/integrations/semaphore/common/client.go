@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -219,20 +220,59 @@ func (c *Client) GetPipeline(id string) (*Pipeline, error) {
 	return pipelineResponse.Pipeline, nil
 }
 
-func (c *Client) ListPipelines(projectID string) ([]any, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?project_id=%s", c.OrgURL, projectID)
+// ErrPipelineNotFound is returned by FindPipelineByBranchAndCommit when no
+// pipeline matching the given branch and commit SHA could be found.
+//
+// It is backed by an *HTTPError with a 404 status code, so common.IsNotFoundError
+// treats it the same way it treats a real "not found" response from the API.
+var ErrPipelineNotFound = &HTTPError{StatusCode: http.StatusNotFound, Body: "pipeline not found"}
+
+// ListPipelines lists the pipelines for a project, optionally narrowed down to a branch.
+//
+// branchName is passed to the API as a best-effort server-side filter. Callers that need
+// an exact match (e.g. a specific commit SHA) should still filter the returned pipelines
+// themselves, since the API may ignore the filter or not support it.
+//
+// Known limitation: this only looks at the first page/response returned by the API.
+// If the Semaphore API paginates this endpoint, pipelines beyond the first page won't
+// be considered. For a branch that was just pushed to, the pipeline should be at or
+// near the top of a "most recent first" listing, so this is acceptable for now.
+func (c *Client) ListPipelines(projectID string, branchName string) ([]Pipeline, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?project_id=%s", c.OrgURL, url.QueryEscape(projectID))
+	if branchName != "" {
+		URL += fmt.Sprintf("&branch_name=%s", url.QueryEscape(branchName))
+	}
+
 	response, err := c.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var pipelines []any
+	var pipelines []Pipeline
 	err = json.Unmarshal(response, &pipelines)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
 	return pipelines, nil
+}
+
+// FindPipelineByBranchAndCommit looks up a pipeline for the given project by branch
+// name and commit SHA. It returns ErrPipelineNotFound if no pipeline matches.
+func (c *Client) FindPipelineByBranchAndCommit(projectID, branch, commitSha string) (*Pipeline, error) {
+	pipelines, err := c.ListPipelines(projectID, branch)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pipeline := range pipelines {
+		if pipeline.BranchName == branch && pipeline.CommitSHA == commitSha {
+			found := pipeline
+			return &found, nil
+		}
+	}
+
+	return nil, ErrPipelineNotFound
 }
 
 type CreateWorkflowResponse struct {

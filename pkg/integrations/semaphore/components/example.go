@@ -16,6 +16,9 @@ var exampleDataOnPipelineDoneBytes []byte
 //go:embed payloads/get_pipeline.json
 var exampleOutputGetPipelineBytes []byte
 
+//go:embed payloads/wait_for_pipeline.json
+var exampleOutputWaitForPipelineBytes []byte
+
 var exampleOutputOnce sync.Once
 var exampleOutput map[string]any
 
@@ -24,6 +27,9 @@ var exampleData map[string]any
 
 var exampleOutputGetPipelineOnce sync.Once
 var exampleOutputGetPipeline map[string]any
+
+var exampleOutputWaitForPipelineOnce sync.Once
+var exampleOutputWaitForPipeline map[string]any
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputRunWorkflowBytes, &exampleOutput)
@@ -35,4 +41,8 @@ func (t *OnPipelineDone) ExampleData() map[string]any {
 
 func (c *GetPipeline) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPipelineOnce, exampleOutputGetPipelineBytes, &exampleOutputGetPipeline)
+}
+
+func (w *WaitForPipeline) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputWaitForPipelineOnce, exampleOutputWaitForPipelineBytes, &exampleOutputWaitForPipeline)
 }
