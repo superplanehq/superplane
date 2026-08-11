@@ -80,7 +80,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
       className={cn(
         "group/block relative w-fit",
         shouldFade && !shouldBlankBody && "opacity-30",
-        isRemoved && "pointer-events-none opacity-50",
+        isRemoved && "sp-block-removed pointer-events-none opacity-50",
       )}
       onClick={(e) => props.onClick?.(e)}
     >
