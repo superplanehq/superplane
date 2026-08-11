@@ -131,6 +131,56 @@ func TestOrderListCommand_Filters(t *testing.T) {
 	assert.Equal(t, []string{"true"}, seenQuery["unassigned"])
 }
 
+func TestOrderListCommand_DefaultsToOpenState(t *testing.T) {
+	var seenQuery map[string][]string
+	server := newOrderListServer(t, func(t *testing.T, query map[string][]string) {
+		seenQuery = query
+	})
+
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+
+	factory := testOrderListFactoryID
+	err := (&orderListCommand{factory: &factory}).Execute(ctx)
+	require.NoError(t, err)
+
+	require.NotNil(t, seenQuery)
+	assert.Equal(t, []string{"STATE_OPEN"}, seenQuery["states"])
+}
+
+func TestOrderListCommand_StateAllDisablesDefaultFilter(t *testing.T) {
+	var seenQuery map[string][]string
+	server := newOrderListServer(t, func(t *testing.T, query map[string][]string) {
+		seenQuery = query
+	})
+
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+
+	factory := testOrderListFactoryID
+	states := []string{"all"}
+	err := (&orderListCommand{factory: &factory, states: &states}).Execute(ctx)
+	require.NoError(t, err)
+
+	require.NotNil(t, seenQuery)
+	assert.Empty(t, seenQuery["states"])
+}
+
+func TestOrderListCommand_StateAllCaseInsensitive(t *testing.T) {
+	var seenQuery map[string][]string
+	server := newOrderListServer(t, func(t *testing.T, query map[string][]string) {
+		seenQuery = query
+	})
+
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+
+	factory := testOrderListFactoryID
+	states := []string{" All "}
+	err := (&orderListCommand{factory: &factory, states: &states}).Execute(ctx)
+	require.NoError(t, err)
+
+	require.NotNil(t, seenQuery)
+	assert.Empty(t, seenQuery["states"])
+}
+
 func TestOrderListCommand_UnknownAssigneeEmail(t *testing.T) {
 	server := newOrderListServer(t, nil)
 	ctx, _ := cli.NewCommandContext(t, server, "text")
@@ -149,4 +199,14 @@ func TestNormalizeFilterValues(t *testing.T) {
 
 	got = normalizeFilterValues([]string{"completed", "RESULT_FAILED", "unknown-token"}, shortOrderResultTokens)
 	assert.Equal(t, []string{"RESULT_COMPLETED", "RESULT_FAILED", "unknown-token"}, got)
+}
+
+func TestResolveStateFilter(t *testing.T) {
+	assert.Equal(t, []string{"open"}, resolveStateFilter(nil))
+	assert.Equal(t, []string{"open"}, resolveStateFilter([]string{}))
+	assert.Equal(t, []string{"closed"}, resolveStateFilter([]string{"closed"}))
+	assert.Nil(t, resolveStateFilter([]string{"all"}))
+	assert.Nil(t, resolveStateFilter([]string{"ALL"}))
+	assert.Nil(t, resolveStateFilter([]string{" all "}))
+	assert.Nil(t, resolveStateFilter([]string{"open", "all"}))
 }
