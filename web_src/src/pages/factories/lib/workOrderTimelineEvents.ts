@@ -67,9 +67,6 @@ export interface WorkOrderTimelineAutomationActor {
   stepName?: string;
 }
 
-/** @deprecated use WorkOrderTimelineAutomationActor */
-export type WorkOrderTimelineCommentAutomation = WorkOrderTimelineAutomationActor;
-
 export interface WorkOrderTimelineComment {
   body: string;
   authorKind?: string;
@@ -122,8 +119,23 @@ export function buildWorkOrderUserDisplayLookup(
 export function buildWorkOrderTimelineView(
   apiEvents: FactoriesWorkOrderEvent[] | undefined,
   resolveUserName?: UserNameLookup,
+  executions: FactoriesWorkOrderExecution[] = [],
 ): WorkOrderTimelineViewModel {
-  return buildWorkOrderTimelineViewFromEvents(apiEvents ?? [], resolveUserName);
+  const timeline = buildWorkOrderTimelineViewFromEvents(apiEvents ?? [], resolveUserName);
+  const executionsByRunID = new Map(
+    executions.flatMap((execution) => (execution.run?.id ? [[execution.run.id, execution]] : [])),
+  );
+
+  for (const event of timeline.events) {
+    for (const step of event.steps ?? []) {
+      const execution = step.execution.id ? executionsByRunID.get(step.execution.id) : undefined;
+      if (execution) {
+        step.execution = { ...step.execution, ...execution };
+      }
+    }
+  }
+
+  return timeline;
 }
 
 export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string | null {

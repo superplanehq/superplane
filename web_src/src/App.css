@@ -375,14 +375,7 @@
   color: #1f2937;
 }
 
-/*
- * v3 design tokens (Cursor-inspired), scoped to the factories area.
- * Applied via `document.body.classList.add("theme-factories")` while a
- * /workspaces route is mounted (see useFactoriesThemeClass). Values here
- * mirror superplanehq/v3 src/index.css verbatim; only the CSS variables
- * that shadcn primitives already consume are overridden, so components
- * repaint themselves without needing bespoke wrappers.
- */
+/* Workspace design tokens, active while a /workspaces route is mounted. */
 .theme-factories {
   --radius: 0.5rem;
   --workspace-navigation-width: 15rem;
@@ -402,6 +395,7 @@
   --workspace-label-size: 11px;
   --workspace-label-line-height: 16.5px;
   --workspace-label-tracking: 0.04em;
+  --workspace-markdown-line-height: 1.625;
 
   --background: #ffffff;
   --foreground: #26251e;
@@ -512,16 +506,120 @@
     letter-spacing: var(--workspace-label-tracking);
     line-height: var(--workspace-label-line-height);
   }
+
+  .workspace-markdown {
+    max-width: 42rem;
+    color: var(--muted-foreground);
+    font-size: var(--workspace-body-size);
+    line-height: var(--workspace-markdown-line-height);
+  }
+
+  .workspace-markdown p,
+  .workspace-markdown ul,
+  .workspace-markdown ol,
+  .workspace-markdown blockquote,
+  .workspace-markdown pre {
+    margin-block: 0.5rem;
+  }
+
+  .workspace-markdown ul,
+  .workspace-markdown ol {
+    margin-left: 1.25rem;
+  }
+
+  .workspace-markdown ul {
+    list-style-type: disc;
+  }
+
+  .workspace-markdown ol {
+    list-style-type: decimal;
+  }
+
+  .workspace-markdown li + li {
+    margin-top: 0.25rem;
+  }
+
+  .workspace-markdown strong,
+  .workspace-markdown b {
+    color: color-mix(in srgb, var(--foreground) 90%, transparent);
+    font-weight: 500;
+  }
+
+  .workspace-markdown blockquote {
+    border-left: 2px solid var(--border);
+    padding-left: 0.75rem;
+  }
+
+  .workspace-markdown pre {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    background: color-mix(in srgb, var(--accent) 50%, transparent);
+    padding: 0.75rem;
+  }
+
+  .workspace-markdown code {
+    border-radius: calc(var(--radius) - 4px);
+    background: var(--accent);
+    color: var(--foreground);
+    padding: 0.125rem 0.25rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .workspace-markdown pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  .workspace-markdown hr {
+    margin-block: 0.75rem;
+    border-color: var(--border);
+  }
+
+  .workspace-markdown a {
+    color: var(--foreground);
+    text-decoration-line: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 2px;
+  }
+
+  .workspace-markdown a:hover {
+    text-decoration-color: var(--foreground);
+  }
+
+  .workspace-markdown-heading {
+    color: var(--foreground);
+    line-height: var(--workspace-markdown-line-height);
+  }
+
+  .workspace-markdown-heading:first-child {
+    margin-top: 0;
+  }
+
+  .workspace-markdown-heading-h1 {
+    margin-block: 1rem 0.5rem;
+    font-size: var(--workspace-section-title-size);
+    font-weight: 600;
+    letter-spacing: var(--workspace-section-title-tracking);
+  }
+
+  .workspace-markdown-heading-h2 {
+    margin-block: 1rem 0.375rem;
+    font-size: var(--workspace-body-size);
+    font-weight: 600;
+    letter-spacing: var(--workspace-section-title-tracking);
+  }
+
+  .workspace-markdown-heading-h3,
+  .workspace-markdown-heading-h4 {
+    margin-block: 0.75rem 0.25rem;
+    font-size: var(--workspace-body-size);
+    font-weight: 500;
+  }
 }
 
-/*
- * v3 uses subtly-rounded buttons, not the pill shape our base variants apply
- * globally. Compound-selector specificity (0,2,0) beats Tailwind's `rounded-full`
- * utility (0,1,0), so every shadcn Button inside the factories theme gets the
- * v3 radius without needing per-call overrides. Avatars and other bare
- * `rounded-full` elements are untouched because they don't carry `data-slot`.
- */
-.theme-factories [data-slot="button"] {
+.theme-factories [data-slot="button"]:not([data-size^="icon"]) {
   border-radius: calc(var(--radius) - 2px);
 }
 

@@ -12,20 +12,25 @@ interface WorkOrderDescriptionProps {
 
 const COLLAPSED_MAX_HEIGHT_PX = 220;
 
-/**
- * Render the work order description as markdown with a collapsible fade.
- * Uses a ref to measure the rendered markdown so we only show the "Show more"
- * toggle when content actually exceeds the collapsed height.
- */
 export function WorkOrderDescription({ description, className }: WorkOrderDescriptionProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
 
   useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    setNeedsToggle(el.scrollHeight > COLLAPSED_MAX_HEIGHT_PX + 4);
+    const content = contentRef.current;
+    if (!content) {
+      return;
+    }
+
+    const updateOverflow = () => {
+      setNeedsToggle(content.scrollHeight > COLLAPSED_MAX_HEIGHT_PX + 4);
+    };
+    updateOverflow();
+
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(content);
+    return () => observer.disconnect();
   }, [description]);
 
   if (!description.trim()) {

@@ -63,26 +63,13 @@ const MARKDOWN_CONTENT_CLASSES = cn(
   CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES,
 );
 
-const WORKSPACE_MARKDOWN_CONTENT_CLASSES = cn(
-  "max-w-2xl text-[13px] leading-relaxed text-muted-foreground " +
-    "[&_p]:my-2 [&_ul]:my-2 [&_ul]:ml-5 [&_ul]:list-disc [&_ul]:space-y-1 " +
-    "[&_ol]:my-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_li]:leading-relaxed " +
-    "[&_strong]:font-medium [&_strong]:text-foreground/90 [&_b]:font-medium [&_b]:text-foreground/90 " +
-    "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 " +
-    "[&_blockquote]:text-muted-foreground [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md " +
-    "[&_pre]:border [&_pre]:border-border [&_pre]:bg-accent/50 [&_pre]:p-3 " +
-    "[&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono " +
-    "[&_code]:text-[12px] [&_code]:text-foreground [&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-    "[&_hr]:my-3 [&_hr]:border-border",
-  CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES,
-  CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES,
-);
+const WORKSPACE_MARKDOWN_CONTENT_CLASSES = "workspace-markdown";
 
 const WORKSPACE_MARKDOWN_HEADING_CLASSES = {
-  h1: "mt-4 mb-2 text-[15px] leading-[1.625] font-semibold tracking-[-0.01em] text-foreground first:mt-0",
-  h2: "mt-4 mb-1.5 text-[13px] leading-[1.625] font-semibold tracking-[-0.01em] text-foreground first:mt-0",
-  h3: "mt-3 mb-1 text-[13px] leading-[1.625] font-medium text-foreground first:mt-0",
-  h4: "mt-3 mb-1 text-[13px] leading-[1.625] font-medium text-foreground first:mt-0",
+  h1: "workspace-markdown-heading workspace-markdown-heading-h1",
+  h2: "workspace-markdown-heading workspace-markdown-heading-h2",
+  h3: "workspace-markdown-heading workspace-markdown-heading-h3",
+  h4: "workspace-markdown-heading workspace-markdown-heading-h4",
 } as const;
 /**
  * Sanitize schema extending the rehype-sanitize defaults with `<details>` /

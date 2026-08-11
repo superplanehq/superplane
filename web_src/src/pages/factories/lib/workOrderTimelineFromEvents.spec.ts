@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 
+import { buildWorkOrderTimelineView } from "./workOrderTimelineEvents";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
 function stepExecutionEvent(
@@ -23,6 +24,21 @@ function stepExecutionEvent(
 }
 
 describe("buildWorkOrderTimelineViewFromEvents", () => {
+  it("hydrates timeline steps with execution usage", () => {
+    const view = buildWorkOrderTimelineView(
+      [stepExecutionEvent("step.execution.finished", "2026-08-04T12:00:00.000Z", "finished", "passed")],
+      undefined,
+      [{ id: "execution-1", run: { id: "run-1" }, totalTokens: "1200", costCents: "45" }],
+    );
+
+    expect(view.events[0]?.steps?.[0]?.execution).toMatchObject({
+      id: "execution-1",
+      run: { id: "run-1" },
+      totalTokens: "1200",
+      costCents: "45",
+    });
+  });
+
   it("keeps finished step state when created and finished share a timestamp", () => {
     const timestamp = "2026-08-04T12:00:00.000Z";
     const apiEvents = [

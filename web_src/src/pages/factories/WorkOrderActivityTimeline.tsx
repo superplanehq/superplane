@@ -1,26 +1,31 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderExecution } from "@/api-client";
-import { Avatar } from "@/components/Avatar/avatar";
+import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
 import { Link } from "@/components/Link/link";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { appRunPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { Fragment, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ExternalLink, FileText, MessageSquare, Play, Sparkles, UserRound } from "lucide-react";
+import { Fragment, useMemo, type ReactNode } from "react";
+import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
   buildWorkOrderUserNameLookup,
-  formatStepExecutionDuration,
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineEventKind,
-  type WorkOrderTimelineStep,
 } from "./lib/workOrderTimelineEvents";
-import { getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
+import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { OrgUserReference } from "./OrgUserReference";
+import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
+import { TimelineMarker } from "./timeline/TimelineMarker";
+import {
+  timelineActorClassName as inlineActorClassName,
+  timelineLinkClassName as inlineLinkClassName,
+  timelineParagraphClassName as inlineParagraphClassName,
+  timelineTimeClassName as inlineTimeClassName,
+} from "./timeline/timelineStyles";
 import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 
 interface WorkOrderTimelineProps {
@@ -33,11 +38,7 @@ interface WorkOrderTimelineProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
-  /**
-   * Optional trailing element rendered as the final row of the timeline
-   * (e.g. the comment composer). Rendered with an icon marker so it hangs
-   * off the same vertical rail as the events above it.
-   */
+  /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
 }
 
@@ -62,7 +63,7 @@ export function WorkOrderActivityTimeline({
     return pendingView;
   }
 
-  const timeline = buildWorkOrderTimelineView(events, resolveUserName);
+  const timeline = buildWorkOrderTimelineView(events, resolveUserName, order.executions);
 
   if (timeline.events.length === 0 && !footer) {
     return <TimelineActivityEmpty />;
@@ -74,14 +75,15 @@ export function WorkOrderActivityTimeline({
     <div>
       {hasMoreEvents ? (
         <div className="mb-3">
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={onLoadMoreEvents}
             disabled={isLoadingMoreEvents || !onLoadMoreEvents}
-            className="text-[13px] font-medium text-violet-600 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-violet-400 dark:hover:text-violet-300"
+            className="h-auto p-0 text-[13px] text-foreground"
           >
             {isLoadingMoreEvents ? "Loading…" : "Load more events"}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -131,16 +133,17 @@ function renderTimelinePendingView({
 
 function TimelineActivityError({ onRetryEvents }: { onRetryEvents?: () => void }) {
   return (
-    <div role="alert" className="rounded-lg border border-red-300 px-4 py-3 dark:border-red-800">
-      <Text className="text-red-500 dark:text-red-400">Failed to load activity.</Text>
+    <div role="alert" className="rounded-lg border border-destructive/30 px-4 py-3">
+      <Text className="text-destructive">Failed to load activity.</Text>
       {onRetryEvents ? (
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={onRetryEvents}
-          className="mt-2 text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+          className="mt-2 h-auto p-0 text-sm text-foreground"
         >
           Try again
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -488,233 +491,8 @@ function InlineUserName({ display }: { display: OrgUserDisplay | null }) {
   );
 }
 
-// ---------- Dispatch run ----------
-
-function DispatchTimelineItem({
-  event,
-  organizationId,
-  isLatestDispatch,
-}: {
-  event: WorkOrderTimelineEvent;
-  organizationId: string;
-  isLatestDispatch: boolean;
-}) {
-  const [open, setOpen] = useState(isLatestDispatch);
-  const steps = event.steps ?? [];
-  const latestStep = steps.length > 0 ? steps[steps.length - 1] : undefined;
-  const overallDurationLabel = formatOverallDuration(steps);
-  const usageLabel = latestStep ? formatExecutionUsageLabel(latestStep.execution) : null;
-  const statusLabel = latestStep ? runStatusLabel(latestStep.execution) : null;
-  const contentId = `line-run-${event.id}`;
-
-  return (
-    <li id={event.lineId ? `activity-line-run-${event.lineId}` : undefined} className="scroll-mt-20">
-      <div className="min-w-0">
-        <div className="flex gap-3">
-          <TimelineMarker icon={Sparkles} />
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls={contentId}
-            onClick={() => setOpen((value) => !value)}
-            className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 py-0.5 text-left"
-          >
-            <div className="min-w-0 flex-1 pt-0.5">
-              <p className={inlineParagraphClassName}>
-                <span className={inlineActorClassName}>{event.lineName ?? "Factory line"}</span>
-                {statusLabel ? (
-                  <span className={cn("ml-1.5 font-medium", statusLabel.className)}>{statusLabel.label}</span>
-                ) : null}
-                {isLatestDispatch ? (
-                  <Badge
-                    variant="outline"
-                    className="ml-1.5 inline-flex h-auto rounded-md px-1.5 py-0 align-middle text-[10px] font-medium text-muted-foreground"
-                  >
-                    Current
-                  </Badge>
-                ) : null}
-                <span className={inlineTimeClassName}>
-                  {" · "}Sent {formatTimelineDate(new Date(event.at))}
-                  {overallDurationLabel ? ` · ${overallDurationLabel}` : ""}
-                  {usageLabel ? ` · ${usageLabel}` : ""}
-                </span>
-              </p>
-            </div>
-            <ChevronDown
-              className={cn(
-                "mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform",
-                open ? "rotate-180" : "",
-              )}
-              aria-hidden
-            />
-          </button>
-        </div>
-
-        {open ? (
-          <ul id={contentId} className="mt-1 ml-[36px] space-y-0.5">
-            {steps.map((step) => (
-              <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
-            ))}
-          </ul>
-        ) : null}
-      </div>
-    </li>
-  );
-}
-
-function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
-  const durationLabel = formatStepExecutionDuration(step);
-  const status = stepStatusLabel(step.execution);
-  const nameNode = runHref ? (
-    <a
-      href={runHref}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:underline"
-    >
-      {step.stepName}
-      <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-    </a>
-  ) : (
-    <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{step.stepName}</span>
-  );
-
-  return (
-    <li className="min-w-0 py-1.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        {nameNode}
-        {status ? (
-          <span className={cn("inline-flex items-center gap-1.5 text-[12px]", status.textClassName)}>
-            <span className={cn("size-1.5 shrink-0 rounded-full", status.dotClassName)} aria-hidden />
-            {status.label}
-          </span>
-        ) : null}
-        {durationLabel ? <span className="text-[12px] tabular-nums text-muted-foreground">{durationLabel}</span> : null}
-        {step.artifacts?.map((artifact, index) => (
-          <span className="inline-flex min-w-0 max-w-full" key={artifact.id ?? `${artifact.type}-${index}`}>
-            <WorkOrderArtifactInline artifact={artifact} />
-          </span>
-        ))}
-      </div>
-      {step.note ? (
-        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground" data-testid="work-order-dispatch-note">
-          <span className="font-medium text-foreground/80">Note</span>: {step.note}
-        </p>
-      ) : null}
-      {step.comments?.map((comment, index) => (
-        <p
-          className="mt-1 text-[12px] leading-relaxed text-muted-foreground"
-          key={`${comment.label ?? "comment"}-${index}`}
-        >
-          <span className="font-medium text-foreground/80">{comment.label ?? "Comment"}</span>: {comment.body}
-        </p>
-      ))}
-    </li>
-  );
-}
-
-interface StatusChip {
-  label: string;
-  textClassName: string;
-  dotClassName: string;
-}
-
-function stepStatusLabel(execution: FactoriesWorkOrderExecution): StatusChip | null {
-  if (execution.result === "RESULT_PASSED") {
-    return {
-      label: "Completed",
-      textClassName: "text-[color:var(--status-success)]",
-      dotClassName: "bg-[var(--status-success-dot)]",
-    };
-  }
-  if (execution.result === "RESULT_FAILED") {
-    return {
-      label: "Failed",
-      textClassName: "text-[color:var(--status-danger)]",
-      dotClassName: "bg-[var(--status-danger-dot)]",
-    };
-  }
-  if (execution.result === "RESULT_CANCELLED") {
-    return { label: "Cancelled", textClassName: "text-muted-foreground", dotClassName: "bg-muted-foreground/60" };
-  }
-  const isInFlight =
-    execution.state === "STATE_PENDING" ||
-    execution.state === "STATE_STARTED" ||
-    execution.state === "STATE_CANCELLING";
-  if (!isInFlight) return null;
-  return {
-    label: "Running",
-    textClassName: "text-[color:var(--status-running)]",
-    dotClassName: "bg-[var(--status-running-dot)]",
-  };
-}
-
-function runStatusLabel(execution: FactoriesWorkOrderExecution): { label: string; className: string } | null {
-  if (execution.result === "RESULT_PASSED")
-    return { label: "Complete", className: "text-[color:var(--status-success)]" };
-  if (execution.result === "RESULT_FAILED") return { label: "Failed", className: "text-[color:var(--status-danger)]" };
-  if (execution.result === "RESULT_CANCELLED") return { label: "Cancelled", className: "text-muted-foreground" };
-  const isInFlight =
-    execution.state === "STATE_PENDING" ||
-    execution.state === "STATE_STARTED" ||
-    execution.state === "STATE_CANCELLING";
-  if (!isInFlight) return null;
-  return { label: "Running", className: "text-[color:var(--status-running)]" };
-}
-
-function formatOverallDuration(steps: WorkOrderTimelineStep[]): string | null {
-  if (steps.length === 0) return null;
-  const started = Date.parse(steps[0]?.startedAt ?? "");
-  const lastStep = steps[steps.length - 1];
-  const finished = Date.parse(lastStep?.finishedAt ?? lastStep?.startedAt ?? "");
-  const duration = finished - started;
-  if (!Number.isFinite(duration) || duration <= 0) return null;
-  const seconds = Math.round(duration / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
-}
-
-function formatExecutionUsageLabel(execution: FactoriesWorkOrderExecution): string | null {
-  const tokens = Number(execution.totalTokens ?? 0);
-  const cents = Number(execution.costCents ?? 0);
-  const parts: string[] = [];
-  if (Number.isFinite(tokens) && tokens > 0) {
-    parts.push(tokens >= 1000 ? `${(tokens / 1000).toFixed(0)}k tokens` : `${tokens} tokens`);
-  }
-  if (Number.isFinite(cents) && cents > 0) {
-    parts.push(`$${(cents / 100).toFixed(2)}`);
-  }
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
-
-// ---------- Marker + shared classnames ----------
-
-function TimelineMarker({ display, icon: Icon }: { display?: OrgUserDisplay | null; icon?: TimelineMarkerIcon }) {
-  if (display) {
-    return (
-      <span className="relative z-[1]">
-        <Avatar src={display.avatarUrl} initials={display.initials} alt={display.name} className="size-6" />
-      </span>
-    );
-  }
-  const IconComponent = Icon ?? UserRound;
-  return (
-    <span className="relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-background">
-      <IconComponent className="size-3 text-muted-foreground" aria-hidden />
-    </span>
-  );
-}
-
-type TimelineMarkerIcon = typeof UserRound;
-
-function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): TimelineMarkerIcon {
+function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
-    case "dispatched":
-      return Sparkles;
     case "artifactAdded":
       return FileText;
     case "statusChanged":
@@ -723,26 +501,4 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): TimelineMarker
     default:
       return UserRound;
   }
-}
-
-const inlineParagraphClassName = "text-[13px] leading-snug tracking-[-0.01em] text-muted-foreground";
-const inlineActorClassName = "font-medium text-foreground";
-const inlineTimeClassName = "text-muted-foreground";
-const inlineLinkClassName =
-  "inline-flex items-center gap-1 rounded-md text-[13px] text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground";
-
-function formatTimelineDate(date: Date): string {
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  })
-    .format(date)
-    .replace(",", "");
 }

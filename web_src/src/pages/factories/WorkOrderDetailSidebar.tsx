@@ -6,6 +6,7 @@ import type {
   FactoriesWorkOrderExecution,
 } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Button } from "@/components/ui/button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ import {
 import { Link } from "react-router-dom";
 
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
+import { formatWorkOrderDateTime } from "./lib/workOrderDateTime";
+import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./lib/workOrderUsage";
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
 import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
@@ -173,8 +176,8 @@ function OverviewSection({
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
 }) {
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
-  const totalTokens = parseNumericFromString(order.totalTokens);
-  const totalCostCents = parseNumericFromString(order.totalCostCents);
+  const totalTokens = parseWorkOrderMetric(order.totalTokens);
+  const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
   const showSpending = totalTokens > 0 || totalCostCents > 0;
 
   return (
@@ -200,7 +203,7 @@ function OverviewSection({
 
         {createdAt ? (
           <OverviewRow icon={<Calendar className="size-3.5" aria-hidden />} srLabel="Created">
-            <span title={createdAt.toLocaleString()}>{formatCompactDate(createdAt)}</span>
+            <span title={createdAt.toLocaleString()}>{formatWorkOrderDateTime(createdAt)}</span>
           </OverviewRow>
         ) : null}
 
@@ -296,18 +299,19 @@ function AssigneeOverviewRow({
           canEdit={canEdit}
           align="end"
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
             disabled={!canEdit || isSaving}
             aria-label={
               assigneeIds.length > 0 ? `Assignee: ${assigneeNames.filter(Boolean).join(", ")}` : "Assign work order"
             }
-            className="-my-1.5 -mr-1.5 flex w-full min-w-0 items-center gap-1.5 rounded-md py-1.5 pr-1.5 text-left text-[13px] tracking-[-0.01em] text-foreground outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
+            className="-my-1.5 -mr-1.5 h-auto w-full min-w-0 justify-start gap-1.5 whitespace-normal rounded-md py-1.5 pr-1.5 pl-0 text-left text-[13px] tracking-[-0.01em] text-foreground hover:bg-accent/60 focus-visible:bg-accent/60"
             data-testid="work-order-edit-assignees"
           >
             <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
             <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </button>
+          </Button>
         </WorkOrderAssigneesPopover>
       </PermissionTooltip>
     </OverviewRow>
@@ -379,21 +383,21 @@ function FactoryLinesSection({
               onDispatch={onDispatch}
               align="start"
             >
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 disabled={isDispatchDisabled}
                 aria-label="Send to line"
                 className={cn(
-                  "-mx-1.5 mt-0.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-[13px] tracking-[-0.01em] outline-none transition-colors",
+                  "-mx-1.5 mt-0.5 h-auto w-[calc(100%+0.75rem)] justify-start gap-2 whitespace-normal rounded-md px-1.5 py-1.5 text-left text-[13px] tracking-[-0.01em]",
                   "text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60",
-                  "disabled:cursor-not-allowed disabled:opacity-60",
                 )}
                 data-testid="work-order-sidebar-dispatch-button"
               >
                 <Plus className="size-3.5 shrink-0" aria-hidden />
                 Send to line
                 <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              </button>
+              </Button>
             </DispatchWorkOrderPopover>
           </PermissionTooltip>
         ) : null}
@@ -437,9 +441,6 @@ function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRowMo
   return "muted";
 }
 
-// Line rows collapse many executions into a single dot. "worst" surfaces
-// failure over running over completed so operators see the highest-priority
-// state at a glance.
 function worstTone(a: FactoryLineRowModel["tone"], b: FactoryLineRowModel["tone"]): FactoryLineRowModel["tone"] {
   const priority: Record<FactoryLineRowModel["tone"], number> = {
     danger: 3,
@@ -467,28 +468,23 @@ function FactoryLineRow({ row }: { row: FactoryLineRowModel }) {
     </>
   );
   const commonClass =
-    "-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60";
+    "-mx-1.5 flex w-[calc(100%+0.75rem)] items-center justify-start gap-2 whitespace-normal rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60";
 
   if (!activityId) {
     return <span className={cn(commonClass, "cursor-default")}>{inner}</span>;
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       className={commonClass}
       aria-label={`Show ${row.lineName} in activity`}
       onClick={() => document.getElementById(activityId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
     >
       {inner}
-    </button>
+    </Button>
   );
-}
-
-function parseNumericFromString(value: string | undefined): number {
-  if (!value) return 0;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatSpendingLine(totalTokens: number, totalCostCents: number): React.ReactNode {
@@ -507,28 +503,6 @@ function formatSpendingLine(totalTokens: number, totalCostCents: number): React.
 function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
   const parts: string[] = [];
   if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
-  if (totalCostCents > 0) parts.push(`$${(totalCostCents / 100).toFixed(2)}`);
+  if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
   return parts.join(" · ");
-}
-
-function formatCompactTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(0)}k tokens`;
-  return `${tokens} tokens`;
-}
-
-function formatUsdCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function formatCompactDate(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  })
-    .format(date)
-    .replace(",", "");
 }

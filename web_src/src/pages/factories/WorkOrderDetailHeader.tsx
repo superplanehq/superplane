@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Check, Ellipsis, Link2 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,12 +29,6 @@ interface WorkOrderDetailHeaderProps {
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
 
-/**
- * Detail-page header. Renders just the title on the left and Copy link + a
- * kebab of lifecycle actions on the right. Status now lives in the sidebar
- * Overview and dispatch lives in the sidebar Factory Lines section, so this
- * header stays minimal.
- */
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
   const { orderTitle } = props;
   return (
@@ -80,38 +74,20 @@ function CopyLinkButton() {
   );
 }
 
-function HeaderOverflowMenu({
-  displayStatus,
-  isOpen,
-  isDispatchable,
-  isClosed,
-  canClose,
-  canManage,
-  isCompleting,
-  isRejecting,
-  isClosing,
-  isUpdatingStatus,
-  onClose,
-  onStatusChange,
-}: WorkOrderDetailHeaderProps) {
-  // Draft is "dispatchable, not yet open, not closed" — the only lifecycle
-  // stage where an operator can abandon the order before any work runs.
-  const isDraft = isDispatchable && !isOpen && !isClosed;
-  // Back-to-draft transition is only safe when no line execution is active —
-  // the `open → draft` FSM guard rejects otherwise, so we hide the action
-  // instead of letting the API 400.
-  const canReturnToDraft = isOpen && displayStatus !== "running";
-
-  const anyActionAvailable = isDraft || isOpen || isClosed;
-  if (!anyActionAvailable) {
+function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
+  const actions = buildHeaderActions(props);
+  if (actions.length === 0) {
     return null;
   }
 
-  const disabled = isClosing || isUpdatingStatus || isCompleting || isRejecting;
+  const disabled = props.isClosing || props.isUpdatingStatus || props.isCompleting || props.isRejecting;
 
   return (
     <DropdownMenu>
-      <PermissionTooltip allowed={canClose || canManage} message="You don't have permission to manage this work order.">
+      <PermissionTooltip
+        allowed={props.canClose || props.canManage}
+        message="You don't have permission to manage this work order."
+      >
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -128,57 +104,74 @@ function HeaderOverflowMenu({
       </PermissionTooltip>
 
       <DropdownMenuContent align="end" className="w-48">
-        {isOpen ? (
-          <>
-            <DropdownMenuItem
-              disabled={!canClose || isClosing}
-              onSelect={() => onClose("RESULT_COMPLETED")}
-              data-testid="work-order-complete-button"
-            >
-              Complete
+        {actions.map((action) => (
+          <Fragment key={action.testId}>
+            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem disabled={action.disabled} onSelect={action.onSelect} data-testid={action.testId}>
+              {action.label}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!canClose || isClosing}
-              onSelect={() => onClose("RESULT_REJECTED")}
-              data-testid="work-order-reject-button"
-            >
-              Reject
-            </DropdownMenuItem>
-            {canReturnToDraft ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={!canManage || isUpdatingStatus}
-                  onSelect={() => void onStatusChange("STATE_DRAFT")}
-                  data-testid="work-order-back-to-draft-button"
-                >
-                  Back to draft
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </>
-        ) : null}
-
-        {isDraft ? (
-          <DropdownMenuItem
-            disabled={!canClose || isClosing}
-            onSelect={() => onClose("RESULT_REJECTED")}
-            data-testid="work-order-reject-draft-button"
-          >
-            Reject
-          </DropdownMenuItem>
-        ) : null}
-
-        {isClosed ? (
-          <DropdownMenuItem
-            disabled={!canManage || isUpdatingStatus}
-            onSelect={() => void onStatusChange("STATE_OPEN")}
-            data-testid="work-order-reopen-open-button"
-          >
-            Reopen
-          </DropdownMenuItem>
-        ) : null}
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+interface HeaderAction {
+  label: string;
+  testId: string;
+  disabled: boolean;
+  separatorBefore?: boolean;
+  onSelect: () => void;
+}
+
+function buildHeaderActions(props: WorkOrderDetailHeaderProps): HeaderAction[] {
+  const actions: HeaderAction[] = [];
+  const isDraft = props.isDispatchable && !props.isOpen && !props.isClosed;
+
+  if (props.isOpen) {
+    actions.push(
+      closeAction("Complete", "RESULT_COMPLETED", "work-order-complete-button", props),
+      closeAction("Reject", "RESULT_REJECTED", "work-order-reject-button", props),
+    );
+  }
+
+  if (props.isOpen && props.displayStatus !== "running") {
+    actions.push({
+      label: "Back to draft",
+      testId: "work-order-back-to-draft-button",
+      disabled: !props.canManage || props.isUpdatingStatus,
+      separatorBefore: true,
+      onSelect: () => void props.onStatusChange("STATE_DRAFT"),
+    });
+  }
+
+  if (isDraft) {
+    actions.push(closeAction("Reject", "RESULT_REJECTED", "work-order-reject-draft-button", props));
+  }
+
+  if (props.isClosed) {
+    actions.push({
+      label: "Reopen",
+      testId: "work-order-reopen-open-button",
+      disabled: !props.canManage || props.isUpdatingStatus,
+      onSelect: () => void props.onStatusChange("STATE_OPEN"),
+    });
+  }
+
+  return actions;
+}
+
+function closeAction(
+  label: string,
+  result: FactoriesWorkOrderResult,
+  testId: string,
+  props: WorkOrderDetailHeaderProps,
+): HeaderAction {
+  return {
+    label,
+    testId,
+    disabled: !props.canClose || props.isClosing,
+    onSelect: () => props.onClose(result),
+  };
 }

@@ -8,11 +8,6 @@ interface WorkOrderArtifactsListProps {
   error?: Error | null;
 }
 
-/**
- * Bare artifacts list for the work order sidebar. Renders as an unstyled
- * `<ul>` with `icon + name` rows — no card container, no timestamp caption —
- * to match the mockup's compact metadata treatment.
- */
 export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrderArtifactsListProps) {
   return (
     <section>
@@ -20,7 +15,7 @@ export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrde
 
       <div className="mt-2">
         {error ? (
-          <p className="text-[13px] text-red-500 dark:text-red-400">Failed to load artifacts.</p>
+          <p className="text-[13px] text-destructive">Failed to load artifacts.</p>
         ) : isLoading ? (
           <p className="text-[13px] text-muted-foreground">Loading artifacts…</p>
         ) : artifacts.length === 0 ? (

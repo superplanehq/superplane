@@ -65,9 +65,7 @@ export function DispatchWorkOrderPopover({
       <PopoverContent align={align} className="w-80 p-3" sideOffset={8}>
         <div className="space-y-3">
           {lines.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Configure at least one line before dispatching work orders.
-            </p>
+            <p className="text-sm text-muted-foreground">Configure at least one line before dispatching work orders.</p>
           ) : (
             <>
               <div className="space-y-1.5">

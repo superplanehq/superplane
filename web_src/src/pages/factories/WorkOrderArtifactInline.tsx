@@ -1,5 +1,6 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { ExternalLink, FileText, GitBranch, GitPullRequest, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -23,6 +24,9 @@ interface WorkOrderArtifactInlineProps {
   className?: string;
 }
 
+const artifactInlineClassName =
+  "inline-flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground";
+
 export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
   const kind = normalizeArtifactKind(artifact.type);
   const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
@@ -39,10 +43,7 @@ export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifa
       {safeUrl ? <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden /> : null}
     </>
   );
-  const classes = cn(
-    "inline-flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground",
-    className,
-  );
+  const classes = cn(artifactInlineClassName, className);
 
   if (!safeUrl) {
     return <span className={classes}>{content}</span>;
@@ -68,17 +69,15 @@ function MarkdownArtifactInline({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="link"
         onClick={() => setOpen(true)}
-        className={cn(
-          "inline-flex min-w-0 max-w-full items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em] text-foreground hover:underline",
-          className,
-        )}
+        className={cn(artifactInlineClassName, "h-auto justify-start p-0 text-left", className)}
       >
         <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <span className="truncate">{label}</span>
-      </button>
+      </Button>
       <WorkOrderMarkdownArtifactDialog open={open} onClose={() => setOpen(false)} title={label} body={body} />
     </>
   );
@@ -96,17 +95,24 @@ function artifactLinkPresentation(
     case "pr":
       return {
         icon: GitPullRequest,
-        label: formatPrArtifactLabel(artifact.data) ?? title ?? name ?? compactUrlLabel(url) ?? "Pull request",
+        label: firstLabel(formatPrArtifactLabel(artifact.data), title, name, compactUrlLabel(url), "Pull request"),
       };
     case "branch":
-      return { icon: GitBranch, label: name ?? title ?? compactUrlLabel(url) ?? "Branch" };
+      return { icon: GitBranch, label: firstLabel(name, title, compactUrlLabel(url), "Branch") };
     case "link":
     case "url":
     case "preview":
-      return { icon: LinkIcon, label: name ?? title ?? compactUrlLabel(url) ?? "Link" };
+      return { icon: LinkIcon, label: firstLabel(name, title, compactUrlLabel(url), "Link") };
     default:
-      return { icon: url ? LinkIcon : FileText, label: title ?? name ?? compactUrlLabel(url) ?? "Artifact" };
+      return {
+        icon: url ? LinkIcon : FileText,
+        label: firstLabel(title, name, compactUrlLabel(url), "Artifact"),
+      };
   }
+}
+
+function firstLabel(...labels: Array<string | undefined>): string {
+  return labels.find((label) => Boolean(label?.trim())) ?? "Artifact";
 }
 
 function normalizeArtifactKind(type: string): string {

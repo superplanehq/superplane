@@ -62,9 +62,6 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
-  // LineStepExecutionPayload already exposes `run` + `app`; they are
-  // populated on `order.status.updated` when the transition is attributed
-  // to a canvas run (source-run enrichment or automation caller).
 }
 
 interface TimelineBuildState {
@@ -176,10 +173,7 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
-// `order.status.updated` is the sole authoritative lifecycle event. The
-// visual kind (`created` / `closed` / `statusChanged`) is derived from
-// `fromState` + `toState` so downstream renderers keep their per-kind
-// styling (badges, colors, action verbs) without needing coarse events.
+// Derive the visual lifecycle kind from the authoritative status transition.
 function appendStatusUpdatedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -363,8 +357,6 @@ function findAutomationStep(
   return dispatch.steps.at(-1);
 }
 
-// Short-form artifact label ("PR", "note") for event descriptions.
-// See timeline/authorLabels.ts for the long form used in bodies.
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
   pr: "PR",
   markdown: "note",
@@ -385,9 +377,6 @@ function describeArtifactAdded(artifact: EventArtifactPayload): string {
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
 
-// Close-result string (from `status.updated.toResult`) → proto enum the
-// presentation helpers expect. Kept centralized so `describeStatusTransition`
-// stays a pure formatter.
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
