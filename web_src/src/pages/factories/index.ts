@@ -8,6 +8,7 @@ export {
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LinesPage,
   MissionsPage,
   OverviewPage,
   VelocityPage,

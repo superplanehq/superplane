@@ -169,7 +169,7 @@ function FactoriesSidebar({
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1 pb-3">
         <FactoriesNav organizationId={organizationId} factoryId={factoryId} recentWorkOrders={recentWorkOrders} />
       </div>
       <SidebarUserMenu
