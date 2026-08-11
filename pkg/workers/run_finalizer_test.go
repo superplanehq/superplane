@@ -579,7 +579,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var startErr error
-		firstResult, startErr = line.StartStep(tx, order, 0)
+		firstResult, startErr = line.StartStep(tx, order, 0, "")
 		return startErr
 	}))
 
@@ -661,7 +661,7 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var startErr error
-		firstResult, startErr = line.StartStep(tx, order, 0)
+		firstResult, startErr = line.StartStep(tx, order, 0, "")
 		return startErr
 	}))
 
@@ -729,7 +729,7 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var startErr error
-		firstResult, startErr = line.StartStep(tx, order, 0)
+		firstResult, startErr = line.StartStep(tx, order, 0, "")
 		return startErr
 	}))
 

@@ -9,6 +9,7 @@ export type StepExecutionEventType = "step.execution.created" | "step.execution.
 
 export interface LineStepExecutionPayload {
   stepName?: string;
+  note?: string;
   line?: { id?: string; name?: string };
   app?: { id?: string };
   run?: { id?: string; state?: string; result?: string };
@@ -78,6 +79,7 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
   }
 
   const { startedAt, finishedAt } = resolveStepTiming(existingStep, at, eventType === "step.execution.finished");
+  const note = eventType === "step.execution.created" ? payload.note?.trim() || undefined : existingStep?.note;
 
   return {
     id: stepId,
@@ -85,6 +87,9 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
     at: finishedAt ?? startedAt,
     startedAt,
     finishedAt,
+    note,
+    comments: existingStep?.comments,
+    artifacts: existingStep?.artifacts,
     execution: executionFromStepPayload(payload, startedAt, at, eventType),
   };
 }
@@ -138,6 +143,7 @@ function createDispatchBatchEvent(lineId: string, lineName: string, at: string):
     id: `dispatch-${lineId}-${at}`,
     kind: "dispatched",
     at,
+    lineId,
     lineName,
     title: `Dispatched to ${lineName}`,
     steps: [],

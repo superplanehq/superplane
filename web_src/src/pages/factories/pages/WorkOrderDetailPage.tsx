@@ -1,7 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -65,10 +65,9 @@ function WorkOrderDetailPageContent({
 
   return (
     <LoadedWorkOrderDetail
-      factory={factory}
       order={order}
       derived={derived}
-      workOrdersHref={workOrdersHref}
+      factoryLines={factory.lines ?? []}
       organizationId={organizationId}
       events={events}
       eventsQuery={eventsQuery}
@@ -92,10 +91,9 @@ function shouldRedirectAfterError(state: {
 }
 
 interface LoadedWorkOrderDetailProps {
-  factory: FactoriesFactory;
   order: FactoriesWorkOrder;
   derived: ReturnType<typeof getWorkOrderDetailDerived>;
-  workOrdersHref: string;
+  factoryLines: FactoriesFactoryLine[];
   organizationId: string;
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
@@ -106,10 +104,9 @@ interface LoadedWorkOrderDetailProps {
 }
 
 function LoadedWorkOrderDetail({
-  factory,
   order,
   derived,
-  workOrdersHref,
+  factoryLines,
   organizationId,
   events,
   eventsQuery,
@@ -120,9 +117,6 @@ function LoadedWorkOrderDetail({
 }: LoadedWorkOrderDetailProps) {
   return (
     <WorkOrderDetailLoadedView
-      factory={factory}
-      factoryHref={workOrdersHref}
-      backLabel="Work Orders"
       organizationId={organizationId}
       order={order}
       events={events}
@@ -143,7 +137,7 @@ function LoadedWorkOrderDetail({
       statusMeta={derived.statusMeta!}
       assigneeIds={derived.assigneeIds}
       assigneeNames={derived.assigneeNames}
-      factoryLines={factory.lines ?? []}
+      factoryLines={factoryLines}
       isOpen={derived.isOpen}
       isDispatchable={derived.isDispatchable}
       isClosed={derived.isClosed}

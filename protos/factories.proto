@@ -418,6 +418,12 @@ message WorkOrder {
   repeated UserRef assignees = 8;
   repeated WorkOrderExecution executions = 9;
   UserRef created_by = 10;
+  // Automation that created the work order (from the originating canvas run).
+  // Populated when the order was opened by a canvas automation.
+  AutomationRef created_by_automation = 11;
+  // Aggregate usage summed across executions. UI hides values that are zero.
+  int64 total_tokens = 12;
+  int64 total_cost_cents = 13;
 }
 
 message UserRef {
@@ -460,6 +466,22 @@ message WorkOrderExecution {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   RunRef run = 8;
+  // Zero-based index of the step inside the containing line; matches the
+  // position in `phases` so the UI can highlight the current phase.
+  int32 step_index = 9;
+  // Phases the run walks through, snapshotted from the line's step
+  // definitions. The current execution's `step_index` marks the active phase.
+  repeated WorkOrderExecutionPhase phases = 10;
+  // Optional aggregate usage; UI hides zero values.
+  int64 total_tokens = 11;
+  int64 cost_cents = 12;
+  // When the execution finished (set for finished executions only).
+  google.protobuf.Timestamp finished_at = 13;
+}
+
+message WorkOrderExecutionPhase {
+  string name = 1;
+  int32 step_index = 2;
 }
 
 message DescribeWorkOrderRequest {
@@ -485,6 +507,9 @@ message DispatchWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
   string line_name = 3;
+  // Optional free-form note (e.g. "Attempt 2 - dedicated canvas memory
+  // browser"); surfaced under the "kicked off" timeline entry.
+  string note = 4;
 }
 
 message DispatchWorkOrderResponse {

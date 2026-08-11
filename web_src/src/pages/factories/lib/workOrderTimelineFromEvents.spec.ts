@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 
+import { buildWorkOrderTimelineView } from "./workOrderTimelineEvents";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
 function stepExecutionEvent(
@@ -23,6 +24,21 @@ function stepExecutionEvent(
 }
 
 describe("buildWorkOrderTimelineViewFromEvents", () => {
+  it("hydrates timeline steps with execution usage", () => {
+    const view = buildWorkOrderTimelineView(
+      [stepExecutionEvent("step.execution.finished", "2026-08-04T12:00:00.000Z", "finished", "passed")],
+      undefined,
+      [{ id: "execution-1", run: { id: "run-1" }, totalTokens: "1200", costCents: "45" }],
+    );
+
+    expect(view.events[0]?.steps?.[0]?.execution).toMatchObject({
+      id: "execution-1",
+      run: { id: "run-1" },
+      totalTokens: "1200",
+      costCents: "45",
+    });
+  });
+
   it("keeps finished step state when created and finished share a timestamp", () => {
     const timestamp = "2026-08-04T12:00:00.000Z";
     const apiEvents = [
@@ -396,6 +412,77 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
           nodeName: "node-comment",
         },
       },
+    });
+  });
+
+  it("groups an automation artifact into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: {
+            lineId: "line-1",
+            lineName: "CI",
+            stepName: "Build",
+          },
+          artifact: {
+            id: "artifact-1",
+            type: "pr",
+            data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          artifacts: [
+            {
+              id: "artifact-1",
+              type: "pr",
+              data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("groups an automation comment into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              lineId: "line-1",
+              lineName: "CI",
+              stepName: "Build",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          comments: [{ body: "Ready for review" }],
+        },
+      ],
     });
   });
 });
