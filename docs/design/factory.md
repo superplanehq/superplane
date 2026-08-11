@@ -242,7 +242,10 @@ superplane factory orders describe --order <uuid> [flags]
   members.
 - `--state` — filter by work order state, repeatable. Accepts the proto
   enum token (`STATE_DRAFT`, `STATE_OPEN`, `STATE_CLOSED`) or a short
-  case-insensitive form (`draft`, `open`, `closed`).
+  case-insensitive form (`draft`, `open`, `closed`). Defaults to `open`
+  when omitted, so `orders list` only shows open work orders unless you
+  ask otherwise. Pass `--state all` to remove the state filter entirely
+  and see work orders in every state.
 - `--result` — filter by work order result, repeatable. Accepts the proto
   enum token (`RESULT_COMPLETED`, `RESULT_REJECTED`, `RESULT_FAILED`) or a
   short case-insensitive form (`completed`, `rejected`, `failed`).
@@ -256,6 +259,9 @@ superplane factory orders list \
   --result failed
 
 superplane factory orders list --unassigned
+
+# Show work orders in every state (draft, open, and closed)
+superplane factory orders list --state all
 ```
 
 `orders describe` shows a work order's title, assignees, description,
