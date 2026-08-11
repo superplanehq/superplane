@@ -120,12 +120,22 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 }
 
 func (b *Bitbucket) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		&CreatePullRequest{},
+		&UpdatePullRequest{},
+		&MergePullRequest{},
+		&CreatePRComment{},
+		&PublishCommitStatus{},
+		&GetCommitStatus{},
+	}
 }
 
 func (b *Bitbucket) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnPush{},
+		&OnPullRequest{},
+		&OnPRComment{},
+		&OnCommitStatus{},
 	}
 }
 
