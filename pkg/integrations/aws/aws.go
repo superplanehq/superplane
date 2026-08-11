@@ -370,8 +370,6 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
    > Attach **AmazonEventBridgeFullAccess** and **IAMFullAccess**, which the integration uses to set itself up and deliver events to SuperPlane. Then attach one managed policy for each AWS service your components use: EC2 (**AmazonEC2FullAccess**), ECS (**AmazonECS_FullAccess**), ECR (**AmazonEC2ContainerRegistryFullAccess**), Lambda (**AWSLambda_FullAccess**), CloudWatch (**CloudWatchFullAccessV2**), SQS (**AmazonSQSFullAccess**), SNS (**AmazonSNSFullAccess**), Route 53 (**AmazonRoute53FullAccess**), CodePipeline (**AWSCodePipeline_FullAccess**), CodeArtifact (**AWSCodeArtifactAdminAccess**), and Amazon Managed Service for Prometheus (**AmazonPrometheusFullAccess**).
 
 3. Copy the ARN of the role you created and paste it into the **IAM Role ARN** field below, then save.
-
-**Note:** A missing service policy shows up as an empty resource picker when you configure a component — for example, no machine types to choose from in **EC2 · Create Instance**.
 `, ctx.BaseURL, ctx.Integration.ID().String()),
 	})
 
