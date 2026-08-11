@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Check, Circle, Loader2, X as XIcon, X } from "lucide-react";
+import { useTheme } from "@/contexts/useTheme";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import superplaneIcon from "@/assets/superplane.svg";
@@ -102,13 +103,13 @@ function portsForNode(nodeId: string, edges: Edge[]): NodePorts {
 function statusBadgeClass(status: StepStatus) {
   switch (normalizeStatus(status)) {
     case "passed":
-      return "border-[#15803d] bg-[#dcfce7] text-[#166534]";
+      return "border-[#15803d] bg-[#dcfce7] text-[#166534] dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
     case "running":
-      return "border-[#2563eb] bg-[#dbeafe] text-[#1d4ed8]";
+      return "border-[#2563eb] bg-[#dbeafe] text-[#1d4ed8] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200";
     case "failed":
-      return "border-[#b91c1c] bg-[#fee2e2] text-[#991b1b]";
+      return "border-[#b91c1c] bg-[#fee2e2] text-[#991b1b] dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200";
     case "pending":
-      return "border-[#737373] bg-[#f3f3f3] text-[#525252]";
+      return "border-[#737373] bg-[#f3f3f3] text-[#525252] dark:border-border dark:bg-muted dark:text-muted-foreground";
   }
 }
 
@@ -170,23 +171,28 @@ function StatusGlyph({ status, className }: { status: StepStatus; className?: st
     );
   }
   if (normalized === "running") {
-    return <Loader2 className={cn(iconClass, "animate-spin text-[#2563eb]")} aria-hidden />;
+    return <Loader2 className={cn(iconClass, "animate-spin text-[#2563eb] dark:text-blue-300")} aria-hidden />;
   }
-  return <Circle className={cn(iconClass, "text-[#a3a3a3]")} strokeWidth={1.75} aria-hidden />;
+  return <Circle className={cn(iconClass, "text-[#a3a3a3] dark:text-muted-foreground")} strokeWidth={1.75} aria-hidden />;
+}
+
+function statusStripClass(status: StepStatus): string {
+  switch (normalizeStatus(status)) {
+    case "passed":
+      return "border-[#dcfce7] bg-[#f0fdf4] text-[#166534] dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
+    case "failed":
+      return "border-[#fecaca] bg-[#fef2f2] text-[#991b1b] dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
+    case "running":
+      return "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300";
+    case "pending":
+      return "border-[#e5e5e5] bg-[#fafafa] text-[#737373] dark:border-border dark:bg-muted dark:text-muted-foreground";
+  }
 }
 
 /** Tinted status strip: glyph + label left, duration right. */
 function NodeStatusFooter({ status, metrics }: { status: StepStatus; metrics: string | null }) {
-  const normalized = normalizeStatus(status);
-  const stripClass = {
-    passed: "border-[#dcfce7] bg-[#f0fdf4] text-[#166534]",
-    failed: "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]",
-    running: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
-    pending: "border-[#e5e5e5] bg-[#fafafa] text-[#737373]",
-  }[normalized];
-
   return (
-    <div className={cn("flex items-center justify-between gap-2 border-t px-3.5 py-2", stripClass)}>
+    <div className={cn("flex items-center justify-between gap-2 border-t px-3.5 py-2", statusStripClass(status))}>
       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
         <StatusGlyph status={status} />
         {statusLabel(status)}
@@ -196,7 +202,7 @@ function NodeStatusFooter({ status, metrics }: { status: StepStatus; metrics: st
   );
 }
 
-/** White card: icon + component name + tinted status footer. */
+/** Card: icon + component name + tinted status footer. */
 function StackNodeShell({
   data,
   selected,
@@ -211,30 +217,31 @@ function StackNodeShell({
   const metrics = nodeFooterMetrics(data.details);
   const description = nodeDescription(data);
   const iconSrc = providerIconSrc(data.provider);
+  const monoIcon = data.provider === "github" || data.provider === "superplane";
 
   return (
     <div
       className={cn(
-        "cursor-pointer overflow-hidden rounded-2xl border border-[#e8e8e8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_12px_rgba(15,23,42,0.04)]",
+        "cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_12px_rgba(15,23,42,0.04)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)]",
         widthClass,
-        selected && "border-[#c7c7c7] shadow-[0_0_0_3px_rgba(15,23,42,0.06)]",
+        selected && "border-ring shadow-[0_0_0_3px_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_3px_rgba(163,163,163,0.25)]",
       )}
     >
       <div className="px-3.5 pt-3.5 pb-3">
         <div className="flex items-start gap-2.5">
-          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-[#f0f0f0] bg-[#fafafa]">
+          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
             <img
               src={iconSrc}
               alt=""
-              className={cn("size-4", data.provider === "superplane" && "opacity-90")}
+              className={cn("size-4", monoIcon ? "opacity-90 dark:invert" : null)}
             />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] leading-snug font-semibold tracking-[-0.015em] text-[#171717]">
+            <div className="text-[14px] leading-snug font-semibold tracking-[-0.015em] text-card-foreground">
               {data.componentName}
             </div>
             {description ? (
-              <p className="mt-0.5 text-[12px] leading-snug text-[#737373]">{description}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
             ) : null}
           </div>
         </div>
@@ -247,7 +254,7 @@ function StackNodeShell({
 }
 
 const HANDLE_CLASS =
-  "!size-2.5 !rounded-[3px] !border !border-[#d4d4d4] !bg-white !shadow-none";
+  "!size-2.5 !rounded-[3px] !border !border-border !bg-card !shadow-none";
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const ports = data.ports;
@@ -279,8 +286,29 @@ const nodeTypes = {
 
 const MAIN_X = 120;
 const SIDE_X = 520;
-const EDGE_STYLE = { stroke: "#cbd5e1", strokeWidth: 1.5 };
 const EDGE_TYPE = "default";
+
+function edgePalette(isDark: boolean) {
+  if (isDark) {
+    return {
+      default: { stroke: "#4a4740", strokeWidth: 1.5 },
+      running: { stroke: "#818cf8", strokeWidth: 1.5 },
+      failed: { stroke: "#f87171", strokeWidth: 1.5 },
+    };
+  }
+  return {
+    default: { stroke: "#cbd5e1", strokeWidth: 1.5 },
+    running: { stroke: "#818cf8", strokeWidth: 1.5 },
+    failed: { stroke: "#fca5a5", strokeWidth: 1.5 },
+  };
+}
+
+function backgroundColors(isDark: boolean) {
+  if (isDark) {
+    return { gap: 22, size: 1, color: "#33312b", bgColor: "#14120b" };
+  }
+  return { gap: 22, size: 1, color: "#e5e7eb", bgColor: "#f9fafb" };
+}
 
 function step(
   id: string,
@@ -585,7 +613,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "out",
       target: "open-draft-pr",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-pr-plan",
@@ -593,7 +621,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "out",
       target: "write-plan",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-plan-comment",
@@ -601,7 +629,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-comment",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-plan-notify",
@@ -609,7 +637,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-notify-start",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-plan-label",
@@ -617,7 +645,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-label",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-plan-correlate",
@@ -625,7 +653,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-correlate",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-plan-impl",
@@ -633,7 +661,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "out",
       target: "implementation",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-impl-mark-plan",
@@ -641,7 +669,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-mark-plan",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-impl-babysit",
@@ -650,7 +678,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       target: "babysit",
       type: EDGE_TYPE,
       animated: true,
-      style: { ...EDGE_STYLE, stroke: "#818cf8" },
+      data: { tone: "running" },
     },
     {
       id: "e-babysit-mark",
@@ -658,7 +686,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-mark-impl",
       type: EDGE_TYPE,
-      style: EDGE_STYLE,
+      data: { tone: "default" },
     },
     {
       id: "e-babysit-notify-fail",
@@ -666,7 +694,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-notify-fail",
       type: EDGE_TYPE,
-      style: { ...EDGE_STYLE, stroke: "#fca5a5" },
+      data: { tone: "failed" },
     },
     {
       id: "e-babysit-fail-memory",
@@ -674,7 +702,7 @@ function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; ed
       sourceHandle: "side",
       target: "action-mark-fail-memory",
       type: EDGE_TYPE,
-      style: { ...EDGE_STYLE, stroke: "#fca5a5" },
+      data: { tone: "failed" },
     },
   ];
 
@@ -698,7 +726,7 @@ function StepDetailSidebar({ node, onClose }: { node: Node<StepNodeData>; onClos
   const { details } = data;
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-border bg-[#f7f7f7]">
+    <aside className="flex h-full w-[320px] shrink-0 flex-col border-l border-border bg-muted">
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -790,6 +818,11 @@ function StepDetailSidebar({ node, onClose }: { node: Node<StepNodeData>; onClos
 }
 
 export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {}) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const palette = useMemo(() => edgePalette(isDark), [isDark]);
+  const background = useMemo(() => backgroundColors(isDark), [isDark]);
+
   const initialGraph = useMemo(() => buildWorkflowGraph(editable), [editable]);
   const [nodes, , onNodesChange] = useNodesState(initialGraph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialGraph.edges);
@@ -811,6 +844,18 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
     [nodes, edges, selectedId, editable],
   );
 
+  const displayEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        const tone = (edge.data as { tone?: "default" | "running" | "failed" } | undefined)?.tone ?? "default";
+        return {
+          ...edge,
+          style: palette[tone],
+        };
+      }),
+    [edges, palette],
+  );
+
   const onNodeClick = useCallback<NodeMouseHandler>((_event, node) => {
     setSelectedId(node.id);
   }, []);
@@ -827,13 +872,14 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
           {
             ...connection,
             type: EDGE_TYPE,
-            style: EDGE_STYLE,
+            data: { tone: "default" },
+            style: palette.default,
           },
           current,
         ),
       );
     },
-    [editable, setEdges],
+    [editable, setEdges, palette.default],
   );
 
   return (
@@ -841,7 +887,7 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
       <div className="min-h-0 min-w-0 flex-1">
         <ReactFlow
           nodes={displayNodes}
-          edges={edges}
+          edges={displayEdges}
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.18 }}
@@ -856,12 +902,13 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
           panOnScroll
           zoomOnScroll
           proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{ type: EDGE_TYPE, style: EDGE_STYLE }}
+          defaultEdgeOptions={{ type: EDGE_TYPE, style: palette.default }}
+          colorMode={isDark ? "dark" : "light"}
         >
-          <Background gap={22} size={1} color="#e5e7eb" bgColor="#f9fafb" />
+          <Background gap={background.gap} size={background.size} color={background.color} bgColor={background.bgColor} />
           <Controls
             showInteractive={false}
-            className="!overflow-hidden !rounded-xl !border !border-[#e5e7eb] !bg-white !shadow-[0_1px_3px_rgba(15,23,42,0.06)]"
+            className="!overflow-hidden !rounded-xl !border !border-border !bg-card !shadow-[0_1px_3px_rgba(15,23,42,0.06)]"
           />
         </ReactFlow>
       </div>
