@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a Semaphore pipeline by ID" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
+  <LinkCard title="Wait for Pipeline" href="#wait-for-pipeline" description="Wait for a Semaphore pipeline to finish" />
 </CardGrid>
 
 <a id="on-pipeline-done"></a>
@@ -255,6 +256,131 @@ The command reads the token from the environment, fetches JWKS from your SuperPl
 - The component automatically sets up webhook monitoring for pipeline completion
 - Falls back to polling if webhook doesn't arrive
 - Can be cancelled, which will stop the running Semaphore workflow
+
+### Example Output
+
+```json
+{
+  "data": {
+    "blocks": [
+      {
+        "jobs": [
+          {
+            "id": "00000-00000-00000-00000-00000",
+            "index": 0,
+            "name": "Job #1",
+            "result": "passed",
+            "status": "finished"
+          }
+        ],
+        "name": "Block #1",
+        "result": "passed",
+        "result_reason": "test",
+        "state": "done"
+      }
+    ],
+    "organization": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
+    },
+    "pipeline": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "done_at": "2026-01-22T15:32:55Z",
+      "error_description": "",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "Initial Pipeline",
+      "pending_at": "2026-01-22T15:32:48Z",
+      "queuing_at": "2026-01-22T15:32:48Z",
+      "result": "passed",
+      "result_reason": "test",
+      "running_at": "2026-01-22T15:32:48Z",
+      "state": "done",
+      "stopping_at": "1970-01-01T00:00:00Z",
+      "working_directory": ".semaphore",
+      "yaml_file_name": "semaphore.yml"
+    },
+    "project": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
+    },
+    "repository": {
+      "slug": "test/test",
+      "url": "https://github.com/test/test"
+    },
+    "revision": {
+      "branch": {
+        "commit_range": "0000000000000000000000000000000000000000^...0000000000000000000000000000000000000000",
+        "name": "test"
+      },
+      "commit_message": "test",
+      "commit_sha": "0000000000000000000000000000000000000000",
+      "pull_request": null,
+      "reference": "refs/heads/test",
+      "reference_type": "branch",
+      "sender": {
+        "avatar_url": "https://example.com/avatar.png",
+        "email": "test@test.com",
+        "login": "test"
+      },
+      "tag": null
+    },
+    "version": "1.0.0",
+    "workflow": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "initial_pipeline_id": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.workflow.finished"
+}
+```
+
+<a id="wait-for-pipeline"></a>
+
+## Wait for Pipeline
+
+**Component key:** `semaphore.waitForPipeline`
+
+The Wait for Pipeline component waits for a Semaphore pipeline that was started elsewhere to finish, and routes the flow based on its result.
+
+Unlike `semaphore.runWorkflow`, this component does not start a pipeline. It is meant to be used when a pipeline is triggered by something outside of SuperPlane (another CI trigger, the Semaphore UI, a Git push, etc.) and you just need to know when it's done.
+
+### Use Cases
+
+- **Coordinate with external triggers**: Wait for a pipeline that was triggered by a Git push or by the Semaphore UI
+- **Fan-in**: Wait for a specific commit's pipeline to finish before continuing a SuperPlane flow
+- **Decoupled orchestration**: Watch a pipeline without owning its lifecycle
+
+### How It Works
+
+1. Resolves the pipeline to wait for, either directly by ID, or by looking up the most recent pipeline for a given branch and commit SHA
+2. If the pipeline can't be found yet, retries for up to **Lookup Timeout** seconds
+3. Once found, waits for the pipeline to complete (monitored via webhook and polling), for up to **Timeout** seconds
+4. Routes execution based on the pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+### Configuration
+
+- **Project**: Select the Semaphore project the pipeline belongs to
+- **Pipeline ID**: Reference a pipeline directly by its ID
+- **Branch** and **Commit SHA**: Alternatively, look up the pipeline by branch and commit SHA (both must be set)
+- **Timeout (seconds)**: How long to wait for the pipeline to finish once it has been found (default 3600)
+- **Lookup Timeout (seconds)**: How long to keep trying to find the pipeline before giving up (default 60)
+
+Exactly one of **Pipeline ID** or (**Branch** and **Commit SHA**) must be provided.
+
+### Output Channels
+
+- **Passed**: Emitted when the pipeline completes successfully
+- **Failed**: Emitted when the pipeline fails or is cancelled
+
+### Notes
+
+- The component automatically sets up webhook monitoring for pipeline completion
+- Falls back to polling if the webhook doesn't arrive
+- The component never starts or cancels the Semaphore pipeline - it only observes it
 
 ### Example Output
 

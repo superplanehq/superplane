@@ -113,6 +113,7 @@ func (s *Semaphore) Actions() []core.Action {
 	return []core.Action{
 		&components.RunWorkflow{},
 		&components.GetPipeline{},
+		&components.WaitForPipeline{},
 	}
 }
 
