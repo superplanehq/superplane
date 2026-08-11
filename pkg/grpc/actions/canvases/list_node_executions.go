@@ -21,7 +21,7 @@ const (
 	MaxLimit     = 25
 )
 
-func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
+func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp, beforeID string) (*pb.ListNodeExecutionsResponse, error) {
 	_, err := models.FindCanvasNode(db, canvas.ID, nodeID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -42,12 +42,12 @@ func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 	}
 
 	limit = getLimit(limit)
-	beforeTime := getBefore(before)
+	cursor := getCursor(before, beforeID)
 
 	//
 	// List and count executions
 	//
-	executions, err := models.ListNodeExecutions(db, canvas.ID, nodeID, states, results, int(limit), beforeTime)
+	executions, err := models.ListNodeExecutions(db, canvas.ID, nodeID, states, results, int(limit), cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,7 @@ func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 		TotalCount:    uint32(totalCount),
 		HasNextPage:   hasNextPage(len(executions), int(limit), totalCount),
 		LastTimestamp: getLastExecutionTimestamp(executions),
+		LastId:        getLastID(len(executions), func() uuid.UUID { return executions[len(executions)-1].ID }),
 	}, nil
 }
 
@@ -317,6 +318,34 @@ func getBefore(before *timestamppb.Timestamp) *time.Time {
 	}
 	t := before.AsTime()
 	return &t
+}
+
+// getCursor builds the keyset cursor for a listing request. beforeID is
+// optional: a request that only carries a timestamp pages the way it always
+// has, one that carries both can also cross rows sharing a created_at. An
+// unparseable id is treated as absent rather than an error, so a malformed
+// cursor degrades to the old behavior instead of failing the listing.
+func getCursor(before *timestamppb.Timestamp, beforeID string) *models.KeysetCursor {
+	beforeTime := getBefore(before)
+	if beforeTime == nil {
+		return nil
+	}
+
+	cursor := &models.KeysetCursor{CreatedAt: beforeTime}
+	if id, err := uuid.Parse(beforeID); err == nil {
+		cursor.ID = id
+	}
+
+	return cursor
+}
+
+// getLastID returns the id of the last row of a page, which the client echoes
+// back as before_id on the next request. Empty for an empty page.
+func getLastID(numResults int, last func() uuid.UUID) string {
+	if numResults == 0 {
+		return ""
+	}
+	return last().String()
 }
 
 func hasNextPage(numResults, limit int, totalCount int64) bool {

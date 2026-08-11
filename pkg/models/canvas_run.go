@@ -471,22 +471,19 @@ type CanvasRunFilters struct {
 	Results []string
 }
 
-func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
-	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, beforeTime, filters)
+func ListCanvasRuns(workflowID uuid.UUID, limit int, cursor *KeysetCursor, filters CanvasRunFilters) ([]CanvasRun, error) {
+	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, cursor, filters)
 }
 
-func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, cursor *KeysetCursor, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
 	query := tx.
 		Where("workflow_id = ?", workflowID).
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Limit(limit)
 
 	query = applyCanvasRunFilters(query, filters)
-
-	if beforeTime != nil {
-		query = query.Where("created_at < ?", beforeTime)
-	}
+	query = cursor.Apply(query)
 
 	err := query.Find(&runs).Error
 	if err != nil {

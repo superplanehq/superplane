@@ -184,6 +184,10 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 				Type:        "string",
 				Description: "For read_runtime paginated resources. RFC3339 timestamp cursor.",
 			},
+			"before_id": {
+				Type:        "string",
+				Description: "For read_runtime paginated resources. Id of the last row of the previous page, echoed back from last_id. Send it with before so rows sharing that timestamp are not skipped.",
+			},
 			"states": {
 				Type:        "array",
 				Description: "For read_runtime resources runs and node_executions. Use started/finished for runs; pending/started/finished for node executions.",

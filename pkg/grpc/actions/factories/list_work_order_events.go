@@ -3,8 +3,8 @@ package factories
 import (
 	"context"
 	"encoding/json"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -34,7 +34,7 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 	}
 
 	limit := getWorkOrderEventsLimit(req.GetLimit())
-	before := getWorkOrderEventsBefore(req.GetBefore())
+	cursor := getWorkOrderEventsCursor(req.GetBefore(), req.GetBeforeId())
 
 	db := database.DB(ctx)
 	factory, err := models.FindFactory(db, orgID, factoryID)
@@ -47,7 +47,7 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
 
-	events, err := order.ListEvents(db, int(limit), before)
+	events, err := order.ListEvents(db, int(limit), cursor)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
@@ -67,6 +67,7 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 		TotalCount:    uint32(totalCount),
 		HasNextPage:   hasWorkOrderEventsNextPage(len(events), int(limit), totalCount),
 		LastTimestamp: lastWorkOrderEventTimestamp(events),
+		LastId:        lastWorkOrderEventID(events),
 	}, nil
 }
 
@@ -114,17 +115,35 @@ func getWorkOrderEventsLimit(limit uint32) uint32 {
 	return limit
 }
 
-func getWorkOrderEventsBefore(before *timestamppb.Timestamp) *time.Time {
+// getWorkOrderEventsCursor builds the keyset cursor for the listing. beforeID
+// is optional: without it the cursor cannot cross rows sharing a created_at,
+// which is the behavior clients had before before_id existed.
+func getWorkOrderEventsCursor(before *timestamppb.Timestamp, beforeID string) *models.KeysetCursor {
 	if before == nil {
 		return nil
 	}
 
 	t := before.AsTime()
-	return &t
+	cursor := &models.KeysetCursor{CreatedAt: &t}
+	if id, err := uuid.Parse(beforeID); err == nil {
+		cursor.ID = id
+	}
+
+	return cursor
 }
 
 func hasWorkOrderEventsNextPage(numResults, limit int, totalCount int64) bool {
 	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
+}
+
+// lastWorkOrderEventID returns the id of the last row of the page, which the
+// client echoes back as before_id on the next request.
+func lastWorkOrderEventID(events []models.FactoryWorkOrderEvent) string {
+	if len(events) == 0 {
+		return ""
+	}
+
+	return events[len(events)-1].ID.String()
 }
 
 func lastWorkOrderEventTimestamp(events []models.FactoryWorkOrderEvent) *timestamppb.Timestamp {

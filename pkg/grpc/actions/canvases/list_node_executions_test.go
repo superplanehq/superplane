@@ -51,6 +51,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 			[]pb.CanvasNodeExecution_Result{},
 			0,
 			nil,
+			"",
 		)
 
 		//
@@ -105,6 +106,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 			[]pb.CanvasNodeExecution_Result{},
 			0,
 			nil,
+			"",
 		)
 
 		//

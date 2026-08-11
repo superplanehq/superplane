@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -18,15 +17,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
+func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, beforeID string, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
 	limit = getLimit(limit)
-	beforeTime := getBefore(before)
+	cursor := getCursor(before, beforeID)
 	filters, err := buildCanvasRunFilters(states, results)
 	if err != nil {
 		return nil, err
 	}
 
-	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), beforeTime, filters)
+	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), cursor, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +58,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		TotalCount:    uint32(count),
 		HasNextPage:   hasNextPage(len(runs), int(limit), count),
 		LastTimestamp: getLastRunTimestamp(runs),
+		LastId:        getLastID(len(runs), func() uuid.UUID { return runs[len(runs)-1].ID }),
 	}, nil
 }
 
@@ -441,11 +441,11 @@ func serializeCanvasRuns(
 	return serialized, nil
 }
 
-func listCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, limit int, beforeTime *time.Time, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
+func listCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, limit int, cursor *models.KeysetCursor, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.list")
 	defer done(&err)
 
-	return models.ListCanvasRunsInTransaction(db, canvasID, limit, beforeTime, filters)
+	return models.ListCanvasRunsInTransaction(db, canvasID, limit, cursor, filters)
 }
 
 func countCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {

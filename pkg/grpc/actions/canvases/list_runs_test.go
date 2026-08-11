@@ -33,7 +33,7 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
 	execution := createRunExecution(t, run, rootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, "", nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Runs, 1)
@@ -79,7 +79,7 @@ func Test__ListRuns__ReturnsRunsWithQueueItems(t *testing.T) {
 	createStartedRun(t, otherRootEvent)
 	support.CreateQueueItem(t, otherCanvas.ID, "trigger", otherRootEvent.ID, otherRootEvent.ID)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, "", nil, nil)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 2)
 
@@ -113,7 +113,7 @@ func Test__ListRuns__ScopesRunsToCanvas(t *testing.T) {
 	runOne := createFinishedRun(t, rootEventOne, models.CanvasRunResultPassed)
 	createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
 
-	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvasOne, 0, nil, nil, nil)
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvasOne, 0, nil, "", nil, nil)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 1)
 	assert.Equal(t, runOne.ID.String(), response.Runs[0].Id)
@@ -143,6 +143,7 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		canvas,
 		0,
 		nil,
+		"",
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_PASSED},
 	)
@@ -161,6 +162,7 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		canvas,
 		0,
 		nil,
+		"",
 		nil,
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_FAILED, pb.CanvasRun_RESULT_CANCELLED},
 	)
@@ -178,6 +180,7 @@ func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 		canvas,
 		0,
 		nil,
+		"",
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
 		nil,
 	)
@@ -205,6 +208,7 @@ func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 		canvas,
 		0,
 		nil,
+		"",
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_UNKNOWN},
 		nil,
 	)
@@ -216,6 +220,7 @@ func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
 		canvas,
 		0,
 		nil,
+		"",
 		nil,
 		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_UNKNOWN},
 	)
@@ -264,6 +269,7 @@ func Test__ListRuns__ReturnsPendingSubRunWithoutRootEvent(t *testing.T) {
 		childCanvas,
 		0,
 		nil,
+		"",
 		[]pb.CanvasRun_State{pb.CanvasRun_STATE_PENDING},
 		nil,
 	)
@@ -273,7 +279,7 @@ func Test__ListRuns__ReturnsPendingSubRunWithoutRootEvent(t *testing.T) {
 	assert.Equal(t, pb.CanvasRun_STATE_PENDING, childResponse.Runs[0].State)
 	assert.Nil(t, childResponse.Runs[0].RootEvent)
 
-	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil)
+	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, "", nil, nil)
 	require.NoError(t, err)
 	require.Len(t, parentResponse.Runs, 1)
 	require.Len(t, parentResponse.Runs[0].Executions, 1)
@@ -320,7 +326,7 @@ func Test__ListRuns__ReturnsSubRunRelationshipRefs(t *testing.T) {
 	childRootEvent := support.EmitCanvasEventForNode(t, childCanvas.ID, "onRun", "default", nil)
 	require.NoError(t, database.Conn().Model(&childRootEvent).Update("run_id", childRun.ID).Error)
 
-	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, nil, nil)
+	parentResponse, err := ListRuns(context.Background(), database.DB(t.Context()), parentCanvas, 0, nil, "", nil, nil)
 	require.NoError(t, err)
 	require.Len(t, parentResponse.Runs, 1)
 	require.Len(t, parentResponse.Runs[0].Executions, 1)

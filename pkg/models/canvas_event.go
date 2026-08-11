@@ -143,7 +143,7 @@ func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasE
 	return events, nil
 }
 
-func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
+func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, cursor *KeysetCursor) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	query := db.
 		Where("workflow_id = ?", canvasID).
@@ -153,11 +153,9 @@ func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int,
 		query = query.Limit(limit)
 	}
 
-	if before != nil {
-		query = query.Where("created_at < ?", before)
-	}
+	query = cursor.Apply(query)
 
-	err := query.Order("created_at DESC").Find(&events).Error
+	err := query.Order("created_at DESC, id DESC").Find(&events).Error
 	if err != nil {
 		return nil, err
 	}
