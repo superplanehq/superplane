@@ -122,7 +122,10 @@ function getPipelineData(outputs: Outputs): PipelineData | undefined {
  * Reuses the same state map/function as semaphore.runWorkflow: the execution
  * metadata shape (`{ workflow, pipeline: { state, result } }`) is identical.
  */
-export { RUN_WORKFLOW_STATE_MAP as WAIT_FOR_PIPELINE_STATE_MAP, runWorkflowStateFunction as waitForPipelineStateFunction };
+export {
+  RUN_WORKFLOW_STATE_MAP as WAIT_FOR_PIPELINE_STATE_MAP,
+  runWorkflowStateFunction as waitForPipelineStateFunction,
+};
 
 export const WAIT_FOR_PIPELINE_STATE_REGISTRY = {
   stateMap: RUN_WORKFLOW_STATE_MAP,
