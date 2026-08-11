@@ -63,6 +63,12 @@ type StepDetail = {
   inputs?: string[];
 };
 
+type NodePorts = {
+  target?: boolean;
+  out?: boolean;
+  side?: boolean;
+};
+
 type StepNodeData = {
   /** Human step label (sidebar / instance name). */
   title: string;
@@ -75,7 +81,23 @@ type StepNodeData = {
   meta?: string[];
   showLogs?: boolean;
   details: StepDetail;
+  /** Which connection handles are in use (derived from edges). */
+  ports?: NodePorts;
 };
+
+function portsForNode(nodeId: string, edges: Edge[]): NodePorts {
+  let target = false;
+  let out = false;
+  let side = false;
+  for (const edge of edges) {
+    if (edge.target === nodeId) target = true;
+    if (edge.source === nodeId) {
+      if (edge.sourceHandle === "side") side = true;
+      else out = true;
+    }
+  }
+  return { target, out, side };
+}
 
 function statusBadgeClass(status: StepStatus) {
   switch (normalizeStatus(status)) {
@@ -174,7 +196,7 @@ function NodeStatusFooter({ status, metrics }: { status: StepStatus; metrics: st
   );
 }
 
-/** All-white StackAI-style card: icon + component name + status footer. */
+/** White card: icon + component name + tinted status footer. */
 function StackNodeShell({
   data,
   selected,
@@ -228,12 +250,15 @@ const HANDLE_CLASS =
   "!size-2.5 !rounded-[3px] !border !border-[#d4d4d4] !bg-white !shadow-none";
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
+  const ports = data.ports;
   return (
     <div className="relative">
-      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      {ports?.target ? <Handle type="target" position={Position.Top} className={HANDLE_CLASS} /> : null}
       <StackNodeShell data={data} selected={selected} widthClass="w-[280px]" />
-      <Handle id="out" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle id="side" type="source" position={Position.Right} className={cn(HANDLE_CLASS, "!top-1/2")} />
+      {ports?.out ? <Handle id="out" type="source" position={Position.Bottom} className={HANDLE_CLASS} /> : null}
+      {ports?.side ? (
+        <Handle id="side" type="source" position={Position.Right} className={cn(HANDLE_CLASS, "!top-1/2")} />
+      ) : null}
     </div>
   );
 }
@@ -241,7 +266,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
 function ActionNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   return (
     <div className="relative">
-      <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
+      {data.ports?.target ? <Handle type="target" position={Position.Left} className={HANDLE_CLASS} /> : null}
       <StackNodeShell data={data} selected={selected} widthClass="w-[260px]" />
     </div>
   );
@@ -778,8 +803,12 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
         ...node,
         selected: node.id === selectedId,
         draggable: editable,
+        data: {
+          ...node.data,
+          ports: portsForNode(node.id, edges),
+        },
       })),
-    [nodes, selectedId, editable],
+    [nodes, edges, selectedId, editable],
   );
 
   const onNodeClick = useCallback<NodeMouseHandler>((_event, node) => {
