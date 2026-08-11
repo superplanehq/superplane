@@ -141,6 +141,8 @@ func (j *Jira) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
 		&OnIssueComment{},
+		&OnIncident{},
+		&OnAlert{},
 	}
 }
 
