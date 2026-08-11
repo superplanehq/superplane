@@ -1,7 +1,8 @@
-import { BookOpen, ClipboardList, Crosshair, Gauge, LayoutDashboard, Workflow } from "lucide-react";
+import { BookOpen, ClipboardList, Crosshair, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   automationsPath,
+  factoryLinesPath,
   factoryMissionsPath,
   factoryOverviewPath,
   factoryVelocityPath,
@@ -9,7 +10,14 @@ import {
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
-export type FactoriesNavKind = "overview" | "missions" | "work-orders" | "automations" | "wiki" | "velocity";
+export type FactoriesNavKind =
+  | "overview"
+  | "missions"
+  | "work-orders"
+  | "lines"
+  | "automations"
+  | "wiki"
+  | "velocity";
 
 export interface FactoriesNavItem {
   id: FactoriesNavKind;
@@ -18,6 +26,11 @@ export interface FactoriesNavItem {
   buildHref: (organizationId: string, factoryId: string) => string;
 }
 
+/**
+ * Primary workspace nav. Order matches v3 (Overview → Missions → Work Orders →
+ * Lines → Automations → Wiki → Velocity). The Lines item is Storybook-only —
+ * its route lives in `OrgWorkspaceHarness`, not production `App.tsx`.
+ */
 export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
   {
     id: "overview",
@@ -37,6 +50,16 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
     Icon: ClipboardList,
     buildHref: workOrdersPath,
   },
+  ...(import.meta.env.STORYBOOK
+    ? [
+        {
+          id: "lines" as const,
+          label: "Lines",
+          Icon: Layers,
+          buildHref: factoryLinesPath,
+        },
+      ]
+    : []),
   {
     id: "automations",
     label: "Automations",

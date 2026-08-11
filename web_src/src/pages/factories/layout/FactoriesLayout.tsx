@@ -109,7 +109,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
           recentWorkOrders={recentWorkOrders}
           onOpenCreateFactory={() => setCreateFactoryOpen(true)}
         />
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
+        <main className="relative flex min-h-screen min-w-0 flex-1 flex-col bg-background">
           <Outlet />
         </main>
       </div>
