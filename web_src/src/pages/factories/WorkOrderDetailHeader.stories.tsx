@@ -33,8 +33,8 @@ const draftMeta = getWorkOrderDisplayStatusMeta("draft");
 const closedFailedMeta = getWorkOrderDisplayStatusMeta("closedFailed");
 
 const commonHandlers = {
-  onDispatch: async (lineName: string) => {
-    console.log("dispatch", lineName);
+  onDispatch: async (input: { lineName: string; note?: string }) => {
+    console.log("dispatch", input);
   },
   onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED" | "RESULT_FAILED") => {
     console.log("close", result);

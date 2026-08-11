@@ -38,6 +38,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
+	dispatchNote := strings.TrimSpace(req.GetNote())
+
 	var actor *uuid.UUID
 	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
 		parsed, err := uuid.Parse(userIDStr)
@@ -90,7 +92,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		result, err := line.StartStep(tx, order, 0)
+		result, err := line.StartStep(tx, order, 0, dispatchNote)
 		if err != nil {
 			return err
 		}

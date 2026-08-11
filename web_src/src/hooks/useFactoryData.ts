@@ -4,6 +4,7 @@ import {
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
+  factoriesCreateWorkOrderApproval,
   factoriesDeleteFactory,
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
@@ -13,6 +14,7 @@ import {
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
+  factoriesResolveWorkOrderApproval,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrderAssignees,
@@ -22,6 +24,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
+  FactoriesWorkOrderApprovalStatus,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
@@ -306,13 +309,14 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; lineName: string }) => {
+    mutationFn: async (input: { orderId: string; lineName: string; note?: string }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             lineName: input.lineName,
+            note: input.note,
           },
         }),
       );
@@ -389,6 +393,82 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
       return response.data.comment;
     },
     onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useCreateWorkOrderApproval(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      orderId: string;
+      title: string;
+      message?: string;
+      executionId?: string;
+      approverId?: string;
+    }) => {
+      const response = await factoriesCreateWorkOrderApproval(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            title: input.title,
+            message: input.message,
+            executionId: input.executionId,
+            approverId: input.approverId,
+          },
+        }),
+      );
+      if (!response.data?.approval) {
+        throw new Error("Failed to create approval");
+      }
+      return response.data.approval;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useResolveWorkOrderApproval(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      orderId: string;
+      approvalId: string;
+      status: FactoriesWorkOrderApprovalStatus;
+      comment?: string;
+    }) => {
+      const response = await factoriesResolveWorkOrderApproval(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId, approvalId: input.approvalId },
+          body: {
+            status: input.status,
+            comment: input.comment,
+          },
+        }),
+      );
+      if (!response.data?.approval) {
+        throw new Error("Failed to resolve approval");
+      }
+      return response.data.approval;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });

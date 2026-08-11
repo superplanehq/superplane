@@ -46,8 +46,8 @@ export const Open: Story = {
     order: OPEN_WORK_ORDER,
     canDispatch: true,
     isDispatching: false,
-    onDispatch: async (lineName) => {
-      console.log("dispatch", lineName);
+    onDispatch: async (input) => {
+      console.log("dispatch", input);
     },
   },
 };

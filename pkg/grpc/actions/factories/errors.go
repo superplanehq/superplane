@@ -34,6 +34,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderApprovalNotFound):
+		return grpcerrors.NotFound(err, "work order approval not found")
+	case errors.Is(err, models.ErrFactoryWorkOrderApprovalAlreadyClosed):
+		return grpcerrors.FailedPrecondition(err, "work order approval is already resolved")
+	case errors.Is(err, models.ErrFactoryWorkOrderApprovalInvalidStatus):
+		return grpcerrors.InvalidArgument(err, "approval status must be approved or rejected")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

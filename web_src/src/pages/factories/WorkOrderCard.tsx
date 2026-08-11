@@ -21,7 +21,7 @@ interface WorkOrderCardProps {
   lines: FactoriesFactoryLine[];
   canDispatch?: boolean;
   isDispatching?: boolean;
-  onDispatch?: (lineName: string) => Promise<void>;
+  onDispatch?: (input: { lineName: string; note?: string }) => Promise<void>;
 }
 
 export function WorkOrderCard({
@@ -103,7 +103,7 @@ function WorkOrderCardDispatchButton({
   lines: FactoriesFactoryLine[];
   canDispatch: boolean;
   isDispatching: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
 }) {
   return (
     <div className="pointer-events-auto">

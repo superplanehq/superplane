@@ -1,7 +1,9 @@
 package factories
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -83,18 +85,47 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 	return result
 }
 
-func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
+func serializeWorkOrder(
+	order *models.FactoryWorkOrder,
+	executions []models.FactoryWorkOrderExecutionRecord,
+	approvals []models.FactoryWorkOrderApproval,
+	createdByAutomation *factory.AutomationRef,
+) *pb.WorkOrder {
+	serializedExecutions := serializeWorkOrderExecutions(executions)
+
+	var totalTokens, totalCostCents int64
+	for _, e := range executions {
+		totalTokens += e.TotalTokens
+		totalCostCents += e.CostCents
+	}
+
 	return &pb.WorkOrder{
-		Id:          order.ID.String(),
-		Title:       order.Title,
-		Description: order.Description,
-		State:       serializeWorkOrderState(order.State),
-		Result:      serializeWorkOrderResult(order.Result),
-		CreatedAt:   timestamppb.New(order.CreatedAt),
-		UpdatedAt:   timestamppb.New(order.UpdatedAt),
-		Assignees:   serializeWorkOrderAssignees(order.Assignees),
-		Executions:  serializeWorkOrderExecutions(executions),
-		CreatedBy:   serializeWorkOrderCreator(order),
+		Id:                  order.ID.String(),
+		Title:               order.Title,
+		Description:         order.Description,
+		State:               serializeWorkOrderState(order.State),
+		Result:              serializeWorkOrderResult(order.Result),
+		CreatedAt:           timestamppb.New(order.CreatedAt),
+		UpdatedAt:           timestamppb.New(order.UpdatedAt),
+		Assignees:           serializeWorkOrderAssignees(order.Assignees),
+		Executions:          serializedExecutions,
+		CreatedBy:           serializeWorkOrderCreator(order),
+		CreatedByAutomation: serializeAutomationRef(createdByAutomation),
+		TotalTokens:         totalTokens,
+		TotalCostCents:      totalCostCents,
+		Approvals:           serializeWorkOrderApprovals(approvals),
+	}
+}
+
+func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {
+	if ref == nil {
+		return nil
+	}
+	return &pb.AutomationRef{
+		NodeId:   ref.NodeID,
+		NodeName: ref.NodeName,
+		AppId:    ref.AppID.String(),
+		AppName:  ref.AppName,
 	}
 }
 
@@ -124,12 +155,16 @@ func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionR
 
 func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
-		Id:        execution.ID.String(),
-		Step:      execution.StepName,
-		State:     serializeWorkOrderExecutionState(execution.Status, execution.RunState),
-		Result:    serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
-		CreatedAt: timestamppb.New(execution.CreatedAt),
-		UpdatedAt: timestamppb.New(execution.UpdatedAt),
+		Id:          execution.ID.String(),
+		Step:        execution.StepName,
+		StepIndex:   int32(execution.StepIndex),
+		State:       serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:      serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt:   timestamppb.New(execution.CreatedAt),
+		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
+		TotalTokens: execution.TotalTokens,
+		CostCents:   execution.CostCents,
+		Phases:      serializeExecutionPhases(execution.LineSteps),
 		Line: &pb.WorkOrderExecution_LineRef{
 			Id:   execution.LineID.String(),
 			Name: execution.LineName,
@@ -140,7 +175,24 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 			AppName: execution.CanvasName,
 		},
 	}
+	if execution.FinishedAt != nil {
+		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
+	}
 	return item
+}
+
+func serializeExecutionPhases(steps []models.FactoryLineStep) []*pb.WorkOrderExecutionPhase {
+	if len(steps) == 0 {
+		return nil
+	}
+	phases := make([]*pb.WorkOrderExecutionPhase, len(steps))
+	for i, step := range steps {
+		phases[i] = &pb.WorkOrderExecutionPhase{
+			Name:      step.Name,
+			StepIndex: int32(i),
+		}
+	}
+	return phases
 }
 
 func serializeWorkOrderExecutionState(status, runState string) pb.WorkOrderExecution_State {
@@ -201,6 +253,63 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 		return pb.WorkOrder_RESULT_FAILED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
+	}
+}
+
+func serializeWorkOrderApprovals(approvals []models.FactoryWorkOrderApproval) []*pb.WorkOrderApproval {
+	result := make([]*pb.WorkOrderApproval, 0, len(approvals))
+	for i := range approvals {
+		result = append(result, serializeWorkOrderApproval(&approvals[i]))
+	}
+	return result
+}
+
+func serializeWorkOrderApproval(approval *models.FactoryWorkOrderApproval) *pb.WorkOrderApproval {
+	item := &pb.WorkOrderApproval{
+		Id:        approval.ID.String(),
+		Title:     approval.Title,
+		Message:   approval.Message,
+		Status:    serializeWorkOrderApprovalStatus(approval.Status),
+		Comment:   approval.Comment,
+		CreatedAt: timestamppb.New(approval.CreatedAt),
+		UpdatedAt: timestamppb.New(approval.UpdatedAt),
+	}
+	if approval.ExecutionID != nil {
+		item.ExecutionId = approval.ExecutionID.String()
+	}
+	item.Approver = userRefFromApproverFields(approval.ApproverID, approval.Approver)
+	item.CreatedBy = userRefFromApproverFields(approval.CreatedByID, approval.CreatedBy)
+	item.ResolvedBy = userRefFromApproverFields(approval.ResolvedByID, approval.ResolvedBy)
+	if approval.ResolvedAt != nil {
+		item.ResolvedAt = timestamppb.New(*approval.ResolvedAt)
+	}
+	return item
+}
+
+func userRefFromApproverFields(id *uuid.UUID, user *models.User) *pb.UserRef {
+	if id == nil {
+		return nil
+	}
+	name := id.String()
+	if user != nil && user.Name != "" {
+		name = user.Name
+	}
+	return &pb.UserRef{
+		Id:   id.String(),
+		Name: name,
+	}
+}
+
+func serializeWorkOrderApprovalStatus(status string) pb.WorkOrderApproval_Status {
+	switch status {
+	case models.FactoryWorkOrderApprovalStatusPending:
+		return pb.WorkOrderApproval_STATUS_PENDING
+	case models.FactoryWorkOrderApprovalStatusApproved:
+		return pb.WorkOrderApproval_STATUS_APPROVED
+	case models.FactoryWorkOrderApprovalStatusRejected:
+		return pb.WorkOrderApproval_STATUS_REJECTED
+	default:
+		return pb.WorkOrderApproval_STATUS_UNSPECIFIED
 	}
 }
 

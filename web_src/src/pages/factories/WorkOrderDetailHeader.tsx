@@ -1,11 +1,18 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { Forward, Loader2 } from "lucide-react";
-import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { Check, Link2, Loader2, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailHeaderProps {
@@ -15,6 +22,8 @@ interface WorkOrderDetailHeaderProps {
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
+  // factoryLines is still required so the props shape stays stable for
+  // stories/tests. It's unused now that dispatch moved into the sidebar.
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canClose: boolean;
@@ -25,7 +34,7 @@ interface WorkOrderDetailHeaderProps {
   isRejecting: boolean;
   isClosing: boolean;
   isUpdatingStatus: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
@@ -48,139 +57,143 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <HeaderActions {...props} />
+        <div className="flex flex-wrap items-center gap-1">
+          <CopyLinkButton />
+          <HeaderOverflowMenu {...props} />
         </div>
       </div>
     </header>
   );
 }
 
-function HeaderActions({
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showSuccessToast("Link copied to clipboard.");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      showErrorToast("Failed to copy link.");
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={() => void handleCopy()}
+      className="h-8 w-8 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+      aria-label="Copy link to work order"
+      data-testid="work-order-copy-link-button"
+    >
+      {copied ? <Check className="h-4 w-4" aria-hidden /> : <Link2 className="h-4 w-4" aria-hidden />}
+    </Button>
+  );
+}
+
+function HeaderOverflowMenu({
   displayStatus,
   isOpen,
   isDispatchable,
   isClosed,
-  factoryLines,
-  canDispatch,
   canClose,
   canManage,
-  permissionsLoading,
-  isDispatching,
   isCompleting,
   isRejecting,
   isClosing,
   isUpdatingStatus,
-  onDispatch,
   onClose,
   onStatusChange,
 }: WorkOrderDetailHeaderProps) {
   // Draft is "dispatchable, not yet open, not closed" — the only lifecycle
   // stage where an operator can abandon the order before any work runs.
   const isDraft = isDispatchable && !isOpen && !isClosed;
+  // Back-to-draft transition is only safe when no line execution is active
+  // AND no plan approval is pending — the `open → draft` FSM guard rejects
+  // both cases, so we hide the action instead of letting the API 400.
+  const canReturnToDraft = isOpen && displayStatus !== "running" && displayStatus !== "waiting";
+
+  const anyActionAvailable = isDraft || isOpen || isClosed;
+  if (!anyActionAvailable) {
+    return null;
+  }
+
+  const disabled = isClosing || isUpdatingStatus || isCompleting || isRejecting;
 
   return (
-    <>
-      {isDispatchable ? (
-        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-          <DispatchWorkOrderPopover
-            lines={factoryLines}
-            isSaving={isDispatching}
-            canDispatch={canDispatch || permissionsLoading}
-            onDispatch={onDispatch}
-          >
-            <Button
-              type="button"
-              disabled={!canDispatch || factoryLines.length === 0}
-              data-testid="work-order-dispatch-button"
-            >
-              Dispatch
-              <Forward className="ml-1.5 h-4 w-4" aria-hidden />
-            </Button>
-          </DispatchWorkOrderPopover>
-        </PermissionTooltip>
-      ) : null}
-
-      {isDraft ? (
-        <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-          <LoadingButton
+    <DropdownMenu>
+      <PermissionTooltip allowed={canClose || canManage} message="You don't have permission to manage this work order.">
+        <DropdownMenuTrigger asChild>
+          <Button
             type="button"
             variant="ghost"
-            disabled={!canClose || isClosing}
-            loading={isRejecting}
-            loadingText="Rejecting..."
-            onClick={() => void onClose("RESULT_REJECTED")}
-            data-testid="work-order-reject-draft-button"
+            size="icon"
+            className="h-8 w-8 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            disabled={disabled}
+            aria-label="More actions"
+            data-testid="work-order-actions-button"
           >
-            Reject
-          </LoadingButton>
-        </PermissionTooltip>
-      ) : null}
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+      </PermissionTooltip>
 
-      {isOpen ? (
-        <>
-          {/* Back-to-draft hits the `open → draft` FSM guard, which rejects while a line execution is pending/running. */}
-          {displayStatus !== "running" ? (
-            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canManage || isUpdatingStatus}
-                loading={isUpdatingStatus}
-                loadingText="Moving to draft..."
-                onClick={() => void onStatusChange("STATE_DRAFT")}
-                data-testid="work-order-back-to-draft-button"
-              >
-                Back to draft
-              </LoadingButton>
-            </PermissionTooltip>
-          ) : null}
-
-          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-            <LoadingButton
-              type="button"
-              variant="ghost"
+      <DropdownMenuContent align="end" className="w-48">
+        {isOpen ? (
+          <>
+            <DropdownMenuItem
               disabled={!canClose || isClosing}
-              loading={isCompleting}
-              loadingText="Completing..."
-              onClick={() => void onClose("RESULT_COMPLETED")}
+              onSelect={() => onClose("RESULT_COMPLETED")}
               data-testid="work-order-complete-button"
             >
               Complete
-            </LoadingButton>
-          </PermissionTooltip>
-
-          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-            <LoadingButton
-              type="button"
-              variant="ghost"
+            </DropdownMenuItem>
+            <DropdownMenuItem
               disabled={!canClose || isClosing}
-              loading={isRejecting}
-              loadingText="Rejecting..."
-              onClick={() => void onClose("RESULT_REJECTED")}
+              onSelect={() => onClose("RESULT_REJECTED")}
               data-testid="work-order-reject-button"
             >
               Reject
-            </LoadingButton>
-          </PermissionTooltip>
-        </>
-      ) : null}
+            </DropdownMenuItem>
+            {canReturnToDraft ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!canManage || isUpdatingStatus}
+                  onSelect={() => void onStatusChange("STATE_DRAFT")}
+                  data-testid="work-order-back-to-draft-button"
+                >
+                  Back to draft
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </>
+        ) : null}
 
-      {isClosed ? (
-        <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
-          <LoadingButton
-            type="button"
-            variant="ghost"
+        {isDraft ? (
+          <DropdownMenuItem
+            disabled={!canClose || isClosing}
+            onSelect={() => onClose("RESULT_REJECTED")}
+            data-testid="work-order-reject-draft-button"
+          >
+            Reject
+          </DropdownMenuItem>
+        ) : null}
+
+        {isClosed ? (
+          <DropdownMenuItem
             disabled={!canManage || isUpdatingStatus}
-            loading={isUpdatingStatus}
-            loadingText="Reopening..."
-            onClick={() => void onStatusChange("STATE_OPEN")}
+            onSelect={() => void onStatusChange("STATE_OPEN")}
             data-testid="work-order-reopen-open-button"
           >
             Reopen
-          </LoadingButton>
-        </PermissionTooltip>
-      ) : null}
-    </>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

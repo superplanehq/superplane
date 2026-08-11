@@ -94,8 +94,9 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     isAssigneesSaving: false,
     isUpdatingStatus: false,
     isAddingComment: false,
-    onDispatch: async (lineName: string) => {
-      console.log("dispatch", lineName);
+    isResolvingApproval: false,
+    onDispatch: async (input: { lineName: string; note?: string }) => {
+      console.log("dispatch", input);
     },
     onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED" | "RESULT_FAILED") => {
       console.log("close", result);
@@ -108,6 +109,9 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     },
     onAddComment: async (body: string) => {
       console.log("comment", body);
+    },
+    onResolveApproval: async (input: { approvalId: string; status: string; comment?: string }) => {
+      console.log("resolve approval", input);
     },
   };
 }
