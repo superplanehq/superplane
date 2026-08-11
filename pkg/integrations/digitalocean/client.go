@@ -327,7 +327,7 @@ type DOAction struct {
 
 // ListDroplets retrieves all droplets in the account
 func (c *Client) ListDroplets() ([]Droplet, error) {
-	url := fmt.Sprintf("%s/droplets", c.BaseURL)
+	url := fmt.Sprintf("%s/droplets?per_page=200", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -922,7 +922,7 @@ type Snapshot struct {
 
 // GetDropletSnapshots lists snapshots for a given droplet
 func (c *Client) GetDropletSnapshots(dropletID int) ([]Snapshot, error) {
-	url := fmt.Sprintf("%s/droplets/%d/snapshots", c.BaseURL, dropletID)
+	url := fmt.Sprintf("%s/droplets/%d/snapshots?per_page=200", c.BaseURL, dropletID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
