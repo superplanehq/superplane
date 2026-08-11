@@ -19,8 +19,9 @@ func init() {
 type UpdateWorkOrderStatus struct{}
 
 type UpdateWorkOrderStatusConfiguration struct {
-	Status string `json:"status" mapstructure:"status"`
-	Result string `json:"result" mapstructure:"result"`
+	OrderID string `json:"orderId" mapstructure:"orderId"`
+	Status  string `json:"status" mapstructure:"status"`
+	Result  string `json:"result" mapstructure:"result"`
 }
 
 func (c *UpdateWorkOrderStatus) Name() string {
@@ -36,7 +37,9 @@ func (c *UpdateWorkOrderStatus) Description() string {
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran). This component can only be used in factory-owned apps.`
+	return `The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
+
+By default this targets the work order driving the current run — only available when the flow was dispatched from a factory line. Set ` + "`orderId`" + ` to target a different work order explicitly, e.g. ` + "`{{ order().id }}`" + ` or, in a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
 
 func (c *UpdateWorkOrderStatus) Icon() string {
@@ -68,6 +71,15 @@ func (c *UpdateWorkOrderStatus) OutputChannels(configuration any) []core.OutputC
 
 func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:        "orderId",
+			Label:       "Work Order ID",
+			Description: "Work order to target. Defaults to the work order driving the current run (only available when this flow was dispatched from a factory line). Required otherwise, e.g. {{ order().id }} or {{ previous().data.workOrder.id }}.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Default:     "",
+		},
 		{
 			Name:        "status",
 			Label:       "Status",
@@ -116,8 +128,9 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	workOrder, changed, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State:  config.Status,
-		Result: config.Result,
+		OrderID: config.OrderID,
+		State:   config.Status,
+		Result:  config.Result,
 	})
 	if err != nil {
 		return err
