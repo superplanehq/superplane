@@ -398,4 +398,75 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       },
     });
   });
+
+  it("groups an automation artifact into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: {
+            lineId: "line-1",
+            lineName: "CI",
+            stepName: "Build",
+          },
+          artifact: {
+            id: "artifact-1",
+            type: "pr",
+            data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          artifacts: [
+            {
+              id: "artifact-1",
+              type: "pr",
+              data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("groups an automation comment into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              lineId: "line-1",
+              lineName: "CI",
+              stepName: "Build",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          comments: [{ body: "Ready for review" }],
+        },
+      ],
+    });
+  });
 });

@@ -19,11 +19,6 @@ func loadAndSerializeWorkOrder(ctx context.Context, order *models.FactoryWorkOrd
 		return nil, err
 	}
 
-	approvalsByOrderID, err := models.ListFactoryWorkOrderApprovalsByWorkOrderIDs(db, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
-
 	createdByAutomation, err := resolveWorkOrderCreatorAutomation(db, order)
 	if err != nil {
 		return nil, err
@@ -32,7 +27,6 @@ func loadAndSerializeWorkOrder(ctx context.Context, order *models.FactoryWorkOrd
 	return serializeWorkOrder(
 		order,
 		executionsByOrderID[order.ID],
-		approvalsByOrderID[order.ID],
 		createdByAutomation,
 	), nil
 }
@@ -53,11 +47,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, orders []models.FactoryWork
 		return nil, err
 	}
 
-	approvalsByOrderID, err := models.ListFactoryWorkOrderApprovalsByWorkOrderIDs(db, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
 		createdByAutomation, err := resolveWorkOrderCreatorAutomation(db, &orders[i])
@@ -67,7 +56,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, orders []models.FactoryWork
 		result[i] = serializeWorkOrder(
 			&orders[i],
 			executionsByOrderID[orders[i].ID],
-			approvalsByOrderID[orders[i].ID],
 			createdByAutomation,
 		)
 	}

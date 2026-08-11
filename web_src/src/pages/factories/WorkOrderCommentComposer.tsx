@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { AtSign, Paperclip, Slash, SendHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowUp, Loader2, Paperclip } from "lucide-react";
 import { useState } from "react";
 
 interface WorkOrderCommentComposerProps {
@@ -11,19 +11,13 @@ interface WorkOrderCommentComposerProps {
   onSubmit: (body: string) => Promise<void>;
 }
 
-/**
- * Comment composer under the activity feed. Slash commands and attachments
- * are visual placeholders (disabled) per the redesign plan — the field
- * itself is fully functional plain-text.
- */
 export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }: WorkOrderCommentComposerProps) {
   const [body, setBody] = useState("");
+  const canSubmit = canComment && Boolean(body.trim()) && !isSubmitting;
 
   const handleSubmit = async () => {
     const trimmed = body.trim();
-    if (!trimmed) {
-      return;
-    }
+    if (!trimmed) return;
 
     try {
       await onSubmit(trimmed);
@@ -35,7 +29,7 @@ export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }:
 
   return (
     <div
-      className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm focus-within:ring-2 focus-within:ring-violet-100 dark:border-gray-700/70 dark:bg-gray-900/40 dark:focus-within:ring-violet-500/20"
+      className="relative min-h-[68px] rounded-xl border border-border bg-background focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/15"
       data-testid="work-order-comment-composer"
     >
       <label htmlFor="work-order-comment" className="sr-only">
@@ -45,50 +39,54 @@ export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }:
         id="work-order-comment"
         value={body}
         onChange={(event) => setBody(event.target.value)}
-        rows={3}
-        placeholder="Leave a comment for the team or the assistant..."
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSubmit) {
+            event.preventDefault();
+            void handleSubmit();
+          }
+        }}
+        rows={2}
+        placeholder="Add a comment…"
         disabled={!canComment || isSubmitting}
-        className="min-h-[72px] resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+        className="min-h-[66px] resize-none border-0 bg-transparent px-3 pt-2.5 pb-8 text-[13px] leading-5 shadow-none focus-visible:ring-0"
       />
-      <div className="mt-2 flex items-center gap-1">
-        <PlaceholderIconButton icon={Slash} label="Slash commands (coming soon)" />
-        <PlaceholderIconButton icon={AtSign} label="Mention someone (coming soon)" />
-        <PlaceholderIconButton icon={Paperclip} label="Attach a file (coming soon)" />
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setBody("")} disabled={!body || isSubmitting}>
-            Clear
+      <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
+        <PermissionTooltip allowed={canComment} message="Attachments coming soon.">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled
+            aria-label="Attach files (coming soon)"
+            title="Attach files (coming soon)"
+            className="size-7 text-muted-foreground opacity-60"
+          >
+            <Paperclip className="size-3.5" aria-hidden />
           </Button>
-          <PermissionTooltip allowed={canComment} message="You don't have permission to comment.">
-            <LoadingButton
-              type="button"
-              size="sm"
-              disabled={!canComment || !body.trim() || isSubmitting}
-              loading={isSubmitting}
-              loadingText="Posting..."
-              onClick={handleSubmit}
-              data-testid="work-order-comment-submit"
-            >
-              <span className="mr-1">Comment</span>
-              <SendHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </LoadingButton>
-          </PermissionTooltip>
-        </div>
+        </PermissionTooltip>
+        <PermissionTooltip allowed={canComment} message="You don't have permission to comment.">
+          <Button
+            type="button"
+            size="icon"
+            onClick={() => void handleSubmit()}
+            disabled={!canSubmit}
+            aria-label="Send comment"
+            data-testid="work-order-comment-submit"
+            className={cn(
+              "size-7 rounded-full transition-colors",
+              canSubmit
+                ? "bg-foreground text-background hover:bg-foreground/85"
+                : "cursor-not-allowed bg-accent text-muted-foreground",
+            )}
+          >
+            {isSubmitting ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <ArrowUp className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        </PermissionTooltip>
       </div>
     </div>
-  );
-}
-
-function PlaceholderIconButton({ icon: Icon, label }: { icon: typeof AtSign; label: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      aria-label={label}
-      title={label}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 opacity-60 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-gray-800/60"
-    >
-      <Icon className="h-4 w-4" aria-hidden />
-    </button>
   );
 }

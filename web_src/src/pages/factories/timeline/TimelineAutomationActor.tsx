@@ -18,7 +18,7 @@ export function TimelineAutomationActor({ actor, fallbackLabel = "Automation" }:
   if (lineName && tooltip) {
     return (
       <SimpleTooltip content={tooltip}>
-        <span className="font-semibold cursor-help underline decoration-dotted decoration-gray-400 underline-offset-2 hover:decoration-gray-500 dark:decoration-gray-500 dark:hover:decoration-gray-300">
+        <span className="cursor-help font-medium underline decoration-dotted decoration-border underline-offset-2 hover:decoration-foreground">
           {lineName}
         </span>
       </SimpleTooltip>
@@ -26,11 +26,11 @@ export function TimelineAutomationActor({ actor, fallbackLabel = "Automation" }:
   }
 
   if (lineName) {
-    return <span className="font-semibold">{lineName}</span>;
+    return <span className="font-medium">{lineName}</span>;
   }
 
   const fallback = formatAutomationLabel(nodeName, appName) ?? fallbackLabel;
-  return <span className="font-semibold">{fallback}</span>;
+  return <span className="font-medium">{fallback}</span>;
 }
 
 function formatStepNodeTooltip(stepName: string | undefined, nodeName: string | undefined): string | undefined {

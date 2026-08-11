@@ -252,30 +252,6 @@ service Factories {
     };
   }
 
-  rpc CreateWorkOrderApproval(CreateWorkOrderApprovalRequest) returns (CreateWorkOrderApprovalResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/orders/{order_id}/approvals"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create work order approval";
-      description: "Requests an approval on a work order (optionally tied to a line-run execution)";
-      tags: "Factory";
-    };
-  }
-
-  rpc ResolveWorkOrderApproval(ResolveWorkOrderApprovalRequest) returns (ResolveWorkOrderApprovalResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/approvals/{approval_id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Resolve work order approval";
-      description: "Approves or rejects a pending work order approval";
-      tags: "Factory";
-    };
-  }
-
 }
 
 // Factories
@@ -448,9 +424,6 @@ message WorkOrder {
   // Aggregate usage summed across executions. UI hides values that are zero.
   int64 total_tokens = 12;
   int64 total_cost_cents = 13;
-  // All approvals for this work order (pending + resolved), ordered by
-  // creation time. Empty when the order has no approval requests.
-  repeated WorkOrderApproval approvals = 14;
 }
 
 message UserRef {
@@ -647,61 +620,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-// Approvals
-
-message WorkOrderApproval {
-  enum Status {
-    STATUS_UNSPECIFIED = 0;
-    STATUS_PENDING = 1;
-    STATUS_APPROVED = 2;
-    STATUS_REJECTED = 3;
-  }
-
-  string id = 1;
-  // Optional execution the approval blocks (a "plan review" attached to a
-  // specific line-run step).
-  string execution_id = 2;
-  string title = 3;
-  string message = 4;
-  Status status = 5;
-  UserRef approver = 6;
-  string comment = 7;
-  UserRef resolved_by = 8;
-  google.protobuf.Timestamp resolved_at = 9;
-  UserRef created_by = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-}
-
-message CreateWorkOrderApprovalRequest {
-  string factory_id = 1;
-  string order_id = 2;
-  // Optional execution the approval targets. When unset the approval is
-  // attached to the work order as a whole.
-  string execution_id = 3;
-  string title = 4;
-  string message = 5;
-  // Optional user the approval is directed at. Anyone with the required
-  // permissions can still resolve when unset.
-  string approver_id = 6;
-}
-
-message CreateWorkOrderApprovalResponse {
-  WorkOrderApproval approval = 1;
-}
-
-message ResolveWorkOrderApprovalRequest {
-  string factory_id = 1;
-  string order_id = 2;
-  string approval_id = 3;
-  WorkOrderApproval.Status status = 4;
-  string comment = 5;
-}
-
-message ResolveWorkOrderApprovalResponse {
-  WorkOrderApproval approval = 1;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

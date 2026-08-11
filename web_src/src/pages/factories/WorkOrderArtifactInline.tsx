@@ -1,0 +1,129 @@
+import { safeExternalUrl } from "@/lib/safeExternalUrl";
+import { cn } from "@/lib/utils";
+import { ExternalLink, FileText, GitBranch, GitPullRequest, Link as LinkIcon } from "lucide-react";
+import { useState } from "react";
+
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactName,
+  extractArtifactTitle,
+  extractArtifactUrl,
+  formatPrArtifactLabel,
+} from "./lib/workOrderArtifact";
+import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
+
+export interface WorkOrderArtifactPresentation {
+  id?: string;
+  type: string;
+  data?: Record<string, unknown>;
+}
+
+interface WorkOrderArtifactInlineProps {
+  artifact: WorkOrderArtifactPresentation;
+  className?: string;
+}
+
+export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
+  const kind = normalizeArtifactKind(artifact.type);
+  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
+
+  if (kind === "markdown") {
+    return <MarkdownArtifactInline artifact={artifact} className={className} />;
+  }
+
+  const { icon: Icon, label } = artifactLinkPresentation(kind, artifact);
+  const content = (
+    <>
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="truncate">{label}</span>
+      {safeUrl ? <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden /> : null}
+    </>
+  );
+  const classes = cn(
+    "inline-flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground",
+    className,
+  );
+
+  if (!safeUrl) {
+    return <span className={classes}>{content}</span>;
+  }
+
+  return (
+    <a href={safeUrl} target="_blank" rel="noopener noreferrer" className={cn(classes, "hover:underline")}>
+      {content}
+    </a>
+  );
+}
+
+function MarkdownArtifactInline({
+  artifact,
+  className,
+}: {
+  artifact: WorkOrderArtifactPresentation;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = extractArtifactTitle(artifact.data) ?? extractArtifactName(artifact.data) ?? "Note";
+  const body = extractArtifactMarkdownBody(artifact.data) ?? "";
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "inline-flex min-w-0 max-w-full items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em] text-foreground hover:underline",
+          className,
+        )}
+      >
+        <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="truncate">{label}</span>
+      </button>
+      <WorkOrderMarkdownArtifactDialog open={open} onClose={() => setOpen(false)} title={label} body={body} />
+    </>
+  );
+}
+
+function artifactLinkPresentation(
+  kind: string,
+  artifact: WorkOrderArtifactPresentation,
+): { icon: typeof FileText; label: string } {
+  const title = extractArtifactTitle(artifact.data);
+  const name = extractArtifactName(artifact.data);
+  const url = extractArtifactUrl(artifact.data);
+
+  switch (kind) {
+    case "pr":
+      return {
+        icon: GitPullRequest,
+        label: formatPrArtifactLabel(artifact.data) ?? title ?? name ?? compactUrlLabel(url) ?? "Pull request",
+      };
+    case "branch":
+      return { icon: GitBranch, label: name ?? title ?? compactUrlLabel(url) ?? "Branch" };
+    case "link":
+    case "url":
+    case "preview":
+      return { icon: LinkIcon, label: name ?? title ?? compactUrlLabel(url) ?? "Link" };
+    default:
+      return { icon: url ? LinkIcon : FileText, label: title ?? name ?? compactUrlLabel(url) ?? "Artifact" };
+  }
+}
+
+function normalizeArtifactKind(type: string): string {
+  return type.replace(/^TYPE_/i, "").toLowerCase();
+}
+
+function compactUrlLabel(value: string | undefined): string | undefined {
+  const safeUrl = safeExternalUrl(value);
+  if (!safeUrl) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(safeUrl);
+    const lastSegment = parsed.pathname.split("/").filter(Boolean).at(-1);
+    return lastSegment || parsed.hostname;
+  } catch {
+    return safeUrl;
+  }
+}

@@ -36,35 +36,6 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func parseApprovalID(approvalID string) (uuid.UUID, error) {
-	id, err := uuid.Parse(approvalID)
-	if err != nil {
-		return uuid.Nil, invalidArgument("invalid approval id")
-	}
-
-	return id, nil
-}
-
-func parseExecutionID(executionID string) (uuid.UUID, error) {
-	id, err := uuid.Parse(executionID)
-	if err != nil {
-		return uuid.Nil, invalidArgument("invalid execution id")
-	}
-	return id, nil
-}
-
-func workOrderApprovalStatusFromProto(status pb.WorkOrderApproval_Status) (string, bool) {
-	switch status {
-	case pb.WorkOrderApproval_STATUS_PENDING:
-		return models.FactoryWorkOrderApprovalStatusPending, true
-	case pb.WorkOrderApproval_STATUS_APPROVED:
-		return models.FactoryWorkOrderApprovalStatusApproved, true
-	case pb.WorkOrderApproval_STATUS_REJECTED:
-		return models.FactoryWorkOrderApprovalStatusRejected, true
-	}
-	return "", false
-}
-
 func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
 	if len(assigneeIDs) == 0 {
 		return nil, nil

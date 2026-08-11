@@ -56,28 +56,6 @@ func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOr
 	return &execution, nil
 }
 
-// FindWorkOrderExecutionByOrder loads an execution scoped to a specific work
-// order. Callers pass the order's IDs so cross-order lookups (e.g. attaching
-// another order's execution to an approval) return NotFound.
-func FindWorkOrderExecutionByOrder(
-	tx *gorm.DB,
-	orgID, factoryID, workOrderID, executionID uuid.UUID,
-) (*FactoryWorkOrderExecution, error) {
-	var execution FactoryWorkOrderExecution
-	err := tx.
-		Where("id = ? AND organization_id = ? AND factory_id = ? AND work_order_id = ?",
-			executionID, orgID, factoryID, workOrderID).
-		First(&execution).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderExecutionNotFound
-		}
-		return nil, err
-	}
-
-	return &execution, nil
-}
-
 func (e *FactoryWorkOrderExecution) MarkRunning(tx *gorm.DB) error {
 	if e.Status != FactoryWorkOrderExecutionStatusPending {
 		return nil

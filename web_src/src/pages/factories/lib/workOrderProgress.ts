@@ -5,7 +5,6 @@ export type WorkOrderDisplayStatus =
   | "draft"
   | "open"
   | "running"
-  | "waiting"
   | "failed"
   | "completed"
   | "rejected"
@@ -19,52 +18,43 @@ const DISPLAY_STATUS_META: Record<
     label: "Draft",
     filterLabel: "Draft",
     summary: "Being scoped — not yet dispatched",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
+    className: "border-border bg-accent/50 text-muted-foreground",
   },
   open: {
     label: "Open",
     filterLabel: "Open",
     summary: "Ready to dispatch or between runs",
-    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+    className: "border-border bg-accent/50 text-foreground",
   },
   running: {
     label: "Running",
     filterLabel: "Running",
     summary: "Line execution in progress",
-    className:
-      "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
-  },
-  waiting: {
-    label: "Waiting",
-    filterLabel: "Waiting",
-    summary: "Waiting for a plan approval",
-    className:
-      "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-running)]",
   },
   failed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "A line step failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-danger)]",
   },
   completed: {
     label: "Completed",
     filterLabel: "Completed",
     summary: "Work order completed",
-    className:
-      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-success)]",
   },
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
     summary: "Work order rejected",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
+    className: "border-border bg-accent/50 text-muted-foreground",
   },
   closedFailed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "Work order closed as failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-danger)]",
   },
 };
 
@@ -90,7 +80,7 @@ export const WORK_ORDER_SECTIONS: WorkOrderSectionDefinition[] = [
     id: "running",
     title: "Running",
     description: "Work orders executing on a line.",
-    statuses: ["running", "waiting"],
+    statuses: ["running"],
   },
   {
     id: "open",
@@ -134,12 +124,6 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  // A pending approval on an open work order pauses the flow: the run
-  // sits at a plan-review step until a user resolves it.
-  if (hasPendingApproval(order)) {
-    return "waiting";
-  }
-
   const executions = order.executions ?? [];
   if (hasActiveWorkOrderExecution(executions)) {
     return "running";
@@ -162,14 +146,6 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
 
 export function getWorkOrderDisplayStatusMeta(status: WorkOrderDisplayStatus) {
   return DISPLAY_STATUS_META[status];
-}
-
-export function hasPendingApproval(order: FactoriesWorkOrder): boolean {
-  return (order.approvals ?? []).some((approval) => approval.status === "STATUS_PENDING");
-}
-
-export function getPendingApproval(order: FactoriesWorkOrder) {
-  return (order.approvals ?? []).find((approval) => approval.status === "STATUS_PENDING");
 }
 
 export function getWorkOrderStatusSummary(order: FactoriesWorkOrder): string {
@@ -221,9 +197,7 @@ export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
 
 // "Active" pill covers everything not yet closed (draft included, so
 // new orders aren't hidden behind the STATE_OPEN-only `Open` pill).
-// `waiting` is active too — a pending approval pauses the run without
-// closing the order.
-const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "waiting", "failed"];
+const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
 
 // "Failed" pill unions in-flight failures with closed-as-failed orders.
 const FAILED_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["failed", "closedFailed"];

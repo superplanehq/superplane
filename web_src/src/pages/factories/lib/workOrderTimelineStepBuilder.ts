@@ -88,6 +88,8 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
     startedAt,
     finishedAt,
     note,
+    comments: existingStep?.comments,
+    artifacts: existingStep?.artifacts,
     execution: executionFromStepPayload(payload, startedAt, at, eventType),
   };
 }
@@ -141,6 +143,7 @@ function createDispatchBatchEvent(lineId: string, lineName: string, at: string):
     id: `dispatch-${lineId}-${at}`,
     kind: "dispatched",
     at,
+    lineId,
     lineName,
     title: `Dispatched to ${lineName}`,
     steps: [],

@@ -7,6 +7,8 @@ import type {
   WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
+  WorkOrderTimelineStep,
+  WorkOrderTimelineStepComment,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
 import {
@@ -44,18 +46,6 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
-// ApprovalRef payload sent by the backend on approval events. Fields mirror
-// pkg/models/factory/events.go#ApprovalRef; nested user refs are flat
-// `approverId` strings, not `{ id }` objects.
-interface EventApprovalPayload {
-  id?: string;
-  executionId?: string;
-  title?: string;
-  message?: string;
-  status?: string;
-  approverId?: string;
-}
-
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   automation?: EventAutomationRefPayload;
@@ -72,11 +62,6 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
-  approval?: EventApprovalPayload;
-  // `status` and `comment` on approval.resolved events live at the top level
-  // of WorkOrderApprovalResolved, not inside `approval`.
-  status?: string;
-  comment?: string;
   // LineStepExecutionPayload already exposes `run` + `app`; they are
   // populated on `order.status.updated` when the transition is attributed
   // to a canvas run (source-run enrichment or automation caller).
@@ -85,10 +70,6 @@ interface EventPayload extends LineStepExecutionPayload {
 interface TimelineBuildState {
   events: WorkOrderTimelineEvent[];
   dispatchBatchByLine: Map<string, WorkOrderTimelineEvent>;
-  // Approvals resolved during this build pass — used to retro-mark earlier
-  // `approvalRequested` cards so their Approve/Reject buttons don't linger
-  // after the approval was already resolved.
-  resolvedApprovalStatusById: Map<string, "approved" | "rejected">;
 }
 
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
@@ -98,8 +79,6 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "step.execution.finished": 40,
   "order.comment.added": 45,
   "order.artifact.added": 47,
-  "order.approval.requested": 50,
-  "order.approval.resolved": 55,
 };
 
 function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
@@ -129,8 +108,6 @@ export function buildWorkOrderTimelineViewFromEvents(
     applyApiEventToTimeline(state, index, apiEvent, resolveUserName);
   }
 
-  reconcileResolvedApprovalRequests(state);
-
   return { events: state.events };
 }
 
@@ -138,25 +115,7 @@ function createTimelineBuildState(): TimelineBuildState {
   return {
     events: [],
     dispatchBatchByLine: new Map(),
-    resolvedApprovalStatusById: new Map(),
   };
-}
-
-// After the whole event stream is walked, retro-fix any earlier
-// `approvalRequested` card whose approval was later resolved so the pending
-// Approve/Reject form doesn't render for already-resolved approvals.
-function reconcileResolvedApprovalRequests(state: TimelineBuildState): void {
-  if (state.resolvedApprovalStatusById.size === 0) {
-    return;
-  }
-
-  for (const event of state.events) {
-    if (event.kind !== "approvalRequested" || !event.approval) continue;
-    const resolved = state.resolvedApprovalStatusById.get(event.approval.id);
-    if (resolved) {
-      event.approval = { ...event.approval, status: resolved };
-    }
-  }
 }
 
 function applyApiEventToTimeline(
@@ -182,16 +141,10 @@ function applyApiEventToTimeline(
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
       return;
     case "order.comment.added":
-      appendCommentEvent(state.events, index, payload, at, resolveUserName);
+      appendCommentEvent(state, index, payload, at, resolveUserName);
       return;
     case "order.artifact.added":
-      appendArtifactEvent(state.events, index, payload, at, resolveUserName);
-      return;
-    case "order.approval.requested":
-      appendApprovalRequestedEvent(state.events, index, payload, at, resolveUserName);
-      return;
-    case "order.approval.resolved":
-      appendApprovalResolvedEvent(state, index, payload, at, resolveUserName);
+      appendArtifactEvent(state, index, payload, at, resolveUserName);
   }
 }
 
@@ -302,7 +255,7 @@ function humanizeState(state: string): string {
 }
 
 function appendCommentEvent(
-  events: WorkOrderTimelineEvent[],
+  state: TimelineBuildState,
   index: number,
   payload: EventPayload,
   at: string,
@@ -315,7 +268,17 @@ function appendCommentEvent(
 
   const author = payload.author ?? {};
   const automationActor = toAutomationActor(author.automation);
-  events.push({
+  const stepComment: WorkOrderTimelineStepComment = {
+    body,
+    label: automationActor?.nodeName,
+  };
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.comments = [...(step.comments ?? []), stepComment];
+    return;
+  }
+
+  state.events.push({
     id: `comment-${index}`,
     kind: "commented",
     at,
@@ -332,7 +295,7 @@ function appendCommentEvent(
 }
 
 function appendArtifactEvent(
-  events: WorkOrderTimelineEvent[],
+  state: TimelineBuildState,
   index: number,
   payload: EventPayload,
   at: string,
@@ -343,107 +306,61 @@ function appendArtifactEvent(
     return;
   }
 
-  events.push({
+  const timelineArtifact = {
+    id: artifact.id,
+    type: artifact.type,
+    data: artifact.data,
+  };
+  const automationActor = toAutomationActor(payload.automation);
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.artifacts = [...(step.artifacts ?? []), timelineArtifact];
+    return;
+  }
+
+  state.events.push({
     id: `artifact-${index}`,
     kind: "artifactAdded",
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    artifact: {
-      id: artifact.id,
-      type: artifact.type,
-      data: artifact.data,
-    },
+    actorAutomation: automationActor,
+    artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
   });
 }
 
-function appendApprovalRequestedEvent(
-  events: WorkOrderTimelineEvent[],
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
-  const approval = payload.approval;
-  if (!approval?.id) {
-    return;
-  }
-
-  events.push({
-    id: `approval-requested-${approval.id}-${index}`,
-    kind: "approvalRequested",
-    at,
-    actorUserId: payload.user?.id,
-    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    approval: {
-      id: approval.id,
-      title: approval.title?.trim() || "Approve plan",
-      message: approval.message,
-      // Approval refs mostly ship with `status = "pending"` on request
-      // events; use it when present so we don't downgrade a status that
-      // may already have been mutated (e.g. resolved by side effect).
-      status: normalizeApprovalStatus(approval.status),
-      approverId: approval.approverId,
-    },
-    title: "requested approval",
-  });
-}
-
-function appendApprovalResolvedEvent(
+function findAutomationStep(
   state: TimelineBuildState,
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
-  const approval = payload.approval;
-  if (!approval?.id) {
-    return;
+  actor: WorkOrderTimelineAutomationActor | undefined,
+): WorkOrderTimelineStep | undefined {
+  if (!actor) {
+    return undefined;
   }
 
-  // Backend puts the terminal status and resolver comment on the top-level
-  // payload (see WorkOrderApprovalResolved); fall back to the approval ref
-  // for older/embedded shapes.
-  const status = normalizeApprovalStatus(payload.status ?? approval.status);
-  const comment = payload.comment ?? undefined;
-
-  if (status === "approved" || status === "rejected") {
-    state.resolvedApprovalStatusById.set(approval.id, status);
+  const dispatch = [...state.events]
+    .reverse()
+    .find(
+      (event) =>
+        event.kind === "dispatched" &&
+        ((actor.lineId && event.lineId === actor.lineId) || (actor.lineName && event.lineName === actor.lineName)),
+    );
+  if (!dispatch?.steps?.length) {
+    return undefined;
   }
 
-  state.events.push({
-    id: `approval-resolved-${approval.id}-${index}`,
-    kind: "approvalResolved",
-    at,
-    actorUserId: payload.user?.id,
-    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    approval: {
-      id: approval.id,
-      title: approval.title?.trim() || "Approve plan",
-      message: approval.message,
-      status,
-      approverId: approval.approverId,
-      comment,
-      resolvedByUserId: payload.user?.id,
-      resolvedAt: at,
-    },
-    title: status === "approved" ? "approved plan" : status === "rejected" ? "rejected plan" : "resolved approval",
-  });
-}
-
-function normalizeApprovalStatus(status: string | undefined): "pending" | "approved" | "rejected" {
-  switch (status) {
-    case "approved":
-      return "approved";
-    case "rejected":
-      return "rejected";
-    default:
-      return "pending";
+  if (actor.stepName) {
+    const matchingName = [...dispatch.steps].reverse().find((step) => step.stepName === actor.stepName);
+    if (matchingName) {
+      return matchingName;
+    }
   }
+
+  if (actor.stepIndex !== undefined) {
+    return dispatch.steps[actor.stepIndex];
+  }
+
+  return dispatch.steps.at(-1);
 }
 
 // Short-form artifact label ("PR", "note") for event descriptions.

@@ -8,12 +8,10 @@ const (
 	// Work order events. `order.status.updated` is the sole authoritative
 	// lifecycle event: every FSM transition emits one, enriched with the
 	// actor / automation / originating run / app when applicable.
-	EventTypeOrderAssigneesUpdated  = "order.assignees.updated"
-	EventTypeOrderStatusUpdated     = "order.status.updated"
-	EventTypeOrderCommentAdded      = "order.comment.added"
-	EventTypeOrderArtifactAdded     = "order.artifact.added"
-	EventTypeOrderApprovalRequested = "order.approval.requested"
-	EventTypeOrderApprovalResolved  = "order.approval.resolved"
+	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
+	EventTypeOrderStatusUpdated    = "order.status.updated"
+	EventTypeOrderCommentAdded     = "order.comment.added"
+	EventTypeOrderArtifactAdded    = "order.artifact.added"
 
 	// Factory line events
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
@@ -105,24 +103,6 @@ type LineStepExecutionCreated struct {
 	Note string `json:"note,omitempty"`
 }
 
-type WorkOrderApprovalRequested struct {
-	Order    *WorkOrderRef `json:"order,omitempty"`
-	Approval *ApprovalRef  `json:"approval,omitempty"`
-	// Actor is the user or automation that requested the approval.
-	User       *UserRef       `json:"user,omitempty"`
-	Automation *AutomationRef `json:"automation,omitempty"`
-	Run        *RunRef        `json:"run,omitempty"`
-}
-
-type WorkOrderApprovalResolved struct {
-	Order    *WorkOrderRef `json:"order,omitempty"`
-	Approval *ApprovalRef  `json:"approval,omitempty"`
-	// Resolver is the user who Approved / Rejected.
-	User    *UserRef `json:"user,omitempty"`
-	Status  string   `json:"status"`
-	Comment string   `json:"comment,omitempty"`
-}
-
 type LineStepExecutionFinished struct {
 	StepName string        `json:"stepName"`
 	Order    *WorkOrderRef `json:"order,omitempty"`
@@ -162,15 +142,4 @@ type ArtifactRef struct {
 	ID   uuid.UUID      `json:"id"`
 	Type string         `json:"type"`
 	Data map[string]any `json:"data,omitempty"`
-}
-
-// ApprovalRef snapshots the approval request associated with an event so the
-// timeline can render approvals without re-loading the row.
-type ApprovalRef struct {
-	ID          uuid.UUID  `json:"id"`
-	ExecutionID *uuid.UUID `json:"executionId,omitempty"`
-	Title       string     `json:"title,omitempty"`
-	Message     string     `json:"message,omitempty"`
-	Status      string     `json:"status,omitempty"`
-	ApproverID  *uuid.UUID `json:"approverId,omitempty"`
 }

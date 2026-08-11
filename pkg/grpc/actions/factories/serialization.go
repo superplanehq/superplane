@@ -1,7 +1,6 @@
 package factories
 
 import (
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -88,7 +87,6 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 func serializeWorkOrder(
 	order *models.FactoryWorkOrder,
 	executions []models.FactoryWorkOrderExecutionRecord,
-	approvals []models.FactoryWorkOrderApproval,
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
 	serializedExecutions := serializeWorkOrderExecutions(executions)
@@ -113,7 +111,6 @@ func serializeWorkOrder(
 		CreatedByAutomation: serializeAutomationRef(createdByAutomation),
 		TotalTokens:         totalTokens,
 		TotalCostCents:      totalCostCents,
-		Approvals:           serializeWorkOrderApprovals(approvals),
 	}
 }
 
@@ -253,63 +250,6 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 		return pb.WorkOrder_RESULT_FAILED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
-	}
-}
-
-func serializeWorkOrderApprovals(approvals []models.FactoryWorkOrderApproval) []*pb.WorkOrderApproval {
-	result := make([]*pb.WorkOrderApproval, 0, len(approvals))
-	for i := range approvals {
-		result = append(result, serializeWorkOrderApproval(&approvals[i]))
-	}
-	return result
-}
-
-func serializeWorkOrderApproval(approval *models.FactoryWorkOrderApproval) *pb.WorkOrderApproval {
-	item := &pb.WorkOrderApproval{
-		Id:        approval.ID.String(),
-		Title:     approval.Title,
-		Message:   approval.Message,
-		Status:    serializeWorkOrderApprovalStatus(approval.Status),
-		Comment:   approval.Comment,
-		CreatedAt: timestamppb.New(approval.CreatedAt),
-		UpdatedAt: timestamppb.New(approval.UpdatedAt),
-	}
-	if approval.ExecutionID != nil {
-		item.ExecutionId = approval.ExecutionID.String()
-	}
-	item.Approver = userRefFromApproverFields(approval.ApproverID, approval.Approver)
-	item.CreatedBy = userRefFromApproverFields(approval.CreatedByID, approval.CreatedBy)
-	item.ResolvedBy = userRefFromApproverFields(approval.ResolvedByID, approval.ResolvedBy)
-	if approval.ResolvedAt != nil {
-		item.ResolvedAt = timestamppb.New(*approval.ResolvedAt)
-	}
-	return item
-}
-
-func userRefFromApproverFields(id *uuid.UUID, user *models.User) *pb.UserRef {
-	if id == nil {
-		return nil
-	}
-	name := id.String()
-	if user != nil && user.Name != "" {
-		name = user.Name
-	}
-	return &pb.UserRef{
-		Id:   id.String(),
-		Name: name,
-	}
-}
-
-func serializeWorkOrderApprovalStatus(status string) pb.WorkOrderApproval_Status {
-	switch status {
-	case models.FactoryWorkOrderApprovalStatusPending:
-		return pb.WorkOrderApproval_STATUS_PENDING
-	case models.FactoryWorkOrderApprovalStatusApproved:
-		return pb.WorkOrderApproval_STATUS_APPROVED
-	case models.FactoryWorkOrderApprovalStatusRejected:
-		return pb.WorkOrderApproval_STATUS_REJECTED
-	default:
-		return pb.WorkOrderApproval_STATUS_UNSPECIFIED
 	}
 }
 

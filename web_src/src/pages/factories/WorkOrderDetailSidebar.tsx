@@ -5,19 +5,27 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
 } from "@/api-client";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { appPath } from "@/lib/appPaths";
-import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { Forward, Loader2, Plus } from "lucide-react";
+import {
+  Calendar,
+  CircleDollarSign,
+  CircleDot,
+  ChevronDown,
+  Loader2,
+  Plus,
+  Sparkles,
+  User,
+  UserPlus,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import { factoryLineDetailPath } from "./lib/factoryPagePaths";
-import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
-import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
+import { OrgUserReference } from "./OrgUserReference";
+import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
+import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
@@ -31,7 +39,6 @@ interface WorkOrderDetailSidebarProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
-  factoryId: string;
   canAssign: boolean;
   canDispatch: boolean;
   permissionsLoading: boolean;
@@ -43,9 +50,11 @@ interface WorkOrderDetailSidebarProps {
 }
 
 /**
- * Right-hand column for the work order detail page: overview (status /
- * creator / assignee / date / cost), factory lines that ran (with dispatch),
- * and artifacts. Keeps the surrounding aside layout free of business logic.
+ * Right-hand column for the work order detail page. Renders three sections in
+ * the mockup style: a single Overview list (status, creator, assignee(s),
+ * created, spending), Factory Lines (only lines that have runs + compact
+ * "Send to line" trigger), and a bare Artifacts list. Every row shares the
+ * same icon+value shape so the panel reads as a compact metadata list.
  */
 export function WorkOrderDetailSidebar({
   organizationId,
@@ -58,7 +67,6 @@ export function WorkOrderDetailSidebar({
   assigneeIds,
   assigneeNames,
   factoryLines,
-  factoryId,
   canAssign,
   canDispatch,
   permissionsLoading,
@@ -83,8 +91,6 @@ export function WorkOrderDetailSidebar({
       />
 
       <FactoryLinesSection
-        organizationId={organizationId}
-        factoryId={factoryId}
         executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
@@ -94,10 +100,56 @@ export function WorkOrderDetailSidebar({
         onDispatch={onDispatch}
       />
 
-      <WorkOrderArtifactsPanel artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+      <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
     </div>
   );
 }
+
+function SidebarSectionHeading({ children }: { children: React.ReactNode }) {
+  return <h3 className="workspace-section-label">{children}</h3>;
+}
+
+function OverviewRow({
+  icon,
+  srLabel,
+  children,
+}: {
+  icon: React.ReactNode;
+  srLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 py-1.5">
+      <span className="shrink-0 text-muted-foreground" aria-hidden>
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1 text-[13px] tracking-[-0.01em] text-foreground">
+        <span className="sr-only">{srLabel}</span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_TEXT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
+  completed: "text-[color:var(--status-success)]",
+  running: "text-[color:var(--status-running)]",
+  failed: "text-[color:var(--status-danger)]",
+  closedFailed: "text-[color:var(--status-danger)]",
+  rejected: "text-muted-foreground",
+  open: "text-sky-700 dark:text-sky-300",
+  draft: "text-muted-foreground",
+};
+
+const STATUS_DOT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
+  completed: "bg-[var(--status-success-dot)]",
+  running: "bg-[var(--status-running-dot)]",
+  failed: "bg-[var(--status-danger-dot)]",
+  closedFailed: "bg-[var(--status-danger-dot)]",
+  rejected: "bg-gray-400",
+  open: "bg-sky-500",
+  draft: "bg-gray-400",
+};
 
 function OverviewSection({
   organizationId,
@@ -123,77 +175,73 @@ function OverviewSection({
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
   const totalTokens = parseNumericFromString(order.totalTokens);
   const totalCostCents = parseNumericFromString(order.totalCostCents);
-  const showUsage = totalTokens > 0 || totalCostCents > 0;
+  const showSpending = totalTokens > 0 || totalCostCents > 0;
 
   return (
     <section>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Overview</h2>
-
-      <dl className="mt-3 space-y-3">
-        <OverviewRow label="Status">
-          <Badge
-            variant="outline"
-            className={cn("inline-flex px-2 py-0.5 text-[11px] font-medium", statusMeta.className)}
-          >
-            {displayStatus === "running" ? <Loader2 className="mr-1 inline h-3 w-3 animate-spin" aria-hidden /> : null}
-            {statusMeta.label}
-          </Badge>
+      <SidebarSectionHeading>Overview</SidebarSectionHeading>
+      <div className="mt-2">
+        <OverviewRow icon={<CircleDot className="size-3.5" aria-hidden />} srLabel="Status">
+          <StatusValue displayStatus={displayStatus} label={statusMeta.label} />
         </OverviewRow>
 
-        <OverviewRow label="Created by">
+        <OverviewRow icon={<UserPlus className="size-3.5" aria-hidden />} srLabel="Author">
           <CreatorValue organizationId={organizationId} order={order} />
         </OverviewRow>
 
-        <OverviewRow label="Assignee">
-          <div className="flex-1">
-            <WorkOrderAssigneesField
-              organizationId={organizationId}
-              assigneeIds={assigneeIds}
-              assigneeNames={assigneeNames}
-              canEdit={canAssign}
-              isSaving={isAssigneesSaving}
-              onSave={onAssigneesSave}
-            />
-          </div>
-        </OverviewRow>
+        <AssigneeOverviewRow
+          organizationId={organizationId}
+          assigneeIds={assigneeIds}
+          assigneeNames={assigneeNames}
+          canEdit={canAssign}
+          isSaving={isAssigneesSaving}
+          onSave={onAssigneesSave}
+        />
 
         {createdAt ? (
-          <OverviewRow label="Created">
-            <span className="text-sm text-gray-700 dark:text-gray-300" title={createdAt.toLocaleString()}>
-              {formatTimeAgo(createdAt)}
-            </span>
+          <OverviewRow icon={<Calendar className="size-3.5" aria-hidden />} srLabel="Created">
+            <span title={createdAt.toLocaleString()}>{formatCompactDate(createdAt)}</span>
           </OverviewRow>
         ) : null}
 
-        {showUsage ? (
-          <OverviewRow label="Usage">
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {formatUsageLine(totalTokens, totalCostCents)}
+        {showSpending ? (
+          <OverviewRow icon={<CircleDollarSign className="size-3.5" aria-hidden />} srLabel="Spending">
+            <span title={formatSpendingTooltip(totalTokens, totalCostCents)}>
+              {formatSpendingLine(totalTokens, totalCostCents)}
             </span>
           </OverviewRow>
         ) : null}
-      </dl>
+      </div>
     </section>
   );
 }
 
-function OverviewRow({ label, children }: { label: string; children: React.ReactNode }) {
+function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplayStatus; label: string }) {
+  const textClass = STATUS_TEXT_CLASSNAME[displayStatus] ?? "text-foreground";
+  const dotClass = STATUS_DOT_CLASSNAME[displayStatus] ?? "bg-muted-foreground";
   return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="w-24 shrink-0 text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">{children}</dd>
-    </div>
+    <span className={cn("inline-flex items-center gap-1.5 text-[13px]", textClass)}>
+      {displayStatus === "running" ? (
+        <Loader2 className="size-3 animate-spin" aria-hidden />
+      ) : (
+        <span className={cn("size-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
+      )}
+      {label}
+    </span>
   );
 }
 
 function CreatorValue({ organizationId, order }: { organizationId: string; order: FactoriesWorkOrder }) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
   const automation = order.createdByAutomation;
   if (isAutomationRefResolved(automation)) {
     return <AutomationLink organizationId={organizationId} automation={automation} />;
   }
-
-  const name = order.createdBy?.name ?? "Unknown";
-  return <span className="truncate text-sm text-gray-700 dark:text-gray-300">{name}</span>;
+  const display = resolveUser(order.createdBy?.id, order.createdBy?.name);
+  if (display) {
+    return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
+  }
+  return <span className="truncate">{order.createdBy?.name ?? "Unknown"}</span>;
 }
 
 function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref is FactoriesAutomationRef {
@@ -212,18 +260,86 @@ function AutomationLink({
     return (
       <Link
         to={appPath(organizationId, automation.appId)}
-        className="truncate text-sm text-violet-700 hover:underline dark:text-violet-300"
+        className="truncate text-foreground underline underline-offset-2 hover:no-underline"
       >
         {label}
       </Link>
     );
   }
-  return <span className="truncate text-sm text-gray-700 dark:text-gray-300">{label}</span>;
+  return <span className="truncate">{label}</span>;
+}
+
+function AssigneeOverviewRow({
+  organizationId,
+  assigneeIds,
+  assigneeNames,
+  canEdit,
+  isSaving,
+  onSave,
+}: {
+  organizationId: string;
+  assigneeIds: string[];
+  assigneeNames: string[];
+  canEdit: boolean;
+  isSaving: boolean;
+  onSave: (assigneeIds: string[]) => Promise<void>;
+}) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  return (
+    <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Assignee">
+      <PermissionTooltip allowed={canEdit} message="You don't have permission to update assignees.">
+        <WorkOrderAssigneesPopover
+          organizationId={organizationId}
+          selectedIds={assigneeIds}
+          onSave={onSave}
+          isSaving={isSaving}
+          canEdit={canEdit}
+          align="end"
+        >
+          <button
+            type="button"
+            disabled={!canEdit || isSaving}
+            aria-label={
+              assigneeIds.length > 0 ? `Assignee: ${assigneeNames.filter(Boolean).join(", ")}` : "Assign work order"
+            }
+            className="-my-1.5 -mr-1.5 flex w-full min-w-0 items-center gap-1.5 rounded-md py-1.5 pr-1.5 text-left text-[13px] tracking-[-0.01em] text-foreground outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
+            data-testid="work-order-edit-assignees"
+          >
+            <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
+            <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        </WorkOrderAssigneesPopover>
+      </PermissionTooltip>
+    </OverviewRow>
+  );
+}
+
+function AssigneeButtonBody({
+  assigneeIds,
+  assigneeNames,
+  resolveUser,
+}: {
+  assigneeIds: string[];
+  assigneeNames: string[];
+  resolveUser: ReturnType<typeof useOrgUserLookup>["resolveUser"];
+}) {
+  if (assigneeIds.length === 0) {
+    return <span className="min-w-0 truncate text-muted-foreground">Assign…</span>;
+  }
+  if (assigneeIds.length === 1) {
+    const display = resolveUser(assigneeIds[0], assigneeNames[0]);
+    return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
+  }
+  const first = resolveUser(assigneeIds[0], assigneeNames[0]);
+  return (
+    <>
+      <OrgUserReference display={first} size="xs" nameClassName="truncate text-[13px]" />
+      <span className="shrink-0 text-muted-foreground">+{assigneeIds.length - 1}</span>
+    </>
+  );
 }
 
 function FactoryLinesSection({
-  organizationId,
-  factoryId,
   executions,
   factoryLines,
   canDispatch,
@@ -232,8 +348,6 @@ function FactoryLinesSection({
   isDispatching,
   onDispatch,
 }: {
-  organizationId: string;
-  factoryId: string;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
@@ -243,23 +357,20 @@ function FactoryLinesSection({
   onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
 }) {
   const rows = deriveLineRows(executions);
+  const isDispatchDisabled = !canDispatch || factoryLines.length === 0;
 
   return (
     <section>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Factory lines</h2>
+      <SidebarSectionHeading>Factory Lines</SidebarSectionHeading>
 
-      <ul className="mt-3 space-y-1.5">
+      <div className="mt-2">
         {rows.length === 0 ? (
-          <li className="text-sm text-gray-500 dark:text-gray-400">This work order has not run on a line yet.</li>
+          <p className="text-[13px] text-muted-foreground">Not run on a line yet.</p>
         ) : (
-          rows.map((row) => (
-            <LineRow key={row.lineId} organizationId={organizationId} factoryId={factoryId} row={row} />
-          ))
+          rows.map((row) => <FactoryLineRow key={row.lineId} row={row} />)
         )}
-      </ul>
 
-      {isDispatchable ? (
-        <div className="mt-2">
+        {isDispatchable ? (
           <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
             <DispatchWorkOrderPopover
               lines={factoryLines}
@@ -268,34 +379,37 @@ function FactoryLinesSection({
               onDispatch={onDispatch}
               align="start"
             >
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                disabled={!canDispatch || factoryLines.length === 0}
-                className="h-7 justify-start gap-1.5 px-2 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+                disabled={isDispatchDisabled}
+                aria-label="Send to line"
+                className={cn(
+                  "-mx-1.5 mt-0.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-[13px] tracking-[-0.01em] outline-none transition-colors",
+                  "text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60",
+                  "disabled:cursor-not-allowed disabled:opacity-60",
+                )}
                 data-testid="work-order-sidebar-dispatch-button"
               >
-                <Plus className="h-3.5 w-3.5" aria-hidden />
+                <Plus className="size-3.5 shrink-0" aria-hidden />
                 Send to line
-                <Forward className="ml-auto h-3.5 w-3.5" aria-hidden />
-              </Button>
+                <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
             </DispatchWorkOrderPopover>
           </PermissionTooltip>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   );
 }
 
-interface FactoryLineRow {
+interface FactoryLineRowModel {
   lineId: string;
   lineName: string;
   tone: "success" | "warning" | "danger" | "muted";
 }
 
-function deriveLineRows(executions: FactoriesWorkOrderExecution[]): FactoryLineRow[] {
-  const map = new Map<string, FactoryLineRow>();
+function deriveLineRows(executions: FactoriesWorkOrderExecution[]): FactoryLineRowModel[] {
+  const map = new Map<string, FactoryLineRowModel>();
   for (const execution of executions) {
     const lineId = execution.line?.id ?? "unknown";
     const lineName = execution.line?.name?.trim() || "Unnamed line";
@@ -310,7 +424,7 @@ function deriveLineRows(executions: FactoriesWorkOrderExecution[]): FactoryLineR
   return [...map.values()];
 }
 
-function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRow["tone"] {
+function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRowModel["tone"] {
   if (execution.result === "RESULT_FAILED") return "danger";
   if (
     execution.state === "STATE_PENDING" ||
@@ -326,8 +440,8 @@ function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRow["
 // Line rows collapse many executions into a single dot. "worst" surfaces
 // failure over running over completed so operators see the highest-priority
 // state at a glance.
-function worstTone(a: FactoryLineRow["tone"], b: FactoryLineRow["tone"]): FactoryLineRow["tone"] {
-  const priority: Record<FactoryLineRow["tone"], number> = {
+function worstTone(a: FactoryLineRowModel["tone"], b: FactoryLineRowModel["tone"]): FactoryLineRowModel["tone"] {
+  const priority: Record<FactoryLineRowModel["tone"], number> = {
     danger: 3,
     warning: 2,
     success: 1,
@@ -336,43 +450,38 @@ function worstTone(a: FactoryLineRow["tone"], b: FactoryLineRow["tone"]): Factor
   return priority[a] >= priority[b] ? a : b;
 }
 
-const TONE_DOT_CLASS: Record<FactoryLineRow["tone"], string> = {
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  danger: "bg-red-500",
-  muted: "bg-gray-300 dark:bg-gray-600",
+const TONE_DOT_CLASS: Record<FactoryLineRowModel["tone"], string> = {
+  success: "bg-[var(--status-success-dot)]",
+  warning: "bg-[var(--status-warning-dot)]",
+  danger: "bg-[var(--status-danger-dot)]",
+  muted: "bg-muted-foreground/40",
 };
 
-function LineRow({
-  organizationId,
-  factoryId,
-  row,
-}: {
-  organizationId: string;
-  factoryId: string;
-  row: FactoryLineRow;
-}) {
-  const isLinkable = row.lineId && row.lineId !== "unknown";
+function FactoryLineRow({ row }: { row: FactoryLineRowModel }) {
+  const activityId = row.lineId && row.lineId !== "unknown" ? `activity-line-run-${row.lineId}` : undefined;
   const inner = (
     <>
-      <span className={cn("h-2 w-2 rounded-full", TONE_DOT_CLASS[row.tone])} aria-hidden />
-      <span className="min-w-0 truncate text-sm text-gray-800 dark:text-gray-200">{row.lineName}</span>
+      <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className={cn("size-1.5 shrink-0 rounded-full", TONE_DOT_CLASS[row.tone])} aria-hidden />
+      <span className="min-w-0 truncate text-[13px] tracking-[-0.01em] text-foreground">{row.lineName}</span>
     </>
   );
+  const commonClass =
+    "-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60";
+
+  if (!activityId) {
+    return <span className={cn(commonClass, "cursor-default")}>{inner}</span>;
+  }
 
   return (
-    <li>
-      {isLinkable ? (
-        <Link
-          to={factoryLineDetailPath(organizationId, factoryId, row.lineId)}
-          className="inline-flex min-w-0 items-center gap-2 rounded-md px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-800/60"
-        >
-          {inner}
-        </Link>
-      ) : (
-        <span className="inline-flex min-w-0 items-center gap-2 px-2 py-1">{inner}</span>
-      )}
-    </li>
+    <button
+      type="button"
+      className={commonClass}
+      aria-label={`Show ${row.lineName} in activity`}
+      onClick={() => document.getElementById(activityId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+    >
+      {inner}
+    </button>
   );
 }
 
@@ -382,10 +491,23 @@ function parseNumericFromString(value: string | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatUsageLine(totalTokens: number, totalCostCents: number): string {
+function formatSpendingLine(totalTokens: number, totalCostCents: number): React.ReactNode {
+  const tokens = totalTokens > 0 ? formatCompactTokens(totalTokens) : null;
+  const usd = totalCostCents > 0 ? formatUsdCents(totalCostCents) : null;
+  if (tokens && usd) {
+    return (
+      <>
+        {tokens} <span className="text-muted-foreground">·</span> {usd}
+      </>
+    );
+  }
+  return tokens ?? usd ?? "";
+}
+
+function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
   const parts: string[] = [];
-  if (totalTokens > 0) parts.push(formatCompactTokens(totalTokens));
-  if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
+  if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
+  if (totalCostCents > 0) parts.push(`$${(totalCostCents / 100).toFixed(2)}`);
   return parts.join(" · ");
 }
 
@@ -397,4 +519,16 @@ function formatCompactTokens(tokens: number): string {
 
 function formatUsdCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatCompactDate(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  })
+    .format(date)
+    .replace(",", "");
 }
