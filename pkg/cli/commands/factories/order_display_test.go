@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -230,7 +231,7 @@ func TestDescribeEvent(t *testing.T) {
 			"user": map[string]interface{}{"id": "user-1"},
 		})
 		got := describeEvent(event, testMemberLookup)
-		assert.Equal(t, "PLAN.md markdown added", got)
+		assert.Equal(t, "markdown added: PLAN.md", got)
 		assert.NotContains(t, got, "artifact-1")
 		assert.NotContains(t, got, "alice@example.com")
 	})
@@ -244,7 +245,7 @@ func TestDescribeEvent(t *testing.T) {
 			},
 		})
 		got := describeEvent(event, testMemberLookup)
-		assert.Equal(t, "fix/render-issue branch added", got)
+		assert.Equal(t, "branch added: fix/render-issue", got)
 	})
 
 	t.Run("artifact added with url only", func(t *testing.T) {
@@ -256,7 +257,7 @@ func TestDescribeEvent(t *testing.T) {
 			},
 		})
 		got := describeEvent(event, testMemberLookup)
-		assert.Equal(t, "https://github.com/example/repo/pull/1 PR added", got)
+		assert.Equal(t, "PR added: https://github.com/example/repo/pull/1", got)
 	})
 
 	t.Run("artifact added with no data falls back to type only", func(t *testing.T) {
@@ -265,6 +266,24 @@ func TestDescribeEvent(t *testing.T) {
 		})
 		got := describeEvent(event, testMemberLookup)
 		assert.Equal(t, "PR added", got)
+	})
+
+	t.Run("artifact added with long title keeps 'added' next to the type, not trailing", func(t *testing.T) {
+		// Regression test: a long artifact label (e.g. a PR title) can push a
+		// terminal line past its width. The "<type> added" phrase must come
+		// first so it can never be wrapped onto its own line, orphaned from
+		// the rest of the message.
+		longTitle := "feat(factory): add findWorkOrder component and explicit orderId targeting"
+		event := newTestEvent(eventTypeOrderArtifactAdded, map[string]interface{}{
+			"artifact": map[string]interface{}{
+				"id":   "artifact-5",
+				"type": "pr",
+				"data": map[string]interface{}{"title": longTitle},
+			},
+		})
+		got := describeEvent(event, testMemberLookup)
+		assert.Equal(t, "PR added: "+longTitle, got)
+		assert.True(t, strings.HasPrefix(got, "PR added:"), "expected message to start with the fixed phrase, got %q", got)
 	})
 
 	t.Run("step execution created", func(t *testing.T) {

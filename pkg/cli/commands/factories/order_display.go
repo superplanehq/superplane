@@ -462,8 +462,14 @@ func artifactLabel(artifact *eventArtifactRef) string {
 }
 
 // describeArtifactAddedEvent renders only the artifact's own information
-// (label + type) — no run IDs, artifact IDs, or actor — per the ticket's
+// (type + label) — no run IDs, artifact IDs, or actor — per the ticket's
 // request to keep artifact messages focused on the artifact itself.
+//
+// The fixed "<type> added" phrase is kept at the start of the message
+// (rather than after the label) so it stays glued to the TYPE/AGE columns
+// on screen: artifact labels (e.g. a PR title) can be long enough that a
+// terminal wraps the line, and when "added" trailed the label it could get
+// pushed onto its own line, reading like a stray fragment.
 func describeArtifactAddedEvent(event openapi_client.FactoriesWorkOrderEvent) string {
 	data, err := decodeEventPayload[orderArtifactAddedEvent](event.GetEvent())
 	if err != nil {
@@ -476,7 +482,7 @@ func describeArtifactAddedEvent(event openapi_client.FactoriesWorkOrderEvent) st
 
 	typeName := artifactTypeName(data.Artifact.Type)
 	if label := artifactLabel(data.Artifact); label != "" {
-		return fmt.Sprintf("%s %s added", label, typeName)
+		return fmt.Sprintf("%s added: %s", typeName, label)
 	}
 	return fmt.Sprintf("%s added", typeName)
 }
