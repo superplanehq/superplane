@@ -6,70 +6,48 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { JiraIssue, JiraIssueFields, JiraProject, JiraUser } from "./types";
+import type { JiraIssue, JiraServiceDesk, JiraUser } from "./types";
+import { actionLabel, issueFieldValues } from "./on_issue";
 
-interface OnIssueEventData {
+interface OnIncidentEventData {
   action?: string;
   issue?: JiraIssue;
   user?: JiraUser;
 }
 
-interface OnIssueConfiguration {
-  project?: string;
+interface OnIncidentConfiguration {
+  serviceDesk?: string;
+  requestTypes?: string[];
   events?: string[];
 }
 
-interface OnIssueNodeMetadata {
-  project?: JiraProject;
+interface OnIncidentNodeMetadata {
+  serviceDesk?: JiraServiceDesk;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  created: "Created",
-  updated: "Updated",
-  deleted: "Deleted",
-};
-
-// actionLabel and issueFieldValues are shared with on_incident.ts - an incident is just an issue
-// on an incident-practice request type, so both triggers emit the same event shape.
-export function actionLabel(action?: string): string {
-  if (!action) return "";
-  return ACTION_LABELS[action] ?? action;
-}
-
-function issueTitle(issue?: JiraIssue): string {
-  if (!issue) return "Issue event";
+function incidentTitle(issue?: JiraIssue): string {
+  if (!issue) return "Incident event";
   const summary = issue.fields?.summary;
-  return summary ? `${issue.key} - ${summary}` : issue.key || "Issue event";
-}
-
-export function issueFieldValues(fields?: JiraIssueFields): Record<string, string> {
-  return {
-    Summary: stringOrDash(fields?.summary),
-    Status: stringOrDash(fields?.status?.name),
-    Priority: stringOrDash(fields?.priority?.name),
-    "Issue Type": stringOrDash(fields?.issuetype?.name),
-    Assignee: stringOrDash(fields?.assignee?.displayName),
-    Reporter: stringOrDash(fields?.reporter?.displayName),
-  };
+  return summary ? `${issue.key} - ${summary}` : issue.key || "Incident event";
 }
 
 /**
- * Renderer for the "jira.onIssue" trigger.
+ * Renderer for the "jira.onIncident" trigger.
  */
-export const onIssueTriggerRenderer: TriggerRenderer = {
+export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
-    const data = context.event?.data as OnIssueEventData | undefined;
+    const data = context.event?.data as OnIncidentEventData | undefined;
     const label = actionLabel(data?.action);
     const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return {
-      title: issueTitle(data?.issue),
+      title: incidentTitle(data?.issue),
       subtitle: label && timeAgo ? `${label} - ${timeAgo}` : label || timeAgo,
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const data = (context.event?.data ?? {}) as OnIssueEventData;
+    const data = (context.event?.data ?? {}) as OnIncidentEventData;
     const issue = data.issue;
     const receivedAt = context.event?.createdAt ? formatTimestampInUserTimezone(context.event.createdAt) : "-";
 
@@ -83,15 +61,22 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as OnIssueNodeMetadata | undefined;
-    const configuration = node.configuration as OnIssueConfiguration | undefined;
+    const metadata = node.metadata as OnIncidentNodeMetadata | undefined;
+    const configuration = node.configuration as OnIncidentConfiguration | undefined;
     const metadataItems: MetadataItem[] = [];
 
-    const projectLabel = metadata?.project
-      ? `${metadata.project.name} (${metadata.project.key})`
-      : configuration?.project;
-    if (projectLabel) {
-      metadataItems.push({ icon: "folder", label: projectLabel });
+    const serviceDeskLabel = metadata?.serviceDesk
+      ? `${metadata.serviceDesk.projectName} (${metadata.serviceDesk.projectKey})`
+      : configuration?.serviceDesk;
+    if (serviceDeskLabel) {
+      metadataItems.push({ icon: "layers", label: serviceDeskLabel });
+    }
+
+    if (configuration?.requestTypes?.length) {
+      metadataItems.push({
+        icon: "tag",
+        label: `${configuration.requestTypes.length} request type${configuration.requestTypes.length === 1 ? "" : "s"}`,
+      });
     }
 
     if (configuration?.events?.length) {
@@ -109,7 +94,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onIssueTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const { title, subtitle } = onIncidentTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
