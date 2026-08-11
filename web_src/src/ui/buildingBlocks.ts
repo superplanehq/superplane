@@ -212,6 +212,7 @@ function isRunnerBlock(component: { name?: string }): boolean {
 const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp"]);
 const FACTORY_BLOCK_NAMES = new Set([
   "createWorkOrder",
+  "findWorkOrder",
   "updateWorkOrderStatus",
   "addWorkOrderComment",
   "addWorkOrderArtifact",
