@@ -419,6 +419,8 @@ func buildUpdateAlarmInput(
 		AlarmActions:            existing.AlarmActions,
 		OKActions:               existing.OKActions,
 		InsufficientDataActions: existing.InsufficientDataActions,
+
+		EvaluateLowSampleCountPercentile: existing.EvaluateLowSampleCountPercentile,
 	}
 
 	if hasConfigKey(rawConfiguration, "alarmDescription") {
@@ -426,9 +428,11 @@ func buildUpdateAlarmInput(
 		input.IncludeAlarmDescription = true
 	}
 
+	// Switching to a plain statistic drops the percentile-only settings with it.
 	if hasConfigKey(rawConfiguration, "statistic") {
 		input.Statistic = strings.TrimSpace(config.Statistic)
 		input.ExtendedStatistic = ""
+		input.EvaluateLowSampleCountPercentile = ""
 	}
 
 	if conditionConfig, ok := thresholdConditionConfig(rawConfiguration); ok {

@@ -48,6 +48,30 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// A percentile alarm: uses ExtendedStatistic instead of Statistic, and carries
+// the percentile-only EvaluateLowSampleCountPercentile setting.
+const describePercentileAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>api-p90-latency</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-p90-latency</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/ApplicationELB</Namespace>
+        <MetricName>TargetResponseTime</MetricName>
+        <ExtendedStatistic>p90</ExtendedStatistic>
+        <EvaluateLowSampleCountPercentile>ignore</EvaluateLowSampleCountPercentile>
+        <Period>300</Period>
+        <EvaluationPeriods>3</EvaluationPeriods>
+        <Threshold>1.5</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 const describeMetricMathAlarmXML = `
 <DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
   <DescribeAlarmsResult>
@@ -266,6 +290,48 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		body := requestBody(t, httpContext, 1)
 		assert.Contains(t, body, "ActionsEnabled=false")
 		assert.Contains(t, body, "Threshold=80")
+	})
+
+	t.Run("percentile settings survive an unrelated update", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describePercentileAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "api-p90-latency",
+				"period": 60,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "ExtendedStatistic=p90")
+		assert.Contains(t, body, "EvaluateLowSampleCountPercentile=ignore")
+		assert.NotContains(t, body, "Statistic=Average")
+	})
+
+	t.Run("switching to a plain statistic drops the percentile settings", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describePercentileAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "api-p90-latency",
+				"statistic": "Average",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "Statistic=Average")
+		assert.NotContains(t, body, "ExtendedStatistic")
+		assert.NotContains(t, body, "EvaluateLowSampleCountPercentile")
 	})
 
 	t.Run("metric math alarm -> error", func(t *testing.T) {

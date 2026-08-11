@@ -76,6 +76,10 @@ type PutMetricAlarmInput struct {
 	TreatMissingData   string
 	ActionsEnabled     bool
 
+	// EvaluateLowSampleCountPercentile applies to percentile alarms only.
+	// It must be carried over on update, or CloudWatch resets it to its default.
+	EvaluateLowSampleCountPercentile string
+
 	// Action ARNs executed on each state transition. A nil slice clears the actions.
 	AlarmActions            []string
 	OKActions               []string
@@ -181,6 +185,10 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 
 	if unit := strings.TrimSpace(input.Unit); unit != "" {
 		params.Set("Unit", unit)
+	}
+
+	if percentile := strings.TrimSpace(input.EvaluateLowSampleCountPercentile); percentile != "" {
+		params.Set("EvaluateLowSampleCountPercentile", percentile)
 	}
 
 	setActionMembers(params, "AlarmActions", input.AlarmActions)
