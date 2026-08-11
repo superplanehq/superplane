@@ -54,8 +54,11 @@ func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	_ = mapstructure.Decode(a, &configA)
 	_ = mapstructure.Decode(b, &configB)
 
+	// Alert webhooks are scoped by team, not shared like the issue/comment webhook - two configs
+	// only match if both are alert configs for the same team, so publishing an unchanged
+	// jira.onAlert trigger doesn't tear down and recreate its JSM Ops integration every time.
 	if configA.Kind == webhookKindAlert || configB.Kind == webhookKindAlert {
-		return false, nil
+		return configA.Kind == webhookKindAlert && configB.Kind == webhookKindAlert && configA.TeamID == configB.TeamID, nil
 	}
 
 	return true, nil

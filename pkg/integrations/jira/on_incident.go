@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -81,7 +82,7 @@ func (t *OnIncident) Color() string {
 }
 
 func (t *OnIncident) ExampleData() map[string]any {
-	return onIssueExampleData()
+	return onIncidentExampleData()
 }
 
 func (t *OnIncident) Configuration() []configuration.Field {
@@ -155,9 +156,12 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve request type %s: %w", requestTypeID, err)
 		}
-		if requestType.IssueTypeID != "" {
-			issueTypeIDs = append(issueTypeIDs, requestType.IssueTypeID)
+		// A request type with no issue type would silently never match anything in HandleWebhook,
+		// leaving the trigger looking configured but permanently inert - fail loudly instead.
+		if requestType.IssueTypeID == "" {
+			return fmt.Errorf("request type %s has no underlying issue type", requestTypeID)
 		}
+		issueTypeIDs = append(issueTypeIDs, requestType.IssueTypeID)
 	}
 
 	if err := ctx.Metadata.Set(OnIncidentMetadata{ServiceDesk: desk, IssueTypeIDs: issueTypeIDs}); err != nil {
@@ -206,6 +210,14 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 
 	if payload.Issue == nil {
 		ctx.Logger.Info("Ignoring event - missing issue")
+		return http.StatusOK, nil, nil
+	}
+
+	// Issue type ids are global to the site, not scoped to a project, so a matching type alone
+	// doesn't prove the issue belongs to this trigger's service desk - check the project too,
+	// failing closed when the payload doesn't carry one to compare.
+	if metadata.ServiceDesk != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.ServiceDesk.ProjectKey) {
+		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.ServiceDesk.ProjectKey)
 		return http.StatusOK, nil, nil
 	}
 

@@ -94,6 +94,29 @@ func Test__OnIncident__Setup(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "service desk 99 not found")
 	})
+
+	// Regression test: a request type with no underlying issue type would silently never match
+	// anything in HandleWebhook, leaving the trigger looking configured but permanently inert -
+	// Setup must fail loudly instead (BUGBOT_BUG_ID ed7585e9).
+	t.Run("request type without an issue type -> error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"values":[{"id":"2","projectName":"Demo service space","projectKey":"DEMO"}],"isLastPage":true}`,
+				))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+					`{"id":"5","name":"Computer support","issueTypeId":""}`,
+				))},
+			},
+		}
+		err := trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   newAuthorizedIntegration(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"serviceDesk": "2", "requestTypes": []string{"5"}, "events": []string{"created"}},
+		})
+		require.ErrorContains(t, err, "no underlying issue type")
+	})
 }
 
 func Test__OnIncident__HandleWebhook(t *testing.T) {
@@ -141,6 +164,37 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		event := events.Payloads[0].Data.(IssueEvent)
 		assert.Equal(t, "created", event.Action)
 		assert.Equal(t, "DEMO-42", event.Issue.Key)
+	})
+
+	// Regression test: issue type ids are global to the site, not scoped to a project, so an
+	// issue in a different project reusing the same issue type must not match (BUGBOT_BUG_ID
+	// 4eb011cb).
+	t.Run("ignores a matching issue type in a different project's service desk", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		otherProjectBody := []byte(`{
+			"webhookEvent": "jira:issue_created",
+			"issue": {
+				"id": "10001",
+				"key": "OTHER-42",
+				"self": "https://example.atlassian.net/rest/api/3/issue/10001",
+				"fields": {
+					"summary": "Unrelated issue in another project",
+					"issuetype": {"id": "10075"},
+					"project": {"key": "OTHER"}
+				}
+			}
+		}`)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          otherProjectBody,
+			Events:        events,
+			Metadata:      meta(),
+			Configuration: map[string]any{"events": []string{"created"}},
+			Headers:       http.Header{},
+			Logger:        log.NewEntry(log.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
 	})
 
 	t.Run("ignores an issue whose type is not one of the configured request types", func(t *testing.T) {
@@ -194,7 +248,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		events := &contexts.EventContext{}
 		bodyWithoutIssueType := []byte(`{
 			"webhookEvent": "jira:issue_created",
-			"issue": {"id": "10001", "key": "DEMO-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {}}
+			"issue": {"id": "10001", "key": "DEMO-42", "self": "https://example.atlassian.net/rest/api/3/issue/10001", "fields": {"project": {"key": "DEMO"}}}
 		}`)
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          bodyWithoutIssueType,

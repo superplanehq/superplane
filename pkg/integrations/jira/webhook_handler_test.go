@@ -26,13 +26,23 @@ func Test__WebhookHandler__CompareConfig(t *testing.T) {
 		assert.True(t, equal)
 	})
 
-	// Regression test: JSM Ops alert webhooks have no "one URL" restriction like Jira's dynamic
-	// webhook API does - each jira.onAlert trigger must get its own dedicated registration rather
-	// than sharing one, so these must never dedup even when the configs are otherwise identical.
-	t.Run("alert webhooks never match, even with identical configuration", func(t *testing.T) {
+	// Regression test: publishing an unchanged jira.onAlert trigger must not tear down and
+	// recreate its JSM Ops integration on every commit - alert webhooks with the same team
+	// dedup onto one registration, just like the shared issue/comment webhook (BUGBOT_BUG_ID
+	// b743aa09).
+	t.Run("alert webhooks with the same team match", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
 			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
 			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+		)
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
+
+	t.Run("alert webhooks for different teams never match", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-2"},
 		)
 		require.NoError(t, err)
 		assert.False(t, equal)
