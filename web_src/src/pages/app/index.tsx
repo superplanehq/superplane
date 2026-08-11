@@ -3731,13 +3731,19 @@ export function AppPage() {
 
   const handleLiveCanvasNodeClick = useCallback(
     (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
+      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return false;
+      // With no runs to inspect, let CanvasPage open the node's read-only
+      // configuration instead of starting a lookup that cannot succeed.
+      if (logRunsData.runs.length === 0) return false;
 
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
 
       const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
-      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
+      if (cachedRunId) {
+        handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
+        return true;
+      }
 
       void (async () => {
         try {
@@ -3752,6 +3758,7 @@ export function AppPage() {
           console.error("Failed to inspect latest node run", error);
         }
       })();
+      return true;
     },
     [
       canvasNodesById,
@@ -3762,6 +3769,7 @@ export function AppPage() {
       liveSidebarRunLookupEnabled,
       resolveLatestNodeRunLookupEvent,
       resolveRunIdForSidebarEvent,
+      logRunsData.runs.length,
     ],
   );
 
