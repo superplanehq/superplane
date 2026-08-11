@@ -33,6 +33,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LinesPage,
   MissionsPage,
   OverviewPage,
   VelocityPage,
@@ -167,6 +168,7 @@ function AppRouter() {
                     <Route path="missions" element={<MissionsPage />} />
                     <Route path="wiki" element={<WikiPage />} />
                     <Route path="velocity" element={<VelocityPage />} />
+                    <Route path="lines" element={<LinesPage />} />
                     <Route path="work-orders">
                       <Route index element={<WorkOrdersPage />} />
                       <Route path="new" element={<CreateWorkOrderPageGate />} />

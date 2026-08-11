@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Check, Factory as FactoryIcon, Plus, Settings } from "lucide-react";
+import { ArrowLeftRight, Check, Factory as FactoryIcon, Plus, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { factoryDetailPath, factorySettingsPath } from "../lib/factoryPagePaths";
 
@@ -22,6 +22,9 @@ interface WorkspaceSwitcherProps {
   permissionsLoading: boolean;
   onCreateFactory: () => void;
 }
+
+const iconButtonClass =
+  "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground";
 
 export function WorkspaceSwitcher({
   organizationId,
@@ -38,7 +41,7 @@ export function WorkspaceSwitcher({
   return (
     <div className="flex items-center gap-0.5 px-2 pt-3 pb-1" data-testid="factories-workspace-switcher">
       <p
-        className="flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-sidebar-accent"
+        className="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground transition-colors hover:bg-sidebar-accent"
         title={factory.name ?? undefined}
       >
         {factory.name}
@@ -55,13 +58,11 @@ export function WorkspaceSwitcher({
             }
           }}
           aria-label="Workspace settings"
+          title="Workspace settings"
           data-testid="factories-workspace-settings-link"
-          className={cn(
-            "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-            !canOpenSettings && "pointer-events-none opacity-60",
-          )}
+          className={cn(iconButtonClass, !canOpenSettings && "pointer-events-none opacity-60")}
         >
-          <Settings className="size-3.5" aria-hidden />
+          <Settings className="size-3.5" strokeWidth={1.75} aria-hidden />
         </Link>
       </PermissionTooltip>
       <DropdownMenu>
@@ -69,10 +70,11 @@ export function WorkspaceSwitcher({
           <button
             type="button"
             aria-label="Switch workspace"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            title="Switch workspace"
+            className={iconButtonClass}
             data-testid="factories-workspace-switch"
           >
-            <ArrowRightLeft className="size-3.5" aria-hidden />
+            <ArrowLeftRight className="size-3.5" strokeWidth={1.75} aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">

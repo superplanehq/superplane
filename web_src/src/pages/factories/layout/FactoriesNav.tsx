@@ -21,38 +21,33 @@ const RECENT_STATUS_DOT_CLASS: Record<string, string> = {
   closedFailed: "bg-red-500",
 };
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] tracking-[-0.01em] transition-colors",
+    isActive
+      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+      : "font-normal text-foreground/80 hover:bg-sidebar-accent/70 hover:text-foreground",
+  );
+
 export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: FactoriesNavProps) {
   return (
-    <nav className="flex flex-1 flex-col gap-4 px-2 pt-2 pb-4" data-testid="factories-nav">
-      <ul className="flex flex-col gap-0.5">
+    <>
+      <nav className="flex flex-col gap-0.5 px-2" data-testid="factories-nav" aria-label="Primary">
         {FACTORIES_NAV_ITEMS.map((item) => {
           const Icon = item.Icon;
           const href = item.buildHref(organizationId, factoryId);
           return (
-            <li key={item.id}>
-              <NavLink
-                to={href}
-                data-testid={`factories-nav-${item.id}`}
-                className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
-                    isActive && "bg-sidebar-accent font-medium text-foreground",
-                  )
-                }
-              >
-                <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
-                <span>{item.label}</span>
-              </NavLink>
-            </li>
+            <NavLink key={item.id} to={href} data-testid={`factories-nav-${item.id}`} className={navLinkClass}>
+              <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
           );
         })}
-      </ul>
+      </nav>
 
       {recentWorkOrders.length > 0 ? (
-        <section aria-label="Recent work orders">
-          <p className="px-2.5 pb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
-            Recent
-          </p>
+        <div className="mt-5 px-2" aria-label="Recent work orders">
+          <div className="px-2.5 pb-2 text-[11px] font-medium tracking-[0.04em] text-muted-foreground">Recent</div>
           <ul className="flex flex-col gap-0.5">
             {recentWorkOrders.map((order) => {
               if (!order.id) {
@@ -67,24 +62,26 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
                     to={workOrderDetailPath(organizationId, factoryId, order.id)}
                     className={({ isActive }) =>
                       cn(
-                        "group block rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
-                        isActive && "bg-sidebar-accent font-medium text-foreground",
+                        "block rounded-md px-2.5 py-1.5 transition-colors",
+                        isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent",
                       )
                     }
                     data-testid={`factories-nav-recent-${order.id}`}
                   >
-                    <p className="truncate">{order.title || "Untitled work order"}</p>
-                    <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} aria-hidden />
-                      {statusMeta.label}
+                    <p className="truncate text-[13px] leading-snug tracking-[-0.01em] text-foreground">
+                      {order.title || "Untitled work order"}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <span className={cn("size-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
+                      <span>{statusMeta.label}</span>
                     </p>
                   </NavLink>
                 </li>
               );
             })}
           </ul>
-        </section>
+        </div>
       ) : null}
-    </nav>
+    </>
   );
 }

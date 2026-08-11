@@ -61,7 +61,7 @@ export function SidebarUserMenu({
 
   return (
     <div
-      className="flex items-center gap-2 border-t border-sidebar-border px-2 py-3"
+      className="flex items-center gap-2.5 px-3 pb-3.5 pt-2"
       data-testid="factories-sidebar-user-menu"
     >
       <Avatar
@@ -71,8 +71,8 @@ export function SidebarUserMenu({
         className="size-7 text-[10px]"
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] tracking-[-0.01em] text-foreground">{userName}</p>
-        <p className="truncate text-[12px] text-muted-foreground">{organizationName}</p>
+        <p className="truncate text-[13px] font-medium leading-tight tracking-[-0.01em] text-foreground">{userName}</p>
+        <p className="truncate text-[12px] leading-tight text-muted-foreground">{organizationName}</p>
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -80,9 +80,9 @@ export function SidebarUserMenu({
             type="button"
             aria-label="Open user menu"
             data-testid="factories-sidebar-user-menu-trigger"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
           >
-            <MoreHorizontal className="size-3.5" aria-hidden />
+            <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
