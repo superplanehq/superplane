@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearAgentComposerPrefill,
   clearAgentComposerSend,
+  consumeAgentComposerPrefill,
   consumeAgentComposerSend,
   peekAgentComposerSend,
+  requestAgentComposerPrefill,
   requestAgentComposerSend,
 } from "./composerPrefill";
 
@@ -11,6 +14,8 @@ const canvasB = "canvas-b";
 
 afterEach(() => {
   clearAgentComposerSend();
+  clearAgentComposerPrefill();
+  vi.restoreAllMocks();
 });
 
 describe("composerPrefill", () => {
@@ -43,5 +48,29 @@ describe("composerPrefill", () => {
     requestAgentComposerSend(canvasA, "   ");
     requestAgentComposerSend("", "hello");
     expect(peekAgentComposerSend(canvasA)).toBeNull();
+  });
+
+  it("keeps node context as a separate prefill from the auto-send queue", () => {
+    requestAgentComposerPrefill(canvasA, {
+      text: "How can I improve @Deploy?",
+      mentions: [{ type: "node", id: "deploy", label: "Deploy" }],
+    });
+
+    expect(consumeAgentComposerPrefill(canvasA)).toEqual({
+      text: "How can I improve @Deploy?",
+      mentions: [{ type: "node", id: "deploy", label: "Deploy" }],
+    });
+    expect(peekAgentComposerSend(canvasA)).toBeNull();
+  });
+
+  it("does not inject stale node context later", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValue(11_001);
+    requestAgentComposerPrefill(canvasA, {
+      text: "How can I improve @Deploy?",
+      mentions: [{ type: "node", id: "deploy", label: "Deploy" }],
+    });
+
+    expect(consumeAgentComposerPrefill(canvasA)).toBeNull();
+    now.mockRestore();
   });
 });

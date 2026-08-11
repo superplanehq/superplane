@@ -244,4 +244,20 @@ describe("ComponentSidebar", () => {
       expect(onTabChange).toHaveBeenCalledWith("settings");
     });
   });
+
+  it("keeps the Agent and close actions accessible and independent", () => {
+    const onAskAgentAboutNode = vi.fn();
+    const onClose = vi.fn();
+    renderSidebar({ nodeId: "deploy", onAskAgentAboutNode, onClose });
+
+    const action = screen.getByRole("button", { name: "Ask Agent about this component" });
+    expect(action).toHaveAttribute("title", "Ask Agent about this component");
+    fireEvent.click(action);
+
+    expect(onAskAgentAboutNode).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close component details" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });

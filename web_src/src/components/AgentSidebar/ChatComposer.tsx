@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { AgentMode } from "./agentMode";
 import { ComposerToolbar } from "./ComposerToolbar";
 import { useMentions } from "./useMentions";
@@ -11,6 +11,11 @@ import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/C
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { useFlushAgentComposerSend } from "./useFlushAgentComposerSend";
+import {
+  consumeAgentComposerPrefill,
+  subscribeAgentComposerPrefill,
+  type AgentComposerPrefill,
+} from "./composerPrefill";
 
 type ChatComposerProps = {
   canvasId: string;
@@ -114,7 +119,7 @@ function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: C
   const backdropRef = useRef<HTMLDivElement>(null);
   const mentionKeyboardRef = useRef<((e: React.KeyboardEvent) => boolean) | null>(null);
   const mentionsApi = useMentions();
-  const { value, setValue, showDropdown, filter, setCursorPos, getMarkdown, mentions, isEmpty } = mentionsApi;
+  const { value, setValue, showDropdown, filter, setCursorPos, getMarkdown, mentions, isEmpty, prefill } = mentionsApi;
   const { images, addFiles, removeImage, clear: clearImages } = useImageAttachments();
 
   const candidates = useMentionCandidates(nodes, runs, filter, showDropdown);
@@ -185,6 +190,24 @@ function useComposerController({ canvasId, onSend, sendPending, nodes, runs }: C
   const handleToolbarSend = useStableCallback(() => {
     void handleSend();
   });
+
+  const applyPrefill = useCallback(
+    (composerPrefill: AgentComposerPrefill) => {
+      prefill(composerPrefill.text, composerPrefill.mentions);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    [prefill, textareaRef],
+  );
+
+  useEffect(() => {
+    const flush = () => {
+      const prefill = consumeAgentComposerPrefill(canvasId);
+      if (prefill) applyPrefill(prefill);
+    };
+    flush();
+    const unsubscribe = subscribeAgentComposerPrefill(flush);
+    return unsubscribe;
+  }, [applyPrefill, canvasId]);
 
   return {
     textareaRef,

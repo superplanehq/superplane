@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
+import { clearAgentComposerPrefill } from "@/components/AgentSidebar/composerPrefill";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
 
@@ -98,10 +99,12 @@ export function useCanvasToolSidebarState({
     setAgentUnavailableCanvasId(undefined);
   }, [canvasId]);
 
+  useEffect(() => () => clearAgentComposerPrefill(canvasId), [canvasId]);
+
   const persistOpen = useCallback(
     (open: boolean) => {
-      if (typeof window === "undefined") return;
-      window.localStorage.setItem(canvasAgentSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+      if (!open) clearAgentComposerPrefill(canvasId);
+      writeCanvasAgentSidebarOpen(canvasId ?? "", open);
     },
     [canvasId],
   );
@@ -117,12 +120,13 @@ export function useCanvasToolSidebarState({
   }, [persistOpen]);
 
   const handleToolSidebarToggle = useCallback(() => {
-    if (isToolSidebarOpen) onBeforeClose?.();
-
-    const next = !isToolSidebarOpen;
-    setIsToolSidebarOpen(next);
-    persistOpen(next);
-  }, [isToolSidebarOpen, onBeforeClose, persistOpen]);
+    if (isToolSidebarOpen) {
+      onBeforeClose?.();
+      closeToolSidebar();
+      return;
+    }
+    openToolSidebar();
+  }, [closeToolSidebar, isToolSidebarOpen, onBeforeClose, openToolSidebar]);
 
   const switchAgentMode = useCallback((mode: AgentMode) => {
     setAgentMode(mode);
@@ -133,6 +137,7 @@ export function useCanvasToolSidebarState({
   // provider isn't configured on this instance. Hiding the toggle and closing
   // the panel avoids advertising a chat that can never work (issue #5803).
   const markAgentUnavailable = useCallback(() => {
+    clearAgentComposerPrefill(canvasId);
     setAgentUnavailableCanvasId(canvasId);
   }, [canvasId]);
 
@@ -145,9 +150,10 @@ export function useCanvasToolSidebarState({
 
   useEffect(() => {
     if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
+      clearAgentComposerPrefill(canvasId);
       setIsToolSidebarOpen(false);
     }
-  }, [agentEnabled, forceEnable, hideCanvasToolSidebar]);
+  }, [agentEnabled, canvasId, forceEnable, hideCanvasToolSidebar]);
 
   const showToolSidebarToggle = (agentEnabled || forceEnable) && !hideCanvasToolSidebar;
 

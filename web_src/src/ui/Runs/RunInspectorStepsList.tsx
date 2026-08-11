@@ -25,6 +25,7 @@ export function RunInspectorStepsList({
   currentUser,
   errorScrollRequest,
   onErrorScrolled,
+  onAskAgentAboutNode,
 }: {
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
@@ -43,6 +44,7 @@ export function RunInspectorStepsList({
   currentUser?: RunInspectorCurrentUser;
   errorScrollRequest?: { nodeId: string; requestId: number } | null;
   onErrorScrolled?: () => void;
+  onAskAgentAboutNode?: (nodeId: string, nodeName: string) => void;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="run-panel-step-list">
@@ -86,6 +88,7 @@ export function RunInspectorStepsList({
               errorScrollRequestId={errorScrollRequest?.nodeId === section.nodeId ? errorScrollRequest.requestId : null}
               onErrorScrolled={onErrorScrolled}
               onSelectSection={onValueChange}
+              onAskAgentAboutNode={onAskAgentAboutNode}
             />
           ))}
         </Accordion>

@@ -2,7 +2,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { cn, resolveIcon } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, Sparkles, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { useAvailableIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -155,6 +155,7 @@ interface ComponentSidebarProps {
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
   onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
+  onAskAgentAboutNode?: () => void;
 }
 
 export const ComponentSidebar = ({
@@ -218,6 +219,7 @@ export const ComponentSidebar = ({
   resolveRunId,
   fetchRunId,
   onSelectRun,
+  onAskAgentAboutNode,
 }: ComponentSidebarProps) => {
   const isBottomLayout = layout === "bottom";
   const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
@@ -532,8 +534,29 @@ export const ComponentSidebar = ({
                 <h3 className="truncate text-[13px] font-medium text-gray-900 dark:text-gray-100">{nodeName}</h3>
               </div>
               <div className="flex shrink-0 items-stretch">
+                {onAskAgentAboutNode && nodeId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    aria-label="Ask Agent about this component"
+                    title="Ask Agent about this component"
+                    onClick={onAskAgentAboutNode}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                ) : null}
                 <div className="flex items-center px-1">
-                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onClose?.()}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    aria-label="Close component details"
+                    title="Close component details"
+                    onClick={() => onClose?.()}
+                  >
                     <X className="size-3.5" />
                   </Button>
                 </div>
@@ -566,13 +589,32 @@ export const ComponentSidebar = ({
                     </div>
                   )}
                 </div>
-                {null}
-              </div>
-              <div
-                onClick={() => onClose?.()}
-                className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded-full flex items-center justify-center cursor-pointer leading-none dark:hover:bg-gray-800/50"
-              >
-                <X size={16} />
+                <div className="flex shrink-0 items-center gap-1">
+                  {onAskAgentAboutNode && nodeId ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      aria-label="Ask Agent about this component"
+                      title="Ask Agent about this component"
+                      onClick={onAskAgentAboutNode}
+                    >
+                      <Sparkles className="h-4 w-4" aria-hidden />
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    aria-label="Close component details"
+                    title="Close component details"
+                    onClick={() => onClose?.()}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
