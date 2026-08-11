@@ -208,11 +208,62 @@ superplane factory artifacts add \
   --name feature/login
 ```
 
-For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`). Full factory CLI surface beyond artifacts is still pending.
+For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`).
+
+Read-only work order commands (`orders`/`order`), for listing and inspecting
+work orders:
+
+```bash
+superplane factory orders list [flags]
+superplane factory orders describe --order <uuid> [flags]
+```
+
+`orders list` flags:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--assignees` — filter by assignee, repeatable/comma-separated. Accepts
+  user UUIDs or emails; emails are resolved against the organization's
+  members.
+- `--state` — filter by work order state, repeatable. Accepts the proto
+  enum token (`STATE_DRAFT`, `STATE_OPEN`, `STATE_CLOSED`) or a short
+  case-insensitive form (`draft`, `open`, `closed`).
+- `--result` — filter by work order result, repeatable. Accepts the proto
+  enum token (`RESULT_COMPLETED`, `RESULT_REJECTED`, `RESULT_FAILED`) or a
+  short case-insensitive form (`completed`, `rejected`, `failed`).
+- `--unassigned` — only show work orders with no assignees.
+
+```bash
+superplane factory orders list --factory shipping --state open
+
+superplane factory orders list \
+  --assignees alice@example.com,bob@example.com \
+  --result failed
+
+superplane factory orders list --unassigned
+```
+
+`orders describe` shows a work order's title, assignees, description,
+comments, and full event timeline (status changes, assignee changes,
+comments, artifacts added, and line step executions), oldest event first:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias, for consistency with `artifacts`' `--order-id`).
+
+```bash
+superplane factory orders describe --factory shipping --order "$OID"
+```
+
+`--output json`/`--output yaml` on `orders describe` returns
+`{order, comments, events, eventsTruncated}` so scripts get full fidelity
+in one call; the event timeline is capped at the API's max page size (200)
+and `eventsTruncated` is `true` when there are more.
 
 ## Not implemented yet
 
-- Broader CLI (`superplane factory` list/create/dispatch/…).
+- Broader CLI mutation commands (`superplane factory` create/dispatch/close/
+  comment/assign — currently CLI-side only `artifacts add` and the new
+  `orders list`/`orders describe` read commands exist).
 - Work orders sourced from external systems or factory-app components.
 - Full PRD approval flow (gated approvals on `open → closed`).
 - Auto-close work order when a line finishes all steps.
