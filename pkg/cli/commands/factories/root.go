@@ -128,6 +128,97 @@ Example:
 	artifactCmd.AddCommand(listCmd)
 	root.AddCommand(activeCmd)
 	root.AddCommand(artifactCmd)
+	root.AddCommand(newOrdersCommand(options))
 
 	return root
+}
+
+func newOrdersCommand(options core.BindOptions) *cobra.Command {
+	ordersCmd := &cobra.Command{
+		Use:     "orders",
+		Short:   "List and inspect work orders",
+		Aliases: []string{"order"},
+	}
+
+	var (
+		orderListFactory    string
+		orderListAssignees  []string
+		orderListStates     []string
+		orderListResults    []string
+		orderListUnassigned bool
+	)
+
+	orderListCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List work orders in a factory",
+		Long: `List work orders in a factory.
+
+--factory is a factory name or UUID. When omitted, the active factory
+from "superplane factory active" is used.
+
+--assignees accepts user UUIDs or emails (comma-separated or repeated).
+--state and --result accept the proto enum tokens (e.g. STATE_OPEN,
+RESULT_COMPLETED) or short case-insensitive names (open, draft, closed /
+completed, rejected, failed).
+
+Examples:
+  superplane factory orders list --factory shipping --state open
+  superplane factory orders list --assignees alice@example.com --result failed
+  superplane factory orders list --unassigned`,
+		Args: cobra.NoArgs,
+	}
+	orderListCmd.Flags().StringVar(&orderListFactory, "factory", "", "factory name or UUID (default: active factory)")
+	orderListCmd.Flags().StringSliceVar(&orderListAssignees, "assignees", nil, "filter by assignee user UUID or email (repeatable)")
+	orderListCmd.Flags().StringSliceVar(&orderListStates, "state", nil, "filter by work order state (repeatable, e.g. open or STATE_OPEN)")
+	orderListCmd.Flags().StringSliceVar(&orderListResults, "result", nil, "filter by work order result (repeatable, e.g. completed or RESULT_COMPLETED)")
+	orderListCmd.Flags().BoolVar(&orderListUnassigned, "unassigned", false, "only show work orders with no assignees")
+	core.Bind(orderListCmd, &orderListCommand{
+		factory:    &orderListFactory,
+		assignees:  &orderListAssignees,
+		states:     &orderListStates,
+		results:    &orderListResults,
+		unassigned: &orderListUnassigned,
+	}, options)
+
+	var (
+		orderDescribeFactory string
+		orderDescribeOrderID string
+	)
+
+	orderDescribeCmd := &cobra.Command{
+		Use:   "describe",
+		Short: "Show a work order's details, comments, and event timeline",
+		Long: `Show a work order's title, assignees, description, comments, and
+timeline of events.
+
+--factory is a factory name or UUID. When omitted, the active factory
+from "superplane factory active" is used. --order is the work order UUID
+(--order-id is accepted as an alias).
+
+Example:
+  superplane factory orders describe --factory shipping --order "$OID"`,
+		Args: cobra.NoArgs,
+	}
+	orderDescribeCmd.Flags().StringVar(&orderDescribeFactory, "factory", "", "factory name or UUID (default: active factory)")
+	bindOrderIDFlag(orderDescribeCmd, &orderDescribeOrderID)
+	core.Bind(orderDescribeCmd, &orderDescribeCommand{
+		factory: &orderDescribeFactory,
+		orderID: &orderDescribeOrderID,
+	}, options)
+
+	ordersCmd.AddCommand(orderListCmd)
+	ordersCmd.AddCommand(orderDescribeCmd)
+
+	return ordersCmd
+}
+
+// bindOrderIDFlag registers --order and a deprecated --order-id alias
+// (mirroring core.BindAppIDFlag's --canvas-id alias) so either spelling
+// works, keeping this command consistent with the work order's literal
+// spec (--order) and the existing "factory artifacts" commands (--order-id).
+func bindOrderIDFlag(cmd *cobra.Command, dest *string) {
+	const usage = "work order UUID"
+	cmd.Flags().StringVar(dest, "order", "", usage)
+	cmd.Flags().StringVar(dest, "order-id", "", usage)
+	_ = cmd.Flags().MarkDeprecated("order-id", "use --order")
 }
