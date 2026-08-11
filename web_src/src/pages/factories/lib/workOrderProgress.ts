@@ -10,34 +10,21 @@ export type WorkOrderDisplayStatus =
   | "rejected"
   | "closedFailed";
 
-/** Semantic tone for compact status indicators (sidebar dots, etc.). */
-export type WorkOrderStatusTone = "neutral" | "info" | "success" | "destructive" | "warning";
-
-const STATUS_TONE_INDICATOR: Record<WorkOrderStatusTone, { dotClassName: string; textClassName: string }> = {
-  neutral: { dotClassName: "bg-neutral", textClassName: "text-muted-foreground" },
-  info: { dotClassName: "bg-info", textClassName: "text-muted-foreground" },
-  success: { dotClassName: "bg-success", textClassName: "text-success" },
-  destructive: { dotClassName: "bg-destructive", textClassName: "text-destructive" },
-  warning: { dotClassName: "bg-warning", textClassName: "text-warning" },
-};
-
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
-  { label: string; filterLabel: string; summary: string; className: string; tone: WorkOrderStatusTone }
+  { label: string; filterLabel: string; summary: string; className: string }
 > = {
   draft: {
     label: "Draft",
     filterLabel: "Draft",
     summary: "Being scoped — not yet dispatched",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-    tone: "neutral",
   },
   open: {
     label: "Open",
     filterLabel: "Open",
     summary: "Ready to dispatch or between runs",
     className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
-    tone: "info",
   },
   running: {
     label: "Running",
@@ -45,14 +32,12 @@ const DISPLAY_STATUS_META: Record<
     summary: "Line execution in progress",
     className:
       "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
-    tone: "info",
   },
   failed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "A line step failed",
     className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
-    tone: "destructive",
   },
   completed: {
     label: "Completed",
@@ -60,21 +45,18 @@ const DISPLAY_STATUS_META: Record<
     summary: "Work order completed",
     className:
       "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
-    tone: "success",
   },
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
     summary: "Work order rejected",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-    tone: "neutral",
   },
   closedFailed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "Work order closed as failed",
     className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
-    tone: "destructive",
   },
 };
 
@@ -166,10 +148,6 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
 
 export function getWorkOrderDisplayStatusMeta(status: WorkOrderDisplayStatus) {
   return DISPLAY_STATUS_META[status];
-}
-
-export function getWorkOrderStatusIndicator(status: WorkOrderDisplayStatus) {
-  return STATUS_TONE_INDICATOR[DISPLAY_STATUS_META[status].tone];
 }
 
 export function getWorkOrderStatusSummary(order: FactoriesWorkOrder): string {

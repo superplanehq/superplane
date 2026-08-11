@@ -2,11 +2,7 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
-import {
-  getWorkOrderDisplayStatus,
-  getWorkOrderDisplayStatusMeta,
-  getWorkOrderStatusIndicator,
-} from "../lib/workOrderProgress";
+import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { FACTORIES_NAV_ITEMS } from "./factoriesNavItems";
 
 interface FactoriesNavProps {
@@ -14,6 +10,16 @@ interface FactoriesNavProps {
   factoryId: string;
   recentWorkOrders: FactoriesWorkOrder[];
 }
+
+const RECENT_STATUS_DOT_CLASS: Record<string, string> = {
+  draft: "bg-gray-400",
+  open: "bg-sky-500",
+  running: "bg-violet-500",
+  failed: "bg-red-500",
+  completed: "bg-emerald-500",
+  rejected: "bg-gray-400",
+  closedFailed: "bg-red-500",
+};
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -49,7 +55,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
               }
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const indicator = getWorkOrderStatusIndicator(status);
+              const dotClass = RECENT_STATUS_DOT_CLASS[status] ?? "bg-gray-400";
               return (
                 <li key={order.id}>
                   <NavLink
@@ -65,8 +71,8 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
                     <p className="truncate text-[13px] leading-snug tracking-[-0.01em] text-foreground">
                       {order.title || "Untitled work order"}
                     </p>
-                    <p className={cn("mt-0.5 flex items-center gap-1.5 text-[12px]", indicator.textClassName)}>
-                      <span className={cn("size-1.5 shrink-0 rounded-full", indicator.dotClassName)} aria-hidden />
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <span className={cn("size-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
                       <span>{statusMeta.label}</span>
                     </p>
                   </NavLink>

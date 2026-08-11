@@ -254,10 +254,6 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-info: var(--info);
-  --color-neutral: var(--neutral);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -306,10 +302,6 @@
   --accent: #f9fafb;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --success: #16a34a;
-  --warning: #d97706;
-  --info: #2563eb;
-  --neutral: #a3a3a3;
   --border: theme('colors.slate.300');
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -344,10 +336,6 @@
   --accent: theme("colors.gray.800");
   --accent-foreground: theme("colors.gray.100");
   --destructive: oklch(0.577 0.245 27.325);
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --info: #60a5fa;
-  --neutral: #737373;
   --border: color-mix(in oklab, theme("colors.gray.800") 65%, transparent);
   --input: color-mix(in oklab, theme("colors.gray.800") 70%, transparent);
   --ring: theme("colors.gray.400");
@@ -416,12 +404,6 @@
   --destructive: #e5484d;
   --destructive-foreground: #ffffff;
 
-  /* Status colours for work-order indicators (v3 tokens). */
-  --success: #16a34a;
-  --warning: #d97706;
-  --info: #2563eb;
-  --neutral: #a3a3a3;
-
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #a3a3a3;
@@ -454,11 +436,6 @@
   --muted-foreground: #a3a3a3;
   --accent: #26251e;
   --accent-foreground: #edecec;
-  --destructive: #e5484d;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --info: #60a5fa;
-  --neutral: #737373;
   --border: #33312b;
   --input: #33312b;
   --ring: #737373;
