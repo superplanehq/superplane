@@ -1,5 +1,10 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderExecution } from "@/api-client";
+import type {
+  FactoriesWorkOrder,
+  FactoriesWorkOrderApprovalStatus,
+  FactoriesWorkOrderEvent,
+  FactoriesWorkOrderExecution,
+} from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
@@ -32,7 +37,7 @@ import {
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
 import { OrgUserReference } from "./OrgUserReference";
-import { ArtifactTimelineBody, CommentTimelineBody, TimelineAutomationActor } from "./timeline";
+import { ApprovalTimelineBody, ArtifactTimelineBody, CommentTimelineBody, TimelineAutomationActor } from "./timeline";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
@@ -44,6 +49,13 @@ interface WorkOrderTimelineProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
+  canResolveApproval?: boolean;
+  isResolvingApproval?: boolean;
+  onResolveApproval?: (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => Promise<void>;
 }
 
 export function WorkOrderActivityTimeline({
@@ -56,10 +68,14 @@ export function WorkOrderActivityTimeline({
   isLoadingMoreEvents = false,
   onLoadMoreEvents,
   onRetryEvents,
+  canResolveApproval = false,
+  isResolvingApproval = false,
+  onResolveApproval,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
+  const pendingApprovalRunIds = useMemo(() => buildPendingApprovalRunIds(order), [order]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
 
   if (pendingView) {
@@ -80,8 +96,36 @@ export function WorkOrderActivityTimeline({
       hasMoreEvents={hasMoreEvents}
       isLoadingMoreEvents={isLoadingMoreEvents}
       onLoadMoreEvents={onLoadMoreEvents}
+      canResolveApproval={canResolveApproval}
+      isResolvingApproval={isResolvingApproval}
+      onResolveApproval={onResolveApproval}
+      pendingApprovalRunIds={pendingApprovalRunIds}
     />
   );
+}
+
+// Executions blocked on a pending plan approval. The timeline builds run
+// cards from step events whose `execution.id` is the run id, so we resolve
+// each approval's `executionId` (an execution row id) to a run id via the
+// order's execution list. Callers use this set to distinguish "Running" from
+// "Waiting for review" in the run badge.
+function buildPendingApprovalRunIds(order: FactoriesWorkOrder): Set<string> {
+  const executionRowToRunId = new Map<string, string>();
+  for (const execution of order.executions ?? []) {
+    if (execution.id && execution.run?.id) {
+      executionRowToRunId.set(execution.id, execution.run.id);
+    }
+  }
+
+  const runIds = new Set<string>();
+  for (const approval of order.approvals ?? []) {
+    if (approval.status !== "STATUS_PENDING" || !approval.executionId) continue;
+    const runId = executionRowToRunId.get(approval.executionId);
+    if (runId) {
+      runIds.add(runId);
+    }
+  }
+  return runIds;
 }
 
 function renderTimelinePendingView({
@@ -138,6 +182,10 @@ function WorkOrderTimelineList({
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
+  canResolveApproval,
+  isResolvingApproval,
+  onResolveApproval,
+  pendingApprovalRunIds,
 }: {
   timeline: ReturnType<typeof buildWorkOrderTimelineView>;
   organizationId: string;
@@ -145,7 +193,19 @@ function WorkOrderTimelineList({
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
+  canResolveApproval: boolean;
+  isResolvingApproval: boolean;
+  onResolveApproval?: (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => Promise<void>;
+  pendingApprovalRunIds: Set<string>;
 }) {
+  // Latest dispatched run gets a "Current" badge and expands by default so
+  // operators can inspect the running run without extra clicks.
+  const latestDispatchIndex = findLatestDispatchIndex(timeline.events);
+
   return (
     <ol className="relative space-y-0">
       {hasMoreEvents ? (
@@ -168,10 +228,25 @@ function WorkOrderTimelineList({
           organizationId={organizationId}
           resolveUserDisplay={resolveUserDisplay}
           isLast={index === timeline.events.length - 1}
+          isLatestDispatch={index === latestDispatchIndex}
+          canResolveApproval={canResolveApproval}
+          isResolvingApproval={isResolvingApproval}
+          onResolveApproval={onResolveApproval}
+          pendingApprovalRunIds={pendingApprovalRunIds}
         />
       ))}
     </ol>
   );
+}
+
+function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
+  let idx = -1;
+  events.forEach((event, i) => {
+    if (event.kind === "dispatched") {
+      idx = i;
+    }
+  });
+  return idx;
 }
 
 function TimelineItem({
@@ -179,11 +254,25 @@ function TimelineItem({
   organizationId,
   resolveUserDisplay,
   isLast,
+  isLatestDispatch,
+  canResolveApproval,
+  isResolvingApproval,
+  onResolveApproval,
+  pendingApprovalRunIds,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   isLast: boolean;
+  isLatestDispatch: boolean;
+  canResolveApproval: boolean;
+  isResolvingApproval: boolean;
+  onResolveApproval?: (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => Promise<void>;
+  pendingApprovalRunIds: Set<string>;
 }) {
   const { icon: Icon } = getTimelineEventPresentation(event.kind);
 
@@ -194,7 +283,16 @@ function TimelineItem({
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        <TimelineItemContent event={event} organizationId={organizationId} resolveUserDisplay={resolveUserDisplay} />
+        <TimelineItemContent
+          event={event}
+          organizationId={organizationId}
+          resolveUserDisplay={resolveUserDisplay}
+          isLatestDispatch={isLatestDispatch}
+          canResolveApproval={canResolveApproval}
+          isResolvingApproval={isResolvingApproval}
+          onResolveApproval={onResolveApproval}
+          pendingApprovalRunIds={pendingApprovalRunIds}
+        />
       </div>
     </li>
   );
@@ -206,10 +304,24 @@ function TimelineItemContent({
   event,
   organizationId,
   resolveUserDisplay,
+  isLatestDispatch,
+  canResolveApproval,
+  isResolvingApproval,
+  onResolveApproval,
+  pendingApprovalRunIds,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
   resolveUserDisplay: OrgUserDisplayLookup;
+  isLatestDispatch: boolean;
+  canResolveApproval: boolean;
+  isResolvingApproval: boolean;
+  onResolveApproval?: (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => Promise<void>;
+  pendingApprovalRunIds: Set<string>;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
 
@@ -231,6 +343,20 @@ function TimelineItemContent({
     );
   }
 
+  if ((event.kind === "approvalRequested" || event.kind === "approvalResolved") && event.approval) {
+    return (
+      <ApprovalTimelineBody
+        event={event}
+        approval={event.approval}
+        actorDisplay={actorDisplay}
+        resolveUserDisplay={resolveUserDisplay}
+        canResolve={canResolveApproval}
+        isResolving={isResolvingApproval}
+        onResolve={onResolveApproval}
+      />
+    );
+  }
+
   if (USER_ACTION_EVENT_KINDS.includes(event.kind)) {
     return (
       <>
@@ -241,6 +367,17 @@ function TimelineItemContent({
         />
         <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
       </>
+    );
+  }
+
+  if (event.kind === "dispatched") {
+    return (
+      <DispatchRunCard
+        event={event}
+        organizationId={organizationId}
+        isLatestDispatch={isLatestDispatch}
+        pendingApprovalRunIds={pendingApprovalRunIds}
+      />
     );
   }
 
@@ -256,6 +393,132 @@ function TimelineItemContent({
       ) : null}
     </>
   );
+}
+
+function DispatchRunCard({
+  event,
+  organizationId,
+  isLatestDispatch,
+  pendingApprovalRunIds,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  isLatestDispatch: boolean;
+  pendingApprovalRunIds: Set<string>;
+}) {
+  const steps = event.steps ?? [];
+  const latestStep = steps.length > 0 ? steps[steps.length - 1] : undefined;
+  const overallDurationLabel = formatOverallDuration(steps);
+  const usageLabel = latestStep ? formatExecutionUsageLabel(latestStep.execution) : null;
+  const latestStepRunId = latestStep?.execution.id;
+  const isWaitingForApproval = Boolean(latestStepRunId && pendingApprovalRunIds.has(latestStepRunId));
+
+  return (
+    <details
+      className="group rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700/70 dark:bg-transparent"
+      open={isLatestDispatch}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 marker:hidden">
+        <span className="font-medium text-gray-900 dark:text-gray-100">{event.lineName ?? "Dispatched"}</span>
+        {latestStep ? (
+          <RunResultBadge execution={latestStep.execution} isWaitingForApproval={isWaitingForApproval} />
+        ) : null}
+        {isLatestDispatch ? (
+          <span className="inline-flex items-center rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+            Current
+          </span>
+        ) : null}
+        <span className="ml-auto flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <span>Sent {formatTimeAgo(new Date(event.at))}</span>
+          {overallDurationLabel ? <span>· {overallDurationLabel}</span> : null}
+          {usageLabel ? <span>· {usageLabel}</span> : null}
+        </span>
+      </summary>
+
+      <div className="mt-3 space-y-2">
+        {steps.map((step) => (
+          <div key={step.id} className="space-y-1">
+            <DispatchStepRow organizationId={organizationId} step={step} />
+            {step.note ? (
+              <p className="ml-6 text-xs text-gray-500 dark:text-gray-400" data-testid="work-order-dispatch-note">
+                {step.note}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function RunResultBadge({
+  execution,
+  isWaitingForApproval,
+}: {
+  execution: FactoriesWorkOrderExecution;
+  isWaitingForApproval: boolean;
+}) {
+  if (execution.result === "RESULT_FAILED") {
+    return (
+      <span className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+        Failed
+      </span>
+    );
+  }
+  if (execution.result === "RESULT_PASSED") {
+    return (
+      <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+        Complete
+      </span>
+    );
+  }
+  const isInFlight =
+    execution.state === "STATE_PENDING" ||
+    execution.state === "STATE_STARTED" ||
+    execution.state === "STATE_CANCELLING";
+  if (!isInFlight) {
+    return null;
+  }
+  if (isWaitingForApproval) {
+    return (
+      <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+        Waiting for review
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+      Running
+    </span>
+  );
+}
+
+function formatOverallDuration(steps: WorkOrderTimelineStep[]): string | null {
+  if (steps.length === 0) return null;
+  const started = Date.parse(steps[0]?.startedAt ?? "");
+  const lastStep = steps[steps.length - 1];
+  const finished = Date.parse(lastStep?.finishedAt ?? lastStep?.startedAt ?? "");
+  const duration = finished - started;
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+  const seconds = Math.round(duration / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function formatExecutionUsageLabel(execution: FactoriesWorkOrderExecution): string | null {
+  const tokens = Number(execution.totalTokens ?? 0);
+  const cents = Number(execution.costCents ?? 0);
+  const parts: string[] = [];
+  if (Number.isFinite(tokens) && tokens > 0) {
+    parts.push(tokens >= 1000 ? `${(tokens / 1000).toFixed(0)}k tokens` : `${tokens} tokens`);
+  }
+  if (Number.isFinite(cents) && cents > 0) {
+    parts.push(`$${(cents / 100).toFixed(2)}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 // Attribution kinds we may show for an event. Order matters (highest priority
@@ -546,5 +809,9 @@ function getTimelineEventPresentation(kind: WorkOrderTimelineEventKind): {
       return { icon: FileText };
     case "closed":
       return { icon: CircleDot };
+    case "approvalRequested":
+      return { icon: ShieldCheck };
+    case "approvalResolved":
+      return { icon: Check };
   }
 }

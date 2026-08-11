@@ -88,7 +88,11 @@ type FactoryLineStepResult struct {
 
 const onRunTriggerName = "onRun"
 
-func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+// StartStep launches the given step against the run's inputs, recording a
+// `step.execution.created` event. `note` is optional caller-provided context
+// (e.g. "Attempt 2 - dedicated canvas memory browser") rendered under the
+// timeline entry.
+func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int, note string) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
@@ -161,7 +165,7 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 		return nil, err
 	}
 
-	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run); err != nil {
+	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run, note); err != nil {
 		return nil, err
 	}
 
@@ -171,13 +175,14 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 	}, nil
 }
 
-func (l *FactoryLine) RecordStepExecutionCreated(tx *gorm.DB, order *FactoryWorkOrder, execution *FactoryWorkOrderExecution, step *FactoryLineStep, run *CanvasRun) error {
+func (l *FactoryLine) RecordStepExecutionCreated(tx *gorm.DB, order *FactoryWorkOrder, execution *FactoryWorkOrderExecution, step *FactoryLineStep, run *CanvasRun, note string) error {
 	data := factory.LineStepExecutionCreated{
 		StepName: step.Name,
 		Order:    order.Ref(),
 		Line:     &factory.LineRef{ID: l.ID, Name: l.Name},
 		App:      &factory.AppRef{ID: run.WorkflowID},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State},
+		Note:     note,
 	}
 
 	jsonData, err := json.Marshal(data)

@@ -16,10 +16,11 @@ import {
   factoryPageContentClassName,
 } from "./lib/factoryPageStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
-import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
-import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
+import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
+import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
+import type { FactoriesWorkOrderApprovalStatus } from "@/api-client";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
@@ -58,11 +59,17 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  isResolvingApproval: boolean;
+  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string) => Promise<void>;
+  onResolveApproval: (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView({
@@ -101,11 +108,13 @@ export function WorkOrderDetailLoadedView({
   isAssigneesSaving,
   isUpdatingStatus,
   isAddingComment,
+  isResolvingApproval,
   onDispatch,
   onClose,
   onAssigneesSave,
   onStatusChange,
   onAddComment,
+  onResolveApproval,
 }: WorkOrderDetailLoadedViewProps) {
   return (
     <div className={factoryPageContentClassName}>
@@ -140,22 +149,17 @@ export function WorkOrderDetailLoadedView({
       />
 
       <div className={factoryDetailPanelClassName}>
-        <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 px-6 py-6 sm:px-8">
-            {order.description ? (
-              <section className="mb-8 rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700/70">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                  {order.description}
-                </p>
-              </section>
-            ) : null}
-
-            <section className="mb-8">
-              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
-            </section>
+            {order.description ? <WorkOrderDescription description={order.description} className="mb-8" /> : null}
 
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Actions and comments on the work order, plus factory line runs.
+                </p>
+              </div>
               <div className="mt-5">
                 <WorkOrderActivityTimeline
                   organizationId={organizationId}
@@ -167,24 +171,40 @@ export function WorkOrderDetailLoadedView({
                   isLoadingMoreEvents={isLoadingMoreEvents}
                   onLoadMoreEvents={onLoadMoreEvents}
                   onRetryEvents={onRetryEvents}
+                  canResolveApproval={canManage}
+                  isResolvingApproval={isResolvingApproval}
+                  onResolveApproval={onResolveApproval}
                 />
               </div>
+            </section>
+
+            <section className="mt-8">
+              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
             </section>
           </div>
 
           <aside className={cn(factoryDetailSidebarClassName, "lg:min-h-full")}>
-            <WorkOrderAssigneesField
+            <WorkOrderDetailSidebar
               organizationId={organizationId}
+              order={order}
+              artifacts={artifacts}
+              isArtifactsLoading={isArtifactsLoading}
+              artifactsError={artifactsError}
+              displayStatus={displayStatus}
+              statusMeta={statusMeta}
               assigneeIds={assigneeIds}
               assigneeNames={assigneeNames}
-              canEdit={canAssign}
-              isSaving={isAssigneesSaving}
-              onSave={onAssigneesSave}
+              factoryLines={factoryLines}
+              factoryId={factory.id ?? ""}
+              canAssign={canAssign}
+              canDispatch={canDispatch}
+              permissionsLoading={permissionsLoading}
+              isAssigneesSaving={isAssigneesSaving}
+              isDispatchable={isDispatchable}
+              isDispatching={isDispatching}
+              onAssigneesSave={onAssigneesSave}
+              onDispatch={onDispatch}
             />
-
-            <div className="mt-6">
-              <WorkOrderArtifactsPanel artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
-            </div>
           </aside>
         </div>
       </div>

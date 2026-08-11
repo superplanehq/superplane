@@ -34,14 +34,40 @@ type FactoryWorkOrderExecution struct {
 	RunID          uuid.UUID
 	Status         string
 	Result         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	FinishedAt     *time.Time
+	// Aggregate usage populated by runners. Both default to zero; the API
+	// only surfaces non-zero values to the UI.
+	TotalTokens int64
+	CostCents   int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	FinishedAt  *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
 	var execution FactoryWorkOrderExecution
 	err := tx.Where("run_id = ?", runID).First(&execution).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderExecutionNotFound
+		}
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
+// FindWorkOrderExecutionByOrder loads an execution scoped to a specific work
+// order. Callers pass the order's IDs so cross-order lookups (e.g. attaching
+// another order's execution to an approval) return NotFound.
+func FindWorkOrderExecutionByOrder(
+	tx *gorm.DB,
+	orgID, factoryID, workOrderID, executionID uuid.UUID,
+) (*FactoryWorkOrderExecution, error) {
+	var execution FactoryWorkOrderExecution
+	err := tx.
+		Where("id = ? AND organization_id = ? AND factory_id = ? AND work_order_id = ?",
+			executionID, orgID, factoryID, workOrderID).
+		First(&execution).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderExecutionNotFound
@@ -142,6 +168,9 @@ type FactoryWorkOrderExecutionRecord struct {
 	CanvasName string
 	RunState   string
 	RunResult  string
+	// Steps snapshot the containing line's step definitions so the UI can
+	// render Intake -> Implement -> Verify phases without a separate lookup.
+	LineSteps datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
 }
 
 func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
@@ -159,6 +188,7 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 		Select(`
 			e.*,
 			l.name AS line_name,
+			l.steps AS line_steps,
 			c.id AS canvas_id,
 			c.name AS canvas_name,
 			r.state AS run_state,

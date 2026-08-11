@@ -5,6 +5,7 @@ export type WorkOrderDisplayStatus =
   | "draft"
   | "open"
   | "running"
+  | "waiting"
   | "failed"
   | "completed"
   | "rejected"
@@ -32,6 +33,13 @@ const DISPLAY_STATUS_META: Record<
     summary: "Line execution in progress",
     className:
       "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+  },
+  waiting: {
+    label: "Waiting",
+    filterLabel: "Waiting",
+    summary: "Waiting for a plan approval",
+    className:
+      "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
   },
   failed: {
     label: "Failed",
@@ -82,7 +90,7 @@ export const WORK_ORDER_SECTIONS: WorkOrderSectionDefinition[] = [
     id: "running",
     title: "Running",
     description: "Work orders executing on a line.",
-    statuses: ["running"],
+    statuses: ["running", "waiting"],
   },
   {
     id: "open",
@@ -126,6 +134,12 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
+  // A pending approval on an open work order pauses the flow: the run
+  // sits at a plan-review step until a user resolves it.
+  if (hasPendingApproval(order)) {
+    return "waiting";
+  }
+
   const executions = order.executions ?? [];
   if (hasActiveWorkOrderExecution(executions)) {
     return "running";
@@ -148,6 +162,14 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
 
 export function getWorkOrderDisplayStatusMeta(status: WorkOrderDisplayStatus) {
   return DISPLAY_STATUS_META[status];
+}
+
+export function hasPendingApproval(order: FactoriesWorkOrder): boolean {
+  return (order.approvals ?? []).some((approval) => approval.status === "STATUS_PENDING");
+}
+
+export function getPendingApproval(order: FactoriesWorkOrder) {
+  return (order.approvals ?? []).find((approval) => approval.status === "STATUS_PENDING");
 }
 
 export function getWorkOrderStatusSummary(order: FactoriesWorkOrder): string {
@@ -199,7 +221,9 @@ export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
 
 // "Active" pill covers everything not yet closed (draft included, so
 // new orders aren't hidden behind the STATE_OPEN-only `Open` pill).
-const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
+// `waiting` is active too — a pending approval pauses the run without
+// closing the order.
+const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "waiting", "failed"];
 
 // "Failed" pill unions in-flight failures with closed-as-failed orders.
 const FAILED_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["failed", "closedFailed"];

@@ -159,11 +159,13 @@ function LoadedWorkOrderDetail({
       isAssigneesSaving={actions.isAssigneesSaving}
       isUpdatingStatus={actions.isUpdatingStatus}
       isAddingComment={actions.isAddingComment}
+      isResolvingApproval={actions.isResolvingApproval}
       onDispatch={actions.handleDispatch}
       onClose={actions.handleClose}
       onAssigneesSave={actions.handleAssigneesSave}
       onStatusChange={actions.handleStatusChange}
       onAddComment={actions.handleAddComment}
+      onResolveApproval={actions.handleResolveApproval}
     />
   );
 }

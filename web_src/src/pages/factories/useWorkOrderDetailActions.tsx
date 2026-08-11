@@ -1,8 +1,9 @@
-import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
+import type { FactoriesWorkOrderApprovalStatus, FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import {
   useAddWorkOrderComment,
   useCloseWorkOrder,
   useDispatchWorkOrder,
+  useResolveWorkOrderApproval,
   useUpdateWorkOrderAssignees,
   useUpdateWorkOrderStatus,
 } from "@/hooks/useFactoryData";
@@ -16,6 +17,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   const addComment = useAddWorkOrderComment(organizationId, factoryId);
+  const resolveApproval = useResolveWorkOrderApproval(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -27,9 +29,23 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleDispatch = async (lineName: string) => {
-    await dispatchWorkOrder.mutateAsync({ orderId, lineName });
+  const handleDispatch = async ({ lineName, note }: { lineName: string; note?: string }) => {
+    await dispatchWorkOrder.mutateAsync({ orderId, lineName, note });
     showSuccessToast(`Dispatched to ${lineName}.`);
+  };
+
+  const handleResolveApproval = async (input: {
+    approvalId: string;
+    status: FactoriesWorkOrderApprovalStatus;
+    comment?: string;
+  }) => {
+    try {
+      await resolveApproval.mutateAsync({ orderId, ...input });
+      showSuccessToast(input.status === "STATUS_APPROVED" ? "Approval granted." : "Approval rejected.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to resolve approval"));
+      throw error;
+    }
   };
 
   const handleClose = async (result: FactoriesWorkOrderResult) => {
@@ -70,6 +86,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleClose,
     handleStatusChange,
     handleAddComment,
+    handleResolveApproval,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,
@@ -77,5 +94,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     isAssigneesSaving: updateAssignees.isPending,
     isUpdatingStatus: updateStatus.isPending,
     isAddingComment: addComment.isPending,
+    isResolvingApproval: resolveApproval.isPending,
   };
 }

@@ -470,6 +470,38 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
 }
 
+func (o *FactoryWorkOrder) RecordApprovalRequested(
+	tx *gorm.DB,
+	approval *FactoryWorkOrderApproval,
+	requester uuid.UUID,
+) error {
+	ref := approval.Ref()
+	data := factory.WorkOrderApprovalRequested{
+		Order:    o.Ref(),
+		Approval: &ref,
+		User:     &factory.UserRef{ID: requester},
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderApprovalRequested, data)
+}
+
+func (o *FactoryWorkOrder) RecordApprovalResolved(
+	tx *gorm.DB,
+	approval *FactoryWorkOrderApproval,
+	resolver uuid.UUID,
+) error {
+	ref := approval.Ref()
+	data := factory.WorkOrderApprovalResolved{
+		Order:    o.Ref(),
+		Approval: &ref,
+		User:     &factory.UserRef{ID: resolver},
+		Status:   approval.Status,
+		Comment:  approval.Comment,
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderApprovalResolved, data)
+}
+
 func (o *FactoryWorkOrder) RecordAssigneesUpdated(
 	tx *gorm.DB,
 	updatedBy uuid.UUID,

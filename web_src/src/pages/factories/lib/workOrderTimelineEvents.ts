@@ -21,7 +21,9 @@ export type WorkOrderTimelineEventKind =
   | "statusChanged"
   | "commented"
   | "artifactAdded"
-  | "closed";
+  | "closed"
+  | "approvalRequested"
+  | "approvalResolved";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
 export type { OrgUserDisplayLookup };
 
@@ -32,6 +34,8 @@ export interface WorkOrderTimelineStep {
   at: string;
   startedAt: string;
   finishedAt?: string;
+  /** Free-form dispatch note captured on the `step.execution.created` event. */
+  note?: string;
   execution: FactoriesWorkOrderExecution;
 }
 
@@ -73,6 +77,17 @@ export interface WorkOrderTimelineArtifact {
   data?: Record<string, unknown>;
 }
 
+export interface WorkOrderTimelineApproval {
+  id: string;
+  title: string;
+  message?: string;
+  status: "pending" | "approved" | "rejected";
+  approverId?: string;
+  comment?: string;
+  resolvedByUserId?: string;
+  resolvedAt?: string;
+}
+
 export interface WorkOrderTimelineEvent {
   id: string;
   kind: WorkOrderTimelineEventKind;
@@ -86,6 +101,7 @@ export interface WorkOrderTimelineEvent {
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
   artifact?: WorkOrderTimelineArtifact;
+  approval?: WorkOrderTimelineApproval;
   title: string;
   lineName?: string;
   steps?: WorkOrderTimelineStep[];
