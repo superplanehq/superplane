@@ -404,12 +404,20 @@ type RequestContext struct {
 	Duration time.Duration
 	Action   string
 	Params   map[string]any
+	Calls    []ScheduledActionCall
+}
+
+type ScheduledActionCall struct {
+	Action   string
+	Params   map[string]any
+	Duration time.Duration
 }
 
 func (c *RequestContext) ScheduleActionCall(action string, params map[string]any, duration time.Duration) error {
 	c.Action = action
 	c.Params = params
 	c.Duration = duration
+	c.Calls = append(c.Calls, ScheduledActionCall{Action: action, Params: params, Duration: duration})
 	return nil
 }
 
