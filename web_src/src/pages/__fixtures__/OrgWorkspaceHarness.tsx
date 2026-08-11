@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Outlet, Route, Routes, useSearchParams } from "react-router-dom";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
@@ -31,6 +31,8 @@ import {
   WorkOrdersPage,
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
+import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
+import { LinesPage } from "@/pages/factories/pages/LinesPage";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
@@ -145,6 +147,12 @@ function factoryRoute(element: React.ReactNode) {
   return <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>{element}</RequireExperimentalFeature>;
 }
 
+/** Storybook-only: seed LinesPage selection via `?line=` without changing the copied page API. */
+function StorybookLinesPage() {
+  const [searchParams] = useSearchParams();
+  return <LinesPage initialSelectedLineId={searchParams.get("line")} />;
+}
+
 function OrgWorkspaceRoutes() {
   return (
     <Routes>
@@ -178,6 +186,9 @@ function OrgWorkspaceRoutes() {
               <Route path=":lineId" element={<AutomationsPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
             </Route>
+            {/* Storybook-only: v3 Lines (not in App.tsx) */}
+            <Route path="lines" element={<StorybookLinesPage />} />
+            <Route path="lines/:lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
           </Route>
           <Route path=":factoryId/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
