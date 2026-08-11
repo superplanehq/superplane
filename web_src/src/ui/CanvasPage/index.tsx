@@ -97,6 +97,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
+import { wouldCreateCycle } from "./canvasGraphCycles";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
@@ -2477,15 +2478,32 @@ function CanvasContent({
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
 
+  /*
+   * React Flow asks this for every candidate target while a connection is being
+   * dragged, so an edge the server would reject at publish time can never be
+   * drawn in the first place.
+   */
+  const isValidConnection = useCallback(
+    (connection: Connection | CanvasEdge) => {
+      if (!connection.source || !connection.target) {
+        return true;
+      }
+
+      return !wouldCreateCycle(workflowNodes ?? [], state.edges, connection.source, connection.target);
+    },
+    [workflowNodes, state.edges],
+  );
+
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (isReadOnly) return;
       connectionCompletedRef.current = true;
-      if (onEdgeCreate && connection.source && connection.target) {
-        onEdgeCreate(connection.source, connection.target, connection.sourceHandle);
-      }
+      if (!connection.source || !connection.target) return;
+      if (!isValidConnection(connection)) return;
+
+      onEdgeCreate?.(connection.source, connection.target, connection.sourceHandle);
     },
-    [onEdgeCreate, isReadOnly],
+    [onEdgeCreate, isReadOnly, isValidConnection],
   );
 
   const handleDragOver = useCallback(
@@ -3290,6 +3308,7 @@ function CanvasContent({
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+            isValidConnection={isValidConnection}
             onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
             onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
             onDragOver={isReadOnly ? undefined : handleDragOver}
