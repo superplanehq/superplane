@@ -2,7 +2,7 @@ import { Heading } from "@/components/Heading/heading";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { LayoutPanelLeft, Plus, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";

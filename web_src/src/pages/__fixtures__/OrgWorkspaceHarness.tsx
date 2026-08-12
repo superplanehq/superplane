@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ComponentType } from "react";
-import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";

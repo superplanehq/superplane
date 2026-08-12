@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { getWelcomeSurveyRedirectPath } from "./welcomeSurveyRedirect";

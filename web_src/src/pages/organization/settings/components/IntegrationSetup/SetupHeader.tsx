@@ -1,7 +1,7 @@
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { cn } from "@/lib/utils";
 import { MoveLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 interface SetupHeaderProps {
   integrationsHref: string;
