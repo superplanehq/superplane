@@ -1,5 +1,5 @@
 import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
-import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
+import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 import type { HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 
@@ -12,6 +12,8 @@ interface FactoriesHarnessProps {
   factoriesFixture?: FactoriesFixture;
   /** Optional canvas fixture for factory-embedded AppPage routes. */
   appFixture?: CanvasAppFixture;
+  /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
+  pageOverrides?: OrgWorkspacePageOverrides;
 }
 
 /**
@@ -23,6 +25,7 @@ export function FactoriesHarness({
   pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
   appFixture,
+  pageOverrides,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -42,6 +45,7 @@ export function FactoriesHarness({
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
       appFixture={appFixture}
+      pageOverrides={pageOverrides}
     />
   );
 }

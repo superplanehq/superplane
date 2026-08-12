@@ -51,10 +51,38 @@ const listWorkOrderEventsPayload = `{
   "hasNextPage": false
 }`
 
+const testOrderDescribeOrgID = "org-1"
+
+// membersPayload stubs /api/v1/users with the two members referenced by
+// listWorkOrderEventsPayload's user IDs, so the "describe" command can
+// resolve them to emails.
+const membersPayload = `{"users":[
+  {"metadata":{"id":"user-1","email":"alice@example.com"}},
+  {"metadata":{"id":"user-2","email":"bob@example.com"}}
+]}`
+
+// newOrderDescribeServer stubs the describe/events endpoints, plus /me and
+// /users (needed to resolve event actor IDs to emails), following the same
+// pattern as newOrderListServer.
 func newOrderDescribeServer(t *testing.T, eventsPayload string) *httptest.Server {
+	t.Helper()
+	return newOrderDescribeServerWithMembers(t, eventsPayload, http.StatusOK, membersPayload)
+}
+
+// newOrderDescribeServerWithMembers is like newOrderDescribeServer but lets
+// tests control the /api/v1/users response, to exercise the "members list
+// unavailable" degradation path.
+func newOrderDescribeServerWithMembers(t *testing.T, eventsPayload string, membersStatus int, membersBody string) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"me","email":"me@example.com","organizationId":"` + testOrderDescribeOrgID + `"}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/users":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(membersStatus)
+			_, _ = w.Write([]byte(membersBody))
 		case r.Method == http.MethodGet &&
 			r.URL.Path == "/api/v1/factories/"+testOrderDescribeFactoryID+"/orders/"+testOrderDescribeOrderID:
 			w.Header().Set("Content-Type", "application/json")
@@ -96,17 +124,27 @@ func TestOrderDescribeCommand_TextOutput(t *testing.T) {
 	assert.Contains(t, out, "Line two")
 
 	assert.Contains(t, out, "Comments:")
-	assert.Contains(t, out, "user-1: Looks good")
+	assert.Contains(t, out, "alice@example.com: Looks good")
 
-	assert.Contains(t, out, "Timeline:")
-	assert.Contains(t, out, "status changed: Draft -> Open by user user-2")
-	assert.Contains(t, out, "assigned user-1 by user user-2")
-	assert.Contains(t, out, "user-1 commented: Looks good")
+	assert.Contains(t, out, "Events:")
+	assert.Contains(t, out, "order.status.updated")
+	assert.Contains(t, out, "order.assignees.updated")
+	assert.Contains(t, out, "order.comment.added")
+	assert.Contains(t, out, "Work order opened by bob@example.com")
+	assert.Contains(t, out, "Work order assigned to alice@example.com by bob@example.com")
+	assert.Contains(t, out, "alice@example.com commented: Looks good")
 
-	// Timeline must read oldest-first (status -> assignees -> comment).
-	statusIdx := indexOf(out, "status changed")
-	assigneesIdx := indexOf(out, "assigned user-1")
-	commentIdx := indexOf(out, "user-1 commented")
+	// The events table must not leak raw user IDs (the "Created By"/
+	// "Assignees" fields above are a separate code path fed by the API's
+	// already-resolved SuperplaneFactoriesUserRef and are unaffected).
+	eventsSection := out[indexOf(out, "Events:"):]
+	assert.NotContains(t, eventsSection, "user-1")
+	assert.NotContains(t, eventsSection, "user-2")
+
+	// Events must read oldest-first (status -> assignees -> comment).
+	statusIdx := indexOf(out, "Work order opened")
+	assigneesIdx := indexOf(out, "Work order assigned to")
+	commentIdx := indexOf(out, "alice@example.com commented")
 	require.True(t, statusIdx >= 0 && assigneesIdx >= 0 && commentIdx >= 0)
 	assert.Less(t, statusIdx, assigneesIdx)
 	assert.Less(t, assigneesIdx, commentIdx)
@@ -124,10 +162,24 @@ func TestOrderDescribeCommand_CommentsOnlyContainCommentEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	out := stdout.String()
-	commentsSection := out[indexOf(out, "Comments:"):indexOf(out, "Timeline:")]
+	commentsSection := out[indexOf(out, "Comments:"):indexOf(out, "Events:")]
 	assert.Contains(t, commentsSection, "Looks good")
-	assert.NotContains(t, commentsSection, "status changed")
-	assert.NotContains(t, commentsSection, "assigned user-1")
+	assert.NotContains(t, commentsSection, "Work order opened")
+	assert.NotContains(t, commentsSection, "Work order assigned")
+}
+
+func TestOrderDescribeCommand_MembersUnavailableDegradesGracefully(t *testing.T) {
+	server := newOrderDescribeServerWithMembers(t, listWorkOrderEventsPayload, http.StatusInternalServerError, `{"error":"boom"}`)
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
+
+	factory := testOrderDescribeFactoryID
+	orderID := testOrderDescribeOrderID
+	err := (&orderDescribeCommand{factory: &factory, orderID: &orderID}).Execute(ctx)
+	require.NoError(t, err)
+
+	out := stdout.String()
+	assert.Contains(t, out, "Work order opened by unknown user")
+	assert.Contains(t, out, "unknown user commented: Looks good")
 }
 
 func TestOrderDescribeCommand_UnknownEventTypeFallsBack(t *testing.T) {
