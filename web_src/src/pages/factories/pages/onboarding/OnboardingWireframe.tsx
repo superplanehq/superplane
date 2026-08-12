@@ -215,7 +215,7 @@ export function OnboardingWireframe() {
   const navigate = useNavigate();
   const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
   const onboarding = useOnboardingStorybook();
-  const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
+  const setup = useRedesignSetupState();
   const { requestConnect, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<SectionId>("name");
 
@@ -281,7 +281,6 @@ export function OnboardingWireframe() {
                 agent: setup.agent,
                 agentReady: setup.agentReady,
               }}
-              onNavAnalyzing={onboarding?.reportNavAnalyzing}
             />
           </div>
         </div>

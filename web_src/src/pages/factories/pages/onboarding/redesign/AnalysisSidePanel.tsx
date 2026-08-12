@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { Check, Circle, Loader2, Minus } from "lucide-react";
+import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
-import type { OnboardingNavAnalyzingKey } from "../onboardingStorybookContextValue";
 import type { AgentHarnessId, IssuesChoiceId, VcsHostId } from "./redesignFixtures";
 import { vcsLabel } from "./redesignFixtures";
 
@@ -19,162 +19,388 @@ export type AnalysisProgress = {
   agentReady: boolean;
 };
 
-type Milestone = "boot" | "name" | "repo" | "issues" | "agent";
+type SetupTaskId = "wiki" | "velocity" | "ai-readiness" | "issues" | "lines";
+type TaskStatus = "pending" | "running" | "completed" | "skipped";
+type SetupGroupId = "boot" | "name" | "repo" | "issues" | "lines";
 
-function linesForMilestone(milestone: Milestone, progress: AnalysisProgress): string[] {
-  switch (milestone) {
-    case "boot":
-      return ["waiting for workspace setup…"];
-    case "name":
-      return [`workspace registered: ${progress.workspaceName.trim()}`];
-    case "repo": {
-      const host = progress.vcsHost ? vcsLabel(progress.vcsHost) : "git";
-      const repo = progress.selectedRepo ?? "app repository";
-      return [
-        `${host} connected`,
-        `analyzing app repository ${repo}`,
-        "cloning repository…",
-        "indexing codebase in background…",
-      ];
-    }
-    case "issues":
-      if (progress.issuesChoice === "skip") {
-        return ["backlog import skipped - create work orders manually"];
-      }
-      if (progress.issuesChoice === "vcs" && progress.vcsHost) {
-        return [`backlog: ${vcsLabel(progress.vcsHost)} Issues`, "scoring open issues for agent work…"];
-      }
-      if (progress.issuesChoice === "linear") {
-        return ["backlog: Linear", "scoring Linear issues for agent work…"];
-      }
-      if (progress.issuesChoice === "jira") {
-        return ["backlog: Jira", "scoring Jira issues for agent work…"];
-      }
-      return [];
-    case "agent":
-      return [
-        `coding agent: ${progress.agent ?? "configured"}`,
-        "credentials verified",
-        "ready to hand off the first work order",
-      ];
-  }
-}
+type SetupTask = {
+  id: SetupTaskId;
+  label: string;
+  optional?: boolean;
+};
 
-function asNavAnalyzingKey(milestone: Milestone): OnboardingNavAnalyzingKey | null {
-  if (milestone === "repo" || milestone === "issues" || milestone === "agent") return milestone;
-  return null;
+const SETUP_TASKS: SetupTask[] = [
+  { id: "wiki", label: "Generate wiki from the app repository" },
+  { id: "velocity", label: "Get initial velocity metrics" },
+  { id: "ai-readiness", label: "Analyze AI readiness" },
+  { id: "issues", label: "Review issues for candidate work orders", optional: true },
+  { id: "lines", label: "Set up lines and automations" },
+];
+
+const EMPTY_TASK_STATUS: Record<SetupTaskId, TaskStatus> = {
+  wiki: "pending",
+  velocity: "pending",
+  "ai-readiness": "pending",
+  issues: "pending",
+  lines: "pending",
+};
+
+type LogBatch = {
+  taskId: SetupTaskId;
+  lines: string[];
+  finishStatus?: "completed" | "skipped";
+  /** Delay between log lines for this batch (longer = stays running across later steps). */
+  lineIntervalMs?: number;
+};
+
+function repoPreface(progress: AnalysisProgress): string[] {
+  const host = progress.vcsHost ? vcsLabel(progress.vcsHost) : "git";
+  const repo = progress.selectedRepo ?? "app repository";
+  return [`${host} connected`, `analyzing app repository ${repo}`];
 }
 
 /**
- * Persistent setup.log side panel. Advances as the user completes onboarding steps.
- * Velocity / AI readiness / Knowledge results are intentionally omitted for now.
+ * Wiki, velocity, and AI readiness start together after Continue to issues.
+ * Durations differ on purpose: wiki stays running while the user can finish
+ * Issues and start later setup work.
  */
-export function AnalysisSidePanel({
-  progress,
-  onNavAnalyzing,
-}: {
-  progress: AnalysisProgress;
-  onNavAnalyzing?: (key: OnboardingNavAnalyzingKey, analyzing: boolean) => void;
-}) {
-  const [logLines, setLogLines] = useState<string[]>(() => linesForMilestone("boot", progress));
+function repoBatches(): LogBatch[] {
+  return [
+    {
+      taskId: "wiki",
+      lineIntervalMs: 2200,
+      lines: [
+        "building workspace wiki…",
+        "indexing docs and architecture…",
+        "mapping components and dependencies…",
+        "writing wiki draft…",
+        "wiki draft ready",
+      ],
+    },
+    {
+      taskId: "velocity",
+      lineIntervalMs: 1100,
+      lines: ["collecting delivery signals…", "computing initial velocity metrics…", "velocity baseline ready"],
+    },
+    {
+      taskId: "ai-readiness",
+      lineIntervalMs: 900,
+      lines: ["scoring repository for agent work…", "AI readiness summary ready"],
+    },
+  ];
+}
+
+function issuesBatch(progress: AnalysisProgress): LogBatch {
+  if (progress.issuesChoice === "skip") {
+    return {
+      taskId: "issues",
+      finishStatus: "skipped",
+      lines: ["backlog import skipped - create work orders manually"],
+    };
+  }
+  if (progress.issuesChoice === "vcs" && progress.vcsHost) {
+    return {
+      taskId: "issues",
+      lines: [
+        `backlog: ${vcsLabel(progress.vcsHost)} Issues`,
+        "scoring open issues for agent work…",
+        "candidate work orders drafted",
+      ],
+    };
+  }
+  if (progress.issuesChoice === "linear") {
+    return {
+      taskId: "issues",
+      lines: ["backlog: Linear", "scoring Linear issues for agent work…", "candidate work orders drafted"],
+    };
+  }
+  if (progress.issuesChoice === "jira") {
+    return {
+      taskId: "issues",
+      lines: ["backlog: Jira", "scoring Jira issues for agent work…", "candidate work orders drafted"],
+    };
+  }
+  return { taskId: "issues", lines: ["reviewing backlog for candidate work orders…"] };
+}
+
+function linesBatch(progress: AnalysisProgress): LogBatch {
+  return {
+    taskId: "lines",
+    lines: [
+      `coding agent: ${progress.agent ?? "configured"}`,
+      "credentials verified",
+      "configuring lines and automations…",
+      "ready to hand off the first work order",
+    ],
+  };
+}
+
+function TaskStatusIcon({ status }: { status: TaskStatus }) {
+  if (status === "completed") {
+    return (
+      <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+        <Check className="size-2.5" strokeWidth={3} aria-hidden />
+      </span>
+    );
+  }
+  if (status === "skipped") {
+    return (
+      <span className="flex size-3.5 items-center justify-center rounded-full bg-zinc-800 text-zinc-500">
+        <Minus className="size-2.5" strokeWidth={3} aria-hidden />
+      </span>
+    );
+  }
+  if (status === "running") {
+    return <Loader2 className="size-3.5 animate-spin text-emerald-400" aria-hidden />;
+  }
+  return <Circle className="size-3.5 text-zinc-600" strokeWidth={1.75} aria-hidden />;
+}
+
+type ScheduleGroupArgs = {
+  groupId: SetupGroupId;
+  ready: boolean;
+  preface?: string[];
+  batches: LogBatch[];
+  parallel?: boolean;
+  completedGroupsRef: MutableRefObject<Set<SetupGroupId>>;
+  inFlightGroupsRef: MutableRefObject<Set<SetupGroupId>>;
+  setLogLines: Dispatch<SetStateAction<string[]>>;
+  setTaskStatus: Dispatch<SetStateAction<Record<SetupTaskId, TaskStatus>>>;
+  setPendingWrites: Dispatch<SetStateAction<number>>;
+};
+
+/**
+ * Schedule one setup group. Kept in its own effect so later Continues do not
+ * cancel or restart earlier groups that are still running.
+ */
+function scheduleSetupGroup({
+  groupId,
+  ready,
+  preface = [],
+  batches,
+  parallel = false,
+  completedGroupsRef,
+  inFlightGroupsRef,
+  setLogLines,
+  setTaskStatus,
+  setPendingWrites,
+}: ScheduleGroupArgs): (() => void) | undefined {
+  if (!ready) return undefined;
+  if (completedGroupsRef.current.has(groupId) || inFlightGroupsRef.current.has(groupId)) {
+    return undefined;
+  }
+
+  inFlightGroupsRef.current.add(groupId);
+
+  const timers: number[] = [];
+  let delay = 0;
+  let scheduled = 0;
+
+  const appendLine = (line: string, at: number, onDone?: () => void) => {
+    scheduled += 1;
+    timers.push(
+      window.setTimeout(() => {
+        setLogLines((current) => [...current, line]);
+        setPendingWrites((count) => Math.max(0, count - 1));
+        onDone?.();
+      }, at),
+    );
+  };
+
+  preface.forEach((line) => {
+    delay += 280;
+    appendLine(line, delay);
+  });
+
+  if (parallel && batches.length > 0) {
+    const parallelStart = delay + 40;
+    timers.push(
+      window.setTimeout(() => {
+        setTaskStatus((current) => {
+          const nextStatus = { ...current };
+          batches.forEach((batch) => {
+            nextStatus[batch.taskId] = "running";
+          });
+          return nextStatus;
+        });
+      }, parallelStart),
+    );
+
+    let groupEnd = parallelStart;
+    batches.forEach((batch, batchIndex) => {
+      const interval = batch.lineIntervalMs ?? 300;
+      let batchAt = parallelStart + 80 + batchIndex * 70;
+      batch.lines.forEach((line, lineIndex) => {
+        batchAt += interval;
+        const isLastLine = lineIndex === batch.lines.length - 1;
+        appendLine(line, batchAt, () => {
+          if (isLastLine) {
+            setTaskStatus((current) => ({
+              ...current,
+              [batch.taskId]: batch.finishStatus ?? "completed",
+            }));
+          }
+        });
+      });
+      groupEnd = Math.max(groupEnd, batchAt);
+    });
+
+    timers.push(
+      window.setTimeout(() => {
+        inFlightGroupsRef.current.delete(groupId);
+        completedGroupsRef.current.add(groupId);
+      }, groupEnd + 10),
+    );
+  } else {
+    batches.forEach((batch) => {
+      if (batch.finishStatus !== "skipped") {
+        timers.push(
+          window.setTimeout(() => {
+            setTaskStatus((current) => ({ ...current, [batch.taskId]: "running" }));
+          }, delay + 40),
+        );
+      }
+
+      batch.lines.forEach((line, lineIndex) => {
+        delay += 320;
+        const isLastLine = lineIndex === batch.lines.length - 1;
+        appendLine(line, delay, () => {
+          if (isLastLine) {
+            setTaskStatus((current) => ({
+              ...current,
+              [batch.taskId]: batch.finishStatus ?? "completed",
+            }));
+          }
+        });
+      });
+    });
+
+    timers.push(
+      window.setTimeout(() => {
+        inFlightGroupsRef.current.delete(groupId);
+        completedGroupsRef.current.add(groupId);
+      }, delay + 10),
+    );
+  }
+
+  if (scheduled > 0) {
+    setPendingWrites((count) => count + scheduled);
+  }
+
+  return () => {
+    timers.forEach((id) => window.clearTimeout(id));
+    if (scheduled > 0) {
+      setPendingWrites((count) => Math.max(0, count - scheduled));
+    }
+    // Strict Mode: allow this group to re-schedule. Do not mark completed.
+    inFlightGroupsRef.current.delete(groupId);
+  };
+}
+
+/**
+ * Setup side panel: task checklist (pending / running / completed / skipped)
+ * above a streaming setup.log.
+ *
+ * Each onboarding Continue schedules its own group in a separate effect so later
+ * steps do not restart wiki / velocity / AI readiness that are still running.
+ */
+export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) {
+  const [logLines, setLogLines] = useState<string[]>(["waiting for workspace setup…"]);
+  const [taskStatus, setTaskStatus] = useState<Record<SetupTaskId, TaskStatus>>(EMPTY_TASK_STATUS);
   const [pendingWrites, setPendingWrites] = useState(0);
-  /** Milestones whose log lines have fully written. */
-  const completedRef = useRef<Set<Milestone>>(new Set(["boot"]));
-  /** Milestones currently scheduled (may be cancelled by effect cleanup / Strict Mode). */
-  const inFlightRef = useRef<Set<Milestone>>(new Set());
+  const completedGroupsRef = useRef<Set<SetupGroupId>>(new Set(["boot"]));
+  const inFlightGroupsRef = useRef<Set<SetupGroupId>>(new Set());
   const terminalRef = useRef<HTMLOListElement>(null);
-  const onNavAnalyzingRef = useRef(onNavAnalyzing);
-  onNavAnalyzingRef.current = onNavAnalyzing;
 
-  const complete = progress.nameReady && progress.repoCommitted && progress.agentReady;
-  const statusLabel =
-    complete && pendingWrites === 0 ? "idle" : progress.nameReady || pendingWrites > 0 ? "running" : "idle";
+  const complete = progress.nameReady && progress.repoCommitted && progress.agentReady && pendingWrites === 0;
+  const statusLabel = complete ? "idle" : progress.nameReady || pendingWrites > 0 ? "running" : "idle";
 
-  // Allow re-analysis after the user changes a selection and Continues again.
   useEffect(() => {
     if (!progress.repoCommitted) {
-      completedRef.current.delete("repo");
-      inFlightRef.current.delete("repo");
+      completedGroupsRef.current.delete("repo");
+      inFlightGroupsRef.current.delete("repo");
+      setTaskStatus((current) => ({
+        ...current,
+        wiki: "pending",
+        velocity: "pending",
+        "ai-readiness": "pending",
+      }));
     }
   }, [progress.repoCommitted, progress.selectedRepo]);
 
   useEffect(() => {
     if (!progress.issuesCommitted) {
-      completedRef.current.delete("issues");
-      inFlightRef.current.delete("issues");
+      completedGroupsRef.current.delete("issues");
+      inFlightGroupsRef.current.delete("issues");
+      setTaskStatus((current) => ({ ...current, issues: "pending" }));
     }
   }, [progress.issuesCommitted, progress.issuesChoice]);
 
   useEffect(() => {
-    const next: Milestone[] = [];
-    const consider = (milestone: Milestone, ready: boolean) => {
-      if (!ready) return;
-      if (completedRef.current.has(milestone) || inFlightRef.current.has(milestone)) return;
-      next.push(milestone);
-    };
-    consider("name", progress.nameReady);
-    consider("repo", progress.repoCommitted && progress.selectedRepo !== null);
-    consider("issues", progress.issuesCommitted && progress.issuesChoice !== null);
-    consider("agent", progress.agentReady);
-    if (next.length === 0) return;
-
-    next.forEach((milestone) => inFlightRef.current.add(milestone));
-
-    const timers: number[] = [];
-    let delay = 0;
-    let scheduled = 0;
-    next.forEach((milestone) => {
-      const lines = linesForMilestone(milestone, progress);
-      const navKey = asNavAnalyzingKey(milestone);
-      if (lines.length === 0) {
-        inFlightRef.current.delete(milestone);
-        completedRef.current.add(milestone);
-        if (navKey) onNavAnalyzingRef.current?.(navKey, false);
-        return;
-      }
-      lines.forEach((line, lineIndex) => {
-        scheduled += 1;
-        delay += 350;
-        const isLast = lineIndex === lines.length - 1;
-        timers.push(
-          window.setTimeout(() => {
-            setLogLines((current) => [...current, line]);
-            setPendingWrites((count) => Math.max(0, count - 1));
-            if (isLast) {
-              inFlightRef.current.delete(milestone);
-              completedRef.current.add(milestone);
-              if (navKey) onNavAnalyzingRef.current?.(navKey, false);
-            }
-          }, delay),
-        );
-      });
-    });
-    if (scheduled > 0) {
-      setPendingWrites((count) => count + scheduled);
+    if (!progress.agentReady) {
+      completedGroupsRef.current.delete("lines");
+      inFlightGroupsRef.current.delete("lines");
+      setTaskStatus((current) => ({ ...current, lines: "pending" }));
     }
+  }, [progress.agentReady, progress.agent]);
 
-    return () => {
-      timers.forEach((id) => window.clearTimeout(id));
-      if (scheduled > 0) {
-        setPendingWrites((count) => Math.max(0, count - scheduled));
-      }
-      // Allow re-schedule after Strict Mode / dep cleanup. Do not mark completed.
-      next.forEach((milestone) => {
-        inFlightRef.current.delete(milestone);
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- milestone fields only; full `progress` identity changes every render
-  }, [
-    progress.nameReady,
-    progress.repoCommitted,
-    progress.issuesCommitted,
-    progress.issuesChoice,
-    progress.agentReady,
-    progress.workspaceName,
-    progress.selectedRepo,
-    progress.vcsHost,
-    progress.agent,
-  ]);
+  useEffect(() => {
+    return scheduleSetupGroup({
+      groupId: "name",
+      ready: progress.nameReady,
+      preface: [`workspace registered: ${progress.workspaceName.trim()}`],
+      batches: [],
+      completedGroupsRef,
+      inFlightGroupsRef,
+      setLogLines,
+      setTaskStatus,
+      setPendingWrites,
+    });
+  }, [progress.nameReady, progress.workspaceName]);
+
+  useEffect(() => {
+    return scheduleSetupGroup({
+      groupId: "repo",
+      ready: progress.repoCommitted && progress.selectedRepo !== null,
+      preface: repoPreface(progress),
+      batches: repoBatches(),
+      parallel: true,
+      completedGroupsRef,
+      inFlightGroupsRef,
+      setLogLines,
+      setTaskStatus,
+      setPendingWrites,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only repo commit gates this group
+  }, [progress.repoCommitted, progress.selectedRepo, progress.vcsHost]);
+
+  useEffect(() => {
+    return scheduleSetupGroup({
+      groupId: "issues",
+      ready: progress.issuesCommitted && progress.issuesChoice !== null,
+      batches: [issuesBatch(progress)],
+      completedGroupsRef,
+      inFlightGroupsRef,
+      setLogLines,
+      setTaskStatus,
+      setPendingWrites,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only issues commit gates this group
+  }, [progress.issuesCommitted, progress.issuesChoice, progress.vcsHost]);
+
+  useEffect(() => {
+    return scheduleSetupGroup({
+      groupId: "lines",
+      ready: progress.agentReady,
+      batches: [linesBatch(progress)],
+      completedGroupsRef,
+      inFlightGroupsRef,
+      setLogLines,
+      setTaskStatus,
+      setPendingWrites,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only agent readiness gates this group
+  }, [progress.agentReady, progress.agent]);
 
   useEffect(() => {
     const el = terminalRef.current;
@@ -184,21 +410,21 @@ export function AnalysisSidePanel({
   const subtitle = complete
     ? "Ready for the first work order."
     : progress.nameReady
-      ? "SuperPlane analyzes the app and backlog as you finish each section."
-      : "Shows analysis progress while you set up this workspace.";
+      ? "SuperPlane runs these tasks as you finish each section."
+      : "Shows setup tasks while you configure this workspace.";
 
   return (
     <aside
-      className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-lg border border-border bg-background"
+      className="flex h-[min(720px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background"
       data-testid="onboarding-analysis-panel"
     >
-      <div className="border-b border-border px-4 py-3">
+      <div className="shrink-0 border-b border-border px-4 py-3">
         <div className="text-[13px] font-medium tracking-[-0.02em]">Setup log</div>
         <p className="mt-0.5 text-[12px] text-muted-foreground">{subtitle}</p>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col bg-zinc-950 text-zinc-100">
-        <header className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2 text-[11px]">
+        <header className="flex shrink-0 items-center gap-2 border-b border-zinc-800 px-3 py-2 text-[11px]">
           <span className="flex gap-1" aria-hidden>
             <i className="size-2 rounded-full bg-zinc-600" />
             <i className="size-2 rounded-full bg-zinc-600" />
@@ -209,9 +435,39 @@ export function AnalysisSidePanel({
             {statusLabel}
           </span>
         </header>
+
+        <ol className="shrink-0 space-y-1.5 border-b border-zinc-800 px-3 py-3" aria-label="Setup tasks">
+          {SETUP_TASKS.map((task) => {
+            const status = taskStatus[task.id];
+            return (
+              <li
+                key={task.id}
+                className={cn(
+                  "flex items-start gap-2 font-mono text-[11px] leading-4",
+                  status === "pending" && "text-zinc-500",
+                  status === "running" && "text-zinc-100",
+                  status === "completed" && "text-zinc-300",
+                  status === "skipped" && "text-zinc-600",
+                )}
+                data-status={status}
+              >
+                <span className="mt-0.5 shrink-0">
+                  <TaskStatusIcon status={status} />
+                </span>
+                <span className={cn(status === "skipped" && "line-through")}>
+                  {task.label}
+                  {task.optional && status === "pending" ? (
+                    <span className="text-zinc-600 no-underline"> · optional</span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+
         <ol
           ref={terminalRef}
-          className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3 font-mono text-[11px] leading-5"
+          className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-3 font-mono text-[11px] leading-5"
           aria-label="Setup log"
         >
           {logLines.map((line, index) => (

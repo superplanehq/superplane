@@ -6,6 +6,7 @@ import {
   emptyFactoriesFixture,
   PRIMARY_FACTORY_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { ONBOARDING_AVAILABLE_REPOS } from "./onboarding/onboardingMocks";
 import { OnboardingWireframe } from "./onboarding/OnboardingWireframe";
 
@@ -26,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 const factoryBase = `workspaces/${PRIMARY_FACTORY_ID}`;
 
 const pendingSeed = {
-  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds" },
+  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: generateWorkspaceName() },
 };
 
 export const Default: Story = {
