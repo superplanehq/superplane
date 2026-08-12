@@ -48,6 +48,35 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// An "M out of N" alarm: 2 breaching datapoints out of 3 evaluation periods.
+const describeMOfNAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>api-high-cpu</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <Statistic>Average</Statistic>
+        <Period>300</Period>
+        <EvaluationPeriods>3</EvaluationPeriods>
+        <DatapointsToAlarm>2</DatapointsToAlarm>
+        <Threshold>80</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <Dimensions>
+          <member>
+            <Name>InstanceId</Name>
+            <Value>i-1234567890abcdef0</Value>
+          </member>
+        </Dimensions>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 // An EC2 alarm whose ALARM transition mixes all three kinds of action ARN:
 // an SNS topic, an EC2 automation, and a Lambda the components never expose.
 const describeEC2ActionAlarmXML = `
@@ -468,6 +497,66 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		assert.Contains(t, body, "Statistic=Average")
 		assert.NotContains(t, body, "ExtendedStatistic")
 		assert.NotContains(t, body, "EvaluateLowSampleCountPercentile")
+	})
+
+	t.Run("lowering evaluation periods pulls an inherited datapoints to alarm down", func(t *testing.T) {
+		// The existing alarm is 2 of 3; the user only shrinks N to 1, so M follows
+		// rather than the update failing CloudWatch's M-must-be-at-most-N rule.
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeMOfNAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":            "us-east-1",
+				"alarm":             "api-high-cpu",
+				"evaluationPeriods": 1,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "EvaluationPeriods=1")
+		assert.Contains(t, body, "DatapointsToAlarm=1")
+	})
+
+	t.Run("explicitly setting datapoints above evaluation periods -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeMOfNAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":            "us-east-1",
+				"alarm":             "api-high-cpu",
+				"evaluationPeriods": 2,
+				"datapointsToAlarm": 5,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "datapoints to alarm (5) cannot be greater than evaluation periods (2)")
+	})
+
+	t.Run("raising evaluation periods leaves the inherited datapoints alone", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeMOfNAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":            "us-east-1",
+				"alarm":             "api-high-cpu",
+				"evaluationPeriods": 5,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "EvaluationPeriods=5")
+		assert.Contains(t, body, "DatapointsToAlarm=2")
 	})
 
 	t.Run("metric math alarm -> error", func(t *testing.T) {

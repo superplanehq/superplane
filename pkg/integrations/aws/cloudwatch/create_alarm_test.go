@@ -132,6 +132,22 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid dimensions")
 	})
 
+	t.Run("datapoints to alarm above evaluation periods -> error", func(t *testing.T) {
+		configuration := validConfiguration()
+		configuration["evaluationPeriods"] = 3
+		configuration["datapointsToAlarm"] = 5
+		err := component.Setup(core.SetupContext{Configuration: configuration})
+		require.ErrorContains(t, err, "datapoints to alarm (5) cannot be greater than evaluation periods (3)")
+	})
+
+	t.Run("datapoints to alarm above the default evaluation periods -> error", func(t *testing.T) {
+		// evaluationPeriods left empty defaults to 1, so 2 of 1 is still invalid.
+		configuration := validConfiguration()
+		configuration["datapointsToAlarm"] = 2
+		err := component.Setup(core.SetupContext{Configuration: configuration})
+		require.ErrorContains(t, err, "cannot be greater than evaluation periods (1)")
+	})
+
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{

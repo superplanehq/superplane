@@ -13,17 +13,43 @@ const alarmNamespaceEC2 = "AWS/EC2"
 
 const dimensionInstanceID = "InstanceId"
 
+// PartitionForRegion returns the ARN partition a region belongs to. China and
+// GovCloud regions do not use the default "aws" partition.
+func PartitionForRegion(region string) string {
+	region = strings.TrimSpace(region)
+	switch {
+	case strings.HasPrefix(region, "cn-"):
+		return "aws-cn"
+	case strings.HasPrefix(region, "us-gov-"):
+		return "aws-us-gov"
+	default:
+		return "aws"
+	}
+}
+
 // EC2AutomationARN builds the ARN for an EC2 automation action.
 func EC2AutomationARN(region, action string) string {
-	return fmt.Sprintf("arn:aws:automate:%s:ec2:%s", strings.TrimSpace(region), strings.TrimSpace(action))
+	region = strings.TrimSpace(region)
+	return fmt.Sprintf("arn:%s:automate:%s:ec2:%s", PartitionForRegion(region), region, strings.TrimSpace(action))
+}
+
+// arnService reads the service segment of arn:<partition>:<service>:...,
+// so classification holds in every partition.
+func arnService(arn string) string {
+	segments := strings.SplitN(strings.TrimSpace(arn), ":", 4)
+	if len(segments) < 3 || segments[0] != "arn" {
+		return ""
+	}
+
+	return segments[2]
 }
 
 func isEC2AutomationARN(arn string) bool {
-	return strings.HasPrefix(arn, "arn:aws:automate:")
+	return arnService(arn) == "automate"
 }
 
 func isSNSTopicARN(arn string) bool {
-	return strings.HasPrefix(arn, "arn:aws:sns:")
+	return arnService(arn) == "sns"
 }
 
 // mergeAlarmActions rebuilds the action list for a transition. Actions of a kind

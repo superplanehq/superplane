@@ -85,6 +85,29 @@ func requireThreshold(configuration any, threshold float64) (float64, error) {
 	return threshold, nil
 }
 
+// requireDatapointsWithinEvaluationPeriods enforces the "M out of N" rule:
+// CloudWatch rejects an alarm whose datapoints to alarm exceed its evaluation periods.
+func requireDatapointsWithinEvaluationPeriods(datapointsToAlarm, evaluationPeriods int) error {
+	if datapointsToAlarm > 0 && datapointsToAlarm > evaluationPeriods {
+		return fmt.Errorf(
+			"datapoints to alarm (%d) cannot be greater than evaluation periods (%d)",
+			datapointsToAlarm, evaluationPeriods,
+		)
+	}
+
+	return nil
+}
+
+// effectiveEvaluationPeriods mirrors the default the client applies when the
+// field is left empty, so validation compares against what CloudWatch will see.
+func effectiveEvaluationPeriods(evaluationPeriods int) int {
+	if evaluationPeriods <= 0 {
+		return defaultAlarmEvaluationPeriods
+	}
+
+	return evaluationPeriods
+}
+
 func hasConfigKey(configuration any, key string) bool {
 	configurationMap, ok := configuration.(map[string]any)
 	if !ok {

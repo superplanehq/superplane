@@ -301,6 +301,13 @@ func (c *CreateAlarm) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	if err := requireDatapointsWithinEvaluationPeriods(
+		config.DatapointsToAlarm,
+		effectiveEvaluationPeriods(config.EvaluationPeriods),
+	); err != nil {
+		return err
+	}
+
 	dimensions, err := DecodeDimensions(config.Dimensions)
 	if err != nil {
 		return err
@@ -353,6 +360,13 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 
 	threshold, err := requireThreshold(ctx.Configuration, config.Threshold)
 	if err != nil {
+		return err
+	}
+
+	if err := requireDatapointsWithinEvaluationPeriods(
+		config.DatapointsToAlarm,
+		effectiveEvaluationPeriods(config.EvaluationPeriods),
+	); err != nil {
 		return err
 	}
 

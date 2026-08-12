@@ -466,6 +466,20 @@ func buildUpdateAlarmInput(
 		input.DatapointsToAlarm = config.DatapointsToAlarm
 	}
 
+	// Shrinking the evaluation periods below a datapoints-to-alarm the user never
+	// touched would push the alarm past CloudWatch's "M out of N" rule, so the
+	// inherited M follows N down. An M they set themselves is their call and errors.
+	if input.DatapointsToAlarm > effectiveEvaluationPeriods(input.EvaluationPeriods) {
+		if hasConfigKey(rawConfiguration, "datapointsToAlarm") {
+			return PutMetricAlarmInput{}, requireDatapointsWithinEvaluationPeriods(
+				input.DatapointsToAlarm,
+				effectiveEvaluationPeriods(input.EvaluationPeriods),
+			)
+		}
+
+		input.DatapointsToAlarm = effectiveEvaluationPeriods(input.EvaluationPeriods)
+	}
+
 	if hasConfigKey(rawConfiguration, "treatMissingData") {
 		input.TreatMissingData = strings.TrimSpace(config.TreatMissingData)
 	}
