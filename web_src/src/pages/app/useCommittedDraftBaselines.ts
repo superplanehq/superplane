@@ -66,7 +66,7 @@ export function useCommittedDraftBaselines({
     void (async () => {
       try {
         const version = await versionPromise;
-        // Console is optional for factory apps; a console failure must not clear the canvas baseline.
+        // Console is optional for factory apps; a console failure must not block baselines.
         const consoleData = await consolePromise.catch(() => undefined);
         if (cancelled) {
           return;
@@ -86,9 +86,10 @@ export function useCommittedDraftBaselines({
         if (cancelled) {
           return;
         }
-        // Version baseline failed — stay not-ready so edit bootstrap does not
-        // treat the whole graph as uncommitted against an empty baseline.
-        setBaselines({ ready: false });
+        // Unblock edit bootstrap after a version-read failure. Missing canvasSpec
+        // keeps local graph diffs false (hasLocalCanvasGraphDiff) until a later
+        // successful fetch (version/nonce change), instead of stuck loading forever.
+        setBaselines({ console: { panels: [], layout: [] }, ready: true });
       }
     })();
 
