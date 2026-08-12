@@ -57,8 +57,15 @@ export function isWorkflowCanvasViewParam(view: string): boolean {
   return view === "" || view === LEGACY_RUNS_VIEW;
 }
 
+export type WorkflowUrlViewFlags = {
+  isRunInspectionMode: boolean;
+  isMemoryMode: boolean;
+  isFilesMode: boolean;
+  isConsoleMode: boolean;
+};
+
 /** View flags read directly from the URL (source of truth for first paint and header tab selection). */
-export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams) {
+export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams): WorkflowUrlViewFlags {
   const view = searchParams.get("view") ?? "";
   const run = searchParams.get("run") ?? "";
   const isRunInspectionMode = Boolean(run) && isWorkflowCanvasViewParam(view);
@@ -68,6 +75,20 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
     isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
   };
+}
+
+/** Factory apps are canvas-only — no Console / Memory / Files surfaces. */
+export function clampWorkflowViewFlagsForFactoryApp(flags: WorkflowUrlViewFlags): WorkflowUrlViewFlags {
+  return {
+    ...flags,
+    isMemoryMode: false,
+    isFilesMode: false,
+    isConsoleMode: false,
+  };
+}
+
+export function isNonCanvasAppViewParam(view: string): boolean {
+  return isConsoleViewParam(view) || view === "memory" || view === "files";
 }
 
 export function useWorkflowUrlViewFlags(searchParams: URLSearchParams) {
