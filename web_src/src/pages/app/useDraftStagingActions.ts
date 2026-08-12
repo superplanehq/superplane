@@ -75,23 +75,28 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
   const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleCommitStaging = useCallback(
-    async (commitMessage: string) => {
-      if (!hasEditableVersion || !activeCanvasVersionId) {
-        return;
+    async (commitMessage: string, options?: { versionId?: string }): Promise<boolean> => {
+      // Prefer explicit versionId (Factory Configure Save) — React state for
+      // activeCanvasVersionId can lag one frame behind the sync ref write.
+      const versionId = options?.versionId || activeCanvasVersionId;
+      if (!versionId) {
+        showErrorToast("Edit session is not ready to commit");
+        return false;
       }
 
       const trimmedMessage = commitMessage.trim();
       if (!trimmedMessage) {
         showErrorToast("Commit message is required");
-        return;
+        return false;
       }
 
       try {
+        let committed = false;
         await runStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
-          const committed = await executeCommitStaging({
+          committed = await executeCommitStaging({
             organizationId,
             canvasId,
-            activeCanvasVersionId,
+            activeCanvasVersionId: versionId,
             commitMessage: trimmedMessage,
             queryClient,
             commitCanvasStagingMutation,
@@ -108,8 +113,10 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
             showSuccessToast("Changes committed");
           }
         });
+        return committed;
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+        return false;
       }
     },
     [
@@ -120,7 +127,6 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       draftCanvasSpecsRef,
       ensureVersionActionDraftReady,
       flushRepositoryFileStaging,
-      hasEditableVersion,
       onCommittedVersionId,
       organizationId,
       queryClient,
