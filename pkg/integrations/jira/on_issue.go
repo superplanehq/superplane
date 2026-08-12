@@ -133,20 +133,27 @@ func projectAndEventsFields(projectDescription, eventsDescription string) []conf
 				},
 			},
 		},
-		{
-			Name:        "events",
-			Label:       "Events",
-			Type:        configuration.FieldTypeMultiSelect,
-			Required:    true,
-			Default:     []string{"created"},
-			Description: eventsDescription,
-			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Created", Value: "created"},
-						{Label: "Updated", Value: "updated"},
-						{Label: "Deleted", Value: "deleted"},
-					},
+		issueEventsField(eventsDescription),
+	}
+}
+
+// issueEventsField is the "Events" multi-select shared by triggers scoped to Jira's standard
+// issue lifecycle events (created, updated, deleted) - currently jira.onIssue and jira.onIncident,
+// since an incident is just an issue on an incident-practice request type.
+func issueEventsField(description string) configuration.Field {
+	return configuration.Field{
+		Name:        "events",
+		Label:       "Events",
+		Type:        configuration.FieldTypeMultiSelect,
+		Required:    true,
+		Default:     []string{"created"},
+		Description: description,
+		TypeOptions: &configuration.TypeOptions{
+			MultiSelect: &configuration.MultiSelectTypeOptions{
+				Options: []configuration.FieldOption{
+					{Label: "Created", Value: "created"},
+					{Label: "Updated", Value: "updated"},
+					{Label: "Deleted", Value: "deleted"},
 				},
 			},
 		},
