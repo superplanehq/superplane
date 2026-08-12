@@ -88,6 +88,8 @@ type FactoryLineStepResult struct {
 
 const onRunTriggerName = "onRun"
 
+// StartStep launches the given step against the run's inputs and records a
+// `step.execution.created` event.
 func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {

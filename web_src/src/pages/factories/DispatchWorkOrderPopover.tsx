@@ -1,5 +1,6 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -12,7 +13,7 @@ interface DispatchWorkOrderPopoverProps {
   isSaving: boolean;
   canDispatch: boolean;
   align?: "start" | "center" | "end";
-  onDispatch: (lineName: string) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
   children: ReactNode;
 }
 
@@ -47,7 +48,7 @@ export function DispatchWorkOrderPopover({
     }
 
     try {
-      await onDispatch(lineName);
+      await onDispatch({ lineName });
       setOpen(false);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to dispatch work order"));
@@ -57,25 +58,28 @@ export function DispatchWorkOrderPopover({
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} className="w-72 p-3" sideOffset={8}>
+      <PopoverContent align={align} className="w-80 p-3" sideOffset={8}>
         <div className="space-y-3">
           {lines.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Configure at least one line before dispatching work orders.
-            </p>
+            <p className="text-sm text-muted-foreground">Configure at least one line before dispatching work orders.</p>
           ) : (
-            <Select value={lineName} onValueChange={setLineName}>
-              <SelectTrigger id="dispatch-line-select" className="w-full" data-testid="dispatch-line-select">
-                <SelectValue placeholder="Select a line" />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {lines.map((line) => (
-                  <SelectItem key={line.id ?? line.name} value={line.name ?? ""}>
-                    {line.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-1.5">
+              <Label htmlFor="dispatch-line-select" className="text-xs">
+                Line
+              </Label>
+              <Select value={lineName} onValueChange={setLineName}>
+                <SelectTrigger id="dispatch-line-select" className="w-full" data-testid="dispatch-line-select">
+                  <SelectValue placeholder="Select a line" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {lines.map((line) => (
+                    <SelectItem key={line.id ?? line.name} value={line.name ?? ""}>
+                      {line.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
