@@ -12,9 +12,10 @@ import { Factory as FactoryIcon, Plus } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
-import { factoryDetailPath } from "./lib/factoryPagePaths";
+import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
 import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "./pages/onboarding/useOnboardingStorybook";
 
 export function FactoriesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -33,6 +34,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const [createOpen, setCreateOpen] = useState(false);
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
 
   useFactoriesThemeClass();
   usePageTitle(["Workspaces"]);
@@ -69,11 +71,21 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const canCreate = canAct("factories", "create");
 
   const handleCreate = async (input: { name: string; description: string }) => {
+    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const factory = await createFactory.mutateAsync(input);
     setCreateOpen(false);
-    if (factory.id) {
-      navigate(factoryDetailPath(organizationId, factory.id));
+    if (!factory.id) {
+      return;
     }
+    if (storybookOnboarding) {
+      storybookOnboarding.beginOnboarding({
+        workspaceId: factory.id,
+        workspaceName: factory.name || input.name,
+      });
+      navigate(factoryOnboardingPath(organizationId, factory.id));
+      return;
+    }
+    navigate(factoryDetailPath(organizationId, factory.id));
   };
 
   return (
