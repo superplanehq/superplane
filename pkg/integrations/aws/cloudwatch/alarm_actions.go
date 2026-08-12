@@ -13,20 +13,6 @@ const alarmNamespaceEC2 = "AWS/EC2"
 
 const dimensionInstanceID = "InstanceId"
 
-// PartitionForRegion returns the ARN partition a region belongs to. China and
-// GovCloud regions do not use the default "aws" partition.
-func PartitionForRegion(region string) string {
-	region = strings.TrimSpace(region)
-	switch {
-	case strings.HasPrefix(region, "cn-"):
-		return "aws-cn"
-	case strings.HasPrefix(region, "us-gov-"):
-		return "aws-us-gov"
-	default:
-		return "aws"
-	}
-}
-
 // EC2AutomationARN builds the ARN for an EC2 automation action.
 func EC2AutomationARN(region, action string) string {
 	region = strings.TrimSpace(region)

@@ -17,13 +17,18 @@ const COMPARISON_OPERATOR_SYMBOLS: Record<string, string> = {
   LessThanOrEqualToThreshold: "<=",
 };
 
+/** The console serving a region. China regions are on a different host. */
+function consoleHost(region: string): string {
+  return region.startsWith("cn-") ? "console.amazonaws.cn" : "console.aws.amazon.com";
+}
+
 /** CloudWatch Console URL for an alarm. */
 export function alarmConsoleUrl(region?: string, alarmName?: string): string {
   if (!region || !alarmName) {
     return "";
   }
 
-  return `https://${region}.console.aws.amazon.com/cloudwatch/home?region=${region}#alarmsV2:alarm/${encodeURIComponent(alarmName)}`;
+  return `https://${region}.${consoleHost(region)}/cloudwatch/home?region=${region}#alarmsV2:alarm/${encodeURIComponent(alarmName)}`;
 }
 
 /** "AWS/EC2 / CPUUtilization" */

@@ -6,14 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test__PartitionForRegion(t *testing.T) {
-	assert.Equal(t, "aws", PartitionForRegion("us-east-1"))
-	assert.Equal(t, "aws", PartitionForRegion("eu-north-1"))
-	assert.Equal(t, "aws-cn", PartitionForRegion("cn-north-1"))
-	assert.Equal(t, "aws-cn", PartitionForRegion("cn-northwest-1"))
-	assert.Equal(t, "aws-us-gov", PartitionForRegion("us-gov-west-1"))
-}
-
 func Test__EC2AutomationARN(t *testing.T) {
 	assert.Equal(t, "arn:aws:automate:us-east-1:ec2:recover", EC2AutomationARN("us-east-1", "recover"))
 	assert.Equal(t, "arn:aws-cn:automate:cn-north-1:ec2:reboot", EC2AutomationARN("cn-north-1", "reboot"))

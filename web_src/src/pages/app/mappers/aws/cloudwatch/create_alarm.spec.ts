@@ -133,6 +133,16 @@ describe("createAlarmMapper.getExecutionDetails", () => {
     expect(createAlarmMapper.getExecutionDetails(ctx)["CloudWatch Console"]).toBe(alarmOutputData.consoleUrl);
   });
 
+  it("builds a China-partition console URL for cn- regions", () => {
+    const ctx = buildDetailsCtx({
+      node: { configuration: { region: "cn-north-1", alarmName: "api-high-cpu" } },
+      execution: { outputs: undefined },
+    });
+    expect(createAlarmMapper.getExecutionDetails(ctx)["CloudWatch Console"]).toBe(
+      "https://cn-north-1.console.amazonaws.cn/cloudwatch/home?region=cn-north-1#alarmsV2:alarm/api-high-cpu",
+    );
+  });
+
   it("builds the console URL from configuration when output has none", () => {
     const ctx = buildDetailsCtx({
       node: { configuration: { region: "eu-west-1", alarmName: "queue depth" } },

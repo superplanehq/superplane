@@ -48,6 +48,37 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// An alarm carrying non-SNS actions on the OK and INSUFFICIENT_DATA transitions,
+// which the components never expose and so must never drop.
+const describeForeignActionAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>api-high-cpu</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <Statistic>Average</Statistic>
+        <Period>300</Period>
+        <EvaluationPeriods>1</EvaluationPeriods>
+        <Threshold>80</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <OKActions>
+          <member>arn:aws:lambda:us-east-1:123456789012:function:on-ok</member>
+          <member>arn:aws:sns:us-east-1:123456789012:old-ok-topic</member>
+        </OKActions>
+        <InsufficientDataActions>
+          <member>arn:aws:ssm:us-east-1:123456789012:opsitem:3</member>
+          <member>arn:aws:sns:us-east-1:123456789012:old-insufficient-topic</member>
+        </InsufficientDataActions>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 // An "M out of N" alarm: 2 breaching datapoints out of 3 evaluation periods.
 const describeMOfNAlarmXML = `
 <DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
@@ -438,6 +469,47 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		assert.Contains(t, body, "arn%3Aaws%3Alambda%3Aus-east-1%3A123456789012%3Afunction%3Aremediate")
 		assert.NotContains(t, body, "ops-alerts")
 		assert.NotContains(t, body, "automate")
+	})
+
+	t.Run("editing ok actions preserves foreign ARNs on that transition", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeForeignActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "api-high-cpu",
+				"okActions": []any{"arn:aws:sns:us-east-1:123456789012:new-topic"},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "OKActions.member.1=arn%3Aaws%3Alambda%3Aus-east-1%3A123456789012%3Afunction%3Aon-ok")
+		assert.Contains(t, body, "OKActions.member.2=arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3Anew-topic")
+		assert.NotContains(t, body, "old-ok-topic")
+	})
+
+	t.Run("editing insufficient data actions preserves foreign ARNs on that transition", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeForeignActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":                  "us-east-1",
+				"alarm":                   "api-high-cpu",
+				"insufficientDataActions": []any{},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "InsufficientDataActions.member.1=arn%3Aaws%3Assm%3Aus-east-1")
+		assert.NotContains(t, body, "old-insufficient-topic")
 	})
 
 	t.Run("ec2 action on a non-EC2 alarm -> error", func(t *testing.T) {

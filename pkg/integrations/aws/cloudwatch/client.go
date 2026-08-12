@@ -45,7 +45,7 @@ func NewClient(httpCtx core.HTTPContext, credentials *aws.Credentials, region st
 	return &Client{
 		http:        httpCtx,
 		region:      normalizedRegion,
-		endpoint:    fmt.Sprintf("https://%s.%s.amazonaws.com/", monitoringServiceName, normalizedRegion),
+		endpoint:    fmt.Sprintf("https://%s.%s.%s/", monitoringServiceName, normalizedRegion, APIDNSSuffix(normalizedRegion)),
 		credentials: credentials,
 		signer:      v4.NewSigner(),
 	}
@@ -427,8 +427,8 @@ func AlarmConsoleURL(region, alarmName string) string {
 	}
 
 	return fmt.Sprintf(
-		"https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#alarmsV2:alarm/%s",
-		region, region, url.PathEscape(alarmName),
+		"https://%s.%s/cloudwatch/home?region=%s#alarmsV2:alarm/%s",
+		region, ConsoleHost(region), region, url.PathEscape(alarmName),
 	)
 }
 

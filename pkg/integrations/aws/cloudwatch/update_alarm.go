@@ -509,12 +509,16 @@ func buildUpdateAlarmInput(
 		input.AlarmActions = mergeAlarmActions(existing.AlarmActions, config.AlarmActions, ec2ActionARN, replaceSNS, replaceEC2)
 	}
 
+	// These transitions expose only SNS topics, so any other ARN on them is
+	// preserved for the same reason it is on the ALARM transition.
 	if hasConfigKey(rawConfiguration, "okActions") {
-		input.OKActions = config.OKActions
+		input.OKActions = mergeAlarmActions(existing.OKActions, config.OKActions, "", true, false)
 	}
 
 	if hasConfigKey(rawConfiguration, "insufficientDataActions") {
-		input.InsufficientDataActions = config.InsufficientDataActions
+		input.InsufficientDataActions = mergeAlarmActions(
+			existing.InsufficientDataActions, config.InsufficientDataActions, "", true, false,
+		)
 	}
 
 	return input, nil
