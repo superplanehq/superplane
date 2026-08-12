@@ -16,6 +16,8 @@ import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
+import { createAlarmMapper } from "./cloudwatch/create_alarm";
+import { updateAlarmMapper } from "./cloudwatch/update_alarm";
 import { createServiceMapper } from "./ecs/create_service";
 import { createRecordMapper } from "./route53/create_record";
 import { upsertRecordMapper } from "./route53/upsert_record";
@@ -38,9 +40,7 @@ import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { onEc2AlarmTriggerRenderer } from "./ec2/on_alarm";
-import { createAlarmMapper } from "./ec2/create_alarm";
 import { deleteAlarmMapper } from "./ec2/delete_alarm";
-import { updateAlarmMapper } from "./ec2/update_alarm";
 import { createImageMapper } from "./ec2/create_image";
 import { CREATE_INSTANCE_STATE_REGISTRY, createInstanceMapper } from "./ec2/create_instance";
 import { deleteInstanceMapper } from "./ec2/delete_instance";
@@ -75,6 +75,8 @@ import { createLoadBalancerMapper } from "./ec2/create_load_balancer";
 import { deleteLoadBalancerMapper } from "./ec2/delete_load_balancer";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  "cloudwatch.createAlarm": createAlarmMapper,
+  "cloudwatch.updateAlarm": updateAlarmMapper,
   "codepipeline.getPipeline": getPipelineMapper,
   "codepipeline.getPipelineExecution": getPipelineExecutionMapper,
   "codepipeline.retryStageExecution": retryStageExecutionMapper,
@@ -122,7 +124,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.allocateElasticIP": allocateElasticIPMapper,
   "ec2.manageElasticIP": manageElasticIPMapper,
   "ec2.copyImage": copyImageMapper,
-  "ec2.createAlarm": createAlarmMapper,
   "ec2.deleteAlarm": deleteAlarmMapper,
   "ec2.createImage": createImageMapper,
   "ec2.createInstance": createInstanceMapper,
@@ -133,7 +134,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getAlarm": getAlarmMapper,
-  "ec2.updateAlarm": updateAlarmMapper,
   "ec2.getImage": getEc2ImageMapper,
   "ec2.getInstance": getInstanceMapper,
   "ec2.getInstanceMetrics": getInstanceMetricsMapper,
@@ -156,6 +156,8 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  "cloudwatch.createAlarm": buildActionStateRegistry("created"),
+  "cloudwatch.updateAlarm": buildActionStateRegistry("updated"),
   "codepipeline.getPipeline": buildActionStateRegistry("retrieved"),
   "codepipeline.getPipelineExecution": buildActionStateRegistry("retrieved"),
   "codepipeline.retryStageExecution": buildActionStateRegistry("retried"),
@@ -202,7 +204,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.allocateElasticIP": buildActionStateRegistry("allocated"),
   "ec2.manageElasticIP": MANAGE_ELASTIC_IP_STATE_REGISTRY,
   "ec2.copyImage": buildActionStateRegistry("copied"),
-  "ec2.createAlarm": buildActionStateRegistry("created"),
   "ec2.deleteAlarm": buildActionStateRegistry("deleted"),
   "ec2.createImage": buildActionStateRegistry("created"),
   "ec2.createInstance": CREATE_INSTANCE_STATE_REGISTRY,
@@ -213,7 +214,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getAlarm": buildActionStateRegistry("retrieved"),
-  "ec2.updateAlarm": buildActionStateRegistry("updated"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
   "ec2.getInstance": buildActionStateRegistry("retrieved"),
   "ec2.getInstanceMetrics": buildActionStateRegistry("retrieved"),
