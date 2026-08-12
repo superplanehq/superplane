@@ -685,3 +685,13 @@
 .sp-tool-enter {
   animation: sp-tool-enter 0.2s ease-out both;
 }
+
+@keyframes status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
