@@ -7,14 +7,16 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactory, useFactories } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
-import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { CreateFactoryDialog } from "./CreateFactoryDialog";
-import { factoryDetailPath } from "./lib/factoryPagePaths";
+import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
 import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "./pages/onboarding/useOnboardingStorybook";
 
 export function FactoriesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -30,9 +32,9 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [createOpen, setCreateOpen] = useState(false);
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
 
   useFactoriesThemeClass();
   usePageTitle(["Workspaces"]);
@@ -68,11 +70,27 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
 
   const canCreate = canAct("factories", "create");
 
-  const handleCreate = async (input: { name: string; description: string }) => {
-    const factory = await createFactory.mutateAsync(input);
-    setCreateOpen(false);
-    if (factory.id) {
+  const handleCreate = async () => {
+    if (!canCreate || createFactory.isPending) {
+      return;
+    }
+    const workspaceName = generateWorkspaceName();
+    try {
+      const factory = await createFactory.mutateAsync({ name: workspaceName, description: "" });
+      if (!factory.id) {
+        return;
+      }
+      if (storybookOnboarding) {
+        storybookOnboarding.beginOnboarding({
+          workspaceId: factory.id,
+          workspaceName: factory.name || workspaceName,
+        });
+        navigate(factoryOnboardingPath(organizationId, factory.id));
+        return;
+      }
       navigate(factoryDetailPath(organizationId, factory.id));
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to create workspace"));
     }
   };
 
@@ -96,8 +114,8 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           <Button
             type="button"
             className="mt-6"
-            onClick={() => setCreateOpen(true)}
-            disabled={!canCreate}
+            onClick={() => void handleCreate()}
+            disabled={!canCreate || createFactory.isPending}
             data-testid="factories-index-create-button"
           >
             <Plus className="h-4 w-4" aria-hidden />
@@ -105,13 +123,6 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           </Button>
         </PermissionTooltip>
       </div>
-
-      <CreateFactoryDialog
-        open={createOpen}
-        isSaving={createFactory.isPending}
-        onClose={() => setCreateOpen(false)}
-        onCreate={handleCreate}
-      />
     </div>
   );
 }
