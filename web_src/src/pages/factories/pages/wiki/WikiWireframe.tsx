@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ChevronRight, FileText, Folder } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -209,6 +209,65 @@ function WikiDocumentPane({
   return <WikiDocumentReader document={selected} onEdit={onStartEdit} />;
 }
 
+function WikiWireframeHeader({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
+  return (
+    <header className="flex shrink-0 items-end justify-between gap-4 border-b border-border bg-background px-8 py-6">
+      <div className="min-w-0">
+        <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
+          Wiki
+        </Heading>
+        <p className={cn("mt-1", factoryPageSubtitleClassName)}>
+          Shared product context — intent, architecture, and delivery notes for people and Planner.
+        </p>
+      </div>
+      <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={refreshing} onClick={onRefresh}>
+        {refreshing ? "Refreshing…" : "Refresh knowledge"}
+      </Button>
+    </header>
+  );
+}
+
+function WikiTreeAside({
+  documents,
+  tree,
+  selectedId,
+  expanded,
+  onToggle,
+  onSelect,
+}: {
+  documents: WikiDocument[];
+  tree: WikiTreeNode[];
+  selectedId: string | null;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <aside className="flex w-[240px] shrink-0 flex-col border-r border-border bg-muted/40">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+        {documents.length === 0 ? (
+          <p className="px-2 text-[13px] text-muted-foreground">No documents yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {tree.map((node) => (
+              <TreeNode
+                key={node.kind === "folder" ? `folder:${node.name}` : node.document.id}
+                node={node}
+                depth={0}
+                path={node.name}
+                selectedId={selectedId}
+                expanded={expanded}
+                onToggle={onToggle}
+                onSelect={onSelect}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 /**
  * Storybook-only wiki wireframe (v3 parity). Not mounted on the app `/wiki` route.
  * Mock corpora must be passed from stories — this component holds no sample documents.
@@ -221,21 +280,25 @@ export function WikiWireframe({
   const initialSelected = initialDocuments[0] ?? null;
   const [documents, setDocuments] = useState<WikiDocument[]>(initialDocuments);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelected?.id ?? null);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [treeReady, setTreeReady] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(wikiFolderPaths(buildWikiTree(initialDocuments))),
+  );
   const [editing, setEditing] = useState(startEditing);
   const [draftTitle, setDraftTitle] = useState(initialSelected?.title ?? "");
   const [draftContent, setDraftContent] = useState(initialSelected?.content ?? "");
   const [refreshing, setRefreshing] = useState(false);
+  const refreshTimeoutRef = useRef<number | null>(null);
 
   const tree = useMemo(() => buildWikiTree(documents), [documents]);
   const selected = documents.find((doc) => doc.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (treeReady || tree.length === 0) return;
-    setExpanded(new Set(wikiFolderPaths(tree)));
-    setTreeReady(true);
-  }, [tree, treeReady]);
+    return () => {
+      if (refreshTimeoutRef.current !== null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!selected) {
@@ -248,94 +311,41 @@ export function WikiWireframe({
     if (!startEditing) setEditing(false);
   }, [selected, startEditing]);
 
-  function toggleFolder(path: string) {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }
-
-  function saveEdit() {
-    if (!selected) return;
-    setDocuments((current) =>
-      current.map((doc) =>
-        doc.id === selected.id ? { ...doc, title: draftTitle.trim() || doc.title, content: draftContent } : doc,
-      ),
-    );
-    setEditing(false);
-  }
-
-  function cancelEdit() {
-    if (!selected) {
-      setEditing(false);
-      return;
-    }
-    setDraftTitle(selected.title);
-    setDraftContent(selected.content);
-    setEditing(false);
-  }
-
-  function refreshKnowledge() {
-    if (refreshing) return;
-    setRefreshing(true);
-    window.setTimeout(() => {
-      setDocuments(refreshedDocuments);
-      setSelectedId(refreshedDocuments[0]?.id ?? null);
-      setExpanded(new Set());
-      setTreeReady(false);
-      setEditing(false);
-      setRefreshing(false);
-    }, 800);
-  }
-
   return (
     <div className="flex h-screen min-h-0 flex-col" data-testid="wiki-wireframe">
-      <header className="flex shrink-0 items-end justify-between gap-4 border-b border-border bg-background px-8 py-6">
-        <div className="min-w-0">
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Wiki
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Shared product context — intent, architecture, and delivery notes for people and Planner.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          disabled={refreshing}
-          onClick={refreshKnowledge}
-        >
-          {refreshing ? "Refreshing…" : "Refresh knowledge"}
-        </Button>
-      </header>
+      <WikiWireframeHeader
+        refreshing={refreshing}
+        onRefresh={() => {
+          if (refreshing) return;
+          setRefreshing(true);
+          refreshTimeoutRef.current = window.setTimeout(() => {
+            refreshTimeoutRef.current = null;
+            const nextTree = buildWikiTree(refreshedDocuments);
+            setDocuments(refreshedDocuments);
+            setSelectedId(refreshedDocuments[0]?.id ?? null);
+            setExpanded(new Set(wikiFolderPaths(nextTree)));
+            setEditing(false);
+            setRefreshing(false);
+          }, 800);
+        }}
+      />
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[240px] shrink-0 flex-col border-r border-border bg-muted/40">
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-            {documents.length === 0 ? (
-              <p className="px-2 text-[13px] text-muted-foreground">No documents yet.</p>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {tree.map((node) => (
-                  <TreeNode
-                    key={node.kind === "folder" ? `folder:${node.name}` : node.document.id}
-                    node={node}
-                    depth={0}
-                    path={node.name}
-                    selectedId={selectedId}
-                    expanded={expanded}
-                    onToggle={toggleFolder}
-                    onSelect={setSelectedId}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
-        </aside>
+        <WikiTreeAside
+          documents={documents}
+          tree={tree}
+          selectedId={selectedId}
+          expanded={expanded}
+          onToggle={(path) => {
+            setExpanded((current) => {
+              const next = new Set(current);
+              if (next.has(path)) next.delete(path);
+              else next.add(path);
+              return next;
+            });
+          }}
+          onSelect={setSelectedId}
+        />
 
         <section className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
           <WikiDocumentPane
@@ -345,8 +355,24 @@ export function WikiWireframe({
             draftContent={draftContent}
             onDraftTitleChange={setDraftTitle}
             onDraftContentChange={setDraftContent}
-            onCancelEdit={cancelEdit}
-            onSaveEdit={saveEdit}
+            onCancelEdit={() => {
+              if (selected) {
+                setDraftTitle(selected.title);
+                setDraftContent(selected.content);
+              }
+              setEditing(false);
+            }}
+            onSaveEdit={() => {
+              if (!selected) return;
+              setDocuments((current) =>
+                current.map((doc) =>
+                  doc.id === selected.id
+                    ? { ...doc, title: draftTitle.trim() || doc.title, content: draftContent }
+                    : doc,
+                ),
+              );
+              setEditing(false);
+            }}
             onStartEdit={() => setEditing(true)}
           />
         </section>

@@ -60,9 +60,7 @@ export function buildWikiTree(documents: WikiDocument[]): WikiTreeNode[] {
   function freeze(nodes: Map<string, MutableNode>): WikiTreeNode[] {
     return Array.from(nodes.values())
       .map((node) =>
-        node.kind === "folder"
-          ? { kind: "folder" as const, name: node.name, children: freeze(node.children) }
-          : node,
+        node.kind === "folder" ? { kind: "folder" as const, name: node.name, children: freeze(node.children) } : node,
       )
       .sort(compareNodes);
   }
