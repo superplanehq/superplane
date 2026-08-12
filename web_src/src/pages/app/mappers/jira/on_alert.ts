@@ -6,93 +6,87 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { JiraIssue, JiraIssueFields, JiraProject, JiraUser } from "./types";
+import type { JiraOpsTeam } from "./types";
 
-interface OnIssueEventData {
-  action?: string;
-  issue?: JiraIssue;
-  user?: JiraUser;
+interface JiraAlert {
+  alertId?: string;
+  tinyId?: string;
+  message?: string;
+  priority?: string;
+  tags?: string[];
+  source?: string;
 }
 
-interface OnIssueConfiguration {
-  project?: string;
+interface OnAlertEventData {
+  action?: string;
+  alert?: JiraAlert;
+}
+
+interface OnAlertConfiguration {
+  team?: string;
   events?: string[];
 }
 
-interface OnIssueNodeMetadata {
-  project?: JiraProject;
+interface OnAlertNodeMetadata {
+  team?: JiraOpsTeam;
 }
 
 const ACTION_LABELS: Record<string, string> = {
   created: "Created",
-  updated: "Updated",
+  acknowledged: "Acknowledged",
+  closed: "Closed",
   deleted: "Deleted",
 };
 
-// actionLabel and issueFieldValues are shared with on_incident.ts - an incident is just an issue
-// on an incident-practice request type, so both triggers emit the same event shape.
-export function actionLabel(action?: string): string {
+function actionLabel(action?: string): string {
   if (!action) return "";
   return ACTION_LABELS[action] ?? action;
 }
 
-function issueTitle(issue?: JiraIssue): string {
-  if (!issue) return "Issue event";
-  const summary = issue.fields?.summary;
-  return summary ? `${issue.key} - ${summary}` : issue.key || "Issue event";
-}
-
-export function issueFieldValues(fields?: JiraIssueFields): Record<string, string> {
-  return {
-    Summary: stringOrDash(fields?.summary),
-    Status: stringOrDash(fields?.status?.name),
-    Priority: stringOrDash(fields?.priority?.name),
-    "Issue Type": stringOrDash(fields?.issuetype?.name),
-    Assignee: stringOrDash(fields?.assignee?.displayName),
-    Reporter: stringOrDash(fields?.reporter?.displayName),
-  };
+function alertTitle(alert?: JiraAlert): string {
+  if (!alert) return "Alert event";
+  const id = alert.tinyId ? `#${alert.tinyId}` : alert.alertId;
+  return alert.message && id ? `${id} - ${alert.message}` : alert.message || id || "Alert event";
 }
 
 /**
- * Renderer for the "jira.onIssue" trigger.
+ * Renderer for the "jira.onAlert" trigger.
  */
-export const onIssueTriggerRenderer: TriggerRenderer = {
+export const onAlertTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
-    const data = context.event?.data as OnIssueEventData | undefined;
+    const data = context.event?.data as OnAlertEventData | undefined;
     const label = actionLabel(data?.action);
     const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return {
-      title: issueTitle(data?.issue),
+      title: alertTitle(data?.alert),
       subtitle: label && timeAgo ? `${label} - ${timeAgo}` : label || timeAgo,
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const data = (context.event?.data ?? {}) as OnIssueEventData;
-    const issue = data.issue;
+    const data = (context.event?.data ?? {}) as OnAlertEventData;
+    const alert = data.alert;
     const receivedAt = context.event?.createdAt ? formatTimestampInUserTimezone(context.event.createdAt) : "-";
 
     return {
       "Received At": receivedAt,
       Action: stringOrDash(actionLabel(data.action)),
-      Key: stringOrDash(issue?.key),
-      ...issueFieldValues(issue?.fields),
+      Message: stringOrDash(alert?.message),
+      Priority: stringOrDash(alert?.priority),
+      Source: stringOrDash(alert?.source),
+      Tags: stringOrDash(alert?.tags?.join(", ")),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as OnIssueNodeMetadata | undefined;
-    const configuration = node.configuration as OnIssueConfiguration | undefined;
+    const metadata = node.metadata as OnAlertNodeMetadata | undefined;
+    const configuration = node.configuration as OnAlertConfiguration | undefined;
     const metadataItems: MetadataItem[] = [];
 
-    const projectLabel = metadata?.project
-      ? `${metadata.project.name} (${metadata.project.key})`
-      : configuration?.project;
-    if (projectLabel) {
-      metadataItems.push({ icon: "folder", label: projectLabel });
-    }
+    const teamLabel = metadata?.team?.teamName || configuration?.team;
+    metadataItems.push({ icon: "users", label: teamLabel || "All teams" });
 
     if (configuration?.events?.length) {
       metadataItems.push({
@@ -109,7 +103,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onIssueTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const { title, subtitle } = onAlertTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
