@@ -10,7 +10,7 @@ import {
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
 import { ArrowRightLeft, Check, Factory as FactoryIcon, Plus, Settings } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { factoryDetailPath, factorySettingsPath } from "../lib/factoryPagePaths";
 
 interface WorkspaceSwitcherProps {

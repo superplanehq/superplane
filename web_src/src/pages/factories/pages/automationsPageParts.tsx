@@ -7,7 +7,7 @@ import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Plus, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import {
   listFactoryAutomationRuns,
   resolveFactoryAutomationStatus,

@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { canvasesListCanvasRepositoryFiles } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { toTestId } from "@/lib/testID";
 import type { FieldRendererProps } from "./types";
 

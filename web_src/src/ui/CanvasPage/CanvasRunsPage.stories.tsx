@@ -4,7 +4,7 @@ import { Background, ReactFlow, ReactFlowProvider, type Edge, type Node } from "
 import "@xyflow/react/dist/style.css";
 import { CheckCircle2, CircleDashed, XCircle } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";

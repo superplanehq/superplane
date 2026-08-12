@@ -3,7 +3,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { parseGitHubRepoParam } from "@/lib/githubRepo";
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { InstallErrorView } from "./InstallErrorView";
 import { InstallLoadingView } from "./InstallLoadingView";
 import { InstallShell } from "./InstallShell";

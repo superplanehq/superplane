@@ -15,7 +15,7 @@ vi.mock("posthog-js", () => ({
   default: { init, identify, capture, reset, people: { set_once: setOnce } },
 }));
 
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useNavigate: () => vi.fn(),
 }));

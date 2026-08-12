@@ -17,7 +17,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 
 interface LegacyIntegrationDetailsProps {

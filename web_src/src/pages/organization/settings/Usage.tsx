@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { Activity, Bot, Gauge, Timer, type LucideIcon } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
