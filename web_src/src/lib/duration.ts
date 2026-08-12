@@ -66,6 +66,23 @@ export function formatDuration(durationMs: number): string {
   return formatDurationFallback(duration);
 }
 
+/**
+ * Formats a duration with whole-second precision (no milliseconds), for
+ * contexts like the work order timeline where sub-second precision is noise.
+ *
+ * - Non-positive or non-finite durations render as `""`.
+ * - Durations under one second render as `"< 1s"`.
+ * - Otherwise, the duration is rounded to the nearest second and formatted
+ *   using the same days/hours/minutes/seconds rendering as `formatDuration`.
+ */
+export function formatDurationSeconds(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
+  if (durationMs < 1000) return "< 1s";
+
+  const totalSeconds = Math.round(durationMs / 1000);
+  return formatDuration(totalSeconds * 1000);
+}
+
 export function formatMinutesSecondsDuration(durationMs: number): string {
   if (durationMs <= 0) return "";
   if (durationMs < 1000) return "<1s";

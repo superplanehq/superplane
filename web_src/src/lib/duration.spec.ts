@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
+import { formatDuration, formatDurationSeconds, formatMinutesSecondsDuration } from "@/lib/duration";
 
 describe("duration", () => {
   afterEach(() => {
@@ -63,5 +63,36 @@ describe("duration", () => {
     expect(formatMinutesSecondsDuration(51_988)).toBe("51s");
     expect(formatMinutesSecondsDuration(61_500)).toBe("1m 1s");
     expect(formatMinutesSecondsDuration(5_400_000)).toBe("90m");
+  });
+});
+
+describe("formatDurationSeconds", () => {
+  it("returns an empty string for zero, negative, or non-finite durations", () => {
+    expect(formatDurationSeconds(0)).toBe("");
+    expect(formatDurationSeconds(-500)).toBe("");
+    expect(formatDurationSeconds(NaN)).toBe("");
+    expect(formatDurationSeconds(Infinity)).toBe("");
+  });
+
+  it("renders sub-second durations as '< 1s'", () => {
+    expect(formatDurationSeconds(1)).toBe("< 1s");
+    expect(formatDurationSeconds(482)).toBe("< 1s");
+    expect(formatDurationSeconds(999)).toBe("< 1s");
+  });
+
+  it("rounds to the nearest whole second and never renders milliseconds", () => {
+    expect(formatDurationSeconds(1_000)).toBe("1s");
+    expect(formatDurationSeconds(1_499)).toBe("1s");
+    expect(formatDurationSeconds(61_500)).toBe("1m 2s");
+    expect(formatDurationSeconds(16_482)).toBe("16s");
+  });
+
+  it("formats minute and hour durations without milliseconds", () => {
+    expect(formatDurationSeconds(125_000)).toBe("2m 5s");
+    expect(formatDurationSeconds(5_400_000)).toBe("1h 30m");
+  });
+
+  it("rolls over into days for multi-day durations", () => {
+    expect(formatDurationSeconds(90_000_000)).toBe("1d 1h");
   });
 });
