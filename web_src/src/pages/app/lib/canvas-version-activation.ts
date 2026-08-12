@@ -188,14 +188,18 @@ export function activateCanvasVersionForEditing({
   setLastSavedWorkflowSnapshot(null);
 
   setSearchParams((current) => {
-    const next = new URLSearchParams(current);
+    const next = clearRunInspectionSearchParams(new URLSearchParams(current));
     next.delete("branch");
     if (isCurrentLive) {
       next.delete("version");
     } else {
       next.set("version", versionID);
     }
-    return clearRunInspectionSearchParams(next);
+    // Same query string → keep current instance so React Router skips a no-op navigation.
+    if (next.toString() === current.toString()) {
+      return current;
+    }
+    return next;
   });
 
   if (!preserveStagedLayer) {
