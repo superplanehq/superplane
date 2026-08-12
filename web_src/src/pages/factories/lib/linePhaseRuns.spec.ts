@@ -12,8 +12,12 @@ function order(id: string, title: string, executions: FactoriesWorkOrder["execut
   return { id, title, state: "STATE_OPEN", executions };
 }
 
+function workOrderIds(board: ReturnType<typeof buildLinePhaseBoard>): string[] {
+  return board.flatMap((column) => column.runs.map((run) => run.workOrderId));
+}
+
 describe("buildLinePhaseBoard", () => {
-  it("returns one column per step with all runs newest first", () => {
+  it("returns one column per step with current-step cards newest first", () => {
     const orders: FactoriesWorkOrder[] = [
       order("wo-a", "Alpha", [
         {
@@ -79,6 +83,88 @@ describe("buildLinePhaseBoard", () => {
     expect(board[1].runs).toEqual([]);
     expect(board[1].tick).toBeNull();
     expect(board[2].runs).toEqual([]);
+    expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
+  });
+
+  it("places a multi-step work order only in its furthest active step", () => {
+    const orders = [
+      order("wo-progress", "Progressing", [
+        {
+          id: "e-plan",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T10:00:00.000Z",
+          updatedAt: "2026-08-11T10:00:00.000Z",
+        },
+        {
+          id: "e-build",
+          line: { id: "line-1", name: "poc" },
+          step: "build",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T11:00:00.000Z",
+          updatedAt: "2026-08-11T11:00:00.000Z",
+        },
+        {
+          id: "e-demo",
+          line: { id: "line-1", name: "poc" },
+          step: "demo",
+          state: "STATE_STARTED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:30:00.000Z",
+        },
+      ]),
+    ];
+
+    const board = buildLinePhaseBoard(LINE, orders);
+
+    expect(board[0].runs).toEqual([]);
+    expect(board[1].runs).toEqual([]);
+    expect(board[2].runs).toHaveLength(1);
+    expect(board[2].runs[0]).toMatchObject({
+      workOrderId: "wo-progress",
+      title: "Progressing",
+      executionId: "e-demo",
+    });
+    expect(board[2].tick).toBe("running");
+    expect(workOrderIds(board)).toEqual(["wo-progress"]);
+  });
+
+  it("places a failed mid-line work order only on the failed step", () => {
+    const orders = [
+      order("wo-fail", "Failing", [
+        {
+          id: "e-plan",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T09:00:00.000Z",
+          updatedAt: "2026-08-11T09:00:00.000Z",
+        },
+        {
+          id: "e-fail",
+          line: { id: "line-1", name: "poc" },
+          step: "build",
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: "2026-08-11T10:00:00.000Z",
+          updatedAt: "2026-08-11T10:00:00.000Z",
+        },
+      ]),
+    ];
+
+    const board = buildLinePhaseBoard(LINE, orders);
+
+    expect(board[0].runs).toEqual([]);
+    expect(board[1].runs).toHaveLength(1);
+    expect(board[1].runs[0]).toMatchObject({ workOrderId: "wo-fail", executionId: "e-fail" });
+    expect(resolvePhaseRunStatus(board[1].runs[0].execution)).toEqual({ kind: "failed", label: "Failed" });
+    expect(board[1].tick).toBeNull();
+    expect(board[2].runs).toEqual([]);
+    expect(workOrderIds(board)).toEqual(["wo-fail"]);
   });
 
   it("includes the step app id for configure navigation", () => {
