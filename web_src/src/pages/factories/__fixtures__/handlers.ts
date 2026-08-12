@@ -160,7 +160,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     result: "RESULT_UNSPECIFIED",
     createdAt: nowIso,
     updatedAt: nowIso,
-    createdBy: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name },
+    createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
     executions: [],
   };
