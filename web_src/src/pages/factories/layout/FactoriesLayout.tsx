@@ -103,8 +103,10 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     return <FactoriesLayoutLoading />;
   }
 
-  // Storybook onboarding: hide the product shell until setup finishes.
-  const hideSidebar = Boolean(storybookOnboarding?.pending);
+  // Storybook onboarding: hide the product shell only on the pending workspace.
+  const hideSidebar = Boolean(
+    storybookOnboarding?.pending?.workspaceId && storybookOnboarding.pending.workspaceId === factoryId,
+  );
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>

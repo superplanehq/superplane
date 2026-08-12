@@ -4,8 +4,8 @@ import { factoryOnboardingPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
- * Storybook-only: while onboarding is pending, keep the user on the setup route.
- * The factories sidebar is hidden until setup finishes.
+ * Storybook-only: while setup is pending for the current workspace, keep the
+ * user on that workspace's setup route. Other workspaces stay browsable.
  */
 export function OnboardingGate() {
   const onboarding = useOnboardingStorybook();
@@ -13,7 +13,7 @@ export function OnboardingGate() {
   const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
 
   const pending = onboarding?.pending;
-  if (!pending) {
+  if (!pending || pending.workspaceId !== factoryId) {
     return <Outlet />;
   }
 
@@ -21,6 +21,5 @@ export function OnboardingGate() {
     return <Outlet />;
   }
 
-  const onboardingPath = factoryOnboardingPath(organizationId, pending.workspaceId || factoryId);
-  return <Navigate to={onboardingPath} replace />;
+  return <Navigate to={factoryOnboardingPath(organizationId, pending.workspaceId)} replace />;
 }
