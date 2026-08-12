@@ -21,6 +21,9 @@ import {
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
+
+const composerFooter = <WorkOrderCommentComposer canComment isSubmitting={false} onSubmit={async () => undefined} />;
 
 /**
  * Vertical timeline of the work order lifecycle: `created` marker, dispatch
@@ -127,6 +130,7 @@ export const Loading: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: OPEN_WORK_ORDER,
     isLoading: true,
+    footer: composerFooter,
   },
 };
 
@@ -136,5 +140,6 @@ export const ErrorState: Story = {
     order: OPEN_WORK_ORDER,
     eventsError: new Error("Failed to load activity"),
     onRetryEvents: () => undefined,
+    footer: composerFooter,
   },
 };

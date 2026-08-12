@@ -74,8 +74,8 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        "@/canvas": path.resolve(__dirname, "src/pages/canvas"),
-        "@": path.resolve(__dirname, "src"),
+        "@/canvas": path.resolve(import.meta.dirname, "src/pages/canvas"),
+        "@": path.resolve(import.meta.dirname, "src"),
       },
     },
     build: {

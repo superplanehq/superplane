@@ -34,9 +34,13 @@ type FactoryWorkOrderExecution struct {
 	RunID          uuid.UUID
 	Status         string
 	Result         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	FinishedAt     *time.Time
+	// Aggregate usage populated by runners. Both default to zero; the API
+	// only surfaces non-zero values to the UI.
+	TotalTokens int64
+	CostCents   int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	FinishedAt  *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
@@ -142,6 +146,9 @@ type FactoryWorkOrderExecutionRecord struct {
 	CanvasName string
 	RunState   string
 	RunResult  string
+	// Steps snapshot the containing line's step definitions so the UI can
+	// render the Intake -> Implement -> Verify sequence without a separate lookup.
+	LineSteps datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
 }
 
 func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
@@ -159,6 +166,7 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 		Select(`
 			e.*,
 			l.name AS line_name,
+			l.steps AS line_steps,
 			c.id AS canvas_id,
 			c.name AS canvas_name,
 			r.state AS run_state,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";

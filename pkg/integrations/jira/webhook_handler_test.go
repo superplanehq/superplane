@@ -17,13 +17,41 @@ import (
 func Test__WebhookHandler__CompareConfig(t *testing.T) {
 	handler := &JiraWebhookHandler{}
 
-	t.Run("always matches, even with different events - Jira allows only one registered URL per connection", func(t *testing.T) {
+	t.Run("issue/comment webhooks always match, even with different events - Jira allows only one registered URL per connection", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
 			WebhookConfiguration{Events: []string{issueEventCreated}},
 			WebhookConfiguration{Events: []string{commentEventCreated}},
 		)
 		require.NoError(t, err)
 		assert.True(t, equal)
+	})
+
+	// Regression test: publishing an unchanged jira.onAlert trigger must not tear down and
+	// recreate its JSM Ops integration on every commit - alert webhooks with the same team
+	// dedup onto one registration, just like the shared issue/comment webhook (BUGBOT_BUG_ID
+	// b743aa09).
+	t.Run("alert webhooks with the same team match", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+		)
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
+
+	t.Run("alert webhooks for different teams never match", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+			WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-2"},
+		)
+		require.NoError(t, err)
+		assert.False(t, equal)
+	})
+
+	t.Run("an alert webhook never matches an issue/comment webhook", func(t *testing.T) {
+		equal, err := handler.CompareConfig(WebhookConfiguration{Kind: webhookKindAlert}, WebhookConfiguration{})
+		require.NoError(t, err)
+		assert.False(t, equal)
 	})
 }
 
@@ -295,6 +323,100 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		storedMetadata := Metadata{}
 		require.NoError(t, mapstructure.Decode(integration.Metadata, &storedMetadata))
 		assert.Nil(t, storedMetadata.WebhookID)
+	})
+}
+
+func Test__WebhookHandler__Setup__AlertWebhook(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("creates a dedicated JSM Ops integration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"int-1"}`))},
+			},
+		}
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				ID:            "node-1",
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Kind: webhookKindAlert, TeamID: "team-1"},
+			},
+		})
+		require.NoError(t, err)
+
+		alertMetadata, ok := metadata.(*AlertWebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "int-1", alertMetadata.IntegrationID)
+
+		require.Len(t, httpCtx.Requests, 1)
+		req := httpCtx.Requests[0]
+		assert.Contains(t, req.URL.String(), "/jsm/ops/api/"+testCloudID+"/v1/integrations")
+		body, _ := io.ReadAll(req.Body)
+		assert.Contains(t, string(body), `"url":"https://sp.test/webhooks/w1"`)
+		assert.Contains(t, string(body), `"teamId":"team-1"`)
+		assert.Contains(t, string(body), "node-1")
+	})
+
+	t.Run("create failure is surfaced", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"message":"requires a Premium or Enterprise plan"}`))},
+			},
+		}
+
+		_, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/webhooks/w1",
+				Configuration: WebhookConfiguration{Kind: webhookKindAlert},
+			},
+		})
+		require.ErrorContains(t, err, "Premium or Enterprise plan")
+	})
+}
+
+func Test__WebhookHandler__Cleanup__AlertWebhook(t *testing.T) {
+	handler := &JiraWebhookHandler{}
+
+	t.Run("deletes the registered integration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      AlertWebhookMetadata{IntegrationID: "int-1"},
+				Configuration: WebhookConfiguration{Kind: webhookKindAlert},
+			},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "int-1")
+	})
+
+	t.Run("no-op when Setup never completed", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: newAuthorizedIntegration(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      AlertWebhookMetadata{},
+				Configuration: WebhookConfiguration{Kind: webhookKindAlert},
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.Requests)
 	})
 }
 

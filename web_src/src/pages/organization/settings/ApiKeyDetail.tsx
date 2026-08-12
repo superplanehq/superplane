@@ -14,7 +14,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAPIKey, useUpdateAPIKey, useDeleteAPIKey, useRegenerateAPIKeyToken } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";

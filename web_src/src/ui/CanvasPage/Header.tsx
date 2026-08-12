@@ -5,7 +5,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Link } from "@/components/Link/link";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { ChevronLeft } from "lucide-react";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";

@@ -136,7 +136,7 @@ Example:
 func newOrdersCommand(options core.BindOptions) *cobra.Command {
 	ordersCmd := &cobra.Command{
 		Use:     "orders",
-		Short:   "List and inspect work orders",
+		Short:   "Create, inspect, and manage work orders",
 		Aliases: []string{"order"},
 	}
 
@@ -210,8 +210,118 @@ Example:
 		orderID: &orderDescribeOrderID,
 	}, options)
 
+	var (
+		orderCreateFactory     string
+		orderCreateTitle       string
+		orderCreateDescription string
+		orderCreateFile        string
+		orderCreateAssignees   []string
+	)
+
+	orderCreateCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a work order",
+		Long: `Create a work order in draft state.
+
+--factory is a factory name or UUID. When omitted, the active factory
+from "superplane factory active" is used. --title is required.
+--description sets the description inline; -f/--file reads it from a
+file (or - for stdin) instead; the two are mutually exclusive.
+
+--assignee accepts a user UUID or email and is repeatable. When omitted,
+the work order is assigned to the user running the command.
+
+Examples:
+  superplane factory orders create --title "Ship the feature" --description "..."
+
+  superplane factory orders create \
+    --title "Ship the feature" \
+    -f ./description.md \
+    --assignee alice@example.com \
+    --assignee bob@example.com`,
+		Args: cobra.NoArgs,
+	}
+	orderCreateCmd.Flags().StringVar(&orderCreateFactory, "factory", "", "factory name or UUID (default: active factory)")
+	orderCreateCmd.Flags().StringVar(&orderCreateTitle, "title", "", "work order title (required)")
+	orderCreateCmd.Flags().StringVar(&orderCreateDescription, "description", "", "work order description (inline)")
+	orderCreateCmd.Flags().StringVarP(&orderCreateFile, "file", "f", "", "read description from file (or - for stdin)")
+	orderCreateCmd.Flags().StringArrayVar(&orderCreateAssignees, "assignee", nil, "assignee user UUID or email (repeatable); defaults to the current user when omitted")
+	core.Bind(orderCreateCmd, &orderCreateCommand{
+		factory:     &orderCreateFactory,
+		title:       &orderCreateTitle,
+		description: &orderCreateDescription,
+		file:        &orderCreateFile,
+		assignees:   &orderCreateAssignees,
+	}, options)
+
+	var (
+		orderDispatchFactory string
+		orderDispatchOrderID string
+		orderDispatchLine    string
+	)
+
+	orderDispatchCmd := &cobra.Command{
+		Use:   "dispatch",
+		Short: "Dispatch a work order to a factory line",
+		Long: `Dispatch a work order to a factory line, starting its execution.
+
+--factory is a factory name or UUID. When omitted, the active factory
+from "superplane factory active" is used. --order is the work order UUID
+(--order-id is accepted as an alias). --line is the target factory line's
+name.
+
+A draft work order moves to the open state on its first dispatch.
+
+Example:
+  superplane factory orders dispatch --order "$OID" --line build`,
+		Args: cobra.NoArgs,
+	}
+	orderDispatchCmd.Flags().StringVar(&orderDispatchFactory, "factory", "", "factory name or UUID (default: active factory)")
+	bindOrderIDFlag(orderDispatchCmd, &orderDispatchOrderID)
+	orderDispatchCmd.Flags().StringVar(&orderDispatchLine, "line", "", "factory line name (required)")
+	core.Bind(orderDispatchCmd, &orderDispatchCommand{
+		factory: &orderDispatchFactory,
+		orderID: &orderDispatchOrderID,
+		line:    &orderDispatchLine,
+	}, options)
+
+	var (
+		orderAssignFactory   string
+		orderAssignOrderID   string
+		orderAssignAssignees []string
+	)
+
+	orderAssignCmd := &cobra.Command{
+		Use:   "assign",
+		Short: "Set a work order's assignees",
+		Long: `Set a work order's assignees.
+
+--factory is a factory name or UUID. When omitted, the active factory
+from "superplane factory active" is used. --order is the work order UUID
+(--order-id is accepted as an alias).
+
+--assignee accepts a user UUID or email and is repeatable; at least one is
+required. This command replaces the entire assignee list with the ones
+given — it does not add to the existing list.
+
+Example:
+  superplane factory orders assign --order "$OID" --assignee alice@example.com --assignee bob@example.com`,
+		Args: cobra.NoArgs,
+	}
+	orderAssignCmd.Flags().StringVar(&orderAssignFactory, "factory", "", "factory name or UUID (default: active factory)")
+	bindOrderIDFlag(orderAssignCmd, &orderAssignOrderID)
+	orderAssignCmd.Flags().StringArrayVar(&orderAssignAssignees, "assignee", nil, "assignee user UUID or email (repeatable, required); replaces the full assignee list")
+	core.Bind(orderAssignCmd, &orderAssignCommand{
+		factory:   &orderAssignFactory,
+		orderID:   &orderAssignOrderID,
+		assignees: &orderAssignAssignees,
+	}, options)
+
 	ordersCmd.AddCommand(orderListCmd)
 	ordersCmd.AddCommand(orderDescribeCmd)
+	ordersCmd.AddCommand(orderCreateCmd)
+	ordersCmd.AddCommand(orderDispatchCmd)
+	ordersCmd.AddCommand(orderAssignCmd)
 
 	return ordersCmd
 }
