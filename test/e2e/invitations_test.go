@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -139,18 +138,16 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 }
 
 func (s *invitationSteps) openSignupForm() {
-	// Magic-code login is enabled in the e2e environment, so the login page
-	// first renders the magic-code form. Toggle to password login so the
-	// "Create an account" link becomes visible, then open the signup form.
-	//
-	// Use the session's auto-waiting Click (default 15s) instead of a short
-	// best-effort wait: the first navigation to /login makes the Vite dev
-	// server transform the whole app bundle on demand, which can take several
-	// seconds under CI load. A brief optional wait would skip the toggle
-	// click and leave the page on the magic-code view, so "Create an account"
-	// would never appear and the test would time out.
-	s.session.Click(q.Text("Sign in with password instead"))
-	s.session.Click(q.Text("Create an account"))
+	// With magic code enabled, toggle to password login first
+	// so the "Create an account" link becomes visible.
+	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
+	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
+		require.NoError(s.t, toggle.Click())
+	}
+
+	button := s.session.Page().Locator("text=Create an account").First()
+	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
+	require.NoError(s.t, button.Click())
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
