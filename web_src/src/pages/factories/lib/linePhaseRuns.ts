@@ -1,7 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
-export type LinePhaseTick = "running" | "waiting" | "queued" | null;
+export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 export type LinePhaseRunCard = {
   executionId: string;
@@ -51,7 +51,7 @@ export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: Fact
 }
 
 export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
-  kind: "running" | "waiting" | "queued" | "idle";
+  kind: "running" | "waiting" | "queued" | "failed" | "idle";
   label: string;
 } {
   if (execution.state === "STATE_STARTED") {
@@ -69,7 +69,7 @@ export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
       return { kind: "idle", label: "Passed" };
     }
     if (execution.result === "RESULT_FAILED") {
-      return { kind: "waiting", label: "Failed" };
+      return { kind: "failed", label: "Failed" };
     }
     if (execution.result === "RESULT_CANCELLED") {
       return { kind: "idle", label: "Cancelled" };
@@ -127,6 +127,7 @@ function resolvePhaseTick(runs: LinePhaseRunCard[]): LinePhaseTick {
 
   for (const run of runs) {
     const { kind } = resolvePhaseRunStatus(run.execution);
+    // Finished failed runs are row-level only — do not drive the phase aggregate.
     if (kind === "running") hasRunning = true;
     else if (kind === "waiting") hasWaiting = true;
     else if (kind === "queued") hasQueued = true;
