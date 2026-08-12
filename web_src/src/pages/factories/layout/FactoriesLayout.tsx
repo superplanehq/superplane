@@ -110,24 +110,29 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     return <FactoriesLayoutLoading />;
   }
 
+  // Storybook onboarding: hide the product shell until setup finishes.
+  const hideSidebar = Boolean(storybookOnboarding?.pending);
+
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        <FactoriesSidebar
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factory={factory}
-          factories={factories}
-          organizationName={organization?.metadata?.name ?? ""}
-          accountName={account?.name}
-          accountEmail={account?.email}
-          accountAvatarUrl={account?.avatar_url}
-          canOpenSettings={canAct("factories", "update")}
-          canCreateFactory={canAct("factories", "create") && !createFactory.isPending}
-          permissionsLoading={permissionsLoading}
-          recentWorkOrders={recentWorkOrders}
-          onCreateFactory={() => void handleCreateFactory()}
-        />
+        {hideSidebar ? null : (
+          <FactoriesSidebar
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factory={factory}
+            factories={factories}
+            organizationName={organization?.metadata?.name ?? ""}
+            accountName={account?.name}
+            accountEmail={account?.email}
+            accountAvatarUrl={account?.avatar_url}
+            canOpenSettings={canAct("factories", "update")}
+            canCreateFactory={canAct("factories", "create") && !createFactory.isPending}
+            permissionsLoading={permissionsLoading}
+            recentWorkOrders={recentWorkOrders}
+            onCreateFactory={() => void handleCreateFactory()}
+          />
+        )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>

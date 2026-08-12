@@ -10,8 +10,9 @@ import { ONBOARDING_AVAILABLE_REPOS } from "./onboarding/onboardingMocks";
 import { OnboardingWireframe } from "./onboarding/OnboardingWireframe";
 
 /**
- * Storybook-only workspace onboarding (progressive stack + setup.log).
- * Production create still navigates straight to overview.
+ * Storybook-only workspace onboarding (setup stack + setup.log).
+ * Sidebar stays hidden until setup finishes. Production create still
+ * navigates straight to overview.
  */
 const meta = {
   title: "Factories/Pages/Onboarding",
@@ -59,10 +60,11 @@ export const GettingStarted: Story = {
   ),
 };
 
+/** Pending setup redirects non-onboarding routes back to setup (no sidebar). */
 export const Gated: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`${factoryBase}/missions`}
+      pathSuffix={`${factoryBase}/overview`}
       factoriesFixture={defaultFactoriesFixture}
       onboardingSeed={pendingSeed}
     />
