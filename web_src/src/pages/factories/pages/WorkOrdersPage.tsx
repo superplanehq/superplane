@@ -57,10 +57,10 @@ export function WorkOrdersPage() {
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
   const factoryLines = factory?.lines ?? [];
 
-  const handleDispatch = async (orderId: string, lineName: string) => {
+  const handleDispatch = async (orderId: string, input: { lineName: string }) => {
     try {
-      await dispatchWorkOrder.mutateAsync({ orderId, lineName });
-      showSuccessToast(`Dispatched to ${lineName}.`);
+      await dispatchWorkOrder.mutateAsync({ orderId, ...input });
+      showSuccessToast(`Dispatched to ${input.lineName}.`);
     } catch {
       showErrorToast("Failed to dispatch work order.");
     }
@@ -131,7 +131,7 @@ export function WorkOrdersPage() {
                     lines={factoryLines}
                     canDispatch={canDispatch || permissionsLoading}
                     isDispatching={dispatchWorkOrder.isPending}
-                    onDispatch={(lineName) => handleDispatch(order.id!, lineName)}
+                    onDispatch={(input) => handleDispatch(order.id!, input)}
                   />
                 ))}
               </div>

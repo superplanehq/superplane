@@ -62,6 +62,15 @@ const MARKDOWN_CONTENT_CLASSES = cn(
   CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES,
   CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES,
 );
+
+const WORKSPACE_MARKDOWN_CONTENT_CLASSES = "workspace-markdown";
+
+const WORKSPACE_MARKDOWN_HEADING_CLASSES = {
+  h1: "workspace-markdown-heading workspace-markdown-heading-h1",
+  h2: "workspace-markdown-heading workspace-markdown-heading-h2",
+  h3: "workspace-markdown-heading workspace-markdown-heading-h3",
+  h4: "workspace-markdown-heading workspace-markdown-heading-h4",
+} as const;
 /**
  * Sanitize schema extending the rehype-sanitize defaults with `<details>` /
  * `<summary>` (plus the `open` attribute) so collapsible sections can be
@@ -85,6 +94,7 @@ const MARKDOWN_SANITIZE_SCHEMA = {
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  variant?: "default" | "workspace";
   canvasId?: string;
   organizationId?: string;
   "data-testid"?: string;
@@ -103,36 +113,40 @@ interface MarkdownContentProps {
 export function MarkdownContent({
   content,
   className,
+  variant = "default",
   canvasId,
   organizationId,
   "data-testid": dataTestId,
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
+  const contentClassName = variant === "workspace" ? WORKSPACE_MARKDOWN_CONTENT_CLASSES : MARKDOWN_CONTENT_CLASSES;
+  const headingClassName = (level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES) =>
+    variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
   return (
-    <div className={cn(MARKDOWN_CONTENT_CLASSES, className)} data-testid={dataTestId}>
+    <div className={cn(contentClassName, className)} data-testid={dataTestId}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
         urlTransform={(url) => (isSpecialMarkdownLink(url) ? url : defaultUrlTransform(url))}
         components={{
           h1: ({ children, ...props }) => (
-            <h1 className={markdownHeadingClassName("h1")} {...props}>
+            <h1 className={headingClassName("h1")} {...props}>
               {children}
             </h1>
           ),
           h2: ({ children, ...props }) => (
-            <h2 className={markdownHeadingClassName("h2")} {...props}>
+            <h2 className={headingClassName("h2")} {...props}>
               {children}
             </h2>
           ),
           h3: ({ children, ...props }) => (
-            <h3 className={markdownHeadingClassName("h3")} {...props}>
+            <h3 className={headingClassName("h3")} {...props}>
               {children}
             </h3>
           ),
           h4: ({ children, ...props }) => (
-            <h4 className={markdownHeadingClassName("h4")} {...props}>
+            <h4 className={headingClassName("h4")} {...props}>
               {children}
             </h4>
           ),
