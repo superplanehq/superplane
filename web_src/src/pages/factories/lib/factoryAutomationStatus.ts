@@ -63,7 +63,8 @@ export function resolveFactoryAutomationStatusFromCanvasRuns(runs: CanvasesCanva
 
   for (const run of runs) {
     const kind = classifyCanvasRunTick(run);
-    if (kind === "waiting" || kind === "failed") hasWaiting = true;
+    // Finished failed runs are not "Needs input" — only a true waiting signal.
+    if (kind === "waiting") hasWaiting = true;
     else if (kind === "running") hasRunning = true;
     else if (kind === "queued") hasQueued = true;
   }
@@ -160,9 +161,8 @@ function classifyWorkOrderExecution(execution: FactoriesWorkOrderExecution): Fac
   if (execution.state === "STATE_PENDING") {
     return "queued";
   }
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    return "waiting";
-  }
+  // Finished results (passed/failed/cancelled) do not drive the aggregate card —
+  // Idle when nothing is actively executing, queued, or waiting for input.
   return null;
 }
 

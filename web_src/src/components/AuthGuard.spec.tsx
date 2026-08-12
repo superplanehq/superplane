@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import AuthGuard from "@/components/AuthGuard";
 
