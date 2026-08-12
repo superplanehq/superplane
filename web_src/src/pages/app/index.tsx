@@ -407,6 +407,8 @@ export function AppPage({
     isMemoryMode: urlViewFlags.isMemoryMode,
   });
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
+  const draftCanvasSpecRef = useRef(draftCanvasSpec);
+  draftCanvasSpecRef.current = draftCanvasSpec;
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
   const {
     committedBaselinesForEdit,
@@ -3283,7 +3285,9 @@ export function AppPage({
         options,
         liveCanvasVersionId,
         queryClient,
-        draftCanvasSpec,
+        // Read latest draft via ref so this callback identity stays stable across
+        // Configure seeding (setDraftCanvasSpec) and does not re-trigger enter effects.
+        draftCanvasSpec: draftCanvasSpecRef.current,
         draftCanvasSpecsRef,
         activeCanvasVersionIdRef,
         lastAppliedVersionSnapshotRef,
@@ -3301,7 +3305,6 @@ export function AppPage({
       canvasId,
       liveCanvasVersionId,
       queryClient,
-      draftCanvasSpec,
       liveCanvasVersion,
       liveCanvas,
       clearPendingAutoSaveWork,
