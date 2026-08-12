@@ -31,9 +31,12 @@ func Test__AWS__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, integrationCtx.BrowserAction)
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "Create Identity Provider")
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "IAM Role")
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "aps:ListWorkspaces")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "Identity Providers → Add provider")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "IAM Role ARN")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "AmazonEventBridgeFullAccess")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "IAMFullAccess")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "AmazonEC2FullAccess")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "AmazonPrometheusFullAccess")
 	})
 
 	t.Run("role arn -> sets secrets, metadata, and schedules resync", func(t *testing.T) {
