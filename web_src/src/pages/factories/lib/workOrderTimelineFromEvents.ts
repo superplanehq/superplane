@@ -7,6 +7,8 @@ import type {
   WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
+  WorkOrderTimelineStep,
+  WorkOrderTimelineStepComment,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
 import {
@@ -60,9 +62,6 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
-  // LineStepExecutionPayload already exposes `run` + `app`; they are
-  // populated on `order.status.updated` when the transition is attributed
-  // to a canvas run (source-run enrichment or automation caller).
 }
 
 interface TimelineBuildState {
@@ -139,10 +138,10 @@ function applyApiEventToTimeline(
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
       return;
     case "order.comment.added":
-      appendCommentEvent(state.events, index, payload, at, resolveUserName);
+      appendCommentEvent(state, index, payload, at, resolveUserName);
       return;
     case "order.artifact.added":
-      appendArtifactEvent(state.events, index, payload, at, resolveUserName);
+      appendArtifactEvent(state, index, payload, at, resolveUserName);
   }
 }
 
@@ -174,10 +173,7 @@ function appendAssigneesUpdatedEvent(
   });
 }
 
-// `order.status.updated` is the sole authoritative lifecycle event. The
-// visual kind (`created` / `closed` / `statusChanged`) is derived from
-// `fromState` + `toState` so downstream renderers keep their per-kind
-// styling (badges, colors, action verbs) without needing coarse events.
+// Derive the visual lifecycle kind from the authoritative status transition.
 function appendStatusUpdatedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -253,7 +249,7 @@ function humanizeState(state: string): string {
 }
 
 function appendCommentEvent(
-  events: WorkOrderTimelineEvent[],
+  state: TimelineBuildState,
   index: number,
   payload: EventPayload,
   at: string,
@@ -266,7 +262,17 @@ function appendCommentEvent(
 
   const author = payload.author ?? {};
   const automationActor = toAutomationActor(author.automation);
-  events.push({
+  const stepComment: WorkOrderTimelineStepComment = {
+    body,
+    label: automationActor?.nodeName,
+  };
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.comments = [...(step.comments ?? []), stepComment];
+    return;
+  }
+
+  state.events.push({
     id: `comment-${index}`,
     kind: "commented",
     at,
@@ -283,7 +289,7 @@ function appendCommentEvent(
 }
 
 function appendArtifactEvent(
-  events: WorkOrderTimelineEvent[],
+  state: TimelineBuildState,
   index: number,
   payload: EventPayload,
   at: string,
@@ -294,24 +300,63 @@ function appendArtifactEvent(
     return;
   }
 
-  events.push({
+  const timelineArtifact = {
+    id: artifact.id,
+    type: artifact.type,
+    data: artifact.data,
+  };
+  const automationActor = toAutomationActor(payload.automation);
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.artifacts = [...(step.artifacts ?? []), timelineArtifact];
+    return;
+  }
+
+  state.events.push({
     id: `artifact-${index}`,
     kind: "artifactAdded",
     at,
     actorUserId: payload.user?.id,
     actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
-    actorAutomation: toAutomationActor(payload.automation),
-    artifact: {
-      id: artifact.id,
-      type: artifact.type,
-      data: artifact.data,
-    },
+    actorAutomation: automationActor,
+    artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
   });
 }
 
-// Short-form artifact label ("PR", "note") for event descriptions.
-// See timeline/authorLabels.ts for the long form used in bodies.
+function findAutomationStep(
+  state: TimelineBuildState,
+  actor: WorkOrderTimelineAutomationActor | undefined,
+): WorkOrderTimelineStep | undefined {
+  if (!actor) {
+    return undefined;
+  }
+
+  const dispatch = [...state.events]
+    .reverse()
+    .find(
+      (event) =>
+        event.kind === "dispatched" &&
+        ((actor.lineId && event.lineId === actor.lineId) || (actor.lineName && event.lineName === actor.lineName)),
+    );
+  if (!dispatch?.steps?.length) {
+    return undefined;
+  }
+
+  if (actor.stepName) {
+    const matchingName = [...dispatch.steps].reverse().find((step) => step.stepName === actor.stepName);
+    if (matchingName) {
+      return matchingName;
+    }
+  }
+
+  if (actor.stepIndex !== undefined) {
+    return dispatch.steps[actor.stepIndex];
+  }
+
+  return dispatch.steps.at(-1);
+}
+
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
   pr: "PR",
   markdown: "note",
@@ -332,9 +377,6 @@ function describeArtifactAdded(artifact: EventArtifactPayload): string {
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
 }
 
-// Close-result string (from `status.updated.toResult`) → proto enum the
-// presentation helpers expect. Kept centralized so `describeStatusTransition`
-// stays a pure formatter.
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
