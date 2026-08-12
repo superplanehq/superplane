@@ -112,6 +112,13 @@ func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
 		NodeName: node.Name,
 	}, refs[firstOrderID])
 	assert.Same(t, refs[firstOrderID], refs[secondOrderID])
+
+	require.NoError(t, canvas.SoftDeleteInTransaction(database.Conn()))
+	refs, err = ResolveFactoryWorkOrderCreatorAutomations(database.Conn(), []FactoryWorkOrder{
+		{ID: firstOrderID, SourceRunID: &run.ID},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, node.Name, refs[firstOrderID].NodeName)
 }
 
 func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {

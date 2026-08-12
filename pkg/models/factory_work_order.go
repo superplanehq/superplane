@@ -663,7 +663,6 @@ func loadCreatorAutomationNodes(
 
 	var nodes []CanvasNode
 	err := tx.
-		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
 		Where("workflow_nodes.workflow_id IN ?", canvasIDs).
 		Where("workflow_nodes.node_id IN ?", nodeIDs).
 		Find(&nodes).
