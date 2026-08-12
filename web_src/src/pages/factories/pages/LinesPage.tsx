@@ -3,6 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { formatTimeAgo } from "@/lib/date";
@@ -36,6 +37,10 @@ import {
   factoryPageSubtitleClassName,
   factoryPageTitleClassName,
 } from "./factoryPageLayoutStyles";
+import { LineVelocityPanel } from "./LineVelocityPanel";
+
+const lineDetailTabTriggerClass =
+  "rounded-none border-0 border-b-2 border-transparent bg-transparent px-0 pb-2.5 pt-0 text-[13px] text-muted-foreground shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-foreground dark:data-[state=active]:bg-transparent";
 
 export function LinesPage() {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
@@ -136,6 +141,7 @@ function LineDetail({
   const steps = line.steps ?? [];
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryId, line.id) : "#";
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
+  const stageNames = steps.map((step, index) => step.name?.trim() || `Phase ${index + 1}`);
 
   return (
     <div data-testid="lines-detail">
@@ -173,13 +179,28 @@ function LineDetail({
         {steps.length > 0 ? <PhaseStrip steps={steps} ticks={board.map((column) => column.tick)} /> : null}
       </section>
 
-      {steps.length === 0 ? (
-        <p className="mt-6 text-[13px] text-muted-foreground">
-          No phases yet. Edit this line to add app-driven phases.
-        </p>
-      ) : (
-        <PhaseBoard organizationId={organizationId} factoryId={factoryId} lineId={line.id} columns={board} />
-      )}
+      <Tabs defaultValue="velocity" className="mt-6 gap-0">
+        <TabsList className="h-auto w-fit justify-start gap-5 rounded-none border-b border-border bg-transparent p-0">
+          <TabsTrigger value="stages" className={lineDetailTabTriggerClass}>
+            Stages
+          </TabsTrigger>
+          <TabsTrigger value="velocity" className={lineDetailTabTriggerClass}>
+            Velocity
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="stages" className="mt-4 outline-none">
+          {steps.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">
+              No phases yet. Edit this line to add app-driven phases.
+            </p>
+          ) : (
+            <PhaseBoard organizationId={organizationId} factoryId={factoryId} lineId={line.id} columns={board} />
+          )}
+        </TabsContent>
+        <TabsContent value="velocity" className="mt-4 outline-none">
+          <LineVelocityPanel stageNames={stageNames} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
