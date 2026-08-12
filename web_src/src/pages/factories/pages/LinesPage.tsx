@@ -14,9 +14,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
+import { LineVelocityPanel } from "./LineVelocityPanel";
 import { WorkOrderCanvas } from "./WorkOrderCanvas";
+
+const lineDetailTabTriggerClass =
+  "rounded-none border-0 border-b-2 border-transparent bg-transparent px-0 pb-2.5 pt-0 text-[13px] text-muted-foreground shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-foreground dark:data-[state=active]:bg-transparent";
 
 type WorkOrderStatus = "running" | "queued" | "waiting";
 
@@ -541,7 +546,7 @@ function StageBoard({
   onDuplicatePhase: (phase: Phase) => void;
 }) {
   return (
-    <div className="mt-6 grid w-full gap-3" style={{ gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))` }}>
+    <div className="grid w-full gap-3" style={{ gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))` }}>
       {phases.map((phase) => (
         <section
           key={phase.id}
@@ -926,15 +931,30 @@ export function LinesPage({
             {...lineMenuProps(selectedLine)}
           />
           {!editing ? (
-            <StageBoard
-              phases={selectedLine.phases}
-              onWorkOrderClick={(phase, workOrder) => setOpenWorkOrder({ phase, workOrder })}
-              onEditPhase={configurePhase}
-              onRequestPausePhase={requestPausePhase}
-              onRequestResumePhase={requestResumePhase}
-              onDeletePhase={(phase) => deletePhase(phase.id)}
-              onDuplicatePhase={(phase) => duplicatePhase(phase.id)}
-            />
+            <Tabs defaultValue="velocity" className="mt-6 gap-0">
+              <TabsList className="h-auto w-fit justify-start gap-5 rounded-none border-b border-border bg-transparent p-0">
+                <TabsTrigger value="stages" className={lineDetailTabTriggerClass}>
+                  Stages
+                </TabsTrigger>
+                <TabsTrigger value="velocity" className={lineDetailTabTriggerClass}>
+                  Velocity
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="stages" className="mt-4 outline-none">
+                <StageBoard
+                  phases={selectedLine.phases}
+                  onWorkOrderClick={(phase, workOrder) => setOpenWorkOrder({ phase, workOrder })}
+                  onEditPhase={configurePhase}
+                  onRequestPausePhase={requestPausePhase}
+                  onRequestResumePhase={requestResumePhase}
+                  onDeletePhase={(phase) => deletePhase(phase.id)}
+                  onDuplicatePhase={(phase) => duplicatePhase(phase.id)}
+                />
+              </TabsContent>
+              <TabsContent value="velocity" className="mt-4 outline-none">
+                <LineVelocityPanel stageNames={selectedLine.phases.map((phase) => phase.name)} />
+              </TabsContent>
+            </Tabs>
           ) : null}
         </div>
       ) : (
