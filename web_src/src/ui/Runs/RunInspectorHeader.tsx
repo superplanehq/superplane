@@ -41,6 +41,8 @@ export function RunInspectorHeader({
   actionPending,
   actionDisabled,
   onAction,
+  /** Nested inside a node accordion (factory): drop sticky page chrome styles. */
+  embedded = false,
 }: {
   run: CanvasesCanvasRun;
   title: string;
@@ -49,6 +51,7 @@ export function RunInspectorHeader({
   actionPending: boolean;
   actionDisabled: boolean;
   onAction: () => void;
+  embedded?: boolean;
 }) {
   const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
   const resolvedOrganizationId = organizationId ?? routeOrganizationId;
@@ -65,7 +68,13 @@ export function RunInspectorHeader({
   const isStopAction = status === "running";
 
   return (
-    <div className="sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950">
+    <div
+      className={cn(
+        embedded
+          ? "rounded-md border border-slate-950/10 bg-white px-3 py-3 dark:border-gray-800 dark:bg-gray-950"
+          : "sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950",
+      )}
+    >
       <div className="flex flex-col gap-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <RunStatusBadge status={status} />

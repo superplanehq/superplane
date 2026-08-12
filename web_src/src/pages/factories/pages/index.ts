@@ -1,7 +1,9 @@
 export { AutomationsPage } from "./AutomationsPage";
 export { ComingSoonPage } from "./ComingSoonPage";
 export { CreateWorkOrderPage } from "./CreateWorkOrderPage";
+export { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 export { FactoryLineEditPage } from "./FactoryLineEditPage";
+export { LinesPage } from "./LinesPage";
 export { MissionsPage } from "./MissionsPage";
 export { OverviewPage } from "./OverviewPage";
 export { VelocityPage } from "./VelocityPage";

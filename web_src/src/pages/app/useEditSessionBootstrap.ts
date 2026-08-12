@@ -22,6 +22,7 @@ type UseEditSessionBootstrapOptions = {
   selectedCanvasVersion: CanvasesCanvasVersion | null;
   liveCanvasVersionId?: string;
   isRunInspectionMode: boolean;
+  includeConsoleBaseline?: boolean;
 };
 
 export function useEditSessionBootstrap({
@@ -38,6 +39,7 @@ export function useEditSessionBootstrap({
   selectedCanvasVersion,
   liveCanvasVersionId,
   isRunInspectionMode,
+  includeConsoleBaseline = true,
 }: UseEditSessionBootstrapOptions) {
   const stableCanvasViewKeyRef = useRef("live");
   const committedBaselinesForEdit = useCommittedDraftBaselines({
@@ -45,6 +47,7 @@ export function useEditSessionBootstrap({
     versionId: activeCanvasVersionId || undefined,
     enabled: isEditing,
     stagingResetNonce,
+    includeConsole: includeConsoleBaseline,
   });
   const isEditBootstrapReady = resolveEditBootstrapReady({
     isEditing,
