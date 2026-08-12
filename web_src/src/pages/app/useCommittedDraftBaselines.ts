@@ -86,10 +86,11 @@ export function useCommittedDraftBaselines({
         if (cancelled) {
           return;
         }
-        // Unblock edit bootstrap after a version-read failure. Missing canvasSpec
-        // keeps local graph diffs false (hasLocalCanvasGraphDiff) until a later
-        // successful fetch (version/nonce change), instead of stuck loading forever.
-        setBaselines({ console: { panels: [], layout: [] }, ready: true });
+        // Unblock edit bootstrap after a version-read failure. Omit canvasSpec and
+        // console so local diffs stay false (hasLocalCanvasGraphDiff /
+        // hasLocalConsoleDiff) until a later successful fetch — empty console
+        // objects would falsely dirty Commit/Discard for apps with panels.
+        setBaselines({ ready: true });
       }
     })();
 
