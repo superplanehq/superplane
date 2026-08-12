@@ -698,7 +698,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods
 - **Alarm Description** *(toggleable)*: Free-text description
 - **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
-- **Unit** *(toggleable)*: Metric unit
+- **Unit** *(toggleable)*: Metric unit. Enable it and leave it empty to remove the unit, which is how you recover an alarm whose unit matches no datapoints
 - **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
 - **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an `AWS/EC2` alarm with an InstanceId dimension

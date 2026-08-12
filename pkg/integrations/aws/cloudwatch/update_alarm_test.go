@@ -48,6 +48,29 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// An alarm with a unit set, so clearing it can be observed.
+const describeUnitAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>api-high-cpu</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <Statistic>Average</Statistic>
+        <Unit>Percent</Unit>
+        <Period>300</Period>
+        <EvaluationPeriods>1</EvaluationPeriods>
+        <Threshold>80</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 // An alarm carrying non-SNS actions on the OK and INSUFFICIENT_DATA transitions,
 // which the components never expose and so must never drop.
 const describeForeignActionAlarmXML = `
@@ -527,6 +550,48 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "EC2 actions require an AWS/EC2 alarm")
+	})
+
+	t.Run("enabled but empty unit clears the alarm unit", func(t *testing.T) {
+		// Omitting Unit on replace is what unsets it, so an alarm whose unit
+		// matches no datapoints can be recovered.
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeUnitAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "api-high-cpu",
+				"unit":   "",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.NotContains(t, body, "Unit=")
+		// The rest of the alarm is untouched.
+		assert.Contains(t, body, "Threshold=80")
+		assert.Contains(t, body, "MetricName=CPUUtilization")
+	})
+
+	t.Run("a unit left toggled off is preserved", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeUnitAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "api-high-cpu",
+				"period": 60,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		assert.Contains(t, requestBody(t, httpContext, 1), "Unit=Percent")
 	})
 
 	t.Run("percentile settings survive an unrelated update", func(t *testing.T) {

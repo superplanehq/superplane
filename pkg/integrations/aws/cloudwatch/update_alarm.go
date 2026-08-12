@@ -80,7 +80,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods
 - **Alarm Description** *(toggleable)*: Free-text description
 - **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
-- **Unit** *(toggleable)*: Metric unit
+- **Unit** *(toggleable)*: Metric unit. Enable it and leave it empty to remove the unit, which is how you recover an alarm whose unit matches no datapoints
 - **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
 - **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an ` + "`AWS/EC2`" + ` alarm with an InstanceId dimension
@@ -356,11 +356,8 @@ func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfigura
 		}
 	}
 
-	if hasConfigKey(rawConfiguration, "unit") {
-		if _, err := requireUnit(config.Unit); err != nil {
-			return err
-		}
-	}
+	// unit is deliberately not required: enabling it with no value clears the
+	// alarm's unit, which is the only way back from a unit that matches no datapoints.
 
 	if hasConfigKey(rawConfiguration, "period") && config.Period <= 0 {
 		return fmt.Errorf("period must be greater than 0")

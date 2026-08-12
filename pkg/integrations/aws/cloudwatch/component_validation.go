@@ -68,15 +68,6 @@ func requireTreatMissingData(value string) (string, error) {
 	return treatMissingData, nil
 }
 
-func requireUnit(value string) (string, error) {
-	unit := strings.TrimSpace(value)
-	if unit == "" {
-		return "", fmt.Errorf("unit is required")
-	}
-
-	return unit, nil
-}
-
 func requireThreshold(configuration any, threshold float64) (float64, error) {
 	if !hasConfigKey(configuration, "threshold") {
 		return 0, fmt.Errorf("threshold is required")
