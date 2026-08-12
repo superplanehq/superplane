@@ -259,12 +259,13 @@ func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation", "", &userID, nil, nil)
 	require.NoError(t, err)
 
+	stepIndex := 0
 	automation := &factory.AutomationRef{
 		NodeID:    "node-comment",
 		NodeName:  "node-comment",
 		AppName:   "Factory-App",
 		LineName:  "Plan",
-		StepIndex: 0,
+		StepIndex: &stepIndex,
 		StepName:  "step-01",
 	}
 

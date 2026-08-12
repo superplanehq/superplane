@@ -350,11 +350,14 @@ function findAutomationStep(
     }
   }
 
-  if (actor.stepIndex !== undefined) {
+  if (actor.stepIndex !== undefined && actor.stepIndex >= 0 && actor.stepIndex < dispatch.steps.length) {
     return dispatch.steps[actor.stepIndex];
   }
 
-  return dispatch.steps.at(-1);
+  // No confident match. Let the caller push a top-level event rather than
+  // attaching to an arbitrary step (last would misattribute step-0 refs when
+  // JSON `omitempty` dropped the index).
+  return undefined;
 }
 
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
