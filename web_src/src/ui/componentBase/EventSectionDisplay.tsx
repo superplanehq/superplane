@@ -101,4 +101,3 @@ export const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
     </div>
   );
 };
-

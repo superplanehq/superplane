@@ -21,8 +21,6 @@ export type { EventState, EventStateStyle, EventStateMap, EventSection } from ".
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_EVENT_STATE_MAP = defaultEventStateMap;
 
-
-
 export interface SpecBadge {
   label: string;
   bgColor: string;
@@ -116,6 +114,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
         onDelete={props.onDelete}
         onToggleView={props.onToggleView}
         isCompactView={props.isCompactView}
+        canvasMode={props.canvasMode}
       />
     );
   }

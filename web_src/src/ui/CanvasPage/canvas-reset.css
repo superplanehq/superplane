@@ -114,6 +114,19 @@
   stroke-dasharray: 8 4 !important;
 }
 
+/* Factory status edges — beat selected/hover flat stroke (Storybook indigo / red). */
+.sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-running .react-flow__edge-path {
+  stroke: #818cf8 !important;
+}
+
+.sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-failed .react-flow__edge-path {
+  stroke: #fca5a5 !important;
+}
+
+.dark .sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-failed .react-flow__edge-path {
+  stroke: #f87171 !important;
+}
+
 .sp-canvas.sp-canvas-live .react-flow__edge,
 .sp-canvas.sp-canvas-live .react-flow__edge * {
   cursor: default !important;
@@ -127,6 +140,10 @@
   stroke: var(--sp-handle-border) !important;
   stroke-width: 3 !important;
   stroke-dasharray: 8 4 !important;
+}
+
+.sp-canvas.sp-canvas-factory .react-flow__connectionline path {
+  stroke-width: 1.5 !important;
 }
 
 .sp-canvas .react-flow__handle {

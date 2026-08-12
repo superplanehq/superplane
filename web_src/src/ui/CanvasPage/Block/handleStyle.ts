@@ -9,6 +9,9 @@ export const HANDLE_STYLE = {
   background: "transparent",
 } satisfies React.CSSProperties;
 
+/** Pull factory square ports outside the card (flush `0` sat on the border and disappeared). */
+export const FACTORY_HANDLE_OUTSET_PX = 12;
+
 export function resolveHandleStyle(isFactoryApp: boolean): React.CSSProperties {
   return isFactoryApp ? FACTORY_HANDLE_STYLE : HANDLE_STYLE;
 }

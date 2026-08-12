@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { factoryCanvasBackground, factoryEdgePalette } from "./factoryCanvasChrome";
+import {
+  factoryCanvasBackground,
+  factoryEdgePalette,
+  factoryEdgeToneClassName,
+  primaryEventStateFromCanvasNodeData,
+  resolveFactoryEdgeTone,
+} from "./factoryCanvasChrome";
 
 describe("factoryCanvasChrome", () => {
   it("matches Storybook dark canvas dots and background", () => {
@@ -13,5 +19,30 @@ describe("factoryCanvasChrome", () => {
 
   it("uses thin slate edges in light mode", () => {
     expect(factoryEdgePalette(false).default).toEqual({ stroke: "#cbd5e1", strokeWidth: 1.5 });
+  });
+
+  it("maps event state to edge tone and class", () => {
+    expect(resolveFactoryEdgeTone("running")).toBe("running");
+    expect(resolveFactoryEdgeTone("cancelling")).toBe("running");
+    expect(resolveFactoryEdgeTone("failed")).toBe("failed");
+    expect(resolveFactoryEdgeTone("error")).toBe("failed");
+    expect(resolveFactoryEdgeTone("success")).toBe("default");
+    expect(factoryEdgeToneClassName("running")).toBe("sp-edge-factory-running");
+    expect(factoryEdgeToneClassName("failed")).toBe("sp-edge-factory-failed");
+    expect(factoryEdgeToneClassName("default")).toBeUndefined();
+  });
+
+  it("reads primary event state from component or trigger", () => {
+    expect(
+      primaryEventStateFromCanvasNodeData({
+        component: { eventSections: [{ eventState: "running" }] },
+      }),
+    ).toBe("running");
+    expect(
+      primaryEventStateFromCanvasNodeData({
+        trigger: { eventSections: [{ eventState: "failed" }] },
+      }),
+    ).toBe("failed");
+    expect(primaryEventStateFromCanvasNodeData({})).toBeUndefined();
   });
 });

@@ -16,7 +16,13 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import { resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
-import { factoryCanvasBackground } from "@/lib/factoryCanvasChrome";
+import {
+  factoryCanvasBackground,
+  factoryEdgePalette,
+  factoryEdgeToneClassName,
+  primaryEventStateFromCanvasNodeData,
+  resolveFactoryEdgeTone,
+} from "@/lib/factoryCanvasChrome";
 
 import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
@@ -466,7 +472,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
   );
 }
 
-const EDGE_STYLE = {
+const CLASSIC_EDGE_STYLE = {
   type: "custom",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
@@ -3141,15 +3147,43 @@ function CanvasContent({
     (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
+  const edgeDefaults = useMemo(() => {
+    if (!isVerticalFlow) return CLASSIC_EDGE_STYLE;
+    const palette = factoryEdgePalette(resolvedTheme === "dark");
+    return {
+      type: "custom" as const,
+      style: { stroke: palette.default.stroke, strokeWidth: palette.default.strokeWidth },
+    };
+  }, [isVerticalFlow, resolvedTheme]);
+
   const styledEdges = useMemo(() => {
+    const nodesById = isVerticalFlow ? new Map(state.nodes.map((node) => [node.id, node])) : null;
+    const palette = isVerticalFlow ? factoryEdgePalette(resolvedTheme === "dark") : null;
+
     return state.edges?.map((e) => {
       const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
       const diffStyle = getDraftDiffEdgeStyle(diffStatus) ?? {};
 
+      let factoryToneClassName: string | undefined;
+      let factoryToneStyle: { stroke: string; strokeWidth: number } | undefined;
+      let animated = e.animated;
+
+      if (isVerticalFlow && nodesById && palette) {
+        const targetNode = nodesById.get(e.target);
+        const tone = resolveFactoryEdgeTone(primaryEventStateFromCanvasNodeData(targetNode?.data));
+        factoryToneClassName = factoryEdgeToneClassName(tone);
+        factoryToneStyle = palette[tone];
+        animated = tone === "running";
+      }
+
+      const className = [e.className, factoryToneClassName].filter(Boolean).join(" ") || undefined;
+
       return {
         ...e,
-        ...EDGE_STYLE,
-        style: { ...EDGE_STYLE.style, ...diffStyle },
+        ...edgeDefaults,
+        animated,
+        className,
+        style: { ...edgeDefaults.style, ...factoryToneStyle, ...diffStyle },
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
@@ -3159,7 +3193,17 @@ function CanvasContent({
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       };
     });
-  }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
+  }, [
+    state.edges,
+    state.nodes,
+    hoveredEdgeId,
+    stableEdgeDelete,
+    isEditMode,
+    isReadOnly,
+    isVerticalFlow,
+    resolvedTheme,
+    edgeDefaults,
+  ]);
 
   const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);
   const { nodes: culledNodes, edges: culledEdges } = useMemo(

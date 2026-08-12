@@ -125,14 +125,24 @@ function StatusGlyph({ status, className }: { status: StepStatus; className?: st
 
   if (normalized === "passed") {
     return (
-      <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white", className)}>
+      <span
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white",
+          className,
+        )}
+      >
         <Check className="size-2.5" strokeWidth={3} />
       </span>
     );
   }
   if (normalized === "failed") {
     return (
-      <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full bg-[#dc2626] text-white", className)}>
+      <span
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded-full bg-[#dc2626] text-white",
+          className,
+        )}
+      >
         <XIcon className="size-2.5" strokeWidth={3} />
       </span>
     );
@@ -140,7 +150,9 @@ function StatusGlyph({ status, className }: { status: StepStatus; className?: st
   if (normalized === "running") {
     return <Loader2 className={cn(iconClass, "animate-spin text-[#2563eb] dark:text-blue-300")} aria-hidden />;
   }
-  return <Circle className={cn(iconClass, "text-[#a3a3a3] dark:text-muted-foreground")} strokeWidth={1.75} aria-hidden />;
+  return (
+    <Circle className={cn(iconClass, "text-[#a3a3a3] dark:text-muted-foreground")} strokeWidth={1.75} aria-hidden />
+  );
 }
 
 function statusStripClass(status: StepStatus): string {
@@ -197,11 +209,7 @@ function StackNodeShell({
       <div className="px-3.5 pt-3.5 pb-3">
         <div className="flex items-start gap-2.5">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-            <img
-              src={iconSrc}
-              alt=""
-              className={cn("size-4", monoIcon ? "opacity-90 dark:invert" : null)}
-            />
+            <img src={iconSrc} alt="" className={cn("size-4", monoIcon ? "opacity-90 dark:invert" : null)} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[14px] leading-snug font-semibold tracking-[-0.015em] text-card-foreground">
@@ -220,8 +228,7 @@ function StackNodeShell({
   );
 }
 
-const HANDLE_CLASS =
-  "!size-2.5 !rounded-[3px] !border !border-border !bg-card !shadow-none";
+const HANDLE_CLASS = "!size-2.5 !rounded-[3px] !border !border-border !bg-card !shadow-none";
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const ports = data.ports;
@@ -251,7 +258,6 @@ const nodeTypes = {
   action: ActionNode,
 };
 
-
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2 text-[13px]">
@@ -270,14 +276,8 @@ function StepDetailSidebar({ node, onClose }: { node: Node<StepNodeData>; onClos
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <img
-              src={providerIconSrc(data.provider)}
-              alt=""
-              className="size-3.5 shrink-0"
-            />
-            <div className="text-[11px] font-medium tracking-[0.04em] text-muted-foreground">
-              {data.componentName}
-            </div>
+            <img src={providerIconSrc(data.provider)} alt="" className="size-3.5 shrink-0" />
+            <div className="text-[11px] font-medium tracking-[0.04em] text-muted-foreground">{data.componentName}</div>
           </div>
           <h3 className="mt-1 text-[14px] font-semibold tracking-[-0.01em] text-foreground">{data.title}</h3>
         </div>
@@ -445,7 +445,12 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
           defaultEdgeOptions={{ type: EDGE_TYPE, style: palette.default }}
           colorMode={isDark ? "dark" : "light"}
         >
-          <Background gap={background.gap} size={background.size} color={background.color} bgColor={background.bgColor} />
+          <Background
+            gap={background.gap}
+            size={background.size}
+            color={background.color}
+            bgColor={background.bgColor}
+          />
           <Controls
             showInteractive={false}
             className="!overflow-hidden !rounded-xl !border !border-border !bg-card !shadow-[0_1px_3px_rgba(15,23,42,0.06)]"

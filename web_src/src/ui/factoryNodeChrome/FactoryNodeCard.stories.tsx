@@ -49,6 +49,41 @@ export const Pending: Story = {
   args: {
     title: "onRun",
     iconSlug: "play",
-    eventSections: [{ eventId: "4", eventState: "queued", eventTitle: "Queued" }],
+    canvasMode: "live",
+    eventSections: [{ eventId: "4", eventState: "neutral", eventTitle: "Idle" }],
+  },
+};
+
+/** Edit mode: no status footer (Pending would be misleading). */
+export const EditMode: Story = {
+  args: {
+    title: "wait",
+    iconSlug: "alarm-clock",
+    metadata: [{ icon: "clock", label: "Wait for 10 seconds" }],
+    canvasMode: "edit",
+  },
+};
+
+export const Queued: Story = {
+  args: {
+    title: "wait",
+    iconSlug: "alarm-clock",
+    eventSections: [{ eventId: "5", eventState: "queued", eventTitle: "Queued" }],
+  },
+};
+
+export const Cancelled: Story = {
+  args: {
+    title: "Agent",
+    iconSlug: "bot",
+    eventSections: [{ eventId: "6", eventState: "cancelled", eventTitle: "Cancelled", eventSubtitle: "12s" }],
+  },
+};
+
+export const Error: Story = {
+  args: {
+    title: "Send Message",
+    iconSlug: "message-square",
+    eventSections: [{ eventId: "7", eventState: "error", eventTitle: "Error", eventSubtitle: "2s" }],
   },
 };

@@ -4,11 +4,13 @@ import type { MetadataItem } from "../metadataList";
 import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
 import { NodeHoverActions } from "./NodeHoverActions";
 import { WarningBadge } from "./WarningBadge";
-import { formatFactoryNodeDuration, normalizeFactoryNodeStatus } from "./status";
+import { resolveFactoryNodeMetrics } from "./resolveFactoryNodeMetrics";
+import { normalizeFactoryNodeStatus } from "./status";
 import type { FactoryNodeStatus } from "./types";
 
 /** Minimal event slice — avoids importing ComponentBase (circular). */
 export type FactoryNodeEventSlice = {
+  showAutomaticTime?: boolean;
   receivedAt?: Date;
   eventState?: string;
   eventTitle?: string;
@@ -32,7 +34,22 @@ export type FactoryNodeCardProps = {
   onDelete?: () => void;
   onToggleView?: () => void;
   isCompactView?: boolean;
+  /** Edit mode hides the runtime status footer (no fake Pending). */
+  canvasMode?: "live" | "edit";
 };
+
+/** Status footer is for live/run views only — not while editing the graph. */
+export function shouldShowFactoryNodeStatusFooter({
+  canvasMode,
+  isCompactView,
+}: {
+  canvasMode?: "live" | "edit";
+  isCompactView?: boolean;
+}): boolean {
+  if (isCompactView) return false;
+  if (canvasMode === "edit") return false;
+  return true;
+}
 
 function resolveSubtitle(
   metadata: MetadataItem[] | undefined,
@@ -49,11 +66,16 @@ function resolveSubtitle(
   return null;
 }
 
-function useFactoryNodeMetrics(status: FactoryNodeStatus, section: FactoryNodeEventSlice | undefined): string | null {
+function useFactoryNodeMetrics(
+  status: FactoryNodeStatus,
+  section: FactoryNodeEventSlice | undefined,
+): React.ReactNode | null {
   const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
 
+  const isLiveStatus = status === "running" || status === "cancelling";
+
   React.useEffect(() => {
-    if (status !== "running" || !section?.receivedAt) {
+    if (!isLiveStatus || !section?.receivedAt) {
       setLiveDuration(null);
       return;
     }
@@ -63,18 +85,13 @@ function useFactoryNodeMetrics(status: FactoryNodeStatus, section: FactoryNodeEv
       setLiveDuration(Date.now() - receivedAt.getTime());
     }, 1000);
     return () => clearInterval(interval);
-  }, [status, section?.receivedAt]);
+  }, [isLiveStatus, section?.receivedAt]);
 
-  if (status === "running" && liveDuration !== null) {
-    return formatFactoryNodeDuration(liveDuration, { soFar: true });
-  }
-  if (status === "pending") {
-    return null;
-  }
-  if (typeof section?.eventSubtitle === "string" && section.eventSubtitle.trim()) {
-    return section.eventSubtitle.trim();
-  }
-  return null;
+  return resolveFactoryNodeMetrics({
+    status,
+    section,
+    liveDurationMs: liveDuration,
+  });
 }
 
 /**
@@ -98,12 +115,14 @@ export function FactoryNodeCard({
   onDelete,
   onToggleView,
   isCompactView,
+  canvasMode = "live",
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const status = normalizeFactoryNodeStatus(primarySection?.eventState);
   const metrics = useFactoryNodeMetrics(status, primarySection);
   const subtitle = resolveSubtitle(metadata, eventSections);
   const badgeText = error?.trim() || warning?.trim() || "";
+  const showStatusFooter = shouldShowFactoryNodeStatusFooter({ canvasMode, isCompactView });
 
   return (
     <div className="group relative" data-view-mode={isCompactView ? "compact" : "expanded"}>
@@ -127,6 +146,7 @@ export function FactoryNodeCard({
         draftDiffStatus={draftDiffStatus}
         dimBodyBelowHeader={dimBodyBelowHeader}
         isCompactView={isCompactView}
+        showStatusFooter={showStatusFooter}
       />
     </div>
   );

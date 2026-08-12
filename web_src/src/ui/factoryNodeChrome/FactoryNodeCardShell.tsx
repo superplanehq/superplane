@@ -14,11 +14,19 @@ type FactoryNodeCardShellProps = {
   selected?: boolean;
   subtitle: string | null;
   status: FactoryNodeStatus;
-  metrics: string | null;
+  metrics: React.ReactNode | null;
   draftDiffStatus?: DraftDiffStatus;
   dimBodyBelowHeader?: boolean;
   isCompactView?: boolean;
+  showStatusFooter?: boolean;
 };
+
+/** Monochrome logos (github / SuperPlane) need invert on dark card chrome. */
+function shouldInvertMonoFactoryIcon(iconSrc: string | undefined): boolean {
+  if (!iconSrc) return false;
+  const lower = iconSrc.toLowerCase();
+  return lower.includes("github") || lower.includes("superplane");
+}
 
 export function FactoryNodeCardShell({
   title,
@@ -32,8 +40,10 @@ export function FactoryNodeCardShell({
   draftDiffStatus,
   dimBodyBelowHeader = false,
   isCompactView,
+  showStatusFooter = true,
 }: FactoryNodeCardShellProps) {
   const Icon = React.useMemo(() => resolveIcon(iconSlug), [iconSlug]);
+  const invertMonoIcon = shouldInvertMonoFactoryIcon(iconSrc);
 
   return (
     <div
@@ -49,7 +59,11 @@ export function FactoryNodeCardShell({
         <div className="flex items-start justify-start gap-2.5">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
             {iconSrc ? (
-              <img src={iconSrc} alt="" className="size-4 object-contain opacity-90" />
+              <img
+                src={iconSrc}
+                alt=""
+                className={cn("size-4 object-contain opacity-90", invertMonoIcon && "dark:invert")}
+              />
             ) : (
               <Icon size={16} className={resolveNodeIconColorClass(iconColor)} />
             )}
@@ -64,7 +78,7 @@ export function FactoryNodeCardShell({
           </div>
         </div>
       </div>
-      {!isCompactView ? <NodeStatusFooter status={status} metrics={metrics} /> : null}
+      {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} /> : null}
     </div>
   );
 }

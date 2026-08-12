@@ -3,7 +3,7 @@ import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
-import { resolveHandleStyle } from "./handleStyle";
+import { FACTORY_HANDLE_OUTSET_PX, resolveHandleStyle } from "./handleStyle";
 import { MultiBottomHandle } from "./multiBottomHandle";
 import { MultiRightHandle } from "./multiRightHandle";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
@@ -128,7 +128,7 @@ function SingleSourceHandle({
         ...resolveHandleStyle(isVertical),
         ...(isVertical
           ? {
-              bottom: -15,
+              bottom: -FACTORY_HANDLE_OUTSET_PX,
               left: "50%",
               transform: "translateX(-50%)",
             }
@@ -186,7 +186,7 @@ function EndNodeAppendConnector({
           isHighlighted={isHighlighted}
           orientation="vertical"
           style={{
-            bottom: -15,
+            bottom: -FACTORY_HANDLE_OUTSET_PX,
             left: "50%",
             transform: "translateX(-50%)",
           }}
@@ -271,7 +271,7 @@ export function LeftHandle({
         ...resolveHandleStyle(isVertical),
         ...(isVertical
           ? {
-              top: -15,
+              top: -FACTORY_HANDLE_OUTSET_PX,
               left: "50%",
               transform: "translateX(-50%)",
             }
