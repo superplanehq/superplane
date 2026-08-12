@@ -2,6 +2,10 @@
 
 This document captures the architecture principles, patterns, and workflow for developing components for SuperPlane.
 
+For user-facing labels, buttons, empty states, errors, confirmations, and other
+product wording, follow [../.agents/skills/ui-copy/SKILL.md](../.agents/skills/ui-copy/SKILL.md)
+— write real copy as part of the design, not placeholder text after layout.
+
 ## Architecture Principles
 
 ### Component Design
