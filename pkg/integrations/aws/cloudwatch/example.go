@@ -16,3 +16,23 @@ var exampleDataOnAlarm map[string]any
 func (t *OnAlarm) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlarmOnce, exampleDataOnAlarmBytes, &exampleDataOnAlarm)
 }
+
+//go:embed example_output_query_logs.json
+var exampleOutputQueryLogsBytes []byte
+
+var exampleOutputQueryLogsOnce sync.Once
+var exampleOutputQueryLogs map[string]any
+
+func (c *QueryLogs) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryLogsOnce, exampleOutputQueryLogsBytes, &exampleOutputQueryLogs)
+}
+
+//go:embed example_output_add_log_event.json
+var exampleOutputAddLogEventBytes []byte
+
+var exampleOutputAddLogEventOnce sync.Once
+var exampleOutputAddLogEvent map[string]any
+
+func (c *AddLogEvent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddLogEventOnce, exampleOutputAddLogEventBytes, &exampleOutputAddLogEvent)
+}
