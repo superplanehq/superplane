@@ -6,7 +6,7 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Forward, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
 import { factoryDetailPath, workOrderDetailPath } from "./lib/factoryPagePaths";

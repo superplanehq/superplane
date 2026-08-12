@@ -9,7 +9,7 @@ import { useFactoryApps } from "@/hooks/useFactoryData";
 
 import { AppFieldRenderer } from "./AppFieldRenderer";
 
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   useParams: () => ({ appId: "canvas_current" }),
 }));
 

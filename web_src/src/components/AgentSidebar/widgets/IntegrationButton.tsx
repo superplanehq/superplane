@@ -1,7 +1,7 @@
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { cn } from "@/lib/utils";
 import { useConnectedIntegrations, useAvailableIntegrations } from "@/hooks/useIntegrations";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { useCallback, useMemo } from "react";
 
 interface IntegrationButtonProps {

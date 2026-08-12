@@ -1,7 +1,7 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import type { SetURLSearchParams } from "react-router-dom";
+import type { SetURLSearchParams } from "react-router";
 
 import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
 
