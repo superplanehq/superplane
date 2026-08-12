@@ -109,7 +109,7 @@ export function RunInspectorNodeAccordion({
             {section.nodeName}
           </span>
         </NodeHeaderButton>
-        <NodeActions section={section} actions={actions} currentUser={currentUser} />
+        <RunInspectorNodeActions section={section} actions={actions} currentUser={currentUser} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
@@ -157,14 +157,20 @@ function NodeHeaderButton({
   );
 }
 
-function NodeActions({
+/** Approve / Reject / Push through / Stop / Cancel queue — no Rerun. */
+export function RunInspectorNodeActions({
   section,
   actions,
   currentUser,
+  className,
+  layout = "inline",
 }: {
   section: RunInspectorNodeSection;
   actions: ReturnType<typeof useRunInspectorActions>;
   currentUser?: RunInspectorCurrentUser;
+  className?: string;
+  /** `bar` = full-width strip under factory Close chrome. */
+  layout?: "inline" | "bar";
 }) {
   const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
   const hasActions =
@@ -173,7 +179,14 @@ function NodeActions({
   if (!hasActions) return null;
 
   return (
-    <div className="flex shrink-0 items-center gap-2 pl-3">
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-2",
+        layout === "inline" && "pl-3",
+        layout === "bar" && "justify-end border-b border-slate-950/10 px-3 py-2 dark:border-gray-800",
+        className,
+      )}
+    >
       {section.queueItem ? (
         <NodeActionButton
           label="Cancel"

@@ -48,7 +48,7 @@ describe("executeCommitStaging", () => {
     expect(onCommittedVersionId).toHaveBeenCalledWith("version-2");
     expect(callOrder[0]).toBe("exit-edit");
     expect(callOrder.indexOf("invalidate")).toBeGreaterThan(0);
-    expect(setQueryData).not.toHaveBeenCalled();
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: canvasKeys.detail("org-1", "canvas-1"),
       refetchType: "all",

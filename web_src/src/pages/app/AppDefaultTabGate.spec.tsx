@@ -19,8 +19,16 @@ function consoleLoaded(panels: object[]): ConsoleQueryLike {
 const consoleLoading: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };
 const consoleErrored: ConsoleQueryLike = { isSuccess: false, isError: true, data: undefined };
 
+type CanvasQueryLike = {
+  data: { metadata?: { factoryId?: string } } | undefined;
+  isLoading: boolean;
+};
+
+let mockCanvasQuery: CanvasQueryLike = { data: undefined, isLoading: false };
+
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvasConsole: () => mockConsoleQuery,
+  useCanvas: () => mockCanvasQuery,
 }));
 
 // AppPage pulls in the entire canvas surface; substitute a marker so the gate
@@ -36,6 +44,7 @@ function renderGate({ initialEntry }: { initialEntry: string }) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
+        <Route path="/:organizationId/apps/:appId" element={<AppDefaultTabGate />} />
         <Route path="/apps/:appId" element={<AppDefaultTabGate />} />
       </Routes>
       <LocationProbe />
@@ -59,6 +68,7 @@ function getLocation() {
 beforeEach(() => {
   window.localStorage.clear();
   mockConsoleQuery = consoleLoaded([]);
+  mockCanvasQuery = { data: undefined, isLoading: false };
 });
 
 describe("AppDefaultTabGate — pinned URLs", () => {
@@ -132,6 +142,26 @@ describe("AppDefaultTabGate — stored-tab redirect", () => {
     // Legacy `view=runs` is not tab-selecting; the stored redirect still fires
     // and useWorkflowViewSearchParams cleans up the leftover legacy value.
     expect(getLocation().search).toBe("?view=console");
+  });
+});
+
+describe("AppDefaultTabGate — factory apps", () => {
+  it("keeps factory apps on the canvas and strips console/memory/files views", () => {
+    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
+    recordLastVisitedAppTab("canvas-1", "console");
+    renderGate({ initialEntry: "/org-1/apps/canvas-1?view=console" });
+
+    expect(getLocation().search).toBe("");
+    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+  });
+
+  it("does not redirect factory apps to a stored non-canvas tab", () => {
+    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
+    recordLastVisitedAppTab("canvas-1", "memory");
+    renderGate({ initialEntry: "/org-1/apps/canvas-1" });
+
+    expect(getLocation().search).toBe("");
+    expect(screen.getByTestId("app-page")).toBeInTheDocument();
   });
 });
 

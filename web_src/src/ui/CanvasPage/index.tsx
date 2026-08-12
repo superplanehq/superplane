@@ -1,6 +1,7 @@
 import {
   Background,
   Panel,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   ViewportPortal,
@@ -14,6 +15,7 @@ import {
   type Node as ReactFlowNode,
   type Viewport,
 } from "@xyflow/react";
+import { resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
 
 import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
@@ -100,6 +102,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
+import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -261,6 +264,8 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Hide the top PageHeader / SecondaryHeader chrome (factory embed shell owns the header). */
+  hidePageChrome?: boolean;
   /** Enables managed agent chat controls when the user has the required RBAC permissions. */
   canUseAgents?: boolean;
   /** Optional Agent improvement suggestions shown on the Agent header control. */
@@ -414,6 +419,11 @@ export interface CanvasPageProps {
   onSeeCurrentVersion?: () => void;
   /** Returns from run inspection to the current live canvas. */
   onBackToLiveCanvas?: () => void;
+  /**
+   * Factory-embedded canvas/automation: run inspector opens only when a node is
+   * selected, and chrome is Close-only (no newer/older/copy link).
+   */
+  factoryEmbed?: boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -543,6 +553,7 @@ type EnrichedCanvasNodeCacheEntry = {
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
   runParticipantKey: string;
+  flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
 };
 
 function canReuseEnrichedNodeData({
@@ -554,6 +565,7 @@ function canReuseEnrichedNodeData({
   isHighlighted,
   hasHighlightedNodes,
   runParticipantKey,
+  flowDirection,
 }: {
   cachedNode: EnrichedCanvasNodeCacheEntry | undefined;
   node: ReactFlowNode;
@@ -563,6 +575,7 @@ function canReuseEnrichedNodeData({
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
   runParticipantKey: string;
+  flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
 }) {
   return (
     cachedNode &&
@@ -572,7 +585,8 @@ function canReuseEnrichedNodeData({
     cachedNode.edges === edges &&
     cachedNode.isHighlighted === isHighlighted &&
     cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
-    cachedNode.runParticipantKey === runParticipantKey
+    cachedNode.runParticipantKey === runParticipantKey &&
+    cachedNode.flowDirection === flowDirection
   );
 }
 
@@ -1297,6 +1311,8 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
+  // Factory embed opens the inspector on ?run= even before a node is selected;
+  // the factory body prompts "Select a node…" until one is picked.
   const runInspectorOpen =
     props.isRunInspectionMode &&
     !props.isEditing &&
@@ -1400,68 +1416,70 @@ function CanvasPage(props: CanvasPageProps) {
         props.isEditing && "sp-canvas-editing",
       )}
     >
-      {/* Header at the top spanning full width */}
-      <div className="relative z-40">
-        <CanvasContentHeader
-          canvasName={props.title ?? ""}
-          organizationId={props.organizationId}
-          factoryId={props.factoryId}
-          onPublishVersion={props.onPublishVersion}
-          onDiscardVersion={props.onDiscardVersion}
-          onShowDiff={props.onShowDiff}
-          onShowConsoleDiff={props.onShowConsoleDiff}
-          visualDiffEnabled={props.visualDiffEnabled}
-          draftVisualDiff={props.draftVisualDiff}
-          draftConsoleDiff={props.draftConsoleDiff}
-          onToggleVisualDiff={props.onToggleVisualDiff}
-          publishVersionDisabled={props.publishVersionDisabled}
-          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-          discardVersionDisabled={props.discardVersionDisabled}
-          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-          hasStagingChanges={props.hasStagingChanges}
-          stagingStale={props.stagingStale}
-          onCommitStaging={props.onCommitStaging}
-          commitStagingPending={props.commitStagingPending}
-          resetStagingPending={props.resetStagingPending}
-          onResetStaging={props.onResetStaging}
-          onDiscardStaleStaging={props.onDiscardStaleStaging}
-          discardStaleStagingPending={props.discardStaleStagingPending}
-          headerMode={props.headerMode}
-          isEditing={props.isEditing}
-          isEditSessionActive={props.isEditSessionActive}
-          onSelectCanvasView={props.onSelectCanvasView}
-          onEnterEditMode={props.onEnterEditMode}
-          enterEditModeDisabled={props.enterEditModeDisabled}
-          enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-          onExitEditMode={props.onExitEditMode}
-          exitEditModeDisabled={props.exitEditModeDisabled}
-          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectConsole={props.onSelectConsole}
-          onSelectMemory={props.onSelectMemory}
-          onSelectFiles={props.onSelectFiles}
-          filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
-          publishVersionLabel={props.publishVersionLabel}
-          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
-          hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
-          hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
-          hasFilesStagingChanges={props.hasFilesStagingChanges}
-          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
-          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
-          hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
-          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
-          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
-          hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
-          activeDraftBranchLabel={props.activeDraftBranchLabel}
-          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
-          showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          toolSidebarState={toolSidebarState}
-          runsSidebarState={runsSidebarState}
-          versionsSidebarState={versionsSidebarState}
-          agentSuggestions={props.agentSuggestions}
-          onSelectAgentSuggestion={props.onSelectAgentSuggestion}
-        />
-        {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
-      </div>
+      {/* Header at the top spanning full width (omitted for factory embed chrome). */}
+      {props.hidePageChrome ? null : (
+        <div className="relative z-40">
+          <CanvasContentHeader
+            canvasName={props.title ?? ""}
+            organizationId={props.organizationId}
+            factoryId={props.factoryId}
+            onPublishVersion={props.onPublishVersion}
+            onDiscardVersion={props.onDiscardVersion}
+            onShowDiff={props.onShowDiff}
+            onShowConsoleDiff={props.onShowConsoleDiff}
+            visualDiffEnabled={props.visualDiffEnabled}
+            draftVisualDiff={props.draftVisualDiff}
+            draftConsoleDiff={props.draftConsoleDiff}
+            onToggleVisualDiff={props.onToggleVisualDiff}
+            publishVersionDisabled={props.publishVersionDisabled}
+            publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+            discardVersionDisabled={props.discardVersionDisabled}
+            discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+            hasStagingChanges={props.hasStagingChanges}
+            stagingStale={props.stagingStale}
+            onCommitStaging={props.onCommitStaging}
+            commitStagingPending={props.commitStagingPending}
+            resetStagingPending={props.resetStagingPending}
+            onResetStaging={props.onResetStaging}
+            onDiscardStaleStaging={props.onDiscardStaleStaging}
+            discardStaleStagingPending={props.discardStaleStagingPending}
+            headerMode={props.headerMode}
+            isEditing={props.isEditing}
+            isEditSessionActive={props.isEditSessionActive}
+            onSelectCanvasView={props.onSelectCanvasView}
+            onEnterEditMode={props.onEnterEditMode}
+            enterEditModeDisabled={props.enterEditModeDisabled}
+            enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+            onExitEditMode={props.onExitEditMode}
+            exitEditModeDisabled={props.exitEditModeDisabled}
+            exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+            onSelectConsole={props.onSelectConsole}
+            onSelectMemory={props.onSelectMemory}
+            onSelectFiles={props.onSelectFiles}
+            filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
+            publishVersionLabel={props.publishVersionLabel}
+            hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+            hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
+            hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+            hasFilesStagingChanges={props.hasFilesStagingChanges}
+            hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+            hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+            hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
+            hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+            hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+            hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
+            activeDraftBranchLabel={props.activeDraftBranchLabel}
+            activeDraftBranchShortSha={props.activeDraftBranchShortSha}
+            showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+            toolSidebarState={toolSidebarState}
+            runsSidebarState={runsSidebarState}
+            versionsSidebarState={versionsSidebarState}
+            agentSuggestions={props.agentSuggestions}
+            onSelectAgentSuggestion={props.onSelectAgentSuggestion}
+          />
+          {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
+        </div>
+      )}
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -1540,6 +1558,7 @@ function CanvasPage(props: CanvasPageProps) {
               <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
                 <CanvasContent
                   state={state}
+                  factoryId={props.factoryId}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
                   onDuplicateNodes={props.onDuplicateNodes}
@@ -1637,10 +1656,14 @@ function CanvasPage(props: CanvasPageProps) {
                 selectRun: props.onSelectRunFromSidebarEvent,
               })
             }
+            factoryContext={props.factoryEmbed}
             onClose={() => props.onRunNodeDetailClose?.()}
           />
         ) : runInspectorOpen ? (
-          <RunInspectorLoadingPanel onClose={() => props.onRunNodeDetailClose?.()} />
+          <RunInspectorLoadingPanel
+            factoryContext={props.factoryEmbed}
+            onClose={() => props.onRunNodeDetailClose?.()}
+          />
         ) : null}
       </div>
 
@@ -2162,6 +2185,7 @@ function applySidebarTabOnNodeOpen(
 
 function CanvasContent({
   state,
+  factoryId,
   onNodeDelete,
   onNodesDelete,
   onDuplicateNodes,
@@ -2212,6 +2236,7 @@ function CanvasContent({
   canCreateIntegrations,
 }: {
   state: CanvasPageState;
+  factoryId?: string;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
@@ -2274,6 +2299,8 @@ function CanvasContent({
   const flowBgColor = resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9";
   const flowDotColor = resolvedTheme === "dark" ? "#374151" : "#cbd5e1";
   const isReadOnly = readOnly ?? false;
+  const flowDirection = resolveCanvasFlowDirection(factoryId);
+  const isVerticalFlow = flowDirection === "vertical";
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
   // while editing the viewport must stay put (the draft is the same graph the
@@ -2859,27 +2886,23 @@ function CanvasContent({
         return;
       }
 
-      const sourceWidth = sourceNode.width ?? 240;
-      const appendGapX = 300;
-      const appendAlignmentY = 30;
-      const placeholderPosition = {
-        x: sourceNode.position.x + sourceWidth + appendGapX,
-        y: sourceNode.position.y + appendAlignmentY,
-      };
-
-      const currentViewport = getViewport();
       const canvasWidth =
         typeof document === "undefined" ? 0 : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
-      const rightSidebarSafeArea = 560;
-      const placeholderEstimatedWidth = 420;
-      const viewportBuffer = 48;
-      const placeholderRightScreenX =
-        (placeholderPosition.x + placeholderEstimatedWidth) * currentViewport.zoom + currentViewport.x;
-      const maxVisibleScreenX = canvasWidth - rightSidebarSafeArea - viewportBuffer;
+      const canvasHeight =
+        typeof document === "undefined"
+          ? 0
+          : (document.querySelector(".react-flow")?.clientHeight ?? window.innerHeight);
+      const { placeholderPosition, nextViewport } = computeAppendFromNodePlacement({
+        sourcePosition: sourceNode.position,
+        sourceWidth: sourceNode.width ?? 240,
+        sourceHeight: sourceNode.height ?? 180,
+        isVerticalFlow,
+        viewport: getViewport(),
+        canvasWidth,
+        canvasHeight,
+      });
 
-      if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
-        const overflow = placeholderRightScreenX - maxVisibleScreenX;
-        const nextViewport = { ...currentViewport, x: currentViewport.x - overflow };
+      if (nextViewport) {
         setViewport(nextViewport, { duration: 180 });
         viewportRef.current = nextViewport;
       }
@@ -2889,7 +2912,7 @@ function CanvasContent({
         handleId: sourceHandleId ?? "default",
       });
     },
-    [getViewport, isReadOnly, onConnectionDropInEmptySpace, setViewport, viewportRef],
+    [getViewport, isReadOnly, isVerticalFlow, onConnectionDropInEmptySpace, setViewport, viewportRef],
   );
 
   // Store callback handlers in a ref so they can be accessed without being in node data
@@ -3035,6 +3058,7 @@ function CanvasContent({
         isHighlighted,
         hasHighlightedNodes,
         runParticipantKey,
+        flowDirection,
       });
 
       if (canReuseData && cachedNode && cachedNode.sourceNode === node) {
@@ -3054,10 +3078,13 @@ function CanvasContent({
               _isHighlighted: isHighlighted,
               _hasHighlightedNodes: hasHighlightedNodes,
               _dimBodyBelowHeader: shouldBlankBody,
+              _flowDirection: flowDirection,
             };
       const enrichedNode: ReactFlowNode = {
         ...node,
         selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),
+        sourcePosition: isVerticalFlow ? Position.Bottom : Position.Right,
+        targetPosition: isVerticalFlow ? Position.Top : Position.Left,
         data: data as ReactFlowNode["data"],
       };
 
@@ -3072,6 +3099,7 @@ function CanvasContent({
         isHighlighted,
         hasHighlightedNodes,
         runParticipantKey,
+        flowDirection,
       });
 
       return enrichedNode;
@@ -3090,6 +3118,8 @@ function CanvasContent({
     connectingFrom,
     state.edges,
     blockConnectingFrom,
+    flowDirection,
+    isVerticalFlow,
     runParticipantNodeIds,
     runSelectableSet,
   ]);

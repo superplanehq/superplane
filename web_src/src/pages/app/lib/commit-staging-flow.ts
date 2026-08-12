@@ -72,6 +72,34 @@ async function applyPostCommitCacheUpdates({
   await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
 }
 
+function stampCommittedCanvasDetailCache(
+  queryClient: QueryClient,
+  organizationId: string,
+  canvasId: string,
+  committedVersionId: string,
+  committedVersion: CanvasesCanvasVersion | undefined,
+) {
+  if (!committedVersion?.spec) {
+    return;
+  }
+
+  // Eagerly stamp the committed graph into the canvas detail cache so Configure
+  // re-entry (refetchOnMount: false) cannot flash the pre-commit live spec.
+  queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+    if (!current) {
+      return current;
+    }
+    return {
+      ...current,
+      spec: committedVersion.spec,
+      metadata: {
+        ...current.metadata,
+        liveVersionId: committedVersionId,
+      },
+    };
+  });
+}
+
 export async function executeCommitStaging({
   organizationId,
   canvasId,
@@ -113,9 +141,11 @@ export async function executeCommitStaging({
   const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   const previousVersionId = activeCanvasVersionId;
   let committedVersionId = activeCanvasVersionId;
+  let committedVersion: CanvasesCanvasVersion | undefined;
   try {
     const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);
-    committedVersionId = response?.version?.metadata?.id || activeCanvasVersionId;
+    committedVersion = response?.version;
+    committedVersionId = committedVersion?.metadata?.id || activeCanvasVersionId;
   } catch (error) {
     releaseCanvasUpdatedEcho?.();
     throw error;
@@ -128,6 +158,7 @@ export async function executeCommitStaging({
   setDraftCanvasSpec(null);
 
   if (organizationId && canvasId && committedVersionId) {
+    stampCommittedCanvasDetailCache(queryClient, organizationId, canvasId, committedVersionId, committedVersion);
     await applyPostCommitCacheUpdates({
       queryClient,
       organizationId,
