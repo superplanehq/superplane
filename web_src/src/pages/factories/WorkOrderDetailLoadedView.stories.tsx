@@ -75,6 +75,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     assigneeIds: derived.assigneeIds,
     assigneeNames: derived.assigneeNames,
     factoryLines: REFUND_FACTORY_LINES,
+    canEditFactoryLines: true,
     isOpen: derived.isOpen,
     isDispatchable: derived.isDispatchable,
     isClosed: derived.isClosed,

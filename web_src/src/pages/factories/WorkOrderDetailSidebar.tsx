@@ -24,7 +24,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import { editFactoryLinePath } from "./lib/factoryPagePaths";
+import { factoryLineDestinationPath } from "./lib/factoryLineNavigation";
 import { formatWorkOrderDateTime } from "./lib/workOrderDateTime";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./lib/workOrderUsage";
 import { OrgUserReference } from "./OrgUserReference";
@@ -44,6 +44,7 @@ interface WorkOrderDetailSidebarProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
+  canEditFactoryLines: boolean;
   canAssign: boolean;
   canDispatch: boolean;
   permissionsLoading: boolean;
@@ -54,13 +55,7 @@ interface WorkOrderDetailSidebarProps {
   onDispatch: (input: { lineName: string }) => Promise<void>;
 }
 
-/**
- * Right-hand column for the work order detail page. Renders three sections in
- * the mockup style: a single Overview list (status, creator, assignee(s),
- * created, spending), Factory Lines (only lines that have runs + compact
- * "Send to line" trigger), and a bare Artifacts list. Every row shares the
- * same icon+value shape so the panel reads as a compact metadata list.
- */
+/** Work order overview, factory lines, and artifacts. */
 export function WorkOrderDetailSidebar({
   organizationId,
   factoryId,
@@ -73,6 +68,7 @@ export function WorkOrderDetailSidebar({
   assigneeIds,
   assigneeNames,
   factoryLines,
+  canEditFactoryLines,
   canAssign,
   canDispatch,
   permissionsLoading,
@@ -99,6 +95,7 @@ export function WorkOrderDetailSidebar({
       <FactoryLinesSection
         organizationId={organizationId}
         factoryId={factoryId}
+        canEditFactoryLines={canEditFactoryLines}
         executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
@@ -351,6 +348,7 @@ function AssigneeButtonBody({
 function FactoryLinesSection({
   organizationId,
   factoryId,
+  canEditFactoryLines,
   executions,
   factoryLines,
   canDispatch,
@@ -361,6 +359,7 @@ function FactoryLinesSection({
 }: {
   organizationId: string;
   factoryId: string;
+  canEditFactoryLines: boolean;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
@@ -381,7 +380,13 @@ function FactoryLinesSection({
           <p className="text-[13px] text-muted-foreground">Not run on a line yet.</p>
         ) : (
           rows.map((row) => (
-            <FactoryLineRow key={row.lineId} row={row} organizationId={organizationId} factoryId={factoryId} />
+            <FactoryLineRow
+              key={row.lineId}
+              row={row}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              canEdit={canEditFactoryLines}
+            />
           ))
         )}
 
@@ -473,13 +478,14 @@ function FactoryLineRow({
   row,
   organizationId,
   factoryId,
+  canEdit,
 }: {
   row: FactoryLineRowModel;
   organizationId: string;
   factoryId: string;
+  canEdit: boolean;
 }) {
-  const href =
-    row.lineId && row.lineId !== "unknown" ? editFactoryLinePath(organizationId, factoryId, row.lineId) : undefined;
+  const href = factoryLineDestinationPath({ lineId: row.lineId, organizationId, factoryId, canEdit });
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -495,7 +501,7 @@ function FactoryLineRow({
   }
 
   return (
-    <Link to={href} className={commonClass} aria-label={`Edit ${row.lineName}`}>
+    <Link to={href} className={commonClass} aria-label={`${canEdit ? "Edit" : "View"} ${row.lineName}`}>
       {inner}
     </Link>
   );
