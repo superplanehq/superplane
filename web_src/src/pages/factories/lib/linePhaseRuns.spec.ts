@@ -92,7 +92,7 @@ describe("buildLinePhaseBoard", () => {
     expect(board[0]).toMatchObject({ stepName: "plan", appId: "app-planner" });
   });
 
-  it("marks phase waiting when a run failed", () => {
+  it("keeps phase idle when only finished failed runs exist", () => {
     const orders = [
       order("wo-f", "Failing", [
         {
@@ -108,7 +108,7 @@ describe("buildLinePhaseBoard", () => {
     ];
 
     const board = buildLinePhaseBoard(LINE, orders);
-    expect(board[1].tick).toBe("waiting");
+    expect(board[1].tick).toBeNull();
   });
 });
 
@@ -120,6 +120,10 @@ describe("resolvePhaseRunStatus", () => {
     expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_PASSED" })).toEqual({
       kind: "idle",
       label: "Passed",
+    });
+    expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_FAILED" })).toEqual({
+      kind: "failed",
+      label: "Failed",
     });
   });
 });

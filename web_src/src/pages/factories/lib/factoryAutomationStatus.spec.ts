@@ -36,7 +36,22 @@ describe("resolveFactoryAutomationStatus", () => {
     ).toEqual({ tick: "running", label: "Executing" });
   });
 
-  it("prefers Needs input over Executing", () => {
+  it("returns Idle when only finished failed executions exist", () => {
+    expect(
+      resolveFactoryAutomationStatus("app-1", [
+        order("wo-1", "A", [
+          {
+            id: "e2",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            run: { id: "r2", appId: "app-1" },
+          },
+        ]),
+      ]),
+    ).toEqual({ tick: null, label: "Idle" });
+  });
+
+  it("prefers Executing over finished failed siblings", () => {
     expect(
       resolveFactoryAutomationStatus("app-1", [
         order("wo-1", "A", [
@@ -53,7 +68,7 @@ describe("resolveFactoryAutomationStatus", () => {
           },
         ]),
       ]),
-    ).toEqual({ tick: "waiting", label: "Needs input" });
+    ).toEqual({ tick: "running", label: "Executing" });
   });
 
   it("ignores executions for other apps", () => {
@@ -72,7 +87,7 @@ describe("resolveFactoryAutomationStatus", () => {
 });
 
 describe("resolveFactoryAutomationStatusFromCanvasRuns", () => {
-  it("returns Idle when there are no active or failed runs", () => {
+  it("returns Idle when there are no active runs", () => {
     expect(
       resolveFactoryAutomationStatusFromCanvasRuns([
         canvasRun({
@@ -84,13 +99,21 @@ describe("resolveFactoryAutomationStatusFromCanvasRuns", () => {
     ).toEqual({ tick: null, label: "Idle" });
   });
 
-  it("prefers Needs input when a canvas run failed", () => {
+  it("returns Idle when canvas runs only failed", () => {
+    expect(
+      resolveFactoryAutomationStatusFromCanvasRuns([
+        canvasRun({ id: "r2", state: "STATE_FINISHED", result: "RESULT_FAILED" }),
+      ]),
+    ).toEqual({ tick: null, label: "Idle" });
+  });
+
+  it("prefers Executing when a canvas run is started even if another failed", () => {
     expect(
       resolveFactoryAutomationStatusFromCanvasRuns([
         canvasRun({ id: "r1", state: "STATE_STARTED" }),
         canvasRun({ id: "r2", state: "STATE_FINISHED", result: "RESULT_FAILED" }),
       ]),
-    ).toEqual({ tick: "waiting", label: "Needs input" });
+    ).toEqual({ tick: "running", label: "Executing" });
   });
 });
 
