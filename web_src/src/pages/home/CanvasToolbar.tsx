@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { Plus, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 interface CanvasToolbarProps {
   searchQuery: string;

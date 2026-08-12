@@ -5,7 +5,7 @@ import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";

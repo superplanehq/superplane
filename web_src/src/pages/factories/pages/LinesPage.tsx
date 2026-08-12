@@ -11,7 +11,7 @@ import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoL
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ArrowLeft, Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   buildLinePhaseBoard,

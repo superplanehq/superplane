@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";

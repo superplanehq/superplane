@@ -13,7 +13,7 @@ import {
 } from "@/ui/dropdownMenu";
 import { LogOut, Monitor, Moon, MoreHorizontal, Sun, User as UserIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 interface SidebarUserMenuProps {
   organizationId: string;
