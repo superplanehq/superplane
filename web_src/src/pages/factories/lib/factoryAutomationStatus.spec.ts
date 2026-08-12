@@ -6,11 +6,7 @@ import {
   resolveFactoryAutomationStatusFromCanvasRuns,
 } from "./factoryAutomationStatus";
 
-function order(
-  id: string,
-  title: string,
-  executions: FactoriesWorkOrder["executions"],
-): FactoriesWorkOrder {
+function order(id: string, title: string, executions: FactoriesWorkOrder["executions"]): FactoriesWorkOrder {
   return { id, title, state: "STATE_OPEN", executions };
 }
 

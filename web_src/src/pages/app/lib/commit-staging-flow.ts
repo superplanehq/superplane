@@ -133,22 +133,19 @@ export async function executeCommitStaging({
     // Eagerly stamp the committed graph into the canvas detail cache so Configure
     // re-entry (refetchOnMount: false) cannot flash the pre-commit live spec.
     if (committedVersion?.spec) {
-      queryClient.setQueryData<CanvasesCanvas | undefined>(
-        canvasKeys.detail(organizationId, canvasId),
-        (current) => {
-          if (!current) {
-            return current;
-          }
-          return {
-            ...current,
-            spec: committedVersion.spec,
-            metadata: {
-              ...current.metadata,
-              liveVersionId: committedVersionId,
-            },
-          };
-        },
-      );
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          spec: committedVersion.spec,
+          metadata: {
+            ...current.metadata,
+            liveVersionId: committedVersionId,
+          },
+        };
+      });
     }
 
     await applyPostCommitCacheUpdates({

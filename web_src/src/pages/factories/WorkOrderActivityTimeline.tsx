@@ -339,12 +339,7 @@ function UserActionEventDescription({
           resolveUserDisplay={resolveUserDisplay}
         />
       ) : hasSourceRun ? (
-        <SourceRunAttribution
-          event={event}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          orderId={orderId}
-        />
+        <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
       ) : (
         <span>{event.title}</span>
       )}

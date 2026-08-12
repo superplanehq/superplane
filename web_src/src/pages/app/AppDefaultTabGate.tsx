@@ -60,8 +60,7 @@ export function AppDefaultTabGate() {
   // The console query is only useful for the Console fallback (no stored tab).
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
   // stored tab do not pay for an unused read. Factory apps never use Console.
-  const consoleQueryEnabled =
-    !alreadyCommitted && !factoryOwnedApp && !pinned && !!canvasId && storedTab === null;
+  const consoleQueryEnabled = !alreadyCommitted && !factoryOwnedApp && !pinned && !!canvasId && storedTab === null;
   const liveConsoleQuery = useCanvasConsole(canvasId, undefined, consoleQueryEnabled);
 
   const commit = (): ReactElement => {

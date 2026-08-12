@@ -23,7 +23,11 @@ export function FactoryAppCanvasPage() {
   const configureActionsRef = useRef<FactoryConfigureActions | null>(null);
   const [configureBusy, setConfigureBusy] = useState(false);
 
-  const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId, appId, {
+  const {
+    data: canvas,
+    isLoading: canvasLoading,
+    error: canvasError,
+  } = useCanvas(organizationId, appId, {
     enabled: Boolean(appId),
   });
 
@@ -112,7 +116,11 @@ export function FactoryAppCanvasPage() {
               </span>
             ) : null}
           </div>
-          <p className={isConfigure ? "mt-1 text-[12px] text-muted-foreground" : "mt-0.5 text-[13px] text-muted-foreground"}>
+          <p
+            className={
+              isConfigure ? "mt-1 text-[12px] text-muted-foreground" : "mt-0.5 text-[13px] text-muted-foreground"
+            }
+          >
             {subtitle}
           </p>
         </div>

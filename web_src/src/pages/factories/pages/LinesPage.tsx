@@ -71,13 +71,7 @@ export function LinesPage() {
             allowed={canUpdate || permissionsLoading}
             message="You don't have permission to create lines."
           >
-            <Button
-              type="button"
-              variant="outline"
-              asChild
-              disabled={!canUpdate}
-              data-testid="lines-create-button"
-            >
+            <Button type="button" variant="outline" asChild disabled={!canUpdate} data-testid="lines-create-button">
               <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryId) : "#"}>
                 <Plus className="h-3.5 w-3.5" aria-hidden />
                 Add line
@@ -180,28 +174,17 @@ function LineDetail({
       </section>
 
       {steps.length === 0 ? (
-        <p className="mt-6 text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
+        <p className="mt-6 text-[13px] text-muted-foreground">
+          No phases yet. Edit this line to add app-driven phases.
+        </p>
       ) : (
-        <PhaseBoard
-          organizationId={organizationId}
-          factoryId={factoryId}
-          lineId={line.id}
-          columns={board}
-        />
+        <PhaseBoard organizationId={organizationId} factoryId={factoryId} lineId={line.id} columns={board} />
       )}
     </div>
   );
 }
 
-function LineCard({
-  line,
-  href,
-  ticks,
-}: {
-  line: FactoriesFactoryLine;
-  href: string;
-  ticks: LinePhaseTick[];
-}) {
+function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: string; ticks: LinePhaseTick[] }) {
   const navigate = useNavigate();
   const steps = line.steps ?? [];
 

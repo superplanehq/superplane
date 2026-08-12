@@ -139,10 +139,7 @@ export function AutomationsPage() {
       </header>
 
       <div
-        className={cn(
-          factoryContentBodyClassName,
-          selectedApp && "flex min-h-0 flex-1 flex-col overflow-hidden py-6",
-        )}
+        className={cn(factoryContentBodyClassName, selectedApp && "flex min-h-0 flex-1 flex-col overflow-hidden py-6")}
       >
         {appsLoading && !selectedApp ? (
           <p className="text-[13px] text-muted-foreground">Loading automations…</p>
@@ -199,10 +196,7 @@ function AutomationDetail({
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteCanvasRuns(canvasId, {}, Boolean(canvasId));
-  const canvasRuns = useMemo(
-    () => runsPages?.pages.flatMap((page) => page?.runs ?? []) ?? [],
-    [runsPages],
-  );
+  const canvasRuns = useMemo(() => runsPages?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsPages]);
   const status = resolveFactoryAutomationStatusFromCanvasRuns(canvasRuns);
   const runs = useMemo(() => listFactoryAutomationRuns(canvasRuns), [canvasRuns]);
   const configureHref = canvasId
@@ -269,12 +263,7 @@ function AutomationDetail({
             <>
               {runs.map((run) => (
                 <li key={run.runId}>
-                  <AutomationRunCard
-                    organizationId={organizationId}
-                    factoryId={factoryId}
-                    appId={canvasId}
-                    run={run}
-                  />
+                  <AutomationRunCard organizationId={organizationId} factoryId={factoryId} appId={canvasId} run={run} />
                 </li>
               ))}
               {isFetchingNextPage ? (
@@ -302,11 +291,7 @@ function AutomationRunCard({
   const href = factoryAppRunPath(organizationId, factoryId, appId, run.runId, { from: "automations" });
   const timestamp = run.updatedAt ?? run.finishedAt ?? run.createdAt;
   const timeLabel =
-    run.tick === "queued" && !timestamp
-      ? "next"
-      : timestamp
-        ? formatTimeAgo(new Date(timestamp), false)
-        : null;
+    run.tick === "queued" && !timestamp ? "next" : timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
 
   return (
     <Link

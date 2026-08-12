@@ -183,8 +183,7 @@ export function RunInspectorNodeActions({
       className={cn(
         "flex shrink-0 items-center gap-2",
         layout === "inline" && "pl-3",
-        layout === "bar" &&
-          "justify-end border-b border-slate-950/10 px-3 py-2 dark:border-gray-800",
+        layout === "bar" && "justify-end border-b border-slate-950/10 px-3 py-2 dark:border-gray-800",
         className,
       )}
     >

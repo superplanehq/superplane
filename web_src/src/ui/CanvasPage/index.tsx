@@ -2904,7 +2904,9 @@ function CanvasContent({
       const currentViewport = getViewport();
       if (!isVerticalFlow) {
         const canvasWidth =
-          typeof document === "undefined" ? 0 : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
+          typeof document === "undefined"
+            ? 0
+            : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
         const rightSidebarSafeArea = 560;
         const placeholderEstimatedWidth = 420;
         const viewportBuffer = 48;

@@ -10,14 +10,7 @@ import {
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
-export type FactoriesNavKind =
-  | "overview"
-  | "missions"
-  | "work-orders"
-  | "lines"
-  | "automations"
-  | "wiki"
-  | "velocity";
+export type FactoriesNavKind = "overview" | "missions" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
 
 export interface FactoriesNavItem {
   id: FactoriesNavKind;

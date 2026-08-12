@@ -4,15 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  startTransition,
-  useState,
-  type MutableRefObject,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, startTransition, useState, type MutableRefObject } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -249,7 +241,11 @@ export function AppPage({
   const factoryViewOnly = factoryEmbed && !factoryConfigure;
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
   onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
-  const { organizationId, appId, factoryId: routeFactoryId } = useParams<{
+  const {
+    organizationId,
+    appId,
+    factoryId: routeFactoryId,
+  } = useParams<{
     organizationId: string;
     appId?: string;
     factoryId?: string;
@@ -575,10 +571,7 @@ export function AppPage({
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(
-    canvasId!,
-    shouldLoadCanvasMemoryEntries(urlViewFlags.isMemoryMode, isViewingLiveVersion),
-  );
+  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(urlViewFlags.isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
@@ -3754,16 +3747,17 @@ export function AppPage({
     setSearchParams,
     // Factory view embed is read-only. Configure enters via a dedicated effect
     // (does not await staged-spec resync — that was leaving "Loading canvas..." forever).
-    startup: factoryViewOnly || factoryConfigure
-      ? undefined
-      : {
-          hasEditableVersion,
-          canUpdateCanvas: canStageCanvasVersion,
-          canvas,
-          liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
-          handlePlaceholderAdd,
-          searchParams,
-        },
+    startup:
+      factoryViewOnly || factoryConfigure
+        ? undefined
+        : {
+            hasEditableVersion,
+            canUpdateCanvas: canStageCanvasVersion,
+            canvas,
+            liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
+            handlePlaceholderAdd,
+            searchParams,
+          },
   });
 
   // Ends the edit session: closes the versions sidebar and returns to the live

@@ -42,10 +42,7 @@ import {
   WorkOrderDetailPage,
   WorkOrdersPage,
 } from "./pages/factories";
-import {
-  createFactoryLinePath,
-  editFactoryLinePath,
-} from "./pages/factories/lib/factoryPagePaths";
+import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";

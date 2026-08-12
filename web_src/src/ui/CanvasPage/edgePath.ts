@@ -173,9 +173,7 @@ function getLeftwardBackwardGutterX(sourceX: number, targetX: number): number {
   return targetLeft - BACKWARD_ROUTE_OFFSET;
 }
 
-function getVerticalBackwardEdgePath(
-  params: CanvasEdgePathParams,
-): [path: string, labelX: number, labelY: number] {
+function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, targetX, targetY } = params;
   const horizontalDelta = targetX - sourceX;
   const gutterX =
@@ -202,9 +200,7 @@ function getVerticalBackwardEdgePath(
   return [path, gutterX, (exitY + entryY) / 2];
 }
 
-function getHorizontalBackwardEdgePath(
-  params: CanvasEdgePathParams,
-): [path: string, labelX: number, labelY: number] {
+function getHorizontalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition } = params;
   const verticalDelta = targetY - sourceY;
 
