@@ -51,6 +51,7 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
+import { requestAgentComposerSend } from "@/components/AgentSidebar/composerPrefill";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
@@ -58,6 +59,7 @@ import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { useCanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
+import { openCanvasToolSidebarTab } from "@/components/CanvasToolSidebar/events";
 import {
   useCanvasToolSidebarState,
   type CanvasToolSidebarState,
@@ -875,6 +877,22 @@ function CanvasPage(props: CanvasPageProps) {
     onAgentStagingReady: props.onAgentStagingReady,
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
+  const agentCanvasId = toolSidebarState.canvasId ?? props.runNodeDetailCanvasId;
+  const rootEventId = props.runNodeDetailRun?.rootEvent?.id;
+
+  const canAskAgentAboutEvent =
+    toolSidebarState.isAgentEnabled && toolSidebarState.showToolSidebarToggle && !!agentCanvasId && !!rootEventId;
+
+  const handleAskAgentAboutEvent = useCallback(() => {
+    if (!canAskAgentAboutEvent || !agentCanvasId || !rootEventId) {
+      return;
+    }
+
+    // Queue the prompt before opening so the composer can flush it after the sidebar mounts.
+    requestAgentComposerSend(agentCanvasId, buildAgentEventInvestigationPrompt(rootEventId));
+    openCanvasToolSidebarTab("agent");
+  }, [agentCanvasId, canAskAgentAboutEvent, rootEventId]);
+
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = allowsRunsSidebar(props.headerMode) && props.toolSidebarRunsContent != null;
   const runningRunsCount = useMemo(
@@ -1656,6 +1674,7 @@ function CanvasPage(props: CanvasPageProps) {
                 selectRun: props.onSelectRunFromSidebarEvent,
               })
             }
+            onAskAgentAboutEvent={canAskAgentAboutEvent ? handleAskAgentAboutEvent : undefined}
             factoryContext={props.factoryEmbed}
             onClose={() => props.onRunNodeDetailClose?.()}
           />
@@ -3571,6 +3590,14 @@ function CanvasContent({
       ) : null}
     </div>
   );
+}
+
+function buildAgentEventInvestigationPrompt(eventId: string): string {
+  return [
+    `Investigate the run associated with event ID "${eventId}".`,
+    "Use the SuperPlane runtime tools to inspect that event's executions and explain the current status, failure, or unusual behavior.",
+    "Do not modify the workflow unless I explicitly ask you to.",
+  ].join(" ");
 }
 
 export type { BuildingBlock } from "../BuildingBlocksSidebar";
