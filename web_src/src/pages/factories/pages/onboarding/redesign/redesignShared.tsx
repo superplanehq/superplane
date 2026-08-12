@@ -41,6 +41,21 @@ function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsH
   return <IntegrationIcon integrationName={name} className="size-5" size={size} />;
 }
 
+function ComingSoonRibbon() {
+  // Nested clip box so the diagonal band can extend past the corner while the
+  // label stays fully inside the visible triangle.
+  return (
+    <span
+      className="pointer-events-none absolute -right-px -top-px z-10 size-[5.5rem] overflow-hidden"
+      aria-hidden
+    >
+      <span className="absolute top-[1.35rem] -right-8 w-[8.5rem] rotate-45 bg-muted py-1 text-center text-[9px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+        Coming soon
+      </span>
+    </span>
+  );
+}
+
 /**
  * Shared row for version control, issues, and coding agent options.
  * Connectable rows always show Connect / Connected on the right.
@@ -53,6 +68,7 @@ function ConnectOptionRow({
   meta,
   connectLabel,
   connected,
+  soon,
   onSelect,
   onConnect,
 }: {
@@ -64,12 +80,14 @@ function ConnectOptionRow({
   /** When set, show Connect / Connected on the right. */
   connectLabel?: string;
   connected?: boolean;
+  soon?: boolean;
   onSelect: () => void;
   onConnect?: () => void;
 }) {
-  const needsConnect = Boolean(connectLabel) && !connected;
+  const needsConnect = Boolean(connectLabel) && !connected && !soon;
 
   const select = () => {
+    if (soon) return;
     onSelect();
     if (needsConnect) onConnect?.();
   };
@@ -77,44 +95,61 @@ function ConnectOptionRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
-        selected ? "border-foreground bg-accent/40" : "border-border bg-background",
+        "relative rounded-lg border px-4 py-3 transition-colors",
+        soon
+          ? "overflow-hidden border-border/70 bg-muted/20 opacity-70"
+          : selected
+            ? "border-foreground bg-accent/40"
+            : "border-border bg-background",
       )}
+      aria-disabled={soon || undefined}
+      data-soon={soon ? "true" : undefined}
     >
-      <button type="button" className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={select}>
-        <span className="mt-0.5 shrink-0">{icon}</span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
-            {meta ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
-            {selected && !needsConnect ? (
-              <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
-            ) : null}
-          </span>
-          <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
-        </span>
-      </button>
-      {connectLabel ? (
-        <div className="shrink-0 self-center">
-          {connected ? (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-              <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
-              Connected
-            </span>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                onSelect();
-                onConnect?.();
-              }}
-            >
-              Connect {connectLabel}
-            </Button>
+      {soon ? <ComingSoonRibbon /> : null}
+      <div className="flex flex-wrap items-start gap-3">
+        <button
+          type="button"
+          className={cn(
+            "flex min-w-0 flex-1 items-start gap-3 text-left",
+            soon && "cursor-not-allowed",
           )}
-        </div>
-      ) : null}
+          onClick={select}
+          disabled={soon}
+        >
+          <span className="mt-0.5 shrink-0">{icon}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
+              {meta && !soon ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
+              {selected && !needsConnect && !soon ? (
+                <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
+              ) : null}
+            </span>
+            <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
+          </span>
+        </button>
+        {connectLabel && !soon ? (
+          <div className="shrink-0 self-center">
+            {connected ? (
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
+                <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+                Connected
+              </span>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  onSelect();
+                  onConnect?.();
+                }}
+              >
+                Connect {connectLabel}
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -273,9 +308,9 @@ export function RepoStep({
               title={option.label}
               detail={option.detail}
               selected={selected}
-              meta={option.id === "github" ? "Recommended" : undefined}
               connectLabel={vcsLabel(optionId)}
               connected={connected}
+              soon={option.soon}
               onSelect={() => setup.selectVcsHost(optionId)}
               onConnect={() => onRequestConnect(optionId)}
             />
@@ -350,6 +385,7 @@ export function IssuesStep({
               selected={setup.issuesChoice === "linear"}
               connectLabel="Linear"
               connected={setup.connected.has("linear")}
+              soon
               onSelect={() => setup.setIssuesChoice("linear")}
               onConnect={() => onRequestConnect("linear")}
             />
@@ -360,6 +396,7 @@ export function IssuesStep({
               selected={setup.issuesChoice === "jira"}
               connectLabel="Jira"
               connected={setup.connected.has("jira")}
+              soon
               onSelect={() => setup.setIssuesChoice("jira")}
               onConnect={() => onRequestConnect("jira")}
             />
@@ -395,9 +432,9 @@ export function AgentStep({
             title={option.label}
             detail={option.detail}
             selected={setup.agent === option.id}
-            meta={option.recommended ? "Recommended" : undefined}
             connectLabel={integrationLabel(option.integrationId)}
             connected={connected}
+            soon={option.soon}
             onSelect={() => setup.setAgent(option.id as AgentHarnessId)}
             onConnect={() => onRequestConnect(option.integrationId)}
           />

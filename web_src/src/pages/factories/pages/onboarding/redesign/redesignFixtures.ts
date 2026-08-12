@@ -13,8 +13,8 @@ export type IntegrationOption = {
 };
 
 export const VCS_OPTIONS: IntegrationOption[] = [
-  { id: "github", label: "GitHub", detail: "Recommended. Connect the app repository on GitHub." },
-  { id: "gitlab", label: "GitLab", detail: "Connect the app repository on GitLab." },
+  { id: "github", label: "GitHub", detail: "Connect the app repository on GitHub." },
+  { id: "gitlab", label: "GitLab", detail: "Connect the app repository on GitLab.", soon: true },
 ];
 
 export const AGENT_OPTIONS: {
@@ -22,26 +22,27 @@ export const AGENT_OPTIONS: {
   label: string;
   integrationId: IntegrationId;
   detail: string;
-  recommended?: boolean;
+  soon?: boolean;
 }[] = [
   {
     id: "claude-code",
     label: "Claude Code",
     integrationId: "claude",
     detail: "Cloud agent that changes the app repository and opens pull requests.",
-    recommended: true,
   },
   {
     id: "cursor",
     label: "Cursor",
     integrationId: "cursor",
     detail: "Cloud agent that changes the app repository and opens pull requests.",
+    soon: true,
   },
   {
     id: "codex",
     label: "Codex",
     integrationId: "openai",
     detail: "Cloud agent (OpenAI) that changes the app repository and opens pull requests.",
+    soon: true,
   },
 ];
 
