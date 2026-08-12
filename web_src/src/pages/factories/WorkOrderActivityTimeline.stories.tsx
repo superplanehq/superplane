@@ -8,6 +8,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_ID,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
 import {
@@ -29,6 +30,9 @@ const meta = {
   title: "Factories/Components/WorkOrderActivityTimeline",
   component: WorkOrderActivityTimeline,
   parameters: { layout: "padded" },
+  args: {
+    factoryId: PRIMARY_FACTORY_ID,
+  },
   decorators: [
     (Story) => (
       <ComponentStoryShell className="min-h-[380px] max-w-2xl bg-white p-6 dark:bg-gray-900">
