@@ -79,6 +79,12 @@ func (s *TestSession) Close() {
 // Page exposes the underlying playwright Page to satisfy queries.Runner.
 func (s *TestSession) Page() pw.Page { return s.page }
 
+// TimeoutMs is the default timeout (in milliseconds) used for page
+// interactions such as navigation and waiting for elements. Steps that need to
+// wait on the UI should use this instead of ad-hoc values so they share a
+// single, consistent budget.
+func (s *TestSession) TimeoutMs() float64 { return s.timeoutMs }
+
 func (s *TestSession) Visit(path string) {
 	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
 	if err != nil {

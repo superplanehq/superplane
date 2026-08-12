@@ -138,14 +138,27 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 }
 
 func (s *invitationSteps) openSignupForm() {
-	// With magic code enabled, toggle to password login first
-	// so the "Create an account" link becomes visible.
-	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
-	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
-		require.NoError(s.t, toggle.Click())
-	}
+	page := s.session.Page()
 
-	button := s.session.Page().Locator("text=Create an account").First()
+	// The e2e environment always enables magic-code login (see test_context.go),
+	// so the login screen opens in email-code mode and hides the password/signup
+	// form behind a "Sign in with password instead" toggle. The "Create an
+	// account" link only renders once that toggle is clicked; in magic-code mode
+	// the signup entry point instead reads "Sign up".
+	//
+	// Wait for the toggle with the session's standard timeout rather than a short
+	// one: a cold Vite dev server can take several seconds to serve the login
+	// bundle, and racing it with a 3s timeout previously left the page in
+	// magic-code mode, causing a misleading timeout while waiting for the
+	// "Create an account" link that could never appear.
+	toggle := page.Locator("text=Sign in with password instead").First()
+	require.NoError(s.t, toggle.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(s.session.TimeoutMs()),
+	}))
+	require.NoError(s.t, toggle.Click())
+
+	button := page.Locator("text=Create an account").First()
 	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
 	require.NoError(s.t, button.Click())
 }
