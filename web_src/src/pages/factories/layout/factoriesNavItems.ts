@@ -1,8 +1,7 @@
-import { BookOpen, ClipboardList, Crosshair, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
+import { BookOpen, ClipboardList, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   automationsPath,
-  factoryMissionsPath,
   factoryOverviewPath,
   factoryVelocityPath,
   factoryWikiPath,
@@ -10,7 +9,7 @@ import {
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
-export type FactoriesNavKind = "overview" | "missions" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
+export type FactoriesNavKind = "overview" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
 
 export interface FactoriesNavItem {
   id: FactoriesNavKind;
@@ -25,12 +24,6 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
     label: "Overview",
     Icon: LayoutDashboard,
     buildHref: factoryOverviewPath,
-  },
-  {
-    id: "missions",
-    label: "Missions",
-    Icon: Crosshair,
-    buildHref: factoryMissionsPath,
   },
   {
     id: "work-orders",
