@@ -12,6 +12,8 @@ export function RunInspectorChrome({
   onNavigateRun,
   onNavigateOlder,
   onClose,
+  /** Factory embed: only Close — hide newer/older/copy-link. */
+  showRunNavigation = true,
 }: {
   runId?: string | null;
   newerRunId?: string | null;
@@ -20,6 +22,7 @@ export function RunInspectorChrome({
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
   onClose: () => void;
+  showRunNavigation?: boolean;
 }) {
   const canUseOlderNavigation = canNavigateOlder ?? Boolean(olderRunId);
   const olderNavigationDisabled = !canUseOlderNavigation || (olderRunId ? !onNavigateRun : !onNavigateOlder);
@@ -34,7 +37,12 @@ export function RunInspectorChrome({
   };
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-950/10 px-2 py-1.5 dark:border-gray-800">
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-2 border-b border-slate-950/10 px-2 py-1.5 dark:border-gray-800",
+        showRunNavigation ? "justify-between" : "justify-start",
+      )}
+    >
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -50,33 +58,39 @@ export function RunInspectorChrome({
           </TooltipTrigger>
           <TooltipContent side="bottom">Close</TooltipContent>
         </Tooltip>
-        <RunNavigationButton
-          label="Newer run"
-          disabled={!newerRunId || !onNavigateRun}
-          onClick={() => newerRunId && onNavigateRun?.(newerRunId)}
-        >
-          <ChevronUp className="h-4 w-4" />
-        </RunNavigationButton>
-        <RunNavigationButton label="Older run" disabled={olderNavigationDisabled} onClick={handleOlderNavigation}>
-          <ChevronDown className="h-4 w-4" />
-        </RunNavigationButton>
-      </div>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <button
-              type="button"
-              aria-label="Copy run link"
-              disabled={!runId}
-              onClick={() => runId && void copyRunLink(runId)}
-              className={chromeIconButtonClassName}
+        {showRunNavigation ? (
+          <>
+            <RunNavigationButton
+              label="Newer run"
+              disabled={!newerRunId || !onNavigateRun}
+              onClick={() => newerRunId && onNavigateRun?.(newerRunId)}
             >
-              <LinkIcon className="h-4 w-4" />
-            </button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Copy link</TooltipContent>
-      </Tooltip>
+              <ChevronUp className="h-4 w-4" />
+            </RunNavigationButton>
+            <RunNavigationButton label="Older run" disabled={olderNavigationDisabled} onClick={handleOlderNavigation}>
+              <ChevronDown className="h-4 w-4" />
+            </RunNavigationButton>
+          </>
+        ) : null}
+      </div>
+      {showRunNavigation ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <button
+                type="button"
+                aria-label="Copy run link"
+                disabled={!runId}
+                onClick={() => runId && void copyRunLink(runId)}
+                className={chromeIconButtonClassName}
+              >
+                <LinkIcon className="h-4 w-4" />
+              </button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Copy link</TooltipContent>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }
