@@ -23,9 +23,9 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
- * Builds the Lines detail board: one column per line step, each with every
- * canvas-run execution for that step (matched by line id + step name), newest
- * first. The detail UI pages these into a scrollable column.
+ * Builds the Lines detail board: one column per line step. Each work order
+ * appears once, in the column for its current (furthest active, else furthest
+ * finished) step on this line — newest cards first within a column.
  */
 export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: FactoriesWorkOrder[]): LinePhaseColumn[] {
   const lineId = line.id;
@@ -34,7 +34,7 @@ export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: Fact
     return [];
   }
 
-  const runsByStep = collectRunsByStep(lineId, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
 
   return steps.map((step, stepIndex) => {
     const stepName = step.name?.trim() || `Phase ${stepIndex + 1}`;
@@ -78,29 +78,48 @@ export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
   return { kind: "idle", label: "Unknown" };
 }
 
-function collectRunsByStep(lineId: string, workOrders: FactoriesWorkOrder[]): Map<string, LinePhaseRunCard[]> {
+function collectCurrentRunsByStep(
+  lineId: string,
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  workOrders: FactoriesWorkOrder[],
+): Map<string, LinePhaseRunCard[]> {
+  const stepIndexByName = new Map<string, number>();
+  for (const [index, step] of steps.entries()) {
+    if (step.name) {
+      stepIndexByName.set(step.name, index);
+    }
+  }
+
   const runsByStep = new Map<string, LinePhaseRunCard[]>();
 
   for (const order of workOrders) {
     if (!order.id) {
       continue;
     }
-    for (const execution of order.executions ?? []) {
-      if (execution.line?.id !== lineId || !execution.step) {
-        continue;
-      }
-      const card: LinePhaseRunCard = {
-        executionId: execution.id ?? `${order.id}-${execution.step}-${execution.createdAt ?? ""}`,
-        workOrderId: order.id,
-        title: order.title?.trim() || "Untitled work order",
-        execution,
-      };
-      const existing = runsByStep.get(execution.step);
-      if (existing) {
-        existing.push(card);
-      } else {
-        runsByStep.set(execution.step, [card]);
-      }
+
+    const lineExecutions = (order.executions ?? []).filter(
+      (execution) => execution.line?.id === lineId && Boolean(execution.step) && stepIndexByName.has(execution.step!),
+    );
+    if (lineExecutions.length === 0) {
+      continue;
+    }
+
+    const currentExecution = pickCurrentLineExecution(lineExecutions, stepIndexByName);
+    if (!currentExecution?.step) {
+      continue;
+    }
+
+    const card: LinePhaseRunCard = {
+      executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
+      workOrderId: order.id,
+      title: order.title?.trim() || "Untitled work order",
+      execution: currentExecution,
+    };
+    const existing = runsByStep.get(currentExecution.step);
+    if (existing) {
+      existing.push(card);
+    } else {
+      runsByStep.set(currentExecution.step, [card]);
     }
   }
 
@@ -109,6 +128,37 @@ function collectRunsByStep(lineId: string, workOrders: FactoriesWorkOrder[]): Ma
   }
 
   return runsByStep;
+}
+
+function pickCurrentLineExecution(
+  executions: FactoriesWorkOrderExecution[],
+  stepIndexByName: Map<string, number>,
+): FactoriesWorkOrderExecution | null {
+  const active = executions.filter(isActiveWorkOrderExecution);
+  const candidates = active.length > 0 ? active : executions;
+  let best: FactoriesWorkOrderExecution | null = null;
+  let bestStepIndex = -1;
+  let bestTime = -1;
+
+  for (const execution of candidates) {
+    const stepIndex = stepIndexByName.get(execution.step ?? "") ?? -1;
+    if (stepIndex < 0) {
+      continue;
+    }
+    const time = Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
+    if (
+      !best ||
+      stepIndex > bestStepIndex ||
+      (stepIndex === bestStepIndex && time > bestTime) ||
+      (stepIndex === bestStepIndex && time === bestTime && (execution.id ?? "") > (best.id ?? ""))
+    ) {
+      best = execution;
+      bestStepIndex = stepIndex;
+      bestTime = time;
+    }
+  }
+
+  return best;
 }
 
 function compareRunsNewestFirst(left: LinePhaseRunCard, right: LinePhaseRunCard): number {
