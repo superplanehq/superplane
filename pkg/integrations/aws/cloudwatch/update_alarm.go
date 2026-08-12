@@ -27,6 +27,7 @@ type UpdateAlarmConfiguration struct {
 	Unit                    string             `json:"unit" mapstructure:"unit"`
 	ActionsEnabled          string             `json:"actionsEnabled" mapstructure:"actionsEnabled"`
 	AlarmActions            []string           `json:"alarmActions" mapstructure:"alarmActions"`
+	EC2Action               string             `json:"ec2Action" mapstructure:"ec2Action"`
 	OKActions               []string           `json:"okActions" mapstructure:"okActions"`
 	InsufficientDataActions []string           `json:"insufficientDataActions" mapstructure:"insufficientDataActions"`
 }
@@ -65,6 +66,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Threshold tuning**: Raise or lower thresholds without recreating the alarm
 - **Operational changes**: Adjust periods, statistics or missing-data handling as workloads change
 - **Notification updates**: Change which SNS topics are notified on each state transition
+- **Self-healing**: Attach or change an EC2 recover/reboot action on an existing alarm
 - **Maintenance windows**: Disable alarm actions during planned work and re-enable them afterwards
 
 ## Configuration
@@ -81,6 +83,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Unit** *(toggleable)*: Metric unit
 - **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an ` + "`AWS/EC2`" + ` alarm with an InstanceId dimension
 - **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
 - **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
 
@@ -228,6 +231,7 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 			},
 		},
 		alarmActionsField("alarmActions", "Alarm Actions", "SNS topics notified when the alarm enters ALARM"),
+		ec2ActionField(nil),
 		alarmActionsField("okActions", "OK Actions", "SNS topics notified when the alarm returns to OK"),
 		alarmActionsField(
 			"insufficientDataActions",
@@ -303,7 +307,7 @@ func (c *UpdateAlarm) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to describe alarm: %w", err)
 	}
 
-	input, err := buildUpdateAlarmInput(existing, config, ctx.Configuration)
+	input, err := buildUpdateAlarmInput(region, existing, config, ctx.Configuration)
 	if err != nil {
 		return err
 	}
@@ -388,6 +392,7 @@ func thresholdConditionConfig(rawConfiguration any) (map[string]any, bool) {
 }
 
 func buildUpdateAlarmInput(
+	region string,
 	existing *MetricAlarm,
 	config UpdateAlarmConfiguration,
 	rawConfiguration any,
@@ -473,9 +478,21 @@ func buildUpdateAlarmInput(
 		input.ActionsEnabled = strings.TrimSpace(config.ActionsEnabled) != "false"
 	}
 
-	// An enabled-but-empty action field clears that transition's actions.
-	if hasConfigKey(rawConfiguration, "alarmActions") {
-		input.AlarmActions = config.AlarmActions
+	// The ALARM transition carries both SNS topics and the EC2 action, so only the
+	// kinds the user enabled are replaced. An enabled-but-empty field clears its kind.
+	replaceSNS := hasConfigKey(rawConfiguration, "alarmActions")
+	replaceEC2 := hasConfigKey(rawConfiguration, "ec2Action")
+	if replaceSNS || replaceEC2 {
+		ec2ActionARN := ""
+		if ec2Action := strings.TrimSpace(config.EC2Action); ec2Action != "" {
+			if err := requireEC2ActionTarget(existing.Namespace, existing.Dimensions); err != nil {
+				return PutMetricAlarmInput{}, err
+			}
+
+			ec2ActionARN = EC2AutomationARN(region, ec2Action)
+		}
+
+		input.AlarmActions = mergeAlarmActions(existing.AlarmActions, config.AlarmActions, ec2ActionARN, replaceSNS, replaceEC2)
 	}
 
 	if hasConfigKey(rawConfiguration, "okActions") {

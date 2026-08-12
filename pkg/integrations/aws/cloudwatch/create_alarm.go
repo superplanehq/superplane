@@ -3,6 +3,7 @@ package cloudwatch
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -30,6 +31,7 @@ type CreateAlarmConfiguration struct {
 	Unit                    string   `json:"unit" mapstructure:"unit"`
 	ActionsEnabled          bool     `json:"actionsEnabled" mapstructure:"actionsEnabled"`
 	AlarmActions            []string `json:"alarmActions" mapstructure:"alarmActions"`
+	EC2Action               string   `json:"ec2Action" mapstructure:"ec2Action"`
 	OKActions               []string `json:"okActions" mapstructure:"okActions"`
 	InsufficientDataActions []string `json:"insufficientDataActions" mapstructure:"insufficientDataActions"`
 }
@@ -81,6 +83,7 @@ func (c *CreateAlarm) Documentation() string {
 - **Unit** *(toggleable)*: Metric unit. Leave unset unless the metric is published with several units
 - **Actions Enabled**: Whether alarm actions run on state changes (default: enabled)
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM — Recover, Reboot, Stop or Terminate. Shown for ` + "`AWS/EC2`" + ` alarms, and requires an InstanceId dimension
 - **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
 - **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
 
@@ -248,6 +251,9 @@ func (c *CreateAlarm) Configuration() []configuration.Field {
 			Description: "Run the configured actions when the alarm changes state",
 		},
 		alarmActionsField("alarmActions", "Alarm Actions", "SNS topics notified when the alarm enters ALARM"),
+		ec2ActionField([]configuration.VisibilityCondition{
+			{Field: "namespace", Values: []string{alarmNamespaceEC2}},
+		}),
 		alarmActionsField("okActions", "OK Actions", "SNS topics notified when the alarm returns to OK"),
 		alarmActionsField(
 			"insufficientDataActions",
@@ -355,6 +361,15 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	alarmActions := config.AlarmActions
+	if ec2Action := strings.TrimSpace(config.EC2Action); ec2Action != "" {
+		if err := requireEC2ActionTarget(namespace, dimensions); err != nil {
+			return err
+		}
+
+		alarmActions = append(alarmActions, EC2AutomationARN(region, ec2Action))
+	}
+
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
@@ -376,7 +391,7 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		ComparisonOperator:      comparisonOperator,
 		TreatMissingData:        config.TreatMissingData,
 		ActionsEnabled:          !hasConfigKey(ctx.Configuration, "actionsEnabled") || config.ActionsEnabled,
-		AlarmActions:            config.AlarmActions,
+		AlarmActions:            alarmActions,
 		OKActions:               config.OKActions,
 		InsufficientDataActions: config.InsufficientDataActions,
 	})

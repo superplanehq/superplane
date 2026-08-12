@@ -609,6 +609,7 @@ The Create Alarm component creates a CloudWatch metric alarm on any metric publi
 - **Unit** *(toggleable)*: Metric unit. Leave unset unless the metric is published with several units
 - **Actions Enabled**: Whether alarm actions run on state changes (default: enabled)
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM — Recover, Reboot, Stop or Terminate. Shown for `AWS/EC2` alarms, and requires an InstanceId dimension
 - **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
 - **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
 
@@ -683,6 +684,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Threshold tuning**: Raise or lower thresholds without recreating the alarm
 - **Operational changes**: Adjust periods, statistics or missing-data handling as workloads change
 - **Notification updates**: Change which SNS topics are notified on each state transition
+- **Self-healing**: Attach or change an EC2 recover/reboot action on an existing alarm
 - **Maintenance windows**: Disable alarm actions during planned work and re-enable them afterwards
 
 ### Configuration
@@ -699,6 +701,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Unit** *(toggleable)*: Metric unit
 - **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an `AWS/EC2` alarm with an InstanceId dimension
 - **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
 - **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
 

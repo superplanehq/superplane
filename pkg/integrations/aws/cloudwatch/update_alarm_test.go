@@ -48,6 +48,40 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// An EC2 alarm whose ALARM transition mixes all three kinds of action ARN:
+// an SNS topic, an EC2 automation, and a Lambda the components never expose.
+const describeEC2ActionAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>api-status-check</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-status-check</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>StatusCheckFailed_System</MetricName>
+        <Statistic>Maximum</Statistic>
+        <Period>60</Period>
+        <EvaluationPeriods>2</EvaluationPeriods>
+        <Threshold>1</Threshold>
+        <ComparisonOperator>GreaterThanOrEqualToThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <AlarmActions>
+          <member>arn:aws:sns:us-east-1:123456789012:ops-alerts</member>
+          <member>arn:aws:automate:us-east-1:ec2:recover</member>
+          <member>arn:aws:lambda:us-east-1:123456789012:function:remediate</member>
+        </AlarmActions>
+        <Dimensions>
+          <member>
+            <Name>InstanceId</Name>
+            <Value>i-1234567890abcdef0</Value>
+          </member>
+        </Dimensions>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 // A percentile alarm: uses ExtendedStatistic instead of Statistic, and carries
 // the percentile-only EvaluateLowSampleCountPercentile setting.
 const describePercentileAlarmXML = `
@@ -290,6 +324,108 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		body := requestBody(t, httpContext, 1)
 		assert.Contains(t, body, "ActionsEnabled=false")
 		assert.Contains(t, body, "Threshold=80")
+	})
+
+	t.Run("changing the sns topics preserves the existing ec2 action", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeEC2ActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"alarm":        "api-status-check",
+				"alarmActions": []any{"arn:aws:sns:us-east-1:123456789012:pager"},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3Apager")
+		assert.Contains(t, body, "arn%3Aaws%3Aautomate%3Aus-east-1%3Aec2%3Arecover")
+		assert.NotContains(t, body, "ops-alerts")
+	})
+
+	t.Run("changing the ec2 action preserves the existing sns topics", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeEC2ActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "api-status-check",
+				"ec2Action": "reboot",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "arn%3Aaws%3Aautomate%3Aus-east-1%3Aec2%3Areboot")
+		assert.Contains(t, body, "arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3Aops-alerts")
+		assert.NotContains(t, body, "ec2%3Arecover")
+	})
+
+	t.Run("enabled but empty ec2 action clears it and keeps the sns topics", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeEC2ActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "api-status-check",
+				"ec2Action": "",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.NotContains(t, body, "automate")
+		assert.Contains(t, body, "arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3Aops-alerts")
+	})
+
+	t.Run("action ARNs of other kinds always survive", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeEC2ActionAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"alarm":        "api-status-check",
+				"alarmActions": []any{},
+				"ec2Action":    "",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		// The Lambda action was never exposed as a field, so it must not be collateral.
+		body := requestBody(t, httpContext, 1)
+		assert.Contains(t, body, "arn%3Aaws%3Alambda%3Aus-east-1%3A123456789012%3Afunction%3Aremediate")
+		assert.NotContains(t, body, "ops-alerts")
+		assert.NotContains(t, body, "automate")
+	})
+
+	t.Run("ec2 action on a non-EC2 alarm -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describePercentileAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "api-p90-latency",
+				"ec2Action": "terminate",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "EC2 actions require an AWS/EC2 alarm")
 	})
 
 	t.Run("percentile settings survive an unrelated update", func(t *testing.T) {

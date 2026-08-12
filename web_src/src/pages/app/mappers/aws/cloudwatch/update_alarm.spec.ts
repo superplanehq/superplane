@@ -143,6 +143,14 @@ describe("updateAlarmMapper.getExecutionDetails", () => {
     expect(updateAlarmMapper.getExecutionDetails(ctx)["Updated"]).toBe("Threshold, Period, Alarm Actions");
   });
 
+  it("includes the EC2 action in the updated row", () => {
+    const ctx = buildDetailsCtx({
+      node: { configuration: { region: "us-east-1", alarm: "api-status-check", ec2Action: "recover" } },
+      execution: { outputs: { default: [buildOutput(alarmOutputData)] } },
+    });
+    expect(updateAlarmMapper.getExecutionDetails(ctx)["Updated"]).toBe("EC2 Action");
+  });
+
   it("shows a dash when nothing is enabled", () => {
     const ctx = buildDetailsCtx({
       node: { configuration: { region: "us-east-1", alarm: "api-high-cpu" } },

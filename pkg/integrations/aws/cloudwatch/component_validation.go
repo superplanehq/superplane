@@ -106,6 +106,7 @@ var updateAlarmFieldKeys = []string{
 	"unit",
 	"actionsEnabled",
 	"alarmActions",
+	"ec2Action",
 	"okActions",
 	"insufficientDataActions",
 }
@@ -121,6 +122,7 @@ var updateAlarmFieldLabels = map[string]string{
 	"unit":                    "Unit",
 	"actionsEnabled":          "Actions Enabled",
 	"alarmActions":            "Alarm Actions",
+	"ec2Action":               "EC2 Action",
 	"okActions":               "OK Actions",
 	"insufficientDataActions": "Insufficient Data Actions",
 }

@@ -59,6 +59,26 @@ func alarmActionsField(name, label, description string) configuration.Field {
 	}
 }
 
+// ec2ActionField exposes the EC2 automation action. Only Create Alarm can gate
+// it on the namespace, since Update Alarm does not learn the alarm's namespace
+// until it reads the alarm.
+func ec2ActionField(visibilityConditions []configuration.VisibilityCondition) configuration.Field {
+	return configuration.Field{
+		Name:                 "ec2Action",
+		Label:                "EC2 Action",
+		Type:                 configuration.FieldTypeSelect,
+		Required:             false,
+		Togglable:            true,
+		Description:          "EC2 automation CloudWatch runs when the alarm enters ALARM. Requires an AWS/EC2 alarm with an InstanceId dimension",
+		VisibilityConditions: visibilityConditions,
+		TypeOptions: &configuration.TypeOptions{
+			Select: &configuration.SelectTypeOptions{
+				Options: AlarmEC2ActionOptions,
+			},
+		},
+	}
+}
+
 func regionParameter() configuration.ParameterRef {
 	return configuration.ParameterRef{
 		Name:      "region",

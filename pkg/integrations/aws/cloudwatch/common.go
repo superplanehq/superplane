@@ -35,6 +35,15 @@ var AllAlarmStates = []configuration.FieldOption{
 	},
 }
 
+// AlarmEC2ActionOptions are the EC2 automations CloudWatch can run itself when
+// an alarm fires. Each value maps to arn:aws:automate:<region>:ec2:<value>.
+var AlarmEC2ActionOptions = []configuration.FieldOption{
+	{Label: "Recover", Value: "recover"},
+	{Label: "Reboot", Value: "reboot"},
+	{Label: "Stop", Value: "stop"},
+	{Label: "Terminate", Value: "terminate"},
+}
+
 var AlarmStatisticOptions = []configuration.FieldOption{
 	{Label: "Average", Value: StatisticAverage},
 	{Label: "Sum", Value: "Sum"},

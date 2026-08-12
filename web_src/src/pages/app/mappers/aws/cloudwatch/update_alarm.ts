@@ -38,6 +38,7 @@ interface Configuration {
   unit?: string;
   actionsEnabled?: string;
   alarmActions?: string[];
+  ec2Action?: string;
   okActions?: string[];
   insufficientDataActions?: string[];
 }
@@ -59,6 +60,7 @@ const UPDATABLE_FIELDS: [keyof Configuration, string][] = [
   ["unit", "Unit"],
   ["actionsEnabled", "Actions Enabled"],
   ["alarmActions", "Alarm Actions"],
+  ["ec2Action", "EC2 Action"],
   ["okActions", "OK Actions"],
   ["insufficientDataActions", "Insufficient Data Actions"],
 ];

@@ -246,6 +246,79 @@ func Test__CreateAlarm__Execute(t *testing.T) {
 		assert.Contains(t, body, "ActionsEnabled=true")
 	})
 
+	t.Run("ec2 action is sent alongside the sns topics", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(``))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(describeAlarmsXML))},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"alarmName":          "api-status-check",
+				"namespace":          "AWS/EC2",
+				"metricName":         "StatusCheckFailed_System",
+				"dimensions":         instanceDimensions,
+				"statistic":          "Maximum",
+				"comparisonOperator": "GreaterThanOrEqualToThreshold",
+				"threshold":          1.0,
+				"alarmActions":       []any{"arn:aws:sns:us-east-1:123456789012:ops-alerts"},
+				"ec2Action":          "recover",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 0)
+		assert.Contains(t, body, "AlarmActions.member.1=arn%3Aaws%3Asns%3Aus-east-1%3A123456789012%3Aops-alerts")
+		assert.Contains(t, body, "AlarmActions.member.2=arn%3Aaws%3Aautomate%3Aus-east-1%3Aec2%3Arecover")
+	})
+
+	t.Run("ec2 action on a non-EC2 namespace -> error", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"alarmName":          "queue-depth",
+				"namespace":          "AWS/SQS",
+				"metricName":         "ApproximateNumberOfMessagesVisible",
+				"statistic":          "Maximum",
+				"comparisonOperator": "GreaterThanThreshold",
+				"threshold":          100.0,
+				"ec2Action":          "reboot",
+			},
+			HTTP:           &contexts.HTTPContext{},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "EC2 actions require an AWS/EC2 alarm")
+	})
+
+	t.Run("ec2 action without an InstanceId dimension -> error", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"alarmName":          "fleet-cpu",
+				"namespace":          "AWS/EC2",
+				"metricName":         "CPUUtilization",
+				"dimensions":         `[{"name":"AutoScalingGroupName","value":"api-asg"}]`,
+				"statistic":          "Average",
+				"comparisonOperator": "GreaterThanThreshold",
+				"threshold":          80.0,
+				"ec2Action":          "stop",
+			},
+			HTTP:           &contexts.HTTPContext{},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "require the alarm to have an InstanceId dimension")
+	})
+
 	t.Run("alarm creation failure -> error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
