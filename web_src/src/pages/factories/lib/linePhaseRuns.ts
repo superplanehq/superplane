@@ -58,7 +58,8 @@ export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
     return { kind: "running", label: "Executing" };
   }
   if (execution.state === "STATE_CANCELLING") {
-    return { kind: "waiting", label: "Cancelling" };
+    // In-flight like Automations (running tick), but keep Cancelling label.
+    return { kind: "running", label: "Cancelling" };
   }
   if (execution.state === "STATE_PENDING") {
     return { kind: "queued", label: "Queued" };

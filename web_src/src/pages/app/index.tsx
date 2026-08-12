@@ -3778,6 +3778,7 @@ export function AppPage({
   }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
 
   const factoryConfigureEnterStartedRef = useRef(false);
+  const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
   useEffect(() => {
     if (!factoryConfigure) {
       factoryConfigureEnterStartedRef.current = false;
@@ -3805,19 +3806,40 @@ export function AppPage({
       },
       spec: immediateSpec,
     };
+    const configureVersionId = liveCanvasVersionId;
+    let cancelled = false;
+    let editEnabled = false;
 
     previewingCurrentVersionRef.current = true;
-    activateCanvasVersionForEditing(liveCanvasVersionId, versionForEdit, { preserveStagedLayer: true });
-    draftCanvasSpecsRef.current.set(liveCanvasVersionId, immediateSpec);
+    activateCanvasVersionForEditing(configureVersionId, versionForEdit, { preserveStagedLayer: true });
+    draftCanvasSpecsRef.current.set(configureVersionId, immediateSpec);
     setDraftCanvasSpec(immediateSpec);
-    setEditSessionActive(true);
-    if (liveCanvas) {
-      setLastSavedWorkflowSnapshot({ ...liveCanvas, spec: immediateSpec });
-    }
 
-    void resyncStagedEditorState(liveCanvasVersionId, { bumpResetNonce: false }).catch(() => {
-      // Keep the immediate live/committed spec so Configure stays usable.
-    });
+    // Await staged resync before enabling edit so a late applyStagedSpec cannot
+    // wipe edits typed against the immediate seed.
+    void (async () => {
+      try {
+        await resyncStagedEditorState(configureVersionId, { bumpResetNonce: false });
+      } catch {
+        // Keep the immediate live/committed spec so Configure stays usable.
+      }
+      if (cancelled) {
+        return;
+      }
+      editEnabled = true;
+      setEditSessionActive(true);
+      if (liveCanvas) {
+        const spec = draftCanvasSpecsRef.current.get(configureVersionId) ?? immediateSpec;
+        setLastSavedWorkflowSnapshot({ ...liveCanvas, spec });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (!editEnabled) {
+        factoryConfigureEnterStartedRef.current = false;
+      }
+    };
   }, [
     activateCanvasVersionForEditing,
     canStageCanvasVersion,
@@ -3832,7 +3854,7 @@ export function AppPage({
     setLastSavedWorkflowSnapshot,
   ]);
 
-  const factoryConfigureBusy = commitStagingPending || resetStagingPending;
+  const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   useEffect(() => {
     if (!factoryConfigure || !onFactoryConfigureBusyChange) {
       return;
@@ -4224,7 +4246,7 @@ export function AppPage({
       : {
           busy: factoryConfigureBusy,
           save: () => {
-            if (commitStagingPending || resetStagingPending) {
+            if (factoryConfigureBusy) {
               return;
             }
             void (async () => {
@@ -4253,6 +4275,7 @@ export function AppPage({
                 return;
               }
 
+              setFactoryConfigureSavePending(true);
               try {
                 // Stage canvas.yaml directly — skip enqueueCanvasSave stale/session checks.
                 await updateCanvasVersionMutation.mutateAsync({
@@ -4262,28 +4285,34 @@ export function AppPage({
                 draftCanvasSpecsRef.current.set(savingVersionId, workflow.spec);
                 setDraftCanvasSpec(workflow.spec);
                 setLastSavedWorkflowSnapshot(workflow);
+
+                const committed = await handleCommitStaging("Update automation", { versionId: savingVersionId });
+                if (!committed) {
+                  return;
+                }
+                onFactoryConfigureDoneRef.current?.();
               } catch (error) {
                 showErrorToast(getApiErrorMessage(error, "Failed to stage canvas changes"));
-                return;
+              } finally {
+                setFactoryConfigureSavePending(false);
               }
-
-              const committed = await handleCommitStaging("Update automation", { versionId: savingVersionId });
-              if (!committed) {
-                return;
-              }
-              onFactoryConfigureDoneRef.current?.();
             })();
           },
           discard: () => {
-            if (commitStagingPending || resetStagingPending) {
+            if (factoryConfigureBusy) {
               return;
             }
             void (async () => {
-              if (hasStagingChanges || hasUncommittedCanvasDraftChanges) {
-                await handleResetStaging();
+              setFactoryConfigureSavePending(true);
+              try {
+                if (hasStagingChanges || hasUncommittedCanvasDraftChanges) {
+                  await handleResetStaging();
+                }
+                handleExitEditSession();
+                onFactoryConfigureDoneRef.current?.();
+              } finally {
+                setFactoryConfigureSavePending(false);
               }
-              handleExitEditSession();
-              onFactoryConfigureDoneRef.current?.();
             })();
           },
         };
@@ -4440,13 +4469,15 @@ export function AppPage({
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
           runNavigation={runNavigation}
-          onRunNodeDetailClose={handleBackToRunList}
+          onRunNodeDetailClose={factoryEmbed ? handleSelectLiveCanvas : handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onRunNavigate={handleNavigateRun}
           onRunNavigateOlder={() => {
             void infiniteRunsQuery.fetchNextPage();
           }}
+          // Factory embed keeps the floating "Back to Live" chrome hidden, but
+          // Close on the run inspector must still exit ?run= inspection mode.
           onBackToLiveCanvas={factoryEmbed ? undefined : handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}

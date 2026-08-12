@@ -63,8 +63,11 @@ export function useCommittedDraftBaselines({
         })
       : Promise.resolve(undefined);
 
-    void Promise.all([versionPromise, consolePromise])
-      .then(([version, consoleData]) => {
+    void (async () => {
+      try {
+        const version = await versionPromise;
+        // Console is optional for factory apps; a console failure must not clear the canvas baseline.
+        const consoleData = await consolePromise.catch(() => undefined);
         if (cancelled) {
           return;
         }
@@ -79,14 +82,15 @@ export function useCommittedDraftBaselines({
             : { panels: [], layout: [] },
           ready: true,
         });
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) {
           return;
         }
-        // Never leave edit bootstrap stuck on a failed baseline fetch.
-        setBaselines({ console: { panels: [], layout: [] }, ready: true });
-      });
+        // Version baseline failed — stay not-ready so edit bootstrap does not
+        // treat the whole graph as uncommitted against an empty baseline.
+        setBaselines({ ready: false });
+      }
+    })();
 
     return () => {
       cancelled = true;

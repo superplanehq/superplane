@@ -1310,12 +1310,13 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
+  // Factory embed opens the inspector on ?run= even before a node is selected;
+  // the factory body prompts "Select a node…" until one is picked.
   const runInspectorOpen =
     props.isRunInspectionMode &&
     !props.isEditing &&
     !!props.runNodeDetailCanvasId &&
-    (!!props.runNodeDetailRun || !!props.runCanvasLoading) &&
-    (!props.factoryEmbed || !!props.runNodeDetailNodeId);
+    (!!props.runNodeDetailRun || !!props.runCanvasLoading);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (

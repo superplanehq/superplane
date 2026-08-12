@@ -127,4 +127,22 @@ describe("listFactoryAutomationRuns", () => {
     expect(runs[1]).toMatchObject({ title: "New executing", label: "Executing", tick: "running" });
     expect(runs[2]).toMatchObject({ title: "Old failure", label: "Failed", tick: "failed" });
   });
+
+  it("labels STATE_CANCELLING as Cancelling with a running tick", () => {
+    const runs = listFactoryAutomationRuns([
+      canvasRun({
+        id: "dddddddd-cancel",
+        state: "STATE_CANCELLING",
+        updatedAt: "2026-01-04T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(runs).toEqual([
+      expect.objectContaining({
+        runId: "dddddddd-cancel",
+        tick: "running",
+        label: "Cancelling",
+      }),
+    ]);
+  });
 });

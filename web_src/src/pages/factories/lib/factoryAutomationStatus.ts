@@ -12,7 +12,7 @@ export type FactoryAutomationRunCard = {
   runId: string;
   title: string;
   tick: Exclude<FactoryAutomationTick, null>;
-  label: "Executing" | "Needs input" | "Queued" | "Passed" | "Failed" | "Cancelled";
+  label: "Executing" | "Cancelling" | "Needs input" | "Queued" | "Passed" | "Failed" | "Cancelled";
   updatedAt?: string;
   createdAt?: string;
   finishedAt?: string;
@@ -115,6 +115,9 @@ function canvasRunTitle(run: CanvasesCanvasRun): string {
 function classifyCanvasRun(
   run: CanvasesCanvasRun,
 ): { tick: Exclude<FactoryAutomationTick, null>; label: FactoryAutomationRunCard["label"] } | null {
+  if (run.state === "STATE_CANCELLING") {
+    return { tick: "running", label: "Cancelling" };
+  }
   const tick = classifyCanvasRunTick(run);
   if (!tick) {
     return null;
