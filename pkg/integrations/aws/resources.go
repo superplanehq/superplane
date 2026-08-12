@@ -2,6 +2,7 @@ package aws
 
 import (
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
@@ -18,6 +19,18 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	switch resourceType {
 	case "lambda.function":
 		return lambda.ListFunctions(ctx, resourceType)
+
+	case "cloudwatch.alarm":
+		return cloudwatch.ListAlarms(ctx, resourceType)
+
+	case "cloudwatch.namespace":
+		return cloudwatch.ListNamespaces(ctx, resourceType)
+
+	case "cloudwatch.metric":
+		return cloudwatch.ListMetricNames(ctx, resourceType)
+
+	case "cloudwatch.metricDimensions":
+		return cloudwatch.ListMetricDimensions(ctx, resourceType)
 
 	case "ecr.repository":
 		return ecr.ListRepositories(ctx, resourceType)
