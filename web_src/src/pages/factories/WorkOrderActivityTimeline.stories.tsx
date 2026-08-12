@@ -8,6 +8,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_ID,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
 import {
@@ -20,15 +21,21 @@ import {
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
+
+const composerFooter = <WorkOrderCommentComposer canComment isSubmitting={false} onSubmit={async () => undefined} />;
 
 /**
  * Vertical timeline of the work order lifecycle: `created` marker, dispatch
  * batches per line, and (when closed) a "Closed as …" footer.
  */
 const meta = {
-  title: "Factories/WorkOrderActivityTimeline",
+  title: "Factories/Components/WorkOrderActivityTimeline",
   component: WorkOrderActivityTimeline,
   parameters: { layout: "padded" },
+  args: {
+    factoryId: PRIMARY_FACTORY_ID,
+  },
   decorators: [
     (Story) => (
       <ComponentStoryShell className="min-h-[380px] max-w-2xl bg-white p-6 dark:bg-gray-900">
@@ -123,6 +130,7 @@ export const Loading: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: OPEN_WORK_ORDER,
     isLoading: true,
+    footer: composerFooter,
   },
 };
 
@@ -132,5 +140,6 @@ export const ErrorState: Story = {
     order: OPEN_WORK_ORDER,
     eventsError: new Error("Failed to load activity"),
     onRetryEvents: () => undefined,
+    footer: composerFooter,
   },
 };

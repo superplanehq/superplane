@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
-import { FACTORIES_ORGANIZATION_ID, RUNNING_WORK_ORDER, CLOSED_WORK_ORDER } from "./__fixtures__/factoryPageResponses";
+import {
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_ID,
+  RUNNING_WORK_ORDER,
+  CLOSED_WORK_ORDER,
+} from "./__fixtures__/factoryPageResponses";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 
 /**
@@ -10,7 +15,7 @@ import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
  * `WorkOrderCard`), and `inline` (single flat list).
  */
 const meta = {
-  title: "Factories/WorkOrderExecutionsList",
+  title: "Factories/Components/WorkOrderExecutionsList",
   component: WorkOrderExecutionsList,
   parameters: { layout: "padded" },
   decorators: [
@@ -30,6 +35,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     executions: RUNNING_WORK_ORDER.executions,
     variant: "default",
   },
@@ -39,6 +45,7 @@ export const Default: Story = {
 export const Compact: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     executions: CLOSED_WORK_ORDER.executions,
     variant: "compact",
   },
@@ -48,6 +55,7 @@ export const Compact: Story = {
 export const Inline: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     executions: CLOSED_WORK_ORDER.executions,
     variant: "inline",
   },
@@ -57,6 +65,7 @@ export const Inline: Story = {
 export const Empty: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     executions: [],
     variant: "default",
   },

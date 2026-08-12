@@ -205,6 +205,233 @@ func Test_NodeConfigurationBuilder_AppFunction(t *testing.T) {
 	})
 }
 
+func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	require.NoError(t, err)
+
+	sourceCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "source-trigger",
+				Name:   "source-trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		nil,
+	)
+	sourceRoot := support.EmitCanvasEventForNodeWithData(
+		t,
+		sourceCanvas.ID,
+		"source-trigger",
+		"default",
+		nil,
+		map[string]any{
+			"type": "github.issues",
+			"data": map[string]any{
+				"issue": map[string]any{"number": 42, "title": "Fix login"},
+			},
+		},
+	)
+	sourceRun, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), sourceRoot)
+	require.NoError(t, err)
+	sourceExecution := support.CreateCanvasNodeExecution(t, sourceCanvas.ID, "source-trigger", sourceRoot.ID, sourceRoot.ID)
+	sourceExecution.RunID = sourceRun.ID
+	require.NoError(t, database.Conn().Save(sourceExecution).Error)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+
+	order, err := factory.CreateWorkOrder(
+		database.Conn(),
+		"Ship feature",
+		"Implement and open PR",
+		&r.User,
+		nil,
+		&sourceRun.ID,
+	)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	markdownArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Data: map[string]any{"body": "notes from implement"},
+	})
+	require.NoError(t, err)
+
+	prArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypePR,
+		Data: map[string]any{"url": "https://github.com/org/repo/pull/7", "number": 7},
+	})
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&nodeExecution.RootEventID).
+		WithInput(map[string]any{})
+
+	t.Run("returns live work order fields and source", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, order.ID.String(), payload["id"])
+		assert.Equal(t, "Ship feature", payload["title"])
+		assert.Equal(t, "Implement and open PR", payload["description"])
+		assert.Equal(t, factory.ID.String(), payload["factory_id"])
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
+		assert.Equal(t, "", payload["result"])
+		assert.NotContains(t, payload, "artifacts")
+
+		source, ok := payload["source"].(map[string]any)
+		require.True(t, ok)
+		issue, ok := source["issue"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, float64(42), issue["number"])
+		assert.Equal(t, "Fix login", issue["title"])
+	})
+
+	t.Run("field access and templates", func(t *testing.T) {
+		id, err := builder.ResolveExpression(`order().id`)
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), id)
+
+		title, err := builder.ResolveExpression(`order().title`)
+		require.NoError(t, err)
+		assert.Equal(t, "Ship feature", title)
+
+		issueNumber, err := builder.ResolveExpression(`order().source.issue.number`)
+		require.NoError(t, err)
+		assert.Equal(t, float64(42), issueNumber)
+
+		built, err := builder.Build(map[string]any{
+			"orderID": "{{ order().id }}",
+			"title":   "{{ order().title }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), built["orderID"])
+		assert.Equal(t, "Ship feature", built["title"])
+	})
+
+	t.Run("artifacts equivalents", func(t *testing.T) {
+		// ListArtifacts orders created_at DESC, id DESC — PR was created last.
+		full, err := builder.ResolveExpression(`order().artifacts`)
+		require.NoError(t, err)
+		artifacts, ok := full.([]any)
+		require.True(t, ok)
+		require.Len(t, artifacts, 2)
+
+		bracket, err := builder.ResolveExpression(`order()["artifacts"]`)
+		require.NoError(t, err)
+		assert.Equal(t, full, bracket)
+
+		count, err := builder.ResolveExpression(`len(order().artifacts)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		firstType, err := builder.ResolveExpression(`order().artifacts[0].type`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, firstType)
+
+		firstID, err := builder.ResolveExpression(`order().artifacts[0].id`)
+		require.NoError(t, err)
+		assert.Equal(t, prArtifact.ID.String(), firstID)
+
+		prURL, err := builder.ResolveExpression(`order().artifacts[0].data.url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/org/repo/pull/7", prURL)
+
+		bracketType, err := builder.ResolveExpression(`order()["artifacts"][0]["type"]`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, bracketType)
+
+		secondType, err := builder.ResolveExpression(`order().artifacts[1].type`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypeMarkdown, secondType)
+
+		body, err := builder.ResolveExpression(`order().artifacts[1].data.body`)
+		require.NoError(t, err)
+		assert.Equal(t, "notes from implement", body)
+		assert.Equal(t, markdownArtifact.ID.String(), mustResolveString(t, builder, `order().artifacts[1].id`))
+	})
+
+	t.Run("none and any over artifact types", func(t *testing.T) {
+		hasNoPR, err := builder.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, false, hasNoPR)
+
+		hasPR, err := builder.ResolveExpression(`any(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, true, hasPR)
+
+		orderWithoutPR, err := factory.CreateWorkOrder(database.Conn(), "No PR yet", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = orderWithoutPR.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+			Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": "still implementing"},
+		})
+		require.NoError(t, err)
+
+		canvas2, nodeExecution2, run2 := setupFactoryAppExecution(t, r, factory.ID)
+		linkRunToWorkOrder(t, r, factory, orderWithoutPR.ID, run2.ID)
+		builderNoPR := NewNodeConfigurationBuilder(database.Conn(), canvas2.ID).
+			WithRootEvent(&nodeExecution2.RootEventID)
+
+		nonePR, err := builderNoPR.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, true, nonePR)
+	})
+}
+
+func Test_NodeConfigurationBuilder_OrderFunction_NilWhenAbsent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Name:   "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger-1", "default", nil, map[string]any{"user": "john"})
+	_, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	result, err := builder.ResolveExpression(`order()`)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+
+	nilCheck, err := builder.ResolveExpression(`order() == nil`)
+	require.NoError(t, err)
+	assert.Equal(t, true, nilCheck)
+}
+
+func mustResolveString(t *testing.T, builder *NodeConfigurationBuilder, expression string) string {
+	t.Helper()
+	value, err := builder.ResolveExpression(expression)
+	require.NoError(t, err)
+	asString, ok := value.(string)
+	require.True(t, ok)
+	return asString
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{

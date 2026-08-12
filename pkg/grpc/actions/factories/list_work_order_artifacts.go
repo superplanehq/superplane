@@ -101,6 +101,8 @@ func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 		return pb.WorkOrderArtifact_TYPE_PR
 	case models.FactoryWorkOrderArtifactTypeMarkdown:
 		return pb.WorkOrderArtifact_TYPE_MARKDOWN
+	case models.FactoryWorkOrderArtifactTypeBranch:
+		return pb.WorkOrderArtifact_TYPE_BRANCH
 	default:
 		return pb.WorkOrderArtifact_TYPE_UNSPECIFIED
 	}
@@ -112,6 +114,8 @@ func artifactTypeFromProto(t pb.WorkOrderArtifact_Type) (string, bool) {
 		return models.FactoryWorkOrderArtifactTypePR, true
 	case pb.WorkOrderArtifact_TYPE_MARKDOWN:
 		return models.FactoryWorkOrderArtifactTypeMarkdown, true
+	case pb.WorkOrderArtifact_TYPE_BRANCH:
+		return models.FactoryWorkOrderArtifactTypeBranch, true
 	}
 	return "", false
 }

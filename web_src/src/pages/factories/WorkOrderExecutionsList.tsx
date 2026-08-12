@@ -13,6 +13,8 @@ import {
 
 interface WorkOrderExecutionsListProps {
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   executions?: FactoriesWorkOrderExecution[];
   variant?: "default" | "compact" | "inline";
   emptyMessage?: string;
@@ -20,6 +22,8 @@ interface WorkOrderExecutionsListProps {
 
 export function WorkOrderExecutionsList({
   organizationId,
+  factoryId,
+  orderId,
   executions,
   variant = "default",
   emptyMessage = "No line runs yet. Dispatch this work order to a line to start execution.",
@@ -40,6 +44,8 @@ export function WorkOrderExecutionsList({
             <CompactExecutionRow
               key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
               organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
               execution={execution}
             />
           )),
@@ -52,7 +58,13 @@ export function WorkOrderExecutionsList({
     return (
       <ul className="mt-4 space-y-4">
         {groups.map((group) => (
-          <CompactLineGroup key={group.lineId} organizationId={organizationId} group={group} />
+          <CompactLineGroup
+            key={group.lineId}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
+            group={group}
+          />
         ))}
       </ul>
     );
@@ -70,6 +82,8 @@ export function WorkOrderExecutionsList({
               <ExecutionRow
                 key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
                 organizationId={organizationId}
+                factoryId={factoryId}
+                orderId={orderId}
                 execution={execution}
               />
             ))}
@@ -80,7 +94,17 @@ export function WorkOrderExecutionsList({
   );
 }
 
-function CompactLineGroup({ organizationId, group }: { organizationId: string; group: WorkOrderExecutionLineGroup }) {
+function CompactLineGroup({
+  organizationId,
+  factoryId,
+  orderId,
+  group,
+}: {
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+  group: WorkOrderExecutionLineGroup;
+}) {
   return (
     <li>
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.lineName}</p>
@@ -89,6 +113,8 @@ function CompactLineGroup({ organizationId, group }: { organizationId: string; g
           <CompactExecutionRow
             key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
             organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
             execution={execution}
           />
         ))}
@@ -99,14 +125,18 @@ function CompactLineGroup({ organizationId, group }: { organizationId: string; g
 
 function CompactExecutionRow({
   organizationId,
+  factoryId,
+  orderId,
   execution,
 }: {
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   execution: FactoriesWorkOrderExecution;
 }) {
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
-  const runHref = getWorkOrderExecutionRunHref(organizationId, execution);
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, execution, { orderId });
 
   return (
     <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -117,15 +147,19 @@ function CompactExecutionRow({
 
 function ExecutionRow({
   organizationId,
+  factoryId,
+  orderId,
   execution,
 }: {
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   execution: FactoriesWorkOrderExecution;
 }) {
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
   const appName = execution.run?.appName?.trim();
-  const runHref = getWorkOrderExecutionRunHref(organizationId, execution);
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, execution, { orderId });
 
   return (
     <li className="px-4 py-3">

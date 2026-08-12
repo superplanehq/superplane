@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -18,11 +19,21 @@ import (
 const (
 	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
+	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
+
+	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
+	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
+
+	// MaxFactoryWorkOrderArtifactKeyBytes matches the `key` column width.
+	MaxFactoryWorkOrderArtifactKeyBytes = 512
 )
 
+const factoryWorkOrderArtifactKeyUniqueConstraint = "idx_factory_work_order_artifacts_factory_key_unique"
+
 var (
-	ErrFactoryWorkOrderArtifactNotFound = errors.New("factory work order artifact not found")
-	ErrFactoryWorkOrderArtifactInvalid  = errors.New("invalid work order artifact")
+	ErrFactoryWorkOrderArtifactNotFound         = errors.New("factory work order artifact not found")
+	ErrFactoryWorkOrderArtifactInvalid          = errors.New("invalid work order artifact")
+	ErrFactoryWorkOrderArtifactKeyAlreadyExists = errors.New("factory work order artifact key already exists")
 )
 
 type FactoryWorkOrderArtifact struct {
@@ -32,6 +43,7 @@ type FactoryWorkOrderArtifact struct {
 	WorkOrderID    uuid.UUID
 	Type           string
 	Data           datatypes.JSON
+	Key            *string
 	CreatedByID    *uuid.UUID
 	CreatedAt      time.Time
 
@@ -45,9 +57,26 @@ func (FactoryWorkOrderArtifact) TableName() string {
 type FactoryWorkOrderArtifactParams struct {
 	Type       string
 	Data       map[string]any
+	Key        string
 	CreatedBy  *uuid.UUID
 	Automation *factory.AutomationRef
 	Run        *factory.RunRef
+}
+
+// MapFactoryWorkOrderArtifactKeyUniqueConstraintError maps a violation of
+// the per-factory unique `key` index to a sentinel error, mirroring
+// MapFactoryNameUniqueConstraintError.
+func MapFactoryWorkOrderArtifactKeyUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == factoryWorkOrderArtifactKeyUniqueConstraint {
+		return ErrFactoryWorkOrderArtifactKeyAlreadyExists
+	}
+
+	return err
 }
 
 // CreateArtifact writes the row and its `order.artifact.added` event
@@ -66,6 +95,10 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(params.Data, "body") == "" {
 			return nil, fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeBranch:
+		if extractArtifactString(params.Data, "name") == "" {
+			return nil, fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return nil, fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, params.Type)
@@ -86,6 +119,28 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	if err != nil {
 		return nil, err
 	}
+	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
+		return nil, fmt.Errorf(
+			"%w: artifact data exceeds %d bytes",
+			ErrFactoryWorkOrderArtifactInvalid,
+			MaxFactoryWorkOrderArtifactDataBytes,
+		)
+	}
+
+	// An explicitly empty key must land as NULL, not "" — the partial
+	// unique index only excludes NULL, and two artifacts with key=""
+	// in the same factory would otherwise collide.
+	var key *string
+	if trimmedKey := strings.TrimSpace(params.Key); trimmedKey != "" {
+		if len(trimmedKey) > MaxFactoryWorkOrderArtifactKeyBytes {
+			return nil, fmt.Errorf(
+				"%w: artifact key exceeds %d bytes",
+				ErrFactoryWorkOrderArtifactInvalid,
+				MaxFactoryWorkOrderArtifactKeyBytes,
+			)
+		}
+		key = &trimmedKey
+	}
 
 	now := time.Now()
 	artifact := &FactoryWorkOrderArtifact{
@@ -95,13 +150,15 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		WorkOrderID:    o.ID,
 		Type:           artifactType,
 		Data:           dataJSON,
+		Key:            key,
 		CreatedByID:    params.CreatedBy,
 		CreatedAt:      now,
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Returning{}).Create(artifact).Error; err != nil {
-			return err
+		createErr := tx.Clauses(clause.Returning{}).Create(artifact).Error
+		if createErr != nil {
+			return MapFactoryWorkOrderArtifactKeyUniqueConstraintError(createErr)
 		}
 
 		ref := &factory.ArtifactRef{
@@ -138,7 +195,7 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {
-	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown:
+	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch:
 		return true
 	}
 	return false

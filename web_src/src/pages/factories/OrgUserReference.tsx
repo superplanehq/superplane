@@ -41,9 +41,7 @@ export function OrgUserReference({
         className={avatarSizeClass[size]}
       />
       {showName ? (
-        <span
-          className={cn("truncate text-gray-900 dark:text-gray-100", emphasizeName && "font-semibold", nameClassName)}
-        >
+        <span className={cn("truncate text-foreground", emphasizeName && "font-semibold", nameClassName)}>
           {resolvedDisplay.name}
         </span>
       ) : null}

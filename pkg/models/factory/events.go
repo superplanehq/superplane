@@ -29,6 +29,7 @@ const (
 const (
 	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
+	ArtifactTypeBranch   = "branch"
 )
 
 // Events
@@ -58,7 +59,8 @@ type WorkOrderStatusUpdated struct {
 
 // AutomationRef snapshots the canvas node + app + factory line/step
 // behind an automated event. Captured at write time so later renames
-// don't retro-edit history.
+// don't retro-edit history. `StepIndex` is a pointer so consumers can
+// distinguish "no line context" from a legitimate index of 0.
 type AutomationRef struct {
 	NodeID    string    `json:"nodeId,omitempty"`
 	NodeName  string    `json:"nodeName,omitempty"`
@@ -66,7 +68,7 @@ type AutomationRef struct {
 	AppName   string    `json:"appName,omitempty"`
 	LineID    uuid.UUID `json:"lineId,omitempty"`
 	LineName  string    `json:"lineName,omitempty"`
-	StepIndex int       `json:"stepIndex,omitempty"`
+	StepIndex *int      `json:"stepIndex,omitempty"`
 	StepName  string    `json:"stepName,omitempty"`
 }
 

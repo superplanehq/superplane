@@ -98,10 +98,21 @@ func (c *UpdateMergeRequest) Documentation() string {
 - **Description** (toggle): New description for the merge request
 - **Target Branch** (toggle): Retarget the merge request onto a different branch
 - **State** (toggle): Close or reopen the merge request
-- **Labels** (toggle): Labels to add, keeping any existing labels
+- **Labels to Add** (toggle): Labels to add, keeping any existing labels
 - **Assignees** (toggle): Users to assign, replacing any existing assignees
 
-Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the merge request's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+
+### List fields: append vs. replace
+
+The two list fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as ` + "`add_labels`" + `, so labels already on the merge request are kept | No change |
+| **Assignees** | **Replaces** — sent as ` + "`assignee_ids`" + `, which overwrites the whole list | Clears all assignees |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls, or a dedicated label action, when you need to take one off.
 
 ## Permissions
 
@@ -191,11 +202,12 @@ func (c *UpdateMergeRequest) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "labels",
-			Label:     "Labels",
-			Type:      configuration.FieldTypeList,
-			Required:  false,
-			Togglable: true,
+			Name:        "labels",
+			Label:       "Labels to Add",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Labels to add to the merge request. Existing labels are kept, not replaced.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",
@@ -206,11 +218,12 @@ func (c *UpdateMergeRequest) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "assignees",
-			Label:     "Assignees",
-			Type:      configuration.FieldTypeIntegrationResource,
-			Required:  false,
-			Togglable: true,
+			Name:        "assignees",
+			Label:       "Assignees",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Users to assign. Replaces the existing assignees; selecting none clears them.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  ResourceTypeMember,

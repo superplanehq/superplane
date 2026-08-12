@@ -17,7 +17,7 @@ import { WorkOrderCard } from "./WorkOrderCard";
  * and a compact execution list beneath. Open orders also expose a dispatch popover.
  */
 const meta = {
-  title: "Factories/WorkOrderCard",
+  title: "Factories/Components/WorkOrderCard",
   component: WorkOrderCard,
   parameters: { layout: "padded" },
   decorators: [
@@ -33,19 +33,21 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`;
+const commonArgs = {
+  organizationId: FACTORIES_ORGANIZATION_ID,
+  factoryId: PRIMARY_FACTORY_ID,
+  lines: REFUND_FACTORY_LINES,
+};
 
 /** Open — dispatch button visible; no line executions yet. */
 export const Open: Story = {
   args: {
+    ...commonArgs,
     order: OPEN_WORK_ORDER,
-    factoryHref,
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    lines: REFUND_FACTORY_LINES,
     canDispatch: true,
     isDispatching: false,
-    onDispatch: async (lineName) => {
-      console.log("dispatch", lineName);
+    onDispatch: async (input) => {
+      console.log("dispatch", input);
     },
   },
 };
@@ -53,10 +55,8 @@ export const Open: Story = {
 /** Running — execution list shows one finished step and one in-progress. */
 export const Running: Story = {
   args: {
+    ...commonArgs,
     order: RUNNING_WORK_ORDER,
-    factoryHref,
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    lines: REFUND_FACTORY_LINES,
     canDispatch: true,
     onDispatch: async () => undefined,
   },
@@ -65,10 +65,8 @@ export const Running: Story = {
 /** Failed — status badge in red, failing step surfaced in the execution list. */
 export const Failed: Story = {
   args: {
+    ...commonArgs,
     order: FAILED_WORK_ORDER,
-    factoryHref,
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    lines: REFUND_FACTORY_LINES,
     canDispatch: true,
     onDispatch: async () => undefined,
   },
@@ -77,10 +75,8 @@ export const Failed: Story = {
 /** Closed — dispatch affordance hidden, badge shows the closed result. */
 export const Closed: Story = {
   args: {
+    ...commonArgs,
     order: CLOSED_WORK_ORDER,
-    factoryHref,
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    lines: REFUND_FACTORY_LINES,
     canDispatch: false,
   },
 };

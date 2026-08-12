@@ -78,6 +78,32 @@ function buildRunExample(): Record<string, unknown> {
   };
 }
 
+// Representative work-order shape for order() autocomplete / preview.
+// Real values come from the factory execution at runtime; this is only a stub.
+const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+
+function buildOrderExample(): Record<string, unknown> {
+  return {
+    id: EXAMPLE_ORDER_ID,
+    title: "Ship feature",
+    description: "Implement and open PR",
+    factory_id: EXAMPLE_FACTORY_ID,
+    state: "open",
+    result: "",
+    source: {
+      issue: { number: 42, title: "Fix login" },
+    },
+    artifacts: [
+      {
+        id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        type: "pr",
+        data: { url: "https://github.com/org/repo/pull/7", number: 7 },
+      },
+    ],
+  };
+}
+
 function collectChainNodeIds(
   nodeId: string,
   currentNode: ComponentsNode | undefined,
@@ -250,6 +276,7 @@ type BuildNamedExampleObjInput = {
   incomingNodeIdsByTargetId: Map<string, string[]>;
   appExample: Record<string, unknown>;
   runExample: Record<string, unknown>;
+  orderExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -263,6 +290,7 @@ function buildNamedExampleObj({
   incomingNodeIdsByTargetId,
   appExample,
   runExample,
+  orderExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -312,6 +340,7 @@ function buildNamedExampleObj({
 
   namedExampleObj.__app = appExample;
   namedExampleObj.__run = runExample;
+  namedExampleObj.__order = orderExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -364,6 +393,7 @@ export function buildAutocompleteExampleObj(
     previousByDepth,
     appExample: buildAppExample(context.app),
     runExample: buildRunExample(),
+    orderExample: buildOrderExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

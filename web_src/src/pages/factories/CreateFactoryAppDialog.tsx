@@ -51,10 +51,10 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
         description: description.trim(),
       });
     } catch (error) {
-      const message = getApiErrorMessage(error, "Failed to create app");
+      const message = getApiErrorMessage(error, "Failed to create automation");
       showErrorToast(message);
       if (message.toLowerCase().includes("already") || message.toLowerCase().includes("exists")) {
-        setNameError("An app with this name already exists");
+        setNameError("An automation with this name already exists");
       }
     }
   };
@@ -70,7 +70,7 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
     >
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create factory app</DialogTitle>
+          <DialogTitle>Create automation</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

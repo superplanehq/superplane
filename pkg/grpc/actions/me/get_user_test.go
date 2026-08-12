@@ -56,6 +56,7 @@ func Test_ListUserPermissions(t *testing.T) {
 			"members",
 			"canvases",
 			"factories",
+			"work_orders",
 			"api_keys",
 			"agents",
 		}))

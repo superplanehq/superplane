@@ -24,6 +24,9 @@ const (
 	// both by the createAttachment action and the onIssueAttachment trigger.
 	AttachmentPayloadType = "linear.attachment"
 
+	// ReactionPayloadType is the payload type emitted by the addReaction action.
+	ReactionPayloadType = "linear.reaction"
+
 	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request body.
 	SignatureHeader = "Linear-Signature"
 

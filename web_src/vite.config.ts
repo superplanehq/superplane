@@ -48,6 +48,12 @@ export default defineConfig(() => {
           changeOrigin: true,
           secure: false,
         },
+        // Admin JSON API (keep `/admin` itself on Vite for the React admin UI)
+        "/admin/api": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
         // Account session routes (same origin as production when served from Go; required for pure Vite dev)
         "/account": {
           target: `http://localhost:${apiPort}`,
@@ -68,8 +74,8 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        "@/canvas": path.resolve(__dirname, "src/pages/canvas"),
-        "@": path.resolve(__dirname, "src"),
+        "@/canvas": path.resolve(import.meta.dirname, "src/pages/canvas"),
+        "@": path.resolve(import.meta.dirname, "src"),
       },
     },
     build: {

@@ -22,13 +22,11 @@ func TestFactories(t *testing.T) {
 
 		steps.start()
 		factory := steps.givenFactoryExists(originalName, "original description")
-		steps.visitFactory(factory.ID)
-		steps.openFactoryActionsMenu()
-		steps.clickEditFactory()
-		steps.fillEditFactoryName(updatedName)
-		steps.fillEditFactoryDescription("updated description")
-		steps.submitEditFactory()
-		steps.assertFactoryVisibleOnDetail(updatedName)
+		steps.visitFactorySettings(factory.ID)
+		steps.fillFactorySettingsName(updatedName)
+		steps.fillFactorySettingsDescription("updated description")
+		steps.submitFactorySettings()
+		steps.assertFactoryVisibleInSidebar(updatedName)
 		steps.assertFactorySavedInDB(factory.ID, updatedName, "updated description")
 	})
 
@@ -38,8 +36,7 @@ func TestFactories(t *testing.T) {
 
 		steps.start()
 		factory := steps.givenFactoryExists(name, "will be deleted")
-		steps.visitFactory(factory.ID)
-		steps.openFactoryActionsMenu()
+		steps.visitFactorySettings(factory.ID)
 		steps.clickDeleteFactory()
 		steps.confirmDeleteFactory()
 		steps.assertRedirectedToFactoriesList()
@@ -72,45 +69,35 @@ func (s *factorySteps) givenFactoryExists(name, description string) *models.Fact
 }
 
 func (s *factorySteps) visitFactoriesList() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/factories")
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces")
 	s.session.Sleep(500)
 }
 
-func (s *factorySteps) visitFactory(factoryID uuid.UUID) {
-	s.session.Visit("/" + s.session.OrgID.String() + "/factories/" + factoryID.String())
+func (s *factorySteps) visitFactorySettings(factoryID uuid.UUID) {
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factoryID.String() + "/settings/general")
 	s.session.Sleep(500)
 }
 
-func (s *factorySteps) openFactoryActionsMenu() {
-	s.session.Click(q.TestID("factory-actions-menu"))
-	s.session.Sleep(300)
-}
-
-func (s *factorySteps) clickEditFactory() {
-	s.session.Click(q.TestID("factory-edit-action"))
-	s.session.Sleep(300)
-}
-
-func (s *factorySteps) fillEditFactoryName(name string) {
+func (s *factorySteps) fillFactorySettingsName(name string) {
 	page := s.session.Page()
-	err := page.GetByTestId("edit-factory-name-input").Fill(name)
+	err := page.GetByTestId("factory-settings-name").Fill(name)
 	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
-func (s *factorySteps) fillEditFactoryDescription(description string) {
+func (s *factorySteps) fillFactorySettingsDescription(description string) {
 	page := s.session.Page()
-	err := page.GetByTestId("edit-factory-description-input").Fill(description)
+	err := page.GetByTestId("factory-settings-description").Fill(description)
 	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
-func (s *factorySteps) submitEditFactory() {
-	s.session.Click(q.TestID("factory-edit-save-button"))
+func (s *factorySteps) submitFactorySettings() {
+	s.session.Click(q.TestID("factory-settings-save"))
 	s.session.Sleep(1000)
 }
 
-func (s *factorySteps) assertFactoryVisibleOnDetail(name string) {
+func (s *factorySteps) assertFactoryVisibleInSidebar(name string) {
 	s.session.AssertText(name)
 }
 
@@ -122,7 +109,7 @@ func (s *factorySteps) assertFactorySavedInDB(factoryID uuid.UUID, name, descrip
 }
 
 func (s *factorySteps) clickDeleteFactory() {
-	s.session.Click(q.TestID("factory-delete-action"))
+	s.session.Click(q.TestID("factory-settings-delete-button"))
 	s.session.Sleep(300)
 }
 
@@ -133,7 +120,7 @@ func (s *factorySteps) confirmDeleteFactory() {
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
-	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/factories")
+	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
 }
 
 func (s *factorySteps) assertFactoryVisibleInList(name string) {

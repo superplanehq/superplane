@@ -56,7 +56,9 @@ func Test__OnIssue__Setup(t *testing.T) {
 		// Setup only resolves the project - it doesn't call Jira's webhook API itself.
 		require.Len(t, httpCtx.Requests, 1)
 		require.Len(t, integration.WebhookRequests, 1)
-		assert.Equal(t, WebhookConfiguration{}, integration.WebhookRequests[0])
+		assert.Equal(t, WebhookConfiguration{
+			Events: []string{issueEventCreated, issueEventUpdated, issueEventDeleted},
+		}, integration.WebhookRequests[0])
 	})
 }
 

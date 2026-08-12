@@ -1,5 +1,5 @@
 import { Rabbit } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 import { appPath } from "@/lib/appPaths";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";

@@ -62,7 +62,7 @@ export function FactoryLineForm({
     }
 
     if (apps.length === 0) {
-      showErrorToast("Create at least one factory app before defining a line.");
+      showErrorToast("Create at least one app before defining a line.");
       return;
     }
 
@@ -100,7 +100,7 @@ export function FactoryLineForm({
 
         {apps.length === 0 ? (
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Create a factory app first — lines run apps owned by this factory.
+            Create an app first — lines run apps owned by this workspace.
           </p>
         ) : null}
 

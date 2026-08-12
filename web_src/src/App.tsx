@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useEffect } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
@@ -24,12 +24,25 @@ import OwnerSetup from "./pages/auth/OwnerSetup";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
-  FactoryDetailPage,
-  FactoryListPage,
+  AutomationsPage,
   CreateWorkOrderPage,
+  FactoriesIndexPage,
+  FactoriesLayout,
+  FactoryAppCanvasPage,
   FactoryLineEditPage,
+  FactorySettingsGeneralPage,
+  FactorySettingsLayout,
+  FactorySettingsSoonPage,
+  FACTORY_SETTINGS_NAV_ITEMS,
+  LinesPage,
+  MissionsPage,
+  OverviewPage,
+  VelocityPage,
+  WikiPage,
   WorkOrderDetailPage,
+  WorkOrdersPage,
 } from "./pages/factories";
+import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -101,7 +114,7 @@ function AppRouter() {
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
-        <div className="flex-1 overflow-auto">
+        <div className="relative flex-1 overflow-auto">
           <SetupGuard>
             <GlobalCommandPalette />
             <Routes>
@@ -143,28 +156,60 @@ function AppRouter() {
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
-                <Route path="factories">
-                  <Route index element={withAuthPermissionAndFactoriesFeature(FactoryListPage, "factories", "read")} />
+                <Route path="workspaces">
+                  <Route
+                    index
+                    element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")}
+                  />
                   <Route
                     path=":factoryId"
-                    element={withAuthPermissionAndFactoriesFeature(FactoryDetailPage, "factories", "read")}
-                  />
+                    element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
+                  >
+                    <Route index element={<Navigate to="overview" replace />} />
+                    <Route path="overview" element={<OverviewPage />} />
+                    <Route path="missions" element={<MissionsPage />} />
+                    <Route path="wiki" element={<WikiPage />} />
+                    <Route path="velocity" element={<VelocityPage />} />
+                    <Route path="work-orders">
+                      <Route index element={<WorkOrdersPage />} />
+                      <Route path="new" element={<CreateWorkOrderPageGate />} />
+                      <Route path=":orderId" element={<WorkOrderDetailPage />} />
+                    </Route>
+                    <Route path="lines">
+                      <Route index element={<LinesPage />} />
+                      <Route path="new" element={<FactoryLineEditPageGate />} />
+                      <Route path=":lineId" element={<LinesPage />} />
+                      <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
+                    </Route>
+                    <Route path="automations">
+                      <Route index element={<AutomationsPage />} />
+                      <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
+                      <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
+                      <Route path=":appId" element={<AutomationsPage />} />
+                    </Route>
+                    <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+                    <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+                  </Route>
                   <Route
-                    path=":factoryId/orders/new"
-                    element={withAuthPermissionAndFactoriesFeature(CreateWorkOrderPage, "factories", "create")}
-                  />
-                  <Route
-                    path=":factoryId/orders/:orderId"
-                    element={withAuthPermissionAndFactoriesFeature(WorkOrderDetailPage, "factories", "read")}
-                  />
-                  <Route
-                    path=":factoryId/lines/new"
-                    element={withAuthPermissionAndFactoriesFeature(FactoryLineEditPage, "factories", "update")}
-                  />
-                  <Route
-                    path=":factoryId/lines/:lineId/edit"
-                    element={withAuthPermissionAndFactoriesFeature(FactoryLineEditPage, "factories", "update")}
-                  />
+                    path=":factoryId/settings"
+                    element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
+                  >
+                    <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+                    <Route path="general" element={<FactorySettingsGeneralPage />} />
+                    {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
+                      <Route
+                        key={item.id}
+                        path={item.id}
+                        element={
+                          <FactorySettingsSoonPage
+                            title={item.label}
+                            description={`${item.label} settings for this workspace.`}
+                            Icon={item.Icon}
+                          />
+                        }
+                      />
+                    ))}
+                  </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
@@ -199,6 +244,42 @@ function OrganizationScope() {
       <Outlet />
     </PermissionsProvider>
   );
+}
+
+function CreateWorkOrderPageGate() {
+  return (
+    <RequirePermission resource="work_orders" action="create">
+      <CreateWorkOrderPage />
+    </RequirePermission>
+  );
+}
+
+function FactoryLineEditPageGate() {
+  return (
+    <RequirePermission resource="factories" action="update">
+      <FactoryLineEditPage />
+    </RequirePermission>
+  );
+}
+
+function LegacyAutomationsNewLineRedirect() {
+  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
+  if (!organizationId || !factoryId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={createFactoryLinePath(organizationId, factoryId)} replace />;
+}
+
+function LegacyAutomationsLineEditRedirect() {
+  const { organizationId, factoryId, lineId } = useParams<{
+    organizationId: string;
+    factoryId: string;
+    lineId: string;
+  }>();
+  if (!organizationId || !factoryId || !lineId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {

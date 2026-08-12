@@ -26,11 +26,14 @@ type ArtifactDataEntry struct {
 }
 
 type AddWorkOrderArtifactConfiguration struct {
+	OrderID      string              `json:"orderId" mapstructure:"orderId"`
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
 	Number       string              `json:"number" mapstructure:"number"`
 	Title        string              `json:"title" mapstructure:"title"`
 	Body         string              `json:"body" mapstructure:"body"`
+	Name         string              `json:"name" mapstructure:"name"`
+	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -43,7 +46,7 @@ func (c *AddWorkOrderArtifact) Label() string {
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (PR or markdown) to a work order"
+	return "Attach a typed artifact (PR, markdown note, or branch) to a work order"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
@@ -53,8 +56,13 @@ Supported types:
 
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + ` and ` + "`title`" + `.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name).
 
-Both types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.`
+PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
+
+Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
+
+` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -91,9 +99,19 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
+	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
+	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
 	return []configuration.Field{
+		{
+			Name:        "orderId",
+			Label:       "Work Order ID",
+			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Default:     "{{ order().id }}",
+		},
 		{
 			Name:        "artifactType",
 			Label:       "Type",
@@ -106,6 +124,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Pull Request", Value: "pr"},
 						{Label: "Markdown", Value: "markdown"},
+						{Label: "Branch", Value: "branch"},
 					},
 				},
 			},
@@ -141,6 +160,17 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:                 "name",
+			Label:                "Name",
+			Description:          "Branch name (e.g. feature/refund-retry)",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: branchOnly,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "artifactType", Values: []string{"branch"}},
+			},
+		},
+		{
 			Name:                 "title",
 			Label:                "Title",
 			Description:          "Optional artifact title",
@@ -149,12 +179,21 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			VisibilityConditions: bothTypes,
 		},
 		{
+			Name:        "artifactKey",
+			Label:       "Artifact Key",
+			Description: "Optional queryable key for this artifact (e.g. a pull request's URL), unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Default:     "",
+		},
+		{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
 			Type:                 configuration.FieldTypeList,
 			Required:             false,
-			VisibilityConditions: bothTypes,
+			VisibilityConditions: withMetadata,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Entry",
@@ -180,8 +219,10 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	data := buildArtifactData(config)
 
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type: config.ArtifactType,
-		Data: data,
+		OrderID: config.OrderID,
+		Type:    config.ArtifactType,
+		Data:    data,
+		Key:     config.ArtifactKey,
 	})
 	if err != nil {
 		return err
@@ -235,6 +276,7 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		"number": config.Number,
 		"title":  config.Title,
 		"body":   config.Body,
+		"name":   config.Name,
 	}
 
 	for key, value := range typed {

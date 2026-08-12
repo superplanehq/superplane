@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -506,6 +507,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveAppPayload()
 		}),
+		expr.Function("order", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("order() takes no arguments")
+			}
+
+			return b.resolveOrderPayload(expression)
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -1002,6 +1010,111 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 	return payload, nil
 }
 
+// resolveOrderPayload exposes the work order driving this run via order().
+// Returns nil when the run is not attached to a factory work-order execution.
+// Artifacts are loaded only when the expression AST references order().artifacts.
+func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+
+	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+
+	payload := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
+		"state":       order.State,
+		"result":      order.Result,
+	}
+
+	if err := attachOrderSource(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+
+	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if !usesArtifacts {
+		return payload, nil
+	}
+
+	artifacts, err := order.ListArtifacts(b.tx)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not load artifacts: %w", err)
+	}
+
+	artifactPayloads := make([]any, 0, len(artifacts))
+	for i := range artifacts {
+		item, err := artifactExpressionPayload(&artifacts[i])
+		if err != nil {
+			return nil, err
+		}
+		artifactPayloads = append(artifactPayloads, item)
+	}
+	payload["artifacts"] = artifactPayloads
+
+	return payload, nil
+}
+
+func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	if order.SourceRunID == nil {
+		return nil
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, *order.SourceRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return fmt.Errorf("order() could not resolve source: %w", err)
+	}
+	if rootEvent == nil {
+		return nil
+	}
+
+	if source := models.RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+		payload["source"] = normalizeExpressionValue(source)
+	}
+	return nil
+}
+
+func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
+	data := map[string]any{}
+	if len(artifact.Data) > 0 {
+		if err := json.Unmarshal(artifact.Data, &data); err != nil {
+			return nil, fmt.Errorf("order() could not decode artifact data: %w", err)
+		}
+	}
+
+	return map[string]any{
+		"id":   artifact.ID.String(),
+		"type": artifact.Type,
+		"data": normalizeExpressionValue(data),
+	}, nil
+}
+
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
 	if err != nil {
@@ -1152,6 +1265,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"previous": {},
 	"run":      {},
 	"app":      {},
+	"order":    {},
 	"ctx":      {},
 }
 

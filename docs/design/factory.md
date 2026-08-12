@@ -46,6 +46,15 @@ Run input shape (for app triggers):
 run. Manual work orders omit it. `source` is the root trigger event from the
 linked source run (`source_run_id` on the work order record).
 
+Expressions on a dispatched run should prefer `order()` over
+`root().data.work_order`. `order()` resolves the live work order for the
+current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
+`source`) and returns `nil` when the run is not attached to a work order.
+`order().artifacts` is a list field loaded lazily only when the expression
+references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
+`root().data.work_order` remains the onRun snapshot and does not include
+artifacts.
+
 ## Work order lifecycle
 
 States (persisted on `factory_work_orders.state`; `result` is set only on `closed`):
@@ -91,7 +100,8 @@ Every transition writes exactly one `order.status.updated` event (`fromState`, `
 ## Comments and artifacts
 
 - **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is `user` or `automation`. `user` comments carry the authenticated caller's id; `automation` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation comments show a small badge.
-- **Artifacts** are first-class rows in `factory_work_order_artifacts`, only ever produced by the `addWorkOrderArtifact` canvas component (no manual attach flow today). Each artifact has a required `type` (`pr` or `markdown`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only.
+- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifacts add`). Each artifact has a required `type` (`pr`, `markdown`, or `branch`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`. `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
+- Artifacts optionally carry a `key` (`VARCHAR(512)`, nullable, unique per factory via a partial index that excludes `NULL`) so a work order can be looked up from an external identifier — e.g. a pull request's URL — without already knowing the order id. `addWorkOrderArtifact`'s `artifactKey` field sets it; `findWorkOrder` (`by: artifactKey`) reads it. Setting it is currently only possible from the canvas component — the artifact-key field is not yet exposed on the REST API or CLI, so artifacts created that way can't be tagged with a key (known gap).
 
 ## API
 
@@ -100,17 +110,19 @@ REST gateway on `protos/factories.proto`:
 - Factories: list, create, describe (includes lines).
 - Lines: create, update.
 - Apps: list factory-owned canvases.
-- Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, list events. Artifact creation is intentionally not exposed as an interactive API — it flows through the `addWorkOrderArtifact` canvas component instead.
+- Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
 New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 
 | RPC | HTTP | Action |
 | --- | --- | --- |
-| `UpdateWorkOrderStatus` | `PATCH …/status` | `factories:update` |
-| `AddWorkOrderComment` | `POST …/comments` | `factories:update` |
-| `ListWorkOrderArtifacts` | `GET …/artifacts` | `factories:read` |
+| `UpdateWorkOrderStatus` | `PATCH …/status` | `work_orders:update` |
+| `AddWorkOrderComment` | `POST …/comments` | `work_orders:update` |
+| `ListWorkOrderArtifacts` | `GET …/artifacts` | `work_orders:read` |
+| `CreateWorkOrderArtifact` | `POST …/artifacts` | `work_orders:update` |
 
-Permissions use the `factories` resource (`read`, `create`, `update`); all endpoints stay behind the `factories` experimental feature flag.
+Factory structure (create/update/delete factory + lines) uses the `factories` resource.
+Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
 
 ## Canvas components
 
@@ -119,11 +131,26 @@ Built-in factory components in `pkg/components/factory/`, registered on the stan
 | Component | Config | Effect |
 | --- | --- | --- |
 | `createWorkOrder` | `title`, `description`, `assignees[]` | Creates a work order in `draft`. |
-| `updateWorkOrderStatus` | `status` (`draft`/`open`/`closed`), conditional `result` (`completed`/`rejected`/`failed`, required for `closed`; only `rejected` is valid when closing from `draft`) | Runs the FSM and records an enriched `order.status.updated`. |
-| `addWorkOrderComment` | `body` | Appends an `order.comment.added` event. Authorship is derived from the executing canvas node (`kind = automation`, `automation = { nodeName, appName, lineName, stepName }`). |
-| `addWorkOrderArtifact` | `artifactType` (`pr`/`markdown`); for `pr`: required `url`, optional `number`; for `markdown`: required `body`; optional `title` on both; free-form `data` (`{name, value}` list, merged into the artifact's `data` map — typed fields win on name collisions) | Creates the artifact row + `order.artifact.added` event. |
+| `findWorkOrder` | `by` (`id`/`artifactKey`), conditional `orderId` or `artifactKey` | Resolves a work order by id or by an artifact's `key`, without needing a `factory_work_order_executions` row. Emits `workOrder.found` on the `found` channel on a match, or `workOrder.notFound` on the `notFound` channel otherwise — never fails the run just because nothing matched. |
+| `updateWorkOrderStatus` | required `orderId` (defaults to `{{ order().id }}`), `status` (`draft`/`open`/`closed`), conditional `result` (`completed`/`rejected`/`failed`, required for `closed`; only `rejected` is valid when closing from `draft`) | Runs the FSM and records an enriched `order.status.updated`. |
+| `addWorkOrderComment` | required `orderId` (defaults to `{{ order().id }}`), `body` | Appends an `order.comment.added` event. Authorship is derived from the executing canvas node (`kind = automation`, `automation = { nodeName, appName, lineName, stepName }`). |
+| `addWorkOrderArtifact` | required `orderId` (defaults to `{{ order().id }}`), `artifactType` (`pr`/`markdown`/`branch`); for `pr`: required `url`, optional `number`; for `markdown`: required `body`; for `branch`: required `name`; optional `title` on `pr`/`markdown`; optional `artifactKey`; free-form `data` (`{name, value}` list, merged into the artifact's `data` map — typed fields win on name collisions) | Creates the artifact row + `order.artifact.added` event. |
 
-Components target the work order that owns the current canvas run — the link is the `factory_work_order_executions` row created when the run was dispatched, so component authors don't have to (and can't) supply the work order ID by hand. Canvas invocations attribute events to the caller line: the `automation` payload snapshots `{ nodeId, nodeName, appId, appName, lineId, lineName, stepIndex, stepName }` at write time, and status updates additionally carry the current `run` + `app` refs so the timeline can link straight back to the originating run. No acting user is attributed on canvas-driven events.
+`updateWorkOrderStatus` / `addWorkOrderComment` / `addWorkOrderArtifact` always target a work order explicitly via `orderId` — there is no implicit fallback. The field defaults to `{{ order().id }}`, which resolves the work order driving the current canvas run (via the `factory_work_order_executions` row created when the run was dispatched from a factory line) and only works in that context. Runs not dispatched from a line, e.g. a flow triggered by `github.onPullRequest`, must replace the default with an id resolved another way — typically `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. Canvas invocations attribute events to the caller line: the `automation` payload snapshots `{ nodeId, nodeName, appId, appName, lineId, lineName, stepIndex, stepName }` at write time (line/step are omitted when the run isn't attached to one), and status updates additionally carry the current `run` + `app` refs so the timeline can link straight back to the originating run. No acting user is attributed on canvas-driven events.
+
+### Closing a work order from an external merge event
+
+`findWorkOrder` plus the new `orderId` fields let a flow that starts on `github.onPullRequest` (not a factory line) close the work order a merged pull request belongs to:
+
+```yaml
+github.onPullRequest (merged)
+  -> if ($.pull_request.merged == true)
+  -> findWorkOrder (by: artifactKey, artifactKey: {{ $.pull_request.html_url }})
+       [found]    -> updateWorkOrderStatus (orderId: {{ previous().data.workOrder.id }}, status: closed, result: completed)
+       [notFound] -> (no-op; the merged PR isn't tied to a tracked order)
+```
+
+This assumes an earlier `addWorkOrderArtifact` step (e.g. when the PR was opened) tagged an artifact with `artifactKey: {{ $.pull_request.html_url }}` so `findWorkOrder` has something to match against.
 
 ## UI
 
@@ -152,11 +179,169 @@ steps:
 
 Entrypoints must be `onRun` triggers on the factory app’s live version.
 
+## CLI
+
+Minimal factory CLI for artifacts (flag-based; optional active factory):
+
+```bash
+superplane factory active [factory]   # set/show active factory (name or UUID)
+superplane factory artifacts list --factory <name-or-id> --order-id <uuid>
+superplane factory artifacts add --order-id <uuid> --type <pr|markdown|branch> [flags]
+```
+
+`--factory` accepts a factory name or UUID. When omitted, the active factory
+from `superplane factory active` is used. `--order-id` is the work-order UUID.
+`--type` is `pr`, `markdown`, or `branch`. Typed flags build the API `data` map:
+
+```bash
+superplane factory artifacts list \
+  --factory shipping \
+  --order-id "$OID"
+
+# Uses the active factory
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type markdown \
+  --title "PLAN.md" \
+  -f ./PLAN.md
+
+superplane factory artifacts add \
+  --factory shipping \
+  --order-id "$OID" \
+  --type markdown \
+  --title "PLAN.md" \
+  -f ./PLAN.md
+
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type pr \
+  --url https://github.com/org/repo/pull/7 \
+  --number 7
+
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type branch \
+  --name feature/login
+```
+
+For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`).
+
+Work order commands (`orders`/`order`), for creating, dispatching, assigning,
+listing, and inspecting work orders:
+
+```bash
+superplane factory orders list [flags]
+superplane factory orders describe --order <uuid> [flags]
+superplane factory orders create --title <title> [flags]
+superplane factory orders dispatch --order <uuid> --line <line-name>
+superplane factory orders assign --order <uuid> --assignee <id-or-email> [flags]
+```
+
+`orders list` flags:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--assignees` — filter by assignee, repeatable/comma-separated. Accepts
+  user UUIDs or emails; emails are resolved against the organization's
+  members.
+- `--state` — filter by work order state, repeatable. Accepts the proto
+  enum token (`STATE_DRAFT`, `STATE_OPEN`, `STATE_CLOSED`) or a short
+  case-insensitive form (`draft`, `open`, `closed`). Defaults to `open`
+  when omitted, so `orders list` only shows open work orders unless you
+  ask otherwise. Pass `--state all` to remove the state filter entirely
+  and see work orders in every state.
+- `--result` — filter by work order result, repeatable. Accepts the proto
+  enum token (`RESULT_COMPLETED`, `RESULT_REJECTED`, `RESULT_FAILED`) or a
+  short case-insensitive form (`completed`, `rejected`, `failed`).
+- `--unassigned` — only show work orders with no assignees.
+
+```bash
+superplane factory orders list --factory shipping --state open
+
+superplane factory orders list \
+  --assignees alice@example.com,bob@example.com \
+  --result failed
+
+superplane factory orders list --unassigned
+
+# Show work orders in every state (draft, open, and closed)
+superplane factory orders list --state all
+```
+
+`orders describe` shows a work order's title, assignees, description,
+comments, and full event timeline (status changes, assignee changes,
+comments, artifacts added, and line step executions), oldest event first:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias, for consistency with `artifacts`' `--order-id`).
+
+```bash
+superplane factory orders describe --factory shipping --order "$OID"
+```
+
+`--output json`/`--output yaml` on `orders describe` returns
+`{order, comments, events, eventsTruncated}` so scripts get full fidelity
+in one call; the event timeline is capped at the API's max page size (200)
+and `eventsTruncated` is `true` when there are more.
+
+`orders create` creates a work order in `draft` state:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--title` — work order title (required).
+- `--description` — description text (inline). Mutually exclusive with
+  `--file`.
+- `-f`/`--file` — read the description from a file, or `-` for stdin.
+  Mutually exclusive with `--description`.
+- `--assignee` — assignee user UUID or email, repeatable. When omitted
+  entirely, the work order is assigned to the user running the command
+  (the API itself does not default assignees; the CLI does).
+
+```bash
+superplane factory orders create --title "Ship the feature" --description "..."
+
+superplane factory orders create \
+  --title "Ship the feature" \
+  -f ./description.md \
+  --assignee alice@example.com \
+  --assignee bob@example.com
+```
+
+`orders dispatch` dispatches a work order to a factory line, starting its
+execution. A `draft` work order moves to `open` on its first dispatch;
+dispatching fails if the line doesn't exist, has no steps, or the order
+already has an active execution:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--line` — target factory line's name (required).
+
+```bash
+superplane factory orders dispatch --order "$OID" --line build
+```
+
+`orders assign` **sets** a work order's assignee list — it replaces the
+existing assignees with exactly the ones given, rather than adding to them
+(there is no additive assign/unassign endpoint):
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--assignee` — assignee user UUID or email, repeatable; at least one is
+  required (clearing all assignees is out of scope for this command).
+
+```bash
+superplane factory orders assign --order "$OID" --assignee alice@example.com --assignee bob@example.com
+```
+
 ## Not implemented yet
 
-- CLI (`superplane factory …`).
+- `superplane factory orders close`/`comment` and other work order status
+  transitions (backend RPCs exist; CLI-side `create`/`dispatch`/`assign`
+  are implemented, these are not yet).
 - Work orders sourced from external systems or factory-app components.
 - Full PRD approval flow (gated approvals on `open → closed`).
 - Auto-close work order when a line finishes all steps.
 - Editing or deleting comments and artifacts.
+- UI attach-artifact composer (sidebar remains read-only; API/CLI/canvas create still refresh via websocket).
 - Additional artifact types (screenshots, recordings). The schema is extensible via `type` + JSONB `data` when needed.

@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type ActionsAction,
@@ -14,7 +15,9 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { RunInspectorChrome } from "./RunInspectorChrome";
 import { RunInspectorHeader } from "./RunInspectorHeader";
+import { RunInspectorNodeActions } from "./RunInspectorNodeAccordion";
 import { ResizeHandle } from "./RunInspectorResize";
+import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
 import { buildNodeMap, buildRunPresentation, type RUN_STATUS_META } from "./runPresentation";
 import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
@@ -41,6 +44,8 @@ export interface RunInspectorPanelProps {
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
   onClose: () => void;
+  /** Factory canvas/automation: Close-only chrome (no newer/older/copy link). */
+  factoryContext?: boolean;
 }
 
 type AccountFallback = {
@@ -53,6 +58,7 @@ type AccountFallback = {
 export function RunInspectorPanel(props: RunInspectorPanelProps) {
   const {
     componentIconMap = {},
+    factoryContext = false,
     onClose,
     onEditNode,
     onNavigateOlder,
@@ -71,6 +77,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
       )}
       style={{ width: model.inspectorWidth.width }}
       data-testid="run-inspector-panel"
+      data-factory-context={factoryContext ? "true" : undefined}
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={model.inspectorWidth.startResize} isResizing={model.inspectorWidth.isResizing} />
@@ -82,28 +89,68 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         onNavigateRun={onNavigateRun}
         onNavigateOlder={onNavigateOlder}
         onClose={onClose}
+        showRunNavigation={!factoryContext}
       />
+      <RunInspectorPanelBody
+        factoryContext={factoryContext}
+        organizationId={organizationId}
+        run={run}
+        model={model}
+        componentIconMap={componentIconMap}
+        onEditNode={onEditNode}
+      />
+    </aside>
+  );
+}
+
+function isStopOrCancelStatus(status: string) {
+  return status === "running" || status === "cancelling";
+}
+
+function RunInspectorPanelBody({
+  factoryContext,
+  organizationId,
+  run,
+  model,
+  componentIconMap,
+  onEditNode,
+}: {
+  factoryContext: boolean;
+  organizationId?: string;
+  run: CanvasesCanvasRun;
+  model: ReturnType<typeof useRunInspectorPanelModel>;
+  componentIconMap: Record<string, string>;
+  onEditNode?: (nodeId: string) => void;
+}) {
+  if (factoryContext) {
+    return (
+      <FactoryNodeDetailBody
+        organizationId={organizationId}
+        sections={model.sections}
+        isLoading={model.isStepsLoading}
+        selectedValue={model.accordionValue}
+        componentIconMap={componentIconMap}
+        canShowExpressionTemplates={model.hasRunVersionSpec}
+        onEditNode={onEditNode}
+        actions={model.actions}
+        currentUser={model.resolvedCurrentUser}
+        errorScrollRequest={model.errorScrollRequest}
+        onErrorScrolled={model.clearErrorScrollRequest}
+      />
+    );
+  }
+
+  const stopping = isStopOrCancelStatus(model.presentation.status);
+  return (
+    <>
       <RunInspectorHeader
         run={run}
         title={model.presentation.title}
         stepCount={model.sections.length || run.executions?.length || 0}
-        onAction={() =>
-          model.presentation.status === "running" || model.presentation.status === "cancelling"
-            ? model.actions.stop()
-            : model.actions.rerun()
-        }
-        actionPending={
-          model.presentation.status === "running" || model.presentation.status === "cancelling"
-            ? model.actions.stopPending
-            : model.actions.rerunPending
-        }
-        actionDisabled={
-          model.presentation.status === "running" || model.presentation.status === "cancelling"
-            ? model.actions.stopDisabled
-            : !run.rootEvent?.id
-        }
+        onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
+        actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
+        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
       />
-
       <RunInspectorContent
         errorSummaries={model.errorSummaries}
         status={model.presentation.status}
@@ -123,7 +170,92 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         errorScrollRequest={model.errorScrollRequest}
         onErrorScrolled={model.clearErrorScrollRequest}
       />
-    </aside>
+    </>
+  );
+}
+
+/**
+ * Factory embed: Close chrome + node actions (approve / push through / …) +
+ * that node's timeline only. No run header, node header, or Rerun.
+ */
+function FactoryNodeDetailBody({
+  organizationId,
+  sections,
+  isLoading,
+  selectedValue,
+  componentIconMap,
+  canShowExpressionTemplates,
+  onEditNode,
+  actions,
+  currentUser,
+  errorScrollRequest,
+  onErrorScrolled,
+}: {
+  organizationId?: string;
+  sections: RunInspectorNodeSection[];
+  isLoading: boolean;
+  selectedValue: string;
+  componentIconMap: Record<string, string>;
+  canShowExpressionTemplates: boolean;
+  onEditNode?: (nodeId: string) => void;
+  actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser: RunInspectorCurrentUser | undefined;
+  errorScrollRequest: { nodeId: string; requestId: number } | null;
+  onErrorScrolled: () => void;
+}) {
+  const selectedSection = sections.find((section) => section.sectionValue === selectedValue) ?? null;
+
+  if (isLoading && !selectedSection) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading run steps...
+      </div>
+    );
+  }
+
+  if (!selectedSection) {
+    return (
+      <div className="px-4 py-8 text-sm text-slate-500 dark:text-gray-400" data-testid="factory-run-inspector-empty">
+        Select a node to inspect this run.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-950/10 px-3 py-2.5 dark:border-gray-800">
+        <h2
+          className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-gray-100"
+          data-testid="factory-run-node-title"
+        >
+          {selectedSection.nodeName}
+        </h2>
+        <RunInspectorNodeActions
+          section={selectedSection}
+          actions={actions}
+          currentUser={currentUser}
+          className="pl-0"
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3 dark:bg-gray-950">
+        {selectedSection.isQueued ? (
+          <p className="text-sm text-slate-500 dark:text-gray-400">This step is queued.</p>
+        ) : (
+          <RunInspectorStepTimeline
+            section={selectedSection}
+            componentIconMap={componentIconMap}
+            organizationId={organizationId}
+            canShowExpressionTemplates={canShowExpressionTemplates}
+            onEditNode={onEditNode}
+            errorScrollRequestId={
+              errorScrollRequest?.nodeId === selectedSection.nodeId ? errorScrollRequest.requestId : null
+            }
+            onErrorScrolled={onErrorScrolled}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 

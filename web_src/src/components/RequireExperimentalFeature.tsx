@@ -1,6 +1,6 @@
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { ReactNode } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 
 interface RequireExperimentalFeatureProps {
   featureId: string;

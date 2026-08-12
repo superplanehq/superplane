@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
@@ -32,6 +35,90 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, json.Unmarshal(events[0].Data, &payload))
 	assert.Equal(t, "", payload.FromState)
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
+}
+
+func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	organization, userID, _ := setupFactoryWithUser(t, "creator-automations")
+	now := time.Now()
+	versionID := uuid.New()
+	canvas := Canvas{
+		ID:             uuid.New(),
+		OrganizationID: organization.ID,
+		LiveVersionID:  &versionID,
+		Name:           "Release automation",
+		CreatedBy:      &userID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	version := CanvasVersion{
+		ID:         versionID,
+		WorkflowID: canvas.ID,
+		OwnerID:    &userID,
+		Nodes:      datatypes.NewJSONSlice([]Node{}),
+		Edges:      datatypes.NewJSONSlice([]Edge{}),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	node := CanvasNode{
+		WorkflowID:    canvas.ID,
+		NodeID:        "create-order",
+		Name:          "Create work order",
+		State:         CanvasNodeStateReady,
+		Type:          NodeTypeComponent,
+		Ref:           datatypes.NewJSONType(NodeRef{Component: &ComponentRef{Name: "noop"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(Position{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	run := CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     node.NodeID,
+		VersionID:  versionID,
+		State:      CanvasRunStateFinished,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&canvas).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+		return tx.Create(&run).Error
+	}))
+
+	firstOrderID := uuid.New()
+	secondOrderID := uuid.New()
+	refs, err := ResolveFactoryWorkOrderCreatorAutomations(database.Conn(), []FactoryWorkOrder{
+		{ID: firstOrderID, SourceRunID: &run.ID},
+		{ID: secondOrderID, SourceRunID: &run.ID},
+		{ID: uuid.New()},
+	})
+	require.NoError(t, err)
+	require.Len(t, refs, 2)
+	assert.Equal(t, &factory.AutomationRef{
+		AppID:    canvas.ID,
+		AppName:  canvas.Name,
+		NodeID:   node.NodeID,
+		NodeName: node.Name,
+	}, refs[firstOrderID])
+	assert.Same(t, refs[firstOrderID], refs[secondOrderID])
+
+	require.NoError(t, canvas.SoftDeleteInTransaction(database.Conn()))
+	refs, err = ResolveFactoryWorkOrderCreatorAutomations(database.Conn(), []FactoryWorkOrder{
+		{ID: firstOrderID, SourceRunID: &run.ID},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, node.Name, refs[firstOrderID].NodeName)
 }
 
 func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
@@ -172,12 +259,13 @@ func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation", "", &userID, nil, nil)
 	require.NoError(t, err)
 
+	stepIndex := 0
 	automation := &factory.AutomationRef{
 		NodeID:    "node-comment",
 		NodeName:  "node-comment",
 		AppName:   "Factory-App",
 		LineName:  "Plan",
-		StepIndex: 0,
+		StepIndex: &stepIndex,
 		StepName:  "step-01",
 	}
 
@@ -298,6 +386,32 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
 
+	t.Run("rejects artifact data over 64KiB", func(t *testing.T) {
+		body := strings.Repeat("a", MaxFactoryWorkOrderArtifactDataBytes)
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": body},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+		assert.Contains(t, err.Error(), "exceeds")
+	})
+
+	t.Run("branch requires data.name", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "   "},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
 	t.Run("markdown rejects non-http(s) data.url", func(t *testing.T) {
 		cases := []string{
 			"javascript:alert(1)",
@@ -368,6 +482,28 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.Equal(t, "Design notes", payload.Artifact.Data["title"])
 	})
 
+	t.Run("creates branch and emits event", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{
+				"name": "feature/refund-retry",
+			},
+			CreatedBy: &userID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeBranch, artifact.Type)
+
+		events, err := order.ListEvents(database.Conn(), 10, nil)
+		require.NoError(t, err)
+
+		artifactEvent := findEventOfType(t, events, factory.EventTypeOrderArtifactAdded)
+		var payload factory.WorkOrderArtifactAdded
+		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
+		require.NotNil(t, payload.Artifact)
+		assert.Equal(t, "feature/refund-retry", payload.Artifact.Data["name"])
+	})
+
 	// A markdown artifact with no data.url must succeed — the http(s)
 	// guard only kicks in when url is actually present. Runs last so
 	// earlier subtests that count artifacts stay accurate.
@@ -380,6 +516,132 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, artifact)
+	})
+}
+
+func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "artifact-key")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Key target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("creates artifact with a key", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact.Key)
+		assert.Equal(t, "https://github.com/example/repo/pull/1", *artifact.Key)
+	})
+
+	t.Run("rejects a duplicate key in the same factory", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/2"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactKeyAlreadyExists)
+	})
+
+	t.Run("allows the same key across two different factories", func(t *testing.T) {
+		_, otherUserID, otherFactory := setupFactoryWithUser(t, "artifact-key-other")
+
+		otherOrder, err := otherFactory.CreateWorkOrder(database.Conn(), "Other factory target", "", &otherUserID, nil, nil)
+		require.NoError(t, err)
+
+		_, err = otherOrder.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("trims the key and treats blank as no key", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/trimmed-key"},
+			Key:  "  padded-key  ",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact.Key)
+		assert.Equal(t, "padded-key", *artifact.Key)
+
+		blank, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/blank-key-1"},
+			Key:  "   ",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, blank.Key)
+
+		// A second artifact with an empty key must not collide with the
+		// first — the partial unique index excludes NULLs.
+		blankTwo, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/blank-key-2"},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, blankTwo.Key)
+	})
+
+	t.Run("rejects a key over 512 bytes", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/long-key"},
+			Key:  strings.Repeat("a", MaxFactoryWorkOrderArtifactKeyBytes+1),
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+}
+
+func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-key")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Find target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypePR,
+		Data: map[string]any{"url": "https://github.com/example/repo/pull/42"},
+		Key:  "https://github.com/example/repo/pull/42",
+	})
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its artifact key", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("trims the lookup key", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "  https://github.com/example/repo/pull/42  ")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown key", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "no-such-key")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank key", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a key belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-key-other")
+
+		_, err := otherFactory.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
 	})
 }
 

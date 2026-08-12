@@ -1,5 +1,4 @@
 import type {
-  FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
@@ -7,25 +6,17 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
 } from "@/api-client";
-import { Link } from "@/components/Link/link";
-import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
-import {
-  factoryDetailPanelClassName,
-  factoryDetailSidebarClassName,
-  factoryPageContentClassName,
-} from "./lib/factoryPageStyles";
+import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
-import { WorkOrderArtifactsPanel } from "./WorkOrderArtifactsPanel";
-import { WorkOrderAssigneesField } from "./WorkOrderAssigneesField";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
+import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
+import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
-  factory: FactoriesFactory;
-  factoryHref: string;
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -42,6 +33,7 @@ interface WorkOrderDetailLoadedViewProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
+  canEditFactoryLines: boolean;
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
@@ -57,7 +49,7 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
@@ -65,9 +57,8 @@ interface WorkOrderDetailLoadedViewProps {
 }
 
 export function WorkOrderDetailLoadedView({
-  factory,
-  factoryHref,
   organizationId,
+  factoryId,
   order,
   events,
   eventsError,
@@ -84,6 +75,7 @@ export function WorkOrderDetailLoadedView({
   assigneeIds,
   assigneeNames,
   factoryLines,
+  canEditFactoryLines,
   isOpen,
   isDispatchable,
   isClosed,
@@ -106,85 +98,80 @@ export function WorkOrderDetailLoadedView({
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
   return (
-    <div className={factoryPageContentClassName}>
-      <Link
-        href={factoryHref}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        {factory.name}
-      </Link>
+    <div className={factoryContentBodyClassName}>
+      <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
+        <WorkOrderDetailHeader
+          orderTitle={order.title ?? "Work Order"}
+          displayStatus={displayStatus}
+          isOpen={isOpen}
+          isDispatchable={isDispatchable}
+          isClosed={isClosed}
+          canClose={canClose}
+          canManage={canManage}
+          isCompleting={isCompleting}
+          isRejecting={isRejecting}
+          isClosing={isClosing}
+          isUpdatingStatus={isUpdatingStatus}
+          onClose={onClose}
+          onStatusChange={onStatusChange}
+        />
 
-      <WorkOrderDetailHeader
-        orderTitle={order.title ?? "Work Order"}
-        statusMeta={statusMeta}
-        displayStatus={displayStatus}
-        isOpen={isOpen}
-        isDispatchable={isDispatchable}
-        isClosed={isClosed}
-        factoryLines={factoryLines}
-        canDispatch={canDispatch}
-        canClose={canClose}
-        canManage={canManage}
-        permissionsLoading={permissionsLoading}
-        isDispatching={isDispatching}
-        isCompleting={isCompleting}
-        isRejecting={isRejecting}
-        isClosing={isClosing}
-        isUpdatingStatus={isUpdatingStatus}
-        onDispatch={onDispatch}
-        onClose={onClose}
-        onStatusChange={onStatusChange}
-      />
+        <div className="min-w-0">
+          {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-      <div className={factoryDetailPanelClassName}>
-        <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-w-0 px-6 py-6 sm:px-8">
-            {order.description ? (
-              <section className="mb-8 rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700/70">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                  {order.description}
-                </p>
-              </section>
-            ) : null}
-
-            <section className="mb-8">
-              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
-            </section>
-
-            <section>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
-              <div className="mt-5">
-                <WorkOrderActivityTimeline
-                  organizationId={organizationId}
-                  order={order}
-                  events={events}
-                  eventsError={eventsError}
-                  isLoading={isEventsLoading}
-                  hasMoreEvents={hasMoreEvents}
-                  isLoadingMoreEvents={isLoadingMoreEvents}
-                  onLoadMoreEvents={onLoadMoreEvents}
-                  onRetryEvents={onRetryEvents}
-                />
-              </div>
-            </section>
-          </div>
-
-          <aside className={cn(factoryDetailSidebarClassName, "lg:min-h-full")}>
-            <WorkOrderAssigneesField
-              organizationId={organizationId}
-              assigneeIds={assigneeIds}
-              assigneeNames={assigneeNames}
-              canEdit={canAssign}
-              isSaving={isAssigneesSaving}
-              onSave={onAssigneesSave}
-            />
-
-            <div className="mt-6">
-              <WorkOrderArtifactsPanel artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+          <section className={order.description ? "mt-10" : undefined}>
+            <h2 className="workspace-section-title">Activity</h2>
+            <p className="workspace-body-text mt-1 text-muted-foreground">
+              Actions and comments on the work order, plus factory line runs.
+            </p>
+            <div className="mt-4">
+              <WorkOrderActivityTimeline
+                organizationId={organizationId}
+                factoryId={factoryId}
+                order={order}
+                events={events}
+                eventsError={eventsError}
+                isLoading={isEventsLoading}
+                hasMoreEvents={hasMoreEvents}
+                isLoadingMoreEvents={isLoadingMoreEvents}
+                onLoadMoreEvents={onLoadMoreEvents}
+                onRetryEvents={onRetryEvents}
+                footer={
+                  <WorkOrderCommentComposer
+                    canComment={canManage}
+                    isSubmitting={isAddingComment}
+                    onSubmit={onAddComment}
+                  />
+                }
+              />
             </div>
-          </aside>
+          </section>
         </div>
+
+        <aside className="mt-1 lg:sticky lg:top-16 lg:self-start">
+          <WorkOrderDetailSidebar
+            organizationId={organizationId}
+            factoryId={factoryId}
+            order={order}
+            artifacts={artifacts}
+            isArtifactsLoading={isArtifactsLoading}
+            artifactsError={artifactsError}
+            displayStatus={displayStatus}
+            statusMeta={statusMeta}
+            assigneeIds={assigneeIds}
+            assigneeNames={assigneeNames}
+            factoryLines={factoryLines}
+            canEditFactoryLines={canEditFactoryLines}
+            canAssign={canAssign}
+            canDispatch={canDispatch}
+            permissionsLoading={permissionsLoading}
+            isAssigneesSaving={isAssigneesSaving}
+            isDispatchable={isDispatchable}
+            isDispatching={isDispatching}
+            onAssigneesSave={onAssigneesSave}
+            onDispatch={onDispatch}
+          />
+        </aside>
       </div>
     </div>
   );

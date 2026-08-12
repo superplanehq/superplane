@@ -206,13 +206,15 @@ type Issue struct {
 }
 
 // Comment is a comment on an issue. user is the author and is null when Linear
-// attributes the comment to a bot or integration rather than a person.
+// attributes the comment to a bot or integration rather than a person. editedAt
+// stays null until the body is changed, so it doubles as an edited marker.
 type Comment struct {
 	ID        string        `json:"id"`
 	Body      string        `json:"body"`
 	URL       string        `json:"url"`
 	CreatedAt string        `json:"createdAt,omitempty"`
 	UpdatedAt string        `json:"updatedAt,omitempty"`
+	EditedAt  string        `json:"editedAt,omitempty"`
 	User      *User         `json:"user,omitempty"`
 	Issue     *CommentIssue `json:"issue,omitempty"`
 }
@@ -550,7 +552,7 @@ func (c *Client) UpdateIssue(id string, input map[string]any) (*Issue, error) {
 }
 
 const commentFields = `
-      id body url createdAt updatedAt
+      id body url createdAt updatedAt editedAt
       user { id name displayName email }
       issue { id identifier title url }`
 
@@ -582,6 +584,70 @@ func (c *Client) CreateComment(input map[string]any) (*Comment, error) {
 	}
 
 	return response.CommentCreate.Comment, nil
+}
+
+const updateCommentMutation = `
+mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) {
+  commentUpdate(id: $id, input: $input) {
+    success
+    comment {` + commentFields + `
+    }
+  }
+}`
+
+// UpdateComment edits an existing comment. Unlike issues, comments are addressed
+// only by their UUID - there is no human-readable identifier for one.
+func (c *Client) UpdateComment(id string, input map[string]any) (*Comment, error) {
+	response := struct {
+		CommentUpdate struct {
+			Success bool     `json:"success"`
+			Comment *Comment `json:"comment"`
+		} `json:"commentUpdate"`
+	}{}
+
+	if err := c.execute(updateCommentMutation, map[string]any{"id": id, "input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.CommentUpdate.Success || response.CommentUpdate.Comment == nil {
+		return nil, fmt.Errorf("linear reported the comment was not updated")
+	}
+
+	return response.CommentUpdate.Comment, nil
+}
+
+const issueCommentsQuery = `
+query IssueComments($id: String!) {
+  issue(id: $id) {
+    comments(first: 100) {
+      nodes {
+        id body
+        user { id name displayName email }
+      }
+    }
+  }
+}`
+
+// ListIssueComments returns the comments on a single issue, for the comment
+// picker. Issues carry few enough comments that one page is plenty.
+func (c *Client) ListIssueComments(issueID string) ([]Comment, error) {
+	response := struct {
+		Issue *struct {
+			Comments struct {
+				Nodes []Comment `json:"nodes"`
+			} `json:"comments"`
+		} `json:"issue"`
+	}{}
+
+	if err := c.execute(issueCommentsQuery, map[string]any{"id": issueID}, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Issue == nil {
+		return nil, fmt.Errorf("issue %s not found", issueID)
+	}
+
+	return response.Issue.Comments.Nodes, nil
 }
 
 const attachmentFields = `
@@ -679,6 +745,53 @@ func (c *Client) ListIssueAttachments(issueID string) ([]Attachment, error) {
 	return response.Issue.Attachments.Nodes, nil
 }
 
+// Reaction is an emoji reaction on an issue or a comment. Linear normalizes
+// emoji aliases on write, so the stored emoji can differ from the one sent
+// (thumbsup becomes +1).
+type Reaction struct {
+	ID        string   `json:"id"`
+	Emoji     string   `json:"emoji"`
+	CreatedAt string   `json:"createdAt,omitempty"`
+	User      *User    `json:"user,omitempty"`
+	Issue     *Issue   `json:"issue,omitempty"`
+	Comment   *Comment `json:"comment,omitempty"`
+}
+
+const reactionFields = `
+      id emoji createdAt
+      user { id name displayName email }`
+
+const createReactionMutation = `
+mutation ReactionCreate($input: ReactionCreateInput!) {
+  reactionCreate(input: $input) {
+    success
+    reaction {` + reactionFields + `
+    }
+  }
+}`
+
+// CreateReaction adds an emoji reaction to an issue or a comment. Re-sending the
+// same emoji returns the existing reaction rather than failing, but sending an
+// alias of an emoji already present is rejected - see isReactionConflict.
+func (c *Client) CreateReaction(input map[string]any) (*Reaction, error) {
+	response := struct {
+		ReactionCreate struct {
+			Success  bool      `json:"success"`
+			Reaction *Reaction `json:"reaction"`
+		} `json:"reactionCreate"`
+	}{}
+
+	if err := c.execute(createReactionMutation, map[string]any{"input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.ReactionCreate.Success || response.ReactionCreate.Reaction == nil {
+		return nil, fmt.Errorf("linear reported the reaction was not created")
+	}
+
+	return response.ReactionCreate.Reaction, nil
+}
+
 const addIssueLabelMutation = `
 mutation IssueAddLabel($id: String!, $labelId: String!) {
   issueAddLabel(id: $id, labelId: $labelId) {
@@ -687,6 +800,38 @@ mutation IssueAddLabel($id: String!, $labelId: String!) {
     }
   }
 }`
+
+const removeIssueLabelMutation = `
+mutation IssueRemoveLabel($id: String!, $labelId: String!) {
+  issueRemoveLabel(id: $id, labelId: $labelId) {
+    success
+    issue {` + issueFields + `
+    }
+  }
+}`
+
+// RemoveIssueLabel removes a single label from an issue without touching its
+// other labels, returning the updated issue. Like AddIssueLabel, the id may be
+// the issue UUID or its identifier (e.g. ENG-142). Linear errors when the label
+// is not on the issue - see isLabelNotOnIssue.
+func (c *Client) RemoveIssueLabel(id, labelID string) (*Issue, error) {
+	response := struct {
+		IssueRemoveLabel struct {
+			Success bool   `json:"success"`
+			Issue   *Issue `json:"issue"`
+		} `json:"issueRemoveLabel"`
+	}{}
+
+	if err := c.execute(removeIssueLabelMutation, map[string]any{"id": id, "labelId": labelID}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.IssueRemoveLabel.Success || response.IssueRemoveLabel.Issue == nil {
+		return nil, fmt.Errorf("linear reported the label was not removed")
+	}
+
+	return response.IssueRemoveLabel.Issue, nil
+}
 
 // AddIssueLabel adds a single label to an issue without touching its existing
 // labels, returning the updated issue. Like UpdateIssue, the id may be the issue

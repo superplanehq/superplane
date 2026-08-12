@@ -12,7 +12,7 @@ import { CreateFactoryAppDialog } from "./CreateFactoryAppDialog";
  * in the sidebar and can be reviewed in parallel.
  */
 const meta = {
-  title: "Factories/CreateFactoryAppDialog",
+  title: "Factories/Components/CreateFactoryAppDialog",
   component: CreateFactoryAppDialog,
   parameters: { layout: "centered" },
   decorators: [

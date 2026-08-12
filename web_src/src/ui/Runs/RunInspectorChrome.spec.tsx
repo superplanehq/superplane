@@ -53,4 +53,22 @@ describe("RunInspectorChrome", () => {
       expect(writeText).toHaveBeenCalledWith("http://localhost:3000/org-1/apps/app-1?run=run-1");
     });
   });
+
+  it("hides run navigation in factory context", () => {
+    render(
+      <RunInspectorChrome
+        runId="run-1"
+        newerRunId="run-newer"
+        olderRunId="run-older"
+        onNavigateRun={vi.fn()}
+        onClose={() => {}}
+        showRunNavigation={false}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Newer run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Older run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy run link" })).not.toBeInTheDocument();
+  });
 });

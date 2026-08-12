@@ -9,7 +9,7 @@ import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
  * backend attributes the comment to a system/LLM author.
  */
 const meta = {
-  title: "Factories/WorkOrderCommentComposer",
+  title: "Factories/Components/WorkOrderCommentComposer",
   component: WorkOrderCommentComposer,
   parameters: { layout: "padded" },
   decorators: [
