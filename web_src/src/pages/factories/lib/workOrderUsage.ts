@@ -27,3 +27,18 @@ export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
+
+interface WorkOrderExecutionUsage {
+  totalTokens?: string | number;
+  costCents?: string | number;
+}
+
+export function formatWorkOrderExecutionUsage(executions: WorkOrderExecutionUsage[]): string | null {
+  let totalTokens = 0;
+  let totalCostCents = 0;
+  for (const execution of executions) {
+    totalTokens += parseWorkOrderMetric(execution.totalTokens);
+    totalCostCents += parseWorkOrderMetric(execution.costCents);
+  }
+  return formatWorkOrderUsage(totalTokens, totalCostCents);
+}

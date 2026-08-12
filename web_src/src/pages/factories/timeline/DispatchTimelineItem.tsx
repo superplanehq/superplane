@@ -11,7 +11,7 @@ import {
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineStep,
 } from "../lib/workOrderTimelineEvents";
-import { parseWorkOrderMetric, formatWorkOrderUsage } from "../lib/workOrderUsage";
+import { formatWorkOrderExecutionUsage } from "../lib/workOrderUsage";
 import { getWorkOrderExecutionRunHref } from "../lib/workOrderExecutions";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
 import { TimelineMarker } from "./TimelineMarker";
@@ -28,7 +28,7 @@ export function DispatchTimelineItem({ event, organizationId, isLatestDispatch }
   const steps = event.steps ?? [];
   const latestStep = steps.at(-1);
   const duration = formatOverallDuration(steps);
-  const usage = latestStep ? formatExecutionUsage(latestStep.execution) : null;
+  const usage = formatWorkOrderExecutionUsage(steps.map((step) => step.execution));
   const status = latestStep ? executionStatus(latestStep.execution) : null;
   const contentId = `line-run-${event.id}`;
 
@@ -222,8 +222,4 @@ function formatOverallDuration(steps: WorkOrderTimelineStep[]): string | null {
     return `${minutes}m`;
   }
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-}
-
-function formatExecutionUsage(execution: FactoriesWorkOrderExecution): string | null {
-  return formatWorkOrderUsage(parseWorkOrderMetric(execution.totalTokens), parseWorkOrderMetric(execution.costCents));
 }
