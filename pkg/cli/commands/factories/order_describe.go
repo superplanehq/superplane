@@ -64,9 +64,29 @@ func (c *orderDescribeCommand) Execute(ctx core.CommandContext) error {
 		})
 	}
 
+	lookup := resolveMemberEmailLookup(ctx, events)
+
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderOrderDescribeText(stdout, order, comments, events, truncated, totalCount)
+		return renderOrderDescribeText(stdout, order, comments, events, truncated, totalCount, lookup)
 	})
+}
+
+// resolveMemberEmailLookup fetches the organization's members so event actor
+// user IDs can be rendered as emails instead of raw UUIDs. It's best-effort:
+// when there are no events to render there's nothing to resolve, and when
+// the members list can't be fetched (e.g. the caller lacks permission), it
+// degrades gracefully to an empty lookup rather than failing the whole
+// "describe" command — every actor then renders as "unknown user" instead.
+func resolveMemberEmailLookup(ctx core.CommandContext, events []openapi_client.FactoriesWorkOrderEvent) memberEmailLookup {
+	if len(events) == 0 {
+		return memberEmailLookup{}
+	}
+
+	members, err := listOrganizationMembers(ctx)
+	if err != nil {
+		return memberEmailLookup{}
+	}
+	return newMemberEmailLookup(members)
 }
 
 func reverseWorkOrderEvents(events []openapi_client.FactoriesWorkOrderEvent) []openapi_client.FactoriesWorkOrderEvent {
@@ -94,6 +114,7 @@ func renderOrderDescribeText(
 	events []openapi_client.FactoriesWorkOrderEvent,
 	eventsTruncated bool,
 	totalEventCount int64,
+	lookup memberEmailLookup,
 ) error {
 	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 	writeAlignedField(writer, "ID", order.GetId())
@@ -135,7 +156,7 @@ func renderOrderDescribeText(
 		_, _ = fmt.Fprintln(stdout, "  No comments.")
 	} else {
 		for _, comment := range comments {
-			author, body, ok := decodeCommentEvent(comment)
+			author, body, ok := decodeCommentEvent(comment, lookup)
 			if !ok {
 				author, body = "unknown", ""
 			}
@@ -144,12 +165,22 @@ func renderOrderDescribeText(
 	}
 
 	_, _ = fmt.Fprintln(stdout)
-	_, _ = fmt.Fprintln(stdout, "Timeline:")
+	_, _ = fmt.Fprintln(stdout, "Events:")
 	if len(events) == 0 {
 		_, _ = fmt.Fprintln(stdout, "  No events.")
 	} else {
+		eventsWriter := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		for _, event := range events {
-			_, _ = fmt.Fprintf(stdout, "  %s %s\n", formatRelativeTime(event.GetTimestamp()), describeEvent(event))
+			_, _ = fmt.Fprintf(
+				eventsWriter,
+				"  %s\t%s\t%s\n",
+				event.GetType(),
+				formatRelativeTime(event.GetTimestamp()),
+				describeEvent(event, lookup),
+			)
+		}
+		if err := eventsWriter.Flush(); err != nil {
+			return err
 		}
 		if eventsTruncated {
 			_, _ = fmt.Fprintf(stdout, "  (showing latest %d of %d events)\n", maxWorkOrderEventsLimit, totalEventCount)
