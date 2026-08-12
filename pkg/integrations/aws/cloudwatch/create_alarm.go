@@ -241,7 +241,7 @@ func (c *CreateAlarm) Configuration() []configuration.Field {
 				},
 			},
 		},
-		unitField(),
+		unitField(false),
 		{
 			Name:        "actionsEnabled",
 			Label:       "Actions Enabled",
@@ -311,6 +311,14 @@ func (c *CreateAlarm) Setup(ctx core.SetupContext) error {
 	dimensions, err := DecodeDimensions(config.Dimensions)
 	if err != nil {
 		return err
+	}
+
+	// Namespace and dimensions are known at setup, so an EC2 action that could
+	// never fire is rejected here rather than at execute time.
+	if strings.TrimSpace(config.EC2Action) != "" {
+		if err := requireEC2ActionTarget(namespace, dimensions); err != nil {
+			return err
+		}
 	}
 
 	return ctx.Metadata.Set(CreateAlarmNodeMetadata{
@@ -397,7 +405,7 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		MetricName:              metricName,
 		Dimensions:              dimensions,
 		Statistic:               statistic,
-		Unit:                    config.Unit,
+		Unit:                    resolveUnit(config.Unit),
 		Period:                  config.Period,
 		EvaluationPeriods:       config.EvaluationPeriods,
 		DatapointsToAlarm:       config.DatapointsToAlarm,

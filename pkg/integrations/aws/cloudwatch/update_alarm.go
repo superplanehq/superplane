@@ -80,7 +80,7 @@ sent back unchanged, because CloudWatch replaces the whole alarm configuration o
 - **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods
 - **Alarm Description** *(toggleable)*: Free-text description
 - **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
-- **Unit** *(toggleable)*: Metric unit. Enable it and leave it empty to remove the unit, which is how you recover an alarm whose unit matches no datapoints
+- **Unit** *(toggleable)*: Metric unit. Choose **No unit** to remove it, which is how you recover an alarm whose unit matches no datapoints. This is not the same as the literal **None** unit, which still filters datapoints
 - **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
 - **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
 - **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an ` + "`AWS/EC2`" + ` alarm with an InstanceId dimension
@@ -212,7 +212,7 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 				},
 			},
 		},
-		unitField(),
+		unitField(true),
 		{
 			Name:        "actionsEnabled",
 			Label:       "Actions Enabled",
@@ -356,8 +356,8 @@ func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfigura
 		}
 	}
 
-	// unit is deliberately not required: enabling it with no value clears the
-	// alarm's unit, which is the only way back from a unit that matches no datapoints.
+	// unit is deliberately not required: the "No unit" option clears the alarm's
+	// unit, which is the only way back from a unit that matches no datapoints.
 
 	if hasConfigKey(rawConfiguration, "period") && config.Period <= 0 {
 		return fmt.Errorf("period must be greater than 0")
@@ -394,7 +394,12 @@ func buildUpdateAlarmInput(
 	config UpdateAlarmConfiguration,
 	rawConfiguration any,
 ) (PutMetricAlarmInput, error) {
-	if strings.TrimSpace(existing.MetricName) == "" {
+	// A Metrics array or a threshold metric id means the alarm is driven by a
+	// query or an anomaly model; an empty metric name means it is neither. Any of
+	// the three would be flattened into a plain threshold alarm by PutMetricAlarm.
+	if existing.HasMetricQueries ||
+		strings.TrimSpace(existing.ThresholdMetricID) != "" ||
+		strings.TrimSpace(existing.MetricName) == "" {
 		return PutMetricAlarmInput{}, fmt.Errorf(
 			"alarm %q is not a single-metric alarm and cannot be updated by this component",
 			existing.AlarmName,
@@ -482,7 +487,7 @@ func buildUpdateAlarmInput(
 	}
 
 	if hasConfigKey(rawConfiguration, "unit") {
-		input.Unit = strings.TrimSpace(config.Unit)
+		input.Unit = resolveUnit(config.Unit)
 	}
 
 	if hasConfigKey(rawConfiguration, "actionsEnabled") {

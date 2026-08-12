@@ -48,6 +48,49 @@ const describeExistingAlarmXML = `
   </DescribeAlarmsResult>
 </DescribeAlarmsResponse>`
 
+// A metric math alarm that also reports a MetricName. Whether CloudWatch does
+// this in practice or not, the Metrics array alone must be enough to reject it.
+const describeMetricMathWithNameXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>error-rate</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:error-rate</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>MyService</Namespace>
+        <MetricName>ConnectionsFailed</MetricName>
+        <Threshold>40</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <Metrics>
+          <member><Id>m1</Id></member>
+          <member><Id>error_rate</Id></member>
+        </Metrics>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
+// An anomaly detection alarm, marked by ThresholdMetricId.
+const describeAnomalyAlarmXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>cpu-anomaly</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpu-anomaly</AlarmArn>
+        <ActionsEnabled>true</ActionsEnabled>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <ThresholdMetricId>t1</ThresholdMetricId>
+        <ComparisonOperator>LessThanLowerOrGreaterThanUpperThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 // An alarm with a unit set, so clearing it can be observed.
 const describeUnitAlarmXML = `
 <DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
@@ -552,6 +595,46 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "EC2 actions require an AWS/EC2 alarm")
 	})
 
+	t.Run("the No unit option clears the alarm unit", func(t *testing.T) {
+		// The UI can only submit one of the select's values, so this — not an
+		// empty string — is the reachable clear path.
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeUnitAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "api-high-cpu",
+				"unit":   UnitUnsetValue,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		body := requestBody(t, httpContext, 1)
+		assert.NotContains(t, body, "Unit=")
+		assert.Contains(t, body, "Threshold=80")
+	})
+
+	t.Run("the literal None unit is still sent", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeUnitAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "api-high-cpu",
+				"unit":   "None",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+		require.NoError(t, err)
+
+		assert.Contains(t, requestBody(t, httpContext, 1), "Unit=None")
+	})
+
 	t.Run("enabled but empty unit clears the alarm unit", func(t *testing.T) {
 		// Omitting Unit on replace is what unsets it, so an alarm whose unit
 		// matches no datapoints can be recovered.
@@ -694,6 +777,42 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		body := requestBody(t, httpContext, 1)
 		assert.Contains(t, body, "EvaluationPeriods=5")
 		assert.Contains(t, body, "DatapointsToAlarm=2")
+	})
+
+	t.Run("metric math alarm that still reports a metric name -> error", func(t *testing.T) {
+		// The Metrics array is the authoritative marker; rewriting this alarm as a
+		// plain threshold alarm would silently drop its formula.
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeMetricMathWithNameXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "error-rate",
+				"period": 60,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "is not a single-metric alarm")
+	})
+
+	t.Run("anomaly detection alarm -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: updateAlarmResponses(describeAnomalyAlarmXML)}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "cpu-anomaly",
+				"period": 60,
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "is not a single-metric alarm")
 	})
 
 	t.Run("metric math alarm -> error", func(t *testing.T) {

@@ -119,6 +119,11 @@ type MetricAlarm struct {
 	InsufficientDataActions            []string    `json:"insufficientDataActions" mapstructure:"insufficientDataActions"`
 	Region                             string      `json:"region" mapstructure:"region"`
 	ConsoleURL                         string      `json:"consoleUrl" mapstructure:"consoleUrl"`
+
+	// HasMetricQueries marks an alarm defined by a Metrics array — metric math,
+	// anomaly detection or a Metrics Insights query. Those cannot be expressed
+	// with the single-metric fields, so they are never rewritten.
+	HasMetricQueries bool `json:"-" mapstructure:"-"`
 }
 
 // Metric identifies a CloudWatch metric: a namespace, a name and a dimension set.
@@ -400,6 +405,7 @@ func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
 		InsufficientDataActions:            x.InsufficientDataActions,
 		Region:                             region,
 		ConsoleURL:                         AlarmConsoleURL(region, x.AlarmName),
+		HasMetricQueries:                   len(x.Metrics) > 0,
 	}
 }
 

@@ -148,6 +148,32 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "cannot be greater than evaluation periods (1)")
 	})
 
+	t.Run("ec2 action on a non-EC2 namespace is rejected at setup", func(t *testing.T) {
+		configuration := validConfiguration()
+		configuration["namespace"] = "AWS/SQS"
+		configuration["ec2Action"] = "reboot"
+		err := component.Setup(core.SetupContext{Configuration: configuration})
+		require.ErrorContains(t, err, "EC2 actions require an AWS/EC2 alarm")
+	})
+
+	t.Run("ec2 action without an InstanceId dimension is rejected at setup", func(t *testing.T) {
+		configuration := validConfiguration()
+		configuration["dimensions"] = `[{"name":"AutoScalingGroupName","value":"api-asg"}]`
+		configuration["ec2Action"] = "stop"
+		err := component.Setup(core.SetupContext{Configuration: configuration})
+		require.ErrorContains(t, err, "require the alarm to have an InstanceId dimension")
+	})
+
+	t.Run("valid ec2 action -> no error", func(t *testing.T) {
+		configuration := validConfiguration()
+		configuration["ec2Action"] = "recover"
+		err := component.Setup(core.SetupContext{
+			Configuration: configuration,
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{

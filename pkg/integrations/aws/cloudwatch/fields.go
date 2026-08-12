@@ -1,6 +1,8 @@
 package cloudwatch
 
 import (
+	"strings"
+
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
@@ -22,7 +24,15 @@ func regionField() configuration.Field {
 	}
 }
 
-func unitField() configuration.Field {
+// unitField offers the metric units. Only Update Alarm can clear a unit, so
+// only it gets the "No unit" option; on create, leaving the field off is the
+// same thing.
+func unitField(allowUnset bool) configuration.Field {
+	options := AlarmUnitOptions
+	if allowUnset {
+		options = append([]configuration.FieldOption{AlarmUnitClearOption}, AlarmUnitOptions...)
+	}
+
 	return configuration.Field{
 		Name:        "unit",
 		Label:       "Unit",
@@ -32,10 +42,20 @@ func unitField() configuration.Field {
 		Description: "Only needed when the metric is published with more than one unit",
 		TypeOptions: &configuration.TypeOptions{
 			Select: &configuration.SelectTypeOptions{
-				Options: AlarmUnitOptions,
+				Options: options,
 			},
 		},
 	}
+}
+
+// resolveUnit maps the clear sentinel to the empty string the client omits.
+func resolveUnit(value string) string {
+	unit := strings.TrimSpace(value)
+	if unit == UnitUnsetValue {
+		return ""
+	}
+
+	return unit
 }
 
 func alarmActionsField(name, label, description string) configuration.Field {

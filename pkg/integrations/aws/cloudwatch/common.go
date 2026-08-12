@@ -66,9 +66,22 @@ var AlarmTreatMissingDataOptions = []configuration.FieldOption{
 	{Label: "Not Breaching", Value: "notBreaching"},
 }
 
+// UnitUnsetValue removes an alarm's unit. CloudWatch has no "no unit" unit —
+// omitting the parameter is what clears it — but a select cannot submit a blank
+// value, so the option carries this sentinel and the components map it to empty.
+// Note this is distinct from the real "None" unit, which still filters datapoints.
+const UnitUnsetValue = "unset"
+
+// AlarmUnitClearOption lets an update remove a unit that matches no datapoints.
+var AlarmUnitClearOption = configuration.FieldOption{
+	Label:       "No unit",
+	Value:       UnitUnsetValue,
+	Description: "Remove the unit so the alarm matches datapoints of any unit",
+}
+
 // AlarmUnitOptions are the metric units accepted by PutMetricAlarm.
 var AlarmUnitOptions = []configuration.FieldOption{
-	{Label: "None", Value: "None"},
+	{Label: "None", Value: "None", Description: "The literal None unit, not the absence of one"},
 	{Label: "Percent", Value: "Percent"},
 	{Label: "Count", Value: "Count"},
 	{Label: "Count/Second", Value: "Count/Second"},
