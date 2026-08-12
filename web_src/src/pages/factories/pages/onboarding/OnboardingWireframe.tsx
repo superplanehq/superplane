@@ -98,7 +98,7 @@ function SetupSections({
       <Section
         id="name"
         title="Name and invite"
-        purpose="Name this workspace for continuous AI work on your app. Invite people who will review pull requests."
+        purpose="Name this workspace for continuous AI work on your app. Invite people who will collaborate on work orders."
         summary={setup.nameReady ? setup.workspaceName.trim() : undefined}
         open={openSection === "name"}
         complete={setup.nameReady}

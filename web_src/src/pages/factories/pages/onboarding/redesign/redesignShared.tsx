@@ -177,7 +177,7 @@ export function NameInviteStep({ setup }: { setup: RedesignSetupApi }) {
       <div className="rounded-lg border border-border p-4">
         <div className="text-[13px] font-medium">Invite teammates</div>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Optional. Share the organization invite link so teammates can review agent pull requests. People join as
+          Optional. Share the organization invite link so teammates can collaborate on work orders. People join as
           viewers. You can change roles later.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -60,7 +60,8 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
   const onboarding = useOnboardingStorybook();
   const progressive = Boolean(onboarding?.pending);
   const progress = onboarding?.setupProgress;
-  const showRecent = !progressive || ((progress?.issuesReady ?? false) && !(progress?.analyzingIssues ?? false));
+  // No recent work orders during setup — the workspace has none yet.
+  const showRecent = !progressive;
 
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2 pt-2 pb-4" data-testid="factories-nav">
