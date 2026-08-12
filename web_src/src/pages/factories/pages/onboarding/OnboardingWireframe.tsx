@@ -6,7 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
 import { AnalysisSidePanel } from "./redesign/AnalysisSidePanel";
-import type { IntegrationId } from "./redesign/redesignFixtures";
+import { AGENT_OPTIONS, type IntegrationId } from "./redesign/redesignFixtures";
 import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./redesign/redesignShared";
 import { useConnectDialog } from "./redesign/useConnectDialog";
 import { useRedesignSetupState } from "./redesign/useRedesignSetupState";
@@ -17,6 +17,7 @@ type SectionId = "name" | "repo" | "issues" | "agent";
 function Section({
   id,
   title,
+  purpose,
   summary,
   open,
   complete,
@@ -26,6 +27,8 @@ function Section({
 }: {
   id: SectionId;
   title: string;
+  /** Short why text. Shown when open, and when collapsed if there is no summary. */
+  purpose: string;
   summary?: string;
   open: boolean;
   complete: boolean;
@@ -33,6 +36,8 @@ function Section({
   onOpen: (id: SectionId) => void;
   children: ReactNode;
 }) {
+  const collapsedHint = summary ?? purpose;
+
   return (
     <section
       className={cn(
@@ -60,14 +65,17 @@ function Section({
           </span>
           <span className="min-w-0">
             <span className="block text-[13px] font-medium">{title}</span>
-            {summary && !open ? (
-              <span className="block truncate text-[12px] text-muted-foreground">{summary}</span>
-            ) : null}
+            {!open ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{collapsedHint}</span> : null}
           </span>
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition", open && "rotate-180")} />
       </button>
-      {open ? <div className="border-t border-border px-4 py-4">{children}</div> : null}
+      {open ? (
+        <div className="border-t border-border px-4 py-4">
+          <p className="mb-4 text-[13px] text-muted-foreground">{purpose}</p>
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -89,7 +97,8 @@ function SetupSections({
     <div className="space-y-3">
       <Section
         id="name"
-        title="Name & invite"
+        title="Name and invite"
+        purpose="Give this workspace a name. Invite teammates who will review or run work orders."
         summary={setup.nameReady ? setup.workspaceName.trim() : undefined}
         open={openSection === "name"}
         complete={setup.nameReady}
@@ -98,14 +107,15 @@ function SetupSections({
         <NameInviteStep setup={setup} />
         <div className="mt-4">
           <Button type="button" size="sm" disabled={!setup.nameReady} onClick={() => setOpenSection("repo")}>
-            Continue to repository
+            Continue to version control
           </Button>
         </div>
       </Section>
 
       <Section
         id="repo"
-        title="Repository"
+        title="Version control"
+        purpose="Connect version control, then pick the repository where work orders open pull requests."
         summary={setup.selectedRepo ?? undefined}
         open={openSection === "repo"}
         complete={setup.repoReady}
@@ -123,12 +133,17 @@ function SetupSections({
       <Section
         id="issues"
         title="Issues"
+        purpose="Optional. Choose where SuperPlane imports work from, or skip and create work orders yourself."
         summary={
           setup.issuesChoice === "skip"
-            ? "Skipped. Manual work orders."
-            : setup.issuesChoice
-              ? "Source selected"
-              : undefined
+            ? "Skipped. Create work orders yourself."
+            : setup.issuesChoice === "vcs" && setup.vcsHost
+              ? `${setup.vcsHost === "github" ? "GitHub" : "GitLab"} Issues`
+              : setup.issuesChoice === "linear"
+                ? "Linear"
+                : setup.issuesChoice === "jira"
+                  ? "Jira"
+                  : undefined
         }
         open={openSection === "issues"}
         complete={setup.issuesReady}
@@ -138,15 +153,18 @@ function SetupSections({
         <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover />
         <div className="mt-4">
           <Button type="button" size="sm" disabled={!setup.issuesReady} onClick={() => setOpenSection("agent")}>
-            Continue to agent
+            Continue to coding agent
           </Button>
         </div>
       </Section>
 
       <Section
         id="agent"
-        title="Agent"
-        summary={setup.agentReady ? (setup.agent ?? undefined) : undefined}
+        title="Coding agent"
+        purpose="Pick a coding agent and connect it. The agent writes code and opens pull requests for work orders."
+        summary={
+          setup.agentReady ? (AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? undefined) : undefined
+        }
         open={openSection === "agent"}
         complete={setup.agentReady}
         locked={!setup.issuesReady}
@@ -202,7 +220,7 @@ export function OnboardingWireframe() {
       <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
         <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">
-          Finish each section to unlock the next. The setup log on the right follows each step.
+          Complete each section so SuperPlane can run work orders here. Finish one section to unlock the next.
         </p>
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">

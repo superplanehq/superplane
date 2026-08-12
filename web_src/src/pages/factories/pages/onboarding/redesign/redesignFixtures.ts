@@ -13,8 +13,8 @@ export type IntegrationOption = {
 };
 
 export const VCS_OPTIONS: IntegrationOption[] = [
-  { id: "github", label: "GitHub", detail: "Recommended. Connect, then select a repository." },
-  { id: "gitlab", label: "GitLab", detail: "Connect GitLab, then select a repository." },
+  { id: "github", label: "GitHub", detail: "Recommended. Open pull requests on GitHub." },
+  { id: "gitlab", label: "GitLab", detail: "Open pull requests on GitLab." },
 ];
 
 export const AGENT_OPTIONS: {
@@ -28,20 +28,20 @@ export const AGENT_OPTIONS: {
     id: "claude-code",
     label: "Claude Code",
     integrationId: "claude",
-    detail: "Claude (Anthropic) integration required.",
+    detail: "Use Claude to write code and open pull requests for work orders.",
     recommended: true,
   },
   {
     id: "cursor",
     label: "Cursor",
     integrationId: "cursor",
-    detail: "Cursor integration required.",
+    detail: "Use Cursor to write code and open pull requests for work orders.",
   },
   {
     id: "codex",
     label: "Codex",
     integrationId: "openai",
-    detail: "OpenAI integration required.",
+    detail: "Use Codex (OpenAI) to write code and open pull requests for work orders.",
   },
 ];
 
@@ -112,10 +112,10 @@ export function fixtureIssueCount(repo: string): number {
 export const FIXTURE_INVITE_URL = "https://app.superplane.dev/invite/storybook-demo-token";
 
 export const RAIL_STEPS = [
-  { id: "name", label: "Workspace", detail: "Name it and invite the team" },
-  { id: "repo", label: "Repository", detail: "Where the workspace opens pull requests" },
+  { id: "name", label: "Workspace", detail: "Name the workspace and invite teammates" },
+  { id: "repo", label: "Version control", detail: "Where work orders open pull requests" },
   { id: "issues", label: "Issues", detail: "Optional source for work orders" },
-  { id: "agent", label: "Agent", detail: "How the workspace runs work orders" },
+  { id: "agent", label: "Coding agent", detail: "Writes code when a work order runs" },
 ] as const;
 
 export function vcsLabel(host: VcsHostId) {

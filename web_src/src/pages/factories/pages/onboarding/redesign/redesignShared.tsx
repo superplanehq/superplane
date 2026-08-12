@@ -37,51 +37,86 @@ export function Shell({ children, className }: { children: ReactNode; className?
   );
 }
 
-export function ChoiceCard({
+function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
+  return <IntegrationIcon integrationName={name} className="size-5" size={size} />;
+}
+
+/**
+ * Shared row for version control, issues, and coding agent options.
+ * Connectable rows always show Connect / Connected on the right.
+ */
+function ConnectOptionRow({
+  icon,
   title,
   detail,
   selected,
-  disabled,
-  badge,
-  icon,
-  onClick,
+  meta,
+  connectLabel,
+  connected,
+  onSelect,
+  onConnect,
 }: {
+  icon: ReactNode;
   title: string;
   detail: string;
   selected?: boolean;
-  disabled?: boolean;
-  badge?: string;
-  icon?: ReactNode;
-  onClick: () => void;
+  meta?: string;
+  /** When set, show Connect / Connected on the right. */
+  connectLabel?: string;
+  connected?: boolean;
+  onSelect: () => void;
+  onConnect?: () => void;
 }) {
+  const needsConnect = Boolean(connectLabel) && !connected;
+
+  const select = () => {
+    onSelect();
+    if (needsConnect) onConnect?.();
+  };
+
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
+    <div
       className={cn(
-        "flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
-        selected ? "border-foreground bg-accent/40" : "border-border bg-background hover:bg-accent/30",
-        disabled && "cursor-not-allowed opacity-50 hover:bg-background",
+        "flex flex-wrap items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
+        selected ? "border-foreground bg-accent/40" : "border-border bg-background",
       )}
     >
-      {icon ? <span className="mt-0.5 shrink-0">{icon}</span> : null}
-      <span className="min-w-0 flex-1">
-        <span className="flex w-full items-center justify-between gap-2">
-          <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
-          <span className="flex shrink-0 items-center gap-2">
-            {badge ? <span className="text-[11px] text-muted-foreground">{badge}</span> : null}
-            {selected ? <Check className="size-3.5" strokeWidth={2.5} aria-hidden /> : null}
+      <button type="button" className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={select}>
+        <span className="mt-0.5 shrink-0">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
+            {meta ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
+            {selected && !needsConnect ? (
+              <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
+            ) : null}
           </span>
+          <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
         </span>
-        <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
-      </span>
-    </button>
+      </button>
+      {connectLabel ? (
+        <div className="shrink-0 self-center">
+          {connected ? (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
+              <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+              Connected
+            </span>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                onSelect();
+                onConnect?.();
+              }}
+            >
+              Connect {connectLabel}
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
-}
-
-function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
-  return <IntegrationIcon integrationName={name} className="size-5" size={size} />;
 }
 
 export function NameInviteStep({ setup }: { setup: RedesignSetupApi }) {
@@ -99,7 +134,9 @@ export function NameInviteStep({ setup }: { setup: RedesignSetupApi }) {
           className="mt-2 h-10"
           autoFocus
         />
-        <p className="mt-1.5 text-[12px] text-muted-foreground">Short name for this workspace.</p>
+        <p className="mt-1.5 text-[12px] text-muted-foreground">
+          Shown in the sidebar and on work orders for this workspace.
+        </p>
       </div>
 
       <div className="rounded-lg border border-border p-4">
@@ -153,10 +190,10 @@ function RepositoryPicker({
   }, [repos, query]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 rounded-lg border border-border p-4">
       <div className="text-[13px] font-medium">Select repository</div>
       <p className="text-[12px] text-muted-foreground">
-        This workspace opens pull requests and writes output in this repository.
+        Choose the repository that receives pull requests from this workspace.
       </p>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -218,57 +255,35 @@ export function RepoStep({
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   const host = setup.vcsHost;
-  const connected = host ? setup.connected.has(host) : false;
-  const repos = host ? FIXTURE_REPOS[host] : [];
+  const hostConnected = host ? setup.connected.has(host) : false;
+  const repos = host && hostConnected ? FIXTURE_REPOS[host] : [];
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {VCS_OPTIONS.map((option) => (
-          <ChoiceCard
-            key={option.id}
-            icon={<IntegrationChoiceIcon name={option.id} />}
-            title={option.label}
-            detail={option.detail}
-            selected={setup.vcsHost === option.id}
-            onClick={() => setup.selectVcsHost(option.id as VcsHostId)}
-          />
-        ))}
+    <div className="space-y-4">
+      <div className="grid gap-2">
+        {VCS_OPTIONS.map((option) => {
+          const optionId = option.id as VcsHostId;
+          const connected = setup.connected.has(optionId);
+          const selected = setup.vcsHost === optionId;
+          return (
+            <ConnectOptionRow
+              key={option.id}
+              icon={<IntegrationChoiceIcon name={option.id} />}
+              title={option.label}
+              detail={option.detail}
+              selected={selected}
+              meta={option.id === "github" ? "Recommended" : undefined}
+              connectLabel={vcsLabel(optionId)}
+              connected={connected}
+              onSelect={() => setup.selectVcsHost(optionId)}
+              onConnect={() => onRequestConnect(optionId)}
+            />
+          );
+        })}
       </div>
 
-      {host ? (
-        <div className="rounded-lg border border-border p-4">
-          {!connected ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <IntegrationChoiceIcon name={host} />
-                <div>
-                  <div className="text-[13px] font-medium">Connect {vcsLabel(host)}</div>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    Required before you can choose a repository.
-                  </p>
-                </div>
-              </div>
-              <Button type="button" size="sm" onClick={() => onRequestConnect(host)}>
-                Connect {vcsLabel(host)}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-[13px] text-emerald-700 dark:text-emerald-300">
-                <IntegrationChoiceIcon name={host} />
-                <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
-                {vcsLabel(host)} connected
-              </div>
-              <RepositoryPicker
-                host={host}
-                repos={repos}
-                selectedRepo={setup.selectedRepo}
-                onSelect={setup.selectRepo}
-              />
-            </div>
-          )}
-        </div>
+      {host && hostConnected ? (
+        <RepositoryPicker host={host} repos={repos} selectedRepo={setup.selectedRepo} onSelect={setup.selectRepo} />
       ) : null}
     </div>
   );
@@ -313,60 +328,46 @@ export function IssuesStep({
               Found {setup.issueCount} open issues on {vcsLabel(host)}
             </div>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Use these issues for work orders, connect another tracker, or skip and create work orders yourself.
+              Import these as work orders, connect another tracker, or skip and create work orders yourself.
             </p>
           </div>
 
           <div className="grid gap-2">
-            <ChoiceCard
+            <ConnectOptionRow
               icon={<IntegrationChoiceIcon name={host} />}
               title={`Use ${vcsLabel(host)} Issues`}
-              detail={`Use the ${vcsLabel(host)} integration you already connected.`}
+              detail={`Create work orders from open issues in ${setup.selectedRepo}.`}
               selected={setup.issuesChoice === "vcs"}
-              onClick={() => setup.setIssuesChoice("vcs")}
+              connectLabel={vcsLabel(host)}
+              connected
+              onSelect={() => setup.setIssuesChoice("vcs")}
             />
-            <ChoiceCard
+            <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="linear" />}
               title="Linear"
-              detail={
-                setup.connected.has("linear")
-                  ? "Linear is connected. Import issues from Linear."
-                  : "Connect Linear if your issues are in Linear."
-              }
+              detail="Create work orders from Linear issues."
               selected={setup.issuesChoice === "linear"}
-              onClick={() => {
-                if (!setup.connected.has("linear")) {
-                  onRequestConnect("linear");
-                  return;
-                }
-                setup.setIssuesChoice("linear");
-              }}
-              badge={setup.connected.has("linear") ? "Connected" : "Connect"}
+              connectLabel="Linear"
+              connected={setup.connected.has("linear")}
+              onSelect={() => setup.setIssuesChoice("linear")}
+              onConnect={() => onRequestConnect("linear")}
             />
-            <ChoiceCard
+            <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="jira" />}
               title="Jira"
-              detail={
-                setup.connected.has("jira")
-                  ? "Jira is connected. Import issues from Jira."
-                  : "Connect Jira if your issues are in Jira."
-              }
+              detail="Create work orders from Jira issues."
               selected={setup.issuesChoice === "jira"}
-              onClick={() => {
-                if (!setup.connected.has("jira")) {
-                  onRequestConnect("jira");
-                  return;
-                }
-                setup.setIssuesChoice("jira");
-              }}
-              badge={setup.connected.has("jira") ? "Connected" : "Connect"}
+              connectLabel="Jira"
+              connected={setup.connected.has("jira")}
+              onSelect={() => setup.setIssuesChoice("jira")}
+              onConnect={() => onRequestConnect("jira")}
             />
-            <ChoiceCard
+            <ConnectOptionRow
               icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
               title="Skip for now"
-              detail="Create work orders yourself. No issue analysis."
+              detail="Do not import issues. Create work orders yourself later."
               selected={setup.issuesChoice === "skip"}
-              onClick={() => setup.setIssuesChoice("skip")}
+              onSelect={() => setup.setIssuesChoice("skip")}
             />
           </div>
         </>
@@ -386,37 +387,19 @@ export function AgentStep({
     <div className="grid gap-2">
       {AGENT_OPTIONS.map((option) => {
         const connected = setup.connected.has(option.integrationId);
-        const selected = setup.agent === option.id;
         return (
-          <div key={option.id} className="rounded-lg border border-border p-3">
-            <ChoiceCard
-              icon={<IntegrationChoiceIcon name={option.integrationId} />}
-              title={option.label}
-              detail={option.detail}
-              selected={selected}
-              badge={option.recommended ? "Recommended" : undefined}
-              onClick={() => setup.setAgent(option.id as AgentHarnessId)}
-            />
-            {selected ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1">
-                {connected ? (
-                  <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-                    <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
-                    {integrationLabel(option.integrationId)} connected
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-[12px] text-muted-foreground">
-                      Connect {integrationLabel(option.integrationId)} to use {option.label}.
-                    </span>
-                    <Button type="button" size="sm" onClick={() => onRequestConnect(option.integrationId)}>
-                      Connect {integrationLabel(option.integrationId)}
-                    </Button>
-                  </>
-                )}
-              </div>
-            ) : null}
-          </div>
+          <ConnectOptionRow
+            key={option.id}
+            icon={<IntegrationChoiceIcon name={option.integrationId} />}
+            title={option.label}
+            detail={option.detail}
+            selected={setup.agent === option.id}
+            meta={option.recommended ? "Recommended" : undefined}
+            connectLabel={integrationLabel(option.integrationId)}
+            connected={connected}
+            onSelect={() => setup.setAgent(option.id as AgentHarnessId)}
+            onConnect={() => onRequestConnect(option.integrationId)}
+          />
         );
       })}
     </div>

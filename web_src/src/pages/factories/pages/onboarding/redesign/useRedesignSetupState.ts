@@ -66,7 +66,11 @@ export function useRedesignSetupState(initialName = "") {
 
   const nameReady = workspaceName.trim().length > 0;
   const repoReady = vcsHost !== null && connected.has(vcsHost) && selectedRepo !== null;
-  const issuesReady = issuesChoice !== null;
+  const issuesReady =
+    issuesChoice === "skip" ||
+    issuesChoice === "vcs" ||
+    (issuesChoice === "linear" && connected.has("linear")) ||
+    (issuesChoice === "jira" && connected.has("jira"));
   const agentReady =
     agent !== null &&
     ((agent === "claude-code" && connected.has("claude")) ||

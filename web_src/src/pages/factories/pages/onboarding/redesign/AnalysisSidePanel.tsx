@@ -118,10 +118,10 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
   }, [logLines, statusLabel]);
 
   const subtitle = complete
-    ? "Background work finished for this setup."
+    ? "Workspace setup is complete."
     : progress.nameReady
-      ? "The worker follows each step as you configure the workspace."
-      : "Name your workspace to begin.";
+      ? "SuperPlane prepares this workspace as you finish each section."
+      : "Shows progress while you set up this workspace.";
 
   return (
     <aside
