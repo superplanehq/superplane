@@ -6,10 +6,11 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Forward, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
 import { factoryDetailPath, workOrderDetailPath } from "./lib/factoryPagePaths";
+import { resolveWorkOrderCreatorDisplay } from "./lib/workOrderCreator";
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
@@ -21,7 +22,7 @@ interface WorkOrderCardProps {
   lines: FactoriesFactoryLine[];
   canDispatch?: boolean;
   isDispatching?: boolean;
-  onDispatch?: (lineName: string) => Promise<void>;
+  onDispatch?: (input: { lineName: string }) => Promise<void>;
 }
 
 export function WorkOrderCard({
@@ -41,7 +42,7 @@ export function WorkOrderCard({
   const href = order.id
     ? workOrderDetailPath(organizationId, factoryId, order.id)
     : factoryDetailPath(organizationId, factoryId);
-  const creatorDisplay = resolveUser(order.createdBy?.id, order.createdBy?.name);
+  const creatorDisplay = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)
     .map((assignee) => resolveUser(assignee.id, assignee.name));
@@ -53,7 +54,7 @@ export function WorkOrderCard({
     <article
       className={cn(
         factoryWorkOrderRowClassName,
-        "relative -mx-6 cursor-pointer px-6 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40",
+        "relative -mx-6 cursor-pointer px-6 transition-colors hover:bg-accent/50",
       )}
       data-testid="work-order-card"
     >
@@ -72,8 +73,8 @@ export function WorkOrderCard({
               {statusMeta.label}
             </Badge>
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="min-w-0 text-base font-semibold text-gray-900 dark:text-gray-100">{order.title}</h3>
-              <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">Updated {timeLabel}</span>
+              <h3 className="workspace-section-title min-w-0">{order.title}</h3>
+              <span className="shrink-0 text-xs text-muted-foreground">Updated {timeLabel}</span>
               {canShowDispatchButton && onDispatch ? (
                 <WorkOrderCardDispatchButton
                   lines={lines}
@@ -88,7 +89,13 @@ export function WorkOrderCard({
           <WorkOrderCardActors creatorDisplay={creatorDisplay} assigneeDisplays={assigneeDisplays} />
         </div>
 
-        <WorkOrderExecutionsList organizationId={organizationId} executions={order.executions} variant="compact" />
+        <WorkOrderExecutionsList
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={order.id}
+          executions={order.executions}
+          variant="compact"
+        />
       </div>
     </article>
   );
@@ -103,7 +110,7 @@ function WorkOrderCardDispatchButton({
   lines: FactoriesFactoryLine[];
   canDispatch: boolean;
   isDispatching: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
 }) {
   return (
     <div className="pointer-events-auto">
@@ -118,7 +125,7 @@ function WorkOrderCardDispatchButton({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
             disabled={!canDispatch || lines.length === 0}
             aria-label="Dispatch to line"
             data-testid="work-order-dispatch-button"
@@ -139,7 +146,7 @@ function WorkOrderCardActors({
   assigneeDisplays: Array<ReturnType<ReturnType<typeof useOrgUserLookup>["resolveUser"]>>;
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
         Creator:
         <OrgUserReference display={creatorDisplay} size="md" showName={false} />
@@ -154,7 +161,7 @@ function WorkOrderCardActors({
                 display={display}
                 size="md"
                 showName={false}
-                className="rounded-full ring-2 ring-white dark:ring-gray-900"
+                className="rounded-full ring-2 ring-background"
               />
             ))}
           </span>

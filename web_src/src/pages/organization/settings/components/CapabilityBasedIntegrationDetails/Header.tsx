@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
 import { ArrowLeft, Plug, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 export interface HeaderProps {
   organizationId: string;

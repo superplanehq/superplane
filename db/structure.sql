@@ -381,7 +381,8 @@ CREATE TABLE public.factory_work_order_artifacts (
     type character varying(32) NOT NULL,
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    key character varying(512)
 );
 
 
@@ -426,7 +427,9 @@ CREATE TABLE public.factory_work_order_executions (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    finished_at timestamp with time zone
+    finished_at timestamp with time zone,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    cost_cents bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -1620,6 +1623,13 @@ CREATE INDEX idx_factory_work_order_artifacts_factory_created ON public.factory_
 
 
 --
+-- Name: idx_factory_work_order_artifacts_factory_key_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_order_artifacts_factory_key_unique ON public.factory_work_order_artifacts USING btree (factory_id, key) WHERE (key IS NOT NULL);
+
+
+--
 -- Name: idx_factory_work_order_artifacts_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2679,7 +2689,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260805214133	f
+20260811235128	f
 \.
 
 

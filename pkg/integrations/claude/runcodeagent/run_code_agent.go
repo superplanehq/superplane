@@ -398,6 +398,14 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 		return false, nil
 	}
 
+	if sm.Err != nil {
+		ctx.Logger.Errorf("Session %s failed: %s", meta.Session.ID, sm.Err.Message)
+		mergeSessionIntoMetadata(meta, session)
+		_ = ctx.Metadata.Set(*meta)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
+		return true, fmt.Errorf("code agent session failed: %s", sm.Err.Message)
+	}
+
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
 	applyStructuredOutput(&out, session.Status, schema)
 	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)

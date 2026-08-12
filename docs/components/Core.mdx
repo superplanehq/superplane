@@ -31,6 +31,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="Find Work Order" href="#find-work-order" description="Look up a work order by id or by an artifact's key" />
   <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
@@ -436,7 +437,11 @@ Supported types:
 - **Markdown note** (`markdown`): requires `body`; optional `title`.
 - **Branch** (`branch`): requires `name` (the branch name).
 
-PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key. This component can only be used in factory-owned apps.
+PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
+
+Set `artifactKey` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a `github.onPullRequest` merged event. Keys are unique per factory.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}`. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -465,7 +470,9 @@ PR and markdown types accept a free-form `data` list of `{name, value}` entries 
 
 **Component key:** `addWorkOrderComment`
 
-The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label. This component can only be used in factory-owned apps.
+The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -712,6 +719,42 @@ The expression has access to:
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "filter.executed"
+}
+```
+
+<a id="find-work-order"></a>
+
+## Find Work Order
+
+**Component key:** `findWorkOrder`
+
+The Find Work Order component resolves a work order without requiring the current run to be attached to one — the missing piece for flows that don't start on a factory line, e.g. a `github.onPullRequest` merged event that needs to close the order a pull request belongs to.
+
+Lookup modes:
+
+- **Work Order ID** (`by: id`): resolves `orderId` directly.
+- **Artifact Key** (`by: artifactKey`): resolves the work order that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
+
+On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+
+### Output Channels
+
+- **Found**: A work order matched the lookup
+- **Not Found**: No work order matched the lookup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workOrder": {
+      "id": "wo-123",
+      "state": "open",
+      "title": "Work Order 1"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.found"
 }
 ```
 
@@ -1610,7 +1653,9 @@ iteration starts) instead of a bare expression.
 
 **Component key:** `updateWorkOrderStatus`
 
-The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran). This component can only be used in factory-owned apps.
+The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 

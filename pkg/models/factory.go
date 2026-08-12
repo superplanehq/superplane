@@ -338,6 +338,30 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 	return f.FindWorkOrder(tx, order.ID)
 }
 
+// FindWorkOrderByArtifactKey resolves a work order from one of its
+// artifacts' `key` values, then delegates to FindWorkOrder so the result
+// gets the same preloads/scoping as every other lookup path.
+func (f *Factory) FindWorkOrderByArtifactKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key = ?", f.OrganizationID, f.ID, trimmedKey).
+		First(&artifact).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return f.FindWorkOrder(tx, artifact.WorkOrderID)
+}
+
 func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
 	var order FactoryWorkOrder
 	err := tx.

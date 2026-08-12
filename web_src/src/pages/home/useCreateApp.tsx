@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";

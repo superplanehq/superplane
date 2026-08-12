@@ -22,6 +22,8 @@ type UseCommittedDraftBaselinesOptions = {
   enabled: boolean;
   /** Bumps after reset/commit remounts so committed snapshots reload from the server. */
   stagingResetNonce: number;
+  /** Factory apps have no Console surface — skip console.yaml so a failed read cannot block edit UI. */
+  includeConsole?: boolean;
 };
 
 export function useCommittedDraftBaselines({
@@ -29,6 +31,7 @@ export function useCommittedDraftBaselines({
   versionId,
   enabled,
   stagingResetNonce,
+  includeConsole = true,
 }: UseCommittedDraftBaselinesOptions): CommittedDraftBaselines {
   const queryClient = useQueryClient();
   const [baselines, setBaselines] = useState<CommittedDraftBaselines>({ ready: false });
@@ -47,38 +50,54 @@ export function useCommittedDraftBaselines({
     // The console read shares its key/fetcher with the draft console query, so
     // the two committed console.yaml reads are deduped into a single request.
     // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
-    void Promise.all([
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId),
-        staleTime: Number.POSITIVE_INFINITY,
-      }),
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.console(canvasId, versionId),
-        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
-        staleTime: Number.POSITIVE_INFINITY,
-      }),
-    ]).then(([version, consoleData]) => {
-      if (cancelled) {
-        return;
-      }
-
-      setBaselines({
-        canvasSpec: version?.spec,
-        console: consoleData
-          ? {
-              panels: consoleData.panels,
-              layout: consoleData.layout,
-            }
-          : { panels: [], layout: [] },
-        ready: true,
-      });
+    const versionPromise = queryClient.fetchQuery({
+      queryKey: canvasKeys.versionDetail(canvasId, versionId),
+      queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId),
+      staleTime: Number.POSITIVE_INFINITY,
     });
+    const consolePromise = includeConsole
+      ? queryClient.fetchQuery({
+          queryKey: canvasKeys.console(canvasId, versionId),
+          queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
+          staleTime: Number.POSITIVE_INFINITY,
+        })
+      : Promise.resolve(undefined);
+
+    void (async () => {
+      try {
+        const version = await versionPromise;
+        // Console is optional for factory apps; a console failure must not block baselines.
+        const consoleData = await consolePromise.catch(() => undefined);
+        if (cancelled) {
+          return;
+        }
+
+        setBaselines({
+          canvasSpec: version?.spec,
+          console: consoleData
+            ? {
+                panels: consoleData.panels,
+                layout: consoleData.layout,
+              }
+            : { panels: [], layout: [] },
+          ready: true,
+        });
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        // Unblock edit bootstrap after a version-read failure. Omit canvasSpec and
+        // console so local diffs stay false (hasLocalCanvasGraphDiff /
+        // hasLocalConsoleDiff) until a later successful fetch — empty console
+        // objects would falsely dirty Commit/Discard for apps with panels.
+        setBaselines({ ready: true });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [canvasId, enabled, queryClient, stagingResetNonce, versionId]);
+  }, [canvasId, enabled, includeConsole, queryClient, stagingResetNonce, versionId]);
 
   return baselines;
 }

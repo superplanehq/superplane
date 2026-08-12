@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ConfigurationField } from "@/api-client";

@@ -4,7 +4,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { Description, Label } from "../../../components/Fieldset/fieldset";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";

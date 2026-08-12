@@ -5,9 +5,9 @@ import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryLineDetailPath, workOrderDetailPath, workOrdersPath, automationsPath } from "../lib/factoryPagePaths";
+import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import {
   factoryCardClassName,
@@ -165,7 +165,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={automationsPath(organizationId, factoryId)}
+          to={linesPath(organizationId, factoryId)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >

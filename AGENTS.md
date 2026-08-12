@@ -3,7 +3,9 @@
 Guidance for AI coding agents and human contributors working in this repository.
 Read this top-to-bottom: what the project is, how to set it up, how to build and
 test, the conventions to follow, what not to touch, and how to submit changes.
-For UI-specific work, also read [web_src/AGENTS.md](web_src/AGENTS.md).
+For UI-specific work, also read [web_src/AGENTS.md](web_src/AGENTS.md),
+[.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
+[.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md).
 
 ## Project Overview
 
@@ -251,14 +253,39 @@ _ = HardDeleteCanvasNode(tx, node.OrganizationID, node.ID)
 
 ## Commit & Pull Request Guidelines
 
+Follow [.agents/skills/commit-and-pr-messages/SKILL.md](.agents/skills/commit-and-pr-messages/SKILL.md)
+for commit subjects/bodies and for every PR title and description. That skill
+encodes the Chris Beams / Tim Pope conventions (imperative subject, ~50-char
+summary, blank line before body, wrap at 72, explain why not how) plus
+SuperPlane's CI and DCO rules.
+
+Write commit bodies, PR descriptions, UI copy, and other reviewer/user-facing
+technical text in ASD-STE100 Simplified Technical English style. Follow
+[.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
+(short sentences, active voice, imperative instructions, stable terminology; no
+contractions, slang, or idioms).
+
 - PR titles must follow Conventional Commits with a release-type prefix that CI
-  enforces: `feat:`, `fix:`, `chore:`, or `docs:`.
+  enforces: `feat:`, `fix:`, `chore:`, or `docs:`. After the prefix, use an
+  imperative, capitalized summary with no trailing period
+  (e.g. `feat: Add empty-state copy for integrations`).
+- PR descriptions must explain **why** the change exists (problem, motivation,
+  user/system impact), not narrate the diff. Use a short STE Summary plus a
+  concrete STE Test plan checklist. Avoid empty or placeholder bodies when
+  context matters.
+- Commit subjects use the same imperative style; put motivation and trade-offs
+  in the body. Separate subject and body with a blank line; wrap the body at
+  72 characters.
 - All commits must include a DCO sign-off trailer
   (`Signed-off-by: Name <email>`). Use `git commit -s` (or `git commit --amend -s`).
 - Before submitting, run the checks relevant to your change:
   - Backend: `make format.go`, `make lint`, `make check.build.app`, `make test`.
   - Frontend: `make format.js`, `make check.build.ui`.
   - Protos: `make pb.gen` and `make check.proto.field.numbers`.
+
+For user-facing UI strings while designing or implementing frontend work, follow
+[.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md) together with
+the STE skill above.
 
 ## Cursor Cloud Environment Notes
 
