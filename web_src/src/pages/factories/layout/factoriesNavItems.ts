@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, ClipboardList, Layers, LayoutGrid, Rocket, Workflow } from "lucide-react";
+import { BookOpen, ClipboardList, Crosshair, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   automationsPath,
@@ -30,13 +30,13 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
   {
     id: "overview",
     label: "Overview",
-    Icon: LayoutGrid,
+    Icon: LayoutDashboard,
     buildHref: factoryOverviewPath,
   },
   {
     id: "missions",
     label: "Missions",
-    Icon: Rocket,
+    Icon: Crosshair,
     buildHref: factoryMissionsPath,
   },
   {
@@ -66,7 +66,7 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
   {
     id: "velocity",
     label: "Velocity",
-    Icon: BarChart3,
+    Icon: Gauge,
     buildHref: factoryVelocityPath,
   },
 ];
