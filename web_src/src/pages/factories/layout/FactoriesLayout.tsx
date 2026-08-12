@@ -6,13 +6,16 @@ import { useCreateFactory, useFactories, useFactory, useFactoryWorkOrders } from
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
-import { factoryDetailPath, factoryListPath } from "../lib/factoryPagePaths";
+import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -44,6 +47,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
 
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
   usePageTitle(pageTitle);
@@ -76,10 +80,23 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   );
 
   const handleCreateFactory = async (input: { name: string; description: string }) => {
-    const created = await createFactory.mutateAsync(input);
-    setCreateFactoryOpen(false);
-    if (created.id) {
+    try {
+      const created = await createFactory.mutateAsync(input);
+      setCreateFactoryOpen(false);
+      if (!created.id) {
+        return;
+      }
+      if (storybookOnboarding) {
+        storybookOnboarding.beginOnboarding({
+          workspaceId: created.id,
+          workspaceName: created.name || input.name,
+        });
+        navigate(factoryOnboardingPath(organizationId, created.id));
+        return;
+      }
       navigate(factoryDetailPath(organizationId, created.id));
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to create workspace"));
     }
   };
 
@@ -91,24 +108,29 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     return <FactoriesLayoutLoading />;
   }
 
+  // Storybook onboarding: hide the product shell until setup finishes.
+  const hideSidebar = Boolean(storybookOnboarding?.pending);
+
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        <FactoriesSidebar
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factory={factory}
-          factories={factories}
-          organizationName={organization?.metadata?.name ?? ""}
-          accountName={account?.name}
-          accountEmail={account?.email}
-          accountAvatarUrl={account?.avatar_url}
-          canOpenSettings={canAct("factories", "update")}
-          canCreateFactory={canAct("factories", "create")}
-          permissionsLoading={permissionsLoading}
-          recentWorkOrders={recentWorkOrders}
-          onOpenCreateFactory={() => setCreateFactoryOpen(true)}
-        />
+        {hideSidebar ? null : (
+          <FactoriesSidebar
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factory={factory}
+            factories={factories}
+            organizationName={organization?.metadata?.name ?? ""}
+            accountName={account?.name}
+            accountEmail={account?.email}
+            accountAvatarUrl={account?.avatar_url}
+            canOpenSettings={canAct("factories", "update")}
+            canCreateFactory={canAct("factories", "create")}
+            permissionsLoading={permissionsLoading}
+            recentWorkOrders={recentWorkOrders}
+            onOpenCreateFactory={() => setCreateFactoryOpen(true)}
+          />
+        )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>
