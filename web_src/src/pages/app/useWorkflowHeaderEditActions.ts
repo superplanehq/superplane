@@ -17,6 +17,8 @@ interface WorkflowStartupActionsConfig {
   liveVersionLoading?: boolean;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
+  /** Enter edit once without requiring/stripping `?edit=1` (factory Configure). */
+  forceEnterEdit?: boolean;
 }
 
 interface WorkflowHeaderEditActionsConfig {
@@ -82,10 +84,12 @@ function useAutoEditMode(
   const canvasLoaded = Boolean(startup?.canvas);
   const liveVersionLoading = startup?.liveVersionLoading ?? false;
   const searchParams = startup?.searchParams;
+  const forceEnterEdit = startup?.forceEnterEdit ?? false;
+  const hasEditQuery = searchParams?.get("edit") === "1";
 
   useEffect(() => {
     if (triggeredRef.current) return;
-    if (!searchParams || searchParams.get("edit") !== "1") return;
+    if (!forceEnterEdit && !hasEditQuery) return;
     if (!canvasLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
@@ -94,25 +98,28 @@ function useAutoEditMode(
     triggeredRef.current = true;
 
     void (async () => {
-      if (searchParams.get("run")) {
+      if (searchParams?.get("run")) {
         setRunDetailNodeId(null);
         setSearchParams(clearRunInspectionSearchParams, { replace: true });
         await Promise.resolve();
       }
 
       await handleToggleEditMode();
-      if (searchParams.get("run")) {
+      if (searchParams?.get("run")) {
         setRunDetailNodeId(null);
         setSearchParams(clearRunInspectionSearchParams, { replace: true });
       }
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("edit");
-          return next;
-        },
-        { replace: true },
-      );
+      // Only strip legacy ?edit=1. Factory Configure uses ?configure=1 and must stay.
+      if (hasEditQuery) {
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.delete("edit");
+            return next;
+          },
+          { replace: true },
+        );
+      }
     })();
   }, [
     searchParams,
@@ -123,6 +130,8 @@ function useAutoEditMode(
     canvasLoaded,
     liveVersionLoading,
     handleToggleEditMode,
+    forceEnterEdit,
+    hasEditQuery,
   ]);
 }
 

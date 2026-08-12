@@ -5,7 +5,13 @@ import { RunInspectorChrome } from "./RunInspectorChrome";
 import { ResizeHandle } from "./RunInspectorResize";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 
-export function RunInspectorLoadingPanel({ onClose }: { onClose: () => void }) {
+export function RunInspectorLoadingPanel({
+  onClose,
+  factoryContext = false,
+}: {
+  onClose: () => void;
+  factoryContext?: boolean;
+}) {
   const inspectorWidth = useResizableInspectorWidth();
 
   return (
@@ -18,7 +24,7 @@ export function RunInspectorLoadingPanel({ onClose }: { onClose: () => void }) {
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={inspectorWidth.startResize} isResizing={inspectorWidth.isResizing} />
-      <RunInspectorChrome onClose={onClose} />
+      <RunInspectorChrome onClose={onClose} showRunNavigation={!factoryContext} />
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-gray-400" />
       </div>
