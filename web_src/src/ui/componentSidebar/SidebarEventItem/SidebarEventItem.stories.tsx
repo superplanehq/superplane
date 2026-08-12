@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import React, { useState } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { SidebarEventItem } from "./SidebarEventItem";
 import type { SidebarEvent } from "../types";
 import { DEFAULT_EVENT_STATE_MAP } from "../../componentBase";
