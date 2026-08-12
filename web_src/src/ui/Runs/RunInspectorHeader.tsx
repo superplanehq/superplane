@@ -33,6 +33,21 @@ function getActionLabel(status: string) {
   }
 }
 
+function headerChromeClassName(embedded: boolean) {
+  if (embedded) {
+    return "rounded-md border border-slate-950/10 bg-white px-3 py-3 dark:border-gray-800 dark:bg-gray-950";
+  }
+  return "sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950";
+}
+
+function resolveParentRunHref(run: CanvasesCanvasRun, organizationId?: string) {
+  const parentRun = run.parent;
+  if (!parentRun?.id || !parentRun.canvasId || !organizationId) {
+    return null;
+  }
+  return appRunPath(organizationId, parentRun.canvasId, parentRun.id);
+}
+
 export function RunInspectorHeader({
   run,
   title,
@@ -55,11 +70,7 @@ export function RunInspectorHeader({
 }) {
   const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
   const resolvedOrganizationId = organizationId ?? routeOrganizationId;
-  const parentRun = run.parent;
-  const parentRunHref =
-    parentRun?.id && parentRun.canvasId && resolvedOrganizationId
-      ? appRunPath(resolvedOrganizationId, parentRun.canvasId, parentRun.id)
-      : null;
+  const parentRunHref = resolveParentRunHref(run, resolvedOrganizationId);
   const status = getRunStatus(run);
   const duration = calculateRunDuration(run);
   const durationText = duration !== null ? formatMinutesSecondsDuration(duration) : "";
@@ -68,13 +79,7 @@ export function RunInspectorHeader({
   const isStopAction = status === "running";
 
   return (
-    <div
-      className={cn(
-        embedded
-          ? "rounded-md border border-slate-950/10 bg-white px-3 py-3 dark:border-gray-800 dark:bg-gray-950"
-          : "sticky top-0 z-20 border-b border-slate-950/10 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950",
-      )}
-    >
+    <div className={headerChromeClassName(embedded)}>
       <div className="flex flex-col gap-1.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <RunStatusBadge status={status} />

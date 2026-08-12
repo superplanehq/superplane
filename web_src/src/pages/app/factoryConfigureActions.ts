@@ -68,20 +68,29 @@ export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): P
       versionId: savingVersionId,
       canvasYaml: materializeCanvasSpec(workflow),
     });
-    deps.draftCanvasSpecsRef.current.set(savingVersionId, workflow.spec);
-    deps.setDraftCanvasSpec(workflow.spec);
-    deps.setLastSavedWorkflowSnapshot(workflow);
-
+    applyStagedWorkflowSnapshot(deps, savingVersionId, workflow);
     const committed = await deps.handleCommitStaging("Update automation", { versionId: savingVersionId });
-    if (!committed) {
-      return;
+    if (committed) {
+      deps.onDone?.();
     }
-    deps.onDone?.();
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to stage canvas changes"));
   } finally {
     deps.setSavePending(false);
   }
+}
+
+function applyStagedWorkflowSnapshot(
+  deps: FactoryConfigureSaveDeps,
+  savingVersionId: string,
+  workflow: NonNullable<ReturnType<FactoryConfigureSaveDeps["getCurrentWorkflowSnapshot"]>>,
+) {
+  if (!workflow.spec) {
+    return;
+  }
+  deps.draftCanvasSpecsRef.current.set(savingVersionId, workflow.spec);
+  deps.setDraftCanvasSpec(workflow.spec);
+  deps.setLastSavedWorkflowSnapshot(workflow);
 }
 
 export async function runFactoryConfigureDiscard(deps: FactoryConfigureDiscardDeps): Promise<void> {

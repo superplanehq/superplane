@@ -3,6 +3,15 @@ import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
+import {
+  applyLayoutedPositions,
+  packComponentPositions,
+  resolveLayoutBounds,
+  resolveMinPositionFromLayout,
+  resolveMinPositionFromNodes,
+  sortComponentsByCurrentPosition,
+  type LayoutPosition,
+} from "./elkPacking";
 
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
@@ -15,11 +24,6 @@ const DISCONNECTED_COMPONENT_HORIZONTAL_GAP_VERTICAL = 100;
 const VERTICAL_FLOW_NODE_NODE_SPACING = "48";
 const HORIZONTAL_FLOW_NODE_NODE_SPACING = "100";
 const NODE_NODE_BETWEEN_LAYERS = "180";
-
-type LayoutPosition = {
-  x: number;
-  y: number;
-};
 
 export class ElkLayoutEngine implements LayoutEngine {
   private readonly elk = new ELK();
@@ -68,9 +72,9 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
-    const minCurrentPosition = this.resolveMinPositionFromNodes(layoutNodes);
-    const minLayoutPosition = this.resolveMinPositionFromLayout(layoutedPositions);
-    const updatedNodes = this.applyLayoutedPositions(nodes, layoutedPositions, {
+    const minCurrentPosition = resolveMinPositionFromNodes(layoutNodes);
+    const minLayoutPosition = resolveMinPositionFromLayout(layoutedPositions);
+    const updatedNodes = applyLayoutedPositions(nodes, layoutedPositions, {
       x: minCurrentPosition.x - minLayoutPosition.x,
       y: minCurrentPosition.y - minLayoutPosition.y,
     });
@@ -407,75 +411,6 @@ export class ElkLayoutEngine implements LayoutEngine {
     return layoutedPositions;
   }
 
-  private resolveLayoutBounds(layoutNodes: ComponentsNode[], layoutedPositions: Map<string, LayoutPosition>) {
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-
-    for (const node of layoutNodes) {
-      const nodeID = node.id;
-      if (!nodeID) {
-        continue;
-      }
-
-      const position = layoutedPositions.get(nodeID);
-      if (!position) {
-        continue;
-      }
-
-      const { width, height } = this.estimateNodeSize(node);
-      minX = Math.min(minX, position.x);
-      minY = Math.min(minY, position.y);
-      maxX = Math.max(maxX, position.x + width);
-      maxY = Math.max(maxY, position.y + height);
-    }
-
-    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-      return {
-        minX: 0,
-        minY: 0,
-        maxX: 0,
-        maxY: 0,
-        width: 0,
-        height: 0,
-      };
-    }
-
-    return {
-      minX,
-      minY,
-      maxX,
-      maxY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
-  }
-
-  private sortComponentsByCurrentPosition(
-    components: ComponentsNode[][],
-    direction: CanvasFlowDirection,
-  ): ComponentsNode[][] {
-    return [...components].sort((componentA, componentB) => {
-      const a = this.resolveMinPositionFromNodes(componentA);
-      const b = this.resolveMinPositionFromNodes(componentB);
-
-      if (direction === "vertical") {
-        if (a.x !== b.x) {
-          return a.x - b.x;
-        }
-
-        return a.y - b.y;
-      }
-
-      if (a.y !== b.y) {
-        return a.y - b.y;
-      }
-
-      return a.x - b.x;
-    });
-  }
-
   private async resolvePackedLayoutedPositions(
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
@@ -496,7 +431,7 @@ export class ElkLayoutEngine implements LayoutEngine {
       return this.extractLayoutedPositions(layoutedGraph);
     }
 
-    const sortedComponents = this.sortComponentsByCurrentPosition(components, direction);
+    const sortedComponents = sortComponentsByCurrentPosition(components, direction);
     const packedLayoutedPositions = new Map<string, LayoutPosition>();
     let currentPackOffset = 0;
     const packAlongCrossAxis = direction === "vertical";
@@ -516,12 +451,14 @@ export class ElkLayoutEngine implements LayoutEngine {
         continue;
       }
 
-      const bounds = this.resolveLayoutBounds(componentNodes, componentPositions);
-      for (const [nodeID, position] of componentPositions.entries()) {
-        packedLayoutedPositions.set(nodeID, {
-          x: position.x - bounds.minX + (packAlongCrossAxis ? currentPackOffset : 0),
-          y: position.y - bounds.minY + (packAlongCrossAxis ? 0 : currentPackOffset),
-        });
+      const bounds = resolveLayoutBounds(componentNodes, componentPositions, (node) => this.estimateNodeSize(node));
+      for (const [nodeID, position] of packComponentPositions(
+        componentPositions,
+        bounds,
+        currentPackOffset,
+        packAlongCrossAxis,
+      ).entries()) {
+        packedLayoutedPositions.set(nodeID, position);
       }
 
       currentPackOffset += packAlongCrossAxis
@@ -530,72 +467,6 @@ export class ElkLayoutEngine implements LayoutEngine {
     }
 
     return packedLayoutedPositions;
-  }
-
-  private resolveMinPositionFromNodes(nodes: ComponentsNode[]): LayoutPosition {
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-
-    for (const node of nodes) {
-      minX = Math.min(minX, node.position?.x || 0);
-      minY = Math.min(minY, node.position?.y || 0);
-    }
-
-    if (!Number.isFinite(minX)) {
-      minX = 0;
-    }
-
-    if (!Number.isFinite(minY)) {
-      minY = 0;
-    }
-
-    return { x: minX, y: minY };
-  }
-
-  private resolveMinPositionFromLayout(layoutedPositions: Map<string, LayoutPosition>): LayoutPosition {
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-
-    layoutedPositions.forEach((position) => {
-      minX = Math.min(minX, position.x);
-      minY = Math.min(minY, position.y);
-    });
-
-    if (!Number.isFinite(minX)) {
-      minX = 0;
-    }
-
-    if (!Number.isFinite(minY)) {
-      minY = 0;
-    }
-
-    return { x: minX, y: minY };
-  }
-
-  private applyLayoutedPositions(
-    nodes: ComponentsNode[],
-    layoutedPositions: Map<string, LayoutPosition>,
-    offset: LayoutPosition,
-  ): ComponentsNode[] {
-    return nodes.map((node) => {
-      const nodeID = node.id;
-      if (!nodeID) {
-        return node;
-      }
-
-      const position = layoutedPositions.get(nodeID);
-      if (!position) {
-        return node;
-      }
-
-      return {
-        ...node,
-        position: {
-          x: Math.round(position.x + offset.x),
-          y: Math.round(position.y + offset.y),
-        },
-      };
-    });
   }
 
   private resolveNodeOutputChannels(node: ComponentsNode, components: ActionsAction[]): string[] {

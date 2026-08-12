@@ -91,64 +91,86 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         onClose={onClose}
         showRunNavigation={!factoryContext}
       />
-      {factoryContext ? (
-        <FactoryNodeDetailBody
-          organizationId={organizationId}
-          sections={model.sections}
-          isLoading={model.isStepsLoading}
-          selectedValue={model.accordionValue}
-          componentIconMap={componentIconMap}
-          canShowExpressionTemplates={model.hasRunVersionSpec}
-          onEditNode={onEditNode}
-          actions={model.actions}
-          currentUser={model.resolvedCurrentUser}
-          errorScrollRequest={model.errorScrollRequest}
-          onErrorScrolled={model.clearErrorScrollRequest}
-        />
-      ) : (
-        <>
-          <RunInspectorHeader
-            run={run}
-            title={model.presentation.title}
-            stepCount={model.sections.length || run.executions?.length || 0}
-            onAction={() =>
-              model.presentation.status === "running" || model.presentation.status === "cancelling"
-                ? model.actions.stop()
-                : model.actions.rerun()
-            }
-            actionPending={
-              model.presentation.status === "running" || model.presentation.status === "cancelling"
-                ? model.actions.stopPending
-                : model.actions.rerunPending
-            }
-            actionDisabled={
-              model.presentation.status === "running" || model.presentation.status === "cancelling"
-                ? model.actions.stopDisabled
-                : !run.rootEvent?.id
-            }
-          />
-          <RunInspectorContent
-            errorSummaries={model.errorSummaries}
-            status={model.presentation.status}
-            sections={model.sections}
-            isLoading={model.isStepsLoading}
-            selectedValue={model.accordionValue}
-            componentIconMap={componentIconMap}
-            organizationId={organizationId}
-            canShowExpressionTemplates={model.hasRunVersionSpec}
-            onValueChange={model.handleValueChange}
-            onJumpToError={model.jumpToErrorOutput}
-            onRerun={model.actions.rerun}
-            onEditNode={onEditNode}
-            rerunPending={model.actions.rerunPending}
-            actions={model.actions}
-            currentUser={model.resolvedCurrentUser}
-            errorScrollRequest={model.errorScrollRequest}
-            onErrorScrolled={model.clearErrorScrollRequest}
-          />
-        </>
-      )}
+      <RunInspectorPanelBody
+        factoryContext={factoryContext}
+        organizationId={organizationId}
+        run={run}
+        model={model}
+        componentIconMap={componentIconMap}
+        onEditNode={onEditNode}
+      />
     </aside>
+  );
+}
+
+function isStopOrCancelStatus(status: string) {
+  return status === "running" || status === "cancelling";
+}
+
+function RunInspectorPanelBody({
+  factoryContext,
+  organizationId,
+  run,
+  model,
+  componentIconMap,
+  onEditNode,
+}: {
+  factoryContext: boolean;
+  organizationId?: string;
+  run: CanvasesCanvasRun;
+  model: ReturnType<typeof useRunInspectorPanelModel>;
+  componentIconMap: Record<string, string>;
+  onEditNode?: (nodeId: string) => void;
+}) {
+  if (factoryContext) {
+    return (
+      <FactoryNodeDetailBody
+        organizationId={organizationId}
+        sections={model.sections}
+        isLoading={model.isStepsLoading}
+        selectedValue={model.accordionValue}
+        componentIconMap={componentIconMap}
+        canShowExpressionTemplates={model.hasRunVersionSpec}
+        onEditNode={onEditNode}
+        actions={model.actions}
+        currentUser={model.resolvedCurrentUser}
+        errorScrollRequest={model.errorScrollRequest}
+        onErrorScrolled={model.clearErrorScrollRequest}
+      />
+    );
+  }
+
+  const stopping = isStopOrCancelStatus(model.presentation.status);
+  return (
+    <>
+      <RunInspectorHeader
+        run={run}
+        title={model.presentation.title}
+        stepCount={model.sections.length || run.executions?.length || 0}
+        onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
+        actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
+        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
+      />
+      <RunInspectorContent
+        errorSummaries={model.errorSummaries}
+        status={model.presentation.status}
+        sections={model.sections}
+        isLoading={model.isStepsLoading}
+        selectedValue={model.accordionValue}
+        componentIconMap={componentIconMap}
+        organizationId={organizationId}
+        canShowExpressionTemplates={model.hasRunVersionSpec}
+        onValueChange={model.handleValueChange}
+        onJumpToError={model.jumpToErrorOutput}
+        onRerun={model.actions.rerun}
+        onEditNode={onEditNode}
+        rerunPending={model.actions.rerunPending}
+        actions={model.actions}
+        currentUser={model.resolvedCurrentUser}
+        errorScrollRequest={model.errorScrollRequest}
+        onErrorScrolled={model.clearErrorScrollRequest}
+      />
+    </>
   );
 }
 

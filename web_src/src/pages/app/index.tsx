@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, startTransition, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -89,8 +89,7 @@ import { useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
-import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { useRunInspectionNavigation } from "./useRunInspectionNavigation";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -120,6 +119,7 @@ import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
 import { useFactoryConfigureSession, type FactoryConfigureActions } from "./useFactoryConfigureSession";
+import { resolveFactoryEmbedCanvasChrome, resolveFactoryEmbedSidebars } from "./factoryEmbedCanvasChrome";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
@@ -140,11 +140,9 @@ import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNod
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
-import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useCanvasAutoFocusPreference } from "@/hooks/useCanvasAutoFocusPreference";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
-  applyRunInspectionNavigationSearchParams,
   clearComponentSidebarSearchParams,
   clampWorkflowViewFlagsForFactoryApp,
   getExitEditModeDisabledTooltip,
@@ -658,7 +656,6 @@ export function AppPage({
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
-  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -3540,161 +3537,50 @@ export function AppPage({
     setFocusRequest,
   ]);
 
-  const exitEditableVersionForRunInspection = useCallback(() => {
-    if (!hasEditableVersion || !liveCanvasVersionId) {
-      return;
-    }
-
-    handleUseVersion(liveCanvasVersionId);
-  }, [hasEditableVersion, liveCanvasVersionId, handleUseVersion]);
-
-  const runLookupEnabled = isViewingLiveVersion && !isEditing;
-  const liveSidebarRunLookupEnabled = runLookupEnabled && !isRunInspectionMode;
-
-  const handleSelectRun = useCallback(
-    (runId: string) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      setRunDetailNodeId(null);
-      setFocusRequest(null);
-      requestRunFitRef.current(runId);
-      startTransition(() => {
-        setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
-      });
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
-  );
-
-  const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
-    enabled: runLookupEnabled,
+  const {
+    runLookupEnabled,
+    liveSidebarRunLookupEnabled,
+    resolveRunIdForSidebarEvent,
+    fetchRunIdForSidebarEvent,
+    handleSelectRun,
+    handleSelectRunFromSidebarEvent,
+    handleLogRunExecutionSelect,
+    handleNavigateRun,
+    handleClearRunInspection,
+    handleSelectLiveCanvas,
+    handleRunNodeDetailSelection,
+    handleRunNodeDetailNavigate,
+    handleRunCanvasNodeClick,
+    handleLiveCanvasNodeClick,
+  } = useRunInspectionNavigation({
+    hasEditableVersion,
+    liveCanvasVersionId,
+    handleUseVersion,
+    isViewingLiveVersion,
+    isEditing,
+    isRunInspectionMode,
+    clearDismissedRunDetail,
+    setRunDetailNodeId,
+    setFocusRequest,
+    setSearchParams,
+    requestRunFitRef,
+    preserveRunDetailNodeOnNextRunChangeRef,
+    searchParams,
+    runDetailNodeId,
+    clearParticipantFit: runParticipantFit.clearParticipantFit,
+    selectedRunId,
+    selectedRun,
+    isSelectedRunLoading,
+    describeRunSettled,
     canvasId,
     organizationId,
     queryClient,
     runs: runsData.runs,
     infiniteRunsPages: infiniteRunsQuery.data?.pages,
+    runCanvasData,
+    canvasNodesById,
+    refetchNodeDataMethod,
   });
-
-  const handleSelectRunFromSidebarEvent = useCallback(
-    (runId: string, options?: { nodeId?: string }) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      const inspectorNodeId =
-        options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
-      if (!inspectorNodeId) requestRunFitRef.current(runId);
-      if (inspectorNodeId) {
-        preserveRunDetailNodeOnNextRunChangeRef.current = true;
-        setRunDetailNodeId(inspectorNodeId);
-        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-      } else {
-        setRunDetailNodeId(null);
-        setFocusRequest(null);
-      }
-
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId,
-            nodeId: inspectorNodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, searchParams, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleLogRunExecutionSelect = useCallback(
-    (options: { runId: string; nodeId: string }) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      preserveRunDetailNodeOnNextRunChangeRef.current = true;
-      setRunDetailNodeId(options.nodeId);
-      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId: options.runId,
-            nodeId: options.nodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleNavigateRun = useCallback(
-    (runId: string) => {
-      exitEditableVersionForRunInspection();
-      const preservedNodeId = runDetailNodeId;
-      preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      setFocusRequest(null);
-      requestRunFitRef.current(runId);
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId,
-            nodeId: preservedNodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setFocusRequest, setSearchParams],
-  );
-
-  const handleClearRunInspection = useCallback(() => {
-    setRunDetailNodeId(null);
-    setFocusRequest(null);
-    runParticipantFit.clearParticipantFit();
-    setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
-  }, [runParticipantFit, setSearchParams, setRunDetailNodeId]);
-
-  const handleRunNodeDetailSelection = useCallback(
-    (nodeId: string | null) => {
-      setRunDetailNodeId(nodeId);
-      if (nodeId) {
-        clearDismissedRunDetail({ persistAutoOpen: true });
-      } else {
-        setFocusRequest(null);
-      }
-
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          if (nodeId) {
-            next.set("sidebar", "1");
-            next.set("node", nodeId);
-          } else {
-            next.delete("sidebar");
-            next.delete("node");
-          }
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleRunNodeDetailNavigate = useCallback(
-    (nodeId: string) => {
-      handleRunNodeDetailSelection(nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-    },
-    [handleRunNodeDetailSelection],
-  );
-
-  useStaleRunInspectionUrlCleanup({
-    selectedRunId,
-    isRunInspectionMode,
-    selectedRun,
-    isRunResolveLoading: isSelectedRunLoading,
-    describeRunSettled,
-    onClear: handleClearRunInspection,
-  });
-
-  const handleSelectLiveCanvas = useCallback(() => {
-    handleClearRunInspection();
-  }, [handleClearRunInspection]);
 
   const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
     setIsConsoleAddPanelOpen,
@@ -3797,94 +3683,6 @@ export function AppPage({
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
   });
-
-  const handleRunCanvasNodeClick = useCallback(
-    (nodeId: string) => {
-      if (!isRunInspectionMode || !selectedRun) return;
-      const participants = runCanvasData?.participantNodeIds;
-      if (participants && participants.length > 0 && !participants.includes(nodeId)) {
-        return;
-      }
-      handleRunNodeDetailSelection(nodeId);
-    },
-    [handleRunNodeDetailSelection, isRunInspectionMode, selectedRun, runCanvasData],
-  );
-
-  const resolveLatestNodeRunLookupEvent = useCallback(
-    async (nodeId: string): Promise<SidebarEvent | null> => {
-      const workflowNode = canvasNodesById.get(nodeId);
-      if (!workflowNode || !canvasId) {
-        return null;
-      }
-
-      const nodeType = workflowNode.type || "TYPE_ACTION";
-      await refetchNodeDataMethod(canvasId, nodeId, nodeType, queryClient);
-
-      const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
-      return resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
-    },
-    [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
-  );
-
-  const handleLiveCanvasNodeClick = useCallback(
-    (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
-
-      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
-      liveCanvasNodeClickLookupRef.current = lookupId;
-
-      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
-      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
-
-      void (async () => {
-        try {
-          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          handleSelectRunFromSidebarEvent(runId, { nodeId });
-        } catch (error) {
-          console.error("Failed to inspect latest node run", error);
-        }
-      })();
-    },
-    [
-      canvasNodesById,
-      fetchRunIdForSidebarEvent,
-      handleSelectRunFromSidebarEvent,
-      isEditing,
-      isRunInspectionMode,
-      liveSidebarRunLookupEnabled,
-      resolveLatestNodeRunLookupEvent,
-      resolveRunIdForSidebarEvent,
-    ],
-  );
-
-  useEffect(() => {
-    liveCanvasNodeClickLookupRef.current += 1;
-  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
-
-  useEffect(() => {
-    if (!isRunInspectionMode || isViewingLiveVersion) return;
-    // Entering an edit session on a draft exits run inspection rather than
-    // snapping back to the live version (which would bounce the user out of edit
-    // mode). For non-editable previews, keep pinning run inspection to live.
-    if (hasEditableVersion) {
-      handleClearRunInspection();
-      return;
-    }
-    if (!liveCanvasVersionId) return;
-    handleUseVersion(liveCanvasVersionId);
-  }, [
-    hasEditableVersion,
-    handleClearRunInspection,
-    handleUseVersion,
-    isRunInspectionMode,
-    isViewingLiveVersion,
-    liveCanvasVersionId,
-  ]);
 
   const buildYamlExportPayload = useCallback(
     (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) =>
@@ -4121,22 +3919,44 @@ export function AppPage({
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
 
-  // The runs sidebar (and its toggle icon) is available on both the Canvas and
-  // Console tabs, but not on Memory/Files surfaces or during an edit session.
-  // Factory embed is read-only chrome: no runs/agent tool sidebars.
-  const showRunsSidebar =
-    !factoryEmbed &&
-    allowsRunsSidebar(headerMode) &&
-    !editSessionActive &&
-    !urlViewFlags.isMemoryMode &&
-    !urlViewFlags.isFilesMode;
-
-  // The versions sidebar is available only during an edit session while on the
-  // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
-  // Within the edit session it can be shown/hidden with the header toggle.
-  const showVersionsSidebar =
-    !factoryEmbed && editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
   const selectedRunDetailDismissed = isRunDetailDismissed(detailDismissedForRunId, selectedRunId);
+  const { showRunsSidebar, showVersionsSidebar } = resolveFactoryEmbedSidebars({
+    factoryEmbed,
+    headerModeAllowsRuns: allowsRunsSidebar(headerMode),
+    editSessionActive,
+    isMemoryMode: urlViewFlags.isMemoryMode,
+    isFilesMode: urlViewFlags.isFilesMode,
+    runInspectionChromeActive,
+  });
+  const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
+    factoryEmbed,
+    factoryViewOnly,
+    factoryOwnedApp,
+    routeFactoryId,
+    canvas,
+    headerBanner,
+    canUpdateCanvas,
+    showBottomStatusControls,
+    hideAddControls,
+    editSessionActive,
+    runInspectionChromeActive,
+    handleSelectMemoryMode,
+    handleSelectConsoleMode,
+    handleSelectFilesMode,
+    handleEnterEditModeFromHeader,
+    handleExitEditSession,
+    handleSelectLiveCanvas,
+    handleBackToRunList,
+    filesHeaderActionsSlotId,
+    runsHasFitToViewRef,
+    hasFitToViewRef,
+    runsViewportRef,
+    viewportRef,
+    selectedRunId,
+    selectedRunDetailDismissed,
+    runCanvasLoading,
+    selectedRun,
+  });
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4252,19 +4072,9 @@ export function AppPage({
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
-          // Factory shell must stay vertical: use canvas metadata, fall back to route factoryId.
-          // Page chrome is already hidden via hidePageChrome.
-          factoryId={canvas?.metadata?.factoryId ?? (factoryEmbed ? routeFactoryId : undefined)}
-          headerBanner={factoryEmbed ? null : headerBanner}
+          {...factoryEmbedCanvasChrome}
           canvasStateMode={canvasStateMode}
-          showCanvasSettingsMenu={!factoryEmbed && canUpdateCanvas}
           onSeeCurrentVersion={handleSeeCurrentVersion}
-          showBottomStatusControls={!factoryEmbed && showBottomStatusControls}
-          hideAddControls={hideAddControls || factoryViewOnly}
-          hidePageChrome={factoryEmbed}
-          hideCanvasToolSidebar={factoryEmbed}
-          factoryEmbed={factoryEmbed}
-          onSelectMemory={factoryOwnedApp || factoryEmbed ? undefined : handleSelectMemoryMode}
           nodes={nodes}
           edges={renderedEdges}
           organizationId={organizationId}
@@ -4308,35 +4118,22 @@ export function AppPage({
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
-          hasFitToViewRef={runInspectionChromeActive ? runsHasFitToViewRef : hasFitToViewRef}
-          isRunInspectionMode={runInspectionChromeActive}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
-          viewportRef={runInspectionChromeActive ? runsViewportRef : viewportRef}
           fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           {...runParticipantFit.canvasFitProps}
-          runCanvasLoading={
-            runInspectionChromeActive && selectedRunId !== null && !selectedRunDetailDismissed && runCanvasLoading
-          }
-          runNodeDetailRun={
-            runInspectionChromeActive && selectedRunId && !selectedRunDetailDismissed ? selectedRun : null
-          }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
           runNavigation={runNavigation}
-          onRunNodeDetailClose={factoryEmbed ? handleSelectLiveCanvas : handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onRunNavigate={handleNavigateRun}
           onRunNavigateOlder={() => {
             void infiniteRunsQuery.fetchNextPage();
           }}
-          // Factory embed keeps the floating "Back to Live" chrome hidden, but
-          // Close on the run inspector must still exit ?run= inspection mode.
-          onBackToLiveCanvas={factoryEmbed ? undefined : handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled && isEditSessionUiReady}
@@ -4344,15 +4141,9 @@ export function AppPage({
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           headerMode={headerMode}
-          isEditSessionActive={factoryViewOnly ? false : editSessionActive}
           onSelectCanvasView={handleSelectCanvasView}
-          onEnterEditMode={factoryViewOnly ? undefined : handleEnterEditModeFromHeader}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          onExitEditMode={factoryViewOnly ? undefined : handleExitEditSession}
-          onSelectConsole={factoryOwnedApp || factoryEmbed ? undefined : handleSelectConsoleMode}
-          onSelectFiles={factoryOwnedApp || factoryEmbed ? undefined : handleSelectFilesMode}
-          filesHeaderActionsSlotId={factoryOwnedApp || factoryEmbed ? undefined : filesHeaderActionsSlotId}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}

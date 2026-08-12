@@ -102,6 +102,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
+import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -2885,59 +2886,27 @@ function CanvasContent({
         return;
       }
 
-      const sourceWidth = sourceNode.width ?? 240;
-      const sourceHeight = sourceNode.height ?? 180;
-      const appendGapX = 300;
-      const appendGapY = 220;
-      const appendAlignmentY = 30;
-      const appendAlignmentX = 0;
-      const placeholderPosition = isVerticalFlow
-        ? {
-            x: sourceNode.position.x + appendAlignmentX,
-            y: sourceNode.position.y + sourceHeight + appendGapY,
-          }
-        : {
-            x: sourceNode.position.x + sourceWidth + appendGapX,
-            y: sourceNode.position.y + appendAlignmentY,
-          };
+      const canvasWidth =
+        typeof document === "undefined"
+          ? 0
+          : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
+      const canvasHeight =
+        typeof document === "undefined"
+          ? 0
+          : (document.querySelector(".react-flow")?.clientHeight ?? window.innerHeight);
+      const { placeholderPosition, nextViewport } = computeAppendFromNodePlacement({
+        sourcePosition: sourceNode.position,
+        sourceWidth: sourceNode.width ?? 240,
+        sourceHeight: sourceNode.height ?? 180,
+        isVerticalFlow,
+        viewport: getViewport(),
+        canvasWidth,
+        canvasHeight,
+      });
 
-      const currentViewport = getViewport();
-      if (!isVerticalFlow) {
-        const canvasWidth =
-          typeof document === "undefined"
-            ? 0
-            : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
-        const rightSidebarSafeArea = 560;
-        const placeholderEstimatedWidth = 420;
-        const viewportBuffer = 48;
-        const placeholderRightScreenX =
-          (placeholderPosition.x + placeholderEstimatedWidth) * currentViewport.zoom + currentViewport.x;
-        const maxVisibleScreenX = canvasWidth - rightSidebarSafeArea - viewportBuffer;
-
-        if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
-          const overflow = placeholderRightScreenX - maxVisibleScreenX;
-          const nextViewport = { ...currentViewport, x: currentViewport.x - overflow };
-          setViewport(nextViewport, { duration: 180 });
-          viewportRef.current = nextViewport;
-        }
-      } else {
-        const canvasHeight =
-          typeof document === "undefined"
-            ? 0
-            : (document.querySelector(".react-flow")?.clientHeight ?? window.innerHeight);
-        const bottomSafeArea = 160;
-        const placeholderEstimatedHeight = 220;
-        const viewportBuffer = 48;
-        const placeholderBottomScreenY =
-          (placeholderPosition.y + placeholderEstimatedHeight) * currentViewport.zoom + currentViewport.y;
-        const maxVisibleScreenY = canvasHeight - bottomSafeArea - viewportBuffer;
-
-        if (canvasHeight > 0 && placeholderBottomScreenY > maxVisibleScreenY) {
-          const overflow = placeholderBottomScreenY - maxVisibleScreenY;
-          const nextViewport = { ...currentViewport, y: currentViewport.y - overflow };
-          setViewport(nextViewport, { duration: 180 });
-          viewportRef.current = nextViewport;
-        }
+      if (nextViewport) {
+        setViewport(nextViewport, { duration: 180 });
+        viewportRef.current = nextViewport;
       }
 
       onConnectionDropInEmptySpace(placeholderPosition, {
