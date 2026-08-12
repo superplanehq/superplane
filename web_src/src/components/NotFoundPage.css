@@ -1,0 +1,33 @@
+.not-found-page__plane {
+  animation: not-found-page-flight 5s ease-in-out infinite;
+  filter: drop-shadow(0 3px 4px rgb(15 23 42 / 0.16));
+  will-change: transform, opacity;
+}
+
+@keyframes not-found-page-flight {
+  0% {
+    opacity: 0;
+    transform: translate3d(-2rem, 0.8rem, 0) rotate(-8deg);
+  }
+
+  12%,
+  88% {
+    opacity: 1;
+  }
+
+  45% {
+    transform: translate3d(8.5rem, -1rem, 0) rotate(5deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(19rem, 0.25rem, 0) rotate(-5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .not-found-page__plane {
+    animation: none;
+    transform: translate3d(8.5rem, -1rem, 0) rotate(5deg);
+  }
+}
