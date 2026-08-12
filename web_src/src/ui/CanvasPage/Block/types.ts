@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
 import type { ComponentActionsProps } from "../../types/componentActions";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
@@ -47,6 +48,8 @@ export interface BlockInternalData {
   _hasHighlightedNodes?: boolean;
   _dimBodyBelowHeader?: boolean;
   _draftDiffStatus?: "added" | "updated" | "removed";
+  /** Factory apps use vertical (top→bottom) handles and edges. */
+  _flowDirection?: CanvasFlowDirection;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }

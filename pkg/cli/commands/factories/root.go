@@ -161,15 +161,19 @@ from "superplane factory active" is used.
 RESULT_COMPLETED) or short case-insensitive names (open, draft, closed /
 completed, rejected, failed).
 
+By default, only open work orders are shown. Pass --state all to see
+draft, open, and closed work orders.
+
 Examples:
   superplane factory orders list --factory shipping --state open
   superplane factory orders list --assignees alice@example.com --result failed
-  superplane factory orders list --unassigned`,
+  superplane factory orders list --unassigned
+  superplane factory orders list --state all`,
 		Args: cobra.NoArgs,
 	}
 	orderListCmd.Flags().StringVar(&orderListFactory, "factory", "", "factory name or UUID (default: active factory)")
 	orderListCmd.Flags().StringSliceVar(&orderListAssignees, "assignees", nil, "filter by assignee user UUID or email (repeatable)")
-	orderListCmd.Flags().StringSliceVar(&orderListStates, "state", nil, "filter by work order state (repeatable, e.g. open or STATE_OPEN)")
+	orderListCmd.Flags().StringSliceVar(&orderListStates, "state", nil, "filter by work order state (repeatable, e.g. open or STATE_OPEN); defaults to open when omitted; pass 'all' to include every state")
 	orderListCmd.Flags().StringSliceVar(&orderListResults, "result", nil, "filter by work order result (repeatable, e.g. completed or RESULT_COMPLETED)")
 	orderListCmd.Flags().BoolVar(&orderListUnassigned, "unassigned", false, "only show work orders with no assignees")
 	core.Bind(orderListCmd, &orderListCommand{

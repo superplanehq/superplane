@@ -2,10 +2,41 @@ import { describe, expect, it } from "vitest";
 import {
   allowsRunsSidebar,
   applyRunInspectionNavigationSearchParams,
+  clampWorkflowViewFlagsForFactoryApp,
   clearRunInspectionSearchParams,
   getExitEditModeDisabledTooltip,
   getWorkflowViewPresentation,
+  isNonCanvasAppViewParam,
 } from "./viewState";
+
+describe("clampWorkflowViewFlagsForFactoryApp", () => {
+  it("forces canvas-only flags for factory apps", () => {
+    expect(
+      clampWorkflowViewFlagsForFactoryApp({
+        isRunInspectionMode: true,
+        isMemoryMode: true,
+        isFilesMode: true,
+        isConsoleMode: true,
+      }),
+    ).toEqual({
+      isRunInspectionMode: true,
+      isMemoryMode: false,
+      isFilesMode: false,
+      isConsoleMode: false,
+    });
+  });
+});
+
+describe("isNonCanvasAppViewParam", () => {
+  it("detects console, memory, and files views", () => {
+    expect(isNonCanvasAppViewParam("console")).toBe(true);
+    expect(isNonCanvasAppViewParam("dashboard")).toBe(true);
+    expect(isNonCanvasAppViewParam("memory")).toBe(true);
+    expect(isNonCanvasAppViewParam("files")).toBe(true);
+    expect(isNonCanvasAppViewParam("")).toBe(false);
+    expect(isNonCanvasAppViewParam("runs")).toBe(false);
+  });
+});
 
 describe("allowsRunsSidebar", () => {
   it("allows the runs sidebar on the Canvas workflow tab", () => {

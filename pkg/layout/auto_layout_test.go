@@ -20,11 +20,31 @@ func TestApplyLayout_NilLayoutIsNoOp(t *testing.T) {
 
 func TestApplyLayout_RejectsUnsupportedAlgorithm(t *testing.T) {
 	nodes := []N{{ID: "node-1", Position: Position{X: 0, Y: 0}}}
-	autoLayout := &AutoLayout{Algorithm: "vertical"}
+	autoLayout := &AutoLayout{Algorithm: "diagonal"}
 
 	_, _, err := ApplyLayout(nodes, nil, autoLayout)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported layout algorithm")
+}
+
+func TestApplyLayout_VerticalLayoutsTopToBottom(t *testing.T) {
+	nodes := []N{
+		{ID: "start", Position: Position{X: 0, Y: 0}},
+		{ID: "process", Position: Position{X: 0, Y: 400}},
+		{ID: "check", Position: Position{X: 0, Y: 800}},
+	}
+	edges := []E{
+		{SourceID: "start", TargetID: "process", Channel: "default"},
+		{SourceID: "process", TargetID: "check", Channel: "default"},
+	}
+	autoLayout := &AutoLayout{Algorithm: AlgorithmVertical, Scope: ScopeFullCanvas}
+
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
+	require.NoError(t, err)
+
+	byID := mapLayoutNodesByID(updatedNodes)
+	assert.Less(t, byID["start"].Position.Y, byID["process"].Position.Y)
+	assert.Less(t, byID["process"].Position.Y, byID["check"].Position.Y)
 }
 
 func TestApplyLayout_AcceptsHorizontalAlias(t *testing.T) {
