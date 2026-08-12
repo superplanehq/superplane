@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
+import type { OnboardingNavAnalyzingKey } from "../onboardingStorybookContextValue";
 import type { AgentHarnessId, IssuesChoiceId, VcsHostId } from "./redesignFixtures";
 import { vcsLabel } from "./redesignFixtures";
 
@@ -9,8 +10,11 @@ export type AnalysisProgress = {
   nameReady: boolean;
   selectedRepo: string | null;
   vcsHost: VcsHostId | null;
-  repoReady: boolean;
+  /** Repository analysis starts only after Continue to issues. */
+  repoCommitted: boolean;
   issuesChoice: IssuesChoiceId | null;
+  /** Backlog analysis starts only after Continue to coding agent. */
+  issuesCommitted: boolean;
   agent: AgentHarnessId | null;
   agentReady: boolean;
 };
@@ -20,90 +24,150 @@ type Milestone = "boot" | "name" | "repo" | "issues" | "agent";
 function linesForMilestone(milestone: Milestone, progress: AnalysisProgress): string[] {
   switch (milestone) {
     case "boot":
-      return ["setup worker online", "waiting for workspace configuration…"];
+      return ["waiting for workspace setup…"];
     case "name":
       return [`workspace registered: ${progress.workspaceName.trim()}`];
     case "repo": {
       const host = progress.vcsHost ? vcsLabel(progress.vcsHost) : "git";
-      const repo = progress.selectedRepo ?? "repository";
+      const repo = progress.selectedRepo ?? "app repository";
       return [
         `${host} connected`,
-        `queued analysis for ${repo}`,
+        `analyzing app repository ${repo}`,
         "cloning repository…",
-        "indexing history in background…",
+        "indexing codebase in background…",
       ];
     }
     case "issues":
       if (progress.issuesChoice === "skip") {
-        return ["issues source skipped - work orders will be created manually"];
+        return ["backlog import skipped - create work orders manually"];
       }
       if (progress.issuesChoice === "vcs" && progress.vcsHost) {
-        return [`issues source: ${vcsLabel(progress.vcsHost)} Issues`, "scanning open issues…"];
+        return [`backlog: ${vcsLabel(progress.vcsHost)} Issues`, "scoring open issues for agent work…"];
       }
       if (progress.issuesChoice === "linear") {
-        return ["issues source: Linear", "syncing Linear projects…"];
+        return ["backlog: Linear", "scoring Linear issues for agent work…"];
       }
       if (progress.issuesChoice === "jira") {
-        return ["issues source: Jira", "syncing Jira projects…"];
+        return ["backlog: Jira", "scoring Jira issues for agent work…"];
       }
       return [];
     case "agent":
       return [
         `coding agent: ${progress.agent ?? "configured"}`,
         "credentials verified",
-        "workspace ready for first work order",
+        "ready to hand off the first work order",
       ];
   }
+}
+
+function asNavAnalyzingKey(milestone: Milestone): OnboardingNavAnalyzingKey | null {
+  if (milestone === "repo" || milestone === "issues" || milestone === "agent") return milestone;
+  return null;
 }
 
 /**
  * Persistent setup.log side panel. Advances as the user completes onboarding steps.
  * Velocity / AI readiness / Knowledge results are intentionally omitted for now.
  */
-export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) {
+export function AnalysisSidePanel({
+  progress,
+  onNavAnalyzing,
+}: {
+  progress: AnalysisProgress;
+  onNavAnalyzing?: (key: OnboardingNavAnalyzingKey, analyzing: boolean) => void;
+}) {
   const [logLines, setLogLines] = useState<string[]>(() => linesForMilestone("boot", progress));
   const [pendingWrites, setPendingWrites] = useState(0);
-  const seenRef = useRef<Set<Milestone>>(new Set(["boot"]));
+  /** Milestones whose log lines have fully written. */
+  const completedRef = useRef<Set<Milestone>>(new Set(["boot"]));
+  /** Milestones currently scheduled (may be cancelled by effect cleanup / Strict Mode). */
+  const inFlightRef = useRef<Set<Milestone>>(new Set());
   const terminalRef = useRef<HTMLOListElement>(null);
+  const onNavAnalyzingRef = useRef(onNavAnalyzing);
+  onNavAnalyzingRef.current = onNavAnalyzing;
 
-  const complete = progress.nameReady && progress.repoReady && progress.agentReady;
+  const complete = progress.nameReady && progress.repoCommitted && progress.agentReady;
   const statusLabel =
     complete && pendingWrites === 0 ? "idle" : progress.nameReady || pendingWrites > 0 ? "running" : "idle";
 
+  // Allow re-analysis after the user changes a selection and Continues again.
+  useEffect(() => {
+    if (!progress.repoCommitted) {
+      completedRef.current.delete("repo");
+      inFlightRef.current.delete("repo");
+    }
+  }, [progress.repoCommitted, progress.selectedRepo]);
+
+  useEffect(() => {
+    if (!progress.issuesCommitted) {
+      completedRef.current.delete("issues");
+      inFlightRef.current.delete("issues");
+    }
+  }, [progress.issuesCommitted, progress.issuesChoice]);
+
   useEffect(() => {
     const next: Milestone[] = [];
-    if (progress.nameReady && !seenRef.current.has("name")) next.push("name");
-    if (progress.repoReady && !seenRef.current.has("repo")) next.push("repo");
-    if (progress.issuesChoice !== null && !seenRef.current.has("issues")) next.push("issues");
-    if (progress.agentReady && !seenRef.current.has("agent")) next.push("agent");
+    const consider = (milestone: Milestone, ready: boolean) => {
+      if (!ready) return;
+      if (completedRef.current.has(milestone) || inFlightRef.current.has(milestone)) return;
+      next.push(milestone);
+    };
+    consider("name", progress.nameReady);
+    consider("repo", progress.repoCommitted && progress.selectedRepo !== null);
+    consider("issues", progress.issuesCommitted && progress.issuesChoice !== null);
+    consider("agent", progress.agentReady);
     if (next.length === 0) return;
 
-    next.forEach((milestone) => seenRef.current.add(milestone));
+    next.forEach((milestone) => inFlightRef.current.add(milestone));
 
     const timers: number[] = [];
     let delay = 0;
     let scheduled = 0;
     next.forEach((milestone) => {
-      linesForMilestone(milestone, progress).forEach((line) => {
+      const lines = linesForMilestone(milestone, progress);
+      const navKey = asNavAnalyzingKey(milestone);
+      if (lines.length === 0) {
+        inFlightRef.current.delete(milestone);
+        completedRef.current.add(milestone);
+        if (navKey) onNavAnalyzingRef.current?.(navKey, false);
+        return;
+      }
+      lines.forEach((line, lineIndex) => {
         scheduled += 1;
         delay += 350;
+        const isLast = lineIndex === lines.length - 1;
         timers.push(
           window.setTimeout(() => {
             setLogLines((current) => [...current, line]);
             setPendingWrites((count) => Math.max(0, count - 1));
+            if (isLast) {
+              inFlightRef.current.delete(milestone);
+              completedRef.current.add(milestone);
+              if (navKey) onNavAnalyzingRef.current?.(navKey, false);
+            }
           }, delay),
         );
       });
     });
-    setPendingWrites((count) => count + scheduled);
+    if (scheduled > 0) {
+      setPendingWrites((count) => count + scheduled);
+    }
 
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
+      if (scheduled > 0) {
+        setPendingWrites((count) => Math.max(0, count - scheduled));
+      }
+      // Allow re-schedule after Strict Mode / dep cleanup. Do not mark completed.
+      next.forEach((milestone) => {
+        inFlightRef.current.delete(milestone);
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- milestone fields only; full `progress` identity changes every render
   }, [
     progress.nameReady,
-    progress.repoReady,
+    progress.repoCommitted,
+    progress.issuesCommitted,
     progress.issuesChoice,
     progress.agentReady,
     progress.workspaceName,
@@ -118,10 +182,10 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
   }, [logLines, statusLabel]);
 
   const subtitle = complete
-    ? "Workspace setup is complete."
+    ? "Ready for the first work order."
     : progress.nameReady
-      ? "SuperPlane prepares this workspace as you finish each section."
-      : "Shows progress while you set up this workspace.";
+      ? "SuperPlane analyzes the app and backlog as you finish each section."
+      : "Shows analysis progress while you set up this workspace.";
 
   return (
     <aside

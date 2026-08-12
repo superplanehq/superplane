@@ -130,19 +130,20 @@ export function NameInviteStep({ setup }: { setup: RedesignSetupApi }) {
           id="workspace-name"
           value={setup.workspaceName}
           onChange={(event) => setup.setWorkspaceName(event.target.value)}
-          placeholder="Refunds"
+          placeholder="Tempered Loom"
           className="mt-2 h-10"
           autoFocus
         />
         <p className="mt-1.5 text-[12px] text-muted-foreground">
-          Shown in the sidebar and on work orders for this workspace.
+          Starter name is editable. Use a short name for the app or product area this workspace will improve.
         </p>
       </div>
 
       <div className="rounded-lg border border-border p-4">
         <div className="text-[13px] font-medium">Invite teammates</div>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Optional. Share the organization invite link. People join as viewers. You can change roles later.
+          Optional. Share the organization invite link so teammates can review agent pull requests. People join as
+          viewers. You can change roles later.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <code className="max-w-full truncate rounded-md border border-border bg-accent/40 px-2 py-1.5 text-[12px]">
@@ -193,7 +194,7 @@ function RepositoryPicker({
     <div className="space-y-3 rounded-lg border border-border p-4">
       <div className="text-[13px] font-medium">Select repository</div>
       <p className="text-[12px] text-muted-foreground">
-        Choose the repository that receives pull requests from this workspace.
+        Choose the app repository SuperPlane will analyze and agents will change. Pull requests open here.
       </p>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -308,7 +309,7 @@ export function IssuesStep({
 
   const host = setup.vcsHost;
   if (!host || !setup.selectedRepo) {
-    return <p className="text-[13px] text-muted-foreground">Connect a repository first.</p>;
+    return <p className="text-[13px] text-muted-foreground">Select an app repository first.</p>;
   }
 
   return (
@@ -316,7 +317,7 @@ export function IssuesStep({
       {(setup.issuesDiscovering || (!setup.issuesDiscovered && !setup.issuesChoice)) && (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-4 py-3 text-[13px]">
           <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          Looking for issues on {setup.selectedRepo}…
+          Looking for backlog issues on {setup.selectedRepo}…
         </div>
       )}
 
@@ -328,7 +329,7 @@ export function IssuesStep({
               Found {setup.issueCount} open issues on {vcsLabel(host)}
             </div>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Import these as work orders, connect another tracker, or skip and create work orders yourself.
+              SuperPlane can score these for autonomous work. Use this backlog, connect another tracker, or skip.
             </p>
           </div>
 
@@ -336,7 +337,7 @@ export function IssuesStep({
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name={host} />}
               title={`Use ${vcsLabel(host)} Issues`}
-              detail={`Create work orders from open issues in ${setup.selectedRepo}.`}
+              detail={`Find agent-ready work in open issues on ${setup.selectedRepo}.`}
               selected={setup.issuesChoice === "vcs"}
               connectLabel={vcsLabel(host)}
               connected
@@ -345,7 +346,7 @@ export function IssuesStep({
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="linear" />}
               title="Linear"
-              detail="Create work orders from Linear issues."
+              detail="Find agent-ready work in your Linear backlog."
               selected={setup.issuesChoice === "linear"}
               connectLabel="Linear"
               connected={setup.connected.has("linear")}
@@ -355,7 +356,7 @@ export function IssuesStep({
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name="jira" />}
               title="Jira"
-              detail="Create work orders from Jira issues."
+              detail="Find agent-ready work in your Jira backlog."
               selected={setup.issuesChoice === "jira"}
               connectLabel="Jira"
               connected={setup.connected.has("jira")}
@@ -365,7 +366,7 @@ export function IssuesStep({
             <ConnectOptionRow
               icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
               title="Skip for now"
-              detail="Do not import issues. Create work orders yourself later."
+              detail="Do not import a backlog. Create work orders yourself for selected tasks."
               selected={setup.issuesChoice === "skip"}
               onSelect={() => setup.setIssuesChoice("skip")}
             />
@@ -420,7 +421,8 @@ export function DonePanel({ setup }: { setup: RedesignSetupApi }) {
       <div>
         <h2 className="text-[18px] font-semibold tracking-[-0.02em]">Workspace ready</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          Setup is complete. Background analysis can continue from the steps you finished.
+          SuperPlane can keep analyzing the app and backlog. Create a work order to hand the first task to your coding
+          agent.
         </p>
       </div>
       <ul className="space-y-2 text-[13px]">
@@ -428,13 +430,13 @@ export function DonePanel({ setup }: { setup: RedesignSetupApi }) {
           <span className="text-muted-foreground">Workspace</span> · {setup.summary.workspaceName}
         </li>
         <li>
-          <span className="text-muted-foreground">Repository</span> · {setup.summary.selectedRepo}
+          <span className="text-muted-foreground">App repository</span> · {setup.summary.selectedRepo}
         </li>
         <li>
-          <span className="text-muted-foreground">Issues</span> · {issuesLabel(setup.issuesChoice)}
+          <span className="text-muted-foreground">Backlog</span> · {issuesLabel(setup.issuesChoice)}
         </li>
         <li>
-          <span className="text-muted-foreground">Agent</span> ·{" "}
+          <span className="text-muted-foreground">Coding agent</span> ·{" "}
           {AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? "—"}
         </li>
       </ul>

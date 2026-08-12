@@ -6,6 +6,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { useEffect, useState } from "react";
 
 const MAX_NAME_LENGTH = 128;
@@ -25,7 +26,7 @@ export function CreateFactoryDialog({ open, isSaving, onClose, onCreate }: Creat
 
   useEffect(() => {
     if (open) {
-      setName("");
+      setName(generateWorkspaceName());
       setDescription("");
       setNameError("");
     }

@@ -6,10 +6,12 @@ import { useCreateFactory, useFactories, useFactory, useFactoryWorkOrders } from
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
+import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
-import { CreateFactoryDialog } from "../CreateFactoryDialog";
 import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
@@ -36,7 +38,6 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
 
   const { data: factories = [] } = useFactories(organizationId);
   const { data: organization } = useOrganization(organizationId);
@@ -77,19 +78,28 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     [organizationId, factoryId, factory, factories],
   );
 
-  const handleCreateFactory = async (input: { name: string; description: string }) => {
-    const created = await createFactory.mutateAsync(input);
-    setCreateFactoryOpen(false);
-    if (!created.id) {
+  const handleCreateFactory = async () => {
+    if (createFactory.isPending) {
       return;
     }
-    if (storybookOnboarding) {
-      const workspaceName = created.name || input.name;
-      storybookOnboarding.beginOnboarding({ workspaceId: created.id, workspaceName });
-      navigate(factoryOnboardingPath(organizationId, created.id));
-      return;
+    const workspaceName = generateWorkspaceName();
+    try {
+      const created = await createFactory.mutateAsync({ name: workspaceName, description: "" });
+      if (!created.id) {
+        return;
+      }
+      if (storybookOnboarding) {
+        storybookOnboarding.beginOnboarding({
+          workspaceId: created.id,
+          workspaceName: created.name || workspaceName,
+        });
+        navigate(factoryOnboardingPath(organizationId, created.id));
+        return;
+      }
+      navigate(factoryDetailPath(organizationId, created.id));
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to create workspace"));
     }
-    navigate(factoryDetailPath(organizationId, created.id));
   };
 
   if (factoryError) {
@@ -113,22 +123,15 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
           accountEmail={account?.email}
           accountAvatarUrl={account?.avatar_url}
           canOpenSettings={canAct("factories", "update")}
-          canCreateFactory={canAct("factories", "create")}
+          canCreateFactory={canAct("factories", "create") && !createFactory.isPending}
           permissionsLoading={permissionsLoading}
           recentWorkOrders={recentWorkOrders}
-          onOpenCreateFactory={() => setCreateFactoryOpen(true)}
+          onCreateFactory={() => void handleCreateFactory()}
         />
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>
       </div>
-
-      <CreateFactoryDialog
-        open={createFactoryOpen}
-        isSaving={createFactory.isPending}
-        onClose={() => setCreateFactoryOpen(false)}
-        onCreate={handleCreateFactory}
-      />
     </FactoriesLayoutContext.Provider>
   );
 }
@@ -146,7 +149,7 @@ interface FactoriesSidebarProps {
   canCreateFactory: boolean;
   permissionsLoading: boolean;
   recentWorkOrders: FactoriesWorkOrder[];
-  onOpenCreateFactory: () => void;
+  onCreateFactory: () => void;
 }
 
 function FactoriesSidebar({
@@ -162,7 +165,7 @@ function FactoriesSidebar({
   canCreateFactory,
   permissionsLoading,
   recentWorkOrders,
-  onOpenCreateFactory,
+  onCreateFactory,
 }: FactoriesSidebarProps) {
   return (
     <aside
@@ -176,7 +179,7 @@ function FactoriesSidebar({
         canOpenSettings={canOpenSettings}
         canCreateFactory={canCreateFactory}
         permissionsLoading={permissionsLoading}
-        onCreateFactory={onOpenCreateFactory}
+        onCreateFactory={onCreateFactory}
       />
       <div className="flex-1 overflow-y-auto">
         <FactoriesNav organizationId={organizationId} factoryId={factoryId} recentWorkOrders={recentWorkOrders} />

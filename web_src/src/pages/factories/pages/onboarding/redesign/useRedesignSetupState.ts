@@ -1,3 +1,4 @@
+import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -22,14 +23,18 @@ export type RedesignSetupState = {
 };
 
 export function useRedesignSetupState(initialName = "") {
-  const [workspaceName, setWorkspaceName] = useState(initialName);
+  const [workspaceName, setWorkspaceName] = useState(() => initialName.trim() || generateWorkspaceName());
   const [inviteCopied, setInviteCopied] = useState(false);
   const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  /** True after Continue to issues — starts repository analysis. */
+  const [repoCommitted, setRepoCommitted] = useState(false);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
   const [issuesDiscovered, setIssuesDiscovered] = useState(false);
   const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(null);
+  /** True after Continue to coding agent — starts backlog analysis. */
+  const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
   const [finished, setFinished] = useState(false);
 
@@ -40,16 +45,28 @@ export function useRedesignSetupState(initialName = "") {
   const selectVcsHost = useCallback((host: VcsHostId) => {
     setVcsHost(host);
     setSelectedRepo(null);
+    setRepoCommitted(false);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
     setIssuesChoice(null);
+    setIssuesCommitted(false);
   }, []);
 
   const selectRepo = useCallback((repo: string) => {
     setSelectedRepo(repo);
+    setRepoCommitted(false);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
     setIssuesChoice(null);
+    setIssuesCommitted(false);
+  }, []);
+
+  const commitRepoStep = useCallback(() => {
+    setRepoCommitted(true);
+  }, []);
+
+  const commitIssuesStep = useCallback(() => {
+    setIssuesCommitted(true);
   }, []);
 
   const startIssuesDiscovery = useCallback(() => {
@@ -59,6 +76,8 @@ export function useRedesignSetupState(initialName = "") {
     window.setTimeout(() => {
       setIssuesDiscovering(false);
       setIssuesDiscovered(true);
+      // Default to the connected host's Issues (GitHub or GitLab).
+      setIssuesChoice((current) => current ?? "vcs");
     }, 900);
   }, [selectedRepo]);
 
@@ -102,11 +121,15 @@ export function useRedesignSetupState(initialName = "") {
     selectVcsHost,
     selectedRepo,
     selectRepo,
+    repoCommitted,
+    commitRepoStep,
     issuesDiscovering,
     issuesDiscovered,
     startIssuesDiscovery,
     issuesChoice,
     setIssuesChoice,
+    issuesCommitted,
+    commitIssuesStep,
     agent,
     setAgent,
     finished,

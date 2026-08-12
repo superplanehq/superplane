@@ -13,8 +13,8 @@ export type IntegrationOption = {
 };
 
 export const VCS_OPTIONS: IntegrationOption[] = [
-  { id: "github", label: "GitHub", detail: "Recommended. Open pull requests on GitHub." },
-  { id: "gitlab", label: "GitLab", detail: "Open pull requests on GitLab." },
+  { id: "github", label: "GitHub", detail: "Recommended. Connect the app repository on GitHub." },
+  { id: "gitlab", label: "GitLab", detail: "Connect the app repository on GitLab." },
 ];
 
 export const AGENT_OPTIONS: {
@@ -28,20 +28,20 @@ export const AGENT_OPTIONS: {
     id: "claude-code",
     label: "Claude Code",
     integrationId: "claude",
-    detail: "Use Claude to write code and open pull requests for work orders.",
+    detail: "Cloud agent that changes the app repository and opens pull requests.",
     recommended: true,
   },
   {
     id: "cursor",
     label: "Cursor",
     integrationId: "cursor",
-    detail: "Use Cursor to write code and open pull requests for work orders.",
+    detail: "Cloud agent that changes the app repository and opens pull requests.",
   },
   {
     id: "codex",
     label: "Codex",
     integrationId: "openai",
-    detail: "Use Codex (OpenAI) to write code and open pull requests for work orders.",
+    detail: "Cloud agent (OpenAI) that changes the app repository and opens pull requests.",
   },
 ];
 
@@ -112,10 +112,10 @@ export function fixtureIssueCount(repo: string): number {
 export const FIXTURE_INVITE_URL = "https://app.superplane.dev/invite/storybook-demo-token";
 
 export const RAIL_STEPS = [
-  { id: "name", label: "Workspace", detail: "Name the workspace and invite teammates" },
-  { id: "repo", label: "Version control", detail: "Where work orders open pull requests" },
-  { id: "issues", label: "Issues", detail: "Optional source for work orders" },
-  { id: "agent", label: "Coding agent", detail: "Writes code when a work order runs" },
+  { id: "name", label: "Workspace", detail: "Name the workspace for continuous AI work" },
+  { id: "repo", label: "Version control", detail: "App repository agents analyze and change" },
+  { id: "issues", label: "Issues", detail: "Backlog SuperPlane can turn into work" },
+  { id: "agent", label: "Coding agent", detail: "Runs work in the app repository" },
 ] as const;
 
 export function vcsLabel(host: VcsHostId) {

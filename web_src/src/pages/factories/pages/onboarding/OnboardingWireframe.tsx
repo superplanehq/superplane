@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, ChevronDown } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
@@ -98,7 +98,7 @@ function SetupSections({
       <Section
         id="name"
         title="Name and invite"
-        purpose="Give this workspace a name. Invite teammates who will review or run work orders."
+        purpose="Name this workspace for continuous AI work on your app. Invite people who will review pull requests."
         summary={setup.nameReady ? setup.workspaceName.trim() : undefined}
         open={openSection === "name"}
         complete={setup.nameReady}
@@ -115,7 +115,7 @@ function SetupSections({
       <Section
         id="repo"
         title="Version control"
-        purpose="Connect version control, then pick the repository where work orders open pull requests."
+        purpose="Connect version control and pick the app repository. SuperPlane analyzes that codebase. Agents change it and open pull requests."
         summary={setup.selectedRepo ?? undefined}
         open={openSection === "repo"}
         complete={setup.repoReady}
@@ -124,7 +124,15 @@ function SetupSections({
       >
         <RepoStep setup={setup} onRequestConnect={requestConnect} />
         <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.repoReady} onClick={() => setOpenSection("issues")}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!setup.repoReady}
+            onClick={() => {
+              setup.commitRepoStep();
+              setOpenSection("issues");
+            }}
+          >
             Continue to issues
           </Button>
         </div>
@@ -133,7 +141,7 @@ function SetupSections({
       <Section
         id="issues"
         title="Issues"
-        purpose="Optional. Choose where SuperPlane imports work from, or skip and create work orders yourself."
+        purpose="Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself."
         summary={
           setup.issuesChoice === "skip"
             ? "Skipped. Create work orders yourself."
@@ -148,11 +156,24 @@ function SetupSections({
         open={openSection === "issues"}
         complete={setup.issuesReady}
         locked={!setup.repoReady}
-        onOpen={setOpenSection}
+        onOpen={(id) => {
+          if (id === "issues" && setup.repoReady) {
+            setup.commitRepoStep();
+          }
+          setOpenSection(id);
+        }}
       >
         <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover />
         <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.issuesReady} onClick={() => setOpenSection("agent")}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!setup.issuesReady}
+            onClick={() => {
+              setup.commitIssuesStep();
+              setOpenSection("agent");
+            }}
+          >
             Continue to coding agent
           </Button>
         </div>
@@ -161,14 +182,19 @@ function SetupSections({
       <Section
         id="agent"
         title="Coding agent"
-        purpose="Pick a coding agent and connect it. The agent writes code and opens pull requests for work orders."
+        purpose="Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run."
         summary={
           setup.agentReady ? (AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? undefined) : undefined
         }
         open={openSection === "agent"}
         complete={setup.agentReady}
         locked={!setup.issuesReady}
-        onOpen={setOpenSection}
+        onOpen={(id) => {
+          if (id === "agent" && setup.issuesReady) {
+            setup.commitIssuesStep();
+          }
+          setOpenSection(id);
+        }}
       >
         <AgentStep setup={setup} onRequestConnect={requestConnect} />
         <div className="mt-4">
@@ -192,6 +218,16 @@ export function OnboardingWireframe() {
   const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
   const { requestConnect, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<SectionId>("name");
+
+  const reportSetupProgress = onboarding?.reportSetupProgress;
+  useEffect(() => {
+    reportSetupProgress?.({
+      // Nav / analysis wait until Continue — selection alone must not start work.
+      repoReady: setup.repoCommitted,
+      issuesReady: setup.issuesCommitted,
+      agentReady: setup.agentReady,
+    });
+  }, [reportSetupProgress, setup.repoCommitted, setup.issuesCommitted, setup.agentReady]);
 
   const finishSetup = () => {
     if (onboarding && factoryId) {
@@ -220,7 +256,8 @@ export function OnboardingWireframe() {
       <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
         <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">
-          Complete each section so SuperPlane can run work orders here. Finish one section to unlock the next.
+          Hand off small engineering work to AI. SuperPlane finds candidate work in your app and backlog, then a coding
+          agent opens pull requests. Finish one section to unlock the next.
         </p>
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
@@ -238,11 +275,13 @@ export function OnboardingWireframe() {
                 nameReady: setup.nameReady,
                 selectedRepo: setup.selectedRepo,
                 vcsHost: setup.vcsHost,
-                repoReady: setup.repoReady,
+                repoCommitted: setup.repoCommitted,
                 issuesChoice: setup.issuesChoice,
+                issuesCommitted: setup.issuesCommitted,
                 agent: setup.agent,
                 agentReady: setup.agentReady,
               }}
+              onNavAnalyzing={onboarding?.reportNavAnalyzing}
             />
           </div>
         </div>
