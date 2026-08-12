@@ -29,7 +29,11 @@ export const Missions: Story = {
 
 export const Wiki: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/wiki`} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/wiki`}
+      factoriesFixture={defaultFactoriesFixture}
+      pageOverrides={{ wiki: WikiPage }}
+    />
   ),
 };
 
