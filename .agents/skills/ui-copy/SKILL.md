@@ -5,6 +5,7 @@ description: >-
   microcopy, button labels, link text, form labels, helper text, empty states,
   error messages, confirmation dialogs, onboarding text, notifications, or
   user-facing product wording — including when designing or implementing UI.
+  Applies ASD-STE100 Simplified Technical English style.
 ---
 
 # UI Copy
@@ -15,27 +16,33 @@ is done. The product is speaking to someone who is trying to complete a task.
 Adapted from Operately's [ui-copy skill](https://github.com/operately/operately/blob/main/.agents/skills/ui-copy/SKILL.md)
 for SuperPlane product vocabulary.
 
+**Language:** Write all user-facing strings in ASD-STE100 Simplified Technical
+English style. Follow
+[simplified-technical-english](../simplified-technical-english/SKILL.md)
+together with this skill. If UX tone and STE conflict, choose the clearer STE
+wording.
+
 ## Workflow
 
 1. Identify the user's current goal, screen state, and likely concern.
 2. Find nearby existing copy and match the product vocabulary, casing, tense, and tone.
-3. Draft the clearest version first. Prefer plain, specific, task-oriented language over personality.
-4. Tighten the copy until every word has a job.
+3. Draft the clearest STE version first. Prefer plain, specific, task-oriented language over personality.
+4. Tighten the copy until every word has a job (≤20 words for instructions, ≤25 for descriptions).
 5. Check that buttons, links, errors, and helper text set accurate expectations.
 6. If changing existing copy, scan adjacent screens or components for terms that should stay consistent.
 
 ## Principles
 
 - Treat words as UI. Real copy belongs in early designs, prototypes, and implementation; do not rely on placeholder text when the wording affects comprehension, trust, or layout.
-- Clarity beats brevity and personality. Short is good only when it remains specific. Cute, clever, or branded wording is acceptable only after the action is unmistakable.
+- Clarity beats brevity and personality. Short is good only when it remains specific. Do not use cute, clever, or branded wording when it can hide the action.
 - Write for the user in this moment. Ask what they are trying to do, what they need to know now, what can wait, and whether they need reassurance.
 - Be honest and concrete. Avoid marketing adjectives, hype, vague promises, and copy that tells users how to feel.
-- Use plain language. Avoid jargon, unexplained acronyms, idioms, internal names, and technical error codes unless the user can act on them.
-- Prefer active voice, present tense, and specific verbs: `Create`, `Save`, `Archive`, `Invite`, `Download`, `Connect`.
+- Use STE plain language. Avoid jargon, unexplained acronyms, idioms, contractions, internal names, and technical error codes unless the user can act on them.
+- Prefer active voice, imperative or simple present, and specific verbs: `Create`, `Save`, `Archive`, `Invite`, `Download`, `Connect`.
 - Keep copy scannable. Use short sentences, front-load important words, and reveal advanced detail only when needed.
 - Keep vocabulary consistent. Do not alternate between terms like `canvas`, `workflow`, and `pipeline` unless the product treats them as different concepts.
 - Match the platform and interaction. Use `tap` for touch surfaces and `click` only where pointer interaction is the assumption.
-- Use humor sparingly. Never use humor in repetitive, high-friction, high-risk, error, payment, privacy, or destructive flows.
+- Do not use humor in UI copy. Never use humor in high-friction, high-risk, error, payment, privacy, or destructive flows.
 
 ## Product Vocabulary
 
@@ -99,8 +106,9 @@ For success messages, confirm the completed action without hype:
 - Does the copy help the user complete the current task?
 - Is the primary action named with a specific verb?
 - Could the user understand it without reading surrounding body text?
+- Does the wording obey STE limits (≤20 words for instructions, ≤25 for descriptions)?
 - Is any word internal, technical, vague, promotional, or trying too hard?
-- Is the tone appropriate for the situation's risk, friction, or emotion?
+- Are contractions, slang, idioms, or humor absent?
 - Are terms, casing, and point of view consistent with nearby UI?
 - Is detail progressively disclosed instead of shown all at once?
 - Does the copy still fit small screens and common localization expansion?

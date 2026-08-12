@@ -3,8 +3,9 @@ name: commit-and-pr-messages
 description: >-
   Write Git commit messages and pull request titles/descriptions using the
   Chris Beams / Tim Pope conventions (subject/body split, ~50-char subject,
-  imperative mood, why-not-how body). Use when creating commits, drafting or
-  editing PR descriptions, writing PR titles, or when the user asks for help
+  imperative mood, why-not-how body) plus ASD-STE100 Simplified Technical
+  English for bodies and PR descriptions. Use when creating commits, drafting
+  or editing PR descriptions, writing PR titles, or when the user asks for help
   with commit/PR wording, changelogs from commits, or git history style.
 ---
 
@@ -16,6 +17,11 @@ Write history that future readers can scan, search, and trust. A diff shows
 Based on [How to Write a Git Commit Message](https://cbea.ms/git-commit/)
 (Chris Beams) and [A Note About Git Commit Messages](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html)
 (Tim Pope), adapted for SuperPlane's Conventional Commits + DCO requirements.
+
+**Language:** Write commit bodies, PR titles (after the type prefix), and PR
+descriptions in ASD-STE100 Simplified Technical English style. Follow
+[simplified-technical-english](../simplified-technical-english/SKILL.md)
+before you finalize wording.
 
 ## When to use
 
@@ -84,27 +90,30 @@ PR titles are the public subject line for a whole change set.
 
 Treat the PR body like an expanded commit body for reviewers and future
 maintainers. Lead with purpose; do not narrate the diff file-by-file.
+Write the Summary and Test plan in STE
+([simplified-technical-english](../simplified-technical-english/SKILL.md)).
 
 ### Required shape
 
 ```markdown
 ## Summary
 
-<2–4 sentences or bullets: what problem this solves and why this change
-exists. Focus on motivation and user/system impact, not implementation
-tour.>
+<2–4 short STE sentences or bullets: what problem this solves and why this
+change exists. Max 25 words per descriptive sentence. Focus on motivation
+and user/system impact, not implementation tourism.>
 
 ## Test plan
 
-- [ ] <Concrete verification steps a reviewer can run>
+- [ ] <STE procedural step: max 20 words, one instruction, imperative>
 - [ ] <Edge cases or regressions worth checking>
 ```
 
 ### Writing rules for the Summary
 
+- **STE first.** Short sentences, active voice, no contractions, no slang.
 - **Why over how.** State the before/after behavior and the reason for the
   change. Mention approach only when it is non-obvious or risky.
-- **Imperative / present orientation.** Describe what the PR *does*
+- **Present / imperative orientation.** Describe what the PR *does*
   (`Adds…`, `Fixes…`, `Removes…`), not a diary of what you did yesterday.
 - **Scannable.** Short paragraphs or bullets; no wall of implementation notes
   that duplicate the diff.
@@ -127,6 +136,7 @@ Before submitting a PR description, confirm:
 
 - [ ] Title completes: *If merged, this PR will ________.*
 - [ ] Summary explains **why**, not a file list
+- [ ] Summary and Test plan obey STE sentence limits and style
 - [ ] Test plan has actionable checks
 - [ ] No trailing period / non-imperative mush in the title
 - [ ] Body would still make sense months later without the author present

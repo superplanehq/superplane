@@ -4,7 +4,9 @@ This document captures the architecture principles, patterns, and workflow for d
 
 For user-facing labels, buttons, empty states, errors, confirmations, and other
 product wording, follow [../.agents/skills/ui-copy/SKILL.md](../.agents/skills/ui-copy/SKILL.md)
-— write real copy as part of the design, not placeholder text after layout.
+and [../.agents/skills/simplified-technical-english/SKILL.md](../.agents/skills/simplified-technical-english/SKILL.md)
+— write real ASD-STE100-style copy as part of the design, not placeholder text
+after layout.
 
 ## Architecture Principles
 
