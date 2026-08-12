@@ -151,7 +151,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
@@ -171,7 +171,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [],
 };
@@ -185,7 +185,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
   assignees: [
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
@@ -211,7 +211,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [
     planLineExecution("plan", { id: "3", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
@@ -233,7 +233,7 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [],
 };
@@ -246,7 +246,7 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_FAILED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [],
 };
@@ -259,7 +259,7 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   executions: [
     planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),

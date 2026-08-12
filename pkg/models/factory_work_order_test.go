@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
@@ -33,6 +35,90 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, json.Unmarshal(events[0].Data, &payload))
 	assert.Equal(t, "", payload.FromState)
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
+}
+
+func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	organization, userID, _ := setupFactoryWithUser(t, "creator-automations")
+	now := time.Now()
+	versionID := uuid.New()
+	canvas := Canvas{
+		ID:             uuid.New(),
+		OrganizationID: organization.ID,
+		LiveVersionID:  &versionID,
+		Name:           "Release automation",
+		CreatedBy:      &userID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	version := CanvasVersion{
+		ID:         versionID,
+		WorkflowID: canvas.ID,
+		OwnerID:    &userID,
+		Nodes:      datatypes.NewJSONSlice([]Node{}),
+		Edges:      datatypes.NewJSONSlice([]Edge{}),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	node := CanvasNode{
+		WorkflowID:    canvas.ID,
+		NodeID:        "create-order",
+		Name:          "Create work order",
+		State:         CanvasNodeStateReady,
+		Type:          NodeTypeComponent,
+		Ref:           datatypes.NewJSONType(NodeRef{Component: &ComponentRef{Name: "noop"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(Position{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	run := CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     node.NodeID,
+		VersionID:  versionID,
+		State:      CanvasRunStateFinished,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&canvas).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+		return tx.Create(&run).Error
+	}))
+
+	firstOrderID := uuid.New()
+	secondOrderID := uuid.New()
+	refs, err := ResolveFactoryWorkOrderCreatorAutomations(database.Conn(), []FactoryWorkOrder{
+		{ID: firstOrderID, SourceRunID: &run.ID},
+		{ID: secondOrderID, SourceRunID: &run.ID},
+		{ID: uuid.New()},
+	})
+	require.NoError(t, err)
+	require.Len(t, refs, 2)
+	assert.Equal(t, &factory.AutomationRef{
+		AppID:    canvas.ID,
+		AppName:  canvas.Name,
+		NodeID:   node.NodeID,
+		NodeName: node.Name,
+	}, refs[firstOrderID])
+	assert.Same(t, refs[firstOrderID], refs[secondOrderID])
+
+	require.NoError(t, canvas.SoftDeleteInTransaction(database.Conn()))
+	refs, err = ResolveFactoryWorkOrderCreatorAutomations(database.Conn(), []FactoryWorkOrder{
+		{ID: firstOrderID, SourceRunID: &run.ID},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, node.Name, refs[firstOrderID].NodeName)
 }
 
 func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {

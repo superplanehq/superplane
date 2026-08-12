@@ -123,7 +123,7 @@ func renderOrderDescribeText(
 	writeAlignedField(writer, "Result", formatOrderResult(order.GetResult()))
 	writeAlignedField(writer, "Created", formatRelativeTime(order.GetCreatedAt()))
 	writeAlignedField(writer, "Updated", formatRelativeTime(order.GetUpdatedAt()))
-	writeAlignedField(writer, "Created By", formatUserRef(order.GetCreatedBy()))
+	writeAlignedField(writer, "Created By", formatWorkOrderCreator(order.GetCreatedBy()))
 	if err := writer.Flush(); err != nil {
 		return err
 	}

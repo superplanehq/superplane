@@ -56,7 +56,7 @@ function openedWorkOrderEvent(order: FactoriesWorkOrder, at: string): FactoriesW
   return statusUpdatedEvent(order, at, {
     fromState: "draft",
     toState: "open",
-    actor: { id: order.createdBy?.id ?? STORYBOOK_ME_USER_ID },
+    actor: { id: order.createdBy?.user?.id ?? STORYBOOK_ME_USER_ID },
   });
 }
 

@@ -24,7 +24,7 @@ const describeWorkOrderPayload = `{
     "createdAt": "2025-01-15T10:00:00Z",
     "updatedAt": "2025-01-15T10:05:00Z",
     "assignees": [{"id": "user-1", "name": "Alice"}],
-    "createdBy": {"id": "user-2", "name": "Bob"}
+    "createdBy": {"user": {"id": "user-2", "name": "Bob"}}
   }
 }`
 
