@@ -44,9 +44,13 @@ export function useFactoryConfigureEnter({
   resyncStagedEditorState,
   setLastSavedWorkflowSnapshot,
 }: UseFactoryConfigureEnterOptions) {
-  const factoryConfigureEnterStartedRef = useRef(false);
-  // Keep latest callbacks/refs so enter effect does not re-fire when their
-  // identities churn after setDraftCanvasSpec / version activation.
+  // Latest values via refs so the enter effect deps stay stable. Unstable
+  // callback/query identities must not re-fire enter (update-depth loop), and
+  // resync setQueryData must not cancel the in-flight path before edit enables.
+  const liveCanvasRef = useRef(liveCanvas);
+  liveCanvasRef.current = liveCanvas;
+  const liveCanvasVersionRef = useRef(liveCanvasVersion);
+  liveCanvasVersionRef.current = liveCanvasVersion;
   const enterDepsRef = useRef({
     activateCanvasVersionForEditing,
     draftCanvasSpecsRef,
@@ -67,33 +71,28 @@ export function useFactoryConfigureEnter({
   };
 
   useEffect(() => {
-    if (!factoryConfigure) {
-      factoryConfigureEnterStartedRef.current = false;
-    }
-  }, [factoryConfigure]);
-
-  useEffect(() => {
-    if (!factoryConfigure) {
+    if (!factoryConfigure || editSessionActive) {
       return;
     }
-    if (factoryConfigureEnterStartedRef.current || editSessionActive) {
-      return;
-    }
-    if (!canStageCanvasVersion || !liveCanvasVersionId || !liveCanvasVersion) {
+    if (!canStageCanvasVersion || !liveCanvasVersionId) {
       return;
     }
     if (canvasLoading || liveCanvasVersionLoading) {
       return;
     }
 
-    factoryConfigureEnterStartedRef.current = true;
+    const version = liveCanvasVersionRef.current;
+    if (!version) {
+      return;
+    }
+
     // Seed draft from the live version directly — do not wait on the versions
     // list (handleUseVersion), which often left Configure with no activeVersionId.
-    const immediateSpec = liveCanvas?.spec ?? liveCanvasVersion.spec ?? { nodes: [], edges: [] };
+    const immediateSpec = liveCanvasRef.current?.spec ?? version.spec ?? { nodes: [], edges: [] };
     const versionForEdit: CanvasesCanvasVersion = {
-      ...liveCanvasVersion,
+      ...version,
       metadata: {
-        ...liveCanvasVersion.metadata,
+        ...version.metadata,
         id: liveCanvasVersionId,
       },
       spec: immediateSpec,
@@ -127,16 +126,14 @@ export function useFactoryConfigureEnter({
         return;
       }
       setEditActive(true);
-      if (liveCanvas) {
+      const canvas = liveCanvasRef.current;
+      if (canvas) {
         const spec = specsRef.current.get(configureVersionId) ?? immediateSpec;
-        setSnapshot({ ...liveCanvas, spec });
+        setSnapshot({ ...canvas, spec });
       }
     })();
 
     return () => {
-      // Cancel in-flight resync only. Do NOT reset enterStarted here — unstable
-      // callback identity (e.g. activateCanvasVersionForEditing after setDraft)
-      // would re-enter Configure and spam setSearchParams / ReactFlow setEdges.
       cancelled = true;
     };
   }, [
@@ -144,8 +141,6 @@ export function useFactoryConfigureEnter({
     canvasLoading,
     editSessionActive,
     factoryConfigure,
-    liveCanvas,
-    liveCanvasVersion,
     liveCanvasVersionId,
     liveCanvasVersionLoading,
   ]);
