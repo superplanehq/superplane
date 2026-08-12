@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Plus, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { factoryLineDestinationPath } from "../lib/factoryLineNavigation";

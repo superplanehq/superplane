@@ -6,7 +6,7 @@ import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { Calendar, ChevronDown, CircleDollarSign, CircleDot, Loader2, User, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 import { resolveWorkOrderCreatorDisplay } from "../lib/workOrderCreator";
 import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
