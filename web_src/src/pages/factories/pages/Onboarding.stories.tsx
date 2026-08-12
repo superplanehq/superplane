@@ -50,7 +50,6 @@ export const GettingStarted: Story = {
       pathSuffix={`${factoryBase}/overview`}
       factoriesFixture={defaultFactoriesFixture}
       onboardingSeed={{
-        connectedProviders: ["github"],
         enabledReposByWorkspace: {
           [PRIMARY_FACTORY_ID]: ONBOARDING_AVAILABLE_REPOS.filter((repo) => repo.provider === "github").slice(0, 2),
         },
