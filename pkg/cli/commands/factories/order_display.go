@@ -129,6 +129,26 @@ func userRefLabel(ref openapi_client.SuperplaneFactoriesUserRef) string {
 	return ref.GetId()
 }
 
+// formatWorkOrderCreator renders the polymorphic `createdBy` field: either a
+// resolved user (as "name (id)") or a canvas automation (as "automation
+// (node/app name)"). Returns "-" when neither branch is populated.
+func formatWorkOrderCreator(creator openapi_client.FactoriesWorkOrderCreator) string {
+	if automation, ok := creator.GetAutomationOk(); ok && automation != nil {
+		name := automation.GetNodeName()
+		if name == "" {
+			name = automation.GetAppName()
+		}
+		if name == "" {
+			return "automation"
+		}
+		return fmt.Sprintf("automation (%s)", name)
+	}
+	if user, ok := creator.GetUserOk(); ok && user != nil {
+		return formatUserRef(*user)
+	}
+	return "-"
+}
+
 // unknownActorLabel is shown in place of a user ID that couldn't be resolved
 // to an organization member, so raw UUIDs never leak into event output.
 const unknownActorLabel = "unknown user"

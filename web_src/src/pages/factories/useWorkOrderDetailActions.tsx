@@ -27,7 +27,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleDispatch = async (lineName: string) => {
+  const handleDispatch = async ({ lineName }: { lineName: string }) => {
     await dispatchWorkOrder.mutateAsync({ orderId, lineName });
     showSuccessToast(`Dispatched to ${lineName}.`);
   };
