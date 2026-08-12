@@ -216,4 +216,33 @@ describe("useWorkflowHeaderEditActions", () => {
     const clearedEdit = clearEditUpdater(new URLSearchParams("edit=1"));
     expect(clearedEdit.get("edit")).toBeNull();
   });
+
+  it("forceEnterEdit enters edit without stripping configure query", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("configure=1&from=automations");
+
+    renderHook(() =>
+      useWorkflowHeaderEditActions({
+        isRunInspectionMode: false,
+        handleClearRunInspection: vi.fn(),
+        handleToggleEditMode,
+        setRunDetailNodeId: vi.fn(),
+        setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+        startup: {
+          hasEditableVersion: false,
+          canUpdateCanvas: true,
+          canvas: { metadata: { id: "canvas-1" }, spec: {} },
+          searchParams,
+          forceEnterEdit: true,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
 });

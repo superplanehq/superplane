@@ -159,6 +159,7 @@ export function WorkOrderDetailLoadedView({
               <div className="mt-5">
                 <WorkOrderActivityTimeline
                   organizationId={organizationId}
+                  factoryId={factory.id ?? ""}
                   order={order}
                   events={events}
                   eventsError={eventsError}

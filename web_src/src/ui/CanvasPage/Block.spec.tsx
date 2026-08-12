@@ -6,18 +6,21 @@ vi.mock("@xyflow/react", () => ({
   Handle: ({
     type,
     id,
+    position,
     className,
     style,
     children,
   }: {
     type: string;
     id?: string;
+    position?: string;
     className?: string;
     style?: { pointerEvents?: string };
     children?: React.ReactNode;
   }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
+      data-position={position}
       data-highlighted={className?.includes("highlighted") ? "true" : "false"}
       data-pointer-events={style?.pointerEvents || "auto"}
       data-class-name={className}
@@ -28,6 +31,8 @@ vi.mock("@xyflow/react", () => ({
   Position: {
     Left: "left",
     Right: "right",
+    Top: "top",
+    Bottom: "bottom",
   },
 }));
 
@@ -190,6 +195,42 @@ describe("Block fallback rendering", () => {
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("places handles top-to-bottom for vertical factory flow", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="component-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _flowDirection: "vertical",
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-position", "top");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-position", "bottom");
   });
 
   it("shows an append connector button for end nodes in edit mode", () => {

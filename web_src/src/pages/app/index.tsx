@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, startTransition, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, startTransition, useState, type MutableRefObject } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -61,6 +61,7 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
+import { isFactoryApp, resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -144,10 +145,12 @@ import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   applyRunInspectionNavigationSearchParams,
   clearComponentSidebarSearchParams,
+  clampWorkflowViewFlagsForFactoryApp,
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
   allowsRunsSidebar,
+  isNonCanvasAppViewParam,
   useWorkflowUrlViewFlags,
   clearRunInspectionSearchParams,
 } from "./viewState";
@@ -214,10 +217,38 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
-export function AppPage() {
-  const { organizationId, appId } = useParams<{
+export type FactoryConfigureActions = {
+  save: () => void;
+  discard: () => void;
+  busy: boolean;
+};
+
+export function AppPage({
+  factoryEmbed = false,
+  factoryConfigure = false,
+  factoryConfigureActionsRef,
+  onFactoryConfigureBusyChange,
+  onFactoryConfigureDone,
+}: {
+  factoryEmbed?: boolean;
+  /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
+  factoryConfigure?: boolean;
+  /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
+  factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
+  onFactoryConfigureBusyChange?: (busy: boolean) => void;
+  onFactoryConfigureDone?: () => void;
+} = {}) {
+  const factoryViewOnly = factoryEmbed && !factoryConfigure;
+  const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
+  onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
+  const {
+    organizationId,
+    appId,
+    factoryId: routeFactoryId,
+  } = useParams<{
     organizationId: string;
     appId?: string;
+    factoryId?: string;
   }>();
   const canvasId = appId || "";
   const agentSuggestions = useAppPageAgentSuggestions(appId);
@@ -227,7 +258,6 @@ export function AppPage() {
   const { data: me } = useMe();
   const {
     isRunInspectionMode,
-    isMemoryMode,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
@@ -257,7 +287,7 @@ export function AppPage() {
     canvasId,
     onBackToRunList: clearRunDetailNodeSearch,
   });
-  const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
+  const rawUrlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   useEffect(() => {
@@ -297,7 +327,7 @@ export function AppPage() {
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
-  const canUseAgents = canAct("agents", "create") && canAct("agents", "read");
+  const canUseAgents = !factoryEmbed && canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -311,6 +341,31 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+  const factoryOwnedApp = isFactoryApp(liveCanvas?.metadata?.factoryId);
+  const urlViewFlags = useMemo(
+    () => (factoryOwnedApp ? clampWorkflowViewFlagsForFactoryApp(rawUrlViewFlags) : rawUrlViewFlags),
+    [factoryOwnedApp, rawUrlViewFlags],
+  );
+  useEffect(() => {
+    if (!factoryOwnedApp) {
+      return;
+    }
+
+    const view = searchParams.get("view") ?? "";
+    if (!isNonCanvasAppViewParam(view)) {
+      return;
+    }
+
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        next.delete("file");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [factoryOwnedApp, searchParams, setSearchParams]);
   const liveCanvasVersionId = liveCanvas?.metadata?.liveVersionId;
   const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useDescribeCanvasVersion(
     canvasId!,
@@ -356,7 +411,7 @@ export function AppPage() {
     liveCanvasVersionId,
     selectableVersionsById,
     isRunInspectionMode,
-    isMemoryMode,
+    isMemoryMode: urlViewFlags.isMemoryMode,
   });
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
@@ -382,7 +437,10 @@ export function AppPage() {
     selectedCanvasVersion,
     liveCanvasVersionId,
     isRunInspectionMode,
+    includeConsoleBaseline: !factoryOwnedApp,
   });
+  // Factory Configure seeds draft up front; never block the shell on baseline/resync fetches.
+  const showDraftCanvasLoadingOverlay = isDraftCanvasLoading && !(factoryConfigure && draftCanvasSpec);
   useDraftCanvasSpecSync({
     isEditing,
     isEnteringEditSession,
@@ -513,7 +571,7 @@ export function AppPage() {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
+  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(urlViewFlags.isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
@@ -939,7 +997,9 @@ export function AppPage() {
     canvas,
     getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
     committedBaselines: committedBaselinesForEdit,
-    editBootstrapReady: isEditBootstrapReady,
+    // Factory Configure seeds draft before baselines finish; still treat as ready so
+    // Save can see local graph diffs and open the commit dialog.
+    editBootstrapReady: isEditBootstrapReady || (factoryConfigure && Boolean(draftCanvasSpec)),
   });
 
   useDefaultAppTab({ canvasId, urlViewFlags, searchParams });
@@ -1146,6 +1206,7 @@ export function AppPage() {
         scope: "connected-component",
         nodeIds: [nodeID],
         components,
+        direction: resolveCanvasFlowDirection(workflow.metadata?.factoryId),
       });
     },
     [isAutoLayoutOnUpdateEnabled, components],
@@ -2821,6 +2882,7 @@ export function AppPage() {
         nodeIds,
         scope: "connected-component",
         components,
+        direction: resolveCanvasFlowDirection(canvas.metadata?.factoryId),
       });
 
       analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
@@ -3156,8 +3218,11 @@ export function AppPage() {
     async (commitMessage: string) => {
       await handleCommitStaging(commitMessage);
       setCommitDialogOpen(false);
+      if (factoryConfigure) {
+        onFactoryConfigureDone?.();
+      }
     },
-    [handleCommitStaging],
+    [factoryConfigure, handleCommitStaging, onFactoryConfigureDone],
   );
 
   const handleAgentSidebarStagingCommit = useCallback(
@@ -3680,14 +3745,19 @@ export function AppPage() {
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,
-    startup: {
-      hasEditableVersion,
-      canUpdateCanvas: canStageCanvasVersion,
-      canvas,
-      liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
-      handlePlaceholderAdd,
-      searchParams,
-    },
+    // Factory view embed is read-only. Configure enters via a dedicated effect
+    // (does not await staged-spec resync — that was leaving "Loading canvas..." forever).
+    startup:
+      factoryViewOnly || factoryConfigure
+        ? undefined
+        : {
+            hasEditableVersion,
+            canUpdateCanvas: canStageCanvasVersion,
+            canvas,
+            liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
+            handlePlaceholderAdd,
+            searchParams,
+          },
   });
 
   // Ends the edit session: closes the versions sidebar and returns to the live
@@ -3700,6 +3770,91 @@ export function AppPage() {
       handleUseVersion(liveCanvasVersionId);
     }
   }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
+
+  const factoryConfigureEnterStartedRef = useRef(false);
+  const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
+  useEffect(() => {
+    if (!factoryConfigure) {
+      factoryConfigureEnterStartedRef.current = false;
+      return;
+    }
+    if (factoryConfigureEnterStartedRef.current || editSessionActive) {
+      return;
+    }
+    if (!canStageCanvasVersion || !liveCanvasVersionId || !liveCanvasVersion) {
+      return;
+    }
+    if (canvasLoading || liveCanvasVersionLoading) {
+      return;
+    }
+
+    factoryConfigureEnterStartedRef.current = true;
+    // Seed draft from the live version directly — do not wait on the versions
+    // list (handleUseVersion), which often left Configure with no activeVersionId.
+    const immediateSpec = liveCanvas?.spec ?? liveCanvasVersion.spec ?? { nodes: [], edges: [] };
+    const versionForEdit: CanvasesCanvasVersion = {
+      ...liveCanvasVersion,
+      metadata: {
+        ...liveCanvasVersion.metadata,
+        id: liveCanvasVersionId,
+      },
+      spec: immediateSpec,
+    };
+    const configureVersionId = liveCanvasVersionId;
+    let cancelled = false;
+    let editEnabled = false;
+
+    previewingCurrentVersionRef.current = true;
+    activateCanvasVersionForEditing(configureVersionId, versionForEdit, { preserveStagedLayer: true });
+    draftCanvasSpecsRef.current.set(configureVersionId, immediateSpec);
+    setDraftCanvasSpec(immediateSpec);
+
+    // Await staged resync before enabling edit so a late applyStagedSpec cannot
+    // wipe edits typed against the immediate seed.
+    void (async () => {
+      try {
+        await resyncStagedEditorState(configureVersionId, { bumpResetNonce: false });
+      } catch {
+        // Keep the immediate live/committed spec so Configure stays usable.
+      }
+      if (cancelled) {
+        return;
+      }
+      editEnabled = true;
+      setEditSessionActive(true);
+      if (liveCanvas) {
+        const spec = draftCanvasSpecsRef.current.get(configureVersionId) ?? immediateSpec;
+        setLastSavedWorkflowSnapshot({ ...liveCanvas, spec });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (!editEnabled) {
+        factoryConfigureEnterStartedRef.current = false;
+      }
+    };
+  }, [
+    activateCanvasVersionForEditing,
+    canStageCanvasVersion,
+    canvasLoading,
+    editSessionActive,
+    factoryConfigure,
+    liveCanvas,
+    liveCanvasVersion,
+    liveCanvasVersionId,
+    liveCanvasVersionLoading,
+    resyncStagedEditorState,
+    setLastSavedWorkflowSnapshot,
+  ]);
+
+  const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
+  useEffect(() => {
+    if (!factoryConfigure || !onFactoryConfigureBusyChange) {
+      return;
+    }
+    onFactoryConfigureBusyChange(factoryConfigureBusy);
+  }, [factoryConfigure, factoryConfigureBusy, onFactoryConfigureBusyChange]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -3929,7 +4084,7 @@ export function AppPage() {
     !canvas && (canvasLoading || triggersLoading || componentsLoading || widgetsLoading);
 
   useReportPageReady(!isInitialCanvasBootstrapLoading && !!canvas, {
-    failed: !canvas && !canvasLoading && !isDraftCanvasLoading,
+    failed: !canvas && !canvasLoading && !showDraftCanvasLoadingOverlay,
   });
 
   // Keep full-screen loading only for initial bootstrap.
@@ -3945,7 +4100,7 @@ export function AppPage() {
     );
   }
 
-  if (!canvas && !canvasLoading && !isDraftCanvasLoading) {
+  if (!canvas && !canvasLoading && !showDraftCanvasLoadingOverlay) {
     // Workflow not found after loading - could be deleted or doesn't exist
     // Show a brief message then redirect (handled by the error useEffect above)
     return (
@@ -4026,13 +4181,19 @@ export function AppPage() {
 
   // The runs sidebar (and its toggle icon) is available on both the Canvas and
   // Console tabs, but not on Memory/Files surfaces or during an edit session.
+  // Factory embed is read-only chrome: no runs/agent tool sidebars.
   const showRunsSidebar =
-    allowsRunsSidebar(headerMode) && !editSessionActive && !urlViewFlags.isMemoryMode && !urlViewFlags.isFilesMode;
+    !factoryEmbed &&
+    allowsRunsSidebar(headerMode) &&
+    !editSessionActive &&
+    !urlViewFlags.isMemoryMode &&
+    !urlViewFlags.isFilesMode;
 
   // The versions sidebar is available only during an edit session while on the
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
   // Within the edit session it can be shown/hidden with the header toggle.
-  const showVersionsSidebar = editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
+  const showVersionsSidebar =
+    !factoryEmbed && editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
   const selectedRunDetailDismissed = isRunDetailDismissed(detailDismissedForRunId, selectedRunId);
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
@@ -4072,6 +4233,84 @@ export function AppPage() {
     loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
     loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
   });
+
+  if (factoryConfigureActionsRef) {
+    factoryConfigureActionsRef.current = !factoryConfigure
+      ? null
+      : {
+          busy: factoryConfigureBusy,
+          save: () => {
+            if (factoryConfigureBusy) {
+              return;
+            }
+            void (async () => {
+              if (!canStageCanvasVersion) {
+                showErrorToast("You don't have permission to edit this canvas.");
+                return;
+              }
+
+              const savingVersionId =
+                activeCanvasVersionIdRef.current || activeCanvasVersionId || liveCanvasVersionId || "";
+              if (!savingVersionId) {
+                showErrorToast("Edit session is not ready. Try Configure again.");
+                return;
+              }
+
+              // Align the sync ref before staging. The shared save queue rejects as
+              // "stale" when ref !== savingVersionId — that was failing Configure Save.
+              activeCanvasVersionIdRef.current = savingVersionId;
+              if (!editSessionActive) {
+                setEditSessionActive(true);
+              }
+
+              const workflow = getCurrentWorkflowSnapshot();
+              if (!workflow?.spec) {
+                showErrorToast("Nothing to save");
+                return;
+              }
+
+              setFactoryConfigureSavePending(true);
+              try {
+                // Stage canvas.yaml directly — skip enqueueCanvasSave stale/session checks.
+                await updateCanvasVersionMutation.mutateAsync({
+                  versionId: savingVersionId,
+                  canvasYaml: materializeCanvasSpec(workflow),
+                });
+                draftCanvasSpecsRef.current.set(savingVersionId, workflow.spec);
+                setDraftCanvasSpec(workflow.spec);
+                setLastSavedWorkflowSnapshot(workflow);
+
+                const committed = await handleCommitStaging("Update automation", { versionId: savingVersionId });
+                if (!committed) {
+                  return;
+                }
+                onFactoryConfigureDoneRef.current?.();
+              } catch (error) {
+                showErrorToast(getApiErrorMessage(error, "Failed to stage canvas changes"));
+              } finally {
+                setFactoryConfigureSavePending(false);
+              }
+            })();
+          },
+          discard: () => {
+            if (factoryConfigureBusy) {
+              return;
+            }
+            void (async () => {
+              setFactoryConfigureSavePending(true);
+              try {
+                if (hasStagingChanges || hasUncommittedCanvasDraftChanges) {
+                  await handleResetStaging();
+                }
+                handleExitEditSession();
+                onFactoryConfigureDoneRef.current?.();
+              } finally {
+                setFactoryConfigureSavePending(false);
+              }
+            })();
+          },
+        };
+  }
 
   return (
     <>
@@ -4149,14 +4388,19 @@ export function AppPage() {
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
-          factoryId={canvas?.metadata?.factoryId}
-          headerBanner={headerBanner}
+          // Factory shell must stay vertical: use canvas metadata, fall back to route factoryId.
+          // Page chrome is already hidden via hidePageChrome.
+          factoryId={canvas?.metadata?.factoryId ?? (factoryEmbed ? routeFactoryId : undefined)}
+          headerBanner={factoryEmbed ? null : headerBanner}
           canvasStateMode={canvasStateMode}
-          showCanvasSettingsMenu={canUpdateCanvas}
+          showCanvasSettingsMenu={!factoryEmbed && canUpdateCanvas}
           onSeeCurrentVersion={handleSeeCurrentVersion}
-          showBottomStatusControls={showBottomStatusControls}
-          hideAddControls={hideAddControls}
-          onSelectMemory={handleSelectMemoryMode}
+          showBottomStatusControls={!factoryEmbed && showBottomStatusControls}
+          hideAddControls={hideAddControls || factoryViewOnly}
+          hidePageChrome={factoryEmbed}
+          hideCanvasToolSidebar={factoryEmbed}
+          factoryEmbed={factoryEmbed}
+          onSelectMemory={factoryOwnedApp || factoryEmbed ? undefined : handleSelectMemoryMode}
           nodes={nodes}
           edges={renderedEdges}
           organizationId={organizationId}
@@ -4219,14 +4463,16 @@ export function AppPage() {
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
           runNavigation={runNavigation}
-          onRunNodeDetailClose={handleBackToRunList}
+          onRunNodeDetailClose={factoryEmbed ? handleSelectLiveCanvas : handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onRunNavigate={handleNavigateRun}
           onRunNavigateOlder={() => {
             void infiniteRunsQuery.fetchNextPage();
           }}
-          onBackToLiveCanvas={handleSelectLiveCanvas}
+          // Factory embed keeps the floating "Back to Live" chrome hidden, but
+          // Close on the run inspector must still exit ?run= inspection mode.
+          onBackToLiveCanvas={factoryEmbed ? undefined : handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled && isEditSessionUiReady}
@@ -4234,15 +4480,15 @@ export function AppPage() {
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           headerMode={headerMode}
-          isEditSessionActive={editSessionActive}
+          isEditSessionActive={factoryViewOnly ? false : editSessionActive}
           onSelectCanvasView={handleSelectCanvasView}
-          onEnterEditMode={handleEnterEditModeFromHeader}
+          onEnterEditMode={factoryViewOnly ? undefined : handleEnterEditModeFromHeader}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          onExitEditMode={handleExitEditSession}
-          onSelectConsole={handleSelectConsoleMode}
-          onSelectFiles={handleSelectFilesMode}
-          filesHeaderActionsSlotId={filesHeaderActionsSlotId}
+          onExitEditMode={factoryViewOnly ? undefined : handleExitEditSession}
+          onSelectConsole={factoryOwnedApp || factoryEmbed ? undefined : handleSelectConsoleMode}
+          onSelectFiles={factoryOwnedApp || factoryEmbed ? undefined : handleSelectFilesMode}
+          filesHeaderActionsSlotId={factoryOwnedApp || factoryEmbed ? undefined : filesHeaderActionsSlotId}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}
@@ -4298,7 +4544,7 @@ export function AppPage() {
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
         />
-        {isDraftCanvasLoading ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
+        {showDraftCanvasLoadingOverlay ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
         {versionCanvasLoading && !runInspectionChromeActive ? (
           <CanvasPageLoadingOverlay message="Loading version..." testId="canvas-version-loading" />
         ) : null}
