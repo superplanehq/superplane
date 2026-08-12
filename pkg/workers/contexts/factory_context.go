@@ -274,9 +274,10 @@ func (c *FactoryContext) automationRef() *factory.AutomationRef {
 	}
 
 	if info, ok := c.lineStep(); ok {
+		stepIndex := info.StepIndex
 		ref.LineID = info.LineID
 		ref.LineName = info.LineName
-		ref.StepIndex = info.StepIndex
+		ref.StepIndex = &stepIndex
 		ref.StepName = info.StepName
 	}
 
