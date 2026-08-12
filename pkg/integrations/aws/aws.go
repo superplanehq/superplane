@@ -137,6 +137,8 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
+		&cloudwatch.CreateAlarm{},
+		&cloudwatch.UpdateAlarm{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -157,7 +159,6 @@ func (a *AWS) Actions() []core.Action {
 		&ec2.AllocateElasticIP{},
 		&ec2.ManageElasticIP{},
 		&ec2.CopyImage{},
-		&ec2.CreateAlarm{},
 		&ec2.DeleteAlarm{},
 		&ec2.CreateImage{},
 		&ec2.CreateInstance{},
@@ -170,7 +171,6 @@ func (a *AWS) Actions() []core.Action {
 		&ec2.EnableImage{},
 		&ec2.EnableImageDeprecation{},
 		&ec2.GetAlarm{},
-		&ec2.UpdateAlarm{},
 		&ec2.GetImage{},
 		&ec2.GetInstance{},
 		&ec2.GetInstanceMetrics{},
@@ -376,6 +376,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
 - Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
 - Add permissions for Amazon Managed Service for Prometheus workspaces if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**; the workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, **aps:DeleteWorkspace**, and **aps:QueryMetrics** for their respective operations. The rule group namespace components need **aps:ListRuleGroupsNamespaces**, **aps:CreateRuleGroupsNamespace**, **aps:DescribeRuleGroupsNamespace**, **aps:PutRuleGroupsNamespace**, and **aps:DeleteRuleGroupsNamespace**.
+- Add permissions for CloudWatch alarms if you use the CloudWatch or EC2 alarm components. The namespace, metric and dimension pickers require **cloudwatch:ListMetrics**, and the alarm picker requires **cloudwatch:DescribeAlarms**. Creating and updating alarms also needs **cloudwatch:PutMetricAlarm**, and deleting them needs **cloudwatch:DeleteAlarms**. Alarms that notify an SNS topic need **sns:ListTopics** for the topic picker, and alarms using the **EC2 Action** field (recover, reboot, stop, terminate) additionally need **iam:CreateServiceLinkedRole**.
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
