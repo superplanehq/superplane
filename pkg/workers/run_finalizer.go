@@ -536,7 +536,7 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil
 	}
 
-	result, err := line.StartStep(tx, workOrder, nextIndex, "")
+	result, err := line.StartStep(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, err
 	}

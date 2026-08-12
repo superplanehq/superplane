@@ -507,9 +507,6 @@ message DispatchWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
   string line_name = 3;
-  // Optional free-form note (e.g. "Attempt 2 - dedicated canvas memory
-  // browser"); surfaced under the "kicked off" timeline entry.
-  string note = 4;
 }
 
 message DispatchWorkOrderResponse {

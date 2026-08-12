@@ -69,6 +69,7 @@ function WorkOrderDetailPageContent({
       derived={derived}
       factoryLines={factory.lines ?? []}
       organizationId={organizationId}
+      factoryId={factoryId}
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
@@ -95,6 +96,7 @@ interface LoadedWorkOrderDetailProps {
   derived: ReturnType<typeof getWorkOrderDetailDerived>;
   factoryLines: FactoriesFactoryLine[];
   organizationId: string;
+  factoryId: string;
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
@@ -108,6 +110,7 @@ function LoadedWorkOrderDetail({
   derived,
   factoryLines,
   organizationId,
+  factoryId,
   events,
   eventsQuery,
   artifactsQuery,
@@ -118,6 +121,7 @@ function LoadedWorkOrderDetail({
   return (
     <WorkOrderDetailLoadedView
       organizationId={organizationId}
+      factoryId={factoryId}
       order={order}
       events={events}
       eventsError={eventsQuery.error ?? null}

@@ -65,6 +65,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
   const derived = getWorkOrderDetailDerived(order);
   return {
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
@@ -89,7 +90,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     isAssigneesSaving: false,
     isUpdatingStatus: false,
     isAddingComment: false,
-    onDispatch: async (input: { lineName: string; note?: string }) => {
+    onDispatch: async (input: { lineName: string }) => {
       console.log("dispatch", input);
     },
     onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED" | "RESULT_FAILED") => {

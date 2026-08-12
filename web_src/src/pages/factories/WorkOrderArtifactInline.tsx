@@ -1,6 +1,5 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { ExternalLink, FileText, GitBranch, GitPullRequest, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -69,15 +68,18 @@ function MarkdownArtifactInline({
 
   return (
     <>
-      <Button
+      <button
         type="button"
-        variant="link"
         onClick={() => setOpen(true)}
-        className={cn(artifactInlineClassName, "h-auto justify-start p-0 text-left", className)}
+        className={cn(
+          artifactInlineClassName,
+          "cursor-pointer justify-start border-0 bg-transparent p-0 text-left hover:underline",
+          className,
+        )}
       >
         <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <span className="truncate">{label}</span>
-      </Button>
+      </button>
       <WorkOrderMarkdownArtifactDialog open={open} onClose={() => setOpen(false)} title={label} body={body} />
     </>
   );

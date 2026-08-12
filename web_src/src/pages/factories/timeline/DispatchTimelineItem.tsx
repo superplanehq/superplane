@@ -108,7 +108,6 @@ function DispatchStepRow({ organizationId, step }: { organizationId: string; ste
           </span>
         ))}
       </div>
-      {step.note ? <StepDetail label="Note" body={step.note} testId="work-order-dispatch-note" /> : null}
       {step.comments?.map((comment, index) => (
         <StepDetail
           key={`${comment.label ?? "comment"}-${index}`}
@@ -134,9 +133,9 @@ function StepName({ name, runHref }: { name: string; runHref: string | null }) {
   );
 }
 
-function StepDetail({ label, body, testId }: { label: string; body: string; testId?: string }) {
+function StepDetail({ label, body }: { label: string; body: string }) {
   return (
-    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground" data-testid={testId}>
+    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
       <span className="font-medium text-foreground/80">{label}</span>: {body}
     </p>
   );

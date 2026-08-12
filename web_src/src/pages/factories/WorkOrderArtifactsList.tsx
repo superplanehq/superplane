@@ -25,8 +25,9 @@ export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrde
         ) : (
           <ul>
             {artifacts.map((artifact) => (
-              <li className="py-1.5" key={artifact.id ?? `${artifact.type}-${artifact.createdAt}`}>
+              <li className="flex items-center py-1.5" key={artifact.id ?? `${artifact.type}-${artifact.createdAt}`}>
                 <WorkOrderArtifactInline
+                  className="w-full justify-start"
                   artifact={{
                     id: artifact.id,
                     type: artifact.type ?? "TYPE_UNSPECIFIED",

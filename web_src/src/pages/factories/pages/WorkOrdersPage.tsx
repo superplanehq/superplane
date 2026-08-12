@@ -57,7 +57,7 @@ export function WorkOrdersPage() {
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
   const factoryLines = factory?.lines ?? [];
 
-  const handleDispatch = async (orderId: string, input: { lineName: string; note?: string }) => {
+  const handleDispatch = async (orderId: string, input: { lineName: string }) => {
     try {
       await dispatchWorkOrder.mutateAsync({ orderId, ...input });
       showSuccessToast(`Dispatched to ${input.lineName}.`);

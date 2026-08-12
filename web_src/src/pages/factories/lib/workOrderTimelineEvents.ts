@@ -32,8 +32,6 @@ export interface WorkOrderTimelineStep {
   at: string;
   startedAt: string;
   finishedAt?: string;
-  /** Free-form dispatch note captured on the `step.execution.created` event. */
-  note?: string;
   comments?: WorkOrderTimelineStepComment[];
   artifacts?: WorkOrderTimelineArtifact[];
   execution: FactoriesWorkOrderExecution;

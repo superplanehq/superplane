@@ -3,7 +3,6 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -14,7 +13,7 @@ interface DispatchWorkOrderPopoverProps {
   isSaving: boolean;
   canDispatch: boolean;
   align?: "start" | "center" | "end";
-  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
   children: ReactNode;
 }
 
@@ -28,12 +27,10 @@ export function DispatchWorkOrderPopover({
 }: DispatchWorkOrderPopoverProps) {
   const [open, setOpen] = useState(false);
   const [lineName, setLineName] = useState("");
-  const [note, setNote] = useState("");
 
   useEffect(() => {
     if (open) {
       setLineName(lines[0]?.name ?? "");
-      setNote("");
     }
   }, [open, lines]);
 
@@ -51,8 +48,7 @@ export function DispatchWorkOrderPopover({
     }
 
     try {
-      const trimmedNote = note.trim();
-      await onDispatch({ lineName, note: trimmedNote || undefined });
+      await onDispatch({ lineName });
       setOpen(false);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to dispatch work order"));
@@ -67,40 +63,23 @@ export function DispatchWorkOrderPopover({
           {lines.length === 0 ? (
             <p className="text-sm text-muted-foreground">Configure at least one line before dispatching work orders.</p>
           ) : (
-            <>
-              <div className="space-y-1.5">
-                <Label htmlFor="dispatch-line-select" className="text-xs">
-                  Line
-                </Label>
-                <Select value={lineName} onValueChange={setLineName}>
-                  <SelectTrigger id="dispatch-line-select" className="w-full" data-testid="dispatch-line-select">
-                    <SelectValue placeholder="Select a line" />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    {lines.map((line) => (
-                      <SelectItem key={line.id ?? line.name} value={line.name ?? ""}>
-                        {line.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dispatch-note" className="text-xs">
-                  Note (optional)
-                </Label>
-                <Textarea
-                  id="dispatch-note"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="Attempt 2 - dedicated canvas memory browser"
-                  rows={2}
-                  className="text-sm"
-                  data-testid="dispatch-note-input"
-                />
-              </div>
-            </>
+            <div className="space-y-1.5">
+              <Label htmlFor="dispatch-line-select" className="text-xs">
+                Line
+              </Label>
+              <Select value={lineName} onValueChange={setLineName}>
+                <SelectTrigger id="dispatch-line-select" className="w-full" data-testid="dispatch-line-select">
+                  <SelectValue placeholder="Select a line" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {lines.map((line) => (
+                    <SelectItem key={line.id ?? line.name} value={line.name ?? ""}>
+                      {line.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">

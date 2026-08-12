@@ -24,6 +24,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
+import { editFactoryLinePath } from "./lib/factoryPagePaths";
 import { formatWorkOrderDateTime } from "./lib/workOrderDateTime";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./lib/workOrderUsage";
 import { OrgUserReference } from "./OrgUserReference";
@@ -33,6 +34,7 @@ import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
@@ -49,7 +51,7 @@ interface WorkOrderDetailSidebarProps {
   isDispatchable: boolean;
   isDispatching: boolean;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
-  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
 }
 
 /**
@@ -61,6 +63,7 @@ interface WorkOrderDetailSidebarProps {
  */
 export function WorkOrderDetailSidebar({
   organizationId,
+  factoryId,
   order,
   artifacts,
   isArtifactsLoading,
@@ -94,6 +97,8 @@ export function WorkOrderDetailSidebar({
       />
 
       <FactoryLinesSection
+        organizationId={organizationId}
+        factoryId={factoryId}
         executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
@@ -344,6 +349,8 @@ function AssigneeButtonBody({
 }
 
 function FactoryLinesSection({
+  organizationId,
+  factoryId,
   executions,
   factoryLines,
   canDispatch,
@@ -352,13 +359,15 @@ function FactoryLinesSection({
   isDispatching,
   onDispatch,
 }: {
+  organizationId: string;
+  factoryId: string;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   permissionsLoading: boolean;
   isDispatchable: boolean;
   isDispatching: boolean;
-  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
 }) {
   const rows = deriveLineRows(executions);
   const isDispatchDisabled = !canDispatch || factoryLines.length === 0;
@@ -371,7 +380,9 @@ function FactoryLinesSection({
         {rows.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">Not run on a line yet.</p>
         ) : (
-          rows.map((row) => <FactoryLineRow key={row.lineId} row={row} />)
+          rows.map((row) => (
+            <FactoryLineRow key={row.lineId} row={row} organizationId={organizationId} factoryId={factoryId} />
+          ))
         )}
 
         {isDispatchable ? (
@@ -458,8 +469,17 @@ const TONE_DOT_CLASS: Record<FactoryLineRowModel["tone"], string> = {
   muted: "bg-muted-foreground/40",
 };
 
-function FactoryLineRow({ row }: { row: FactoryLineRowModel }) {
-  const activityId = row.lineId && row.lineId !== "unknown" ? `activity-line-run-${row.lineId}` : undefined;
+function FactoryLineRow({
+  row,
+  organizationId,
+  factoryId,
+}: {
+  row: FactoryLineRowModel;
+  organizationId: string;
+  factoryId: string;
+}) {
+  const href =
+    row.lineId && row.lineId !== "unknown" ? editFactoryLinePath(organizationId, factoryId, row.lineId) : undefined;
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -468,22 +488,16 @@ function FactoryLineRow({ row }: { row: FactoryLineRowModel }) {
     </>
   );
   const commonClass =
-    "-mx-1.5 flex w-[calc(100%+0.75rem)] items-center justify-start gap-2 whitespace-normal rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60";
+    "flex w-full items-center justify-start gap-2 whitespace-normal rounded-md py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent/60";
 
-  if (!activityId) {
+  if (!href) {
     return <span className={cn(commonClass, "cursor-default")}>{inner}</span>;
   }
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      className={commonClass}
-      aria-label={`Show ${row.lineName} in activity`}
-      onClick={() => document.getElementById(activityId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-    >
+    <Link to={href} className={commonClass} aria-label={`Edit ${row.lineName}`}>
       {inner}
-    </Button>
+    </Link>
   );
 }
 

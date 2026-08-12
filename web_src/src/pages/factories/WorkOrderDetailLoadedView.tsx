@@ -16,6 +16,7 @@ import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -47,7 +48,7 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
-  onDispatch: (input: { lineName: string; note?: string }) => Promise<void>;
+  onDispatch: (input: { lineName: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
@@ -56,6 +57,7 @@ interface WorkOrderDetailLoadedViewProps {
 
 export function WorkOrderDetailLoadedView({
   organizationId,
+  factoryId,
   order,
   events,
   eventsError,
@@ -146,6 +148,7 @@ export function WorkOrderDetailLoadedView({
         <aside className="mt-1 lg:sticky lg:top-16 lg:self-start">
           <WorkOrderDetailSidebar
             organizationId={organizationId}
+            factoryId={factoryId}
             order={order}
             artifacts={artifacts}
             isArtifactsLoading={isArtifactsLoading}
