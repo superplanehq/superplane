@@ -91,43 +91,71 @@ function collectCurrentRunsByStep(
   }
 
   const runsByStep = new Map<string, LinePhaseRunCard[]>();
-
   for (const order of workOrders) {
-    if (!order.id) {
-      continue;
-    }
-
-    const lineExecutions = (order.executions ?? []).filter(
-      (execution) => execution.line?.id === lineId && Boolean(execution.step) && stepIndexByName.has(execution.step!),
-    );
-    if (lineExecutions.length === 0) {
-      continue;
-    }
-
-    const currentExecution = pickCurrentLineExecution(lineExecutions, stepIndexByName);
-    if (!currentExecution?.step) {
-      continue;
-    }
-
-    const card: LinePhaseRunCard = {
-      executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
-      workOrderId: order.id,
-      title: order.title?.trim() || "Untitled work order",
-      execution: currentExecution,
-    };
-    const existing = runsByStep.get(currentExecution.step);
-    if (existing) {
-      existing.push(card);
-    } else {
-      runsByStep.set(currentExecution.step, [card]);
-    }
+    appendCurrentRunForOrder(order, lineId, stepIndexByName, runsByStep);
   }
-
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
   }
-
   return runsByStep;
+}
+
+function appendCurrentRunForOrder(
+  order: FactoriesWorkOrder,
+  lineId: string,
+  stepIndexByName: Map<string, number>,
+  runsByStep: Map<string, LinePhaseRunCard[]>,
+): void {
+  if (!order.id) {
+    return;
+  }
+
+  const lineExecutions = (order.executions ?? []).filter(
+    (execution) => execution.line?.id === lineId && execution.step != null && stepIndexByName.has(execution.step),
+  );
+  if (lineExecutions.length === 0) {
+    return;
+  }
+
+  const currentExecution = pickCurrentLineExecution(lineExecutions, stepIndexByName);
+  if (!currentExecution?.step) {
+    return;
+  }
+
+  const card: LinePhaseRunCard = {
+    executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
+    workOrderId: order.id,
+    title: order.title?.trim() || "Untitled work order",
+    execution: currentExecution,
+  };
+  const existing = runsByStep.get(currentExecution.step);
+  if (existing) {
+    existing.push(card);
+    return;
+  }
+  runsByStep.set(currentExecution.step, [card]);
+}
+
+function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
+  return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
+}
+
+function isPreferableCurrentExecution(
+  candidate: FactoriesWorkOrderExecution,
+  incumbent: FactoriesWorkOrderExecution,
+  stepIndexByName: Map<string, number>,
+): boolean {
+  const candidateStep = stepIndexByName.get(candidate.step ?? "") ?? -1;
+  const incumbentStep = stepIndexByName.get(incumbent.step ?? "") ?? -1;
+  if (candidateStep !== incumbentStep) {
+    return candidateStep > incumbentStep;
+  }
+  const candidateTime = executionTimestamp(candidate);
+  const incumbentTime = executionTimestamp(incumbent);
+  if (candidateTime !== incumbentTime) {
+    return candidateTime > incumbentTime;
+  }
+  return (candidate.id ?? "") > (incumbent.id ?? "");
 }
 
 function pickCurrentLineExecution(
@@ -137,24 +165,14 @@ function pickCurrentLineExecution(
   const active = executions.filter(isActiveWorkOrderExecution);
   const candidates = active.length > 0 ? active : executions;
   let best: FactoriesWorkOrderExecution | null = null;
-  let bestStepIndex = -1;
-  let bestTime = -1;
 
   for (const execution of candidates) {
     const stepIndex = stepIndexByName.get(execution.step ?? "") ?? -1;
     if (stepIndex < 0) {
       continue;
     }
-    const time = Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
-    if (
-      !best ||
-      stepIndex > bestStepIndex ||
-      (stepIndex === bestStepIndex && time > bestTime) ||
-      (stepIndex === bestStepIndex && time === bestTime && (execution.id ?? "") > (best.id ?? ""))
-    ) {
+    if (!best || isPreferableCurrentExecution(execution, best, stepIndexByName)) {
       best = execution;
-      bestStepIndex = stepIndex;
-      bestTime = time;
     }
   }
 
