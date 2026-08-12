@@ -11,11 +11,23 @@ import (
 )
 
 const (
-	autoLayoutNodeWidth                        = 420.0
-	autoLayoutNodeHeight                       = 180.0
-	autoLayoutLayerGap                         = 220.0
-	autoLayoutNodeGap                          = 180.0
-	autoLayoutDisconnectedComponentVerticalGap = 280
+	autoLayoutNodeWidth  = 420.0
+	autoLayoutNodeHeight = 180.0
+	autoLayoutLayerGap   = 220.0
+	autoLayoutNodeGap    = 180.0
+	// Same-rank spacing for top→bottom (factory) layouts — horizontal gap between siblings.
+	autoLayoutVerticalNodeGap                    = 48.0
+	autoLayoutDisconnectedComponentVerticalGap   = 280
+	autoLayoutDisconnectedComponentHorizontalGap = 280
+	// Side-by-side packing for vertical canvases.
+	autoLayoutDisconnectedComponentHorizontalGapVertical = 100
+)
+
+type layoutOrientation string
+
+const (
+	layoutOrientationHorizontal layoutOrientation = "horizontal"
+	layoutOrientationVertical   layoutOrientation = "vertical"
 )
 
 type N struct {
@@ -47,7 +59,13 @@ func ApplyLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, []E, error) {
 
 	switch algorithm {
 	case AlgorithmHorizontal:
-		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
+		layoutedNodes, err := applyLayeredLayout(nodes, edges, layout, layoutOrientationHorizontal)
+		if err != nil {
+			return nil, nil, err
+		}
+		return layoutedNodes, edges, nil
+	case AlgorithmVertical:
+		layoutedNodes, err := applyLayeredLayout(nodes, edges, layout, layoutOrientationVertical)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -57,7 +75,7 @@ func ApplyLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, []E, error) {
 	}
 }
 
-func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error) {
+func applyLayeredLayout(nodes []N, edges []E, layout *AutoLayout, orientation layoutOrientation) ([]N, error) {
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
@@ -110,8 +128,8 @@ func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error
 		return nodes, nil
 	}
 
-	sortedComponents := sortComponentsByCurrentPosition(components)
-	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdgesForPositioning)
+	sortedComponents := sortComponentsByCurrentPosition(components, orientation)
+	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdgesForPositioning, orientation)
 	if len(layoutedPositions.byNodeID) == 0 {
 		return nodes, nil
 	}
@@ -317,12 +335,19 @@ func resolveDisconnectedLayoutComponents(layoutNodes []N, layoutEdges []E) [][]N
 	return components
 }
 
-func sortComponentsByCurrentPosition(components [][]N) [][]N {
+func sortComponentsByCurrentPosition(components [][]N, orientation layoutOrientation) [][]N {
 	sorted := append([][]N(nil), components...)
 
 	sort.SliceStable(sorted, func(i, j int) bool {
 		minA := resolveMinPositionFromNodes(sorted[i])
 		minB := resolveMinPositionFromNodes(sorted[j])
+		if orientation == layoutOrientationVertical {
+			if minA.X != minB.X {
+				return minA.X < minB.X
+			}
+			return minA.Y < minB.Y
+		}
+
 		if minA.Y != minB.Y {
 			return minA.Y < minB.Y
 		}
@@ -332,7 +357,7 @@ func sortComponentsByCurrentPosition(components [][]N) [][]N {
 	return sorted
 }
 
-func resolvePackedLayoutedPositions(sortedComponents [][]N, layoutEdges []E) *layoutPositions {
+func resolvePackedLayoutedPositions(sortedComponents [][]N, layoutEdges []E, orientation layoutOrientation) *layoutPositions {
 	totalNodes := 0
 	for _, component := range sortedComponents {
 		totalNodes += len(component)
@@ -349,10 +374,11 @@ func resolvePackedLayoutedPositions(sortedComponents [][]N, layoutEdges []E) *la
 			nodeSet[node.ID] = struct{}{}
 		}
 		componentEdges := resolveLayoutEdges(layoutEdges, nodeSet)
-		return computeAutogPositions(sortedComponents[0], componentEdges)
+		return computeAutogPositions(sortedComponents[0], componentEdges, orientation)
 	}
 
-	currentTopY := 0
+	currentPackOffset := 0
+	packAlongCrossAxis := orientation == layoutOrientationVertical
 	for _, componentNodes := range sortedComponents {
 		nodeSet := make(map[string]struct{}, len(componentNodes))
 		for _, node := range componentNodes {
@@ -360,20 +386,31 @@ func resolvePackedLayoutedPositions(sortedComponents [][]N, layoutEdges []E) *la
 		}
 
 		componentEdges := resolveLayoutEdges(layoutEdges, nodeSet)
-		componentPositions := computeAutogPositions(componentNodes, componentEdges)
+		componentPositions := computeAutogPositions(componentNodes, componentEdges, orientation)
 		if len(componentPositions.byNodeID) == 0 {
 			continue
 		}
 
 		bounds := resolveLayoutBounds(componentNodes, componentPositions)
 		for nodeID, position := range componentPositions.byNodeID {
-			packedPositions.byNodeID[nodeID] = Position{
-				X: position.X - bounds.minX,
-				Y: position.Y - bounds.minY + currentTopY,
+			if packAlongCrossAxis {
+				packedPositions.byNodeID[nodeID] = Position{
+					X: position.X - bounds.minX + currentPackOffset,
+					Y: position.Y - bounds.minY,
+				}
+			} else {
+				packedPositions.byNodeID[nodeID] = Position{
+					X: position.X - bounds.minX,
+					Y: position.Y - bounds.minY + currentPackOffset,
+				}
 			}
 		}
 
-		currentTopY += bounds.height + autoLayoutDisconnectedComponentVerticalGap
+		if packAlongCrossAxis {
+			currentPackOffset += bounds.width + autoLayoutDisconnectedComponentHorizontalGapVertical
+		} else {
+			currentPackOffset += bounds.height + autoLayoutDisconnectedComponentVerticalGap
+		}
 	}
 
 	return packedPositions
@@ -434,9 +471,9 @@ func resolveLayoutBounds(componentNodes []N, componentPositions *layoutPositions
 }
 
 // computeAutogPositions runs the Sugiyama layout via autog.
-// autog is top-to-bottom, so we swap W↔H on input and X↔Y on output
-// to produce a left-to-right horizontal layout.
-func computeAutogPositions(componentNodes []N, componentEdges []E) *layoutPositions {
+// autog is natively top-to-bottom. For horizontal canvases we swap W↔H on input
+// and X↔Y on output to produce left-to-right flow. Vertical keeps native order.
+func computeAutogPositions(componentNodes []N, componentEdges []E, orientation layoutOrientation) *layoutPositions {
 	positions := newLayoutPositions(len(componentNodes))
 	if len(componentNodes) == 0 {
 		return positions
@@ -477,16 +514,33 @@ func computeAutogPositions(componentNodes []N, componentEdges []E) *layoutPositi
 		autogEdges = append(autogEdges, []string{edge.SourceID, edge.TargetID})
 	}
 
+	nodeWidth := autoLayoutNodeHeight
+	nodeHeight := autoLayoutNodeWidth
+	nodeSpacing := autoLayoutNodeGap
+	if orientation == layoutOrientationVertical {
+		nodeWidth = autoLayoutNodeWidth
+		nodeHeight = autoLayoutNodeHeight
+		nodeSpacing = autoLayoutVerticalNodeGap
+	}
+
 	result := autog.Layout(
 		graph.EdgeSlice(autogEdges),
-		autog.WithNodeFixedSize(autoLayoutNodeHeight, autoLayoutNodeWidth),
+		autog.WithNodeFixedSize(nodeWidth, nodeHeight),
 		autog.WithLayerSpacing(autoLayoutLayerGap),
-		autog.WithNodeSpacing(autoLayoutNodeGap),
+		autog.WithNodeSpacing(nodeSpacing),
 		autog.WithPositioning(autog.PositioningVAlign),
 		autog.WithEdgeRouting(autog.EdgeRoutingNoop),
 	)
 
 	for _, n := range result.Nodes {
+		if orientation == layoutOrientationVertical {
+			positions.byNodeID[n.ID] = Position{
+				X: int(math.Round(n.X)),
+				Y: int(math.Round(n.Y)),
+			}
+			continue
+		}
+
 		positions.byNodeID[n.ID] = Position{
 			X: int(math.Round(n.Y)),
 			Y: int(math.Round(n.X)),

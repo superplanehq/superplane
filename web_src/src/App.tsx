@@ -28,11 +28,13 @@ import {
   CreateWorkOrderPage,
   FactoriesIndexPage,
   FactoriesLayout,
+  FactoryAppCanvasPage,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LinesPage,
   MissionsPage,
   OverviewPage,
   VelocityPage,
@@ -40,6 +42,7 @@ import {
   WorkOrderDetailPage,
   WorkOrdersPage,
 } from "./pages/factories";
+import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -172,12 +175,19 @@ function AppRouter() {
                       <Route path="new" element={<CreateWorkOrderPageGate />} />
                       <Route path=":orderId" element={<WorkOrderDetailPage />} />
                     </Route>
-                    <Route path="automations">
-                      <Route index element={<AutomationsPage />} />
+                    <Route path="lines">
+                      <Route index element={<LinesPage />} />
                       <Route path="new" element={<FactoryLineEditPageGate />} />
-                      <Route path=":lineId" element={<AutomationsPage />} />
+                      <Route path=":lineId" element={<LinesPage />} />
                       <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
                     </Route>
+                    <Route path="automations">
+                      <Route index element={<AutomationsPage />} />
+                      <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
+                      <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
+                      <Route path=":appId" element={<AutomationsPage />} />
+                    </Route>
+                    <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>
                   <Route
@@ -250,6 +260,26 @@ function FactoryLineEditPageGate() {
       <FactoryLineEditPage />
     </RequirePermission>
   );
+}
+
+function LegacyAutomationsNewLineRedirect() {
+  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
+  if (!organizationId || !factoryId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={createFactoryLinePath(organizationId, factoryId)} replace />;
+}
+
+function LegacyAutomationsLineEditRedirect() {
+  const { organizationId, factoryId, lineId } = useParams<{
+    organizationId: string;
+    factoryId: string;
+    lineId: string;
+  }>();
+  if (!organizationId || !factoryId || !lineId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {

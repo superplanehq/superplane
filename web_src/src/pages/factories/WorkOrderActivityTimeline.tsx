@@ -4,9 +4,8 @@ import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { formatTimeAgo } from "@/lib/date";
-import { appRunPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { Fragment, useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import {
   Check,
   CircleDashed,
@@ -31,11 +30,14 @@ import {
   type WorkOrderTimelineStep,
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
+import { factoryAppRunPath } from "./lib/factoryPagePaths";
 import { OrgUserReference } from "./OrgUserReference";
 import { ArtifactTimelineBody, CommentTimelineBody, TimelineAutomationActor } from "./timeline";
+import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -48,6 +50,7 @@ interface WorkOrderTimelineProps {
 
 export function WorkOrderActivityTimeline({
   organizationId,
+  factoryId,
   order,
   events,
   eventsError = null,
@@ -76,6 +79,8 @@ export function WorkOrderActivityTimeline({
     <WorkOrderTimelineList
       timeline={timeline}
       organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={order.id}
       resolveUserDisplay={resolveUserDisplay}
       hasMoreEvents={hasMoreEvents}
       isLoadingMoreEvents={isLoadingMoreEvents}
@@ -134,6 +139,8 @@ function TimelineActivityEmpty() {
 function WorkOrderTimelineList({
   timeline,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   hasMoreEvents,
   isLoadingMoreEvents,
@@ -141,6 +148,8 @@ function WorkOrderTimelineList({
 }: {
   timeline: ReturnType<typeof buildWorkOrderTimelineView>;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
@@ -166,6 +175,8 @@ function WorkOrderTimelineList({
           key={event.id}
           event={event}
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           resolveUserDisplay={resolveUserDisplay}
           isLast={index === timeline.events.length - 1}
         />
@@ -177,11 +188,15 @@ function WorkOrderTimelineList({
 function TimelineItem({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   isLast,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   isLast: boolean;
 }) {
@@ -194,7 +209,13 @@ function TimelineItem({
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        <TimelineItemContent event={event} organizationId={organizationId} resolveUserDisplay={resolveUserDisplay} />
+        <TimelineItemContent
+          event={event}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
+          resolveUserDisplay={resolveUserDisplay}
+        />
       </div>
     </li>
   );
@@ -205,10 +226,14 @@ const USER_ACTION_EVENT_KINDS: WorkOrderTimelineEventKind[] = ["created", "assig
 function TimelineItemContent({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -237,6 +262,8 @@ function TimelineItemContent({
         <UserActionEventDescription
           event={event}
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           resolveUserDisplay={resolveUserDisplay}
         />
         <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
@@ -250,7 +277,13 @@ function TimelineItemContent({
       {event.steps?.length ? (
         <ul className="mt-2 space-y-1">
           {event.steps.map((step) => (
-            <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
+            <DispatchStepRow
+              key={step.id}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
+              step={step}
+            />
           ))}
         </ul>
       ) : null}
@@ -268,10 +301,14 @@ const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "status
 function UserActionEventDescription({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -303,7 +340,7 @@ function UserActionEventDescription({
           resolveUserDisplay={resolveUserDisplay}
         />
       ) : hasSourceRun ? (
-        <SourceRunAttribution event={event} organizationId={organizationId} />
+        <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
       ) : (
         <span>{event.title}</span>
       )}
@@ -319,9 +356,24 @@ function UserActionEventDescription({
 // Renders an event title followed by "run" (linked to the originating canvas
 // run when the app+run ids are known). Used for events attributed to a run
 // rather than to a user or a factory-line automation.
-function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimelineEvent; organizationId: string }) {
+function SourceRunAttribution({
+  event,
+  organizationId,
+  factoryId,
+  orderId,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+}) {
   const runHref =
-    event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+    event.sourceAppId && event.sourceRunId
+      ? factoryAppRunPath(organizationId, factoryId, event.sourceAppId, event.sourceRunId, {
+          from: "work-order",
+          orderId,
+        })
+      : null;
 
   // `created` events read "Work order created from run"; other kinds (e.g.
   // `statusChanged` for the `draft → open` marker) read "opened this work
@@ -347,119 +399,18 @@ function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimel
 const timelineRunLinkClassName =
   "pointer-events-auto inline-flex w-fit max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-sm text-gray-700 underline decoration-gray-300 underline-offset-2 transition-colors hover:bg-gray-50 hover:text-gray-900 hover:decoration-gray-500 dark:text-gray-300 dark:decoration-gray-600 dark:hover:bg-gray-800/40 dark:hover:text-gray-100 dark:hover:decoration-gray-400";
 
-function AssigneeChangeDescription({
-  actorUserId,
-  assigneeChange,
-  resolveUserDisplay,
+function DispatchStepRow({
+  organizationId,
+  factoryId,
+  orderId,
+  step,
 }: {
-  actorUserId?: string;
-  assigneeChange: NonNullable<WorkOrderTimelineEvent["assigneeChange"]>;
-  resolveUserDisplay: OrgUserDisplayLookup;
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+  step: WorkOrderTimelineStep;
 }) {
-  const { assignedUserIds, unassignedUserIds } = assigneeChange;
-  const parts: ReactNode[] = [];
-
-  const assignedDescription = buildAssignedChangeDescription(actorUserId, assignedUserIds, resolveUserDisplay);
-  if (assignedDescription) {
-    parts.push(<span key="assigned">{assignedDescription}</span>);
-  }
-
-  if (unassignedUserIds.length > 0) {
-    parts.push(
-      <span key="unassigned" className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-        unassigned <InlineUserList userIds={unassignedUserIds} resolveUserDisplay={resolveUserDisplay} />
-      </span>,
-    );
-  }
-
-  if (parts.length === 0) {
-    return <span>updated assignees</span>;
-  }
-
-  return (
-    <>
-      {parts.map((part, index) => (
-        <Fragment key={index}>
-          {index > 0 ? <span> and </span> : null}
-          {part}
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-function buildAssignedChangeDescription(
-  actorUserId: string | undefined,
-  assignedUserIds: string[],
-  resolveUserDisplay: OrgUserDisplayLookup,
-): ReactNode | null {
-  if (assignedUserIds.length === 0) {
-    return null;
-  }
-
-  const assignedOthers = actorUserId ? assignedUserIds.filter((userId) => userId !== actorUserId) : assignedUserIds;
-  const selfAssigned = Boolean(actorUserId && assignedUserIds.includes(actorUserId));
-
-  if (selfAssigned && assignedOthers.length === 0) {
-    return <span>self-assigned</span>;
-  }
-
-  if (selfAssigned && assignedOthers.length > 0) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-        self-assigned and assigned <InlineUserList userIds={assignedOthers} resolveUserDisplay={resolveUserDisplay} />
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-      assigned <InlineUserList userIds={assignedUserIds} resolveUserDisplay={resolveUserDisplay} />
-    </span>
-  );
-}
-
-function InlineUserList({
-  userIds,
-  resolveUserDisplay,
-}: {
-  userIds: string[];
-  resolveUserDisplay: OrgUserDisplayLookup;
-}) {
-  if (userIds.length === 0) {
-    return null;
-  }
-
-  if (userIds.length === 1) {
-    return <OrgUserReference display={resolveUserDisplay(userIds[0])} size="sm" emphasizeName />;
-  }
-
-  if (userIds.length === 2) {
-    return (
-      <>
-        <OrgUserReference display={resolveUserDisplay(userIds[0])} size="sm" emphasizeName />
-        <span> and </span>
-        <OrgUserReference display={resolveUserDisplay(userIds[1])} size="sm" emphasizeName />
-      </>
-    );
-  }
-
-  return (
-    <>
-      {userIds.slice(0, -1).map((userId, index) => (
-        <Fragment key={userId}>
-          {index > 0 ? <span>, </span> : null}
-          <OrgUserReference display={resolveUserDisplay(userId)} size="sm" emphasizeName />
-        </Fragment>
-      ))}
-      <span>, and </span>
-      <OrgUserReference display={resolveUserDisplay(userIds[userIds.length - 1])} size="sm" emphasizeName />
-    </>
-  );
-}
-
-function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, step.execution, { orderId });
   const durationLabel = formatStepExecutionDuration(step);
   const linkClassName = timelineRunLinkClassName;
   const stepContent = (
