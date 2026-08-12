@@ -6,7 +6,7 @@ import type {
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import type { QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import type { SetURLSearchParams } from "react-router-dom";
+import type { SetURLSearchParams } from "react-router";
 
 import type { CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import type { RunCanvasData } from "./useRunCanvasData";

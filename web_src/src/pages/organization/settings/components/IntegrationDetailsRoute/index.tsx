@@ -1,7 +1,7 @@
 import { useIntegration } from "@/hooks/useIntegrations";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { LegacyIntegrationDetails } from "./LegacyIntegrationDetails";
 import { CapabilityBasedIntegrationDetails } from "../CapabilityBasedIntegrationDetails";
 import { isCapabilityBasedIntegration } from "@/lib/integrations";

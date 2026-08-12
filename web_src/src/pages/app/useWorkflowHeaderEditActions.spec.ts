@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { SetURLSearchParams } from "react-router-dom";
+import type { SetURLSearchParams } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";

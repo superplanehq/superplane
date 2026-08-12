@@ -1,7 +1,7 @@
 import { useCreateFactoryLine, useUpdateFactoryLine, type FactoryLineStep } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 export function useFactoryLineEditActions(
   organizationId: string,

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useSecrets } from "@/hooks/useSecrets";
 import { CreateSecretDialog } from "@/ui/CreateSecretDialog";
 import type { SuperplaneSecretsSecret } from "@/api-client";

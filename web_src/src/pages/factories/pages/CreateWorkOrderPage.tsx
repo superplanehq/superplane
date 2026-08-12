@@ -12,7 +12,7 @@ import { showErrorToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { ArrowLeft } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
