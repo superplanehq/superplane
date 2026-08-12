@@ -137,6 +137,8 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
+		&cloudwatch.CreateAlarm{},
+		&cloudwatch.UpdateAlarm{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -157,7 +159,6 @@ func (a *AWS) Actions() []core.Action {
 		&ec2.AllocateElasticIP{},
 		&ec2.ManageElasticIP{},
 		&ec2.CopyImage{},
-		&ec2.CreateAlarm{},
 		&ec2.DeleteAlarm{},
 		&ec2.CreateImage{},
 		&ec2.CreateInstance{},
@@ -170,7 +171,6 @@ func (a *AWS) Actions() []core.Action {
 		&ec2.EnableImage{},
 		&ec2.EnableImageDeprecation{},
 		&ec2.GetAlarm{},
-		&ec2.UpdateAlarm{},
 		&ec2.GetImage{},
 		&ec2.GetInstance{},
 		&ec2.GetInstanceMetrics{},
