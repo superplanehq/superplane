@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
@@ -237,16 +237,6 @@ export function OnboardingWireframe() {
   const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
   const { requestConnect, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<SectionId>("name");
-
-  const reportSetupProgress = onboarding?.reportSetupProgress;
-  useEffect(() => {
-    reportSetupProgress?.({
-      // Nav / analysis wait until Continue — selection alone must not start work.
-      repoReady: setup.repoCommitted,
-      issuesReady: setup.issuesCommitted,
-      agentReady: setup.agentReady,
-    });
-  }, [reportSetupProgress, setup.repoCommitted, setup.issuesCommitted, setup.agentReady]);
 
   const finishSetup = () => {
     if (onboarding && factoryId) {

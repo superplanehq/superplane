@@ -31,7 +31,6 @@ export function providerLabel(provider: GitProvider) {
 
 export type OnboardingStorybookSeed = {
   pending?: PendingOnboarding | null;
-  connectedProviders?: GitProvider[];
   enabledReposByWorkspace?: Record<string, OnboardingRepo[]>;
   overviewTipsWorkspaceId?: string | null;
 };

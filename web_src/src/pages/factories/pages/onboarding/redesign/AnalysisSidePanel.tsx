@@ -205,11 +205,14 @@ function scheduleSetupGroup({
   const timers: number[] = [];
   let delay = 0;
   let scheduled = 0;
+  let remaining = 0;
 
   const appendLine = (line: string, at: number, onDone?: () => void) => {
     scheduled += 1;
+    remaining += 1;
     timers.push(
       window.setTimeout(() => {
+        remaining -= 1;
         setLogLines((current) => [...current, line]);
         setPendingWrites((count) => Math.max(0, count - 1));
         onDone?.();
@@ -299,12 +302,23 @@ function scheduleSetupGroup({
 
   return () => {
     timers.forEach((id) => window.clearTimeout(id));
-    if (scheduled > 0) {
-      setPendingWrites((count) => Math.max(0, count - scheduled));
+    // Only reverse writes that have not fired yet (fired timers already decremented).
+    if (remaining > 0) {
+      setPendingWrites((count) => Math.max(0, count - remaining));
     }
     // Strict Mode: allow this group to re-schedule. Do not mark completed.
     inFlightGroupsRef.current.delete(groupId);
   };
+}
+
+function panelStatusLabel(complete: boolean, nameReady: boolean, pendingWrites: number): "idle" | "running" {
+  if (complete) {
+    return "idle";
+  }
+  if (nameReady || pendingWrites > 0) {
+    return "running";
+  }
+  return "idle";
 }
 
 /**
@@ -323,7 +337,7 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
   const terminalRef = useRef<HTMLOListElement>(null);
 
   const complete = progress.nameReady && progress.repoCommitted && progress.agentReady && pendingWrites === 0;
-  const statusLabel = complete ? "idle" : progress.nameReady || pendingWrites > 0 ? "running" : "idle";
+  const statusLabel = panelStatusLabel(complete, progress.nameReady, pendingWrites);
 
   useEffect(() => {
     if (!progress.repoCommitted) {

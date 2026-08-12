@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   fixtureIssueCount,
@@ -86,18 +86,30 @@ export function useRedesignSetupState(initialName = "") {
   const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
   const [finished, setFinished] = useState(false);
+  const discoveryTimerRef = useRef<number | null>(null);
+
+  const clearDiscoveryTimer = useCallback(() => {
+    if (discoveryTimerRef.current === null) {
+      return;
+    }
+    window.clearTimeout(discoveryTimerRef.current);
+    discoveryTimerRef.current = null;
+  }, []);
+
+  useEffect(() => clearDiscoveryTimer, [clearDiscoveryTimer]);
 
   const connectIntegration = useCallback((id: IntegrationId) => {
     setConnected((prev) => new Set(prev).add(id));
   }, []);
 
   const resetIssuesState = useCallback(() => {
+    clearDiscoveryTimer();
     setIssuesRepo(null);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
     setIssuesChoice(null);
     setIssuesCommitted(false);
-  }, []);
+  }, [clearDiscoveryTimer]);
 
   const selectVcsHost = useCallback(
     (host: VcsHostId) => {
@@ -126,17 +138,22 @@ export function useRedesignSetupState(initialName = "") {
     setIssuesCommitted(true);
   }, []);
 
-  const runIssuesDiscovery = useCallback((backlogRepo: string) => {
-    setIssuesRepo(backlogRepo);
-    setIssuesDiscovering(true);
-    setIssuesDiscovered(false);
-    window.setTimeout(() => {
-      setIssuesDiscovering(false);
-      setIssuesDiscovered(true);
-      // Default to the connected host's Issues (GitHub or GitLab).
-      setIssuesChoice((current) => current ?? "vcs");
-    }, 900);
-  }, []);
+  const runIssuesDiscovery = useCallback(
+    (backlogRepo: string) => {
+      clearDiscoveryTimer();
+      setIssuesRepo(backlogRepo);
+      setIssuesDiscovering(true);
+      setIssuesDiscovered(false);
+      discoveryTimerRef.current = window.setTimeout(() => {
+        discoveryTimerRef.current = null;
+        setIssuesDiscovering(false);
+        setIssuesDiscovered(true);
+        // Default to the connected host's Issues (GitHub or GitLab).
+        setIssuesChoice((current) => current ?? "vcs");
+      }, 900);
+    },
+    [clearDiscoveryTimer],
+  );
 
   const startIssuesDiscovery = useCallback(() => {
     const backlogRepo = issuesRepo ?? selectedRepo;
