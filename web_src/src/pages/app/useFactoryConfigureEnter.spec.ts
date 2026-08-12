@@ -126,4 +126,38 @@ describe("useFactoryConfigureEnter", () => {
 
     expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(2);
   });
+
+  it("does not re-enter Configure when editSessionActive clears during save exit", async () => {
+    const activateCanvasVersionForEditing = vi.fn();
+    const setEditSessionActive = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ editSessionActive, factoryConfigure }: { editSessionActive: boolean; factoryConfigure: boolean }) =>
+        useFactoryConfigureEnter(
+          baseOptions({
+            editSessionActive,
+            factoryConfigure,
+            activateCanvasVersionForEditing,
+            setEditSessionActive,
+          }),
+        ),
+      { initialProps: { editSessionActive: false, factoryConfigure: true } },
+    );
+
+    await waitFor(() => {
+      expect(setEditSessionActive).toHaveBeenCalledWith(true);
+    });
+    expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender({ editSessionActive: true, factoryConfigure: true });
+    });
+    // Save path: flushSync clears edit while configure=1 still present.
+    await act(async () => {
+      rerender({ editSessionActive: false, factoryConfigure: true });
+    });
+
+    expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
+    expect(setEditSessionActive).toHaveBeenCalledTimes(1);
+  });
 });

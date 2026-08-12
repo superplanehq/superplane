@@ -70,6 +70,22 @@ export function useFactoryConfigureEnter({
     setLastSavedWorkflowSnapshot,
   };
 
+  // Per Configure visit: bump when leaving so a later visit can seed again.
+  // Once edit enables for a visit, save/exit must not re-seed while URL still
+  // has configure=1 (handleCommittedVersionId clears editSessionActive first).
+  const configureVisitIdRef = useRef(0);
+  const inFlightVisitIdRef = useRef<number | null>(null);
+  const editEnabledVisitIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (factoryConfigure) {
+      return;
+    }
+    configureVisitIdRef.current += 1;
+    inFlightVisitIdRef.current = null;
+    editEnabledVisitIdRef.current = null;
+  }, [factoryConfigure]);
+
   useEffect(() => {
     if (!factoryConfigure || editSessionActive) {
       return;
@@ -81,11 +97,19 @@ export function useFactoryConfigureEnter({
       return;
     }
 
+    const visitId = configureVisitIdRef.current;
+    // Save/discard can clear editSessionActive while configure=1 is still set.
+    // Never re-seed that same Configure visit.
+    if (editEnabledVisitIdRef.current === visitId || inFlightVisitIdRef.current === visitId) {
+      return;
+    }
+
     const version = liveCanvasVersionRef.current;
     if (!version) {
       return;
     }
 
+    inFlightVisitIdRef.current = visitId;
     // Seed draft from the live version directly — do not wait on the versions
     // list (handleUseVersion), which often left Configure with no activeVersionId.
     const immediateSpec = liveCanvasRef.current?.spec ?? version.spec ?? { nodes: [], edges: [] };
@@ -122,9 +146,11 @@ export function useFactoryConfigureEnter({
       } catch {
         // Keep the immediate live/committed spec so Configure stays usable.
       }
-      if (cancelled) {
+      if (cancelled || configureVisitIdRef.current !== visitId) {
         return;
       }
+      editEnabledVisitIdRef.current = visitId;
+      inFlightVisitIdRef.current = null;
       setEditActive(true);
       const canvas = liveCanvasRef.current;
       if (canvas) {
@@ -135,6 +161,10 @@ export function useFactoryConfigureEnter({
 
     return () => {
       cancelled = true;
+      // Strict Mode remount: allow retry only when edit never enabled for visit.
+      if (editEnabledVisitIdRef.current !== visitId && inFlightVisitIdRef.current === visitId) {
+        inFlightVisitIdRef.current = null;
+      }
     };
   }, [
     canStageCanvasVersion,
