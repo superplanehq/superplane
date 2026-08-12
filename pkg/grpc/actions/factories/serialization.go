@@ -2,6 +2,7 @@ package factories
 
 import (
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -83,18 +84,45 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 	return result
 }
 
-func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
+func serializeWorkOrder(
+	order *models.FactoryWorkOrder,
+	executions []models.FactoryWorkOrderExecutionRecord,
+	createdByAutomation *factory.AutomationRef,
+) *pb.WorkOrder {
+	serializedExecutions := serializeWorkOrderExecutions(executions)
+
+	var totalTokens, totalCostCents int64
+	for _, e := range executions {
+		totalTokens += e.TotalTokens
+		totalCostCents += e.CostCents
+	}
+
 	return &pb.WorkOrder{
-		Id:          order.ID.String(),
-		Title:       order.Title,
-		Description: order.Description,
-		State:       serializeWorkOrderState(order.State),
-		Result:      serializeWorkOrderResult(order.Result),
-		CreatedAt:   timestamppb.New(order.CreatedAt),
-		UpdatedAt:   timestamppb.New(order.UpdatedAt),
-		Assignees:   serializeWorkOrderAssignees(order.Assignees),
-		Executions:  serializeWorkOrderExecutions(executions),
-		CreatedBy:   serializeWorkOrderCreator(order),
+		Id:                  order.ID.String(),
+		Title:               order.Title,
+		Description:         order.Description,
+		State:               serializeWorkOrderState(order.State),
+		Result:              serializeWorkOrderResult(order.Result),
+		CreatedAt:           timestamppb.New(order.CreatedAt),
+		UpdatedAt:           timestamppb.New(order.UpdatedAt),
+		Assignees:           serializeWorkOrderAssignees(order.Assignees),
+		Executions:          serializedExecutions,
+		CreatedBy:           serializeWorkOrderCreator(order),
+		CreatedByAutomation: serializeAutomationRef(createdByAutomation),
+		TotalTokens:         totalTokens,
+		TotalCostCents:      totalCostCents,
+	}
+}
+
+func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {
+	if ref == nil {
+		return nil
+	}
+	return &pb.AutomationRef{
+		NodeId:   ref.NodeID,
+		NodeName: ref.NodeName,
+		AppId:    ref.AppID.String(),
+		AppName:  ref.AppName,
 	}
 }
 
@@ -124,12 +152,16 @@ func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionR
 
 func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
-		Id:        execution.ID.String(),
-		Step:      execution.StepName,
-		State:     serializeWorkOrderExecutionState(execution.Status, execution.RunState),
-		Result:    serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
-		CreatedAt: timestamppb.New(execution.CreatedAt),
-		UpdatedAt: timestamppb.New(execution.UpdatedAt),
+		Id:          execution.ID.String(),
+		Step:        execution.StepName,
+		StepIndex:   int32(execution.StepIndex),
+		State:       serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:      serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt:   timestamppb.New(execution.CreatedAt),
+		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
+		TotalTokens: execution.TotalTokens,
+		CostCents:   execution.CostCents,
+		Phases:      serializeExecutionPhases(execution.LineSteps),
 		Line: &pb.WorkOrderExecution_LineRef{
 			Id:   execution.LineID.String(),
 			Name: execution.LineName,
@@ -140,7 +172,24 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 			AppName: execution.CanvasName,
 		},
 	}
+	if execution.FinishedAt != nil {
+		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
+	}
 	return item
+}
+
+func serializeExecutionPhases(steps []models.FactoryLineStep) []*pb.WorkOrderExecutionPhase {
+	if len(steps) == 0 {
+		return nil
+	}
+	phases := make([]*pb.WorkOrderExecutionPhase, len(steps))
+	for i, step := range steps {
+		phases[i] = &pb.WorkOrderExecutionPhase{
+			Name:      step.Name,
+			StepIndex: int32(i),
+		}
+	}
+	return phases
 }
 
 func serializeWorkOrderExecutionState(status, runState string) pb.WorkOrderExecution_State {
