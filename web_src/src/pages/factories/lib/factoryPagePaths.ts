@@ -22,20 +22,94 @@ export function workOrderDetailPath(organizationId: string, factoryId: string, o
   return `${workOrdersPath(organizationId, factoryId)}/${orderId}`;
 }
 
+export function linesPath(organizationId: string, factoryId: string) {
+  return `${factoryDetailPath(organizationId, factoryId)}/lines`;
+}
+
+export function createFactoryLinePath(organizationId: string, factoryId: string) {
+  return `${linesPath(organizationId, factoryId)}/new`;
+}
+
+export function factoryLineDetailPath(organizationId: string, factoryId: string, lineId: string) {
+  return `${linesPath(organizationId, factoryId)}/${lineId}`;
+}
+
+export function editFactoryLinePath(organizationId: string, factoryId: string, lineId: string) {
+  return `${linesPath(organizationId, factoryId)}/${lineId}/edit`;
+}
+
 export function automationsPath(organizationId: string, factoryId: string) {
   return `${factoryDetailPath(organizationId, factoryId)}/automations`;
 }
 
-export function createFactoryLinePath(organizationId: string, factoryId: string) {
-  return `${automationsPath(organizationId, factoryId)}/new`;
+export function automationDetailPath(organizationId: string, factoryId: string, appId: string) {
+  return `${automationsPath(organizationId, factoryId)}/${appId}`;
 }
 
-export function factoryLineDetailPath(organizationId: string, factoryId: string, lineId: string) {
-  return `${automationsPath(organizationId, factoryId)}/${lineId}`;
+export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
+
+export type FactoryAppNavOptions = {
+  from?: FactoryAppNavFrom;
+  lineId?: string;
+  orderId?: string;
+  runId?: string;
+  /**
+   * Open factory-shell Configure chrome. Uses `configure=1` (not `edit=1`) so
+   * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
+   */
+  configure?: boolean;
+};
+
+function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
+  if (!options) {
+    return "";
+  }
+  const params = new URLSearchParams();
+  if (options.runId) {
+    params.set("run", options.runId);
+  }
+  if (options.configure) {
+    params.set("configure", "1");
+  }
+  if (options.from) {
+    params.set("from", options.from);
+  }
+  if (options.lineId) {
+    params.set("lineId", options.lineId);
+  }
+  if (options.orderId) {
+    params.set("orderId", options.orderId);
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
 }
 
-export function editFactoryLinePath(organizationId: string, factoryId: string, lineId: string) {
-  return `${automationsPath(organizationId, factoryId)}/${lineId}/edit`;
+export function factoryAppConfigurePath(
+  organizationId: string,
+  factoryId: string,
+  appId: string,
+  options?: Omit<FactoryAppNavOptions, "configure" | "runId">,
+) {
+  return factoryAppPath(organizationId, factoryId, appId, { ...options, configure: true });
+}
+
+export function factoryAppPath(
+  organizationId: string,
+  factoryId: string,
+  appId: string,
+  options?: FactoryAppNavOptions,
+) {
+  return `${factoryDetailPath(organizationId, factoryId)}/apps/${appId}${buildFactoryAppSearchParams(options)}`;
+}
+
+export function factoryAppRunPath(
+  organizationId: string,
+  factoryId: string,
+  appId: string,
+  runId: string,
+  options?: Omit<FactoryAppNavOptions, "runId">,
+) {
+  return factoryAppPath(organizationId, factoryId, appId, { ...options, runId });
 }
 
 export function factorySettingsPath(organizationId: string, factoryId: string) {

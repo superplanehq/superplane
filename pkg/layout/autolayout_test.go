@@ -40,8 +40,15 @@ func TestParseAutoLayout_Horizontal(t *testing.T) {
 	assert.Equal(t, AlgorithmHorizontal, autoLayout.Algorithm)
 }
 
+func TestParseAutoLayout_Vertical(t *testing.T) {
+	autoLayout, err := ParseAutoLayout("vertical", "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, AlgorithmVertical, autoLayout.Algorithm)
+}
+
 func TestParseAutoLayout_UnsupportedValue(t *testing.T) {
-	_, err := ParseAutoLayout("vertical", "", nil)
+	_, err := ParseAutoLayout("diagonal", "", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported auto layout")
 }
