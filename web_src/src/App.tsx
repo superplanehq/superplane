@@ -114,7 +114,7 @@ function AppRouter() {
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
-        <div className="flex-1 overflow-auto">
+        <div className="relative flex-1 overflow-auto">
           <SetupGuard>
             <GlobalCommandPalette />
             <Routes>
