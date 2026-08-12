@@ -1,4 +1,5 @@
 import type React from "react";
+import { FACTORY_HANDLE_STYLE } from "@/lib/factoryCanvasChrome";
 
 export const HANDLE_STYLE = {
   width: 12,
@@ -7,3 +8,7 @@ export const HANDLE_STYLE = {
   border: "3px solid var(--sp-handle-border, #C9D5E1)",
   background: "transparent",
 } satisfies React.CSSProperties;
+
+export function resolveHandleStyle(isFactoryApp: boolean): React.CSSProperties {
+  return isFactoryApp ? FACTORY_HANDLE_STYLE : HANDLE_STYLE;
+}

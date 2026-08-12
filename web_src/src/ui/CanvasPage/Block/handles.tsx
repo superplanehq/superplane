@@ -3,7 +3,7 @@ import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
-import { HANDLE_STYLE } from "./handleStyle";
+import { resolveHandleStyle } from "./handleStyle";
 import { MultiBottomHandle } from "./multiBottomHandle";
 import { MultiRightHandle } from "./multiRightHandle";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
@@ -125,7 +125,7 @@ function SingleSourceHandle({
       position={isVertical ? Position.Bottom : Position.Right}
       id={channel}
       style={{
-        ...HANDLE_STYLE,
+        ...resolveHandleStyle(isVertical),
         ...(isVertical
           ? {
               bottom: -15,
@@ -268,7 +268,7 @@ export function LeftHandle({
       type="target"
       position={isVertical ? Position.Top : Position.Left}
       style={{
-        ...HANDLE_STYLE,
+        ...resolveHandleStyle(isVertical),
         ...(isVertical
           ? {
               top: -15,

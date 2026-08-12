@@ -90,7 +90,7 @@ describe("getCanvasEdgePath", () => {
     expect(path).toContain("C");
   });
 
-  it("uses a rect orthogonal path for forward vertical edges", () => {
+  it("uses a bezier path for forward vertical (factory) edges", () => {
     const [path] = getCanvasEdgePath({
       sourceX: 100,
       sourceY: 100,
@@ -100,8 +100,7 @@ describe("getCanvasEdgePath", () => {
       targetPosition: Position.Top,
     });
 
-    expect(path).not.toContain("C");
-    expect(path).not.toContain("Q");
+    expect(path).toContain("C");
   });
 
   it("uses a smooth step path for same-row loop-back edges below both nodes", () => {
