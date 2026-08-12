@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	autoLayoutNodeWidth                          = 420.0
-	autoLayoutNodeHeight                         = 180.0
-	autoLayoutLayerGap                           = 220.0
-	autoLayoutNodeGap                            = 180.0
+	autoLayoutNodeWidth  = 420.0
+	autoLayoutNodeHeight = 180.0
+	autoLayoutLayerGap   = 220.0
+	autoLayoutNodeGap    = 180.0
 	// Same-rank spacing for top→bottom (factory) layouts — horizontal gap between siblings.
 	autoLayoutVerticalNodeGap                    = 48.0
 	autoLayoutDisconnectedComponentVerticalGap   = 280
