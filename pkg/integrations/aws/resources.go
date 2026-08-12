@@ -2,6 +2,7 @@ package aws
 
 import (
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
@@ -16,6 +17,9 @@ import (
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "cloudwatch.logGroup":
+		return cloudwatch.ListLogGroups(ctx, resourceType)
+
 	case "lambda.function":
 		return lambda.ListFunctions(ctx, resourceType)
 

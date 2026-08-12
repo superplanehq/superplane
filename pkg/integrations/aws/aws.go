@@ -137,6 +137,8 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
+		&cloudwatch.QueryLogs{},
+		&cloudwatch.AddLogEvent{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -376,6 +378,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
 - Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
 - Add permissions for Amazon Managed Service for Prometheus workspaces if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**; the workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, **aps:DeleteWorkspace**, and **aps:QueryMetrics** for their respective operations. The rule group namespace components need **aps:ListRuleGroupsNamespaces**, **aps:CreateRuleGroupsNamespace**, **aps:DescribeRuleGroupsNamespace**, **aps:PutRuleGroupsNamespace**, and **aps:DeleteRuleGroupsNamespace**.
+- Add permissions for CloudWatch Logs if you use the Query Logs or Add Log Event components. At minimum, the log group picker requires **logs:DescribeLogGroups**; Query Logs also needs **logs:StartQuery** and **logs:GetQueryResults**; Add Log Event also needs **logs:CreateLogStream** and **logs:PutLogEvents**.
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
