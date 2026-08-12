@@ -2,7 +2,7 @@ import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";

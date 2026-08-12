@@ -5,7 +5,7 @@ import type {
 } from "@/api-client";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,

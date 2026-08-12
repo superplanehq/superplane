@@ -5,7 +5,7 @@
     ".storybook/**/*.{ts,tsx}",
     "scripts/**/*.mjs"
   ],
-  "ignoreDependencies": ["@storybook/react", "monaco-editor", "tippy.js"],
+  "ignoreDependencies": ["monaco-editor", "tippy.js"],
   "ignore": [],
   "rules": {
     "nsTypes": "off"

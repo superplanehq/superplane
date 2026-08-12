@@ -6,7 +6,7 @@ import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { flushSync } from "react-dom";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
@@ -98,13 +98,13 @@ import {
   syncLoadedVersionToCanvasDetail,
   isHistoricalVersionSpecLoading,
 } from "./lib/resolve-canvas-for-view";
-import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
 import {
   clearLiveEditSessionDraftState,
   clearLiveEditSessionSearchParams,
   isActiveCanvasVersionCurrentLive,
   resetCommittedLiveCanvasDetail,
 } from "./lib/live-edit-session";
+import { useActivateCanvasVersionForEditing } from "./useActivateCanvasVersionForEditing";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import type { CanvasVersionListItem } from "./lib/canvas-versions";
 import { canvasVersionShell, sortVersionsDesc } from "./lib/canvas-versions";
@@ -3273,43 +3273,24 @@ export function AppPage({
     await handleResetStaging();
   }, [handleResetStaging]);
 
-  const activateCanvasVersionForEditing = useCallback(
-    (versionID: string, version: CanvasesCanvasVersion, options?: { preserveStagedLayer?: boolean }) =>
-      applyCanvasVersionForEditing({
-        organizationId,
-        canvasId,
-        versionID,
-        version,
-        options,
-        liveCanvasVersionId,
-        queryClient,
-        draftCanvasSpec,
-        draftCanvasSpecsRef,
-        activeCanvasVersionIdRef,
-        lastAppliedVersionSnapshotRef,
-        liveCanvasVersion,
-        liveCanvas,
-        clearPendingAutoSaveWork,
-        setDraftCanvasSpec,
-        setActiveCanvasVersion,
-        setLastSavedWorkflowSnapshot,
-        setSearchParams,
-        initializeFromWorkflow,
-      }),
-    [
-      organizationId,
-      canvasId,
-      liveCanvasVersionId,
-      queryClient,
-      draftCanvasSpec,
-      liveCanvasVersion,
-      liveCanvas,
-      clearPendingAutoSaveWork,
-      setLastSavedWorkflowSnapshot,
-      setSearchParams,
-      initializeFromWorkflow,
-    ],
-  );
+  const activateCanvasVersionForEditing = useActivateCanvasVersionForEditing({
+    organizationId,
+    canvasId,
+    liveCanvasVersionId,
+    queryClient,
+    draftCanvasSpec,
+    draftCanvasSpecsRef,
+    activeCanvasVersionIdRef,
+    lastAppliedVersionSnapshotRef,
+    liveCanvasVersion,
+    liveCanvas,
+    clearPendingAutoSaveWork,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setLastSavedWorkflowSnapshot,
+    setSearchParams,
+    initializeFromWorkflow,
+  });
 
   const handleUseVersion = useCallback(
     (versionID: string, options?: { preserveStagedLayer?: boolean }) => {

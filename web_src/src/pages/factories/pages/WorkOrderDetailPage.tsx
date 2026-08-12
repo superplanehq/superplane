@@ -3,7 +3,7 @@ import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } f
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { workOrdersPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
