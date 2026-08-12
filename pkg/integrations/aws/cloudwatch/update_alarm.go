@@ -1,4 +1,4 @@
-package ec2
+package cloudwatch
 
 import (
 	"fmt"
@@ -15,16 +15,21 @@ import (
 type UpdateAlarm struct{}
 
 type UpdateAlarmConfiguration struct {
-	Region             string             `json:"region" mapstructure:"region"`
-	AlarmName          string             `json:"alarm" mapstructure:"alarm"`
-	ThresholdCondition ThresholdCondition `json:"thresholdCondition" mapstructure:"thresholdCondition"`
-	Statistic          string             `json:"statistic" mapstructure:"statistic"`
-	Period             int                `json:"period" mapstructure:"period"`
-	EvaluationPeriods  int                `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
-	AlarmDescription   string             `json:"alarmDescription" mapstructure:"alarmDescription"`
-	TreatMissingData   string             `json:"treatMissingData" mapstructure:"treatMissingData"`
-	SNSTopicARN        string             `json:"snsTopic" mapstructure:"snsTopic"`
-	AlarmAction        string             `json:"alarmAction" mapstructure:"alarmAction"`
+	Region                  string             `json:"region" mapstructure:"region"`
+	AlarmName               string             `json:"alarm" mapstructure:"alarm"`
+	ThresholdCondition      ThresholdCondition `json:"thresholdCondition" mapstructure:"thresholdCondition"`
+	Statistic               string             `json:"statistic" mapstructure:"statistic"`
+	Period                  int                `json:"period" mapstructure:"period"`
+	EvaluationPeriods       int                `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
+	DatapointsToAlarm       int                `json:"datapointsToAlarm" mapstructure:"datapointsToAlarm"`
+	AlarmDescription        string             `json:"alarmDescription" mapstructure:"alarmDescription"`
+	TreatMissingData        string             `json:"treatMissingData" mapstructure:"treatMissingData"`
+	Unit                    string             `json:"unit" mapstructure:"unit"`
+	ActionsEnabled          string             `json:"actionsEnabled" mapstructure:"actionsEnabled"`
+	AlarmActions            []string           `json:"alarmActions" mapstructure:"alarmActions"`
+	EC2Action               string             `json:"ec2Action" mapstructure:"ec2Action"`
+	OKActions               []string           `json:"okActions" mapstructure:"okActions"`
+	InsufficientDataActions []string           `json:"insufficientDataActions" mapstructure:"insufficientDataActions"`
 }
 
 type ThresholdCondition struct {
@@ -39,44 +44,55 @@ type UpdateAlarmNodeMetadata struct {
 }
 
 func (c *UpdateAlarm) Name() string {
-	return "aws.ec2.updateAlarm"
+	return "aws.cloudwatch.updateAlarm"
 }
 
 func (c *UpdateAlarm) Label() string {
-	return "EC2 • Update Alarm"
+	return "CloudWatch • Update Alarm"
 }
 
 func (c *UpdateAlarm) Description() string {
-	return "Update an existing CloudWatch metric alarm for an EC2 instance"
+	return "Update an existing CloudWatch metric alarm"
 }
 
 func (c *UpdateAlarm) Documentation() string {
-	return `The Update Alarm component modifies an existing CloudWatch metric alarm scoped to an EC2 instance.
+	return `The Update Alarm component modifies an existing CloudWatch metric alarm.
+
+Only the properties you enable are changed; everything else is read from the current alarm and
+sent back unchanged, because CloudWatch replaces the whole alarm configuration on every update.
 
 ## Use Cases
 
-- **Threshold tuning**: Raise or lower alert thresholds without recreating the alarm
-- **Operational changes**: Adjust evaluation periods or comparison operators as workloads change
-- **Notification updates**: Add or change SNS topics and EC2 automation actions when an alarm fires
+- **Threshold tuning**: Raise or lower thresholds without recreating the alarm
+- **Operational changes**: Adjust periods, statistics or missing-data handling as workloads change
+- **Notification updates**: Change which SNS topics are notified on each state transition
+- **Self-healing**: Attach or change an EC2 recover/reboot action on an existing alarm
+- **Maintenance windows**: Disable alarm actions during planned work and re-enable them afterwards
 
 ## Configuration
 
-- **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to update (` + "`ec2.alarm`" + ` resource picker)
-- **Threshold** *(toggleable)*: New threshold and comparison operator (both must be set together)
-- **Statistic** *(toggleable)*: Aggregation function (Average, Sum, Min, Max, SampleCount)
+- **Region**: AWS region where the alarm lives
+- **Alarm**: CloudWatch alarm to update (` + "`cloudwatch.alarm`" + ` resource picker)
+- **Threshold** *(toggleable)*: New threshold and comparison operator (both set together)
+- **Statistic** *(toggleable)*: Aggregation applied over each period
 - **Period** *(toggleable)*: Evaluation window in seconds
-- **Evaluation Periods** *(toggleable)*: Consecutive breaching periods required before ALARM
+- **Evaluation Periods** *(toggleable)*: Periods evaluated before the alarm changes state
+- **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods
 - **Alarm Description** *(toggleable)*: Free-text description
 - **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
-- **Alarm Action** *(toggleable)*: EC2 automation action when the alarm enters ALARM state
-- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to notify when the alarm enters ALARM state
+- **Unit** *(toggleable)*: Metric unit
+- **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
+- **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an ` + "`AWS/EC2`" + ` alarm with an InstanceId dimension
+- **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
+- **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
 
-At least one toggleable property must be enabled. Unspecified properties keep their current values.
+At least one toggleable property must be enabled. Alarms built on metric math, anomaly detection or
+Metrics Insights queries cannot be updated by this component.
 
 ## Output
 
-Emits the updated alarm details on the default output channel (same fields as Get Alarm).
+Emits the updated alarm on the default output channel, with the same fields as Create Alarm.
 `
 }
 
@@ -94,18 +110,7 @@ func (c *UpdateAlarm) OutputChannels(_ any) []core.OutputChannel {
 
 func (c *UpdateAlarm) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     "region",
-			Label:    "Region",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "us-east-1",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: common.AllRegions,
-				},
-			},
-		},
+		regionField(),
 		{
 			Name:        "alarm",
 			Label:       "Alarm",
@@ -117,15 +122,8 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "ec2.alarm",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "region",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "region",
-							},
-						},
-					},
+					Type:       "cloudwatch.alarm",
+					Parameters: []configuration.ParameterRef{regionParameter()},
 				},
 			},
 		},
@@ -188,6 +186,14 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 			Togglable: true,
 		},
 		{
+			Name:        "datapointsToAlarm",
+			Label:       "Datapoints To Alarm",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "Breaching datapoints required within the evaluation periods",
+		},
+		{
 			Name:      "alarmDescription",
 			Label:     "Alarm Description",
 			Type:      configuration.FieldTypeText,
@@ -206,43 +212,32 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 				},
 			},
 		},
+		unitField(),
 		{
-			Name:        "alarmAction",
-			Label:       "Alarm Action",
+			Name:        "actionsEnabled",
+			Label:       "Actions Enabled",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
 			Togglable:   true,
-			Description: "EC2 action to take when the alarm enters ALARM state",
+			Default:     "true",
+			Description: "Run the configured actions when the alarm changes state",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
-					Options: AlarmEC2ActionOptions,
-				},
-			},
-		},
-		{
-			Name:        "snsTopic",
-			Label:       "SNS Topic (on alarm)",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Togglable:   true,
-			Description: "Publish a notification to this SNS topic when the alarm enters ALARM state",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "region", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "sns.topic",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "region",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "region",
-							},
-						},
+					Options: []configuration.FieldOption{
+						{Label: "Enabled", Value: "true"},
+						{Label: "Disabled", Value: "false"},
 					},
 				},
 			},
 		},
+		alarmActionsField("alarmActions", "Alarm Actions", "SNS topics notified when the alarm enters ALARM"),
+		ec2ActionField(nil),
+		alarmActionsField("okActions", "OK Actions", "SNS topics notified when the alarm returns to OK"),
+		alarmActionsField(
+			"insufficientDataActions",
+			"Insufficient Data Actions",
+			"SNS topics notified when the alarm enters INSUFFICIENT_DATA",
+		),
 	}
 }
 
@@ -361,12 +356,22 @@ func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfigura
 		}
 	}
 
+	if hasConfigKey(rawConfiguration, "unit") {
+		if _, err := requireUnit(config.Unit); err != nil {
+			return err
+		}
+	}
+
 	if hasConfigKey(rawConfiguration, "period") && config.Period <= 0 {
 		return fmt.Errorf("period must be greater than 0")
 	}
 
 	if hasConfigKey(rawConfiguration, "evaluationPeriods") && config.EvaluationPeriods <= 0 {
 		return fmt.Errorf("evaluation periods must be greater than 0")
+	}
+
+	if hasConfigKey(rawConfiguration, "datapointsToAlarm") && config.DatapointsToAlarm <= 0 {
+		return fmt.Errorf("datapoints to alarm must be greater than 0")
 	}
 
 	return nil
@@ -392,29 +397,35 @@ func buildUpdateAlarmInput(
 	config UpdateAlarmConfiguration,
 	rawConfiguration any,
 ) (PutMetricAlarmInput, error) {
-	instanceID, err := instanceIDFromAlarm(existing)
-	if err != nil {
-		return PutMetricAlarmInput{}, err
+	if strings.TrimSpace(existing.MetricName) == "" {
+		return PutMetricAlarmInput{}, fmt.Errorf(
+			"alarm %q is not a single-metric alarm and cannot be updated by this component",
+			existing.AlarmName,
+		)
 	}
 
-	if strings.TrimSpace(existing.Namespace) != "" && existing.Namespace != alarmNamespaceEC2 {
-		return PutMetricAlarmInput{}, fmt.Errorf("alarm %q is not an EC2 metric alarm", existing.AlarmName)
-	}
-
+	// Seed with the current alarm: PutMetricAlarm overwrites the whole configuration.
 	input := PutMetricAlarmInput{
-		AlarmName:          existing.AlarmName,
-		AlarmDescription:   existing.AlarmDescription,
-		InstanceID:         instanceID,
-		MetricName:         existing.MetricName,
-		Statistic:          existing.Statistic,
-		Period:             existing.Period,
-		EvaluationPeriods:  existing.EvaluationPeriods,
-		Threshold:          existing.Threshold,
-		ComparisonOperator: existing.ComparisonOperator,
-		TreatMissingData:   existing.TreatMissingData,
-		// Seed with existing actions so they are preserved by default.
-		// The action-update block below replaces specific types when toggled.
-		AlarmActions: existing.AlarmActions,
+		AlarmName:               existing.AlarmName,
+		AlarmDescription:        existing.AlarmDescription,
+		Namespace:               existing.Namespace,
+		MetricName:              existing.MetricName,
+		Dimensions:              existing.Dimensions,
+		Statistic:               existing.Statistic,
+		ExtendedStatistic:       existing.ExtendedStatistic,
+		Unit:                    existing.Unit,
+		Period:                  existing.Period,
+		EvaluationPeriods:       existing.EvaluationPeriods,
+		DatapointsToAlarm:       existing.DatapointsToAlarm,
+		Threshold:               existing.Threshold,
+		ComparisonOperator:      existing.ComparisonOperator,
+		TreatMissingData:        existing.TreatMissingData,
+		ActionsEnabled:          existing.ActionsEnabled,
+		AlarmActions:            existing.AlarmActions,
+		OKActions:               existing.OKActions,
+		InsufficientDataActions: existing.InsufficientDataActions,
+
+		EvaluateLowSampleCountPercentile: existing.EvaluateLowSampleCountPercentile,
 	}
 
 	if hasConfigKey(rawConfiguration, "alarmDescription") {
@@ -422,8 +433,11 @@ func buildUpdateAlarmInput(
 		input.IncludeAlarmDescription = true
 	}
 
+	// Switching to a plain statistic drops the percentile-only settings with it.
 	if hasConfigKey(rawConfiguration, "statistic") {
 		input.Statistic = strings.TrimSpace(config.Statistic)
+		input.ExtendedStatistic = ""
+		input.EvaluateLowSampleCountPercentile = ""
 	}
 
 	if conditionConfig, ok := thresholdConditionConfig(rawConfiguration); ok {
@@ -448,65 +462,62 @@ func buildUpdateAlarmInput(
 		input.EvaluationPeriods = config.EvaluationPeriods
 	}
 
+	if hasConfigKey(rawConfiguration, "datapointsToAlarm") {
+		input.DatapointsToAlarm = config.DatapointsToAlarm
+	}
+
+	// Shrinking the evaluation periods below a datapoints-to-alarm the user never
+	// touched would push the alarm past CloudWatch's "M out of N" rule, so the
+	// inherited M follows N down. An M they set themselves is their call and errors.
+	if input.DatapointsToAlarm > effectiveEvaluationPeriods(input.EvaluationPeriods) {
+		if hasConfigKey(rawConfiguration, "datapointsToAlarm") {
+			return PutMetricAlarmInput{}, requireDatapointsWithinEvaluationPeriods(
+				input.DatapointsToAlarm,
+				effectiveEvaluationPeriods(input.EvaluationPeriods),
+			)
+		}
+
+		input.DatapointsToAlarm = effectiveEvaluationPeriods(input.EvaluationPeriods)
+	}
+
 	if hasConfigKey(rawConfiguration, "treatMissingData") {
 		input.TreatMissingData = strings.TrimSpace(config.TreatMissingData)
 	}
 
-	if hasConfigKey(rawConfiguration, "alarmAction") || hasConfigKey(rawConfiguration, "snsTopic") {
-		alarmActionToggled := hasConfigKey(rawConfiguration, "alarmAction")
-		snsTopicToggled := hasConfigKey(rawConfiguration, "snsTopic")
+	if hasConfigKey(rawConfiguration, "unit") {
+		input.Unit = strings.TrimSpace(config.Unit)
+	}
 
-		// Seed with existing actions, dropping only the types being replaced.
-		var alarmActions []string
-		for _, existingARN := range existing.AlarmActions {
-			switch {
-			case isEC2AutomationARN(existingARN):
-				if !alarmActionToggled {
-					alarmActions = append(alarmActions, existingARN)
-				}
-			case isSNSTopicARN(existingARN):
-				if !snsTopicToggled {
-					alarmActions = append(alarmActions, existingARN)
-				}
-			default:
-				alarmActions = append(alarmActions, existingARN)
+	if hasConfigKey(rawConfiguration, "actionsEnabled") {
+		input.ActionsEnabled = strings.TrimSpace(config.ActionsEnabled) != "false"
+	}
+
+	// The ALARM transition carries both SNS topics and the EC2 action, so only the
+	// kinds the user enabled are replaced. An enabled-but-empty field clears its kind.
+	replaceSNS := hasConfigKey(rawConfiguration, "alarmActions")
+	replaceEC2 := hasConfigKey(rawConfiguration, "ec2Action")
+	if replaceSNS || replaceEC2 {
+		ec2ActionARN := ""
+		if ec2Action := strings.TrimSpace(config.EC2Action); ec2Action != "" {
+			if err := requireEC2ActionTarget(existing.Namespace, existing.Dimensions); err != nil {
+				return PutMetricAlarmInput{}, err
 			}
+
+			ec2ActionARN = EC2AutomationARN(region, ec2Action)
 		}
 
-		// Append the new values for toggled fields (empty value means clear).
-		if alarmActionToggled {
-			if action := strings.TrimSpace(config.AlarmAction); action != "" {
-				alarmActions = append(alarmActions, fmt.Sprintf("arn:aws:automate:%s:ec2:%s", region, action))
-			}
-		}
-		if snsTopicToggled {
-			if topic := strings.TrimSpace(config.SNSTopicARN); topic != "" {
-				alarmActions = append(alarmActions, topic)
-			}
-		}
+		input.AlarmActions = mergeAlarmActions(existing.AlarmActions, config.AlarmActions, ec2ActionARN, replaceSNS, replaceEC2)
+	}
 
-		input.AlarmActions = alarmActions
+	if hasConfigKey(rawConfiguration, "okActions") {
+		input.OKActions = config.OKActions
+	}
+
+	if hasConfigKey(rawConfiguration, "insufficientDataActions") {
+		input.InsufficientDataActions = config.InsufficientDataActions
 	}
 
 	return input, nil
-}
-
-func isEC2AutomationARN(arn string) bool {
-	return strings.HasPrefix(arn, "arn:aws:automate:")
-}
-
-func isSNSTopicARN(arn string) bool {
-	return strings.HasPrefix(arn, "arn:aws:sns:")
-}
-
-func instanceIDFromAlarm(alarm *MetricAlarm) (string, error) {
-	for _, dimension := range alarm.Dimensions {
-		if dimension.Name == "InstanceId" && strings.TrimSpace(dimension.Value) != "" {
-			return strings.TrimSpace(dimension.Value), nil
-		}
-	}
-
-	return "", fmt.Errorf("alarm %q has no InstanceId dimension", alarm.AlarmName)
 }
 
 func (c *UpdateAlarm) Hooks() []core.Hook {
