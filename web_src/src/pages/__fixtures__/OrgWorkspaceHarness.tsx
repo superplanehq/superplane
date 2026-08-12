@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState, type ComponentType } from "react";
+import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
+import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
@@ -34,6 +35,7 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
@@ -225,6 +227,8 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path="new" element={<FactoryLineEditPage />} />
                 <Route path=":lineId" element={<LinesPage />} />
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
+                {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
+                <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>
               <Route path="automations">
                 <Route index element={<AutomationsPage />} />
@@ -303,7 +307,7 @@ export function OrgWorkspaceHarness({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+      <OptionalThemeProvider>
         <TooltipProvider delayDuration={150}>
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
@@ -313,7 +317,16 @@ export function OrgWorkspaceHarness({
             </MemoryRouter>
           </div>
         </TooltipProvider>
-      </ThemeProvider>
+      </OptionalThemeProvider>
     </QueryClientProvider>
   );
+}
+
+/** Prefer Storybook toolbar theme when present; else mount ThemeProvider. */
+function OptionalThemeProvider({ children }: { children: ReactNode }) {
+  const inheritedTheme = useContext(ThemeContext);
+  if (inheritedTheme) {
+    return children;
+  }
+  return <ThemeProvider>{children}</ThemeProvider>;
 }
