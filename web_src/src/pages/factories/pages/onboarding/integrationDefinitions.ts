@@ -1,6 +1,6 @@
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 
-import type { IntegrationId } from "./redesignFixtures";
+import type { IntegrationId } from "./onboardingFixtures";
 
 type ConfigField = NonNullable<IntegrationsIntegrationDefinition["configuration"]>[number];
 

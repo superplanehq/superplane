@@ -6,16 +6,16 @@ import { useNavigate, useParams } from "react-router";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
 import type { OnboardingRepo } from "./onboardingMocks";
-import { AnalysisSidePanel } from "./redesign/AnalysisSidePanel";
-import { AGENT_OPTIONS, type IntegrationId, type VcsHostId } from "./redesign/redesignFixtures";
-import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./redesign/redesignShared";
-import { useConnectDialog } from "./redesign/useConnectDialog";
-import { useRedesignSetupState, type RedesignSetupApi } from "./redesign/useRedesignSetupState";
+import { AnalysisSidePanel } from "./AnalysisSidePanel";
+import { AGENT_OPTIONS, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
+import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./onboardingSteps";
+import { useConnectDialog } from "./useConnectDialog";
+import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 type SectionId = "name" | "repo" | "issues" | "agent";
 
-function issuesSectionSummary(setup: RedesignSetupApi): string | undefined {
+function issuesSectionSummary(setup: OnboardingSetupApi): string | undefined {
   if (setup.issuesChoice === "skip") {
     return "Skipped. Create work orders yourself.";
   }
@@ -116,7 +116,7 @@ function SetupSections({
   requestConnect,
   onFinish,
 }: {
-  setup: RedesignSetupApi;
+  setup: OnboardingSetupApi;
   openSection: SectionId;
   setOpenSection: (id: SectionId) => void;
   requestConnect: (id: IntegrationId) => void;
@@ -234,7 +234,7 @@ export function OnboardingWireframe() {
   const navigate = useNavigate();
   const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
   const onboarding = useOnboardingStorybook();
-  const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
+  const setup = useOnboardingSetupState(onboarding?.pending?.workspaceName ?? "");
   const { requestConnect, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<SectionId>("name");
 

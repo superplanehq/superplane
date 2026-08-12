@@ -2,8 +2,8 @@ import { cn } from "@/lib/utils";
 import { Check, Circle, Loader2, Minus } from "lucide-react";
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
-import type { AgentHarnessId, IssuesChoiceId, VcsHostId } from "./redesignFixtures";
-import { vcsLabel } from "./redesignFixtures";
+import type { AgentHarnessId, IssuesChoiceId, VcsHostId } from "./onboardingFixtures";
+import { vcsLabel } from "./onboardingFixtures";
 
 export type AnalysisProgress = {
   workspaceName: string;
@@ -432,7 +432,7 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
 
   return (
     <aside
-      className="flex h-[min(720px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background"
+      className="flex h-[min(560px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background"
       data-testid="onboarding-analysis-panel"
     >
       <div className="shrink-0 border-b border-border px-4 py-3">

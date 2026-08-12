@@ -6,9 +6,9 @@ import {
   type IntegrationId,
   type IssuesChoiceId,
   type VcsHostId,
-} from "./redesignFixtures";
+} from "./onboardingFixtures";
 
-export type RedesignSetupState = {
+export type OnboardingSetupState = {
   workspaceName: string;
   inviteCopied: boolean;
   connected: Set<IntegrationId>;
@@ -69,7 +69,7 @@ function setupReadiness(input: {
   };
 }
 
-export function useRedesignSetupState(initialName = "") {
+export function useOnboardingSetupState(initialName = "") {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
   const [inviteCopied, setInviteCopied] = useState(false);
   const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
@@ -113,12 +113,14 @@ export function useRedesignSetupState(initialName = "") {
 
   const selectVcsHost = useCallback(
     (host: VcsHostId) => {
+      // Re-clicking the active host must not clear repo / issues selections.
+      if (host === vcsHost) return;
       setVcsHost(host);
       setSelectedRepo(null);
       setRepoCommitted(false);
       resetIssuesState();
     },
-    [resetIssuesState],
+    [vcsHost, resetIssuesState],
   );
 
   const selectRepo = useCallback(
@@ -229,4 +231,4 @@ export function useRedesignSetupState(initialName = "") {
   };
 }
 
-export type RedesignSetupApi = ReturnType<typeof useRedesignSetupState>;
+export type OnboardingSetupApi = ReturnType<typeof useOnboardingSetupState>;

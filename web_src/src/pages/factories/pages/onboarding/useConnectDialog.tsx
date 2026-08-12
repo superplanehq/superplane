@@ -1,15 +1,15 @@
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useMemo, useState } from "react";
 
-import type { IntegrationId } from "./redesignFixtures";
+import type { IntegrationId } from "./onboardingFixtures";
 import { integrationDefinitionFor, STORYBOOK_ORG_ID } from "./integrationDefinitions";
-import type { RedesignSetupApi } from "./useRedesignSetupState";
+import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 /**
  * Opens the real SuperPlane IntegrationCreateDialog with Storybook stubs
  * so onboarding connect feels grounded in product UI.
  */
-export function useConnectDialog(setup: RedesignSetupApi) {
+export function useConnectDialog(setup: OnboardingSetupApi) {
   const [pending, setPending] = useState<IntegrationId | null>(null);
   const [open, setOpen] = useState(false);
 

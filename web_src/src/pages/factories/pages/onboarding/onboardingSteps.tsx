@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -7,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Check, Copy, ListTodo, Loader2, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
+import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import {
   AGENT_OPTIONS,
   FIXTURE_INVITE_URL,
@@ -19,8 +20,8 @@ import {
   type IntegrationId,
   type IssuesChoiceId,
   type VcsHostId,
-} from "./redesignFixtures";
-import type { RedesignSetupApi } from "./useRedesignSetupState";
+} from "./onboardingFixtures";
+import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function Shell({ children, className }: { children: ReactNode; className?: string }) {
   useFactoriesThemeClass();
@@ -152,13 +153,13 @@ function ConnectOptionRow({
   );
 }
 
-export function NameInviteStep({ setup }: { setup: RedesignSetupApi }) {
+export function NameInviteStep({ setup }: { setup: OnboardingSetupApi }) {
   return (
     <div className="space-y-6">
       <div>
-        <label htmlFor="workspace-name" className="text-[13px] font-medium">
+        <Label htmlFor="workspace-name" className="text-[13px] font-medium">
           Workspace name
-        </label>
+        </Label>
         <Input
           id="workspace-name"
           value={setup.workspaceName}
@@ -287,7 +288,7 @@ export function RepoStep({
   setup,
   onRequestConnect,
 }: {
-  setup: RedesignSetupApi;
+  setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   const host = setup.vcsHost;
@@ -330,7 +331,7 @@ export function IssuesStep({
   onRequestConnect,
   autoDiscover,
 }: {
-  setup: RedesignSetupApi;
+  setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
   autoDiscover?: boolean;
 }) {
@@ -466,7 +467,7 @@ export function AgentStep({
   setup,
   onRequestConnect,
 }: {
-  setup: RedesignSetupApi;
+  setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   return (
@@ -492,7 +493,7 @@ export function AgentStep({
   );
 }
 
-export function DonePanel({ setup }: { setup: RedesignSetupApi }) {
+export function DonePanel({ setup }: { setup: OnboardingSetupApi }) {
   const issuesLabel = (choice: IssuesChoiceId | null) => {
     if (choice === "vcs" && setup.vcsHost) {
       const backlog = setup.issuesRepo ?? setup.selectedRepo;
