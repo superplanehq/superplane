@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldShowFactoryNodeStatusFooter } from "./FactoryNodeCard";
+import { shouldShowFactoryNodeStatusFooter } from "./shouldShowFactoryNodeStatusFooter";
 
 describe("shouldShowFactoryNodeStatusFooter", () => {
   it("hides footer in edit mode", () => {

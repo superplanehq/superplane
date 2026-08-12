@@ -5,6 +5,7 @@ import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
 import { NodeHoverActions } from "./NodeHoverActions";
 import { WarningBadge } from "./WarningBadge";
 import { resolveFactoryNodeMetrics } from "./resolveFactoryNodeMetrics";
+import { shouldShowFactoryNodeStatusFooter } from "./shouldShowFactoryNodeStatusFooter";
 import { normalizeFactoryNodeStatus } from "./status";
 import type { FactoryNodeStatus } from "./types";
 
@@ -37,19 +38,6 @@ export type FactoryNodeCardProps = {
   /** Edit mode hides the runtime status footer (no fake Pending). */
   canvasMode?: "live" | "edit";
 };
-
-/** Status footer is for live/run views only — not while editing the graph. */
-export function shouldShowFactoryNodeStatusFooter({
-  canvasMode,
-  isCompactView,
-}: {
-  canvasMode?: "live" | "edit";
-  isCompactView?: boolean;
-}): boolean {
-  if (isCompactView) return false;
-  if (canvasMode === "edit") return false;
-  return true;
-}
 
 function resolveSubtitle(
   metadata: MetadataItem[] | undefined,

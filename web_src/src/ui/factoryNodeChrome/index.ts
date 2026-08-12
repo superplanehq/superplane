@@ -1,4 +1,5 @@
-export { FactoryNodeCard, shouldShowFactoryNodeStatusFooter, type FactoryNodeCardProps } from "./FactoryNodeCard";
+export { FactoryNodeCard, type FactoryNodeCardProps } from "./FactoryNodeCard";
+export { shouldShowFactoryNodeStatusFooter } from "./shouldShowFactoryNodeStatusFooter";
 export { FactoryNodeStatusGlyph } from "./StatusGlyph";
 export {
   factoryNodeStatusLabel,
