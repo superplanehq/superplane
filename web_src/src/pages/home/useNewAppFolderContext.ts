@@ -1,7 +1,7 @@
 import type { CanvasFoldersCanvasFolder } from "@/api-client";
 import { normalizeCanvasFolderColor, useCanvasFolders } from "@/hooks/useCanvasData";
 import { useMemo } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router";
 import type { CanvasFolderData } from "./types";
 
 export function useNewAppFolderContext() {

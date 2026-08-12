@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router";
 import { Sidebar, SidebarBody, SidebarSection } from "../../../components/Sidebar/sidebar";
 import { General } from "./General";
 import { Groups } from "./Groups";
@@ -9,7 +9,7 @@ import { CreateRolePage } from "./CreateRolePage";
 import { Profile } from "./Profile";
 import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/useAccount";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { Secrets } from "./Secrets";

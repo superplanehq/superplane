@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesCommitCanvasStaging,

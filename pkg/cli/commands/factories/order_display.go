@@ -129,6 +129,54 @@ func userRefLabel(ref openapi_client.SuperplaneFactoriesUserRef) string {
 	return ref.GetId()
 }
 
+// unknownActorLabel is shown in place of a user ID that couldn't be resolved
+// to an organization member, so raw UUIDs never leak into event output.
+const unknownActorLabel = "unknown user"
+
+// memberEmailLookup resolves organization member IDs (as they appear in raw
+// event payloads) to a human-readable label, preferring email and falling
+// back to display name. It's built once per "describe" call from the
+// organization's member list and threaded through event formatting so no
+// user ID ever reaches the terminal.
+type memberEmailLookup struct {
+	emailByID map[string]string
+}
+
+// newMemberEmailLookup builds a lookup from the organization's member list.
+func newMemberEmailLookup(users []openapi_client.SuperplaneUsersUser) memberEmailLookup {
+	emailByID := make(map[string]string, len(users))
+	for _, user := range users {
+		metadata := user.GetMetadata()
+		id := metadata.GetId()
+		if id == "" {
+			continue
+		}
+
+		label := metadata.GetEmail()
+		if label == "" {
+			spec := user.GetSpec()
+			label = spec.GetDisplayName()
+		}
+		if label != "" {
+			emailByID[id] = label
+		}
+	}
+	return memberEmailLookup{emailByID: emailByID}
+}
+
+// actorLabel returns the resolved email/display name for a member ID, or
+// unknownActorLabel when the ID is blank or doesn't match a known member.
+// This is the single place raw user IDs get scrubbed from event output.
+func (l memberEmailLookup) actorLabel(userID string) string {
+	if userID == "" {
+		return unknownActorLabel
+	}
+	if label, ok := l.emailByID[userID]; ok && label != "" {
+		return label
+	}
+	return unknownActorLabel
+}
+
 // The following types decode the generic event payload (a plain
 // map[string]interface{} on the wire) into typed shapes mirroring the
 // server-side event structs in pkg/models/factory/events.go. Only the
@@ -149,8 +197,9 @@ type eventRunRef struct {
 }
 
 type eventArtifactRef struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
+	ID   string                 `json:"id"`
+	Type string                 `json:"type"`
+	Data map[string]interface{} `json:"data,omitempty"`
 }
 
 type orderStatusUpdatedEvent struct {
@@ -212,19 +261,17 @@ func decodeEventPayload[T any](payload map[string]interface{}) (*T, error) {
 	return &out, nil
 }
 
-// formatCommentAuthor renders a comment/event author as either the user id
-// or "automation (<node/app name>)".
-func formatCommentAuthor(author *commentAuthorEvent) string {
+// formatCommentAuthor renders a comment/event author as either the
+// resolved member email (never a raw user id) or "automation (<node/app
+// name>)".
+func formatCommentAuthor(author *commentAuthorEvent, lookup memberEmailLookup) string {
 	if author == nil {
 		return "unknown"
 	}
 
 	switch author.Kind {
 	case "user":
-		if author.UserID != "" {
-			return author.UserID
-		}
-		return "unknown user"
+		return lookup.actorLabel(author.UserID)
 	case "automation":
 		return formatAutomationActor(author.Automation)
 	default:
@@ -246,30 +293,33 @@ func formatAutomationActor(automation *eventAutomationRef) string {
 	return fmt.Sprintf("automation (%s)", name)
 }
 
-// describeEventActor renders "who/what" caused an event, preferring the
-// user, then automation, then originating run, in that order.
-func describeEventActor(user *eventUserRef, automation *eventAutomationRef, run *eventRunRef) string {
+// resolveActor renders "who/what" caused an event, preferring the user,
+// then automation, then originating run, in that order. User IDs are always
+// resolved through the lookup rather than printed raw; an originating run
+// (an internal implementation detail) is described generically rather than
+// by its ID.
+func resolveActor(user *eventUserRef, automation *eventAutomationRef, run *eventRunRef, lookup memberEmailLookup) string {
 	switch {
 	case user != nil && user.ID != "":
-		return fmt.Sprintf("user %s", user.ID)
+		return lookup.actorLabel(user.ID)
 	case automation != nil:
 		return formatAutomationActor(automation)
 	case run != nil && run.ID != "":
-		return fmt.Sprintf("run %s", run.ID)
+		return "an automated process"
 	default:
 		return ""
 	}
 }
 
 // decodeCommentEvent extracts the author label and body from a
-// order.comment.added event, for use by both the Comments and Timeline
+// order.comment.added event, for use by both the Comments and Events
 // sections of "describe".
-func decodeCommentEvent(event openapi_client.FactoriesWorkOrderEvent) (author string, body string, ok bool) {
+func decodeCommentEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) (author string, body string, ok bool) {
 	data, err := decodeEventPayload[orderCommentAddedEvent](event.GetEvent())
 	if err != nil {
 		return "", "", false
 	}
-	return formatCommentAuthor(data.Author), data.Body, true
+	return formatCommentAuthor(data.Author, lookup), data.Body, true
 }
 
 func titleCase(s string) string {
@@ -279,17 +329,19 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// describeEvent renders a single human-readable line for a work order event,
-// covering all known event types with a generic fallback (type + raw JSON)
-// for anything else, so new event types don't break the command.
-func describeEvent(event openapi_client.FactoriesWorkOrderEvent) string {
+// describeEvent renders a single human-readable line (the MESSAGE column)
+// for a work order event, covering all known event types with a generic
+// fallback (type + raw JSON) for anything else, so new event types don't
+// break the command. User IDs found in the payload are resolved to member
+// emails via lookup rather than printed raw.
+func describeEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) string {
 	switch event.GetType() {
 	case eventTypeOrderStatusUpdated:
-		return describeStatusUpdatedEvent(event)
+		return describeStatusUpdatedEvent(event, lookup)
 	case eventTypeOrderAssigneesUpdated:
-		return describeAssigneesUpdatedEvent(event)
+		return describeAssigneesUpdatedEvent(event, lookup)
 	case eventTypeOrderCommentAdded:
-		return describeCommentAddedEvent(event)
+		return describeCommentAddedEvent(event, lookup)
 	case eventTypeOrderArtifactAdded:
 		return describeArtifactAddedEvent(event)
 	case eventTypeStepExecutionCreated:
@@ -301,23 +353,44 @@ func describeEvent(event openapi_client.FactoriesWorkOrderEvent) string {
 	}
 }
 
-func describeStatusUpdatedEvent(event openapi_client.FactoriesWorkOrderEvent) string {
+// describeStatusTransition renders the work order status change itself
+// (without the actor suffix), mirroring the web UI's
+// describeStatusTransition (workOrderTimelineFromEvents.ts) so the two
+// clients read consistently.
+func describeStatusTransition(fromState, toState, toResult string) string {
+	switch {
+	case fromState == "":
+		return "Work order created"
+	case toState == "closed":
+		if toResult != "" {
+			return fmt.Sprintf("Work order closed as %s", titleCase(toResult))
+		}
+		return "Work order closed"
+	case fromState == "draft" && toState == "open":
+		return "Work order opened"
+	case fromState == "open" && toState == "draft":
+		return "Work order moved back to Draft"
+	case fromState == "closed" && toState == "open":
+		return "Work order reopened"
+	default:
+		return fmt.Sprintf("Work order moved from %s to %s", titleCase(fromState), titleCase(toState))
+	}
+}
+
+func describeStatusUpdatedEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) string {
 	data, err := decodeEventPayload[orderStatusUpdatedEvent](event.GetEvent())
 	if err != nil {
 		return describeUnknownEvent(event)
 	}
 
-	line := fmt.Sprintf("status changed: %s -> %s", titleCase(data.FromState), titleCase(data.ToState))
-	if data.ToResult != "" {
-		line += fmt.Sprintf(" (result: %s)", titleCase(data.ToResult))
-	}
-	if actor := describeEventActor(data.User, data.Automation, data.Run); actor != "" {
+	line := describeStatusTransition(data.FromState, data.ToState, data.ToResult)
+	if actor := resolveActor(data.User, data.Automation, data.Run, lookup); actor != "" {
 		line += " by " + actor
 	}
 	return line
 }
 
-func describeAssigneesUpdatedEvent(event openapi_client.FactoriesWorkOrderEvent) string {
+func describeAssigneesUpdatedEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) string {
 	data, err := decodeEventPayload[orderAssigneesUpdatedEvent](event.GetEvent())
 	if err != nil {
 		return describeUnknownEvent(event)
@@ -325,57 +398,93 @@ func describeAssigneesUpdatedEvent(event openapi_client.FactoriesWorkOrderEvent)
 
 	var parts []string
 	if len(data.Assigned) > 0 {
-		parts = append(parts, "assigned "+joinEventUserIDs(data.Assigned))
+		parts = append(parts, "Work order assigned to "+joinEventActors(data.Assigned, lookup))
 	}
 	if len(data.Unassigned) > 0 {
-		parts = append(parts, "unassigned "+joinEventUserIDs(data.Unassigned))
+		parts = append(parts, "unassigned "+joinEventActors(data.Unassigned, lookup))
 	}
 	if len(parts) == 0 {
-		parts = append(parts, "assignees updated")
+		parts = append(parts, "Work order assignees updated")
 	}
 
 	line := strings.Join(parts, "; ")
-	if actor := describeEventActor(data.User, nil, nil); actor != "" {
+	if actor := resolveActor(data.User, nil, nil, lookup); actor != "" {
 		line += " by " + actor
 	}
 	return line
 }
 
-func joinEventUserIDs(users []eventUserRef) string {
-	ids := make([]string, 0, len(users))
+func joinEventActors(users []eventUserRef, lookup memberEmailLookup) string {
+	labels := make([]string, 0, len(users))
 	for _, user := range users {
-		ids = append(ids, user.ID)
+		labels = append(labels, lookup.actorLabel(user.ID))
 	}
-	return strings.Join(ids, ", ")
+	return strings.Join(labels, ", ")
 }
 
-func describeCommentAddedEvent(event openapi_client.FactoriesWorkOrderEvent) string {
-	author, body, ok := decodeCommentEvent(event)
+func describeCommentAddedEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) string {
+	author, body, ok := decodeCommentEvent(event, lookup)
 	if !ok {
 		return describeUnknownEvent(event)
 	}
 	return fmt.Sprintf("%s commented: %s", author, body)
 }
 
+// artifactTypeName maps an artifact's raw type string to the label used in
+// its event message, spelling out abbreviations ("pr" -> "PR") and passing
+// anything else through unchanged.
+func artifactTypeName(t string) string {
+	switch t {
+	case "pr":
+		return "PR"
+	default:
+		return t
+	}
+}
+
+// artifactLabel extracts the artifact's own display info (never a run or
+// artifact ID) from its free-form data, using the same title/name/url
+// precedence as "artifact list".
+func artifactLabel(artifact *eventArtifactRef) string {
+	if artifact == nil || artifact.Data == nil {
+		return ""
+	}
+	if value, ok := artifact.Data["title"].(string); ok && value != "" {
+		return value
+	}
+	if value, ok := artifact.Data["name"].(string); ok && value != "" {
+		return value
+	}
+	if value, ok := artifact.Data["url"].(string); ok && value != "" {
+		return value
+	}
+	return ""
+}
+
+// describeArtifactAddedEvent renders only the artifact's own information
+// (type + label) — no run IDs, artifact IDs, or actor — per the ticket's
+// request to keep artifact messages focused on the artifact itself.
+//
+// The fixed "<type> added" phrase is kept at the start of the message
+// (rather than after the label) so it stays glued to the TYPE/AGE columns
+// on screen: artifact labels (e.g. a PR title) can be long enough that a
+// terminal wraps the line, and when "added" trailed the label it could get
+// pushed onto its own line, reading like a stray fragment.
 func describeArtifactAddedEvent(event openapi_client.FactoriesWorkOrderEvent) string {
 	data, err := decodeEventPayload[orderArtifactAddedEvent](event.GetEvent())
 	if err != nil {
 		return describeUnknownEvent(event)
 	}
 
-	description := "artifact"
-	if data.Artifact != nil {
-		description = data.Artifact.Type + " artifact"
-		if data.Artifact.ID != "" {
-			description += " " + data.Artifact.ID
-		}
+	if data.Artifact == nil {
+		return "Artifact added"
 	}
 
-	line := "added " + description
-	if actor := describeEventActor(data.User, data.Automation, nil); actor != "" {
-		line += " by " + actor
+	typeName := artifactTypeName(data.Artifact.Type)
+	if label := artifactLabel(data.Artifact); label != "" {
+		return fmt.Sprintf("%s added: %s", typeName, label)
 	}
-	return line
+	return fmt.Sprintf("%s added", typeName)
 }
 
 func describeStepExecutionEvent(event openapi_client.FactoriesWorkOrderEvent, verb string) string {

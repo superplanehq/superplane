@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Text } from "../../components/Text/text";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";

@@ -9,7 +9,7 @@ import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { RunStatusBadge } from "@/ui/Runs/RunStatusBadge";
 import { Link as LinkIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { RUNS_SIDEBAR_RUN_ROW_CLASS } from "./runsSidebarRowLayout";

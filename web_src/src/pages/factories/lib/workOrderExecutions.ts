@@ -3,7 +3,7 @@ import type {
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
 } from "@/api-client";
-import { appRunPath } from "@/lib/appPaths";
+import { factoryAppRunPath } from "./factoryPagePaths";
 
 export interface WorkOrderExecutionDisplayMeta {
   label: string;
@@ -63,10 +63,15 @@ const EXECUTION_RESULT_META: Record<
 
 export function getWorkOrderExecutionRunHref(
   organizationId: string,
+  factoryId: string,
   execution: FactoriesWorkOrderExecution,
+  options?: { orderId?: string },
 ): string | null {
   if (execution.run?.appId && execution.run.id) {
-    return appRunPath(organizationId, execution.run.appId, execution.run.id);
+    return factoryAppRunPath(organizationId, factoryId, execution.run.appId, execution.run.id, {
+      from: "work-order",
+      orderId: options?.orderId,
+    });
   }
 
   return null;

@@ -48,7 +48,7 @@ The app argument is optional. When omitted, the active app configured with
 	_ = updateCmd.MarkFlagRequired("file")
 	updateCmd.Flags().StringVarP(&updateMessage, "message", "m", "", "commit message")
 	_ = updateCmd.MarkFlagRequired("message")
-	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, vertical, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{

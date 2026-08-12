@@ -4,7 +4,7 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import { Navigate, NavLink, Outlet, useParams } from "react-router-dom";
+import { Navigate, NavLink, Outlet, useParams } from "react-router";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";

@@ -37,8 +37,12 @@ func (c *orderListCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	if c.states != nil && len(*c.states) > 0 {
-		request = request.States(normalizeFilterValues(*c.states, shortOrderStateTokens))
+	var rawStates []string
+	if c.states != nil {
+		rawStates = *c.states
+	}
+	if resolved := resolveStateFilter(rawStates); resolved != nil {
+		request = request.States(normalizeFilterValues(resolved, shortOrderStateTokens))
 	}
 
 	if c.results != nil && len(*c.results) > 0 {
@@ -91,6 +95,37 @@ var shortOrderStateTokens = map[string]string{
 	"draft":  "STATE_DRAFT",
 	"open":   "STATE_OPEN",
 	"closed": "STATE_CLOSED",
+}
+
+// orderStateAllToken is the special --state value that opts out of the
+// default "open only" filter and restores the "no filter" behavior,
+// returning work orders in every state.
+const orderStateAllToken = "all"
+
+// defaultOrderStates is applied when --state is omitted entirely, so
+// "superplane factory orders list" only shows open work orders by default.
+var defaultOrderStates = []string{"open"}
+
+// resolveStateFilter decides which state values (if any) should be sent to
+// the API as the "states" filter:
+//   - if the caller explicitly passed "all" (case-insensitively, anywhere in
+//     the list), no filter is applied at all (nil is returned), restoring the
+//     legacy "every state" behavior.
+//   - if no states were provided, the default of "open only" is used.
+//   - otherwise, the caller's explicit values are returned unchanged (to be
+//     normalized by normalizeFilterValues as usual).
+func resolveStateFilter(states []string) []string {
+	for _, state := range states {
+		if strings.EqualFold(strings.TrimSpace(state), orderStateAllToken) {
+			return nil
+		}
+	}
+
+	if len(states) == 0 {
+		return defaultOrderStates
+	}
+
+	return states
 }
 
 // shortOrderResultTokens maps short, case-insensitive result names to the

@@ -432,6 +432,132 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "artifact-key")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Key target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("creates artifact with a key", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact.Key)
+		assert.Equal(t, "https://github.com/example/repo/pull/1", *artifact.Key)
+	})
+
+	t.Run("rejects a duplicate key in the same factory", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/2"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactKeyAlreadyExists)
+	})
+
+	t.Run("allows the same key across two different factories", func(t *testing.T) {
+		_, otherUserID, otherFactory := setupFactoryWithUser(t, "artifact-key-other")
+
+		otherOrder, err := otherFactory.CreateWorkOrder(database.Conn(), "Other factory target", "", &otherUserID, nil, nil)
+		require.NoError(t, err)
+
+		_, err = otherOrder.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+			Key:  "https://github.com/example/repo/pull/1",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("trims the key and treats blank as no key", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/trimmed-key"},
+			Key:  "  padded-key  ",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact.Key)
+		assert.Equal(t, "padded-key", *artifact.Key)
+
+		blank, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/blank-key-1"},
+			Key:  "   ",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, blank.Key)
+
+		// A second artifact with an empty key must not collide with the
+		// first — the partial unique index excludes NULLs.
+		blankTwo, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/blank-key-2"},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, blankTwo.Key)
+	})
+
+	t.Run("rejects a key over 512 bytes", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeBranch,
+			Data: map[string]any{"name": "feature/long-key"},
+			Key:  strings.Repeat("a", MaxFactoryWorkOrderArtifactKeyBytes+1),
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+}
+
+func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "find-by-key")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Find target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypePR,
+		Data: map[string]any{"url": "https://github.com/example/repo/pull/42"},
+		Key:  "https://github.com/example/repo/pull/42",
+	})
+	require.NoError(t, err)
+
+	t.Run("finds the work order by its artifact key", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("trims the lookup key", func(t *testing.T) {
+		found, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "  https://github.com/example/repo/pull/42  ")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("returns not-found for an unknown key", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "no-such-key")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("returns not-found for a blank key", func(t *testing.T) {
+		_, err := factoryModel.FindWorkOrderByArtifactKey(database.Conn(), "   ")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+
+	t.Run("does not find a key belonging to a different factory", func(t *testing.T) {
+		_, _, otherFactory := setupFactoryWithUser(t, "find-by-key-other")
+
+		_, err := otherFactory.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/example/repo/pull/42")
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+	})
+}
+
 func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userID uuid.UUID, factoryModel *Factory) {
 	t.Helper()
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NewComponentButton, SelectComponentSidebar } from "./SelectComponentSidebar";
