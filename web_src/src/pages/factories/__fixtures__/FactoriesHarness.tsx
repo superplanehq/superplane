@@ -1,3 +1,4 @@
+import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 import type { HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
@@ -9,6 +10,8 @@ interface FactoriesHarnessProps {
   pathSuffix?: string;
   /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
   factoriesFixture?: FactoriesFixture;
+  /** Optional canvas fixture for factory-embedded AppPage routes. */
+  appFixture?: CanvasAppFixture;
   /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
   pageOverrides?: OrgWorkspacePageOverrides;
 }
@@ -21,6 +24,7 @@ interface FactoriesHarnessProps {
 export function FactoriesHarness({
   pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
+  appFixture,
   pageOverrides,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
@@ -40,6 +44,7 @@ export function FactoriesHarness({
       pathSuffix={pathSuffix}
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
+      appFixture={appFixture}
       pageOverrides={pageOverrides}
     />
   );

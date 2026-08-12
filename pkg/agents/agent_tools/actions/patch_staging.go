@@ -69,7 +69,7 @@ func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSes
 		return updateResult{}, err
 	}
 
-	patched, err := a.applyPatchToStagedCanvas(target, stagedCanvas)
+	patched, err := a.applyPatchToStagedCanvas(target, stagedCanvas, canvas)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -152,6 +152,7 @@ func (a patchStagingAction) readStagedCanvas(ctx context.Context, session agents
 func (a patchStagingAction) applyPatchToStagedCanvas(
 	target patchStagingTarget,
 	stagedCanvas stagedDraftCanvas,
+	canvas *models.Canvas,
 ) (*models.CanvasVersion, error) {
 	patchedDraft := *target.draft
 	patchedDraft.Nodes = stagedCanvas.nodes
@@ -166,7 +167,13 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 		patched = patcher.GetVersion()
 	}
 
-	autoLayout := resolvePatchStagingAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
+	autoLayout := resolvePatchStagingAutoLayout(
+		target.autoLayoutInput,
+		target.changeset,
+		stagedCanvas.edges,
+		patched.Nodes,
+		canvas,
+	)
 	if autoLayout == nil {
 		return patched, nil
 	}
@@ -405,15 +412,25 @@ func patchChangeEdge(operation PatchOperation) (*changesets.ChangeEdge, error) {
 	return edge, nil
 }
 
+func resolveDefaultLayoutAlgorithm(canvas *models.Canvas) string {
+	if canvas != nil && canvas.FactoryID != nil {
+		return layout.AlgorithmVertical
+	}
+	return layout.AlgorithmHorizontal
+}
+
 func resolvePatchStagingAutoLayout(
 	input *AutoLayoutInput,
 	changeset *changesets.CanvasChangeset,
 	originalEdges []models.Edge,
 	finalNodes []models.Node,
+	canvas *models.Canvas,
 ) *layout.AutoLayout {
 	if input != nil && input.Enabled != nil && !*input.Enabled {
 		return nil
 	}
+
+	algorithm := resolveDefaultLayoutAlgorithm(canvas)
 
 	if input == nil {
 		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
@@ -421,7 +438,7 @@ func resolvePatchStagingAutoLayout(
 			return nil
 		}
 		return &layout.AutoLayout{
-			Algorithm: layout.AlgorithmHorizontal,
+			Algorithm: algorithm,
 			Scope:     layout.ScopeConnectedComponent,
 			NodeIDs:   nodeIDs,
 		}
@@ -431,18 +448,18 @@ func resolvePatchStagingAutoLayout(
 		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) > 0 {
 			return &layout.AutoLayout{
-				Algorithm: layout.AlgorithmHorizontal,
+				Algorithm: algorithm,
 				Scope:     layout.ScopeConnectedComponent,
 				NodeIDs:   nodeIDs,
 			}
 		}
 		return &layout.AutoLayout{
-			Algorithm: layout.AlgorithmHorizontal,
+			Algorithm: algorithm,
 			Scope:     layout.ScopeFullCanvas,
 		}
 	}
 
-	return resolveToolAutoLayoutInput(input)
+	return resolveToolAutoLayoutInput(input, canvas)
 }
 
 func isEmptyAutoLayoutInput(input *AutoLayoutInput) bool {
@@ -522,13 +539,13 @@ func defaultPatchStagingAutoLayoutNodeIDs(
 	return nodeIDs
 }
 
-func resolveToolAutoLayoutInput(input *AutoLayoutInput) *layout.AutoLayout {
+func resolveToolAutoLayoutInput(input *AutoLayoutInput, canvas *models.Canvas) *layout.AutoLayout {
 	if input == nil {
 		return nil
 	}
 
 	autoLayout := &layout.AutoLayout{
-		Algorithm: layout.AlgorithmHorizontal,
+		Algorithm: resolveDefaultLayoutAlgorithm(canvas),
 		NodeIDs:   append([]string(nil), input.NodeIDs...),
 	}
 

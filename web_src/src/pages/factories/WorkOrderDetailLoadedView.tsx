@@ -22,6 +22,70 @@ import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
+function WorkOrderDetailMainColumn({
+  organizationId,
+  factoryId,
+  order,
+  events,
+  eventsError,
+  isEventsLoading,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+  onRetryEvents,
+  canManage,
+  isAddingComment,
+  onAddComment,
+}: {
+  organizationId: string;
+  factoryId: string;
+  order: FactoriesWorkOrder;
+  events?: FactoriesWorkOrderEvent[];
+  eventsError?: Error | null;
+  isEventsLoading?: boolean;
+  hasMoreEvents?: boolean;
+  isLoadingMoreEvents?: boolean;
+  onLoadMoreEvents?: () => void;
+  onRetryEvents?: () => void;
+  canManage: boolean;
+  isAddingComment: boolean;
+  onAddComment: (body: string) => Promise<void>;
+}) {
+  return (
+    <>
+      {order.description ? (
+        <section className="mb-8 rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700/70">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+            {order.description}
+          </p>
+        </section>
+      ) : null}
+
+      <section className="mb-8">
+        <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
+        <div className="mt-5">
+          <WorkOrderActivityTimeline
+            organizationId={organizationId}
+            factoryId={factoryId}
+            order={order}
+            events={events}
+            eventsError={eventsError}
+            isLoading={isEventsLoading}
+            hasMoreEvents={hasMoreEvents}
+            isLoadingMoreEvents={isLoadingMoreEvents}
+            onLoadMoreEvents={onLoadMoreEvents}
+            onRetryEvents={onRetryEvents}
+          />
+        </div>
+      </section>
+    </>
+  );
+}
+
 interface WorkOrderDetailLoadedViewProps {
   factory: FactoriesFactory;
   factoryHref: string;
@@ -142,34 +206,21 @@ export function WorkOrderDetailLoadedView({
       <div className={factoryDetailPanelClassName}>
         <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0 px-6 py-6 sm:px-8">
-            {order.description ? (
-              <section className="mb-8 rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700/70">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                  {order.description}
-                </p>
-              </section>
-            ) : null}
-
-            <section className="mb-8">
-              <WorkOrderCommentComposer canComment={canManage} isSubmitting={isAddingComment} onSubmit={onAddComment} />
-            </section>
-
-            <section>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
-              <div className="mt-5">
-                <WorkOrderActivityTimeline
-                  organizationId={organizationId}
-                  order={order}
-                  events={events}
-                  eventsError={eventsError}
-                  isLoading={isEventsLoading}
-                  hasMoreEvents={hasMoreEvents}
-                  isLoadingMoreEvents={isLoadingMoreEvents}
-                  onLoadMoreEvents={onLoadMoreEvents}
-                  onRetryEvents={onRetryEvents}
-                />
-              </div>
-            </section>
+            <WorkOrderDetailMainColumn
+              organizationId={organizationId}
+              factoryId={factory.id ?? ""}
+              order={order}
+              events={events}
+              eventsError={eventsError}
+              isEventsLoading={isEventsLoading}
+              hasMoreEvents={hasMoreEvents}
+              isLoadingMoreEvents={isLoadingMoreEvents}
+              onLoadMoreEvents={onLoadMoreEvents}
+              onRetryEvents={onRetryEvents}
+              canManage={canManage}
+              isAddingComment={isAddingComment}
+              onAddComment={onAddComment}
+            />
           </div>
 
           <aside className={cn(factoryDetailSidebarClassName, "lg:min-h-full")}>

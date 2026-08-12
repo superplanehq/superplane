@@ -32,7 +32,7 @@ import (
 )
 
 func TestResolveToolAutoLayoutInput_DefaultsNodeIDsToConnectedComponent(t *testing.T) {
-	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
@@ -44,12 +44,23 @@ func TestResolveToolAutoLayoutInput_PreservesExplicitSettings(t *testing.T) {
 	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{
 		Scope:   "connected_component",
 		NodeIDs: []string{"node-1"},
-	})
+	}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
 	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
 	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
+}
+
+func TestResolveToolAutoLayoutInput_UsesVerticalForFactoryApps(t *testing.T) {
+	factoryID := uuid.New()
+	autoLayout := resolveToolAutoLayoutInput(
+		&AutoLayoutInput{NodeIDs: []string{"node-1"}},
+		&models.Canvas{FactoryID: &factoryID},
+	)
+
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmVertical, autoLayout.Algorithm)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *testing.T) {
@@ -73,6 +84,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 		changeset,
 		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
 		[]models.Node{{ID: "new-node"}, {ID: "kept-node"}},
+		nil,
 	)
 
 	require.NotNil(t, autoLayout)
@@ -84,6 +96,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
 	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{Scope: "full_canvas"},
+		nil,
 		nil,
 		nil,
 		nil,
@@ -112,6 +125,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 		changeset,
 		nil,
 		[]models.Node{{ID: "new-node"}},
+		nil,
 	)
 
 	require.NotNil(t, autoLayout)
@@ -120,7 +134,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *testing.T) {
-	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
+	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
@@ -144,6 +158,7 @@ func TestResolvePatchDraftAutoLayout_DisabledInputSkipsLayout(t *testing.T) {
 		changeset,
 		nil,
 		[]models.Node{{ID: "node-1"}},
+		nil,
 	)
 
 	assert.Nil(t, autoLayout)
