@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { SetURLSearchParams } from "react-router-dom";
+import type { SetURLSearchParams } from "react-router";
 import type { CanvasesCanvas } from "@/api-client";
 import {
   abandonPendingPlaceholderBoot,

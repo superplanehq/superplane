@@ -1,9 +1,9 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactory, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { workOrdersPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
@@ -65,15 +65,16 @@ function WorkOrderDetailPageContent({
 
   return (
     <LoadedWorkOrderDetail
-      factory={factory}
       order={order}
       derived={derived}
-      workOrdersHref={workOrdersHref}
+      factoryLines={factory.lines ?? []}
       organizationId={organizationId}
+      factoryId={factoryId}
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
       canManageWorkOrders={canAct("work_orders", "update")}
+      canEditFactoryLines={canAct("factories", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />
@@ -92,38 +93,38 @@ function shouldRedirectAfterError(state: {
 }
 
 interface LoadedWorkOrderDetailProps {
-  factory: FactoriesFactory;
   order: FactoriesWorkOrder;
   derived: ReturnType<typeof getWorkOrderDetailDerived>;
-  workOrdersHref: string;
+  factoryLines: FactoriesFactoryLine[];
   organizationId: string;
+  factoryId: string;
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
   canManageWorkOrders: boolean;
+  canEditFactoryLines: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
 }
 
 function LoadedWorkOrderDetail({
-  factory,
   order,
   derived,
-  workOrdersHref,
+  factoryLines,
   organizationId,
+  factoryId,
   events,
   eventsQuery,
   artifactsQuery,
   canManageWorkOrders,
+  canEditFactoryLines,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
   return (
     <WorkOrderDetailLoadedView
-      factory={factory}
-      factoryHref={workOrdersHref}
-      backLabel="Work Orders"
       organizationId={organizationId}
+      factoryId={factoryId}
       order={order}
       events={events}
       eventsError={eventsQuery.error ?? null}
@@ -143,7 +144,8 @@ function LoadedWorkOrderDetail({
       statusMeta={derived.statusMeta!}
       assigneeIds={derived.assigneeIds}
       assigneeNames={derived.assigneeNames}
-      factoryLines={factory.lines ?? []}
+      factoryLines={factoryLines}
+      canEditFactoryLines={canEditFactoryLines}
       isOpen={derived.isOpen}
       isDispatchable={derived.isDispatchable}
       isClosed={derived.isClosed}

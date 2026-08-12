@@ -360,30 +360,16 @@ func (a *AWS) cleanupIAM(ctx core.IntegrationCleanupContext, metadata *common.In
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(`
-**1. Create Identity Provider**
+**Setup steps:**
 
-- Go to AWS IAM Console → Identity Providers → Add provider
-- Choose "OpenID Connect" as the provider type
-- Provider URL: **%s**
-- Audience: **%s**
+1. In the AWS IAM Console, go to **Identity Providers → Add provider** and choose **OpenID Connect** as the provider type. Set the **Provider URL** to `+"`%s`"+` and the **Audience** to `+"`%s`"+`.
 
-**2. Create IAM Role**
+2. Go to **Roles → Create role**, choose **Web identity** as the trusted entity type, and select the identity provider you created in step 1. Give the role a name and description, then create it.
 
-- Go to AWS IAM Console → Roles → Create role
-- Choose "Web identity" as trusted entity type
-- Select the identity provider created in step 1
-- Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
-- Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
-- Add permissions for Amazon Managed Service for Prometheus workspaces if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**; the workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, **aps:DeleteWorkspace**, and **aps:QueryMetrics** for their respective operations. The rule group namespace components need **aps:ListRuleGroupsNamespaces**, **aps:CreateRuleGroupsNamespace**, **aps:DescribeRuleGroupsNamespace**, **aps:PutRuleGroupsNamespace**, and **aps:DeleteRuleGroupsNamespace**.
-- Add permissions for CloudWatch alarms if you use the CloudWatch or EC2 alarm components. The namespace, metric and dimension pickers require **cloudwatch:ListMetrics**, and the alarm picker requires **cloudwatch:DescribeAlarms**. Creating and updating alarms also needs **cloudwatch:PutMetricAlarm**, and deleting them needs **cloudwatch:DeleteAlarms**. Alarms that notify an SNS topic need **sns:ListTopics** for the topic picker, and alarms using the **EC2 Action** field (recover, reboot, stop, terminate) additionally need **iam:CreateServiceLinkedRole**.
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
-- Give it a name and description, and create it
+   > **Permissions:**
+   > Attach **AmazonEventBridgeFullAccess** and **IAMFullAccess**, which the integration uses to set itself up and deliver events to SuperPlane. Then attach one managed policy for each AWS service your components use: EC2 (**AmazonEC2FullAccess**), ECS (**AmazonECS_FullAccess**), ECR (**AmazonEC2ContainerRegistryFullAccess**), Lambda (**AWSLambda_FullAccess**), CloudWatch (**CloudWatchFullAccessV2**), SQS (**AmazonSQSFullAccess**), SNS (**AmazonSNSFullAccess**), Route 53 (**AmazonRoute53FullAccess**), CodePipeline (**AWSCodePipeline_FullAccess**), CodeArtifact (**AWSCodeArtifactAdminAccess**), and Amazon Managed Service for Prometheus (**AmazonPrometheusFullAccess**).
 
-**3. Complete the installation setup**
-
-- Copy the ARN of the IAM role created in step 2
-- Paste it into the "Role ARN" field in the installation configuration
+3. Copy the ARN of the role you created and paste it into the **IAM Role ARN** field below, then save.
 `, ctx.BaseURL, ctx.Integration.ID().String()),
 	})
 

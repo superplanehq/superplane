@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Timestamp } from "@/components/Timestamp";
 import { parseAppRunPath } from "@/lib/appPaths";
 import { isUrl } from "@/lib/utils";

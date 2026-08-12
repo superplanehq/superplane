@@ -1,5 +1,5 @@
 import { CornerLeftUp, Loader2 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Button } from "@/components/ui/button";

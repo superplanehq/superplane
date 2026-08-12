@@ -1,6 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { cn } from "@/lib/utils";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { automationsPath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   factoryContentBodyClassName,

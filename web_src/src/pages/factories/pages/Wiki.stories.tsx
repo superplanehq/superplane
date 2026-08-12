@@ -20,10 +20,6 @@ type Story = StoryObj<typeof meta>;
 
 const wikiPath = `workspaces/${PRIMARY_FACTORY_ID}/wiki`;
 
-function DefaultWikiWireframe() {
-  return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
-}
-
 function EmptyWikiWireframe() {
   return <WikiWireframe initialDocuments={[]} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
 }
@@ -39,13 +35,7 @@ function EditingWikiWireframe() {
 }
 
 export const Default: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={wikiPath}
-      factoriesFixture={defaultFactoriesFixture}
-      pageOverrides={{ wiki: DefaultWikiWireframe }}
-    />
-  ),
+  render: () => <FactoriesHarness pathSuffix={wikiPath} factoriesFixture={defaultFactoriesFixture} />,
 };
 
 export const Empty: Story = {
