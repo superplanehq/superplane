@@ -4,15 +4,7 @@ export function SidebarSectionHeading({ children }: { children: ReactNode }) {
   return <h3 className="workspace-section-label">{children}</h3>;
 }
 
-export function OverviewRow({
-  icon,
-  srLabel,
-  children,
-}: {
-  icon: ReactNode;
-  srLabel: string;
-  children: ReactNode;
-}) {
+export function OverviewRow({ icon, srLabel, children }: { icon: ReactNode; srLabel: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 py-1.5">
       <span className="shrink-0 text-muted-foreground" aria-hidden>

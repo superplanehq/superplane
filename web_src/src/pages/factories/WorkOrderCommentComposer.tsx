@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowUp, Loader2, Paperclip } from "lucide-react";
+import { ArrowUp, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 interface WorkOrderCommentComposerProps {
@@ -51,19 +51,6 @@ export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }:
         className="min-h-[66px] resize-none border-0 bg-transparent px-3 pt-2.5 pb-8 text-[13px] leading-5 shadow-none focus-visible:ring-0"
       />
       <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
-        <PermissionTooltip allowed={canComment} message="Attachments coming soon.">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled
-            aria-label="Attach files (coming soon)"
-            title="Attach files (coming soon)"
-            className="size-7 text-muted-foreground opacity-60"
-          >
-            <Paperclip className="size-3.5" aria-hidden />
-          </Button>
-        </PermissionTooltip>
         <PermissionTooltip allowed={canComment} message="You don't have permission to comment.">
           <Button
             type="button"

@@ -7,7 +7,10 @@ const passthroughResolveUser = (userId: string | undefined, name?: string) =>
 
 describe("resolveWorkOrderCreatorDisplay", () => {
   it("returns a member display when the creator is a user", () => {
-    const display = resolveWorkOrderCreatorDisplay({ user: { id: "user-1", name: "Alice Smith" } }, passthroughResolveUser);
+    const display = resolveWorkOrderCreatorDisplay(
+      { user: { id: "user-1", name: "Alice Smith" } },
+      passthroughResolveUser,
+    );
     expect(display).toMatchObject({ id: "user-1", name: "Alice Smith" });
   });
 
