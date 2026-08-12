@@ -18,45 +18,43 @@ const DISPLAY_STATUS_META: Record<
     label: "Draft",
     filterLabel: "Draft",
     summary: "Being scoped — not yet dispatched",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
+    className: "border-border bg-accent/50 text-muted-foreground",
   },
   open: {
     label: "Open",
     filterLabel: "Open",
     summary: "Ready to dispatch or between runs",
-    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+    className: "border-border bg-accent/50 text-foreground",
   },
   running: {
     label: "Running",
     filterLabel: "Running",
     summary: "Line execution in progress",
-    className:
-      "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-running)]",
   },
   failed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "A line step failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-danger)]",
   },
   completed: {
     label: "Completed",
     filterLabel: "Completed",
     summary: "Work order completed",
-    className:
-      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-success)]",
   },
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
     summary: "Work order rejected",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
+    className: "border-border bg-accent/50 text-muted-foreground",
   },
   closedFailed: {
     label: "Failed",
     filterLabel: "Failed",
     summary: "Work order closed as failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+    className: "border-border bg-accent/50 text-[color:var(--status-danger)]",
   },
 };
 

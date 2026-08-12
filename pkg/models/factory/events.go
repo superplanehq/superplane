@@ -98,6 +98,9 @@ type LineStepExecutionCreated struct {
 	Line     *LineRef      `json:"line,omitempty"`
 	App      *AppRef       `json:"app,omitempty"`
 	Run      *RunRef       `json:"run,omitempty"`
+	// Optional caller-provided note ("Attempt 2 - dedicated canvas memory
+	// browser"); rendered inline under the "kicked off" timeline entry.
+	Note string `json:"note,omitempty"`
 }
 
 type LineStepExecutionFinished struct {
