@@ -83,10 +83,11 @@ describe("useFactoryConfigureEnter", () => {
     expect(resyncStagedEditorState).toHaveBeenCalledTimes(1);
 
     await act(async () => {
+      // New liveCanvas object identity (as after setQueryData), same shape.
       rerender({
         liveCanvas: {
           metadata: { id: "canvas-1", liveVersionId: "version-live" },
-          spec: { nodes: [{ name: "n1" }], edges: [] },
+          spec: { nodes: [], edges: [] },
         },
       });
     });
