@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 
+import { buildWorkOrderTimelineView } from "./workOrderTimelineEvents";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
 
 function stepExecutionEvent(
@@ -9,20 +10,36 @@ function stepExecutionEvent(
   timestamp: string,
   runState: string,
   runResult?: string,
+  overrides: { stepName?: string; runId?: string } = {},
 ): FactoriesWorkOrderEvent {
   return {
     timestamp,
     type,
     event: {
-      stepName: "Build",
+      stepName: overrides.stepName ?? "Build",
       line: { id: "line-1", name: "CI" },
-      run: { id: "run-1", state: runState, result: runResult },
+      run: { id: overrides.runId ?? "run-1", state: runState, result: runResult },
       app: { id: "app-1" },
     },
   };
 }
 
 describe("buildWorkOrderTimelineViewFromEvents", () => {
+  it("hydrates timeline steps with execution usage", () => {
+    const view = buildWorkOrderTimelineView(
+      [stepExecutionEvent("step.execution.finished", "2026-08-04T12:00:00.000Z", "finished", "passed")],
+      undefined,
+      [{ id: "execution-1", run: { id: "run-1" }, totalTokens: "1200", costCents: "45" }],
+    );
+
+    expect(view.events[0]?.steps?.[0]?.execution).toMatchObject({
+      id: "execution-1",
+      run: { id: "run-1" },
+      totalTokens: "1200",
+      costCents: "45",
+    });
+  });
+
   it("keeps finished step state when created and finished share a timestamp", () => {
     const timestamp = "2026-08-04T12:00:00.000Z";
     const apiEvents = [
@@ -396,6 +413,128 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
           nodeName: "node-comment",
         },
       },
+    });
+  });
+
+  it("groups an automation artifact into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: {
+            lineId: "line-1",
+            lineName: "CI",
+            stepName: "Build",
+          },
+          artifact: {
+            id: "artifact-1",
+            type: "pr",
+            data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          artifacts: [
+            {
+              id: "artifact-1",
+              type: "pr",
+              data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("groups automation artifacts by explicit step index (including index 0)", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:01:00.000Z", "started", undefined, {
+        stepName: "Verify",
+        runId: "run-2",
+      }),
+      {
+        timestamp: "2026-08-04T12:02:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: { lineId: "line-1", lineName: "CI", stepIndex: 0 },
+          artifact: { id: "artifact-1", type: "markdown", data: { title: "Plan" } },
+        },
+      },
+    ]);
+
+    const dispatched = view.events.find((event) => event.kind === "dispatched");
+    expect(dispatched?.steps?.[0]?.artifacts).toEqual([
+      { id: "artifact-1", type: "markdown", data: { title: "Plan" } },
+    ]);
+    expect(dispatched?.steps?.[1]?.artifacts).toBeUndefined();
+  });
+
+  it("leaves an unmatchable automation artifact as a top-level event", () => {
+    // Regression: previously fell back to the last dispatch step, which
+    // misattributed step-0 refs whose JSON `stepIndex` was dropped by
+    // `omitempty` on the Go int.
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:01:00.000Z", "started", undefined, {
+        stepName: "Verify",
+        runId: "run-2",
+      }),
+      {
+        timestamp: "2026-08-04T12:02:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          automation: { lineId: "line-1", lineName: "CI" },
+          artifact: { id: "artifact-1", type: "pr", data: { url: "https://example.com/pr/1" } },
+        },
+      },
+    ]);
+
+    const dispatched = view.events.find((event) => event.kind === "dispatched");
+    for (const step of dispatched?.steps ?? []) {
+      expect(step.artifacts).toBeUndefined();
+    }
+    expect(view.events.find((event) => event.kind === "artifactAdded")?.artifact?.id).toBe("artifact-1");
+  });
+
+  it("groups an automation comment into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              lineId: "line-1",
+              lineName: "CI",
+              stepName: "Build",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]).toMatchObject({
+      kind: "dispatched",
+      steps: [
+        {
+          stepName: "Build",
+          comments: [{ body: "Ready for review" }],
+        },
+      ],
     });
   });
 });
